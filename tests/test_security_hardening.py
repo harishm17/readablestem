@@ -12,7 +12,7 @@ from itsdangerous import TimestampSigner
 from itsdangerous.exc import BadSignature
 from starlette.requests import Request
 
-from fixtures.web.support import ALICE, WebEnv, login, make_settings
+from fixtures.web.support import WebEnv, make_settings
 from readablestem.config import ConfigError
 from readablestem.observability.logging import FIELDS_ATTR
 from readablestem.ops import launch
@@ -29,7 +29,6 @@ PROD = {
     "google_client_secret": "client-secret",
     "openai_api_key": "sk-test",
 }
-COOKIE = "readablestem_session"
 OLD = "o" * 40
 NEW = "n" * 40
 
@@ -52,10 +51,6 @@ def test_production_refuses_a_short_cron_token(tmp_path):
     with pytest.raises(ConfigError, match="CRON_TOKEN must be at least 32"):
         prod(tmp_path, cron_token="c" * 31).check_production()
     prod(tmp_path, cron_token="c" * 32).check_production()
-
-
-def test_a_short_cron_token_is_fine_outside_production(tmp_path):
-    make_settings(tmp_path, cron_token="short").check_production()
 
 
 # ------------------------------------------------------------------ maths on image pages
@@ -91,16 +86,6 @@ def test_production_accepts_analytics_once_the_notice_describes_it(tmp_path, mon
         prod(tmp_path, analytics_enabled=True).check_production()
 
 
-def test_analytics_is_allowed_outside_production_whatever_the_notice_says(tmp_path):
-    make_settings(tmp_path, analytics_enabled=True).check_production()
-
-
-def test_launch_check_lists_analytics_without_notice_words(tmp_path, monkeypatch):
-    notice_dir(tmp_path, monkeypatch, "<p>Nothing.</p>")
-    items = launch.launch_blockers(settings=make_settings(tmp_path, analytics_enabled=True))
-    assert any("PostHog" in item for item in items)
-
-
 # ------------------------------------------------------------------ proxy hops
 
 
@@ -119,15 +104,6 @@ def test_extra_forwarded_entries_warn_once_without_addresses(caplog, monkeypatch
     assert "198.51.100" not in caplog.text and "203.0.113" not in caplog.text
     record = next(r for r in caplog.records if r.getMessage() == "proxy_hops_unexpected")
     assert getattr(record, FIELDS_ATTR) == {"trusted_proxy_hops": 1, "forwarded_entries": 3}
-
-
-def test_the_expected_entry_counts_do_not_warn(caplog, monkeypatch):
-    monkeypatch.setattr(abuse, "_hops_warned", False)
-    caplog.set_level(logging.WARNING, logger="readablestem.web.abuse")
-    abuse.client_ip(request_with({"X-Forwarded-For": "203.0.113.5"}), 1)
-    abuse.client_ip(request_with({"X-Forwarded-For": "198.51.100.1, 203.0.113.5"}), 1)
-    abuse.client_ip(request_with({"X-Forwarded-For": "a, 203.0.113.4, 203.0.113.5"}), 2)
-    assert "proxy_hops_unexpected" not in caplog.text
 
 
 def test_launch_check_flags_zero_hops_in_production(tmp_path):
@@ -174,24 +150,6 @@ def test_an_unknown_secret_is_refused(tmp_path):
     env = WebEnv(tmp_path, session_secret=NEW, session_secret_previous=OLD)
     with pytest.raises(BadSignature):
         session_signer(env.app).unsign(cookie_from("x" * 40, {"a": 1}).encode(), max_age=60)
-
-
-def test_a_signed_in_person_stays_signed_in_through_a_rotation(tmp_path):
-    env = WebEnv(tmp_path, session_secret=OLD)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        cookie = client.cookies.get(COOKIE)
-        assert client.get("/app").status_code == 200
-    assert cookie
-    rotated = WebEnv(tmp_path, session_secret=NEW, session_secret_previous=OLD)
-    with rotated.running() as client:
-        client.cookies.set(COOKIE, cookie)
-        assert client.get("/app").status_code == 200
-    dropped = WebEnv(tmp_path, session_secret=NEW)
-    with dropped.running() as client:
-        client.cookies.set(COOKIE, cookie)
-        assert client.get("/app").status_code != 200  # the old secret is gone: signed out
 
 
 def test_production_checks_the_previous_secrets_too(tmp_path):

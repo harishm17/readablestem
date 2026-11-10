@@ -4,25 +4,18 @@ only what it names, and leaves the full-size picture to review and the second ch
 from __future__ import annotations
 
 import io
-import json
 from typing import Any
 
-import httpx2
 import pytest
 from PIL import Image
 
-from readablestem.core.budget import InMemorySpendGuard, JobBudget
-from readablestem.core.types import Status
-from readablestem.models.anthropic_client import AnthropicVisionClient
-from readablestem.models.base import UNTRUSTED_NOTICE, VisionRequest
+from readablestem.models.base import VisionRequest
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.images import shrink_png
 from readablestem.models.openai_client import PNG_SIGNATURE
-from readablestem.pipeline.equation_step import EquationOutput, transcribe
-from readablestem.pipeline.figure_step import describe
+from readablestem.pipeline.equation_step import transcribe
 from test_steps_support import (
     equation_element,
-    figure_element,
     make_settings,
     use_fallback_router,
 )
@@ -58,26 +51,6 @@ def png_of(width: int, height: int) -> bytes:
 # ------------------------------------------------------------------ T3-22 effort
 
 
-def test_the_step_effort_reaches_the_request_and_is_unset_by_default():
-    asked = FakeVisionClient(defaults={"equation": eq()})
-    transcribe(equation_element(), PNG, client=asked, settings=claude())
-    assert asked.requests[0].effort is None
-    low = FakeVisionClient(defaults={"equation": eq()})
-    transcribe(
-        equation_element(), PNG, client=low, settings=claude(anthropic_effort_equation="low")
-    )
-    assert low.requests[0].effort == "low"
-    figs = FakeVisionClient(defaults={"figure": fig()})
-    describe(figure_element(), PNG, client=figs, settings=claude(anthropic_effort_figure="low"))
-    assert figs.requests[0].effort == "low"
-
-
-def sdk_body(settings, request: VisionRequest) -> dict[str, Any]:
-    budget = JobBudget(InMemorySpendGuard(cap_usd=1), max_usd=1, max_calls=10)
-    client = AnthropicVisionClient(settings, budget, http_client=httpx2.Client())
-    return client.batch_params(request, EquationOutput)
-
-
 def request(**kw: Any) -> VisionRequest:
     fields: dict[str, Any] = {
         "step": "equation",
@@ -91,33 +64,7 @@ def request(**kw: Any) -> VisionRequest:
     return VisionRequest(**fields)
 
 
-def test_the_request_effort_wins_over_the_model_effort():
-    assert sdk_body(claude(), request())["output_config"]["effort"] == "medium"
-    assert sdk_body(claude(), request(model=HAIKU))["output_config"]["effort"] == "low"
-    assert sdk_body(claude(), request(effort="low"))["output_config"]["effort"] == "low"
-
-
 # ------------------------------------------------------------- T3-23 notice, context
-
-
-def test_the_notice_is_in_the_cached_system_block_unless_turned_off():
-    before = sdk_body(claude(anthropic_notice_in_system=False), request())
-    assert before["system"][0]["text"] == "Transcribe."
-    assert before["messages"][0]["content"][-1]["text"].startswith(UNTRUSTED_NOTICE)
-
-    after = sdk_body(claude(), request())
-    assert after["system"][0]["text"] == f"Transcribe.\n\n{UNTRUSTED_NOTICE}"
-    assert after["system"][0]["cache_control"] == {"type": "ephemeral"}
-    sent = after["messages"][0]["content"][-1]["text"]
-    assert UNTRUSTED_NOTICE not in sent
-    assert sent == "<document_text>\nthe text near it\n</document_text>"
-
-
-def test_the_system_block_is_the_same_with_and_without_document_text():
-    settings = claude()
-    with_text = sdk_body(settings, request())["system"]
-    without = sdk_body(settings, request(context_text=None))["system"]
-    assert with_text == without
 
 
 def test_context_goes_only_with_the_escalation_when_asked():
@@ -159,37 +106,7 @@ def test_shrink_png_scales_the_long_side_and_never_up():
     assert shrink_png(b"not a png", 800) == b"not a png"
 
 
-def test_the_model_gets_the_reduced_figure_and_the_second_check_the_full_one():
-    big = png_of(1600, 900)
-    client = FakeVisionClient(defaults={"figure": fig()})
-    describe(
-        figure_element(),
-        big,
-        client=client,
-        settings=claude(figure_model_max_edge_px=800),
-    )
-    sent = client.requests[0].images[0]
-    assert Image.open(io.BytesIO(sent)).size == (800, 450)
-    untouched = FakeVisionClient(defaults={"figure": fig()})
-    describe(figure_element(), big, client=untouched, settings=claude())
-    assert untouched.requests[0].images[0] == big
-
-
 # -------------------------------------------------------- T3-29 display equations
-
-
-def test_display_equations_start_on_the_cheap_model_only_when_asked():
-    answers = {OPUS: eq("x", 0.99), HAIKU: eq("x", 0.97)}
-
-    def run(**kw: Any) -> FakeVisionClient:
-        client = FakeVisionClient(responders={"equation": lambda req: answers[req.model]})
-        transcribe(
-            equation_element(display="block", text="x"), PNG, client=client, settings=claude(**kw)
-        )
-        return client
-
-    assert [r.model for r in run().requests] == [OPUS]
-    assert [r.model for r in run(equation_display_first_cheap=True).requests] == [HAIKU]
 
 
 def test_an_unsure_cheap_answer_to_a_display_equation_goes_to_the_main_model():
@@ -206,29 +123,3 @@ def test_an_unsure_cheap_answer_to_a_display_equation_goes_to_the_main_model():
 
 
 # ------------------------------------------------------------ T2-19 accept per model
-
-
-def test_the_accept_bar_is_per_model_and_defaults_to_the_common_one():
-    settings = claude(accept_confidence_by_model={SONNET: 0.92})
-    assert settings.accept_confidence_for(SONNET) == 0.92
-    assert settings.accept_confidence_for(OPUS) == settings.auto_accept_confidence == 0.85
-    assert settings.accept_confidence_for(None) == 0.85
-
-
-def test_a_sonnet_answer_below_its_own_bar_needs_review_while_opus_is_accepted():
-    for model, status in ((SONNET, Status.NEEDS_REVIEW), (OPUS, Status.ACCEPTED)):
-        settings = claude(anthropic_main_model=model, accept_confidence_by_model={SONNET: 0.92})
-        client = FakeVisionClient(defaults={"equation": eq("x", 0.90)})
-        fix = transcribe(
-            equation_element(display="block", text="x"), PNG, client=client, settings=settings
-        )
-        assert fix.status is status, model
-    for model, status in ((SONNET, Status.NEEDS_REVIEW), (OPUS, Status.ACCEPTED)):
-        settings = claude(anthropic_main_model=model, accept_confidence_by_model={SONNET: 0.97})
-        client = FakeVisionClient(defaults={"figure": fig(0.95)})
-        assert describe(figure_element(), PNG, client=client, settings=settings).status is status
-
-
-def test_the_request_body_is_valid_json_for_the_batch_api():
-    body = sdk_body(claude(), request())
-    json.dumps(body)

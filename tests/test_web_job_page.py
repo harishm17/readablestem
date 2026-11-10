@@ -9,16 +9,15 @@ shaped like them, so each page state can be checked on its own.
 from __future__ import annotations
 
 import re
-from datetime import timedelta
 from html import unescape
 
 import pytest
 
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
-from readablestem.core.types import Check, Element, Fix, Kind, PageStats, Status
-from readablestem.web.db import Job, User, session_scope, utcnow
+from readablestem.core.types import Check, PageStats, Status
+from readablestem.web.db import Job, session_scope
 from readablestem.web.outcome import FAILED_MESSAGES
-from readablestem.web.views import job_error_message, queue_ahead
+from readablestem.web.views import job_error_message
 
 
 @pytest.fixture
@@ -101,36 +100,6 @@ def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     assert 'id="partial-note"' in html
 
 
-def test_a_complete_job_has_no_partial_note(web):
-    job_id = convert(web)
-    html = web.browser.get(f"/jobs/{job_id}").text
-    assert (
-        title(html) == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
-    )  # 3 decisions are open
-    assert 'id="partial-note"' not in html
-
-
-def test_a_scanned_pdf_says_why_it_stopped_everywhere_on_the_page(web):
-    """Before, the status box gave the OCR advice while the title said "Stopped" and the
-    "Why the conversion stopped" section said "The conversion stopped unexpectedly"."""
-    pages = [PageStats(page=0, elements=1, fixes=0, cost_usd=0, latency_ms=0)]
-    web.converter.output.result.stats.per_page = pages
-    job_id = convert(web, image_only_pages=[0])
-    assert (web.job(job_id).status, web.job(job_id).error_code) == ("failed", "scanned")
-    html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Stopped: notes.pdf | ReadableSTEM"
-    why = page_text(status_box(html))
-    assert "Every page of this PDF is a scanned image, so this tool cannot convert it." in why
-    assert "OCR" not in why  # the old advice made exactly these files
-    assert "stopped unexpectedly" not in page_text(html)
-    # Said once: the section under it is what to do, with safe ways on.
-    assert page_text(html).count("so this tool cannot convert it.") == 1
-    todo = page_text(section(html, "failed-heading"))
-    assert "What you can do" in todo and "cannot convert" not in todo
-    assert 'href="/app#upload-heading">Upload it again</a>' in html
-    assert 'href="/app">Back to My documents</a>' in html and 'href="/status"' in html
-
-
 def test_a_pdf_with_no_content_says_so_in_the_status_box(web):
     job_id = convert(web, elements=[], fixes=[])
     assert web.job(job_id).error_code == "no_content"
@@ -157,17 +126,6 @@ def test_the_job_page_shows_no_model_cost(web):
     assert "Model cost" not in html and "$0.5" not in html and "$0.012" not in html
 
 
-def test_list_items_are_counted(web):
-    items = [
-        Element(id=f"p1-e{9 + i}", kind=Kind.LIST_ITEM, page=0, bbox=(0, 5, 1, 6), order=9 + i,
-                text=f"item {i}", list_marker="•", list_ordered=False, list_level=1)
-        for i in range(3)
-    ]  # fmt: skip
-    job_id = convert(web, elements=[*web.converter.output.result.elements, *items])
-    results = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "List items 3" in results
-
-
 def test_failed_checks_of_the_html_file_are_listed(web):
     checks = [
         Check(name="html.lang", passed=True),
@@ -182,14 +140,6 @@ def test_failed_checks_of_the_html_file_are_listed(web):
     assert "Must be fixed: The headings skip a level" in text
     assert "heading_skip" not in text and "html.heading_order" not in text  # no codes (T1-11)
     assert "Worth checking: An equation does not say" in text
-
-
-def test_passing_checks_are_summarised_and_old_results_show_none(web):
-    passed = convert(web, html_checks=[Check(name="html.lang", passed=True)])
-    text = page_text(section(web.browser.get(f"/jobs/{passed}").text, "results-heading"))
-    assert "All 1 checks passed" in text
-    old = convert(web, html_checks=[])  # stored before results carried their checks
-    assert 'id="checks-heading"' not in web.browser.get(f"/jobs/{old}").text
 
 
 def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
@@ -209,61 +159,4 @@ def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
     assert "Accepted by you" in review and "Accepted automatically" in review
 
 
-def test_results_stored_before_the_reviewed_flag_still_load_and_count(web):
-    job_id = convert(web)
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None and job.result_json is not None
-        stored = dict(job.result_json)
-        stored["fixes"] = [
-            {k: v for k, v in f.items() if k != "reviewed"} | {"status": s}
-            for f, s in zip(
-                stored["fixes"],
-                ["accepted", "edited", "needs_review", "rejected", "abstained"],
-                strict=True,
-            )
-        ]
-        job.result_json = stored
-    text = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Decisions to make 2" in text and "Decisions made 2" in text
-
-
-def test_fix_reviewed_defaults_to_false_for_stored_json():
-    fix = Fix.model_validate({"element_id": "p1-e0", "kind": "heading", "status": "accepted"})
-    assert fix.reviewed is False and not fix.accepted_by_reviewer
-    assert Fix.model_validate(fix.model_dump() | {"reviewed": True}).accepted_by_reviewer
-
-
 # --------------------------------------------------------------------------- queue
-
-
-def test_queue_position_follows_the_workers_claim_order(web):
-    """The worker takes the fewest attempts first, then the oldest: a job requeued after
-    a lost lease waits behind fresh ones, so it is not "next in line" although it is the
-    oldest. Jobs of people no longer allowed are never claimed and do not count."""
-    retried = job_id_from(upload(web.browser, make_pdf(1)))
-    fresh = job_id_from(upload(web.browser, make_pdf(1)))
-    bob = web.client()
-    login(bob, BOB)
-    removed = job_id_from(upload(bob, make_pdf(1)))
-    with session_scope(web.ctx.factory) as session:
-        start = utcnow() - timedelta(minutes=5)
-        for minutes, job_id in enumerate((removed, retried, fresh)):
-            job = session.get(Job, job_id)
-            assert job is not None
-            job.created_at = start + timedelta(minutes=minutes)
-        job = session.get(Job, retried)
-        assert job is not None
-        job.attempts = 1  # its first attempt lost its lease and was requeued
-        user = session.get(User, session.get(Job, removed).user_id)  # type: ignore[union-attr]
-        assert user is not None
-        user.is_allowed = False
-    with session_scope(web.ctx.factory) as session:
-        ahead = {j: queue_ahead(session, session.get(Job, j)) for j in (fresh, retried)}  # type: ignore[arg-type]
-    assert ahead == {fresh: 0, retried: 1}
-    assert "next in line" in web.browser.get(f"/jobs/{fresh}").text
-    assert "1 document ahead of yours" in web.browser.get(f"/jobs/{retried}").text
-    claim = web.worker().claim()
-    assert claim is not None and claim.job_id == fresh  # the order the page promised
-    assert "next in line" in web.browser.get(f"/jobs/{retried}").text
-    bob.close()

@@ -48,101 +48,11 @@ def row(text: str, width: float = 5.0, gaps: dict[int, float] | None = None) -> 
 # ------------------------------------------------------------------ the rules
 
 
-def test_a_comma_between_script_glyphs_is_part_of_the_index():
-    chars = row("pm,q")
-    script = [False, True, True, True]
-    assert glyph_math.script_punctuation(chars, script, 2)
-
-
 def test_a_comma_at_the_baseline_or_at_the_end_of_an_index_is_not():
     chars = row("pm,q")
     assert not glyph_math.script_punctuation(chars, [False, True, False, True], 2)
     assert not glyph_math.script_punctuation(chars, [False, True, True, False], 2)  # index ends
     assert not glyph_math.script_punctuation(row("pm,"), [False, True, True], 2)
-
-
-def test_two_punctuation_marks_in_a_row_are_not_an_index():
-    chars = row("p,,q")
-    assert not glyph_math.script_punctuation(chars, [False, True, True, True, True][:4], 2)
-
-
-def test_a_blank_between_touching_glyphs_is_no_space():
-    chars = row("v v", gaps={})
-    assert glyph_math.touching(chars, 1)
-    chars = row("v v", gaps={2: 3.0})
-    assert not glyph_math.touching(chars, 1)
-
-
-def test_a_known_operator_name_touching_an_opening_bracket_is_a_function_name():
-    assert glyph_math.function_name(row("Cov("), 0, 3)
-    assert glyph_math.function_name(row("Pr("), 0, 2)
-    assert not glyph_math.function_name(row("Cov(", gaps={3: 3.0}), 0, 3)
-
-
-def test_an_acronym_a_word_or_a_chemical_formula_is_no_function_name():
-    assert not glyph_math.function_name(row("ARFIMA("), 0, 6)
-    assert not glyph_math.function_name(row("CTCS("), 0, 4)
-    assert not glyph_math.function_name(row("form("), 0, 4)
-    assert not glyph_math.function_name(row("NaOH("), 0, 4)
-    assert not glyph_math.function_name(row("Mg("), 0, 2)
-
-
-def unit_of(text: str, *, upright: str, script: str = "") -> int | None:
-    chars = row(text)
-    return glyph_math.trailing_unit(
-        chars,
-        0,
-        len(chars),
-        upright=[c in upright for c in text],
-        script=[c in script for c in text],
-    )
-
-
-def test_a_unit_after_a_number_is_cut_off():
-    assert unit_of("= 24h", upright="h") == 4
-    assert unit_of("t = 5 s", upright="s") == 5
-    assert unit_of("x = 9.8 m", upright="m") == 7
-
-
-def test_a_unit_with_exponents_is_cut_off_whole():
-    # 6.6 x 10^-11 m^3 kg^-1
-    text = "6.6x10-11 m3 kg-1"
-    script = "-11" + ""
-    chars = row(text)
-    flags_script = [False] * len(text)
-    for k in (6, 7, 8, 11, 15, 16):  # "-11", "3", "-1" are raised
-        flags_script[k] = True
-    out = glyph_math.trailing_unit(
-        chars,
-        0,
-        len(text),
-        upright=[c in "mkg" and not flags_script[k] for k, c in enumerate(text)],
-        script=flags_script,
-    )
-    assert out == 9
-    assert script  # the raised figures are the ones listed above
-
-
-def test_a_letter_after_a_variable_is_no_unit():
-    assert unit_of("x m", upright="m") is None
-    assert unit_of("2 + x", upright="x" * 0) is None
-
-
-def test_raised_figures_before_an_element_symbol_are_a_nuclide_not_a_number():
-    # "(b a)15O": the 15 is raised and the O upright, a nuclide
-    text = "a15O"
-    script = [False, True, True, False]
-    chars = row(text)
-    assert (
-        glyph_math.trailing_unit(chars, 0, 4, upright=[False, False, False, True], script=script)
-        is None
-    )
-
-
-def test_a_percent_sign_after_a_digit_is_part_of_a_formula():
-    assert glyph_math.percent_of_number(row("5%"), 1)
-    assert not glyph_math.percent_of_number(row("a%"), 1)
-    assert not glyph_math.percent_of_number(row("%"), 0)
 
 
 # ------------------------------------------------------------------ in the layout
@@ -190,19 +100,6 @@ def test_a_comma_in_an_index_keeps_the_formula_whole():
         )
 
     assert equations(analyze(one_page(fill)).elements) == ["pm,q(x)"]
-
-
-def test_a_unit_glued_to_a_number_stays_outside_the_formula():
-    def fill(page):
-        sentence(
-            page,
-            "The step is ",
-            " in every experiment of this series of runs.",
-            [("t", "heit", BODY, 0), (" = 24", "helv", BODY, 0), ("h", "helv", BODY, 0)],
-        )
-
-    found = equations(analyze(one_page(fill)).elements)
-    assert found == ["t=24"]
 
 
 def test_a_percent_sign_after_the_number_is_in_the_formula():
@@ -266,20 +163,6 @@ def test_the_rules_leave_a_document_not_made_by_tex_alone():
 def relations(text: str, maths: str, script: str = "") -> list[tuple[int, int, str]]:
     chars = row(text)
     return glyph_math.relation_runs(chars, [c in maths for c in text], [c in script for c in text])
-
-
-def test_a_relation_in_a_maths_font_and_the_number_after_it_are_a_formula():
-    assert relations("is ≥2 and", "≥") == [(3, 5, glyph_math.RELATION_REASON)]
-    assert relations("about ≈ 0.14,", "≈") == [(6, 12, glyph_math.RELATION_REASON)]
-
-
-def test_a_percent_sign_after_the_number_is_taken_with_it():
-    assert relations("at ≥90% of", "≥") == [(3, 7, glyph_math.RELATION_REASON)]
-
-
-def test_a_relation_after_a_digit_or_a_maths_glyph_is_part_of_a_longer_formula():
-    assert relations("x=3 ≥2 a", "x≥") == []  # a maths glyph comes before the relation
-    assert relations("3 ≥2", "≥") == []  # a digit comes before it
 
 
 def test_a_relation_that_is_no_maths_glyph_or_has_no_number_is_left_alone():

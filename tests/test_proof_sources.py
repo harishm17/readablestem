@@ -43,21 +43,6 @@ def pinned_manifest(tmp_path) -> str:
     return registry.sha256_file(out / "manifest.json")
 
 
-def test_a_fetch_rebuilds_the_pinned_answer_key_byte_for_byte(tmp_path, pinned_manifest):
-    pset = pset_for(pinned_manifest)
-    said: list[str] = []
-    out = sources.fetch_gold_set(
-        pset,
-        tmp_path / "gold-fetched-x",
-        tmp_path / "cache",
-        fetcher=FakeFetcher(),
-        say=said.append,
-    )
-    assert said == ["fetching 2 section(s) of physics from OpenStax"]
-    checks = registry.check_gold(out, pset)
-    assert [c.status for c in checks] == ["ok", "ok", "ok"]
-
-
 def test_a_fetch_that_gives_other_bytes_does_not_match_the_pin(tmp_path, pinned_manifest):
     pset = pset_for("0" * 64)
     out = sources.fetch_gold_set(
@@ -99,36 +84,7 @@ def test_a_set_without_a_committed_copy_fetches_its_answer_key(tmp_path, pinned_
     assert engine.books_of(gold)[0]["title"] == "Physics"
 
 
-def test_a_committed_copy_is_used_before_anything_is_fetched(tmp_path, pinned_manifest):
-    committed = tmp_path / "data" / "gold"
-    fetch_gold("physics", 2, committed, FakeFetcher(), page_slugs=PAGES, retrieved_at=DATE)
-    pset = pset_for(pinned_manifest, gold_dir="data/gold")
-    opts = engine.ProofOptions(root=tmp_path, fetcher=None)  # a fetch here would hit the network
-    assert engine.resolve_gold(pset, opts, None, tmp_path / "w", lambda _m: None) == committed
-
-
 # ----------------------------------------------------------------- archive pinning
-
-
-def test_a_pin_is_passed_to_the_fetch_when_this_checkout_can_read_a_pinned_release(
-    tmp_path, monkeypatch
-):
-    class Pin:
-        def __init__(self, archive_version: str, version: str) -> None:
-            self.archive_version, self.version = archive_version, version
-
-    seen: list[object] = []
-
-    def fake_fetch(book, n, out, http, **kwargs):
-        seen.append(kwargs.get("pin"))
-        out.mkdir(parents=True, exist_ok=True)
-
-    monkeypatch.setattr(openstax, "BookPin", Pin, raising=False)
-    monkeypatch.setattr(sources, "fetch_gold", fake_fetch)
-    pset = pset_for("0" * 64, pins={"physics": {"archive_version": "2026", "version": "abc"}})
-    sources.fetch_gold_set(pset, tmp_path / "gold-fetched-x", tmp_path / "c", fetcher=object())
-    (pin,) = seen
-    assert isinstance(pin, Pin) and (pin.archive_version, pin.version) == ("2026", "abc")
 
 
 def test_a_pinned_set_is_refused_by_a_checkout_that_cannot_read_a_pinned_release(

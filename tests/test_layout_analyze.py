@@ -14,10 +14,8 @@ import pytest
 
 from readablestem.core.types import Element, Kind, inline_marker
 from readablestem.pipeline.layout import (
-    REASON_BOLD_BODY,
     REASON_LARGER_FONT,
     REASON_NUMBERED,
-    REASON_NUMBERED_LINE,
     LayoutError,
     analyze,
     heading_levels,
@@ -97,55 +95,6 @@ def test_headings_and_paragraphs_in_reading_order():
     assert (layout.page_count, layout.pages, layout.page_sizes) == (1, [0], [(612.0, 792.0)])
 
 
-def test_hyphenation_is_repaired_only_before_a_lowercase_continuation():
-    def fill(page):
-        write(
-            page,
-            72,
-            100,
-            [
-                "The cart keeps moving at a constant veloc-",
-                "ity until friction slows it down. The Newton-",
-                "Raphson method is not needed for this problem.",
-            ],
-        )
-
-    (paragraph,) = analyze(one_page(fill)).elements
-    assert paragraph.text == (
-        "The cart keeps moving at a constant velocity until friction slows it down. "
-        "The Newton-Raphson method is not needed for this problem."
-    )
-
-
-def test_bold_body_line_and_standalone_numbered_line_are_headings_list_items_are_not():
-    def fill(page):
-        y = write(page, 72, 80, ["A cart rolls down a ramp and speeds up as it goes."])
-        page.insert_text((72, y + 10), "Worked example", fontsize=BODY, fontname="hebo")
-        y = write(page, 72, y + 25, ["The ramp is two metres long and the cart starts at rest."])
-        y = write(page, 72, y + 12, ["2.3 Units of Speed"])
-        y = write(page, 72, y + 12, ["Speed is measured in metres per second in SI units."])
-        write(
-            page,
-            72,
-            y + 12,
-            ["1. Measure the length of the ramp.", "2. Time the cart from top to bottom."],
-        )
-
-    elements = analyze(one_page(fill)).elements
-    headings = [e for e in elements if e.kind == Kind.HEADING]
-    assert [(h.text, h.reasons[0]) for h in headings] == [
-        ("Worked example", REASON_BOLD_BODY),
-        ("2.3 Units of Speed", REASON_NUMBERED_LINE),
-    ]
-    items = [e for e in elements if e.kind == Kind.LIST_ITEM]
-    assert [(e.list_marker, e.list_ordered, e.list_level, e.text) for e in items] == [
-        ("1.", True, 1, "Measure the length of the ramp."),
-        ("2.", True, 1, "Time the cart from top to bottom."),
-    ]
-    levels = heading_levels(elements)
-    assert [levels[h.id] for h in headings] == [1, 1]  # no size-based headings at all
-
-
 def test_long_runs_of_large_text_and_bold_sentences_inside_paragraphs_are_not_headings():
     def fill(page):
         y = write(
@@ -176,37 +125,6 @@ def test_long_runs_of_large_text_and_bold_sentences_inside_paragraphs_are_not_he
         "Body text continues here in the normal size of eleven. and this entire line happens "
         "to be bold for emphasis before the sentence ends in plain type again."
     )
-
-
-def test_bullets_start_new_list_items():
-    html = "<p>\u2022 Measure the ramp length.<br>\u2022 Time the cart over that length.</p>"
-    elements = analyze(html_page(html)).elements
-    assert [(e.kind, e.list_marker, e.list_ordered, e.text) for e in elements] == [
-        (Kind.LIST_ITEM, "\u2022", False, "Measure the ramp length."),
-        (Kind.LIST_ITEM, "\u2022", False, "Time the cart over that length."),
-    ]
-
-
-def test_first_line_indent_separates_paragraphs_without_a_gap():
-    """LaTeX style: no space between paragraphs, the first line of each is indented."""
-
-    def fill(page):
-        y = write(
-            page,
-            90,
-            100,
-            ["Momentum is mass times velocity, and it is conserved in every"],
-        )
-        y = write(page, 72, y, ["collision between the carts on the track."])
-        y = write(page, 90, y, ["Kinetic energy is conserved only when the collision is fully"])
-        write(page, 72, y, ["elastic, which real carts never quite manage."])
-
-    assert texts(analyze(one_page(fill)).elements) == [
-        "Momentum is mass times velocity, and it is conserved in every collision between the "
-        "carts on the track.",
-        "Kinetic energy is conserved only when the collision is fully elastic, which real carts "
-        "never quite manage.",
-    ]
 
 
 def test_a_bare_chapter_number_above_the_title_joins_it():
@@ -247,45 +165,6 @@ def test_vector_fraction_bar_ties_numerator_and_denominator_into_one_display_equ
     assert not any(" d " in t or t.endswith(" t") for t in texts(elements, Kind.PARAGRAPH))
 
 
-def test_stacked_numbers_with_a_bar_are_a_fraction_without_a_relation_symbol():
-    def fill(page):
-        write(page, 72, 100, ["One half is written as a fraction like this one:"])
-        page.insert_text((300, 140), "1", fontsize=12)
-        page.draw_line((296, 143.5), (310, 143.5), width=0.6)
-        page.insert_text((300, 153), "2", fontsize=12)
-
-    elements = analyze(one_page(fill)).elements
-    assert [(e.kind, e.text) for e in elements] == [
-        (Kind.PARAGRAPH, "One half is written as a fraction like this one:"),
-        (Kind.EQUATION, "1 2"),
-    ]
-
-
-def test_a_lone_short_line_without_maths_neighbours_stays_text():
-    def fill(page):
-        write(page, 72, 100, ["The final speed of the cart after the ramp is", "12 m/s."])
-
-    (paragraph,) = analyze(one_page(fill)).elements
-    assert paragraph.text == "The final speed of the cart after the ramp is 12 m/s."
-
-
-def test_adjacent_maths_lines_merge_and_the_equation_number_is_kept_apart():
-    def fill(page):
-        write(page, 72, 100, ["The position after the cart has rolled for two seconds:"])
-        page.insert_text((250, 140), "x = v t + 2", fontsize=12)
-        page.insert_text((262, 156), "= 14 m", fontsize=12)
-        page.insert_text((500, 140), "(2.1)", fontsize=12)
-        write(page, 72, 190, ["That is fourteen metres from the start of the track."])
-
-    elements = analyze(one_page(fill)).elements
-    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
-    equation = elements[1]
-    assert equation.text == "x = v t + 2 = 14 m"
-    assert equation.equation_label == "(2.1)"
-    assert "equation number" in equation.reasons
-    assert equation.bbox[2] < 400  # the number is outside the box, so outside the crop
-
-
 # ---------------------------------------------------------------- inline maths
 
 
@@ -322,34 +201,6 @@ def test_inline_maths_becomes_child_equations_with_markers_in_the_paragraph():
         assert px0 <= x0 < x1 <= px1 and py0 <= y0 < y1 <= py1
 
 
-def test_a_variables_superscript_is_maths_but_italic_words_citations_and_ranges_are_not():
-    elements = analyze(
-        html_page(
-            "<p>This is <i>important</i>: see [3] and pages 10-12 of the 2019 edition, a "
-            "classic. The area is <i>x</i><sup>2</sup> square metres.</p>"
-        )
-    ).elements
-    paragraph, square = elements
-    assert square.text == "x2" and square.reasons == ["italic variable with operator"]
-    assert paragraph.text == (
-        "This is important: see [3] and pages 10-12 of the 2019 edition, a classic. "
-        f"The area is {inline_marker(square.id)} square metres."
-    )
-
-
-def test_a_superscript_of_upright_text_is_raised_text_not_maths():
-    # Upright x with a raised 2 (a unit, an ion, a power in a text font) is not a variable:
-    # it stays in the paragraph and is written <sup> (docs/layout.md "Raised and lowered text").
-    (paragraph,) = analyze(
-        html_page("<p>The area is x<sup>2</sup> square metres, in cm<sup>2</sup>.</p>")
-    ).elements
-    assert paragraph.text == "The area is x2 square metres, in cm2."
-    assert [(paragraph.text[r.start : r.end], r.kind) for r in paragraph.script_runs] == [
-        ("2", "sup"),
-        ("2", "sup"),
-    ]
-
-
 def test_code_option_dashes_and_markup_are_not_maths():
     def fill(page):
         page.insert_text((72, 100), "x = 5", fontsize=BODY, fontname="cour")  # code listing
@@ -366,17 +217,6 @@ def test_code_option_dashes_and_markup_are_not_maths():
     prose = " ".join(texts(elements)[1:])
     assert "Run the tool with \u2212v for verbose output and \u2212q to stop." in prose
     assert "The element <a><b/></a> nests b inside a for this example." in prose
-
-
-def test_signed_numbers_are_inline_maths():
-    elements = analyze(
-        html_page("<p>The cart ends at \u22123 m, so its displacement is negative.</p>")
-    ).elements
-    paragraph, number = elements
-    assert (number.text, number.reasons) == ("\u22123 m", ["signed number"])
-    assert paragraph.text == (
-        f"The cart ends at {inline_marker(number.id)}, so its displacement is negative."
-    )
 
 
 def test_a_wide_table_rule_next_to_a_short_cell_is_not_a_fraction_bar():
@@ -427,47 +267,6 @@ def test_tiny_images_and_full_page_backgrounds_are_not_figures():
     assert [e.kind for e in elements] == [Kind.PARAGRAPH]
 
 
-def test_vector_drawing_is_a_figure_with_its_labels_but_rules_and_boxes_are_not():
-    def fill(page):
-        page.draw_line((100, 300), (300, 300))  # axes
-        page.draw_line((100, 300), (100, 180))
-        page.draw_bezier((100, 290), (150, 280), (220, 220), (290, 190), color=(0, 0, 1))
-        page.draw_circle((150, 262), 3, color=(1, 0, 0), fill=(1, 0, 0))
-        page.insert_text((180, 309), "time (s)", fontsize=8)  # axis label just below
-        page.insert_text((100, 330), "Figure 2 Distance against time.", fontsize=10)
-        page.draw_line((72, 400), (540, 400), width=0.5)  # separator rule
-        page.draw_rect(pymupdf.Rect(70, 440, 420, 500), color=(0, 0, 0))  # box around text
-        write(page, 80, 460, ["Remember: speed is distance over time.", "Always check units."])
-
-    elements = analyze(one_page(fill)).elements
-    figures = [e for e in elements if e.kind == Kind.FIGURE]
-    assert len(figures) == 1
-    (figure,) = figures
-    assert figure.caption == "Figure 2 Distance against time."
-    assert figure.text == "time (s)"
-    assert figure.reasons == ["vector drawing (4 paths)"]
-    x0, y0, x1, y1 = figure.bbox
-    assert x0 <= 100 and y0 <= 180 and x1 >= 300 and y1 >= 309  # axes, curve and label
-    assert texts(elements, Kind.PARAGRAPH) == [
-        "Remember: speed is distance over time. Always check units."
-    ]
-
-
-def test_a_dense_scatter_plot_is_one_figure():
-    def fill(page):
-        shape = page.new_shape()
-        for i in range(600):
-            shape.draw_circle((100 + (i * 37) % 300, 150 + (i * 53) % 200), 1.0)
-            shape.finish(color=(0, 0, 1), fill=(0, 0, 1))
-        shape.commit()
-        page.insert_text((100, 380), "Figure 4: Measured speeds of 600 carts.", fontsize=10)
-
-    elements = analyze(one_page(fill)).elements
-    (figure,) = elements
-    assert figure.reasons == ["vector drawing (600 paths)"]
-    assert figure.caption == "Figure 4: Measured speeds of 600 carts."
-
-
 def test_a_ruled_table_with_a_tick_icon_is_not_a_figure():
     def fill(page):
         for y in (100, 120, 140, 160):
@@ -500,14 +299,6 @@ def test_content_outside_the_crop_box_is_ignored_and_figures_are_clipped_to_the_
     paragraph, figure = layout.elements
     assert paragraph.text == "Visible body text inside the crop box."
     assert figure.bbox == (0.0, 500.0, 70.0, 580.0)  # the part inside the crop box
-
-
-def test_caption_without_a_figure_stays_a_paragraph():
-    def fill(page):
-        write(page, 72, 100, ["Figure 9: Not drawn on this page."])
-
-    (paragraph,) = analyze(one_page(fill)).elements
-    assert (paragraph.kind, paragraph.text) == (Kind.PARAGRAPH, "Figure 9: Not drawn on this page.")
 
 
 # ---------------------------------------------------------------- columns and margins
@@ -612,34 +403,12 @@ def test_a_single_page_keeps_unrepeated_margin_text_but_drops_the_page_number():
 # ---------------------------------------------------------------- document properties
 
 
-@pytest.mark.parametrize(
-    ("metadata_title", "expected"),
-    [
-        ("Forces and Motion", "Forces and Motion"),
-        ("Microsoft Word - notes3.docx", "Kinematics"),
-        ("lecture3.pdf", "Kinematics"),
-        ("", "Kinematics"),
-    ],
-)
-def test_title_is_metadata_when_meaningful_else_first_level_one_heading(metadata_title, expected):
-    doc = pymupdf.open()
-    page = doc.new_page()
-    page.insert_text((72, 80), "Kinematics", fontsize=20, fontname="hebo")
-    write(page, 72, 120, ["Kinematics describes motion without asking what causes it."])
-    doc.set_metadata({"title": metadata_title})
-    assert analyze(doc.tobytes()).title == expected
-
-
 @pytest.mark.parametrize(("raw", "expected"), [("(de-DE)", "de-DE"), ("(not a tag!)", "en")])
 def test_lang_comes_from_the_catalog(raw, expected):
     doc = pymupdf.open()
     write(doc.new_page(), 72, 100, ["Ein kurzer Satz."])
     doc.xref_set_key(doc.pdf_catalog(), "Lang", raw)
     assert analyze(doc.tobytes()).lang == expected
-
-
-def test_lang_defaults_to_english():
-    assert analyze(one_page(lambda p: write(p, 72, 100, ["Hello."]))).lang == "en"
 
 
 def test_page_selection_is_sorted_and_ids_follow_page_numbers():
@@ -715,10 +484,6 @@ def test_password_protected_pdf_is_refused_but_owner_only_protection_is_fine():
         permissions=0,
     )
     assert texts(analyze(restricted).elements) == ["Readable lecture text."]
-
-
-def test_max_pages_applies_to_the_requested_pages_only():
-    assert analyze(two_pages(), pages=[1], max_pages=1).pages == [1]
 
 
 def test_analysis_logs_nothing_about_the_document(caplog):

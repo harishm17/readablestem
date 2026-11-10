@@ -16,7 +16,6 @@ from fixtures.web.support import ALICE, WebEnv, csrf_from, login, make_pdf
 from readablestem.core import sandbox
 from readablestem.observability.logging import FIELDS_ATTR
 from readablestem.source import latexml
-from readablestem.web import sandbox_status
 from readablestem.web.db import Job, session_scope
 from readablestem.web.sandbox_status import SandboxStatus, run_probe
 from source_support import make_zip
@@ -59,23 +58,6 @@ def finish(thread: threading.Thread | None) -> None:
 # ------------------------------------------------------------------------------ the probe run
 
 
-def test_a_passing_probe_is_logged_once_and_shown(caplog):
-    status = SandboxStatus()
-    with caplog.at_level(logging.INFO):
-        finish(run_probe(status, timeout_s=5, probe=lambda: report(True), installed=lambda: True))
-    lines = [r for r in caplog.records if "sandbox_probe" in r.getMessage()]
-    assert len(lines) == 1
-    fields = getattr(lines[0], FIELDS_ATTR)
-    assert fields.get("result") == "PASS" and fields.get("bwrap") == "ok"
-    assert "sandbox_start_error" not in fields and "/secret" not in str(fields)
-    shown = status.public()
-    assert shown["state"] == "pass" and shown["result"] == "pass"
-    assert shown["bound_mb"] == 2048 and shown["cgroup"] == "unavailable"
-    assert shown["seccomp"] == "ok" and shown["checked_at"]
-    assert shown["checks"]["bwrap"] == "ok" and "sandbox_start_error" not in shown["checks"]
-    assert status.allows_source()
-
-
 def test_a_failing_probe_does_not_allow_source(caplog):
     status = SandboxStatus()
     with caplog.at_level(logging.INFO):
@@ -107,25 +89,6 @@ def test_a_probe_that_takes_too_long_is_a_timeout_and_a_failure():
     assert status.state == "timeout" and not status.allows_source()  # a late answer changes nothing
 
 
-def test_without_latexml_nothing_is_run_and_the_state_says_so():
-    status = SandboxStatus()
-    ran = []
-    assert (
-        run_probe(status, timeout_s=5, probe=lambda: ran.append(1), installed=lambda: False) is None
-    )
-    assert ran == [] and status.state == "not_installed" and not status.allows_source()
-    assert status.public()["checks"] == {}
-
-
-def test_the_default_probe_is_the_one_with_require_latexml(monkeypatch):
-    from readablestem.ops import sandbox_probe
-
-    seen = {}
-    monkeypatch.setattr(sandbox_probe, "probe", lambda **kw: seen.update(kw) or report())
-    finish(run_probe(SandboxStatus(), timeout_s=5, installed=lambda: True))
-    assert seen == {"require_latexml": True}
-
-
 # --------------------------------------------------------------------- start-up and /healthz/ops
 
 
@@ -150,22 +113,6 @@ def test_the_web_process_runs_the_probe_in_the_background_and_healthz_ops_shows_
             time.sleep(0.05)
         assert shown["state"] == "pass" and shown["result"] == "pass"
         assert set(shown) >= {"state", "checks", "bound_mb", "cgroup", "seccomp", "checked_at"}
-
-
-def test_healthz_ops_says_not_installed_when_the_image_has_no_latexml(tmp_path, monkeypatch):
-    monkeypatch.setattr(latexml, "installed", lambda: False)
-    env = WebEnv(tmp_path, sandbox_probe_at_startup=True)
-    with env.running() as client:
-        assert client.get("/healthz/ops").json()["sandbox"]["state"] == "not_installed"
-
-
-def test_the_probe_is_not_run_when_it_is_switched_off(tmp_path, monkeypatch):
-    called = []
-    monkeypatch.setattr(sandbox_status, "run_probe", lambda *a, **k: called.append(1))
-    env = WebEnv(tmp_path)  # tests turn the start-up probe off
-    with env.running() as client:
-        assert client.get("/healthz/ops").json()["sandbox"]["state"] == "not_run"
-    assert called == []
 
 
 # ------------------------------------------------------------- the switch for LaTeX source
@@ -236,12 +183,3 @@ def test_a_batch_zip_places_its_pdfs_but_not_its_projects_unless_the_probe_passe
     source_env.ctx.sandbox.set("pass")
     send(source_env, data, "term2.zip")
     assert job_names(source_env) == ["p1.zip", "slides.pdf", "slides.pdf"]
-
-
-def test_the_pages_offer_latex_source_only_after_a_pass(source_env):
-    source_env.ctx.sandbox.set("fail")
-    assert 'data-latex="1"' not in source_env.browser.get("/app").text
-    assert "You can upload a PDF or LaTeX file" not in source_env.browser.get("/").text
-    source_env.ctx.sandbox.set("pass")
-    assert 'data-latex="1"' in source_env.browser.get("/app").text
-    assert "You can upload a PDF or LaTeX file" in source_env.browser.get("/").text

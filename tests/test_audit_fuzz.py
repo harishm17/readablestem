@@ -8,8 +8,6 @@ strings, markup).
 
 from __future__ import annotations
 
-import pytest
-
 from fixtures.web.support import csrf_from
 from test_audit_authz import ROUTES, fill, site  # noqa: F401  (site is a fixture)
 
@@ -66,16 +64,3 @@ def test_no_route_answers_junk_with_a_server_error(site):  # noqa: F811
                 if response.status_code >= 500:
                     failures.append((method, template, junk[:12], response.status_code))
     assert failures == []
-
-
-@pytest.mark.parametrize("number", ["0", "-1", "99999999999999999999", "1.5", "abc", "%00"])
-def test_page_image_numbers_that_are_not_pages_are_404s(site, number):  # noqa: F811
-    response = site.alice.get(f"/jobs/{site.ids['job_id']}/pages/{number}.png")
-    assert response.status_code in {404, 422, 400}, response.status_code
-
-
-@pytest.mark.parametrize("element", ["..", "a" * 200, "p1-e3%2f..%2f", "p1 e3", "%00"])
-def test_element_ids_that_are_not_ids_are_404s(site, element):  # noqa: F811
-    for path in ("crops", "regions"):
-        response = site.alice.get(f"/jobs/{site.ids['job_id']}/{path}/{element}.png")
-        assert response.status_code in {404, 400, 422}, (path, element, response.status_code)

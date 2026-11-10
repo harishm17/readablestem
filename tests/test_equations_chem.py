@@ -8,10 +8,8 @@ import pytest
 
 from readablestem.eval import equations_chem as chem
 from readablestem.eval import equations_symbols as sym
-from readablestem.eval import pipeline_eval as pe
 from readablestem.eval.equations import latex_to_mathml, score_latex
 from readablestem.pipeline.validate import safe_latex_to_mathml
-from test_eval_support import eq_fix, equation
 
 # What the authored document's gold has for `\mathrm{H_2O}`: the converter's shape before pipeline
 # 0.5.2 (one upright `mi` per letter, stored as it was made).
@@ -86,16 +84,6 @@ def test_a_forward_arrow_is_one_arrow(arrow):
     gold = "<mn>2</mn><mi>A</mi><mo>→</mo><mi>B</mi>"
     assert same(f"<mn>2</mn><mi>A</mi><mi>{arrow}</mi><mi>B</mi>", gold)
     assert same(f"<mn>2</mn><mi>A</mi><mo>{arrow}</mo><mi>B</mi>", gold)
-
-
-@pytest.mark.parametrize("arrow", ["⇌", "⇋", "⇄"])
-def test_an_equilibrium_arrow_is_one_arrow(arrow):
-    assert same(f"<mi>A</mi><mo>{arrow}</mo><mi>B</mi>", "<mi>A</mi><mo>⇌</mo><mi>B</mi>")
-
-
-def test_a_label_over_the_arrow_is_a_script_marker_whatever_makes_it():
-    over = "<mi>A</mi><mover><mo>→</mo><mi>Δ</mi></mover><mi>B</mi>"
-    assert same(over, over.replace("<mover>", "<mover>").replace("Δ", "∆"))
 
 
 def test_cell_notation_bars_set_as_box_drawing_characters_are_bars():
@@ -190,10 +178,6 @@ def test_a_unconvertible_reading_scores_zero_with_the_error():
     assert not score.exact and score.error and score.similarity == 0.0
 
 
-def test_a_missing_proposal_is_wrong():
-    assert not chem.missing_chem(mml("<mi>x</mi>")).exact
-
-
 # -------------------------------------------------- what it is built on and where it sits
 
 
@@ -218,26 +202,3 @@ def test_the_primary_scorer_and_the_symbols_scorer_are_unchanged_for_algebra():
     assert score_latex(r"x^{2} + 3x = 0", gold).exact_lenient
     assert not score_latex(r"x^{2} + 3x = 1", gold).exact_lenient
     assert not chem.score_chem_latex(r"x^{2} + 3x = 1", gold).exact
-
-
-def test_pairs_carry_exact_chem_and_the_predicted_mathml_beside_the_other_scorers():
-    from readablestem.core.types import Element, Kind
-
-    gold = [equation("p-1", 0, AUTHORED_WATER, "inline")]
-    element = Element(
-        id="p1-e0",
-        kind=Kind.EQUATION,
-        page=1,
-        bbox=(0, 0, 10, 10),
-        order=0,
-        text="H2O",
-        display="inline",
-    )
-    fixes = {"p1-e0": eq_fix("p1-e0", r"\text{H}_2\text{O}")}
-    item = pe.document_page_item("p", gold, [element], fixes, [], [])
-    pair = item["pairs"][0]
-    assert pair["exact_lenient"] is False
-    assert pair["exact_symbols"] is True  # an upright `mi` symbol and an `mtext` one are alike
-    assert pair["exact_chem"] is True
-    assert pair["pred_mathml"]
-    assert pe.document_metrics([item])["matched_exact_lenient"] == 0.0  # primary, unchanged

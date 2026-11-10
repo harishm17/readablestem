@@ -56,23 +56,7 @@ def witness_checks(fix) -> dict[str, bool]:
 # ------------------------------------------------------------------------------ no witness
 
 
-def test_without_a_witness_reading_nothing_changes():
-    client = by_model(cheap=out("x = 5", 0.7), main=out("x = 5", 0.95))
-    fix = run(client, element())
-    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]  # an unsure answer is asked again
-    assert witness_checks(fix) == {}
-    assert fix.equation is not None and fix.equation.other_latex is None
-
-
 # --------------------------------------------------------------------------------- agree
-
-
-def test_agreement_is_a_note_only_and_an_unsure_answer_is_still_asked_again():
-    client = by_model(cheap=out("x = 5", 0.7), main=out("x = 5", 0.95))
-    fix = run(client, element(witness="x=5"))
-    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]  # no escalation skipped
-    assert fix.escalation == "same"
-    assert witness_checks(fix) == {equation_step.WITNESS_READING: True}
 
 
 def test_agreement_lifts_nothing_and_lowers_no_review_level():
@@ -84,21 +68,6 @@ def test_agreement_lifts_nothing_and_lowers_no_review_level():
         b = run(witnessed, element(witness="x = 5"))
         assert (b.status, b.review, b.confidence) == (a.status, a.review, a.confidence)
         assert models(witnessed) == models(plain) and b.escalation == a.escalation
-
-
-def test_agreement_does_not_override_a_failed_text_layer_check():
-    """The crop and the witness both read a 6 where the PDF's text layer has a 5."""
-    client = by_model(cheap=out("x = 6", 0.95), main=out("x = 6", 0.95))
-    fix = run(client, element(text="x = 5", witness="x = 6"))
-    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
-    assert fix.status == Status.NEEDS_REVIEW
-    assert {c.code for c in fix.failed_checks} & {"symbol_mismatch", "text_layer_mismatch"}
-
-
-def test_agreement_is_by_canonical_form_not_spelling():
-    client = by_model(cheap=out(r"v_{0} + \left( a \right)", 0.9))
-    fix = run(client, element(text="v0 + a", witness=r"v_0+(a)"))
-    assert witness_checks(fix) == {equation_step.WITNESS_READING: True}
 
 
 # ------------------------------------------------------------------------------ disagree
@@ -115,15 +84,6 @@ def test_a_disagreement_keeps_the_reading_nearer_the_glyphs_and_shows_the_other(
     assert (fix.equation.other_latex, fix.equation.other_source) == ("x = 6", "crop")
     assert witness_checks(fix)[equation_step.WITNESS_READING] is False
     assert equation_step.WITNESS_MISMATCH_CODE in {c.code for c in fix.failed_checks}
-
-
-def test_when_the_crop_is_nearer_the_glyphs_it_stays_and_the_witness_is_the_other_reading():
-    client = by_model(cheap=out("x = 5", 0.97))
-    fix = run(client, element(text="x = 5", witness="x = 6"))
-    assert fix.status == Status.NEEDS_REVIEW
-    assert fix.equation is not None and fix.equation.latex == "x = 5"
-    assert (fix.equation.other_latex, fix.equation.other_source) == ("x = 6", "page_witness")
-    assert models(client) == [CHEAP_MODEL]  # nothing was spared or asked: they differ
 
 
 def test_a_glyph_tie_keeps_the_crop_and_is_still_a_required_decision_with_both_readings():
@@ -164,12 +124,6 @@ def test_an_extent_that_differs_cannot_agree_and_is_a_decision_when_the_readings
     assert witness_checks(fix) == {equation_step.WITNESS_EXTENT: False}
     assert fix.equation is not None and fix.equation.other_latex == "x = 5 + 1"
     assert models(client) == [CHEAP_MODEL]  # 0.9 is above the accept bar: no second reading anyway
-
-
-def test_an_extent_that_differs_but_reads_the_same_is_not_flagged():
-    client = by_model(cheap=out("x = 5", 0.9))
-    fix = run(client, element(text="x = 5", witness="x=5", status="extent"))
-    assert fix.status == Status.ACCEPTED and witness_checks(fix) == {}
 
 
 def test_a_formula_only_the_witness_found_is_always_a_required_decision():

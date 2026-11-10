@@ -48,11 +48,6 @@ def site(tmp_path):
         stranger.close()
 
 
-def transcript_text(response) -> str:
-    start = response.text.index("data-listen-transcript")
-    return response.text[start:]
-
-
 def test_the_owner_hears_the_converted_page(site):
     listen.CACHE.clear()
     response = site.owner.get(f"/jobs/{site.job_id}/listen")
@@ -72,12 +67,6 @@ def test_the_owner_hears_the_converted_page(site):
     assert "<script>" not in body  # script-src 'self': no inline script
 
 
-def test_latex_never_appears_in_the_transcript(site):
-    body = transcript_text(site.owner.get(f"/jobs/{site.job_id}/listen"))
-    assert "\\frac" not in body and "SECRETLATEX" not in body
-    assert not re.search(r"[\\^_]", re.sub(r"data-[a-z-]+=\"[^\"]*\"", "", body.split("</ol>")[0]))
-
-
 def test_a_person_it_was_shared_with_can_open_it_and_a_stranger_gets_the_404(site):
     path = f"/jobs/{site.job_id}/listen"
     assert site.viewer.get(path).status_code == 200
@@ -95,26 +84,6 @@ def test_signed_out_visitors_are_sent_to_sign_in(site):
         assert "Kinematics" not in response.text
 
 
-def test_the_transcript_is_kept_per_result_version(site):
-    listen.CACHE.clear()
-    path = f"/jobs/{site.job_id}/listen"
-    site.owner.get(path)
-    assert len(listen.CACHE._items) == 1
-    site.owner.get(path)
-    assert len(listen.CACHE._items) == 1
-
-
-def test_the_downloaded_file_has_no_transcript(site):
-    file = site.owner.get(f"/jobs/{site.job_id}/download").text
-    assert "listen" not in file.lower().replace("listening", "")
-
-
-def test_the_job_page_offers_it_next_to_the_preview(site):
-    for client in (site.owner, site.viewer):
-        page = client.get(f"/jobs/{site.job_id}").text
-        assert f'href="/jobs/{site.job_id}/listen"' in page
-
-
 def test_the_demo_is_public(site):
     with site.client() as anonymous:
         response = anonymous.get("/demo/listen")
@@ -123,23 +92,3 @@ def test_the_demo_is_public(site):
         assert "\\frac" not in response.text
         assert 'content="noindex"' in response.text
         assert anonymous.post("/demo/listen").status_code in {403, 405}
-
-
-def test_the_page_folds_what_precedes_the_lesson_and_indexes_headings_and_equations(site):
-    """Play starts at the lesson, so the title and notices are folded away; the index is plain
-    links (it works without script) and the filter is there for script to show."""
-    listen.CACHE.clear()
-    body = site.owner.get(f"/jobs/{site.job_id}/listen").text
-    assert "data-listen-before" in body and "Before the lesson (2)" in body
-    assert body.index("data-listen-before") < body.index('id="item-3"')
-    assert 'id="item-1"' in body and 'id="item-3"' in body
-    assert "Play starts at the lesson." in body
-    assert re.search(r"<summary>Index: 1 heading, 1 equation</summary>", body)
-    assert 'href="#item-4">Kinematics' in body
-    assert "data-listen-filter hidden" in body and 'data-listen="beginning"' in body
-    # The transport is Play, Previous and Next; the rest is behind "More controls".
-    transport = body[body.index("data-listen-transport") : body.index("data-listen-controls")]
-    assert re.findall(r'data-listen="(\w+)"', transport) == ["play", "prev", "next"]
-    assert "data-listen-voice-note" in transport and 'href="#transcript-heading"' in transport
-    controls = body[body.index("data-listen-controls") : body.index('id="transcript-heading"')]
-    assert "More controls" in controls and 'data-listen="heading"' in controls

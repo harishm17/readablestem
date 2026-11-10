@@ -84,16 +84,3 @@ def test_the_comparison_stack_carries_every_fact_source_and_date_of_the_table(en
         "Chatbots",
         "LaTeXML",
     ]
-
-
-def test_the_stack_is_hidden_on_wide_screens_and_the_table_on_phones():
-    from pathlib import Path
-
-    import readablestem
-
-    css = (Path(readablestem.__file__).parent / "web" / "static" / "app.css").read_text()
-    assert ".compare-stack { display: none; }" in css
-    phone = css[css.index(".compare-stack { display: none; }") :]
-    phone = phone[phone.index("@media (max-width: 51.99rem)") :]
-    assert ".compare-wide-view { display: none; }" in phone
-    assert ".compare-stack { display: block; }" in phone

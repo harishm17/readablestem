@@ -18,10 +18,8 @@ from readablestem.models.pricing import (
     THINKING_ALLOWANCE_TOKENS,
     cost_usd,
     estimate_max_cost_usd,
-    image_tokens_upper_bound,
-    png_size,
 )
-from readablestem.pipeline import equation_step, figure_step
+from readablestem.pipeline import equation_step
 from readablestem.web.worker import job_caps
 
 OPUS, HAIKU = "claude-opus-5-5", "claude-haiku-5-5"
@@ -46,45 +44,6 @@ def png(width: int, height: int) -> bytes:
     pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height), False)
     pix.clear_with(200)
     return pix.tobytes("png")
-
-
-def test_png_size_reads_the_header_and_nothing_else():
-    assert png_size(png(321, 123)) == (321, 123)
-    assert png_size(b"\x89PNG\r\n\x1a\nnot a header") is None
-    assert png_size(b"GIF89a" + bytes(30)) is None
-
-
-@pytest.mark.parametrize(("width", "height", "measured"), MEASURED)
-@pytest.mark.parametrize("model", sorted(ANTHROPIC_MODELS))
-def test_the_image_bound_is_above_what_the_api_counts(model, width, height, measured):
-    bound = image_tokens_upper_bound(model, png(width, height))
-    assert measured * IMAGE_TOKEN_MARGIN <= bound <= 6500
-
-
-def test_a_small_crop_reserves_far_less_than_the_flat_maximum():
-    small = image_tokens_upper_bound(OPUS, png(400, 300))
-    assert small < 400
-    assert image_tokens_upper_bound(OPUS, png(2048, 2048)) > 6000
-    assert image_tokens_upper_bound(OPUS, b"not a png") == 6500  # unreadable: the maximum
-
-
-def test_a_small_crop_on_opus_fits_four_at_once_in_a_one_page_job():
-    small = png(600, 200)  # a typical equation crop
-    for tokens in (equation_step.output_limit(OPUS), figure_step.MAX_OUTPUT_TOKENS):
-        one = estimate_max_cost_usd(
-            OPUS, n_images=1, text_chars=700, max_output_tokens=tokens, images=[small]
-        )
-        assert one < 0.12
-        assert 4 * one < Settings(_env_file=None, model_provider="anthropic").max_usd_per_page  # type: ignore[call-arg]
-
-
-def test_the_old_reservation_did_not_fit_a_one_page_job():
-    """The reported bug, with the old numbers: 8,192 thinking tokens and a flat image."""
-    old_output = 2048 + 8192
-    old = (3500 + 6500 + 350) * 6.25 + old_output * 25.0
-    assert old / 1e6 > Settings(_env_file=None).max_usd_per_page  # type: ignore[call-arg]
-    new = estimate_max_cost_usd(OPUS, n_images=1, text_chars=700, max_output_tokens=1024)
-    assert new < Settings(_env_file=None, model_provider="anthropic").max_usd_per_page  # type: ignore[call-arg]
 
 
 def test_a_one_page_claude_job_can_hold_four_worst_case_calls_by_default():

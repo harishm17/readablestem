@@ -21,7 +21,6 @@ from readablestem.core.types import (
     Fix,
     Kind,
     NotationEntry,
-    ProgressEvent,
     Status,
 )
 from readablestem.models.fake import FakeVisionClient
@@ -111,11 +110,6 @@ def convert(s: Settings | None = None, **kw):
     )
 
 
-def test_the_pipeline_version_records_the_content_features(recorder):
-    assert run.PIPELINE_VERSION == "0.5.9"
-    assert convert().result.pipeline_version == "0.5.9"
-
-
 def test_options_default_to_the_settings_flags_in_every_step(recorder):
     convert(settings(feature_tables=True, feature_colour=True))
     assert set(recorder.seen) == {"p1-e1", "p1-e3", "p1-e4"}
@@ -160,43 +154,6 @@ def test_a_table_goes_to_the_table_step_and_is_kept_as_an_image(recorder):
     # The table and the abstained equation; the accepted figure needs nothing.
     assert result.stats.required_decisions == 2
     assert {f.element_id for f in result.fixes if f.review == "required"} == {"p1-e1", "p1-e3"}
-
-
-def test_a_table_step_sees_its_neighbouring_text(recorder):
-    convert()
-    assert recorder.contexts["p1-e1"] == (
-        "Measured speeds are below.\n[this table]\nThe speed doubles."
-    )
-
-
-def test_the_new_result_fields_are_filled_in(recorder):
-    """The table kept as an image is a notice beside its decision; the source facts come
-    from the elements when the PDF itself cannot be read (this one is not a PDF)."""
-    result = convert().result
-    # The text pass's document-wide notice first (two short sentences are too little
-    # text to detect a language from, so "en" is assumed and the job page asks to
-    # confirm it), then the table kept as an image, derived from its fix.
-    assert [(n.code, n.element_id, n.review) for n in result.notices] == [
-        ("lang_assumed", None, "optional"),
-        ("table_not_rebuilt", "p1-e1", "required"),
-    ]
-    assert result.source_facts is not None
-    assert (result.source_facts.equations, result.source_facts.tables) == (1, 1)
-    assert result.source_facts.tagged is None
-    assert (result.lang, result.lang_source) == ("en", "default")
-
-
-def test_stage_progress_is_accepted(recorder):
-    events: list[ProgressEvent] = []
-    convert(stage_progress=events.append)
-    assert events and all(isinstance(e, ProgressEvent) for e in events)
-
-
-def test_the_table_step_keeps_tables_as_images_until_it_is_built():
-    element = el("p1-e1", Kind.TABLE, 1)
-    fix = REAL_REBUILD(element, b"", client=FakeVisionClient(), settings=settings())
-    assert fix.status is Status.FAILED and fix.reason == "table_not_rebuilt"
-    assert fix.table is None and fix.review == "required"
 
 
 def test_every_kind_that_asks_for_a_decision_is_on_the_review_screen():

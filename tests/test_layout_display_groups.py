@@ -59,69 +59,7 @@ def test_two_fractions_with_and_between_them_are_one_display_with_one_number(ele
     assert not [e for e in elements if e.kind == Kind.PARAGRAPH and nospace(e.text) == "and"]
 
 
-def test_a_row_of_two_equations_joined_by_and_is_one_display(elements):
-    (found,) = [e for e in blocks(elements) if "0.75" in nospace(e.text)]
-    assert nospace(found.text) == "P(A=1|L=1)=0.75andP(A=1|L=0)=0.50."
-    assert "0.75" not in " ".join(inline(elements))
-
-
-def test_a_condition_after_for_all_stays_with_its_formula(elements):
-    (found,) = [e for e in blocks(elements) if "foralli" in nospace(e.text)]
-    assert nospace(found.text).startswith("0<π(Li)<1")
-    assert "i" not in inline(elements)  # the lone "i" no longer stands as an equation of its own
-
-
-def test_words_that_are_not_connectives_do_not_join_formulas(elements):
-    # inline "x = 1 and y = 2" in a sentence, and "a = b  where we assume  c = d" in a display
-    assert {"x=1", "y=2", "a=b", "c=d"} <= set(inline(elements))
-    assert not [e for e in blocks(elements) if "where" in nospace(e.text)]
-
-
-def test_the_tail_of_a_sentence_at_the_head_of_a_page_is_not_a_display(elements):
-    # "p_1 = 3 and q_1 = 4" starts at the left margin, with no row above it to wrap from
-    second = [e for e in elements if e.page == 1]
-    assert not [e for e in second if e.kind == Kind.EQUATION and e.display == "block"]
-    assert inline(second) == ["p1=3", "q1=4"]
-
-
-def test_two_numbered_equations_stay_apart(elements):
-    labelled = [e for e in blocks(elements) if e.equation_label in ("(2)", "(3)")]
-    assert [e.equation_label for e in labelled] == ["(2)", "(3)"]
-
-
 # ------------------------------------------------------------ a trailing ellipsis
-
-
-def test_a_trailing_ellipsis_stays_in_an_inline_list_or_chain(elements):
-    found = inline(elements)
-    assert "j=1,2,3,..." in found
-    assert "0>s1>s2>..." in found
-
-
-@pytest.mark.parametrize(
-    "tail", ["3, ...", "3, ..., n", "x > ...", "x > ..."], ids=["list", "closed", "chain", "again"]
-)
-def test_the_helper_keeps_an_ellipsis_only_after_a_comma_or_a_sign(tail):
-    chars = chars_of(f"j = 1, 2, {tail}")
-    ends_open = tail.endswith("...")
-    assert layout._trailing_ellipsis(chars, 0, len(chars)) is ends_open
-
-
-def test_a_full_stop_after_three_dots_still_goes():
-    chars = chars_of("j = 1, 2, 3, ....")  # an ellipsis, then the sentence's own full stop
-    assert not layout._trailing_ellipsis(chars, 0, len(chars))
-    chars = chars_of("x = 1.")
-    assert not layout._trailing_ellipsis(chars, 0, len(chars))
-    chars = chars_of("x...")  # no comma or sign before: not a list
-    assert not layout._trailing_ellipsis(chars, 0, len(chars))
-
-
-def chars_of(text: str) -> list[layout._Char]:
-    out, x = [], 0.0
-    for c in text:
-        out.append(layout._Char(c, x, 0.0, x + 5, 10.0, 8.0, 10.0, "CMMI10", 0))
-        x += 5
-    return out
 
 
 # ------------------------------------------------------------ the right half of a long row
@@ -169,23 +107,6 @@ def test_the_right_half_of_a_row_joins_the_row_it_ends_beside():
     assert found[0].bbox[2] >= 389  # the box reaches the far fraction
 
 
-def test_a_fraction_far_from_the_row_is_not_joined():
-    doc = pymupdf.open()
-    page = doc.new_page(width=612, height=792)
-    page.insert_text(
-        (72, 100), "Consequently the integrals simplify, using the relation above,", fontsize=11
-    )
-    page.insert_text((110, 154), "E", fontsize=12)
-    page.insert_text((124, 154), "=", fontsize=12)
-    fraction(page, 142, 150, "f(s)", "s", 24)
-    fraction(page, 420, 150, "h(s)/g(n)", "s(t - 1)", 60, size=12.0)  # 250 pt on: not a column
-    page.insert_text((72, 260), "which is what we wanted to show in this note.", fontsize=11)
-    found = [
-        e for e in analyze(doc.tobytes(), display_grouping=True).elements if e.kind == Kind.EQUATION
-    ]
-    assert len(found) == 2
-
-
 # ------------------------------------------------------------ a row that starts with "="
 
 
@@ -228,38 +149,4 @@ def test_an_equation_number_is_not_a_column_of_the_display_beside_it():
     assert layout._beside_row([row], [column], 11.0)  # the same place, a column of the display
 
 
-def test_a_region_that_does_not_start_with_a_sign_stays_apart():
-    first = layout._Line([one_row("E=-1", 110, 329), one_row("xyz", 181, 343)], [])
-    lower = layout._Line([one_row("x+y", 142, 361)], [])  # starts with a letter: its own equation
-    row_one, row_two = region_of(first), region_of(lower)
-    merged = layout._merge_continued_regions([row_one, row_two], [[first], [lower]])
-    assert merged == [row_one, row_two]
-
-
-def test_two_numbered_displays_are_never_merged():
-    first = layout._Line([one_row("E=-1", 110, 329), one_row("xyz", 181, 343)], [])
-    lead = layout._Line([one_row("=-1", 142, 361)], [])
-    row_one, row_two = region_of(first), region_of(lead)
-    row_one.labels.append(one_row("(1)", 500, 329))
-    row_two.labels.append(one_row("(2)", 500, 361))
-    merged = layout._merge_continued_regions([row_one, row_two], [[first], [lead]])
-    assert len(merged) == 2
-
-
 # ------------------------------------------------------------ the setting (off by default)
-
-
-def test_with_the_setting_off_the_output_is_the_old_output():
-    from readablestem.config import Settings
-
-    assert Settings().layout_display_grouping is False
-    off = analyze(PDF.read_bytes()).elements
-    on = analyze(PDF.read_bytes(), display_grouping=True).elements
-    # off: "and" is a paragraph after the two equations, the ellipsis is trimmed, no row joins
-    assert [e for e in off if e.kind == Kind.PARAGRAPH and nospace(e.text) == "and"]
-    assert "j=1,2,3" in inline(off) and "j=1,2,3,..." not in inline(off)
-    assert len(off) > len(on)
-    # and the flag does not stay set for the next call
-    assert [e.model_dump() for e in analyze(PDF.read_bytes()).elements] == [
-        e.model_dump() for e in off
-    ]

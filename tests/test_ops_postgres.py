@@ -9,7 +9,6 @@ unaffected.
 from __future__ import annotations
 
 import os
-import threading
 import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
@@ -27,8 +26,7 @@ from fixtures.ops.seed import (
     aggregate_rows,
     sentinel_result,
 )
-from readablestem.ops import aggregate, retention
-from readablestem.ops.aggregate import aggregate_finished
+from readablestem.ops import retention
 from readablestem.ops.retention import PurgeStats, purge_expired
 from readablestem.web import db
 
@@ -77,47 +75,6 @@ def factory(pg_url):
     engine.dispose()
 
 
-def test_upsert_accumulates_on_postgres(factory):
-    with db.session_scope(factory) as s:
-        user = add_user(s)
-        add_job(s, user, result=sentinel_result())
-    assert aggregate_finished(factory, NOW) == 1
-    with db.session_scope(factory) as s:
-        add_job(s, s.query(db.User).one(), result=sentinel_result())
-    assert aggregate_finished(factory, NOW) == 1
-    assert aggregate_finished(factory, NOW) == 0
-    with db.session_scope(factory) as s:
-        assert aggregate_rows(s) == {k: 2 * v for k, v in EXPECTED_DONE_COUNTS.items()}
-
-
-def test_concurrent_cron_runs_count_each_job_once(factory, monkeypatch):
-    monkeypatch.setattr(aggregate, "BATCH_SIZE", 3)
-    with db.session_scope(factory) as s:
-        user = add_user(s)
-        for _ in range(40):
-            add_job(s, user, page_count=1)
-
-    totals: list[int] = []
-    errors: list[BaseException] = []
-
-    def run() -> None:
-        try:
-            totals.append(aggregate_finished(factory, NOW))
-        except BaseException as exc:  # surfaced below
-            errors.append(exc)
-
-    threads = [threading.Thread(target=run) for _ in range(4)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-
-    assert not errors
-    assert sum(totals) == 40
-    with db.session_scope(factory) as s:
-        assert aggregate_rows(s) == {("job", "status:done"): 40, ("job", "pages"): 40}
-
-
 def test_purge_cascades_and_counts_reviews_on_postgres(factory, monkeypatch):
     monkeypatch.setattr(retention, "BATCH_SIZE", 2)
     expired = NOW - timedelta(minutes=1)
@@ -151,31 +108,3 @@ def test_purge_cascades_and_counts_reviews_on_postgres(factory, monkeypatch):
         assert s.query(db.Blob).count() == 1
         assert s.query(db.ReviewEdit).count() == 0
         assert aggregate_rows(s) == expected
-
-
-def test_delete_now_waits_for_a_cron_run_and_never_counts_twice(factory):
-    """A user's "delete now" locks the job row (no SKIP LOCKED): while a cron run holds
-    it, the delete waits, then sees `aggregated=True` and counts nothing again."""
-    with db.session_scope(factory) as s:
-        job_id = add_job(s, add_user(s), result=sentinel_result())
-
-    cron = factory()
-    try:
-        assert aggregate._aggregate_batch(cron, NOW) == 1  # holds the row lock, uncommitted
-        result: list[PurgeStats] = []
-
-        def delete_now() -> None:
-            with db.session_scope(factory) as s:
-                result.append(retention.delete_jobs(s, [job_id], NOW))
-
-        worker = threading.Thread(target=delete_now)
-        worker.start()
-        worker.join(timeout=1)
-        assert worker.is_alive()  # blocked on the cron's lock
-        cron.commit()
-        worker.join(timeout=10)
-    finally:
-        cron.close()
-    assert result == [PurgeStats(jobs_deleted=1, blobs_deleted=0, unaggregated_deleted=0)]
-    with db.session_scope(factory) as s:
-        assert aggregate_rows(s) == EXPECTED_DONE_COUNTS

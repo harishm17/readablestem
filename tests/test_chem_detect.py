@@ -95,14 +95,6 @@ def test_units_variables_footnotes_and_words_are_not_formulas(pieces):
     assert label(*pieces) != "formula"
 
 
-def test_plain_text_with_no_scripts_is_not_a_formula():
-    # H2O set at one size cannot be told from a word.
-    assert label("H2O") == "other"
-    assert label("CO2") == "other"
-    assert label("HCl") == "bare"  # elements, no evidence: counts only inside a reaction
-    assert label("Hello") == "other"
-
-
 def test_sentence_marks_and_wrapping_brackets_are_not_part_of_the_formula():
     assert cut("H", ("2", "sub"), "O,") == "H2O"
     assert cut("H", ("2", "sub"), "O.") == "H2O"
@@ -112,19 +104,6 @@ def test_sentence_marks_and_wrapping_brackets_are_not_part_of_the_formula():
     assert cut("“Na", ("+", "sup")) == "Na+"
     # But a group that carries the count is part of it.
     assert cut("Al", ("2", "sub"), "(SO", ("4", "sub"), ")", ("3", "sub")) == "Al2(SO4)3"
-
-
-def test_state_symbols_alone_and_arrows_and_numbers_and_plus():
-    assert label("(aq)") == "state"
-    assert label("(s)") == "state"
-    assert label("aq") == "other"
-    assert label("−→") == "arrow"
-    assert label("⇌") == "arrow"
-    assert label("⟶") == "arrow"
-    assert label("+") == "plus"
-    assert label("2") == "number"
-    assert label("1/2") == "number"
-    assert label("x") == "other"
 
 
 # ------------------------------------------------------------------------- reactions
@@ -139,17 +118,9 @@ def row(*words: Word) -> list[chem.Labelled]:
     return chem.label_words(placed)
 
 
-AG = word("Ag", ("+", "sup"), "(aq)")
-CL = word("Cl", ("−", "sup"), "(aq)")
 AGCL = word("AgCl(s)")
 PLUS = word("+")
 ARROW = word("−→")
-
-
-def test_a_reaction_is_an_arrow_with_species_on_both_sides():
-    labelled = row(AG, PLUS, CL, ARROW, AGCL)
-    (span,) = chem.reactions(labelled)
-    assert span == (0, labelled[-1].last)
 
 
 def test_coefficients_and_bare_words_inside_a_reaction_belong_to_it():

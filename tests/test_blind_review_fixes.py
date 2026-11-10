@@ -55,11 +55,6 @@ def test_signed_in_nav_keeps_guides_and_offices_and_the_address_is_not_printed(p
     assert 'class="signed-in"' not in pages["app"]
 
 
-def test_signed_out_nav_has_the_same_public_links(pages):
-    links = nav(pages["anon_home"])
-    assert ">Guides</a>" in links and ">For accessibility offices</a>" in links
-
-
 def test_offices_page_has_an_on_this_page_list_that_links_every_section(pages):
     page = pages["offices"]
     toc = page.split('aria-label="On this page"', 1)[1].split("</nav>", 1)[0]

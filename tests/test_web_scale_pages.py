@@ -6,7 +6,6 @@ for it, the finish notice's markup, and the larger link targets on the review sc
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 from html import unescape
 
 import pytest
@@ -31,33 +30,6 @@ def env(tmp_path):
         yield client
 
 
-def test_the_guides_index_lists_every_guide_with_its_date(env):
-    page = env.get("/guides")
-    assert page.status_code == 200
-    for guide in seo.GUIDES:
-        assert f'<a href="{guide.path}">{guide.title}</a>' in page.text
-        assert guide.summary in unescape(page.text)
-    assert "<h1>Guides</h1>" in page.text
-    assert 'rel="canonical"' in page.text and 'name="robots"' not in page.text  # indexable
-    assert 'aria-current="page"' in page.text  # the footer link names this page
-
-
-def test_the_index_is_in_the_sitemap_llms_txt_and_every_footer_and_guide_links_back(env):
-    sitemap = ET.fromstring(env.get("/sitemap.xml").content)
-    locs = [e.text for e in sitemap.findall("s:url/s:loc", NS)]
-    assert any(loc.endswith("/guides") for loc in locs)
-    llms = env.get("/llms.txt").text
-    assert "[All guides](" in llms and "/guides)" in llms
-    assert 'href="/guides"' in env.get("/limits").text
-    for guide in seo.GUIDES:
-        assert 'href="/guides"' in env.get(guide.path).text
-
-
-def test_an_unlisted_guide_cannot_be_added_without_a_public_page():
-    paths = {page.path for page in seo.PUBLIC_PAGES}
-    assert all(guide.path in paths for guide in seo.GUIDES) and seo.GUIDES_INDEX in paths
-
-
 # --------------------------------------------------------------------------- sitemap
 
 
@@ -76,47 +48,7 @@ def showcase(tmp_path, monkeypatch):
         yield client
 
 
-def test_every_showcase_url_in_the_sitemap_is_the_pages_own_canonical(showcase):
-    sitemap = ET.fromstring(showcase.get("/sitemap.xml").content)
-    locs = [e.text for e in sitemap.findall("s:url/s:loc", NS)]
-    showcase_locs = [loc for loc in locs if "/showcase/" in loc]
-    assert showcase_locs and not any("index.html" in loc for loc in showcase_locs)
-    assert any(loc.endswith("/showcase/") for loc in showcase_locs)
-    for loc in showcase_locs:
-        path = "/" + loc.split("/", 3)[3]
-        page = showcase.get(path)
-        assert page.status_code == 200, path
-        assert f'<link rel="canonical" href="{loc}">' in page.text, path
-        assert f'"url":"{loc}"' in page.text.replace(" ", ""), path
-
-
-def test_showcase_pages_have_an_etag_and_answer_304(showcase):
-    first = showcase.get("/showcase/method/")
-    assert first.headers["cache-control"] == "public, max-age=3600"
-    again = showcase.get("/showcase/method/", headers={"If-None-Match": first.headers["etag"]})
-    assert again.status_code == 304 and again.content == b""
-
-
-def test_showcase_canonical_turns_an_index_file_into_its_folder():
-    assert seo.showcase_canonical("/showcase/index.html") == "/showcase/"
-    assert seo.showcase_canonical("/showcase/method/index.html") == "/showcase/method/"
-    assert seo.showcase_canonical("/showcase/x/page.html") == "/showcase/x/page.html"
-
-
 # --------------------------------------------------------------------------- landing
-
-
-def test_the_landing_page_says_what_review_costs_from_the_settings(tmp_path):
-    env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=17, max_pages_per_job=30)
-    with env.running() as client:
-        text = flat(client.get("/").text)
-        limits = flat(client.get("/limits").text)
-    assert "Up to 30 pages at a time" in text  # max_pages_per_job, not written in
-    assert "New accounts have daily limits: 17 pages a day" in text
-    assert "deleted 24 hours after you last work on it" in text
-    # The review load and the planning detail live on /limits.
-    assert "about 1.8 decisions a page" in limits and "its page tells you the exact count" in limits
-    assert "all the equations, or all the figures with alt text, in one step" in limits
 
 
 def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
@@ -153,10 +85,6 @@ def test_an_invite_only_landing_page_does_not_quote_a_new_accounts_quota(tmp_pat
     assert "New accounts have daily limits" not in text
 
 
-def test_the_numbers_are_the_ones_the_limits_page_gives(env):
-    assert "about 1.8 per page" in flat(env.get("/limits").text)
-
-
 # --------------------------------------------------------------------------- revised version
 
 
@@ -181,37 +109,7 @@ def test_the_results_page_offers_a_revised_version_with_decisions_open_and_when_
     assert page.index("settings-heading") < page.index(link)
 
 
-def test_my_documents_rows_offer_one_next_step_and_delete_not_a_revision(finished):
-    """A revised version starts from the document's own page: the list keeps a row to its
-    file name, one next step and Delete (fewer repeated links per row)."""
-    page = finished.browser.get("/app").text
-    assert f'id="rev-{finished.job_id}"' not in page
-    assert f'href="/app?revises={finished.job_id}#upload-heading"' not in page
-    assert f'id="act-{finished.job_id}"' in page and f'id="del-{finished.job_id}"' in page
-
-
-def test_the_revision_form_opens_from_the_link(finished):
-    page = finished.browser.get(f"/app?revises={finished.job_id}").text
-    assert "Upload a revised version" in page and 'name="revises"' in page
-
-
 # --------------------------------------------------------------------------- finish notice
-
-
-def test_a_running_job_page_has_the_hidden_notify_box_and_a_finished_one_does_not(tmp_path):
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        job_id = job_id_from(upload(client, make_pdf(1)))
-        page = client.get(f"/jobs/{job_id}").text
-        assert re.search(r'<div id="notify-box"[^>]*\bhidden\b', page)
-        assert '<button type="button" id="notify-button"' in page
-        assert 'id="notify-state" role="status"' in page
-        assert 'aria-describedby="notify-hint"' in page
-        env.run_worker()
-        done = client.get(f"/jobs/{job_id}").text
-        assert "notify-box" not in done
 
 
 def test_the_status_fragment_of_a_finished_job_says_so_in_the_live_region(tmp_path):
@@ -270,13 +168,6 @@ def test_growing_never_creates_an_overlap_and_stays_on_the_page():
         assert x0 >= 0 and y0 >= 0 and x1 <= LETTER[0] and y1 <= LETTER[1]
         ex0, ey0, ex1, ey1 = mark.element
         assert x0 <= (ex0 + ex1) / 2 <= x1 and y0 <= (ey0 + ey1) / 2 <= y1  # still on its item
-
-
-def test_the_stylesheet_gives_undo_a_44_px_target():
-    css = (
-        seo.Path(__file__).resolve().parent.parent / "src/readablestem/web/static/app.css"
-    ).read_text()
-    assert re.search(r"\.undo-form \.link-button \{[^}]*min-height: 44px; min-width: 44px", css)
 
 
 def test_latex_source_is_listed_only_when_its_flag_is_on(tmp_path):

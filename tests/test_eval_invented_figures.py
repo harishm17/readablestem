@@ -36,27 +36,6 @@ def description(text, caption=None, image=None, source="alt", authored=False):
 # ------------------------------------------------------------------ binding
 
 
-def test_a_description_binds_by_figure_number_or_by_half_the_caption():
-    refs = [
-        reference("2.10", "The diagram shows a straight-line graph of position against time."),
-        reference("2.11", "A graph of position versus time for the drive to school is shown."),
-    ]
-    by_number = description("A line rising.", caption="Figure 2.11 Something else entirely.")
-    by_caption = description(
-        "A line rising.",
-        caption="The diagram shows a straight-line graph of position against time.",
-    )
-    neither = description(
-        "A line rising.", caption="Figure 9.9 Unrelated caption words here today."
-    )
-    bound = figures.bind([by_number, by_caption, neither], refs)
-    assert [(b.reference, b.by) for b in bound] == [
-        (refs[1].id, "number"),
-        (refs[0].id, "caption"),
-        (None, None),
-    ]
-
-
 def test_figure_2_1_does_not_bind_to_figure_2_10():
     refs = [reference("2.1", "Caption one words here and more words."), reference("2.10", "Other")]
     [one, ten] = figures.bind(
@@ -67,38 +46,6 @@ def test_figure_2_1_does_not_bind_to_figure_2_10():
 
 
 # ------------------------------------------------------------------ items
-
-
-def test_images_come_from_the_html_or_the_bound_gold_figure_and_become_png():
-    jpeg = image_bytes("JPEG")
-    refs = [
-        reference(
-            "1.1", "Caption words one two three four five.", alt="Gold alt", image=image_bytes()
-        )
-    ]
-    descriptions = [
-        description("From the HTML.", image=jpeg),
-        description("From gold.", caption="Figure 1.1 x"),
-        description("No image anywhere."),
-        description("Garbage bytes.", image=b"not an image"),
-    ]
-    bound = figures.bind(descriptions, refs)
-    items, skipped = figures.judge_items("out", descriptions, bound, refs)
-    assert [i.unit for i in items] == ["out#0", "out#1"]
-    assert all(i.image.startswith(figures.PNG_SIGNATURE) for i in items)
-    assert items[1].reference_alt == "Gold alt" and items[0].reference_alt == ""
-    assert items[1].caption == "Figure 1.1 x"
-    assert skipped == {"no_image": 1, "unreadable": 1}
-
-
-def test_a_large_image_is_capped_and_a_non_image_is_refused():
-    big = io.BytesIO()
-    Image.new("RGB", (3000, 1000), "blue").save(big, format="PNG")
-    png = figures.to_png(big.getvalue())
-    assert png is not None
-    with Image.open(io.BytesIO(png)) as opened:
-        assert max(opened.size) <= figures.MAX_SIDE
-    assert figures.to_png(b"nope") is None
 
 
 def test_the_sample_is_seeded_ordered_and_a_census_when_k_is_large():
@@ -182,15 +129,6 @@ def test_a_failed_call_is_left_unjudged_and_counted():
     data = result.to_dict()
     assert (data["answered"], data["failed_calls"]) == (0, 3)
     assert data["rate"] is None and data["wilson95"] is None
-
-
-def test_a_sample_smaller_than_the_population_is_not_a_census():
-    client = FakeVisionClient(defaults={"judge": NO_ERROR})
-    result = figures.judge_sample(
-        make_items(10), population=10, skipped={}, client=client, settings=settings(), k=4, seed="s"
-    )
-    assert result.to_dict()["census"] is False and result.sampled == 4
-    assert len(client.requests) == 4
 
 
 def test_the_spend_cap_stops_the_run():

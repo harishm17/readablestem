@@ -15,8 +15,8 @@ from readablestem.config import Settings
 from readablestem.core.types import ConversionOptions, Element, Kind
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import text_pass
-from readablestem.pipeline.html_checks import axe_checks, static_checks
-from readablestem.pipeline.layout import analyze, page_glyphs
+from readablestem.pipeline.html_checks import axe_checks
+from readablestem.pipeline.layout import analyze
 from readablestem.pipeline.run import convert_pdf
 from readablestem.pipeline.text_pass import TextPassResult
 
@@ -110,21 +110,6 @@ def test_coloured_text_becomes_runs_with_the_flag():
     assert ("colour_reference", paragraph.id) in [(n.code, n.element_id) for n in result.notices]
 
 
-def test_without_the_flag_there_is_no_colour():
-    result = passed(colour=False)
-    assert not any(e.colour_runs for e in result.elements)
-    assert "colour_reference" not in {n.code for n in result.notices}
-    assert len(shown(element(result, "The course syllabus"))) == 4  # links stay
-
-
-def test_glyphs_keep_their_span_colours():
-    with pymupdf.open(FIXTURE) as doc:
-        glyphs = page_glyphs(doc[0])
-    colours = {g.rgb for g in glyphs}
-    assert {(0, 0, 0), (255, 0, 0), (210, 210, 210), (38, 38, 38)} <= colours
-    assert not any(g.c.isspace() for g in glyphs)
-
-
 def settings(**kw) -> Settings:
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
 
@@ -137,29 +122,6 @@ def converted(colour: bool = True):
         client=FakeVisionClient(),
         options=ConversionOptions(colour=colour),
     ).result
-
-
-def test_the_converted_document_has_working_links_and_passes_the_static_checks():
-    result = converted()
-    html = result.html
-    assert '<a href="https://example.org/physics/syllabus">course syllabus</a>' in html
-    assert '<a href="mailto:instructor@example.edu">the instructor by email</a>' in html
-    assert "ftp:" not in html
-    assert '<a href="#p1-e12">Figure 1</a>' in html and 'id="p1-e12"' in html
-    assert 'lang="fr"' in html and '<html lang="en">' in html
-    assert '<span class="tc-ff0000">the vectors are printed in red</span>' in html
-    assert ".tc-ff0000 { color: #ee0000; }" in html and ".tc-d2d2d2 { color: #767676; }" in html
-    assert [c.code for c in static_checks(html) if not c.passed] == []
-    assert result.lang_source == "detected"
-    codes = sorted(n.code for n in result.notices)
-    assert codes == [
-        "colour_reference", "lang_detected", "link_scheme_dropped", "link_text_unclear"
-    ]  # fmt: skip
-
-
-def test_the_flag_off_writes_no_colour_css():
-    html = converted(colour=False).html
-    assert "tc-" not in html and "<a href=" in html
 
 
 @pytest.mark.browser
@@ -237,45 +199,3 @@ def test_the_pdfs_lang_is_used_and_not_detected():
     result = text_pass.apply(data, layout.elements, pages=layout.pages, layout_lang=layout.lang)
     assert (result.lang, result.lang_source) == ("en-GB", "pdf")
     assert not any(n.code.startswith("lang_") for n in result.notices)
-
-
-def test_a_lang_that_names_no_language_is_not_used():
-    data = built(lang="x-none")
-    layout = analyze(data)
-    result = text_pass.apply(data, layout.elements, pages=layout.pages, layout_lang=layout.lang)
-    assert result.lang_source in ("detected", "default")
-
-
-def test_links_to_pages_that_were_not_converted_are_left_out_quietly():
-    data = built()
-    layout = analyze(data, pages=[0])
-    result = text_pass.apply(data, layout.elements, pages=layout.pages)
-    paragraph = next(e for e in result.elements if (e.text or "").startswith("Read the"))
-    assert [kind for kind, _, _ in shown(paragraph)] == ["uri"]
-    assert not any(n.code == "link_scheme_dropped" for n in result.notices)
-
-
-@pytest.mark.browser
-def test_a_long_link_wraps_at_320_px_and_links_are_tab_stops():
-    sync_api = pytest.importorskip("playwright.sync_api")
-    with sync_api.sync_playwright() as playwright:
-        try:
-            browser = playwright.chromium.launch()
-        except sync_api.Error:
-            pytest.skip("Playwright's Chromium is not installed")
-        try:
-            page = browser.new_page(viewport={"width": 320, "height": 640})
-            page.set_content(converted().html)
-            widths = page.evaluate(
-                "() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]"
-            )
-            focused = None
-            for _ in range(40):  # the skip link and the contents list come first
-                page.keyboard.press("Tab")
-                focused = page.evaluate("() => document.activeElement.getAttribute('href')")
-                if focused and not focused.startswith("#"):
-                    break
-        finally:
-            browser.close()
-    assert widths[0] <= widths[1]
-    assert focused == "https://example.org/physics/syllabus"

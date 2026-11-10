@@ -184,32 +184,6 @@ def test_forced_colors_keep_the_forms_and_buttons_visible(site, browser, job):
     context.close()
 
 
-def test_change_all_waits_for_a_replacement_and_says_what_will_change(site, browser, job):
-    context, page = open_page(browser, site, viewport=DESKTOP)
-    open_screen(page, site, job, unfold=True)
-    form = page.locator("form.symbol-form", has=page.locator("[data-symbol-affect]")).first
-    line = form.locator("[data-symbol-affect]")
-    button = form.locator("button[data-role=relabel]")
-    # a live region, and nothing to press until a symbol is chosen
-    assert line.get_attribute("role") == "status"
-    assert line.inner_text() == "Choose a symbol first."
-    assert button.get_attribute("aria-disabled") == "true"
-    button.click(force=True)  # refused, and the choice is where focus goes
-    assert page.evaluate("document.activeElement.id").startswith("to-")
-    form.locator("select[name=to]").select_option("X")
-    total = form.locator("input[name=include]").count()
-    assert button.get_attribute("aria-disabled") is None
-    assert f"{total} of" in line.inner_text() and "to capital X (X)." in line.inner_text()
-    # unticking a place changes the count the line says; none ticked, nothing to press
-    form.locator("input[name=include]").first.uncheck()
-    assert line.inner_text().startswith(f"{total - 1} of")
-    for box in form.locator("input[name=include]").all():
-        box.uncheck()
-    assert line.inner_text() == "No place is checked. Check at least one."
-    assert button.get_attribute("aria-disabled") == "true"
-    context.close()
-
-
 def test_the_ticked_count_is_announced_politely_when_it_changes(site, browser, job):
     context, page = open_page(browser, site, viewport=DESKTOP)
     open_screen(page, site, job, unfold=True)

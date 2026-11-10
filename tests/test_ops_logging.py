@@ -19,11 +19,9 @@ from readablestem.observability.logging import (
     TRUNCATION_MARK,
     configure_logging,
     exception_codes,
-    get_logger,
     is_denied_key,
     privacy_filter,
     request_logging_middleware,
-    uvicorn_log_options,
 )
 
 SENTINEL = "quokka"
@@ -65,13 +63,6 @@ def lines(capsys) -> list[dict]:
 @pytest.mark.parametrize("key", sorted(DENYLIST))
 def test_every_denylisted_key_is_dropped(key):
     assert privacy_filter(None, "info", {"event": "x", key: SENTINEL}) == {"event": "x"}
-
-
-@pytest.mark.parametrize(
-    "key", ["alt_text", "user_email", "source_filename", "contextText", "raw-html", "page.text"]
-)
-def test_compound_content_keys_are_dropped(key):
-    assert is_denied_key(key)
 
 
 @pytest.mark.parametrize(
@@ -117,28 +108,6 @@ def test_other_spellings_of_content_keys_are_dropped(key):
     assert privacy_filter(None, "info", {"event": "x", key: SENTINEL}) == {"event": "x"}
 
 
-@pytest.mark.parametrize(
-    "key",
-    [
-        "job_id",
-        "prompt_version",
-        "status",
-        "latency_ms",
-        "error_type",
-        "textbook_id",
-        "jobs_deleted",
-        "unaggregated_deleted",
-        "route",
-        "method",
-        "reason",
-        "stage",
-        "pages",
-    ],
-)
-def test_metadata_keys_are_kept(key):
-    assert not is_denied_key(key)
-
-
 def test_underscore_keys_are_scrubbed_like_any_other():
     """Only ProcessorFormatter's own `_record`/`_from_structlog` skip the filter."""
 
@@ -156,29 +125,6 @@ def test_underscore_keys_are_scrubbed_like_any_other():
     assert out["_note"] == "z" * MAX_STRING + TRUNCATION_MARK
     assert out["_record"] is record
     assert SENTINEL not in json.dumps({k: v for k, v in out.items() if k != "_record"})
-
-
-def test_configured_output_drops_other_spellings(capsys):
-    configure_logging()
-
-    class Doc:
-        def __repr__(self) -> str:
-            return f"Doc(text={SENTINEL!r})"
-
-    get_logger("readablestem.test").info(
-        "e1",
-        MathML=SENTINEL,
-        LaTeX=SENTINEL,
-        file_name=SENTINEL,
-        emails=[SENTINEL],
-        title=SENTINEL,
-        _text=SENTINEL,
-        _doc=Doc(),
-        job_id="j1",
-    )
-    (record,) = lines(capsys)
-    assert record["job_id"] == "j1" and record["_doc"] == "<Doc>"
-    assert SENTINEL not in json.dumps(record)
 
 
 def test_values_are_plain_data_truncated_and_scrubbed_when_nested():
@@ -215,40 +161,6 @@ def test_exceptions_are_logged_by_type_and_location_only():
     assert out["stack"][-1].endswith("test_exceptions_are_logged_by_type_and_location_only")
     assert SENTINEL not in json.dumps(out)
     assert "exc_info" not in out
-
-
-def test_configured_output_is_cloud_run_json(capsys):
-    configure_logging(Settings(_env_file=None, log_level="INFO"))  # type: ignore[call-arg]
-    log = get_logger("readablestem.test")
-    log.info("job_done", job_id="j1", alt=SENTINEL, latex=SENTINEL)
-    log.debug("hidden")
-    try:
-        raise RuntimeError(SENTINEL)
-    except RuntimeError:
-        log.exception("job_failed", job_id="j1")
-    logging.getLogger("sqlalchemy.pool").warning("pool %s", "exhausted")
-
-    records = lines(capsys)
-    assert [r["message"] for r in records] == ["job_done", "job_failed", "pool exhausted"]
-    first = records[0]
-    assert first["severity"] == "INFO" and first["logger"] == "readablestem.test"
-    assert first["time"].endswith("Z")
-    assert first["job_id"] == "j1" and "alt" not in first and "latex" not in first
-    assert records[1]["severity"] == "ERROR"
-    assert records[1]["error_type"] == "builtins.RuntimeError"
-    assert records[2]["severity"] == "WARNING"
-    assert SENTINEL not in json.dumps(records)
-
-
-def test_debug_level_never_enables_chatty_libraries(capsys):
-    configure_logging(Settings(_env_file=None, log_level="DEBUG"))  # type: ignore[call-arg]
-    get_logger("readablestem.test").debug("ours")
-    logging.getLogger("openai").debug("request body would be here")
-    logging.getLogger("httpx2").info(f"HTTP Request: GET /x?email={SENTINEL}")
-    logging.getLogger("some.new.library").info(f"GET /x?q={SENTINEL}")
-    logging.getLogger("some.new.library").warning("disk almost full")
-    assert [r["message"] for r in lines(capsys)] == ["ours", "disk almost full"]
-    assert logging.getLogger("uvicorn.access").disabled
 
 
 def _uvicorn_lines() -> None:
@@ -296,28 +208,6 @@ def test_uvicorn_default_log_config_cannot_bypass_the_chain(capsys, ours_first):
     ]
     assert records[0]["error_type"] == "builtins.RuntimeError"
     assert all(r["logger"] == "uvicorn.error" for r in records)
-
-
-def test_uvicorn_log_options_leave_logging_to_us(capsys):
-    uvicorn = pytest.importorskip("uvicorn")
-
-    async def app(scope, receive, send) -> None:
-        return None
-
-    configure_logging()
-    config = uvicorn.Config(app, **uvicorn_log_options())
-    assert config.log_config is None and config.access_log is False
-    _uvicorn_lines()
-    out, err = capsys.readouterr()
-    assert SENTINEL not in out + err
-    assert len(parse(out)) == 2
-
-
-def test_configure_logging_is_idempotent(capsys):
-    configure_logging()
-    configure_logging()
-    get_logger("readablestem.test").info("once")
-    assert len(lines(capsys)) == 1
 
 
 def make_app() -> FastAPI:

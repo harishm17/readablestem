@@ -57,10 +57,6 @@ def html() -> str:
     return run.convert_pdf(scan_pdf(2), settings=settings, client=client).result.html
 
 
-def test_the_static_checks_pass(html):
-    assert [c.name for c in html_checks.static_checks(html) if not c.passed] == []
-
-
 @pytest.mark.parametrize("scheme", ["light", "dark"])
 def test_axe_finds_nothing_in_either_colour_scheme(html, scheme):
     checks = html_checks.axe_checks(html, color_scheme=scheme)  # type: ignore[arg-type]

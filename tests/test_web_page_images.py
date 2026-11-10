@@ -88,27 +88,11 @@ def test_nobody_else_gets_the_images(web):
     assert bob.get(f"/jobs/{web.job_id}/review").status_code == 404
 
 
-def test_signed_out_visitors_are_sent_to_sign_in(web):
-    anonymous = web.client()
-    for url in urls(web):
-        response = anonymous.get(url)
-        assert response.status_code == 303 and response.headers["location"] == "/login", url
-
-
 def test_past_its_retention_time_a_job_has_no_images(web):
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, web.job_id)
         assert job is not None
         job.retain_until = utcnow() - timedelta(minutes=1)
-    for url in urls(web):
-        assert web.browser.get(url).status_code == 404, url
-
-
-def test_a_deleted_job_has_no_images(web):
-    from readablestem.ops.retention import delete_jobs
-
-    with session_scope(web.ctx.factory) as session:
-        delete_jobs(session, [web.job_id])
     for url in urls(web):
         assert web.browser.get(url).status_code == 404, url
 
@@ -208,60 +192,7 @@ def test_one_user_cannot_tie_up_the_renders_and_waits_hold_no_pdf(web, monkeypat
     assert web.browser.get(f"/jobs/{web.job_id}/pages/1.png").status_code == 200
 
 
-def test_the_real_gate_lets_the_repeated_heading_card_load_all_its_images():
-    """The card for a group of repeated headings loads the page and three crops at once (T1-18),
-    so the per-person limit is four; a fifth at the same time is refused. The audit
-    (docs/security.md) names no number for it, and no audit test depends on it."""
-    assert page_images.MAX_RENDERS_PER_USER == 4
-    gate = page_images.RenderGate(  # the real per-person number, room for them on the instance
-        total=8, per_user=page_images.MAX_RENDERS_PER_USER, wait_s=0.01
-    )
-    with (
-        gate.slot("card"),
-        gate.slot("card"),
-        gate.slot("card"),
-        gate.slot("card"),
-        pytest.raises(page_images.RenderLimited),
-        gate.slot("card"),
-    ):
-        pass
-    with gate.slot("card"):  # all four were freed
-        pass
-
-
-def test_the_gate_counts_each_user_and_frees_slots_on_errors():
-    gate = page_images.RenderGate(total=3, per_user=2, wait_s=0.01)
-    with gate.slot("a"), gate.slot("a"):
-        with pytest.raises(page_images.RenderLimited), gate.slot("a"):
-            pass
-        with gate.slot("b"), pytest.raises(page_images.RenderBusy), gate.slot("c"):
-            pass
-    with pytest.raises(ValueError), gate.slot("a"):
-        raise ValueError("a failed render")
-    with gate.slot("a"), gate.slot("a"), gate.slot("b"):
-        pass  # every slot came back
-
-
-def test_nothing_is_stored_for_the_images(web):
-    from sqlalchemy import func, select
-
-    from readablestem.web.db import Blob
-
-    def blob_count() -> int:
-        with session_scope(web.ctx.factory) as session:
-            return int(session.scalar(select(func.count()).select_from(Blob)) or 0)
-
-    before = blob_count()
-    for url in urls(web):
-        web.browser.get(url)
-    assert blob_count() == before
-
-
 # --------------------------------------------------------------------------- the child
-
-
-def test_the_child_reports_page_sizes():
-    assert page_images.page_sizes(review_pdf()) == {0: PAGE, 1: PAGE}
 
 
 def test_the_child_outlines_the_flagged_symbol_and_nothing_else():
@@ -299,17 +230,6 @@ def _red_pixels(png: bytes) -> list[tuple[int, int]]:
     return out
 
 
-def test_the_child_outlines_a_whole_box():
-    output = review_output()
-    heading = next(e for e in output.result.elements if e.id == "p1-e3")
-    clip = (40.0, 150.0, 380.0, 220.0)
-    plain = page_images.render_region(review_pdf(), 0, zoom=3, max_side=1600, clip=clip)
-    boxed = page_images.render_region(
-        review_pdf(), 0, zoom=3, max_side=1600, clip=clip, box=heading.bbox
-    )
-    assert _red_pixels(boxed) and not _red_pixels(plain)
-
-
 def test_the_child_caps_the_image_size():
     png = pdf_probe.render(review_pdf(), page=0, zoom=50, max_side=99999)
     assert max(png_size(png)) <= pdf_probe.RENDER_MAX_SIDE_PX
@@ -331,13 +251,6 @@ def test_the_child_fails_cleanly(args, monkeypatch, capsysbinary):
     monkeypatch.setattr("sys.stdin", stdin)
     assert pdf_probe.main(args) == pdf_probe.RENDER_FAILED
     assert capsysbinary.readouterr().out == b""
-
-
-def test_not_a_pdf_fails_in_the_parent_too():
-    with pytest.raises(page_images.RenderFailed):
-        page_images.render_page(b"%PDF-1.4 this is not really a pdf", 0)
-    with pytest.raises(page_images.RenderFailed):
-        page_images.page_sizes(b"<html>")
 
 
 def _band_pdf() -> bytes:

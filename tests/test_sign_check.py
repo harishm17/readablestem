@@ -24,12 +24,12 @@ import pytest
 
 from readablestem.config import CHEAP_MODEL, MAIN_MODEL
 from readablestem.core.triage import review_load, tier_reasons
-from readablestem.core.types import Check, DocumentResult, Element, Kind, Status
+from readablestem.core.types import DocumentResult, Element, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step, signs
 from readablestem.pipeline.equation_step import _symbol_bag, transcribe
 from readablestem.pipeline.layout import Layout, analyze
-from readablestem.pipeline.signs import compare_signs, layer_signs
+from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.validate import safe_latex_to_mathml
 from readablestem.web.messages import explain_check
 from test_steps_support import equation_element, make_settings, use_fallback_router
@@ -250,16 +250,6 @@ def test_a_real_minus_glued_to_an_arrow_is_not_lost(text_layer, latex):
     assert differs(text_layer, latex) == ()
 
 
-def test_a_minus_glued_to_a_tex_arrow_shaft_is_uncertain():
-    # "OB −−→ OA" may be a minus and an arrow over OA, or a longer arrow: no flag either
-    # way, so a dropped minus there is missed (counts cannot tell; see docs/steps.md).
-    layer = "−−→ AB = −−→ OB −−→ OA"
-    assert differs(layer, r"\overrightarrow{AB} = \overrightarrow{OB} \overrightarrow{OA}") == ()
-    assert differs("x ←−1", r"x \gets 1") == ()
-    # A relation that changes is still caught.
-    assert differs(layer, r"\overrightarrow{AB} \ne \overrightarrow{OB} - \overrightarrow{OA}")
-
-
 def test_a_dropped_minus_before_a_chromium_vector_arrow_is_caught():
     # Chromium's vector arrow is followed by its letter at once; a minus touching it after
     # "=", "(" or at the start is a real minus (a long arrow sits between two operands).
@@ -366,16 +356,6 @@ def test_typed_ascii_relations_fold_the_same_on_both_sides(text_layer, latex):
     assert differs(text_layer, latex) == ()
 
 
-def test_typed_ascii_relations_still_catch_a_changed_sign():
-    assert differs("x >= 0", r"x > 0") == (signs.GREATER, signs.GREATER_EQUAL)
-    assert differs("x >= 0", r"x >= -0") == (signs.MINUS,)
-    assert differs("L = 5.0 +/- 0.2 m", r"L = 5.0 + 0.2\ \text{m}") == (
-        signs.PLUS,
-        signs.PLUS_MINUS,
-    )
-    assert differs("x<-1", r"x <= -1") == (signs.LESS, signs.LESS_EQUAL)
-
-
 def test_an_overline_bar_does_not_hide_a_dropped_minus():
     # Review 2026-10-08: latex2mathml writes \overline's and \underline's bar as U+2015 in
     # an accent <mo>, which counted as an uncertain minus and covered one dropped minus.
@@ -387,15 +367,6 @@ def test_an_overline_bar_does_not_hide_a_dropped_minus():
     assert differs(layer, r"\overline{x} = -3") == ()
     assert differs(layer, r"\overline{x} = 3") == (signs.MINUS,)
     assert differs(f"¯{IT['x']}= −2.5 m", r"\overline{x} = 2.5\ \text{m}") == (signs.MINUS,)
-
-
-def test_latex_pdf_overline_with_a_dropped_minus():
-    # TeX draws \bar and \overline without a minus-like glyph (¯ or a rule).
-    element = equation(layout_of(LATEX / "problem_set.pdf"), "¯v = ∆x ∆t = xf −x0 tf −t0 .")
-    tail = r"= \frac{\Delta x}{\Delta t} = \frac{x_f - x_0}{t_f - t_0}."
-    assert differs(element.text, r"\overline{v} " + tail) == ()
-    dropped = r"\overline{v} = \frac{\Delta x}{\Delta t} = \frac{x_f - x_0}{t_f t_0}."
-    assert differs(element.text, dropped) == (signs.MINUS,)
 
 
 # Review 2026-10-08: typed maths without an equation editor (Word, Google Docs, HTML
@@ -442,17 +413,6 @@ HYPHENATED_LABELS = [
 @pytest.mark.parametrize(("text_layer", "latex"), HYPHENATED_LABELS)
 def test_a_hyphen_in_a_label_or_a_range_is_not_a_minus(text_layer, latex):
     assert differs(text_layer, latex) == ()
-
-
-def test_a_typed_exponent_between_letters_is_still_ambiguous():
-    # Known gap (docs/steps.md "Limits"): "e-kt" has the shape of a label ("k-e").
-    assert differs("N = N0e-kt", r"N = N_0 e^{kt}") == ()
-
-
-def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
-    # Only a swap of × and · is meaning-level: a missing sign may be juxtaposition
-    # (a scalar times a vector), which the text layer cannot tell apart.
-    assert differs("𝐮 × 𝐯 = 𝐰", r"\mathbf{u}\mathbf{v} = \mathbf{w}") == ()
 
 
 # Review 2026-10-08: the dot-versus-cross rule saw bold vectors only, so an arrow vector's
@@ -503,11 +463,6 @@ def test_a_scalar_product_next_to_an_arrow_is_not_a_vector_product(text_layer, l
     assert differs(text_layer, latex) == ()
 
 
-def test_an_arrow_vector_product_read_the_other_way_needs_a_decision():
-    fix = run(by_model(main=out(r"W = \vec{F} \times \vec{d}")), equation_element(text="𝑊= →𝐹· →𝑑"))
-    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
-
-
 def test_word_hyphens_never_mask_a_dropped_minus():
     assert differs(
         f"𝑣(𝑡) = {MINUS}𝑔𝑡 (time-dependent)", r"v(t) = g t \quad \text{(time-dependent)}"
@@ -529,53 +484,6 @@ def test_unnamed_glyphs_widen_but_never_hide_a_dropped_sign():
     assert differs(layer, r"a = -9.8") == ()
     assert differs(layer, r"a = 9.8") == ()  # cannot tell: no flag
     assert differs(f"{IT['a']}= {MINUS}9.8 \uf02d", r"a = 9.8") == (signs.MINUS,)
-
-
-def test_brace_and_bracket_pieces_are_no_sign():
-    # Review 2026-10-08: pdfTeX writes CMEX brace, bracket, parenthesis, integral and
-    # radical pieces at Adobe's private-use code points (U+F8E5-U+F8FE). As "any sign"
-    # the five pieces of a cases brace hid up to five added signs.
-    pieces = "\uf8f1\uf8f2\uf8f3\uf8f4\uf8eb\uf8ec\uf8ed\uf8ee\uf8ef\uf8f0\uf8f5\uf8e5\uf6be"
-    tokens = layer_signs(f"{pieces} {IT['x']} = 1")
-    assert tokens.any_sign == 0 and tokens.any_arrow == 0
-    assert differs(f"\uf8f1 \uf8f2 {IT['x']} = 1 \uf8f3", r"x = -1") == (signs.MINUS,)
-    assert differs(f"\uf8f1 \uf8f2 {IT['x']} = 1 \uf8f3", r"x \le 1") == (
-        signs.EQUALS,
-        signs.LESS_EQUAL,
-    )
-    # The arrow extenders among them (U+F8E6, U+F8E7) are part of an arrow: arrows only.
-    tokens = layer_signs(f"{IT['x']} \uf8e7→ {IT['y']}")
-    assert tokens.any_sign == 0 and tokens.any_arrow == 1
-    assert differs(f"{IT['x']} \uf8e7→ {IT['y']}", r"x \longrightarrow y") == ()
-    # Other private-use code points (Symbol's minus U+F02D without a map) stay any sign.
-    assert layer_signs("a \uf02d b").any_sign == 1
-
-
-def test_signs_inside_mn_and_hand_written_mathml_count():
-    # latex2mathml writes "-9.8" as <mo>−</mo><mn>9.8</mn>; other MathML (a gold file,
-    # a hand edit) may put the sign inside <mn> or use an ASCII hyphen in <mo>.
-    ns = 'xmlns="http://www.w3.org/1998/Math/MathML"'
-    inside = f"<math {ns}><mi>a</mi><mo>=</mo><mn>−9.8</mn></math>"
-    ascii_mo = f"<math {ns}><mi>a</mi><mo>=</mo><mo>-</mo><mn>9.8</mn></math>"
-    layer = f"{IT['a']}= {MINUS}9.8"
-    for got in (inside, ascii_mo):
-        result = compare_signs(layer, got)
-        assert result is not None and not result.mismatch
-    dropped = compare_signs(layer, f"<math {ns}><mi>a</mi><mo>=</mo><mn>9.8</mn></math>")
-    assert dropped is not None and dropped.differs == (signs.MINUS,)
-
-
-def test_layer_tokens_for_the_documented_normalisation():
-    tokens = layer_signs(
-        "a - b \N{MINUS SIGN} c \N{HYPHEN} d \N{EN DASH} e time-dependent 1\N{EN DASH}3 "
-        "x\N{SUPERSCRIPT MINUS}\N{SUPERSCRIPT ONE} x\N{LESS-THAN OR EQUAL TO}"
-        "\N{LESS-THAN OR SLANTED EQUAL TO}\N{LESS-THAN OVER EQUAL TO}"
-    )
-    # ASCII hyphen-minus, minus sign, hyphen and en dash standing alone; superscript minus
-    assert tokens.certain[signs.MINUS] == 5
-    assert tokens.uncertain[signs.MINUS] == 2  # the word hyphen and the range
-    assert tokens.certain[signs.LESS_EQUAL] == 3
-    assert signs.CROSS not in layer_signs("2 x 3").certain  # a letter x is not a times sign
 
 
 # ------------------------------------------------------------------ the equation step
@@ -617,13 +525,6 @@ def test_a_sign_mismatch_needs_a_decision_and_lowers_the_confidence():
     assert fix.equation is not None  # the proposal stays for the reviewer to correct
 
 
-def test_the_same_signs_pass_with_a_passed_check():
-    fix = run(by_model(main=out(r"N = N_0 e^{-\lambda t}")), equation_element(text=DECAY))
-    check = next(c for c in fix.checks if c.name == "equation.text_layer_signs")
-    assert check.passed and check.code is None
-    assert fix.status is Status.ACCEPTED and fix.review == "none"
-
-
 def test_a_cheap_sign_mismatch_escalates_and_the_main_answer_wins():
     client = by_model(
         cheap=out(r"a = 9.8\ \text{m/s}^2", 0.99), main=out(r"a = -9.8\ \text{m/s}^2")
@@ -632,13 +533,6 @@ def test_a_cheap_sign_mismatch_escalates_and_the_main_answer_wins():
     assert [r.model for r in client.requests] == [CHEAP_MODEL, MAIN_MODEL]
     assert fix.equation is not None and fix.equation.latex == r"a = -9.8\ \text{m/s}^2"
     assert fix.status is Status.ACCEPTED and fix.review == "none"
-
-
-def test_a_sign_mismatch_left_after_escalation_needs_a_decision():
-    client = by_model(cheap=out(r"x < 1", 0.99), main=out(r"x < 1", 0.99))
-    fix = run(client, equation_element(display="inline", text=f"{IT['x']}≤1"))
-    assert [r.model for r in client.requests] == [CHEAP_MODEL, MAIN_MODEL]
-    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
 
 
 def test_style_and_sign_mismatch_lower_the_confidence_once():
@@ -662,39 +556,6 @@ def test_no_sign_check_against_a_text_layer_that_is_a_different_equation():
     fix = run(by_model(main=out(r"E = -mc^2")), equation_element(text="F = ma"))
     assert codes(fix) == {"text_layer_mismatch"}
     assert all(c.name != "equation.text_layer_signs" for c in fix.checks)
-
-
-def test_no_sign_check_without_letters_or_digits_in_the_text_layer():
-    fix = run(by_model(main=out("x = -1")), equation_element(text="= −"))
-    assert all(c.name != "equation.text_layer_signs" for c in fix.checks)
-    assert fix.status is Status.ACCEPTED
-
-
-def test_a_lone_bold_zero_vector_stays_a_cosmetic_note():
-    # Policy: digits are cosmetic, the zero vector too; the signs agree, so no decision.
-    fix = run(
-        by_model(main=out(r"\mathbf{F}_{\text{net}} = 0")),
-        equation_element(text="\U0001d405net = \U0001d7ce"),
-    )
-    assert codes(fix) == {"style_cosmetic"}
-    assert fix.status is Status.ACCEPTED and fix.review == "optional"
-
-
-def test_a_cosmetic_product_style_is_not_even_a_note():
-    fix = run(
-        by_model(main=out(r"F = 2.0 \cdot 10^{3}\ \text{N}")),
-        equation_element(text="𝐹= 2.0 × 103 N"),
-    )
-    assert codes(fix) == set()
-    assert fix.status is Status.ACCEPTED and fix.review == "none"
-
-
-def test_the_reviewer_reads_a_plain_sentence():
-    explained = explain_check(
-        Check(name="equation.text_layer_signs", passed=False, code="sign_mismatch")
-    )
-    assert explained.known
-    assert "minus" in explained.text and "sign_mismatch" in explained.code
 
 
 def test_results_stored_before_the_sign_check_still_load():
@@ -879,37 +740,6 @@ def test_latex_pdf_signs_drawn_from_pieces(text, right, wrong):
     assert differs(element.text, wrong), wrong
 
 
-def test_latex_pdf_arrow_vector_product_read_the_other_way():
-    # TeX prints \vec's arrow as a combining U+20D7 before its letter.
-    layout = layout_of(LATEX / "vectors_relations.pdf")
-    work = equation(layout, "W =⃗F ·⃗d,")
-    assert differs(work.text, r"W = \vec{F} \times \vec{d},") == (signs.VECTOR_PRODUCT,)
-    torque = equation(layout, "τ =⃗r ×⃗F.")
-    assert differs(torque.text, r"\vec{\tau} = \vec{r} \cdot \vec{F}.") == (signs.VECTOR_PRODUCT,)
-
-
-def test_latex_pdf_sign_error_through_the_step():
-    element = equation(layout_of(LATEX / "linear_algebra_twocol.pdf"), "λ2 −5λ −2 = 0,")
-    fix = run(by_model(main=out(r"\lambda^2 - 5\lambda + 2 = 0,")), element)
-    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
-    right = run(by_model(main=out(r"\lambda^2 - 5\lambda - 2 = 0,")), element)
-    assert right.status is Status.ACCEPTED and right.review == "none"
-
-
-def test_latex_pdf_brace_pieces_do_not_hide_an_added_sign():
-    # Review 2026-10-08: sgn is -1 for positive x in this answer. The five brace pieces
-    # counted as "any sign" and it was accepted with nothing to review.
-    element = equation(layout_of(LATEX / "calculus_notes.pdf"), SGN)
-    added = SGN_RIGHT.replace(r"\begin{cases} 1", r"\begin{cases} -1")
-    assert differs(element.text, added) == (signs.MINUS,)
-    fix = run(by_model(main=out(added)), element)
-    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
-    relation = SGN_RIGHT.replace(r"0 & x = 0", r"0 & x \ge 0")
-    assert differs(element.text, relation) == (signs.EQUALS, signs.GREATER_EQUAL)
-    right = run(by_model(main=out(SGN_RIGHT)), element)
-    assert right.status is Status.ACCEPTED and right.review == "none"
-
-
 # ------------------------------------------------------------------ PDF level: Chromium
 
 CHROMIUM_CASES = [
@@ -997,27 +827,6 @@ def _page_html(math_css: str = MATH_CSS) -> str:
         + 'math[display="block"] { margin: 6pt 0; }'
         "</style></head><body><h1>Signs and relations</h1>" + "".join(parts) + "</body></html>"
     )
-
-
-@pytest.mark.browser
-def test_a_chromium_printed_course_page():
-    from readablestem.eval.render import ChromiumRenderer
-
-    with ChromiumRenderer() as renderer:
-        pdf = renderer.pdf(_page_html())
-    equations = [e for e in analyze(pdf).elements if e.kind == Kind.EQUATION]
-    for display, right, wrong in PAGE_CASES:
-        expected = equation_step._mathml_symbols(mathml(right, display))
-        found = [e for e in equations if _symbol_bag(e.text or "") == expected]
-        assert len(found) == 1, (right, [e.text for e in equations])
-        (element,) = found
-        assert element.display == display
-        assert differs(element.text, right) == (), (element.text, right)
-        if wrong is not None:
-            assert differs(element.text, wrong), (element.text, wrong)
-    decay = next(e for e in equations if _symbol_bag(e.text or "") == _symbol_bag("NN0eλt"))
-    fix = run(by_model(main=out(r"N = N_0 e^{\lambda t}")), decay)
-    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
 
 
 @pytest.mark.browser

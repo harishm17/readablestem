@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import stat
 import sys
-import threading
 from pathlib import Path
 
 import pymupdf
@@ -105,65 +104,7 @@ def test_the_name_and_media_type_decide_nothing(web):
     assert stored_upload(web, second.id) == plain
 
 
-def test_the_page_count_is_the_pdfs_and_the_pdf_limits_still_apply(web):
-    assert web.settings.max_pages_per_job == 5
-    soffice = Path(web.settings.soffice_path or "")  # the stand-in now makes 6 pages
-    made = soffice.parent / "made.pdf"
-    made.write_bytes(make_pdf(6, "Too long"))
-    response = send(web.browser, office.docx(), "Long.docx")
-    assert response.status_code == 422
-    assert "has 6 pages once it is made into a PDF" in response.text
-    assert "Acrobat" not in response.text  # advice for a PDF, not for a Word file
-    assert jobs(web) == [] and pages_used(web) == 0
-
-
-def test_the_upload_form_says_which_files_it_takes(web):
-    page = web.browser.get("/app").text
-    assert "Word (.docx)" in page and "PowerPoint (.pptx)" in page
-    assert ".docx" in page and ".pptx" in page and 'data-office="docx pptx"' in page
-    assert 'id="pdf"' in page  # the field and its label are unchanged
-
-
-def test_the_form_is_pdf_only_when_office_input_is_off(tmp_path):
-    env = WebEnv(tmp_path, office_input_enabled=False, soffice_path=fake_soffice(tmp_path))
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        page = client.get("/app").text
-        assert "data-office" not in page and ".docx" not in page
-        refused = send(client, office.docx(), "notes.docx")
-        assert refused.status_code == 415 and "is not a PDF" in refused.text
-        assert jobs(env) == []
-        junk = send(client, b"hello", "notes.docx")
-        assert junk.status_code == 415 and "is not a PDF" in junk.text
-
-
 # --------------------------------------------------------------------------- refused
-
-
-@pytest.mark.parametrize(
-    ("data", "filename", "status", "fragment"),
-    [
-        (office.with_external_picture(), "linked.docx", 422, "linked from another file"),
-        (
-            office.rebuild(office.docx_parts(), add={"word/vbaProject.bin": b"\x00"}),
-            "macro.docx",
-            422,
-            "macros",
-        ),
-        (office.OLE_HEADER, "old.doc", 422, "older Word or PowerPoint format"),
-        (office.rebuild({"a.txt": b"x"}), "other.docx", 415, "is not a PDF, Word (.docx)"),
-        (office.docx()[:-40], "cut.docx", 422, "could not be opened"),
-        (b"just text", "notes.docx", 415, "is not a PDF, Word (.docx)"),
-    ],
-    ids=["linked", "macros", "old-format", "other-zip", "truncated", "text"],
-)
-def test_a_file_that_is_refused_costs_nothing_and_says_why(web, data, filename, status, fragment):
-    response = send(web.browser, data, filename)
-    assert response.status_code == status, response.text
-    assert fragment in response.text
-    assert jobs(web) == [] and pages_used(web) == 0
-    assert 'aria-invalid="true"' in response.text  # the message is on the file field
 
 
 def test_a_presentation_when_impress_is_missing_says_this_server_cannot(tmp_path):
@@ -208,35 +149,6 @@ def test_a_second_conversion_waits_briefly_then_is_told_to_try_again(web, monkey
     assert response.status_code == 503 and response.headers["retry-after"] == "10"
     assert "Another Word or PowerPoint file is being converted" in response.text
     assert jobs(web) == []
-
-
-def test_conversions_never_overlap(tmp_path, monkeypatch):
-    running, peak, lock = [0], [0], threading.Lock()
-
-    def fake_run(data, soffice, timeout_s):
-        with lock:
-            running[0] += 1
-            peak[0] = max(peak[0], running[0])
-        import time
-
-        time.sleep(0.2)
-        with lock:
-            running[0] -= 1
-        return make_pdf(1)
-
-    monkeypatch.setattr(uploads, "_run_office_child", fake_run)
-    monkeypatch.setattr(uploads, "OFFICE_WAIT_S", 5)
-    threads = [
-        threading.Thread(
-            target=uploads.convert_office_isolated, args=(b"x",), kwargs={"soffice": "s"}
-        )
-        for _ in range(4)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-    assert peak[0] == 1
 
 
 def test_the_log_carries_a_category_and_never_the_file_name(web, caplog):

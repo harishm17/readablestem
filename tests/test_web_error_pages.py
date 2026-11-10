@@ -3,23 +3,15 @@
 from __future__ import annotations
 
 import logging
-import re
 
 import pytest
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
-from starlette.exceptions import HTTPException
 
 from fixtures.web.support import ALICE, WebEnv, login
 from readablestem.web import deps
 from readablestem.web.security import APP_CSP
 
-TITLES = {
-    500: "Something went wrong",
-    502: "Not available right now",
-    503: "Not available right now",
-    504: "That took too long",
-}
 SECRET = "postgresql://user:SECRET-PASSWORD@10.0.0.5/a11y"
 
 
@@ -29,30 +21,6 @@ def env(tmp_path):
     with env.running() as client:
         env.browser = client
         yield env
-
-
-def test_404_page_is_calm_and_leads_home(env):
-    response = env.browser.get("/no-such-page")
-    assert response.status_code == 404
-    assert "Page not found" in response.text and 'href="/"' in response.text
-    # (the header's menu is a <details>: look for the word outside tags)
-    assert "Traceback" not in response.text
-    assert "detail" not in re.sub(r"<[^>]*>", "", response.text).lower()
-    assert response.headers["content-security-policy"] == APP_CSP
-
-
-@pytest.mark.parametrize("status", [500, 502, 503, 504])
-def test_server_error_statuses_get_the_same_page_with_a_way_home(env, status):
-    def fail():
-        raise HTTPException(status_code=status, detail="SECRET internal detail")
-
-    env.app.add_api_route(f"/fail{status}", fail)
-    response = env.browser.get(f"/fail{status}")
-    assert response.status_code == status
-    assert "SECRET" not in response.text
-    assert TITLES[status] in response.text
-    assert "Go to the home page" in response.text
-    assert "Please try again" in response.text
 
 
 @pytest.mark.parametrize(

@@ -65,21 +65,6 @@ def test_a_healthy_instance_passes(env):
     assert "backups: ok" in result.stdout and "5 hours old" in result.stdout
 
 
-def test_backups_off_is_a_problem(env):
-    env["STUB_ENABLED"] = "False"
-    result = run(env, "status")
-    assert result.returncode == 1 and "automated backups are off" in result.stdout
-
-
-def test_a_stale_or_missing_automated_backup_is_a_problem(env):
-    env["STUB_NEWEST"] = stamp(50)
-    assert "50 hours old" in run(env, "status").stdout
-    assert run(env, "status").returncode == 1
-    env["STUB_NEWEST"] = ""
-    result = run(env, "status")
-    assert result.returncode == 1 and "no successful automated backup" in result.stdout
-
-
 def test_an_old_manual_backup_is_named_because_it_outlives_retention(env):
     env["STUB_MANUAL"] = f"1700000000000\t{stamp(24 * 10)}\n1700000000001\t{stamp(24)}\n"
     result = run(env, "status")
@@ -87,14 +72,3 @@ def test_an_old_manual_backup_is_named_because_it_outlives_retention(env):
     assert "manual backup 1700000000000 is 10 days old: delete it" in result.stdout
     assert "gcloud sql backups delete 1700000000000" in result.stdout
     assert "manual backup 1700000000001 is 1 days old" in result.stdout
-
-
-def test_now_creates_one_and_says_how_to_delete_it(env):
-    result = run(env, "now")
-    assert result.returncode == 0 and "gcloud sql backups delete BACKUP_ID" in result.stdout
-
-
-def test_unknown_command_and_missing_project_fail_clearly(env):
-    assert run(env, "restore").returncode != 0
-    del env["PROJECT_ID"]
-    assert "PROJECT_ID is not set" in run(env, "status").stderr

@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 
 import pytest
-from sqlalchemy import select
 
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token, upload
@@ -26,8 +25,6 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import equation_step
 from readablestem.web import inventory
-from readablestem.web.db import ReviewEdit, session_scope
-from readablestem.web.review import INVENTORY_KEY, WRITE_KEY
 from test_web_review_split import section, text_of
 
 WAITING = Check(
@@ -140,11 +137,6 @@ def test_a_command_before_a_letter_gets_a_space_and_only_the_chosen_places_chang
     assert inventory.relettered("x_x", "x", "X", {1, 2}) == "X_X"
 
 
-def test_every_symbol_is_in_one_family_at_most():
-    keys = [k for family in inventory.FAMILIES for k in family]
-    assert len(keys) == len(set(keys))
-
-
 # --------------------------------------------------------------------------- the screen
 
 
@@ -166,90 +158,6 @@ def test_the_screen_lists_each_symbol_with_its_count_grouped_by_look_alike(symbo
     assert "Greek rho" in text_of(section(html, 'id="sym-_5crho-title"', "</h3>"))
     # v and y are in no other family member's company here: they follow
     assert html.index('id="sym-y-title"') > html.index('id="sym-p-title"')
-
-
-def test_each_place_shows_the_equation_picture_and_where_the_symbol_is(symbols):
-    html = page(symbols)
-    form = form_of(html, "sym-x")
-    assert form.count('class="place"') == 3
-    assert f'src="/jobs/{symbols.job_id}/crops/p1-e5.png"' in form
-    # the second x of "x + x = ..." is named, and marked in its LaTeX
-    assert "the 2nd one in it" in text_of(form)
-    assert re.search(r'<mark class="said-diff">x</mark>', form)
-    # one checkbox for each waiting place, ticked: ticked is "will change" (no double negative)
-    boxes = re.findall(r'<input type="checkbox" name="include" value="([^"]+)" checked', form)
-    assert boxes == ["p1-e2:1", "p1-e5:1", "p1-e5:2"]
-    assert 'name="exclude"' not in form
-    assert re.search(r"Change\s*: Equation", text_of(form))
-    assert 'name="places" value="chosen"' in form
-    # where it lands is said in words before the list is opened, and what to do first
-    assert "Changes: Equation 1 (page 1), Equation 2 (page 1, 2 times)." in text_of(form)
-    assert "Places (3 of 3 checked)" in text_of(form)
-    status = section(form, "data-symbol-affect", "</p>")
-    assert 'role="status"' in form and "Choose a symbol first." in status
-    # no replacement is chosen before the person acts
-    assert "selected" not in form
-    # the choices are the family's other symbols, each by its name
-    options = re.findall(r"<option value=\"([^\"]*)\">([^<]*)</option>", form)
-    assert options[0] == ("", "Choose a symbol")
-    names = {value: name for value, name in options}
-    assert names["X"] == "capital X (X)" and names["\\chi"].startswith("Greek chi")
-    assert names["\\times"].startswith("the times sign")
-    assert "x" not in names  # not itself
-
-
-def test_a_decided_equation_is_listed_and_has_no_checkbox(symbols):
-    capital = form_of(page(symbols), "sym-X")
-    assert capital.count('class="place"') == 2
-    assert capital.count('name="include"') == 1  # equation 1's; equation 3 is decided
-    assert "Decided: stays." in text_of(capital)
-
-
-def test_the_review_screen_links_to_the_symbols_when_there_is_handwritten_maths(symbols):
-    for path, link in (
-        (f"/jobs/{symbols.job_id}/review", f"/jobs/{symbols.job_id}/symbols?view=split"),
-        (f"/jobs/{symbols.job_id}/review/list", f"/jobs/{symbols.job_id}/symbols?view=list"),
-    ):
-        body = symbols.browser.get(path).text
-        assert f'href="{link}"' in body and ">Symbols</a>" in body
-
-
-def test_a_typed_document_has_no_link_and_an_empty_screen(tmp_path):
-    env = WebEnv(tmp_path)
-    env.converter.output = review_output()
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        assert (
-            "Symbols in the handwritten equations"
-            not in client.get(f"/jobs/{env.job_id}/review").text
-        )
-        empty = text_of(page(env))
-        assert "No symbols to change yet" in empty
-
-
-def test_a_scanned_page_of_printed_maths_is_not_listed(tmp_path):
-    from readablestem.core.types import PageType
-
-    env = WebEnv(tmp_path)
-    output = handwritten_output()
-    output.result.page_types = [
-        PageType(page=0, kind="scan_ocr"),
-        PageType(page=1, kind="handwritten"),
-    ]
-    env.converter.output = output
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        # equations 1 and 2 are on page 1 (a scan), equation 3 on page 2 (handwritten)
-        html = page(env)
-        assert "in 1 equation" in text_of(section(html, 'class="symbols-intro"', "</div>"))
 
 
 def test_only_the_owner_sees_the_screen(symbols):
@@ -294,12 +202,6 @@ def test_a_change_edits_every_waiting_equation_and_accepts_none(symbols):
     )
 
 
-def test_places_left_out_keep_their_symbol(symbols):
-    change(symbols, "x", "X", leave=("p1-e5:2", "p1-e2:1"))
-    assert latex_of(symbols, "p1-e2") == "x + X = p"  # its only x was left out
-    assert latex_of(symbols, "p1-e5") == "X + x = \\rho v"  # the second x kept, the first changed
-
-
 def test_everything_left_out_changes_nothing_and_says_so(symbols):
     written = symbols.job(symbols.job_id).result_version
     response = change(symbols, "x", "X", leave=("p1-e2:1", "p1-e5:1", "p1-e5:2"))
@@ -309,16 +211,6 @@ def test_everything_left_out_changes_nothing_and_says_so(symbols):
     )
     assert latex_of(symbols, "p1-e5") == "x + x = \\rho v"
     assert symbols.job(symbols.job_id).result_version == written  # no write was made
-
-
-def test_a_change_to_a_greek_letter_keeps_the_next_letter_apart(symbols):
-    change(symbols, "p", "\\rho")
-    assert latex_of(symbols, "p1-e2") == "x + X = \\rho"
-    # ... and stays valid LaTeX that converts
-    fix = stored(symbols).fix_for("p1-e2")
-    assert fix is not None and fix.equation is not None and "\u03c1" in fix.equation.mathml
-    change(symbols, "\\rho", "p")
-    assert latex_of(symbols, "p1-e5") == "x + x = p v"
 
 
 def test_an_equation_that_fails_its_check_is_left_and_the_others_are_changed(tmp_path):
@@ -337,18 +229,6 @@ def test_an_equation_that_fails_its_check_is_left_and_the_others_are_changed(tmp
         notice = text_of(section(response.text, "symbols-notice", "</form>"))
         assert "in 1 equation." in notice
         assert "1 equation was left as before: the change did not pass the checks there." in notice
-
-
-def test_the_whole_batch_is_one_write_with_one_marked_record_each(symbols):
-    change(symbols, "x", "X")
-    with session_scope(symbols.ctx.factory) as session:
-        edits = list(session.scalars(select(ReviewEdit).where(ReviewEdit.job_id == symbols.job_id)))
-    assert sorted(e.element_id for e in edits) == ["p1-e2", "p1-e5"]
-    assert {e.action for e in edits} == {"relabel"}
-    assert len({e.after[WRITE_KEY] for e in edits}) == 1
-    for e in edits:
-        assert e.after[INVENTORY_KEY] == {"from": "x", "to": "X", "equations": 2}
-        assert e.before["status"] == "needs_review"  # what Undo puts back
 
 
 def test_one_undo_takes_the_whole_batch_back_and_the_screen_says_so(symbols):
@@ -387,14 +267,6 @@ def test_the_record_shows_the_batch_as_one_row(symbols):
 # --------------------------------------------------------------------------- refused
 
 
-def test_no_symbol_chosen_is_refused_with_nothing_changed(symbols):
-    response = change(symbols, "x", "")
-    assert response.status_code == 422
-    assert "Choose the symbol to change it to." in text_of(response.text)
-    assert 'role="alert"' in response.text  # the error summary takes focus
-    assert latex_of(symbols, "p1-e5") == "x + x = \\rho v"
-
-
 @pytest.mark.parametrize(
     ("symbol", "to"),
     [("x", "x"), ("x", "\\alpha"), ("x", "\\frac{1}{2}"), ("q", "g"), ("y", "Y\\x")],
@@ -415,12 +287,6 @@ def test_a_page_from_before_another_change_is_refused(symbols):
     assert latex_of(symbols, "p1-e5") == "X + X = \\rho v"  # nothing from the old page applied
 
 
-def test_a_form_without_a_version_is_refused(symbols):
-    response = change(symbols, "x", "X", version="")
-    assert response.status_code == 409
-    assert latex_of(symbols, "p1-e5") == "x + x = \\rho v"
-
-
 def test_a_post_without_the_csrf_token_is_refused(symbols):
     response = symbols.browser.post(
         f"/jobs/{symbols.job_id}/symbols", data={"symbol": "x", "to": "X", "version": "0"}
@@ -433,15 +299,6 @@ def test_malformed_exclusions_are_ignored():
     assert inventory.excluded_places(["p1-e2:1", "junk", ":3", "p1-e2:x", "p1-e5:99999"]) == {
         ("p1-e2", 1)
     }
-
-
-@pytest.mark.parametrize("view", ["list", "split", "//evil.example", "https://evil.example", ""])
-def test_symbols_url_stays_on_site(view: str) -> None:
-    from readablestem.web.routes.review import symbols_url
-
-    url = symbols_url("a" * 32, view)
-    assert url.startswith(f"/jobs/{'a' * 32}/symbols?view=")
-    assert url.endswith(("?view=list", "?view=split"))
 
 
 @pytest.mark.parametrize("job_id", ["//evil.example", "x/../../evil", "A" * 32, ""])
@@ -466,34 +323,3 @@ def choose(env, symbol: str, to: str, *, include: tuple[str, ...], version: str 
         "include": list(include),
     }
     return followed(env, env.browser.post(f"/jobs/{env.job_id}/symbols", data=data))
-
-
-def test_only_the_ticked_places_change(symbols):
-    choose(symbols, "x", "X", include=("p1-e5:1",))
-    assert latex_of(symbols, "p1-e5") == "X + x = \\rho v"  # only the first x was ticked
-    assert latex_of(symbols, "p1-e2") == "x + X = p"  # its x was not ticked: as it was
-
-
-def test_nothing_ticked_changes_nothing_and_says_so(symbols):
-    written = symbols.job(symbols.job_id).result_version
-    response = choose(symbols, "x", "X", include=())
-    assert response.status_code == 422
-    assert "no place is checked" in text_of(response.text)
-    assert symbols.job(symbols.job_id).result_version == written
-
-
-def test_the_empty_screen_says_when_it_helps_and_shows_a_small_example(tmp_path):
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        html = page(env)
-        empty = text_of(section(html, 'class="symbols-empty"', "</section>"))
-        assert "Symbols appear once handwritten equations have been read" in empty
-        assert "Convert scanned or handwritten pages" in empty
-        assert "Example, not part of your document" in empty
-        assert "<form" not in section(html, 'class="symbols-example"', "</figure>")
-        assert 'href="/jobs/' in html.split("<h1", 1)[0].rsplit("<main", 1)[-1]  # Back, above

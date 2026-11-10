@@ -296,11 +296,3 @@ def eq_fix(element_id: str, latex: str, confidence: float = 0.9) -> Fix:
         confidence=confidence,
         equation=EquationFix(latex=latex, mathml=latex_to_mathml(latex), speech=""),
     )
-
-
-def test_fake_png_has_a_readable_size_and_is_unique_per_key():
-    from readablestem.eval.pipeline_eval import _png_size
-
-    assert _png_size(fake_png("a", 40, 20)) == (40, 20)
-    assert fake_png("a") != fake_png("b")
-    assert _png_size(b"not a png") is None

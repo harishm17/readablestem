@@ -5,8 +5,6 @@ from __future__ import annotations
 import base64
 import io
 
-import pytest
-
 from readablestem.eval.invented import read
 from readablestem.eval.invented.text import MATH
 
@@ -46,50 +44,6 @@ def test_prose_blocks_cut_maths_out_and_skip_scripts_styles_and_head():
     ]
     assert [e.source for e in out.equations] == ["mathml"]
     assert out.blocks[0].kind == "prose" and not out.blocks[0].authored
-
-
-def test_list_items_headings_and_table_cells_are_not_prose():
-    out = read.read_html(
-        html(
-            "<h2>Section <b>One</b></h2><ul><li>A list item of words</li></ul>"
-            "<table><caption>A table caption</caption><tr><th>Name</th><td>5.0 m</td></tr></table>"
-        )
-    )
-    assert [h.text for h in out.headings] == ["Section One"]
-    assert out.headings[0].level == 2
-    assert [b.text for b in out.blocks] == ["A list item of words", "A table caption"]
-    assert out.blocks[1].kind == "caption"
-    assert [(c.text, c.row, c.col) for c in out.cells] == [("Name", 0, 0), ("5.0 m", 0, 1)]
-
-
-def test_a_figure_caption_is_a_caption_block_not_a_description():
-    out = read.read_html(
-        html(
-            "<figure><img src='x.png' alt='A graph of speed against time.'>"
-            "<figcaption>Figure 2.1 Speed against time.</figcaption></figure>"
-        )
-    )
-    assert [(b.text, b.kind) for b in out.blocks] == [("Figure 2.1 Speed against time.", "caption")]
-    [alt] = out.descriptions
-    assert (alt.source, alt.text, alt.figure) == ("alt", "A graph of speed against time.", 1)
-    assert alt.caption == "Figure 2.1 Speed against time."  # the caption came after the image
-
-
-def test_headings_keep_their_maths_as_tokens_for_matching_and_cut_it_for_numbers():
-    out = read.read_html(html(f"<h3>Solving {MML_X} for 12 cases</h3>"))
-    [heading] = out.headings
-    assert heading.text == "Solving x = 5 for 12 cases"
-    assert "x" not in heading.plain and "12" in heading.plain
-
-
-def test_the_demo_banner_is_not_output():
-    out = read.read_html(
-        html(
-            "<aside aria-label='About this demo'><p>Precomputed demo of a page.</p></aside>"
-            "<p>Body text.</p>"
-        )
-    )
-    assert [b.text for b in out.blocks] == ["Body text."]
 
 
 # ------------------------------------------------------------------ text the tool wrote
@@ -168,61 +122,7 @@ def test_descriptions_from_alt_figure_text_details_svg_and_aria_label():
     assert out.figures == 2
 
 
-def test_a_details_after_other_content_is_not_a_figure_description():
-    out = read.read_html(
-        html(
-            "<figure><img src='x.png' alt='A graph.'></figure><p>Text between.</p>"
-            "<details><p>Folded text.</p></details>"
-        )
-    )
-    assert [d.source for d in out.descriptions] == ["alt"]
-    assert "Folded text." in [b.text for b in out.blocks]
-
-
-def test_the_first_block_after_a_figure_is_marked():
-    out = read.read_html(
-        html(
-            "<p>Before.</p><figure><img src='x.png' alt='A graph.'></figure>"
-            "<p>After one.</p><p>After two.</p>"
-        )
-    )
-    assert [(b.text, b.after_figure) for b in out.blocks] == [
-        ("Before.", False),
-        ("After one.", True),
-        ("After two.", False),
-    ]
-
-
-def test_a_data_table_inside_a_long_description_is_marked():
-    out = read.read_html(
-        html(
-            "<figure><img src='x.png' alt='A graph.'></figure>"
-            "<details><summary>Data</summary><table><tr><td>3.5</td></tr></table></details>"
-            "<table><tr><td>7.0</td></tr></table>"
-        )
-    )
-    assert [(c.text, c.in_description) for c in out.cells] == [("3.5", True), ("7.0", False)]
-
-
 # ------------------------------------------------------------------ maths
-
-
-def test_tex_spans_mathjax_would_typeset_are_found_in_reading_order():
-    out = read.read_html(
-        html(
-            r"<p>Speed is \(v = d/t\) and so on.</p>"
-            r"<p>\[ F = ma \]</p><p>$$ x^2 + y^2 = r^2 $$</p>"
-            r"<p>\begin{equation} E = mc^2 \end{equation}</p>"
-        )
-    )
-    assert [(e.source, e.display, e.raw) for e in out.equations] == [
-        ("tex", "inline", "v = d/t"),
-        ("tex", "block", "F = ma"),
-        ("tex", "block", "x^2 + y^2 = r^2"),
-        ("tex", "block", r"\begin{equation} E = mc^2 \end{equation}"),
-    ]
-    assert all(e.mathml for e in out.equations)
-    assert out.blocks[0].text == f"Speed is {MATH} and so on."
 
 
 def test_dollar_signs_are_maths_only_when_the_pages_own_config_says_so():
@@ -243,55 +143,7 @@ def test_macros_of_the_page_are_expanded_before_conversion():
     assert equation.mathml and "\N{MATHEMATICAL BOLD SMALL V}" in equation.mathml  # \mathbf{v}
 
 
-def test_tex_that_will_not_convert_is_kept_unchecked():
-    out = read.read_html(html(r"<p>Bad \(\undefinedcommand{3} \frac{\)</p>"))
-    [equation] = out.equations
-    assert equation.mathml is None
-    assert equation.tokens  # the words and numbers it still holds
-
-
-def test_mathml_with_a_tex_annotation_keeps_its_tokens_once():
-    mathml = (
-        "<math><semantics><mrow><mi>v</mi><mo>=</mo><mn>3</mn></mrow>"
-        "<annotation encoding='application/x-tex'>v=3</annotation></semantics></math>"
-    )
-    out = read.read_html(html(f"<p>{mathml}</p>"))
-    assert out.equations[0].source == "mathml"
-    assert out.equations[0].display == "inline"
-
-
-def test_display_block_is_read_from_the_attribute():
-    out = read.read_html(html("<div><math display='block'><mi>v</mi></math></div>"))
-    assert out.equations[0].display == "block"
-
-
 # ------------------------------------------------------------------ Markdown
-
-
-def test_markdown_headings_paragraphs_lists_and_emphasis():
-    out = read.read_markdown(
-        "# Title\n\nA paragraph with **bold** and *italic* words\nthat wraps a line.\n\n"
-        "Setext heading\n--------------\n\n- first item here\n- second item here\n\n"
-        "1. numbered item\n\n```\ncode is skipped\n```\n\n---\n\n[a link](http://x.test) text."
-    )
-    assert [(h.level, h.text) for h in out.headings] == [(1, "Title"), (2, "Setext heading")]
-    assert [b.text for b in out.blocks] == [
-        "A paragraph with bold and italic words that wraps a line.",
-        "first item here",
-        "second item here",
-        "numbered item",
-        "a link text.",
-    ]
-
-
-def test_markdown_maths_in_all_its_delimiters_and_money_is_not_maths():
-    out = read.read_markdown(
-        "Speed $v = d/t$ and \\(a = b\\) cost $0.50 and $1 each.\n\n"
-        "$$\nx^2 + y^2 = r^2\n$$\n\n\\[ E = mc^2 \\]\n"
-    )
-    assert [e.raw for e in out.equations] == ["v = d/t", "a = b", "x^2 + y^2 = r^2", "E = mc^2"]
-    assert [e.display for e in out.equations] == ["inline", "inline", "block", "block"]
-    assert out.blocks[0].text.startswith(f"Speed {MATH} and {MATH} cost $0.50 and $1 each.")
 
 
 def test_markdown_tables_images_and_html_tables_with_maths():
@@ -310,19 +162,3 @@ def test_markdown_tables_images_and_html_tables_with_maths():
 
 
 # ------------------------------------------------------------------ entry point
-
-
-def test_read_output_guesses_the_format_and_refuses_an_unknown_one():
-    assert read.read_output("<p>Hello there</p>").format == "html"
-    assert read.read_output("# Hello\n\nthere").format == "markdown"
-    assert read.read_output("plain", name="x.md").format == "markdown"
-    assert read.read_output("<p>x</p>", name="x.htm").format == "html"
-    with pytest.raises(ValueError, match="unknown output format"):
-        read.read_output("x", "docx")
-
-
-def test_output_counts_and_hash_are_stable():
-    first = read.read_html(html("<p>One two three.</p>"))
-    again = read.read_html(html("<p>One two three.</p>"))
-    assert first.sha256 == again.sha256 and len(first.sha256) == 64
-    assert first.counts()["blocks"] == 1

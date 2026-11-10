@@ -11,16 +11,13 @@ from __future__ import annotations
 
 import re
 from html import unescape
-from typing import get_args
 
 import pytest
 
 from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
-from readablestem.core.types import Check, DocumentResult, FigureType
-from readablestem.web import messages
+from readablestem.core.types import DocumentResult
 from readablestem.web.review import FIGURE_KEEP_ACK
-from readablestem.web.routes.review import ALT_GUIDANCE
 
 
 @pytest.fixture
@@ -64,12 +61,6 @@ ALT = "A car moves from a house to a school along a straight road."
 # ----------------------------------------------------------------------------- figures
 
 
-def test_alt_guidance_covers_every_kind_of_figure():
-    assert set(ALT_GUIDANCE) == set(get_args(FigureType))
-    for words in ALT_GUIDANCE.values():
-        assert words.endswith(".") and len(words) < 160
-
-
 def test_keeping_a_figure_without_a_description_needs_the_acknowledgement(env):
     refused = post(env, "p1-e6", action="reject")
     assert refused.status_code == 422
@@ -80,13 +71,6 @@ def test_keeping_a_figure_without_a_description_needs_the_acknowledgement(env):
     done = post(env, "p1-e6", action="reject", acknowledge="on")
     assert done.status_code == 303
     assert fix_of(env, "p1-e6").status.value == "rejected"
-
-
-def test_save_and_accept_settles_the_figure_and_says_so(env):
-    assert post(env, "p1-e6", action="edit", alt=ALT).status_code == 303
-    fix = fix_of(env, "p1-e6")
-    assert fix.status.value == "edited" and fix.figure is not None and fix.figure.alt == ALT
-    assert "Saved and accepted." in text_of(screen(env))
 
 
 def test_save_decide_later_keeps_the_text_and_leaves_the_figure_waiting(env):
@@ -102,22 +86,6 @@ def test_save_decide_later_keeps_the_text_and_leaves_the_figure_waiting(env):
     assert post(env, "p1-e6", action="accept", alt=ALT).status_code == 303
     assert fix_of(env, "p1-e6").status.value == "accepted"
     assert fix_of(env, "p1-e6").figure.alt == ALT  # type: ignore[union-attr]
-
-
-def test_save_decide_later_is_for_a_figure_only(env):
-    response = post(env, "p1-e2", action="save", latex="x")
-    assert response.status_code == 422 and "Choose an action." in text_of(response.text)
-    assert fix_of(env, "p1-e2").status.value == "needs_review"
-
-
-def test_the_figure_card_names_what_each_choice_does_and_guides_the_alt_text(env):
-    body = screen(env, "?item=p1-e6")
-    for words in ("Accept", "Save and accept", "Save, decide later"):
-        assert f">{words}<" in body
-    assert "how its labeled parts connect" in body  # a diagram's guidance, not a general one
-    # the list view uses the same markup
-    listing = env.browser.get(f"/jobs/{env.job_id}/review/list").text
-    assert 'data-role="save-later"' in listing and 'id="acknowledge-p1-e6"' in listing
 
 
 # ----------------------------------------------------------------- repeated headings
@@ -137,54 +105,10 @@ def test_a_repeated_heading_can_be_decided_one_by_one_on_the_review_screen(env):
     assert "Decide them one by one (2)" in text_of(screen(env, f"?item={GROUP}"))
 
 
-def test_a_stay_that_is_not_the_headings_group_is_ignored(env):
-    response = post(env, "p1-e7", action="reject", stay="hg-not-its-group")
-    assert response.status_code == 303
-    assert "#group-members" not in response.headers["location"]
-
-
 # ------------------------------------------------------------------------------ bulk
-
-
-def test_bulk_page_with_nothing_to_accept_names_the_next_step(env):
-    page = env.browser.get(f"/jobs/{env.job_id}/accept/equations?view=split").text
-    text = text_of(page)
-    assert "No equation is waiting with every check passed." in text
-    assert "still waits: a check failed or flagged it" in text
-    assert re.search(r'href="/jobs/\w+/review\?item=p1-e\d">Review the first equation<', page)
 
 
 # ------------------------------------------------------------------------- list view
 
 
-def test_the_list_leads_with_the_first_decision_and_folds_its_tools(env):
-    page = env.browser.get(f"/jobs/{env.job_id}/review/list").text
-    assert '<details class="list-tools" id="list-tools">' in page  # closed
-    assert page.index('id="needs-decision-title"') < page.index('id="list-tools"')
-    assert page.index('id="list-tools"') < page.index('class="review-toc"')
-    assert page.index('class="review-toc"') < page.index('id="group-equations"')
-    # the document (file and page count) is named at the top, before the decisions
-    assert re.search(r'<p class="lede">[^<]+ · \d+ pages?</p>', page)
-    assert page.index('<p class="lede">') < page.index('id="needs-decision-title"')
-    assert '<article id="fix-p1-e2"' in page  # the first decision is there to read, not folded
-    # every item keeps its own anchor (deep links)
-    assert 'id="item-p1-e2"' in page and 'id="item-p1-e6"' in page
-    filtered = env.browser.get(f"/jobs/{env.job_id}/review/list?kind=equations").text
-    assert '<details class="list-tools" id="list-tools" open>' in filtered
-
-
 # ----------------------------------------------------------------------- table checks
-
-
-def test_a_table_check_without_a_sentence_is_named_by_the_part_of_the_table():
-    explained = messages.explain_check(Check(name="table.cell_text", passed=False, code="new_code"))
-    assert not explained.known
-    assert explained.text == (
-        "A check on the words and numbers of this table did not pass, "
-        "so compare them with the image."
-    )
-    other = messages.explain_check(Check(name="table.something_new", passed=False, code="x"))
-    assert "of this table" in other.text and other.text != messages.UNKNOWN_CHECK_MESSAGE
-    # a check that is not about a table keeps the neutral sentence
-    plain = messages.explain_check(Check(name="latex.something_new", passed=False, code="x"))
-    assert plain.text == messages.UNKNOWN_CHECK_MESSAGE

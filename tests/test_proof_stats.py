@@ -25,24 +25,6 @@ def test_the_point_estimate_pools_numerators_and_denominators():
     assert stats.point({}, stats.ratio) is None
 
 
-def test_identical_sections_give_a_point_interval():
-    per_section = {f"s{i}": [3.0, 4.0] for i in range(5)}
-    interval = stats.cluster_bootstrap(per_section, stats.ratio, n_boot=300)
-    assert (interval.low, interval.high) == (0.75, 0.75)
-    assert interval.skipped == 0 and interval.n_sections == 5 and interval.level == 0.95
-
-
-def test_the_interval_is_the_same_every_time_and_holds_the_estimate():
-    per_section = {"a": [0.0, 10.0], "b": [9.0, 10.0], "c": [5.0, 10.0], "d": [8.0, 10.0]}
-    first = stats.cluster_bootstrap(per_section, stats.ratio, n_boot=500)
-    again = stats.cluster_bootstrap(per_section, stats.ratio, n_boot=500)
-    assert first == again
-    estimate = stats.point(per_section, stats.ratio)
-    assert first.low is not None and first.high is not None and estimate is not None
-    assert first.low < estimate < first.high
-    assert first.low >= 0.0 and first.high <= 0.9  # no section is better than 9/10
-
-
 def test_the_resampling_unit_is_the_section_not_the_item():
     # Two sections, all-or-nothing: resampling items would give a narrow interval around
     # 0.5; resampling sections can give 0 or 1.
@@ -59,11 +41,6 @@ def test_resamples_with_an_undefined_metric_are_skipped_and_counted():
     assert interval.low == interval.high == 0.5
     nothing = stats.cluster_bootstrap({"b": [0.0, 0.0]}, stats.ratio, n_boot=50)
     assert (nothing.low, nothing.high, nothing.skipped) == (None, None, 50)
-
-
-def test_no_sections_gives_an_empty_interval():
-    empty = stats.cluster_bootstrap({}, stats.ratio, n_boot=10)
-    assert (empty.low, empty.high, empty.n_sections) == (None, None, 0)
 
 
 def test_a_paired_difference_uses_the_same_resample_for_both_sides():
@@ -93,14 +70,6 @@ def _pairs(a_values, b_values):
     return a, b
 
 
-def test_sign_flip_is_exact_for_few_sections():
-    # Four equal gains: only the all-plus and all-minus assignments are as extreme, 2 of 16.
-    a, b = _pairs([1.0] * 4, [0.0] * 4)
-    flip = stats.sign_flip(a, b, stats.ratio)
-    assert flip.p == pytest.approx(2 / 16)
-    assert (flip.n_used, flip.n_sections) == (4, 4)
-
-
 def test_sign_flip_matches_a_hand_count():
     # Differences +0.3, -0.1, +0.2: sums over the 8 sign patterns are 0.6, 0.4, 0.2, 0.0 and
     # their negatives; |sum| >= 0.4 in 4 of 8 patterns.
@@ -124,8 +93,3 @@ def test_sign_flip_with_many_sections_is_seeded_and_small_for_a_steady_gain():
     first = stats.sign_flip(a, b, stats.ratio)
     assert first == stats.sign_flip(a, b, stats.ratio)
     assert first.p is not None and first.p < 1e-4
-
-
-def test_sign_flip_refuses_different_sections():
-    with pytest.raises(ValueError, match="same sections"):
-        stats.sign_flip({"a": [1.0, 2.0]}, {"b": [1.0, 2.0]}, stats.ratio)

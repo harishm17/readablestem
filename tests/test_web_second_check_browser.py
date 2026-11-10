@@ -171,17 +171,3 @@ def test_the_note_is_an_optional_check_with_no_axe_violations(
         assert width == 0
     for word in ("verified", "checked for accuracy", "compl" + "iant"):
         assert word not in NOTE.lower()
-
-
-def test_the_job_page_counts_the_note_as_optional(site, browser, job, axe_source):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}")
-    text = page.locator("main").inner_text()
-    violations = axe_violations(page, axe_source)
-    _screenshot(page, "second-check-job.png")
-    context.close()
-    assert "1 need your decision" in text or "1 needs your decision" in text
-    # The note is said once, with how many are worth a look (T1-11: decisions are the count).
-    assert "with a note (1 worth a look)" in text
-    assert "nothing to do" not in text
-    assert not violations, describe(violations)

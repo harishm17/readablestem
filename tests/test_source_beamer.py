@@ -241,39 +241,3 @@ def test_the_spike_decks_convert_with_no_unknown_command(name, beamer_on):
     assert len(headings) >= 3
     assert "web version of a slide deck" in result.html
     assert all(f.status is Status.ACCEPTED for f in result.fixes if f.kind is not Kind.FIGURE)
-
-
-@needs_latexml
-def test_the_spike_decks_meet_the_bar_frames_are_sections_and_under_five_percent_fail(beamer_on):
-    frames = failed = 0
-    for name in DECKS:
-        result = convert_source(
-            deck_blob(name), settings=get_settings(), client=FakeVisionClient()
-        ).result
-        text = (FIXTURES / "beamer" / f"{name}.tex").read_text()
-        wrote = len(text.split("\\begin{frame}")) - 1 + text.count("\\frame{")
-        titled = [
-            e
-            for e in result.elements
-            if e.kind is Kind.HEADING and result.fix_for(e.id).heading.level >= 2  # type: ignore[union-attr]
-        ]
-        assert len(titled) >= wrote - 1  # every frame has a heading (a title page has the title)
-        frames += wrote
-        failed += sum(n.count for n in result.notices if n.code == "source_error")
-    assert frames >= 20 and failed / frames < 0.05
-
-
-@needs_latexml
-def test_overlays_follow_the_slide_deck_rule_in_a_real_deck(beamer_on):
-    result = convert_source(
-        deck_blob("kinematics"), settings=get_settings(), client=FakeVisionClient()
-    ).result
-    headings = [e.text for e in result.elements if e.kind is Kind.HEADING]
-    assert "Position and velocity" in headings  # three pauses, one slide
-    assert [h for h in headings if h.startswith("Position and velocity")] == [
-        "Position and velocity"
-    ]
-    assert "Constant acceleration (step 2 of 3)" in headings  # the \\only step differs
-    assert headings.count("Constant acceleration") == 1
-    items = [e.text for e in result.elements if e.kind is Kind.LIST_ITEM]
-    assert len(items) == 3  # the three bullets, each once

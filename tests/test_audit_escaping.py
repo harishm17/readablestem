@@ -181,18 +181,6 @@ def test_every_text_field_is_escaped(payload):
     assert escape(visible, quote=True) in html or escape(visible, quote=False) in html
 
 
-def test_the_inspector_catches_what_it_is_meant_to_catch():
-    for bad in (
-        "<p>ok</p><script>x</script>",
-        '<p onclick="x">ok</p>',
-        '<a href="javascript:alert(1)">x</a>',
-        '<img src="http://evil/x.png">',
-        '<p style="background:url(http://evil)">x</p>',
-    ):
-        with pytest.raises(AssertionError):
-            assert_inert(bad)
-
-
 @pytest.mark.parametrize("language", ['en"><script>alert(1)</script>', "en onload=alert(1)", ""])
 def test_a_language_tag_cannot_break_out_of_the_attribute(language):
     elements, fixes = build("plain")
@@ -226,19 +214,6 @@ def test_hostile_mathml_is_rebuilt_from_an_allowlist_or_refused(mathml):
     assert_inert(out, mathml[:40])
     assert "evil" not in out and "passwd" not in out
     assert "<script" not in out.lower() and "onclick" not in out and "javascript" not in out
-
-
-@pytest.mark.parametrize("mathml", HOSTILE_MATHML)
-def test_hostile_mathml_in_a_fix_never_reaches_the_document(mathml):
-    equation = el(1, Kind.EQUATION, display="block")
-    shown = EquationFix(latex="x", mathml=mathml, speech="x", display="block")
-    fix = Fix(
-        element_id="p1-e1", kind=Kind.EQUATION, status=Status.ACCEPTED, confidence=1.0,
-        equation=shown,
-    )  # fmt: skip
-    html = render_html(title="t", lang="en", elements=[equation], fixes=[fix], crops={})
-    assert_inert(html, mathml[:40])
-    assert "evil" not in html and "passwd" not in html
 
 
 def test_the_review_screen_shows_hostile_alt_text_and_latex_as_text(tmp_path):

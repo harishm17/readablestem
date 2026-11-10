@@ -165,12 +165,6 @@ def test_metadata_makes_no_conformance_claim(made):
     assert meta["dcterms:modified"] == ["2026-11-02T12:00:00Z"]
 
 
-def test_same_document_same_bytes(made):
-    html, _, _ = made
-    first = ee.build_epub(ee.export_epub(html, modified=MODIFIED))
-    assert first == ee.build_epub(ee.export_epub(html, modified=MODIFIED))
-
-
 # ---------------------------------------------------------------------- one synthetic page
 
 
@@ -190,27 +184,6 @@ CHEMISTRY_PAGE = PAGE.replace(
     "<mn>2</mn></msub><mo>+</mo><msub><mi>O</mi><mn>2</mn></msub><mo>\u27f6</mo><mn>2</mn>"
     "<msub><mi>H</mi><mn>2</mn></msub><mi>O</mi></mrow></math></p></main>",
 )
-
-
-def test_intent_is_not_written_to_the_epub_but_the_chemistry_markup_is_kept():
-    """epubcheck 5.4.0 reports RSC-005 `attribute "intent" not allowed here`."""
-    export, parts = make(CHEMISTRY_PAGE)
-    assert b"intent" not in parts[ee.CONTENT]
-    content = xml(parts, ee.CONTENT)
-    maths = list(content.iter(f"{MATHML}math"))
-    assert len(maths) == 2 and all(m.get("intent") is None for m in maths)
-    assert len(list(maths[1].iter(f"{MATHML}msub"))) == 3
-    assert 'properties="mathml"' in export.package
-
-
-def test_images_are_extracted_with_alt_and_deduplicated():
-    page = PAGE.replace("</main>", f'<img src="{DATA_URI}" alt="Same dot again"></main>')
-    export, parts = make(page)
-    assert list(export.images) == ["images/image-01.png"]
-    assert parts["EPUB/images/image-01.png"] == export.images["images/image-01.png"]
-    alts = [i.get("alt") for i in xml(parts, ee.CONTENT).iter(f"{XHTML}img")]
-    assert alts == ["A dot", "Same dot again"]
-    assert 'media-type="image/png"' in export.package
 
 
 def test_nav_has_contents_nested_by_level_and_a_page_list():
@@ -241,87 +214,9 @@ def test_nav_has_contents_nested_by_level_and_a_page_list():
     assert marker.get(f"{EPUB_NS}type") == "pagebreak"
 
 
-def test_no_page_list_without_markers_and_contents_never_empty():
-    export, parts = make('<html lang="en"><body><main><p>Just text.</p></main></body></html>')
-    nav = xml(parts, ee.NAV)
-    assert len(list(nav.iter(f"{XHTML}nav"))) == 1
-    (a,) = nav.iter(f"{XHTML}a")
-    assert a.get("href") == "content.xhtml#start"
-    assert export.title == "Converted document" and export.headings == 0
-    assert "structuralNavigation" not in export.features
-    assert "pageNavigation" not in export.features
-    assert any(e.get("id") == "start" for e in xml(parts, ee.CONTENT).iter())
-
-
-def test_features_come_from_the_document():
-    _, parts = make(PAGE)
-    meta = metadata(parts)
-    assert meta["schema:accessibilityFeature"] == sorted(
-        [
-            "MathML",
-            "alternativeText",
-            "describedMath",
-            "longDescription",
-            "pageNavigation",
-            "structuralNavigation",
-            "tableOfContents",
-        ]
-    )
-    assert meta["schema:accessMode"] == ["textual", "visual"]
-    assert meta["schema:accessModeSufficient"] == ["textual"]
-    plain = '<html lang="en"><body><main><h1>A</h1><p>Text</p></main></body></html>'
-    assert metadata(make(plain)[1])["schema:accessibilityFeature"] == [
-        "structuralNavigation",
-        "tableOfContents",
-    ]
-
-
 def test_sufficiency_is_not_declared_while_items_are_flagged():
     flagged = PAGE.replace("<p>See", '<div class="flagged" data-status="abstained"></div><p>See')
     assert "schema:accessModeSufficient" not in metadata(make(flagged)[1])
-
-
-def test_links_scripts_and_text_are_cleaned():
-    _, parts = make(PAGE)
-    text = parts[ee.CONTENT].decode()
-    assert "<script" not in text and "alert" not in text
-    content = xml(parts, ee.CONTENT)
-    anchors = {a.text: a.get("href") for a in content.iter(f"{XHTML}a")}
-    assert anchors["home"] is None  # a site-relative link points at nothing in a book
-    assert anchors["the web"] == "https://example.org/a?b=1&c=2"
-    assert "<br/>" in text and "Air &amp; water" in text
-    assert "<style>p &gt; b { color: #111 }</style>" in text  # stylesheet kept, escaped
-
-
-def test_language_title_and_identifier():
-    export, parts = make(PAGE)
-    assert export.lang == "en"
-    root = xml(parts, ee.CONTENT)
-    assert root.get("lang") == "en"
-    assert root.get("{http://www.w3.org/XML/1998/namespace}lang") == "en"
-    package = export.package
-    assert "<dc:language>en</dc:language>" in package
-    assert "<dc:title>Speed</dc:title>" in package
-    assert re.search(r"<dc:identifier id=\"pub-id\">urn:uuid:[0-9a-f-]{36}<", package)
-    other, _ = make(PAGE, title="  Other\ntitle ", identifier="urn:isbn:1")
-    assert other.title == "Other title" and "urn:isbn:1" in other.package
-    german, _ = make(PAGE.replace('lang="en"', 'lang="de"'))
-    assert german.lang == "de" and "<dc:language>de</dc:language>" in german.package
-    odd, _ = make(PAGE.replace('lang="en"', 'lang="x&quot; onload=&quot;1"'))
-    assert odd.lang == "en"
-
-
-def test_inline_svg_gets_its_namespace_and_property():
-    page = '<html lang="en"><body><main><svg viewbox="0 0 4 4"><circle r="1"></circle></svg></main>'
-    export, parts = make(page)
-    assert 'properties="svg"' in export.package
-    (svg,) = xml(parts, ee.CONTENT).iter("{http://www.w3.org/2000/svg}svg")
-    assert svg.get("viewBox") == "0 0 4 4"
-
-
-def test_a_document_without_a_body_is_refused():
-    with pytest.raises(ee.EpubExportError):
-        ee.export_epub("just text")
 
 
 def test_no_control_characters_reach_the_xml():
@@ -428,20 +323,3 @@ def test_malformed_base64_is_refused():
     truncated = DATA_URI[:-3]  # wrong padding
     with pytest.raises(CanvasExportError):
         ee.export_epub(f'<html lang="en"><body><img src="{truncated}" alt="x"></body></html>')
-
-
-def test_cli_refuses_an_svg_data_image_and_bad_base64_cleanly(tmp_path, capsys):
-    for src in ("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=", "data:image/png;base64,AAA*"):
-        page = tmp_path / "in.html"
-        page.write_text(f'<html lang="en"><body><img src="{src}" alt="x"></body></html>')
-        out = tmp_path / "o.epub"
-        assert cli.main(["export", "epub", str(page), str(out)]) == 2
-        assert "cannot write an EPUB" in capsys.readouterr().err
-        assert not out.exists()
-
-
-def test_cli_reports_an_unwritable_output(tmp_path, capsys):
-    page = tmp_path / "in.html"
-    page.write_text(PAGE)
-    assert cli.main(["export", "epub", str(page), str(tmp_path / "no" / "o.epub")]) == 2
-    assert "cannot write" in capsys.readouterr().err

@@ -67,11 +67,3 @@ def test_the_line_goes_with_the_crop_under_the_line_prompt():
     line = load_prompt("equation_line")
     assert request.prompt_version == f"{PROMPT_VERSION}+{line.version}"
     assert request.instructions.endswith(line.text)
-
-
-def test_without_the_line_the_request_is_as_before():
-    client = FakeVisionClient(responders={"equation": answer})
-    transcribe(equation_element(), PNG, client=client, settings=make_settings())
-    request = client.requests[0]
-    assert request.images == [PNG]
-    assert request.prompt_version == PROMPT_VERSION

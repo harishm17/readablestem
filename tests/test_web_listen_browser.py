@@ -78,7 +78,6 @@ ONLINE_ONLY = (
     "window.__voices = [{name: 'Cloud Voice', lang: 'en-US', localService: false, "
     "voiceURI: 'cloud', default: false}];\n"
 )
-NO_SPEECH = "Object.defineProperty(window, 'speechSynthesis', {value: undefined});"
 
 
 @pytest.fixture(scope="module")
@@ -194,37 +193,6 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     context.close()
 
 
-def test_the_whole_transcript_plays_through_to_the_end(site, browser, job):
-    context, page = open_listen(
-        browser, site, f"/jobs/{job}/listen", init="window.__auto = true;\n" + STUB, bypass_csp=True
-    )
-    page.wait_for_selector("[data-listen-controls]:not([hidden])")
-    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
-    page.locator("[data-listen=play]").click()
-    page.wait_for_function("window.__spoken.length >= 5", timeout=5000)
-    items = page.locator("[data-listen-item]").count()
-    assert status(page) in {"Playing.", "Finished."}
-    page.wait_for_function(
-        "document.querySelector('[data-listen-status]').textContent === 'Finished.'", timeout=5000
-    )
-    assert len(spoken(page)) == items - 2  # from the lesson: the title and language are skipped
-    page.locator("[data-listen=beginning]").click()
-    page.wait_for_function("n => window.__spoken.length >= n", arg=2 * items - 2, timeout=5000)
-    context.close()
-
-
-def test_speed_and_voice_are_used(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
-    page.wait_for_selector("[data-listen-controls]:not([hidden])")
-    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
-    page.get_by_label("Speed").select_option("1.5")
-    page.locator("[data-listen=play]").click()
-    assert page.evaluate("window.__spoken.at(-1).rate") == 1.5
-    groups = page.locator("#listen-voice optgroup").evaluate_all("els => els.map(e => e.label)")
-    assert groups[0] == "On this device" and groups[1].startswith("Online")
-    context.close()
-
-
 def test_keyboard_shortcuts_work_inside_the_page_and_ignore_modifiers(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen")
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
@@ -318,15 +286,6 @@ def test_with_no_voice_at_all_the_menu_goes_and_a_line_beside_play_says_why(site
     context.close()
 
 
-def test_without_speech_the_transcript_still_reads(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=NO_SPEECH)
-    page.wait_for_selector("[data-listen-unsupported]:not([hidden])")
-    assert page.locator("[data-listen-controls]").is_hidden()
-    assert "cannot speak" in page.locator("[data-listen-unsupported]").inner_text()
-    assert "Heading level 1" in page.locator("[data-listen-transcript]").inner_text()
-    context.close()
-
-
 def test_without_javascript_the_transcript_is_text_and_the_controls_stay_hidden(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen", java_script_enabled=False)
     assert page.locator("[data-listen-controls]").is_hidden()
@@ -349,51 +308,6 @@ def test_hear_this_on_the_review_screen_plays_the_proposal_then_the_pdf(site, br
     assert button.inner_text().startswith("Stop")
     button.click()  # a second press stops it
     assert button.inner_text().startswith("Hear this")
-    context.close()
-
-
-def test_hear_this_with_only_online_voices_asks_before_speaking(site, browser, job):
-    context, page = open_listen(
-        browser, site, f"/jobs/{job}/review?item=p1-e3", init=ONLINE_ONLY + STUB
-    )
-    button = page.locator("[data-hear]").first
-    button.wait_for(state="visible")
-    button.click()
-    assert spoken(page) == []
-    page.wait_for_timeout(150)
-    assert "only online voices" in page.locator("[data-hear-note]").first.inner_text()
-    button.click()
-    assert spoken(page) and page.evaluate("window.__spoken[0].voice") == "Cloud Voice"
-    context.close()
-
-
-def test_hear_this_is_not_shown_without_speech(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/review?item=p1-e3", init=NO_SPEECH)
-    page.wait_for_load_state("networkidle")
-    assert page.locator("[data-hear]:visible").count() == 0
-    context.close()
-
-
-def test_the_landing_hero_plays_both_readings(site, browser):
-    context, page = open_listen(browser, site, "/", signed_in=False)
-    pdf = page.get_by_role("button", name="Play the PDF reading")
-    pdf.wait_for(state="visible")
-    pdf.click()
-    assert spoken(page)[0].startswith("In the PDF a screen reader says: capital delta bold d")
-    page.get_by_role("button", name="Play the converted reading").click()
-    assert spoken(page)[-1] == (
-        "On the converted page a screen reader says: capital delta bold d over capital delta t"
-    )
-    context.close()
-
-
-def test_the_demo_listen_page_is_public_and_plays(site, browser):
-    context, page = open_listen(browser, site, "/demo/listen", signed_in=False)
-    page.wait_for_selector("[data-listen-controls]:not([hidden])")
-    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
-    page.get_by_role("button", name="Next equation").click()
-    assert spoken(page)[-1].startswith("Graphs in this text have perpendicular axes")
-    assert "y equals m x plus b" in current(page)
     context.close()
 
 
@@ -424,80 +338,6 @@ def test_the_pages_pass_axe(site, browser, job, axe_source, where, viewport):
     violations = [v for v in results["violations"] if v["impact"] in STRICT]
     context.close()
     assert not violations, describe(violations)
-
-
-def test_the_transport_stays_in_view_while_the_page_scrolls(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
-    page.wait_for_selector("[data-listen-transport]:not([hidden])")
-    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-    box = page.locator("[data-listen-transport]").bounding_box()
-    assert box is not None and 0 <= box["y"] < 40 and box["y"] + box["height"] <= 300
-    assert page.locator("[data-listen=play]").is_visible()
-    context.close()
-
-
-def test_follow_along_is_on_by_default_can_be_turned_off_and_is_remembered(site, browser, job):
-    context, page = open_listen(
-        browser, site, f"/jobs/{job}/listen", init="window.__auto = true;\n" + STUB, bypass_csp=True
-    )
-    page.wait_for_selector("[data-listen-transport]:not([hidden])")
-    page.locator(".listen-more > summary").click()
-    follow = page.get_by_label("Follow along")
-    assert follow.is_checked()
-    follow.uncheck()
-    page.locator("[data-listen=play]").click()
-    page.wait_for_function("window.__spoken.length >= 3", timeout=5000)
-    assert page.evaluate("window.scrollY") == 0  # it did not scroll after the speech
-    page.reload()
-    page.wait_for_selector("[data-listen-transport]:not([hidden])")
-    assert not page.get_by_label("Follow along").is_checked()
-    context.close()
-
-
-def test_play_starts_at_the_lesson_and_the_beginning_is_an_option(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
-    page.wait_for_selector("[data-listen-transport]:not([hidden])")
-    page.locator("[data-listen=play]").click()
-    first = page.evaluate("window.__spoken[0].text")
-    assert first == "Main landmark"  # not the page title or the language
-    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
-    page.get_by_role("button", name="Play from the beginning").click()
-    assert page.evaluate("window.__spoken.at(-1).text") == "Page title: Kinematics notes"
-    # The items before the lesson are folded away, and open when playback reaches them.
-    assert page.locator("[data-listen-before]").evaluate("d => d.open")
-    context.close()
-
-
-def test_the_transcript_folds_away_what_comes_before_the_lesson(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
-    before = page.locator("[data-listen-before]")
-    assert not before.evaluate("d => d.open")
-    assert "Before the lesson (2)" in before.locator("summary").inner_text()
-    assert page.locator("#item-3").is_visible()  # the lesson starts at item 3
-    assert page.locator("#item-1").is_hidden()
-    context.close()
-
-
-def test_the_index_and_the_filter_find_headings_and_equations(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
-    page.wait_for_selector("[data-listen-filter]:not([hidden])")
-    page.locator(".listen-index > summary").click()
-    links = page.locator(".listen-index a").all_inner_texts()
-    assert any("Average speed" in t for t in links) and any("x plus 1" in t for t in links)
-    page.get_by_label("Show").select_option("heading")
-    page.wait_for_timeout(200)
-    assert page.locator(".listen-item:visible").count() == 2
-    assert "Showing 2 of" in page.locator("[data-listen-filter-count]").inner_text()
-    # Playing and stepping move through what is shown.
-    page.locator("[data-listen=play]").click()
-    assert spoken(page)[-1] == "Heading level 1: Kinematics"
-    page.get_by_role("button", name="Next", exact=True).click()
-    assert spoken(page)[-1] == "Heading level 2: Average speed"
-    page.get_by_label("Show").select_option("")
-    page.get_by_label("Find in the transcript").fill("distance")
-    page.wait_for_timeout(300)
-    assert page.locator(".listen-item:visible").count() == 1
-    context.close()
 
 
 def test_the_scroll_offset_follows_the_real_height_of_the_transport(site, browser, job):

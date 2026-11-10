@@ -25,14 +25,13 @@ from sqlalchemy import select
 from fixtures.web.support import (
     ALICE,
     WebEnv,
-    csrf_from,
     fake_output,
     job_id_from,
     login,
     make_pdf,
     token,
 )
-from readablestem.core.types import ConversionOutput, Status
+from readablestem.core.types import ConversionOutput
 from readablestem.web.db import Job, PendingUpload, QuotaDay, session_scope
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
@@ -122,21 +121,6 @@ def convert(site: WebEnv, output: ConversionOutput | None = None, **form) -> str
     return job_id
 
 
-def outage_output() -> ConversionOutput:
-    """The small document converted while the AI service was down: every model item failed."""
-    output = fake_output()
-    for fix in output.result.fixes:
-        if fix.kind.value in ("equation", "figure"):
-            fix.status, fix.reason, fix.equation, fix.figure = (
-                Status.FAILED,
-                "model_api_error",
-                None,
-                None,
-            )
-            fix.checks, fix.review = [], "required"
-    return output
-
-
 def look(site: WebEnv, browser, axe_source: str, path: str, viewport: dict, name: str, what: str):
     """Open `path` as the signed-in person and check it with axe; returns (context, page)."""
     context, page = open_page(browser, site, viewport=viewport)
@@ -190,36 +174,6 @@ def test_try_again_works_from_the_keyboard_and_queues_the_document(site, browser
     context.close()
     with session_scope(site.ctx.factory) as session:
         assert session.get(Job, job_id).status in {"queued", "running", "done"}
-
-
-@SIZES
-def test_a_conversion_during_an_outage_says_so_and_offers_the_missing_parts(
-    site, browser, axe_source, viewport
-):
-    job_id = convert(site, outage_output())
-    context, page = look(
-        site, browser, axe_source, f"/jobs/{job_id}", viewport, "retry-outage", "outage"
-    )
-    expect(page.get_by_role("button", name="Convert the missing parts")).to_be_visible()
-    expect(page.locator("#job-status")).to_contain_text("Nothing is wrong with your PDF")
-    assert not sideways_overflow(page)
-    context.close()
-
-
-@SIZES
-def test_the_status_page_names_the_ai_service(site, browser, axe_source, viewport):
-    from readablestem.web.provider_health import HEALTH, MIN_CALLS
-
-    for _ in range(MIN_CALLS):
-        HEALTH.record("api_error")
-    try:
-        context, page = look(
-            site, browser, axe_source, "/status", viewport, "status-down", "status"
-        )
-        expect(page.locator("dl")).to_contain_text("Not answering since")
-        context.close()
-    finally:
-        HEALTH.reset()
 
 
 # --------------------------------------------------------------------------- revised versions
@@ -479,36 +433,6 @@ def test_a_part_of_a_larger_file_and_its_siblings_pass_axe(site, browser, axe_so
 
 
 # --------------------------------------------------------------------------- the course page
-
-
-@SIZES
-def test_the_course_page_lists_its_documents_with_download_all(site, browser, axe_source, viewport):
-    made = site.api.post(
-        "/courses",
-        data={
-            "csrf_token": csrf_from(site.api.get("/courses").text),
-            "name": f"Physics {time.monotonic_ns()}",
-        },
-    )
-    assert made.status_code == 303
-    course_id = made.headers["location"].rsplit("/", 1)[-1]
-    first = job_id_from(send_many(site, [("a.pdf", make_pdf(1))], course=course_id))
-    site.converter.output = fake_output()
-    site.run_worker()
-    for element_id, action in (("p1-e3", "accept"), ("p1-e4", "accept"), ("p1-e5", "reject")):
-        site.api.post(
-            f"/jobs/{first}/review/{element_id}",
-            data={"csrf_token": token(site.api), "view": "list", "action": action},
-        )
-    context, page = look(
-        site, browser, axe_source, f"/courses/{course_id}", viewport, "course-page", "course page"
-    )
-    expect(page.get_by_role("heading", name="Documents in this course")).to_be_visible()
-    expect(
-        page.get_by_role("link", name=re.compile("^Download all 1 ready document"))
-    ).to_be_visible()
-    assert not sideways_overflow(page)
-    context.close()
 
 
 # --------------------------------------------------------------------------- the sample

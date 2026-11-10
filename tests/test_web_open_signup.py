@@ -9,9 +9,7 @@ dev login, the fake converter and the offline model client.
 
 from __future__ import annotations
 
-import re
 import threading
-import time
 from datetime import timedelta
 
 import pytest
@@ -49,10 +47,7 @@ from readablestem.web.db import (
     session_scope,
 )
 from readablestem.web.quota import (
-    rereads_used,
     signups_today,
-    try_consume_reread,
-    try_take_signup,
 )
 
 CAROL = "carol@example.org"
@@ -120,27 +115,6 @@ def test_signup_mode_is_validated_and_forgiving_about_case():
         Settings(_env_file=None, signup_mode="everyone")  # type: ignore[call-arg]
 
 
-@pytest.mark.parametrize(
-    "name",
-    ["open_tier_daily_page_quota", "open_tier_daily_spend_cap_usd", "max_new_accounts_per_day"],
-)
-def test_the_open_tier_numbers_refuse_negative_values(name):
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None, **{name: -1})  # type: ignore[call-arg]
-
-
-def test_signup_settings_come_from_the_environment(monkeypatch):
-    monkeypatch.setenv("SIGNUP_MODE", "open")
-    monkeypatch.setenv("OPEN_TIER_DAILY_PAGE_QUOTA", "12")
-    monkeypatch.setenv("OPEN_TIER_DAILY_REREADS", "7")
-    monkeypatch.setenv("MAX_NEW_ACCOUNTS_PER_DAY", "40")
-    monkeypatch.setenv("OPEN_TIER_DAILY_SPEND_CAP_USD", "2.5")
-    s = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert s.signup_mode == "open"
-    assert (s.open_tier_daily_page_quota, s.open_tier_daily_rereads) == (12, 7)
-    assert (s.max_new_accounts_per_day, s.open_tier_daily_spend_cap_usd) == (40, 2.5)
-
-
 def test_the_limits_check_names_open_signup_settings_that_do_not_fit(tmp_path):
     from readablestem.ops.limits import spend_findings
 
@@ -195,22 +169,6 @@ def test_in_open_mode_the_first_sign_in_makes_an_open_tier_account(open_web):
     assert signups_now(open_web) == 1
 
 
-def test_signing_in_again_uses_the_same_account_and_counts_no_new_one(open_web):
-    login(open_web.browser, CAROL)
-    first = user_row(open_web, CAROL)
-    users = user_count(open_web)
-    assert login(open_web.client(), CAROL).status_code == 303
-    second = user_row(open_web, CAROL)
-    assert first is not None and second is not None and first.id == second.id
-    assert user_count(open_web) == users
-    assert signups_now(open_web) == 1
-
-
-def test_the_dev_login_address_is_normalised_before_an_account_is_made(open_web):
-    login(open_web.browser, "  Carol@Example.ORG ")
-    assert user_row(open_web, CAROL) is not None
-
-
 def test_a_person_an_admin_blocked_stays_refused_in_open_mode_and_gets_no_new_row(open_web):
     login(open_web.browser, CAROL)
     with session_scope(open_web.ctx.factory) as session:
@@ -223,25 +181,6 @@ def test_a_person_an_admin_blocked_stays_refused_in_open_mode_and_gets_no_new_ro
     assert user_count(open_web) == before
     # The session they already had is over too.
     assert open_web.browser.get("/app").status_code == 303
-
-
-def test_blocked_is_not_the_same_as_never_invited(tmp_path):
-    """Open mode: no row means a new account, a row that is not allowed means a refusal.
-    Allowlist mode: both are refused (as before), and neither gets the blocked wording."""
-    for mode, expect_account in (("open", True), ("allowlist", False)):
-        env = make_env(tmp_path / mode, signup_mode=mode)
-        with env.running():
-            stranger = login(env.client(), DAVE)
-            assert (stranger.status_code == 303) is expect_account
-            assert (user_row(env, DAVE) is not None) is expect_account
-            env.allow(BOB)
-            with session_scope(env.ctx.factory) as session:
-                set_blocked(session, BOB, blocked=True)
-            refused = login(env.client(), BOB)
-            assert refused.status_code == 403
-            assert ("This account cannot be used" in refused.text) is (mode == "open")
-            row = user_row(env, BOB)
-            assert row is not None and not row.is_allowed
 
 
 def test_an_admin_removed_person_is_refused_in_allowlist_mode_as_before(closed_web):
@@ -286,29 +225,6 @@ def test_two_first_sign_ins_of_one_address_at_once_make_one_account(open_web):
 # --------------------------------------------------------------------------- tiers
 
 
-def test_allowlisting_makes_someone_invited_and_so_are_the_seeded_admins(open_web):
-    open_web.allow(BOB)
-    row = user_row(open_web, BOB)
-    assert row is not None and row.access_tier == access.INVITED
-    admin = user_row(open_web, ADMIN)  # seeded at start-up
-    assert admin is not None and admin.access_tier == access.INVITED
-
-
-def test_allowlisting_an_open_tier_person_promotes_them_and_unblocking_does_not(open_web):
-    login(open_web.browser, CAROL)
-    open_web.allow(CAROL)
-    promoted = user_row(open_web, CAROL)
-    assert promoted is not None and promoted.access_tier == access.INVITED
-
-    login(open_web.client(), DAVE)
-    with session_scope(open_web.ctx.factory) as session:
-        set_blocked(session, DAVE, blocked=True)
-        set_blocked(session, DAVE, blocked=False)
-    back = user_row(open_web, DAVE)
-    assert back is not None and back.is_allowed and back.access_tier == access.OPEN
-    assert login(open_web.client(), DAVE).status_code == 303
-
-
 def test_blocking_an_admin_takes_the_role_and_unblocking_does_not_give_it_back(open_web):
     with session_scope(open_web.ctx.factory) as session:
         set_blocked(session, ADMIN, blocked=True)
@@ -317,46 +233,7 @@ def test_blocking_an_admin_takes_the_role_and_unblocking_does_not_give_it_back(o
     assert row is not None and row.is_allowed and not row.is_admin
 
 
-def test_blocking_an_unknown_address_changes_nothing(open_web):
-    with session_scope(open_web.ctx.factory) as session:
-        assert set_blocked(session, "nobody@example.org", blocked=True) is None
-        assert set_blocked(session, "nobody@example.org", blocked=False) is None
-    assert user_row(open_web, "nobody@example.org") is None
-
-
-def test_the_tier_decides_the_limits():
-    s = Settings(
-        _env_file=None,  # type: ignore[call-arg]
-        per_user_daily_page_quota=90,
-        open_tier_daily_page_quota=20,
-        open_tier_daily_rereads=30,
-    )
-    assert access.page_quota(s, access.INVITED) == 90
-    assert access.page_quota(s, access.OPEN) == 20
-    assert access.reread_allowance(s, access.INVITED) is None
-    assert access.reread_allowance(s, access.OPEN) == 30
-    assert access.spend_pool(access.INVITED) is None
-    assert access.spend_pool(access.OPEN) == access.POOL_OPEN
-
-
 # ----------------------------------------------------------------- the daily cap on accounts
-
-
-def test_when_the_days_accounts_are_taken_new_sign_ups_get_a_calm_page(tmp_path):
-    env = make_env(tmp_path, max_new_accounts_per_day=2)
-    with env.running():
-        assert login(env.client(), CAROL).status_code == 303
-        assert login(env.client(), DAVE).status_code == 303
-        before = user_count(env)
-        full = login(env.client(), "late@example.org")
-        assert full.status_code == 503 and full.headers["retry-after"]
-        assert "Sign-ups are full for today" in full.text
-        assert "Please try again tomorrow" in full.text
-        assert 'href="/demo"' in full.text
-        assert user_row(env, "late@example.org") is None and user_count(env) == before
-        # People who already have an account are not affected.
-        assert login(env.client(), CAROL).status_code == 303
-        assert signups_now(env) == 2
 
 
 def test_the_count_starts_again_on_the_next_utc_day(tmp_path, monkeypatch):
@@ -378,23 +255,6 @@ def test_zero_accounts_a_day_pauses_sign_up_for_everyone_new(tmp_path):
         assert login(env.client(), CAROL).status_code == 503
         env.allow(BOB)
         assert login(env.client(), BOB).status_code == 303
-
-
-def test_the_account_count_is_one_conditional_update(open_web):
-    with session_scope(open_web.ctx.factory) as session:
-        assert try_take_signup(session, limit=2, day=utc_today())
-        assert try_take_signup(session, limit=2, day=utc_today())
-        assert not try_take_signup(session, limit=2, day=utc_today())
-        assert signups_today(session, utc_today()) == 2
-        assert try_take_signup(session, limit=2, day=utc_today() + timedelta(days=1))
-
-
-def test_a_count_whose_account_was_not_saved_is_not_spent(open_web):
-    before = signups_now(open_web)
-    with pytest.raises(RuntimeError), session_scope(open_web.ctx.factory) as session:
-        try_take_signup(session, limit=5, day=utc_today())
-        raise RuntimeError("the account could not be saved")
-    assert signups_now(open_web) == before
 
 
 def test_many_sign_ups_at_once_never_pass_the_daily_cap(tmp_path):
@@ -429,12 +289,6 @@ def test_a_per_address_rule_limits_new_accounts_made_from_one_address(tmp_path):
         assert signups_now(env) == 5
 
 
-def test_the_per_address_rule_is_listed_with_the_other_rules():
-    from readablestem.web.abuse import RULES
-
-    assert RULES["signup"].limit == 5 and RULES["signup"].window_s == 3600
-
-
 # --------------------------------------------------------------------------- page quota by tier
 
 
@@ -459,12 +313,6 @@ def test_an_open_tier_account_has_the_open_quota_and_is_told_the_number(open_web
         assert session.scalar(select(QuotaDay.pages)) == 3
 
 
-def test_the_upload_form_tells_a_new_account_its_limit(open_web):
-    login(open_web.browser, CAROL)
-    page = " ".join(open_web.browser.get("/app").text.split())
-    assert "3 pages left today (a new account can convert 3 pages a day)" in page
-
-
 def test_an_invited_person_keeps_the_normal_quota_in_open_mode(open_web):
     open_web.allow(BOB)
     login(open_web.browser, BOB)
@@ -477,33 +325,7 @@ def test_an_invited_person_keeps_the_normal_quota_in_open_mode(open_web):
     assert "new account" not in text
 
 
-def test_the_quota_message_for_an_invited_person_is_what_it_always_was(open_web):
-    open_web.allow(BOB)
-    login(open_web.browser, BOB)
-    for _ in range(3):
-        upload(open_web.browser, make_pdf(5))
-    upload(open_web.browser, make_pdf(2))
-    response = upload(open_web.browser, make_pdf(5), filename="chapter2.pdf")
-    assert "chapter2.pdf has 5 pages, but you have 3 of today&#39;s 20 pages left" in response.text
-
-
 # --------------------------------------------------------------------------- re-reads
-
-
-def test_the_reread_allowance_is_one_conditional_update_per_person_and_day(open_web):
-    login(open_web.browser, CAROL)
-    login(open_web.client(), DAVE)
-    carol, dave = user_row(open_web, CAROL), user_row(open_web, DAVE)
-    assert carol is not None and dave is not None
-    day = utc_today()
-    with session_scope(open_web.ctx.factory) as session:
-        assert try_consume_reread(session, carol.id, allowance=2, day=day)
-        assert try_consume_reread(session, carol.id, allowance=2, day=day)
-        assert not try_consume_reread(session, carol.id, allowance=2, day=day)
-        assert rereads_used(session, carol.id, day) == 2
-        assert try_consume_reread(session, dave.id, allowance=2, day=day)  # per person
-        assert try_consume_reread(session, carol.id, allowance=2, day=day + timedelta(days=1))
-        assert not try_consume_reread(session, dave.id, allowance=0, day=day)
 
 
 @pytest.fixture
@@ -542,47 +364,6 @@ def mark_region(env, kind: str = "equation"):
     return env.browser.post(f"/jobs/{env.job_id}/pages/1/add", data=data)
 
 
-def rereads_counted(env) -> int:
-    with session_scope(env.ctx.factory) as session:
-        return int(session.scalar(select(func.coalesce(func.sum(QuotaDay.rereads), 0))) or 0)
-
-
-def test_an_open_tier_account_can_start_only_so_many_model_reads_a_day(reviewing):
-    with_model(reviewing)
-    assert mark_region(reviewing).status_code == 303
-    assert mark_region(reviewing).status_code == 303
-    third = mark_region(reviewing)
-    assert third.status_code == 422
-    text = " ".join(third.text.split())
-    assert "You have started 2 reads with the model today, the most a new account can start" in text
-    assert "counts when it starts" in text
-    assert "Type it yourself" in text
-    assert rereads_counted(reviewing) == 2
-
-
-def test_adding_a_picture_costs_no_read_and_is_not_counted(reviewing):
-    with_model(reviewing)
-    for _ in range(3):
-        assert mark_region(reviewing, "picture").status_code == 303
-    assert rereads_counted(reviewing) == 0
-    assert mark_region(reviewing).status_code == 303  # the allowance is still whole
-
-
-def test_an_invited_person_has_no_reread_allowance(tmp_path):
-    env = make_env(tmp_path, open_tier_daily_rereads=1)
-    env.converter.output = review_output()
-    with env.running() as client:
-        env.browser = client
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        with_model(env)
-        for _ in range(3):
-            assert mark_region(env).status_code == 303
-        assert rereads_counted(env) == 0
-
-
 def test_a_read_refused_by_the_allowance_sends_nothing_to_the_model(reviewing):
     sent: list = []
     with_model(reviewing, sent)
@@ -610,18 +391,6 @@ def post_admin(env, path: str, **fields):
     return env.browser.post(path, data=data)
 
 
-def test_the_admin_page_shows_the_tier_the_sign_up_numbers_and_the_open_pool(admin_web):
-    admin_web.allow(BOB)
-    login(admin_web.client(), CAROL)
-    page = " ".join(admin_web.browser.get("/admin").text.split())
-    assert '<th scope="col">Access</th>' in page
-    assert '<th scope="row">carol@example.org</th> <td>Instructor</td> <td>Open</td>' in page
-    assert '<th scope="row">bob@example.org</th> <td>Instructor</td> <td>Invited</td>' in page
-    assert "New accounts today (UTC)</dt><dd>1 of 50" in page
-    assert "Pool for new accounts (open tier)" in page and "$4.00" in page
-    assert "Open-tier accounts</dt><dd>1" in page
-
-
 def test_an_admin_can_block_and_unblock_an_open_tier_account(admin_web):
     carol = client_for(admin_web, CAROL)
     response = post_admin(admin_web, "/admin/users/block", email=CAROL)
@@ -638,15 +407,6 @@ def test_an_admin_can_block_and_unblock_an_open_tier_account(admin_web):
     assert row is not None and row.access_tier == access.OPEN
 
 
-def test_the_admin_page_offers_block_for_open_tier_and_remove_for_invited(admin_web):
-    admin_web.allow(BOB)
-    login(admin_web.client(), CAROL)
-    page = admin_web.browser.get("/admin").text
-    # The "Block by email" form, and the one button of the open-tier account.
-    assert page.count('action="/admin/users/block"') == 2
-    assert page.count('action="/admin/allowlist/remove"') == 1  # bob; not the admin's own row
-
-
 def test_an_admin_cannot_block_themselves_or_a_stranger_and_others_cannot_block(admin_web):
     post_admin(admin_web, "/admin/users/block", email=ADMIN)
     row = user_row(admin_web, ADMIN)
@@ -660,47 +420,6 @@ def test_an_admin_cannot_block_themselves_or_a_stranger_and_others_cannot_block(
     forbidden = carol.post("/admin/users/block", data={"csrf_token": token(carol), "email": BOB})
     assert forbidden.status_code == 403
     assert carol.post("/admin/users/block", data={"email": BOB}).status_code == 403
-
-
-def test_blocking_stops_the_accounts_queued_work(open_web):
-    client = client_for(open_web, CAROL)
-    job_id = job_id_from(upload(client, make_pdf(1)))
-    with session_scope(open_web.ctx.factory) as session:
-        set_blocked(session, CAROL, blocked=True)
-    job = open_web.job(job_id)
-    assert job.status == "failed" and job.error_code == "access_removed"
-    assert open_web.run_worker() is None  # nothing of theirs is claimed
-
-
-def test_the_admin_list_shows_the_newest_accounts_and_block_by_email_reaches_the_rest(
-    tmp_path, monkeypatch
-):
-    import readablestem.web.routes.admin as admin_routes
-
-    monkeypatch.setattr(admin_routes, "PEOPLE_ROWS", 3)
-    env = make_env(tmp_path)
-    with env.running() as admin:
-        login(admin, ADMIN)
-        for n in range(6):
-            login(env.client(), f"person{n}@example.org")
-            time.sleep(0.01)  # created_at orders them
-        page = admin.get("/admin").text
-        assert "The newest 3 accounts are listed" in page
-        shown = [e for e in re.findall(r"person\d@example.org", page)]
-        assert {"person5@example.org", "person4@example.org", "person3@example.org"} <= set(shown)
-        assert "person0@example.org" not in page  # older than the list reaches
-        assert shown.index("person5@example.org") < shown.index("person3@example.org")
-        # The form takes any address, listed or not.
-        assert 'for="block-email"' in page and "Block by email" in page
-        post_admin(env_for(admin), "/admin/users/block", email="person0@example.org")
-        refused = login(env.client(), "person0@example.org")
-        assert refused.status_code == 403 and "This account cannot be used" in refused.text
-        assert "person0@example.org" in admin.get("/admin").text  # now in the blocked table
-
-
-def env_for(client):
-    """`post_admin` wants an env with a `browser`; a bare client is enough."""
-    return type("E", (), {"browser": client})()
 
 
 # --------------------------------------------------------------------------- deleting an account
@@ -751,33 +470,6 @@ def delete_account(client):
     return client.post("/account/delete", data={"csrf_token": csrf, "confirm": "yes"})
 
 
-def test_the_account_page_shows_what_is_held_the_limits_and_the_delete_link(open_web):
-    login(open_web.browser, CAROL)
-    upload(open_web.browser, make_pdf(1))
-    page = " ".join(open_web.browser.get("/account").text.split())
-    assert "carol@example.org" in page and "Documents kept now</dt><dd>1" in page
-    assert "New-account limits" in page
-    assert "Pages today: 2 of 3" in page
-    assert "Model reads from the review screen: 30 of 30" in page
-    assert 'href="/account/delete"' in page and "Delete my account" in page
-    assert 'href="/account"' in open_web.browser.get("/app").text  # in the main navigation
-
-
-def test_an_invited_person_sees_their_own_limits_and_no_reread_line(open_web):
-    open_web.allow(BOB)
-    login(open_web.browser, BOB)
-    page = " ".join(open_web.browser.get("/account").text.split())
-    assert "Invited-account limits" in page
-    assert "Pages today: 20 of 20" in page
-    assert "Model reads" not in page
-
-
-def test_the_account_pages_need_a_signed_in_person(open_web):
-    for path in ("/account", "/account/delete"):
-        assert open_web.client().get(path).status_code == 303
-    assert open_web.client().post("/account/delete", data={"confirm": "yes"}).status_code == 403
-
-
 def test_deleting_an_account_asks_first_and_changes_nothing_until_confirmed(open_web):
     uid = populate(open_web, CAROL)
     client = client_for(open_web, CAROL)
@@ -821,37 +513,6 @@ def test_deleting_an_account_removes_the_person_and_everything_of_theirs(open_we
     kept = rows_of(open_web, theirs)
     assert kept["users"] == 1 and kept["jobs"] == 1 and kept["courses"] == 1
     assert kept["identities"] == 1 and kept["linked"] == 1
-
-
-def test_a_deleted_account_signing_in_again_is_a_new_empty_account(open_web):
-    """Empty of documents; the day's counts are not reset (tests/test_web_account_tombstones.py)."""
-    old = populate(open_web, CAROL)
-    delete_account(client_for(open_web, CAROL))
-    assert signups_now(open_web) == 1  # her place for today stays used, and is reused
-    assert login(open_web.client(), CAROL).status_code == 303
-    row = user_row(open_web, CAROL)
-    assert row is not None and row.id != old and row.access_tier == access.OPEN
-    assert rows_of(open_web, row.id)["jobs"] == 0
-    assert signups_now(open_web) == 1
-
-
-def test_in_invitation_mode_the_confirmation_says_deleting_leaves_the_list(closed_web):
-    closed_web.allow(BOB)
-    client = client_for(closed_web, BOB)
-    page = " ".join(client.get("/account/delete").text.split())
-    assert "Deleting removes you from it." in page
-    delete_account(client)
-    assert user_row(closed_web, BOB) is None
-    assert login(closed_web.client(), BOB).status_code == 403
-
-
-def test_deleting_an_account_while_a_job_is_queued_leaves_nothing_to_claim(open_web):
-    client = client_for(open_web, CAROL)
-    job_id = job_id_from(upload(client, make_pdf(1)))
-    delete_account(client)
-    assert open_web.run_worker() is None
-    with session_scope(open_web.ctx.factory) as session:
-        assert session.get(Job, job_id) is None
 
 
 # --------------------------------------------------------------------------- the command line

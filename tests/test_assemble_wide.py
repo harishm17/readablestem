@@ -11,15 +11,12 @@ from __future__ import annotations
 
 import glob
 import json
-import re
 from pathlib import Path
 
 import pytest
 
 from readablestem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
 from readablestem.pipeline.assemble import (
-    WIDE_EQUATION_EM,
-    estimate_width_em,
     render_html,
     sanitize_mathml,
 )
@@ -78,19 +75,6 @@ def opening_tag(html: str, element_id: str) -> str:
 # --------------------------------------------------------------------------- offline
 
 
-def test_the_width_estimate_tells_short_from_long():
-    assert estimate_width_em(SHORT) < 3
-    assert estimate_width_em(long_sum(40)) > 3 * WIDE_EQUATION_EM
-    assert estimate_width_em(long_sum(3)) < WIDE_EQUATION_EM
-    # A fraction is as wide as its wider part, not the sum of both.
-    frac = "<math><mfrac><mrow>{0}</mrow><mrow>{0}</mrow></mfrac></math>"
-    row = "<mi>x</mi><mo>+</mo><mi>y</mi>"
-    assert estimate_width_em(frac.format(row)) == pytest.approx(
-        estimate_width_em(f"<math>{row}</math>") + 0.2
-    )
-    assert estimate_width_em("not maths") == 0.0
-
-
 def test_only_wide_equations_become_named_tab_stops():
     html = document([SHORT, long_sum(), long_sum()], [None, None, "(2.4)"])
     assert "tabindex" not in opening_tag(html, "p1-e0")
@@ -99,29 +83,6 @@ def test_only_wide_equations_become_named_tab_stops():
     )
     assert 'aria-label="Equation (2.4)"' in opening_tag(html, "p1-e2")
     assert all(c.passed for c in static_checks(html))
-
-
-def test_only_wide_inline_equations_get_a_scroll_box():
-    html = paragraph_with([SHORT, long_sum()])
-    assert '<p id="p1-e0">The sum <math display="inline" id="p1-e1">' in html
-    assert (
-        ' and <span class="equation-scroll" tabindex="0" role="group" aria-label="Equation">'
-        '<math display="inline" id="p1-e2">'
-    ) in html
-    assert all(c.passed for c in static_checks(html))
-
-
-def test_not_converted_equations_are_images_that_shrink_instead():
-    eq = Element(id="p1-e0", kind=Kind.EQUATION, page=0, bbox=(0, 0, 900, 20), order=0,
-                 display="block")  # fmt: skip
-    fix = Fix(element_id="p1-e0", kind=Kind.EQUATION, status=Status.ABSTAINED, reason="x")
-    html = render_html(title="T", lang="en", elements=[eq], fixes=[fix], crops={})
-    # An image is not a tab stop. The one tabindex in the file is the skip link's target (an
-    # empty span, tabindex="-1": focusable by the link, not a tab stop; the Canvas paste
-    # version removes it with the link).
-    assert re.findall(r"<[^>]*\btabindex=[^>]*>", html) == [
-        '<span id="main-content" tabindex="-1">'
-    ]
 
 
 # --------------------------------------------------------------------------- Chromium

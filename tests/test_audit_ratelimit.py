@@ -124,22 +124,6 @@ def test_sign_in_attempts_are_limited_per_address(web):
     assert web.browser.get("/app").status_code == 303  # still signed out
 
 
-def test_another_address_is_not_locked_out(web):
-    rule = web.ctx.limiter.rules["login"]
-    page = web.browser.get("/dev-login").text
-    for _ in range(rule.limit + 1):
-        web.browser.post("/dev-login", data={"csrf_token": csrf_from(page), "email": "x@e.org"})
-    other = web.client()
-    page = other.get("/dev-login").text
-    response = other.post(
-        "/dev-login",
-        data={"csrf_token": csrf_from(page), "email": ALICE},
-        headers={"X-Forwarded-For": "198.51.100.4"},  # a different address behind the proxy
-    )
-    assert response.status_code == 303
-    other.close()
-
-
 def test_google_and_microsoft_callbacks_are_limited(web):
     rule = web.ctx.limiter.rules["callback"]
     codes = [

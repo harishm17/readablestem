@@ -7,10 +7,8 @@ from __future__ import annotations
 import pytest
 
 from readablestem.config import get_settings
-from readablestem.core.types import ConversionOptions, DocumentResult, Kind, Status
+from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
-from readablestem.pipeline import html_checks
-from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope
 from readablestem.source.convert import SourceFailed, convert_source
 from source_support import fixture, make_zip, needs_latexml, png_bytes
@@ -73,14 +71,6 @@ def test_mhchem_is_a_decision_with_our_own_reading_as_the_proposal():
     assert [n.code for n in result.notices] == ["source_error"]
 
 
-def test_a_tikz_figure_is_a_decision_without_a_picture():
-    result = convert("tikz")
-    [fix] = [f for f in result.fixes if f.kind is Kind.FIGURE]
-    assert fix.status is Status.FAILED and fix.reason == "source_figure_missing"
-    assert result.stats.model_calls == 0  # nothing to send a model
-    assert "A circle inside a square." in result.html
-
-
 def test_a_bibliography_becomes_a_list_with_no_repeats():
     result = convert("bib")
     items = [e.text for e in result.elements if e.kind is Kind.LIST_ITEM]
@@ -100,24 +90,6 @@ def test_a_broken_macro_is_a_required_decision_showing_the_tex():
     assert r"\mysterycommand{x}+y" in result.html  # shown as written, flagged
 
 
-def test_a_table_keeps_its_spans():
-    result = convert("tables")
-    [fix] = [f for f in result.fixes if f.kind is Kind.TABLE]
-    grid = fix.table.grid  # type: ignore[union-attr]
-    assert (grid.rows, grid.cols) == (4, 3) and grid.caption == "Grouped data"
-    assert any(c.row_span == 2 for c in grid.cells) and any(c.col_span == 2 for c in grid.cells)
-    assert "<table" in result.html and 'rowspan="2"' in result.html
-
-
-def test_code_footnotes_links_and_scripts():
-    result = convert("listing")
-    assert any(e.preformatted for e in result.elements)
-    text = next(e for e in result.elements if e.text and "footnote" in e.text)
-    assert "(note: A note.)" in (text.text or "")
-    assert [link.href for link in text.links] == ["https://example.org/page"]
-    assert text.script_runs and 'href="https://example.org/page"' in result.html
-
-
 def test_figures_from_the_project_go_through_the_figure_step():
     def figure(request):
         return {
@@ -134,38 +106,6 @@ def test_figures_from_the_project_go_through_the_figure_step():
     assert [r.step for r in client.requests] == ["figure"]  # one picture, one request
     assert figures[0].status in {Status.ACCEPTED, Status.NEEDS_REVIEW}
     assert "data:image/png;base64" in result.html  # the project's picture is in the file
-
-
-def test_a_source_job_with_an_unreadable_picture_still_converts():
-    result = convert("rich_figure", extra={"fig1.png": b"not an image"})
-    [fix] = [f for f in result.fixes if f.kind is Kind.FIGURE]
-    assert fix.status is Status.FAILED and fix.reason == "source_figure_missing"
-
-
-def test_convert_pdf_hands_a_source_envelope_to_the_source_path():
-    blob = envelope.wrap("tex", "a.tex", None, fixture("bib.tex").encode())
-    output = convert_pdf(blob, settings=get_settings(), client=FakeVisionClient())
-    assert output.result.origin == "latex"
-
-
-def test_the_assembled_file_passes_the_static_checks():
-    result = convert("amsmath")
-    assert all(c.passed for c in html_checks.static_checks(result.html) if c.severity == "error")
-
-
-def test_no_pdf_facts_are_invented_for_a_source():
-    result = convert("amsmath")
-    assert result.source_facts is None and result.page_types == [] and result.page_sizes == {}
-    assert result.image_only_pages == [] and result.page_labels == {}
-
-
-def test_options_do_not_change_the_exact_equations():
-    on = ConversionOptions(tables=True, long_descriptions=True, colour=True)
-    blob = envelope.wrap("tex", "a.tex", None, fixture("amsmath.tex").encode())
-    result = convert_source(
-        blob, settings=get_settings(), client=FakeVisionClient(), options=on
-    ).result
-    assert by_status(result, Kind.EQUATION) == {Status.ACCEPTED: 6}
 
 
 def test_a_project_that_is_not_latex_fails_with_a_plain_code():

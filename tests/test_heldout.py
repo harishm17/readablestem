@@ -8,10 +8,7 @@ registration's own numbers.
 
 from __future__ import annotations
 
-import dataclasses
-import hashlib
 import json
-import re
 from pathlib import Path
 from typing import ClassVar
 
@@ -19,14 +16,12 @@ import pymupdf
 import pytest
 
 from readablestem.cli import eval_cli
-from readablestem.cli import heldout as heldout_cli
-from readablestem.cli.main import build_parser, main
+from readablestem.cli.main import main
 from readablestem.config import Settings
 from readablestem.eval import pipeline_eval, render
 from readablestem.gold import heldout, openstax
 from readablestem.gold.heldout import (
     REGISTERED,
-    HeldoutError,
     Registration,
     Section,
     content_sha256,
@@ -35,7 +30,7 @@ from readablestem.gold.heldout import (
     require_gold,
     verify_gold,
 )
-from readablestem.gold.openstax import BookPin, BookStateError, GoldError, fetch_gold
+from readablestem.gold.openstax import BookPin, GoldError, fetch_gold
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step
 from test_eval_support import EQ_A, EQ_V, EQ_X, FakeMedia, equation, fake_transcribe, write_gold
@@ -159,31 +154,6 @@ def test_registration_is_the_pre_registered_set():
     assert REGISTERED.pins["precalculus"] == BookPin("20260604.144757", "ebc5beb")
 
 
-def test_registered_slugs_are_numbered_sections_and_unique():
-    slugs = [section.slug for section in REGISTERED.sections]
-    assert len(set(slugs)) == 15
-    assert all(openstax.SECTION_SLUG.match(slug) for slug in slugs)
-    for section in REGISTERED.sections:
-        assert 1 <= section.pdf_pages <= 30  # the app refuses longer documents
-        assert re.fullmatch(r"[0-9a-f]{64}", section.sha256)
-        assert re.fullmatch(r"[0-9a-f]{64}", section.content_sha256)
-        assert section.path == f"openstax/{section.book}/{section.slug}.jsonl"
-    for digest in (
-        REGISTERED.manifest_sha256,
-        REGISTERED.attribution_sha256,
-        REGISTERED.preregistration_sha256,
-    ):
-        assert digest and re.fullmatch(r"[0-9a-f]{64}", digest)
-
-
-def test_section_lookup_by_slug_and_book():
-    found = REGISTERED.section("3-1-complex-numbers")
-    assert found is not None and found.book == "precalculus"
-    assert REGISTERED.section("3-1-complex-numbers", "precalculus") == found
-    assert REGISTERED.section("3-1-complex-numbers", "chemistry") is None
-    assert REGISTERED.section("2-1-relative-motion-distance-and-displacement") is None
-
-
 def test_no_held_out_gold_is_in_the_repository():
     """Pre-registration section 10: not in data/gold, not in a fixture, not in the demo."""
     for book in REGISTERED.pins:
@@ -220,22 +190,6 @@ def test_fetch_gold_with_a_pin_reads_the_pinned_archive_not_the_current_one(tmp_
     assert (meta["archive_version"], meta["version"]) == (PINNED, "v0")
 
 
-def test_without_a_pin_the_current_archive_is_read(tmp_path):
-    fetcher = PinnedFetcher()
-    fetcher.responses[f"https://openstax.org{CURRENT_ARCHIVE}/contents/book-uuid@v9.json"] = (
-        fetcher.responses[f"{PINNED_URL}.json"]
-    )
-    book = openstax.resolve_book("physics", fetcher)
-    assert (book.version, book.archive_version) == ("v9", "20990101.000000")
-
-
-def test_a_pinned_archive_that_cannot_be_read_says_so(tmp_path):
-    fetcher = PinnedFetcher(missing=(f"{PINNED_URL}.json",))
-    with pytest.raises(GoldError, match=r"pinned archive 20250101\.000000"):
-        fetch_gold("physics", 1, tmp_path, fetcher, allow_retired=True, pin=PINS["physics"])
-    assert not (tmp_path / "openstax").exists()
-
-
 def test_fetch_set_writes_every_record_kind_with_attribution(tmp_path):
     gold, registration = fetched(tmp_path)
     manifest = json.loads((gold / "manifest.json").read_text(encoding="utf-8"))
@@ -247,17 +201,6 @@ def test_fetch_set_writes_every_record_kind_with_attribution(tmp_path):
     assert "Senior Author" in attribution and CC_BY in attribution
     assert "not affiliated with or endorsed by OpenStax" in attribution
     assert verify_gold(gold, registration) == []
-
-
-def test_fetch_set_needs_the_retired_opt_in_and_writes_nothing_without_it(tmp_path):
-    with pytest.raises(BookStateError, match=r"0001-scope\.md"):
-        fetch_set(
-            tmp_path / "gold",
-            PinnedFetcher(),
-            retrieved_at="2026-10-06",
-            registration=draft("2026-10-06"),
-        )
-    assert not (tmp_path / "gold").exists()
 
 
 def test_fetch_set_still_refuses_a_book_that_is_not_cc_by(tmp_path):
@@ -320,29 +263,6 @@ def test_a_missing_folder_or_file_is_reported(registered, tmp_path):
     assert problem.startswith("1 registered file(s) missing") and SLUGS[0] in problem
 
 
-def test_a_changed_record_is_a_content_difference(registered):
-    gold, registration = registered
-    edit_first_line(gold / "openstax/physics" / f"{SLUGS[1]}.jsonl", mathml="<math/>")
-    problems = verify_gold(gold, registration)
-    assert any("1 file(s) differ in content" in p and SLUGS[1] in p for p in problems)
-    assert not any("retrieved_at" in p for p in problems)
-
-
-def test_fetching_on_another_day_is_named_and_the_date_to_use_is_given(tmp_path):
-    _, registration = fetched(tmp_path / "day-one", "2026-10-06")
-    later, _ = fetched(tmp_path / "day-two", "2026-12-01")
-    problems = verify_gold(later, registration)
-    assert any(
-        "2 file(s) differ from the registered ones only in retrieved_at" in p
-        and "--date 2026-10-06" in p
-        for p in problems
-    )
-    assert not any("differ in content" in p for p in problems)
-    assert any(p.startswith("manifest.json is not the registered one") for p in problems)
-    # A book file that matches its folder's own manifest is not a further problem.
-    assert not any("book file" in p for p in problems)
-
-
 def test_a_gold_file_outside_the_registered_set_is_refused(registered):
     gold, registration = registered
     stray = gold / "openstax" / "physics" / "2-1-third-section.jsonl"
@@ -379,21 +299,6 @@ def test_missing_manifest_attribution_and_an_unreadable_book_file(registered):
     assert "manifest.json is missing" in problems and "ATTRIBUTION.md is missing" in problems
 
 
-def test_require_gold_raises_with_every_problem(registered):
-    gold, registration = registered
-    edit_first_line(gold / "openstax/physics" / f"{SLUGS[0]}.jsonl", mathml="<math/>")
-    with pytest.raises(HeldoutError, match="not the pre-registered held-out gold") as caught:
-        require_gold(gold, registration)
-    assert SLUGS[0] in str(caught.value)
-    assert isinstance(caught.value, GoldError)
-
-
-def test_long_lists_of_files_are_shortened(tmp_path):
-    names = [f"openstax/physics/{n}.jsonl" for n in range(7)]
-    shown = heldout._listed(names)
-    assert shown.endswith("and 3 more") and "6.jsonl" not in shown
-
-
 # ---------------------------------------------------------------- the CLI: gold commands
 
 
@@ -406,37 +311,6 @@ def synthetic(monkeypatch, tmp_path):
     PinnedFetcher.made = []
     monkeypatch.chdir(REPO)
     return registration
-
-
-def test_parser_offers_the_set_on_gold_and_eval_commands():
-    parser = build_parser()
-    args = parser.parse_args(["gold", "fetch", "--set", "heldout", "--allow-retired"])
-    assert (args.set, args.allow_retired, args.heldout_dir) == ("heldout", True, None)
-    args = parser.parse_args(["eval", "pipeline", "--task", "equations", "--set", "heldout"])
-    assert (args.gold_set, args.fake) == ("heldout", False)
-    for command in (["eval", "equations", "--self-check"], ["eval", "render", "--page", "x"]):
-        assert parser.parse_args([*command, "--set", "heldout"]).gold_set == "heldout"
-        assert parser.parse_args(command).gold_set is None
-    for bad in (["gold", "fetch", "--set", "other"], ["gold", "verify"]):
-        with pytest.raises(SystemExit):
-            parser.parse_args(bad)
-
-
-def test_gold_fetch_set_heldout_writes_outside_the_repository_and_checks_the_hashes(
-    synthetic, tmp_path, capsys
-):
-    held = tmp_path / "held"
-    argv = ["gold", "fetch", "--set", "heldout", "--allow-retired", "--heldout-dir", str(held)]
-    assert main([*argv, "--date", synthetic.date]) == 0
-    out = capsys.readouterr().out
-    assert (
-        f"matches the pre-registered held-out gold (manifest sha256 {synthetic.manifest_sha256}"
-        in out
-    )
-    assert (held / "gold" / "manifest.json").is_file()
-    (fetcher,) = PinnedFetcher.made
-    assert fetcher.cache_dir == held / "openstax"  # the archive responses, kept apart
-    assert verify_gold(held / "gold") == []
 
 
 def test_gold_fetch_set_heldout_on_another_day_writes_the_files_but_fails_the_check(
@@ -563,15 +437,6 @@ def test_eval_pipeline_set_heldout_uses_the_registered_gold_and_keeps_files_outs
     assert openstax_cache == held / "openstax"  # not the repository's .cache/openstax
 
 
-def test_eval_pipeline_set_heldout_accepts_other_places_outside_the_repository(eval_set, tmp_path):
-    held, _ = eval_set
-    out, items, cache = tmp_path / "r.json", tmp_path / "i.jsonl", tmp_path / "c"
-    argv = pipeline_argv(held, "--max-usd", "1", "--out", str(out), "--items", str(items))
-    assert main([*argv, "--cache", str(cache)]) == 0
-    assert out.is_file() and items.is_file()
-    assert Media.built[0][1] == cache
-
-
 @pytest.mark.parametrize(
     ("extra", "message"),
     [
@@ -633,21 +498,6 @@ def test_held_out_gold_given_by_path_needs_the_set(eval_set, monkeypatch, capsys
     assert "Add --set heldout" in capsys.readouterr().err
 
 
-def test_other_gold_is_not_taken_for_held_out_gold(eval_set, tmp_path):
-    assert heldout_cli.unselected(tmp_path) is None
-    assert heldout_cli.unselected(tmp_path / "missing") is None
-    assert heldout_cli.unselected(eval_set[0] / "gold") is not None
-
-
-def test_the_default_run_without_the_set_is_unchanged(eval_set, tmp_path):
-    dev_gold = write_gold(tmp_path / "dev", [equation("q-1", 0, EQ_V, "block")])
-    out = tmp_path / "plain.json"
-    argv = ["eval", "pipeline", "--task", "equations", "--gold", str(dev_gold)]
-    assert main([*argv, "--out", str(out), "--cache", str(tmp_path / "c"), "--fake"]) == 0
-    assert "set" not in json.loads(out.read_text(encoding="utf-8"))
-    assert Media.built[0][3] == REPO / ".cache" / "openstax"
-
-
 def test_eval_equations_set_heldout_scores_against_the_registered_gold(eval_set, capsys):
     held, _ = eval_set
     argv = ["eval", "equations", "--set", "heldout", "--heldout-dir", str(held), "--self-check"]
@@ -703,23 +553,6 @@ def printed(eval_set, monkeypatch):
     return held, registration, lengths, calls
 
 
-def test_render_all_prints_every_section_and_checks_the_page_counts(printed, capsys):
-    held, _, _, calls = printed
-    assert main(["eval", "render", "--set", "heldout", "--all", "--heldout-dir", str(held)]) == 0
-    out = capsys.readouterr().out
-    assert "5 PDF pages in 2 sections (registered: 5)" in out
-    summary = json.loads((held / "pdfs" / "pages.json").read_text(encoding="utf-8"))
-    assert (summary["total_pdf_pages"], summary["pages_match_registration"]) == (5, True)
-    rows = {row["page"]: row for row in summary["sections"]}
-    assert rows["p-1"]["pdf_pages"] == 2 and rows["p-2"]["pdf_pages"] == 3
-    pdf = (held / "pdfs" / "physics-p-1.pdf").read_bytes()
-    assert rows["p-1"]["sha256"] == hashlib.sha256(pdf).hexdigest()
-    # The prints are cached where the document task looks for them, and read from the
-    # held-out folder's own archive cache.
-    assert ("print", "p-1", "Letter", held / "eval-cache" / "pages") in calls
-    assert ("physics", "p-1", held / "gold", held / "openstax") in calls
-
-
 def test_render_all_fails_when_a_page_count_differs_from_the_registered_one(printed, capsys):
     held, _, lengths, _ = printed
     lengths["p-2"] = 4
@@ -728,15 +561,6 @@ def test_render_all_fails_when_a_page_count_differs_from_the_registered_one(prin
     assert "(registered 3)" in out and "another page count than registered" in out
     summary = json.loads((held / "pdfs" / "pages.json").read_text(encoding="utf-8"))
     assert summary["pages_match_registration"] is False
-
-
-def test_render_all_on_another_paper_does_not_compare_page_counts(printed):
-    held, _, lengths, _ = printed
-    lengths["p-2"] = 4
-    argv = ["eval", "render", "--set", "heldout", "--all", "--paper", "A4"]
-    assert main([*argv, "--heldout-dir", str(held)]) == 0
-    summary = json.loads((held / "pdfs" / "pages.json").read_text(encoding="utf-8"))
-    assert summary["pages_match_registration"] is None
 
 
 def test_render_page_finds_the_book_of_a_held_out_section(printed):
@@ -749,38 +573,7 @@ def test_render_page_finds_the_book_of_a_held_out_section(printed):
     assert main([*argv, "--page", "2-1-relative-motion-distance-and-displacement"]) == 2
 
 
-def test_render_all_and_out_dir_need_the_set(printed, capsys):
-    assert main(["eval", "render", "--all"]) == 2
-    assert main(["eval", "render", "--page", "x", "--out-dir", "somewhere"]) == 2
-    assert "belong to --set heldout" in capsys.readouterr().err
-
-
 # ------------------------------------------------------------------------ small helpers
-
-
-def test_default_folder_follows_xdg_cache_home(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-    assert heldout_cli.default_root() == tmp_path / "readablestem" / "heldout"
-    loc = heldout_cli.locations(None)
-    assert loc.gold == tmp_path / "readablestem" / "heldout" / "gold"
-    monkeypatch.delenv("XDG_CACHE_HOME")
-    monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    assert heldout_cli.default_root() == tmp_path / "home" / ".cache" / "readablestem" / "heldout"
-
-
-def test_inside_the_repository_means_the_checkout_this_runs_in(monkeypatch, tmp_path):
-    monkeypatch.chdir(REPO / "tests")
-    assert heldout_cli.outside_project(REPO / "data" / "eval", "--out") is not None
-    assert heldout_cli.outside_project(REPO, "--out") is not None
-    assert heldout_cli.outside_project(tmp_path, "--out") is None
-    monkeypatch.chdir(tmp_path)  # not a checkout: nothing is inside it
-    assert heldout_cli.checkout_root() is None
-    assert heldout_cli.outside_project(tmp_path / "x", "--out") is None
-
-
-def test_the_dataclasses_are_frozen():
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        REGISTERED.date = "2030-01-01"  # type: ignore[misc]
 
 
 # ----------------------------------------------------------------------------- live

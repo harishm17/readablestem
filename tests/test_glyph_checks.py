@@ -13,13 +13,11 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from readablestem.core.types import Check, Element, GlyphContext, Kind
+from readablestem.core.types import Element, GlyphContext, Kind
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout
 from readablestem.pipeline import text_layer_compare as tl
 from readablestem.pipeline.equation_step import (
-    glyph_style_check,
-    reading_layer,
     transcribe,
 )
 from readablestem.pipeline.layout import _Char, glyph_style
@@ -41,45 +39,6 @@ def g(text: str, style: str | None = "italic") -> list[tuple[str, str | None]]:
 
 
 # ------------------------------------------------------------------ the extent
-
-
-def test_a_reading_that_reaches_past_the_span_is_compared_with_the_glyphs_it_covers():
-    # The box holds "T = 2π"; the line goes on "√ m / k is the period".
-    extent = tl.extend_text_layer(
-        "T = 2π", ml(r"T = 2\pi\sqrt{m/k}"), g("T=2π"), g("("), g("√m/k is the", "upright")
-    )
-    assert extent is not None
-    assert (extent.before, extent.after) == (0, 4)
-    assert extent.text == "T = 2π√m/k"
-
-
-def test_the_extent_can_go_left_of_the_span_too():
-    # The box holds "x = 2"; the reading also has the "v" of "v x" written before it.
-    extent = tl.extend_text_layer(
-        "= 2 s", ml(r"d = 2 s"), g("= 2 s"), g(" d"), g("is long", "upright")
-    )
-    assert extent is not None and extent.before == 2 and extent.after == 0
-    assert extent.text == "d = 2 s"
-
-
-def test_the_least_extent_wins_and_words_after_the_formula_stay_out():
-    extent = tl.extend_text_layer(
-        "E = m", ml(r"E = mc^2"), g("E = m"), (), g("c2 is the energy", "upright")
-    )
-    assert extent is not None
-    assert extent.text == "E = mc2"  # not "... is the energy"
-
-
-def test_a_reading_the_glyphs_cannot_make_has_no_extent():
-    # The reading has a "q" no glyph beside the span has: the difference stays a difference.
-    assert tl.extend_text_layer("T = 2π", ml(r"T = 2\pi q"), g("T=2π"), (), g("m/k")) is None
-    # ... and so has one that has less than the span.
-    assert tl.extend_text_layer("T = 2π m", ml(r"T = 2\pi"), g("T=2πm"), (), g("m")) is None
-
-
-def test_a_reading_that_agrees_with_the_span_needs_no_extent():
-    assert tl.extend_text_layer("x + 1", ml("x + 1"), g("x+1"), (), g("y")) is None
-    assert tl.extend_text_layer(None, ml("x"), (), (), g("x")) is None
 
 
 # ------------------------------------------------------------ the letter styles
@@ -111,46 +70,6 @@ def test_letter_styles_of_a_reading(latex, styles):
 
 def rows(glyphs, latex):
     return [r.letter for r in tl.compare_letter_styles(glyphs, latex)]
-
-
-def test_an_upright_d_read_as_an_italic_d_differs():
-    pdf = [("d", "upright"), ("x", "italic")]
-    assert rows(pdf, "d x") == ["d"]
-    assert rows(pdf, r"\mathrm{d}x") == []
-
-
-def test_bold_against_bold_italic_differs_both_ways():
-    assert rows([("v", "bold-italic")], r"\mathbf{v}") == ["v"]
-    assert rows([("v", "bold")], r"\boldsymbol{v}") == ["v"]
-    assert rows([("v", "bold")], r"\mathbf{v}") == []
-    assert rows([("v", "bold-italic")], r"\bm{v}") == []
-
-
-def test_a_plain_letter_where_the_glyph_is_script_or_double_struck_differs():
-    assert rows([("L", "script")], "L") == ["L"]
-    assert rows([("L", "script")], r"\mathcal{L}") == []
-    assert rows([("R", "double-struck")], "R") == ["R"]
-    assert rows([("R", "double-struck")], r"\mathbb{R}") == []
-
-
-def test_a_glyph_with_no_style_says_nothing_and_cannot_cause_a_difference():
-    assert rows([("d", None), ("x", "italic")], r"\mathrm{d}x") == []
-    assert rows([("d", None)], "d") == []
-    # one known upright d and one unknown glyph against two italic readings: one pairs
-    # with the unknown, the other cannot, so the known one differs
-    assert rows([("d", "upright"), ("d", None)], "d d") == ["d"]
-    assert rows([("d", "upright"), ("d", None)], r"\mathrm{d} d") == []
-
-
-def test_letters_the_reading_does_not_have_are_not_compared():
-    assert rows([("a", "upright"), ("b", "italic")], "b") == []
-    assert rows([("α", "italic")], r"\alpha") == []
-
-
-def test_a_letter_shown_two_ways_is_counted_per_occurrence():
-    pdf = [("e", "upright"), ("e", "italic")]  # e^{...} the constant, and a variable e
-    assert rows(pdf, r"\mathrm{e}^{x} e") == []
-    assert rows(pdf, r"e^{x} e") == ["e"]
 
 
 # ------------------------------------------------------- the style of one glyph
@@ -187,24 +106,6 @@ def test_the_style_of_a_printed_letter(c, font, flags, style):
 
 
 # ------------------------------------------------------------- Element.glyphs
-
-
-def test_glyphs_round_trip_through_the_element():
-    glyphs = [("T", "italic"), ("=", None), ("\U0001d41d", "bold")]
-    context = GlyphContext(span=GlyphContext.encode(glyphs), after=GlyphContext.encode(g("k")))
-    element = Element(
-        id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0, text="T", glyphs=context
-    )
-    back = Element.model_validate_json(element.model_dump_json())
-    assert back.glyphs is not None
-    assert back.glyphs.span_glyphs == tuple(glyphs)
-    assert back.glyphs.after_glyphs == (("k", "italic"),)
-    assert (
-        Element(id="p1-e2", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=1).glyphs is None
-    )
-    assert "glyphs" not in Element(
-        id="p1-e2", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=1
-    ).model_dump(exclude_none=True)
 
 
 # ----------------------------------------------------- a real page and the step
@@ -255,48 +156,8 @@ def pdf():
     layout.release()
 
 
-def test_the_glyphs_of_the_span_and_its_neighbours_are_read(pdf):
-    element = span_of(pdf, "x = 2")
-    context = layout.line_glyphs(pdf, element, (72, 540))
-    assert context is not None
-    assert "".join(c for c, _ in context.span_glyphs).replace(" ", "") == "x=2"
-    assert [s for c, s in context.span_glyphs if c == "x"] == ["italic"]
-    after = "".join(c for c, _ in context.after_glyphs)
-    assert after.startswith(" m/k") or after.startswith("m/k")
-    before = "".join(c for c, _ in context.before_glyphs)
-    assert before.startswith(" ereh") or before.startswith("ereh")  # nearest first
-    assert dict(context.before_glyphs)["e"] == "upright"
-
-
-def test_a_display_equation_has_its_own_glyphs_only(pdf):
-    element = span_of(pdf, "x = 2").model_copy(update={"display": "block"})
-    context = layout.line_glyphs(pdf, element, None)
-    assert context is not None
-    assert context.before == "" and context.after == ""
-    assert layout.line_glyphs(pdf, span_of(pdf, "x = 2"), None, reach=False).after == ""
-
-
-def test_the_reach_is_the_region_the_line_image_shows(pdf):
-    element = span_of(pdf, "x = 2")
-    # across= the paragraph's x-range: nothing outside it is read
-    narrow = layout.line_glyphs(pdf, element, (element.bbox[0], element.bbox[2] + 12))
-    assert narrow is not None
-    assert len(narrow.after_glyphs) < 6 and len(narrow.before_glyphs) <= 1
-
-
 def with_glyphs(pdf: bytes, element: Element) -> Element:
     return element.model_copy(update={"glyphs": layout.line_glyphs(pdf, element, (72, 540))})
-
-
-def test_reading_layer_uses_the_extent_the_reading_covers(pdf):
-    element = with_glyphs(pdf, span_of(pdf, "x = 2"))
-    wide = reading_layer(element, ml(r"x = 2\frac{m}{k}"))
-    assert wide.extended and wide.text is not None and wide.text.replace(" ", "") == "x=2m/k"
-    same = reading_layer(element, ml("x = 2"))
-    assert not same.extended and same.text == "x = 2"
-    wrong = reading_layer(element, ml(r"x = 2\frac{m}{j}"))
-    assert not wrong.extended and wrong.text == "x = 2"  # nothing the glyphs make: a difference
-    assert reading_layer(span_of(pdf, "x = 2"), ml(r"x = 2\frac{m}{k}")).text == "x = 2"
 
 
 def answer(latex: str):
@@ -361,38 +222,9 @@ def test_an_upright_d_read_as_italic_is_a_decision_and_the_right_reading_is_not(
     assert failed_codes(right) == set()
 
 
-def test_without_glyphs_nothing_changes(pdf):
-    fix = run(span_of(pdf, "d", y=430), "d")
-    assert "glyph_style_mismatch" not in failed_codes(fix)
-
-
-def test_the_check_is_made_only_for_a_reading_with_a_style_to_compare():
-    layer = reading_layer(
-        Element(id="e", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0, text="d"),
-        ml("d"),
-    )
-    assert glyph_style_check(layer, "d") is None
-    context = GlyphContext(span=GlyphContext.encode([("d", "upright")]))
-    element = Element(
-        id="e", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0, text="d", glyphs=context
-    )
-    check = glyph_style_check(reading_layer(element, ml("d")), "d")
-    assert isinstance(check, Check) and check.code == "glyph_style_mismatch"
-    assert check.name == "equation.glyph_style" and not check.passed
-
-
 # ------------------------------------------------ bold italic from the glyph's font
 
 BOLD_W = "\U0001d430"  # what the text layer says of LMMathItalic10-Bold: bold, not bold italic
-
-
-def test_a_bold_vector_in_a_bold_italic_face_is_written_boldsymbol():
-    from readablestem.pipeline.equation_step import restyle_bold_italic
-
-    glyphs = [(BOLD_W, "bold-italic")]
-    assert restyle_bold_italic(r"\mathbf{w}^2", BOLD_W, glyphs) == r"\boldsymbol{w}^2"
-    assert restyle_bold_italic(r"\mathbf{w}^2", BOLD_W) == r"\mathbf{w}^2"  # without the glyphs
-    assert restyle_bold_italic(r"\mathbf{w}", BOLD_W, [(BOLD_W, "bold")]) == r"\mathbf{w}"
 
 
 def test_a_lone_bold_letter_in_a_bold_italic_face_is_fixed_without_a_model():

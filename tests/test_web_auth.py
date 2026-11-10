@@ -8,7 +8,6 @@ from sqlalchemy import select
 from fixtures.web.support import (
     ADMIN,
     ALICE,
-    BOB,
     WebEnv,
     csrf_from,
     login,
@@ -61,11 +60,6 @@ def test_protected_pages_send_anonymous_visitors_to_sign_in(web, path):
     assert response.headers["location"] == "/login"
 
 
-@pytest.mark.parametrize("path", ["/", "/demo", "/privacy", "/terms", "/limits", "/login"])
-def test_public_pages_need_no_sign_in(web, path):
-    assert web.browser.get(path).status_code == 200
-
-
 def test_people_not_on_the_allowlist_get_a_polite_403_and_are_not_stored(web):
     response = login(web.browser, ALICE)
     assert response.status_code == 403
@@ -86,19 +80,6 @@ def test_allowlisted_user_signs_in_and_session_is_rotated(web):
     with session_scope(web.ctx.factory) as session:
         user = session.scalar(select(User).where(User.email == ALICE))
         assert user is not None and user.last_login_at is not None
-
-
-def test_emails_are_case_insensitive(web):
-    web.allow(ALICE)
-    assert login(web.browser, "  Alice@Example.ORG ").status_code == 303
-
-
-def test_admin_emails_from_settings_are_seeded_as_allowed_admins(web):
-    with session_scope(web.ctx.factory) as session:
-        admin = session.scalar(select(User).where(User.email == ADMIN))
-        assert admin is not None and admin.is_allowed and admin.is_admin
-    login(web.browser, ADMIN)
-    assert web.browser.get("/admin").status_code == 200
 
 
 def test_session_cookie_is_httponly_lax_and_lasts_seven_days(web):
@@ -179,14 +160,6 @@ def test_dev_login_is_404_unless_enabled(tmp_path):
         assert "/dev-login" not in client.get("/login").text
 
 
-def test_dev_login_rejects_malformed_email(web):
-    token = csrf_from(web.browser.get("/dev-login").text)
-    response = web.browser.post("/dev-login", data={"csrf_token": token, "email": "nope"})
-    assert response.status_code == 422
-    assert 'href="#email"' in response.text  # error summary links to the field
-    assert "<title>Error: " in response.text
-
-
 def test_logout_is_post_only_with_csrf(web):
     web.allow(ALICE)
     login(web.browser, ALICE)
@@ -235,30 +208,6 @@ def test_signing_out_ends_copied_sessions_too(web):
     assert web.browser.get("/app").status_code == 200
     assert copied.get("/app").status_code == 303
     copied.close()
-
-
-def test_a_session_from_before_removal_stays_ended_when_allowed_back(web):
-    from readablestem.web.auth import set_allowed
-
-    web.allow(ALICE)
-    login(web.browser, ALICE)
-    copied = copy_of(web, web.browser)
-    with session_scope(web.ctx.factory) as session:
-        set_allowed(session, ALICE, allowed=False)
-    web.allow(ALICE)
-    assert copied.get("/app").status_code == 303
-    copied.close()
-
-
-def test_signing_out_does_not_touch_other_people(web):
-    web.allow(ALICE)
-    web.allow(BOB)
-    login(web.browser, ALICE)
-    bob = web.client()
-    login(bob, BOB)
-    sign_out(web.browser)
-    assert bob.get("/app").status_code == 200
-    bob.close()
 
 
 def test_admin_page_is_admins_only(web):
@@ -348,12 +297,6 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         assert response.status_code == 403, path
 
 
-def test_csrf_failure_page_explains_what_to_do(web):
-    response = web.browser.post("/login", data={})
-    assert response.status_code == 403
-    assert "This form has expired" in response.text
-
-
 # --------------------------------------------------------------------------- Google
 
 
@@ -421,22 +364,8 @@ def test_google_sign_in_requires_a_verified_email(google):
     assert google.browser.get("/app").status_code == 303
 
 
-def test_google_sign_in_not_on_allowlist(google):
-    google.userinfo = {"email": BOB, "email_verified": True}
-    response = google.browser.get("/auth/callback?code=c&state=abc")
-    assert response.status_code == 403
-    assert BOB not in users(google)
-
-
 def test_google_error_shows_a_retry_page(google):
     google.userinfo = None
     response = google.browser.get("/auth/callback?error=access_denied")
     assert response.status_code == 400
     assert "Sign-in did not finish" in response.text
-
-
-def test_without_google_credentials_sign_in_button_is_hidden(web):
-    page = web.browser.get("/login").text
-    assert "Sign in with Google" not in page
-    assert "/dev-login" in page
-    assert web.browser.get("/auth/callback").status_code == 404

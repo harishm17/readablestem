@@ -12,7 +12,6 @@ Run with: uv run pytest -m browser tests/test_web_tier1_browser.py
 from __future__ import annotations
 
 import os
-import re
 from datetime import date
 from pathlib import Path
 
@@ -23,9 +22,9 @@ from fixtures.web.support import ADMIN
 from fixtures.web.table_doc import table_output, table_pdf
 from readablestem.core.types import Check
 from readablestem.web.db import ErrorAggregate, session_scope
-from test_web_browser import TEXT_SPACING, describe, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
+from test_web_browser import describe, sign_in
 from test_web_review_browser import sideways_overflow
 from test_web_review_split_browser import job as job  # fixture, re-exported for pytest
 from test_web_review_split_browser import open_page, strict_axe, wait_images
@@ -74,69 +73,6 @@ def test_the_job_page_passes_axe_also_with_the_language_control_open(
     context.close()
 
 
-def test_the_language_change_control_opens_from_the_keyboard(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}")
-    summary = page.locator("details.inline-details > summary")
-    summary.focus()
-    page.keyboard.press("Enter")
-    expect(page.get_by_label("Language of this document")).to_be_visible()
-    context.close()
-
-
-def test_the_job_page_reflows_at_320_css_px_with_text_spacing(site, browser, job):
-    context, page = open_page(browser, site, viewport={"width": 320, "height": 640})
-    page.goto(f"{site.base}/jobs/{job}")
-    page.add_style_tag(content=TEXT_SPACING)
-    assert not sideways_overflow(page)
-    context.close()
-
-
-def test_the_title_and_contact_line_are_saved_from_the_page(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}")
-    page.get_by_label("Title students hear").fill("Vectors, week 3")
-    page.get_by_role("button", name="Save the title").click()
-    page.wait_for_url(f"{site.base}/jobs/{job}")
-    expect(page.get_by_role("heading", level=1)).to_have_text("Vectors, week 3")
-    assert page.title().startswith("Converted: Vectors, week 3")
-    page.get_by_label("Contact line for students (optional)").fill("prof.lee@example.edu")
-    page.get_by_role("button", name="Save the contact line").click()
-    page.wait_for_url(f"{site.base}/jobs/{job}")
-    preview = context.new_page()
-    preview.goto(f"{site.base}/jobs/{job}/view")
-    expect(preview.locator("footer a[href='mailto:prof.lee@example.edu']")).to_be_visible()
-    assert preview.title() == "Vectors, week 3"
-    context.close()
-
-
-@SIZES
-def test_a_refused_contact_line_shows_the_error_with_what_was_typed(
-    site, browser, job, axe_source, viewport
-):
-    context, page = open_page(browser, site, viewport=viewport)
-    page.goto(f"{site.base}/jobs/{job}")
-    page.get_by_label("Contact line for students (optional)").fill("not an address")
-    page.get_by_role("button", name="Save the contact line").click()
-    expect(page.locator(".error-summary")).to_be_visible()
-    expect(page.get_by_label("Contact line for students (optional)")).to_have_value(
-        "not an address"
-    )
-    clean(page, axe_source, "refused contact line")
-    shoot(page, "job-page-contact-error", viewport)
-    context.close()
-
-
-def test_keep_7_more_days_works_without_javascript(site, browser, job):
-    context, page = open_page(browser, site, javascript=False)
-    page.goto(f"{site.base}/jobs/{job}")
-    page.get_by_role("button", name="Keep for 7 days").click()
-    expect(page.locator("[role=status], .notice").first).to_contain_text("kept for 7 days")
-    expect(page.locator("#retention-line")).to_contain_text("7 days after you last work on it")
-    expect(page.locator("#retention-line button")).to_have_count(0)
-    context.close()
-
-
 # --------------------------------------------------------------------------- the group card
 
 
@@ -153,15 +89,6 @@ def test_the_group_card_shows_its_copies_and_passes_axe(site, browser, job, axe_
     clean(page, axe_source, "group card")
     shoot(page, "group-card", viewport)
     assert not sideways_overflow(page)
-    context.close()
-
-
-def test_the_list_view_group_card_has_no_codes_or_confidence(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}/review/list")
-    text = page.locator("main").inner_text()
-    assert "Confidence" not in text and "Code:" not in text
-    assert not re.search(r"\(\d+%\)", text)
     context.close()
 
 

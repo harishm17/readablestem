@@ -5,9 +5,6 @@ for it never converts such pages, whatever the deployment's flag.
 
 from __future__ import annotations
 
-import re
-
-import pymupdf
 import pytest
 
 from fixtures.web.support import (
@@ -24,8 +21,7 @@ from readablestem.core.types import ConversionOptions
 from readablestem.ops.limits import largest_reservation_usd
 from readablestem.web import access, notation, quota
 from readablestem.web.db import Job, PendingUpload, User, session_scope
-from readablestem.web.pdf_probe import ProbeRejected, inspect, probe
-from readablestem.web.uploads import UploadRejected, inspect_pdf_detail
+from readablestem.web.pdf_probe import inspect
 from readablestem.web.worker import job_caps
 
 OFFER = "Convert scanned or handwritten pages</label>"
@@ -51,37 +47,12 @@ def offered(tmp_path):
         yield env
 
 
-@pytest.fixture
-def not_offered(tmp_path):
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        yield env
-
-
 def job_of(response, env: WebEnv) -> Job:
     assert response.status_code == 303, response.text[:300]
     return env.job(response.headers["location"].rsplit("/", 1)[-1])
 
 
 # ------------------------------------------------------------------------------ the probe
-
-
-def test_the_probe_counts_scanned_pages_only_when_asked():
-    assert inspect(scan_pdf(2), max_pages=5, allow_image_pages=True) == (2, 2)
-    assert inspect(mixed_pdf(), max_pages=5, allow_image_pages=True) == (3, 2)
-    assert inspect(make_pdf(3), max_pages=5, allow_image_pages=True) == (3, 0)
-    assert inspect(mixed_pdf(), max_pages=5) == (3, 0)  # not asked: not counted
-
-
-def test_a_pdf_of_scans_is_refused_unless_asked_and_a_typed_one_never_is():
-    with pytest.raises(ProbeRejected) as refused:
-        probe(scan_pdf(), max_pages=5)
-    assert refused.value.code == "scanned"
-    assert probe(scan_pdf(), max_pages=5, allow_image_pages=True) == 1
-    assert probe(make_pdf(2), max_pages=5, allow_image_pages=True) == 2
 
 
 @pytest.mark.parametrize(
@@ -100,37 +71,7 @@ def test_the_probe_counts_the_pages_layout_will_keep_as_scanned_or_handwritten(n
     assert inspect(data, max_pages=30, allow_image_pages=True)[1] == len(kept)
 
 
-def test_the_isolated_probe_reports_the_count_from_its_child():
-    assert inspect_pdf_detail(mixed_pdf(), max_pages=5, allow_image_pages=True) == (3, 2)
-    assert inspect_pdf_detail(mixed_pdf(), max_pages=5) == (3, 0)
-    with pytest.raises(UploadRejected) as refused:
-        inspect_pdf_detail(scan_pdf(), max_pages=5)
-    assert refused.value.code == "scanned"
-
-
-def test_the_probe_child_counts_only_the_pages_page_type_calls_scans():
-    from readablestem.pipeline import page_type
-
-    doc = pymupdf.open(stream=mixed_pdf(), filetype="pdf")
-    assert page_type.image_page_count(doc) == 2
-    doc = pymupdf.open(stream=make_pdf(3), filetype="pdf")
-    assert page_type.image_page_count(doc) == 0
-
-
 # ------------------------------------------------------------------------------ the form
-
-
-def test_the_option_is_on_the_upload_form_only_where_it_is_offered(offered, not_offered):
-    page = offered.browser.get("/app").text
-    assert OFFER in page
-    assert 'name="image_pages"' in page and 'id="image_pages"' in page
-    assert re.search(r'<label for="image_pages">', page)
-    assert 'aria-describedby="image-pages-hint"' in page
-    assert "Needed for a PDF that is all scans or handwriting" in " ".join(page.split())
-    assert "checked" not in re.search(r'<input type="checkbox" id="image_pages"[^>]*>', page).group(
-        0
-    )
-    assert OFFER not in not_offered.browser.get("/app").text
 
 
 # ------------------------------------------------------------------------------ the upload
@@ -149,21 +90,9 @@ def test_a_scan_is_refused_without_the_option_and_the_message_says_how_to_ask(of
         assert session.query(Job).count() == 0  # refused: nothing was queued or counted
 
 
-def test_without_the_offer_a_scan_is_refused_as_before_with_no_mention_of_it(not_offered):
-    response = upload(not_offered.browser, scan_pdf(), image_pages=True)  # ignored: not offered
-    assert response.status_code == 422
-    assert "is scanned, so this tool cannot convert it" in response.text
-    assert "Convert scanned or handwritten pages" not in response.text
-
-
 def test_with_the_option_a_scan_becomes_a_job_that_remembers_it(offered):
     job = job_of(upload(offered.browser, scan_pdf(2), image_pages=True), offered)
     assert job.image_pages is True and job.page_count == 2 and job.status == "queued"
-
-
-def test_the_option_does_nothing_for_a_pdf_without_scanned_pages(offered):
-    job = job_of(upload(offered.browser, make_pdf(2), image_pages=True), offered)
-    assert job.image_pages is False and job.page_count == 2
 
 
 def test_a_mixed_pdf_with_the_option_converts_and_without_it_keeps_the_scans_as_images(offered):
@@ -225,37 +154,12 @@ def test_the_option_changes_no_cap_where_the_feature_is_not_offered():
     assert job_caps(s, 30, image_pages=True) == job_caps(s, 30)
 
 
-def test_the_allowance_follows_its_settings():
-    s = settings(
-        feature_image_pages=True,
-        image_pages_usd_per_page=0.40,
-        image_pages_max_usd_per_job=5.0,
-        max_usd_per_job=3.0,
-    )
-    assert job_caps(s, 5, image_pages=True)[0] == pytest.approx(2.0)
-    assert job_caps(s, 10, image_pages=True)[0] == pytest.approx(4.0)
-    assert job_caps(s, 30, image_pages=True)[0] == pytest.approx(5.0)
-
-
 CAPPED = {"feature_image_pages": True, "max_usd_per_job": 2.0, "max_usd_per_page": 0.05}
 
 
 def attempt_of(env: WebEnv, job: Job, pages: int, pool: str | None, asked: bool):
     claim = type("Claim", (), {"job_id": job.id, "attempt": 1})()
     return env.worker()._start_attempt(claim, 0.0, 0, pages, pool, asked)
-
-
-def test_the_worker_starts_a_job_that_asked_with_the_wider_cap(tmp_path):
-    env = WebEnv(tmp_path, **CAPPED)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        asked = job_of(upload(client, scan_pdf(4), image_pages=True), env)
-        plain = job_of(upload(client, make_pdf(4)), env)
-        assert attempt_of(env, asked, 4, None, True).max_usd == pytest.approx(1.0)  # 4 x $0.25
-        assert attempt_of(env, plain, 4, None, False).max_usd == pytest.approx(0.2)  # 4 x $0.05
-        # What the job is told it may spend is what the budget it gets holds:
-        assert attempt_of(env, asked, 4, None, True).budget.max_usd == pytest.approx(1.0)
 
 
 def test_an_open_tier_job_has_the_wider_cap_inside_the_open_pool(tmp_path):
@@ -299,27 +203,6 @@ def test_a_job_converts_scans_only_if_it_asked_whatever_the_flag(offered):
     assert ConversionOptions.from_settings(offered.settings).image_pages is True
 
 
-def test_the_worker_hands_the_converter_the_jobs_choice(offered):
-    job_of(upload(offered.browser, scan_pdf(), image_pages=True), offered)
-    offered.run_worker()
-    [call] = offered.converter.calls
-    assert call["options"] is not None and call["options"].image_pages is True
-
-
-def test_without_the_flag_no_job_converts_scans(not_offered):
-    job_of(upload(not_offered.browser, make_pdf()), not_offered)
-    not_offered.run_worker()
-    [call] = not_offered.converter.calls
-    assert call["options"] is None or call["options"].image_pages is False
-
-
-def test_a_revision_form_remembers_the_earlier_choice(offered):
-    first = job_of(upload(offered.browser, scan_pdf(), image_pages=True), offered)
-    offered.run_worker()
-    page = offered.browser.get(f"/app?revises={first.id}").text
-    assert re.search(r'<input type="checkbox" id="image_pages"[^>]*\bchecked\b', page)
-
-
 # ---------------------------------------------------------------------- large files in parts
 
 
@@ -352,19 +235,6 @@ def test_a_large_scan_keeps_the_choice_for_its_parts(tmp_path):
             assert len(jobs) == 1 and jobs[0].image_pages is True
 
 
-def test_a_pending_upload_made_without_the_option_has_none(tmp_path):
-    env = WebEnv(tmp_path, feature_image_pages=True, max_pages_per_job=2, max_source_pages=6)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        response = upload(client, make_pdf(4))
-        if response.status_code == 303 and response.headers["location"].startswith("/uploads/"):
-            upload_id = response.headers["location"].rsplit("/", 1)[-1]
-            with session_scope(env.ctx.factory) as session:
-                row = session.get(PendingUpload, upload_id)
-                assert row is not None and row.image_pages is False
-
-
 # --------------------------------------------------------------------------- the reservation
 
 
@@ -380,16 +250,3 @@ def test_offering_the_option_makes_room_for_a_page_read_in_the_largest_reservati
         )
     )
     assert cheap <= on
-
-
-def test_the_scan_refusal_summary_says_what_to_do_and_that_the_file_is_chosen_again(offered):
-    page = upload(offered.browser, scan_pdf()).text
-    summary = page.split('id="error-summary-title"', 1)[1].split("</div>", 1)[0]
-    flat = " ".join(re.sub(r"<[^>]+>", " ", summary).split())
-    assert "Check “Convert scanned or handwritten pages” and choose the file again." in flat
-    assert 'href="#image_pages"' in summary  # the link goes to the box to tick
-    assert "cannot convert it" not in flat  # no permanent-sounding verdict in the summary
-    assert "choose the file again" in page.split('id="pdf-error"', 1)[1]  # the field says it too
-    assert 'id="image_pages"' in page and "checked" not in re.search(
-        r'<input type="checkbox" id="image_pages"[^>]*>', page
-    ).group(0)

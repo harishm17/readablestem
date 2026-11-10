@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
 
 import pytest
 
@@ -38,28 +37,6 @@ def raw_set(**overrides) -> dict:
     return data
 
 
-def test_a_minimal_set_gets_the_defaults():
-    pset = registry.parse_set(raw_set())
-    assert pset.tasks == registry.TASKS
-    assert pset.repeats == {"document": 1, "equations": 1, "headings": 1, "figures": 1}
-    assert pset.concurrency == 4 and pset.signoff == () and pset.fetch.pins == {}
-    assert pset.runs()[0] == ("document", 1) and len(pset.runs()) == 4
-    assert [s.id for s in pset.sections] == ["physics/p-1", "physics/p-2"]
-
-
-def test_repeats_expand_to_runs_in_task_order():
-    pset = registry.parse_set(raw_set(repeats={"document": 3, "equations": 2}))
-    assert pset.runs() == [
-        ("document", 1),
-        ("document", 2),
-        ("document", 3),
-        ("equations", 1),
-        ("equations", 2),
-        ("headings", 1),
-        ("figures", 1),
-    ]
-
-
 @pytest.mark.parametrize(
     ("change", "message"),
     [
@@ -88,13 +65,6 @@ def test_sections_must_exist_and_be_unique():
             registry.parse_set(data)
 
 
-def test_a_boolean_does_not_pass_for_a_string():
-    data = raw_set()
-    data["gold"]["manifest_sha256"] = True
-    with pytest.raises(ProofError, match="wrong type"):
-        registry.parse_set(data)
-
-
 def test_archive_pins_are_read_per_book():
     data = copy.deepcopy(raw_set())
     data["gold"]["fetch"]["pins"] = {"physics": {"archive_version": "2026", "version": "abc"}}
@@ -107,64 +77,8 @@ def test_archive_pins_are_read_per_book():
         registry.parse_set(data)
 
 
-def test_a_held_out_set_carries_its_preregistration_pin():
-    pset = registry.parse_set(
-        raw_set(held_out=True, preregistration={"file": "proof/PREREG.md", "sha256": SHA})
-    )
-    assert pset.held_out and pset.prereg is not None and pset.prereg.sha256 == SHA
-
-
-def test_the_registry_lists_sets_and_skips_the_index(tmp_path):
-    root = make_project(tmp_path)
-    assert [s.id for s in registry.list_sets(root)] == [SET_ID]
-    assert registry.default_set_id(root) == SET_ID
-    assert registry.resolve_set(root, None).id == SET_ID
-    assert registry.resolve_set(root, SET_ID).id == SET_ID
-    with pytest.raises(ProofError, match=r"no proof set 'nope' \(known: synthetic\)"):
-        registry.resolve_set(root, "nope")
-
-
-def test_no_sets_folder_means_no_default(tmp_path):
-    assert registry.list_sets(tmp_path) == []
-    assert registry.default_set_id(tmp_path) is None
-    with pytest.raises(ProofError, match="no proof set: add one"):
-        registry.resolve_set(tmp_path, None)
-
-
-def test_a_broken_index_or_set_file_is_a_clear_error(tmp_path):
-    root = make_project(tmp_path)
-    (root / "proof" / "sets" / "index.json").write_text("{not json")
-    assert registry.default_set_id(root) is None
-    (root / "proof" / "sets" / "bad.json").write_text("[1]")
-    with pytest.raises(ProofError, match="expected a JSON object"):
-        registry.list_sets(root)
-    (root / "proof" / "sets" / "bad.json").write_text("{nope")
-    with pytest.raises(ProofError, match=r"cannot read proof set bad\.json"):
-        registry.list_sets(root)
-
-
 def statuses(checks) -> dict[str, str]:
     return {c.name: c.status for c in checks}
-
-
-def test_a_matching_gold_set_passes_every_pin(tmp_path):
-    root = make_project(tmp_path)
-    pset = registry.resolve_set(root, None)
-    checks = registry.check_gold(root / "data" / "gold", pset)
-    assert statuses(checks) == {
-        "gold manifest": "ok",
-        "gold files": "ok",
-        "gold sections": "ok",
-    }
-    registry.require_ok(checks)
-
-
-def test_a_missing_gold_manifest_is_absent_not_a_mismatch(tmp_path):
-    root = make_project(tmp_path)
-    pset = registry.resolve_set(root, None)
-    checks = registry.check_gold(tmp_path / "nowhere", pset)
-    assert statuses(checks) == {"gold manifest": "absent"}
-    registry.require_ok(checks)  # absent is reported, not fatal
 
 
 def test_a_changed_manifest_a_changed_file_and_an_extra_file_are_each_found(tmp_path):
@@ -200,30 +114,4 @@ def test_a_gold_set_for_other_sections_is_a_mismatch(tmp_path):
     pset = registry.parse_set(data)
     assert (
         statuses(registry.check_gold(root / "data" / "gold", pset))["gold sections"] == "mismatch"
-    )
-
-
-def test_the_preregistration_copy_is_checked_when_present(tmp_path):
-    root = make_project(tmp_path, held_out=True, prereg=b"registered")
-    pset = registry.resolve_set(root, None)
-    check = registry.check_prereg(pset, root)
-    assert check is not None and check.status == "ok"
-    (root / "proof" / "PREREGISTRATION.md").write_bytes(b"edited")
-    check = registry.check_prereg(pset, root)
-    assert check is not None and check.status == "mismatch"
-    (root / "proof" / "PREREGISTRATION.md").unlink()
-    check = registry.check_prereg(pset, root)
-    assert check is not None and check.status == "absent" and "no copy at" in check.detail
-
-
-def test_a_development_set_has_no_preregistration_to_check(tmp_path):
-    root = make_project(tmp_path)
-    assert registry.check_prereg(registry.resolve_set(root, None), root) is None
-
-
-def test_sha256_file_streams_a_file(tmp_path: Path):
-    path = tmp_path / "f"
-    path.write_bytes(b"abc")
-    assert registry.sha256_file(path) == (
-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     )

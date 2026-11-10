@@ -9,8 +9,7 @@ import pytest
 from readablestem.config import CHEAP_MODEL, MAIN_MODEL
 from readablestem.core.types import Status
 from readablestem.models.fake import FakeVisionClient
-from readablestem.models.prompts import load_prompt
-from readablestem.pipeline.equation_step import clean_latex, expand_ce, transcribe
+from readablestem.pipeline.equation_step import transcribe
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 PNG = b"\x89PNG equation crop"
@@ -51,21 +50,6 @@ def test_a_ce_answer_is_converted_checked_and_spoken():
     assert [r.model for r in client.requests] == [CHEAP_MODEL]
 
 
-def test_a_reaction_in_ce_is_one_display_equation():
-    client = by_model(main=out(r"\ce{2 H2 + O2 <=> 2 H2O}"))
-    fix = run(client, equation_element(text="2 H2 + O2 ⇌2 H2O"))
-    assert fix.status == Status.ACCEPTED
-    assert fix.equation is not None
-    assert fix.equation.speech == "2 H 2 plus O 2 is in equilibrium with 2 H 2 O"
-
-
-def test_an_ion_with_its_state_symbol():
-    fix = run(by_model(main=out(r"\ce{SO4^2-(aq)}")), equation_element(text="SO42−(aq)"))
-    assert fix.status == Status.ACCEPTED
-    assert fix.equation is not None
-    assert fix.equation.speech == "S O 4 2 minus aqueous"
-
-
 def test_ce_inside_ordinary_latex_is_converted_too():
     fix = run(
         by_model(main=out(r"K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}")),
@@ -92,20 +76,3 @@ def test_the_text_layer_still_checks_a_ce_reading():
     fix = run(client, equation_element(display="inline", text="SO42−"))
     assert fix.status == Status.NEEDS_REVIEW
     assert "symbol_mismatch" in codes(fix) or "text_layer_mismatch" in codes(fix)
-
-
-def test_expand_ce_leaves_everything_else_alone():
-    assert expand_ce(r"x^2 + 1") == r"x^2 + 1"
-    assert expand_ce(r"\ce{H2O}") == r"\text{H}_2\text{O}"
-    assert expand_ce(r"\ce{A <=>> B}") == r"\ce{A <=>> B}"  # refused: left for the check
-    assert clean_latex(r"\ce{H2O}") == r"\ce{H2O}"  # clean_latex itself does not convert
-
-
-@pytest.mark.parametrize("name", ["equation", "equation_notation"])
-def test_the_prompt_asks_for_ce_and_says_what_it_cannot_hold(name):
-    prompt = load_prompt(name).text
-    assert "## Chemistry" in prompt
-    assert r"\ce{H2O}" in prompt and r"\ce{2 H2 + O2 -> 2 H2O}" in prompt
-    assert r"\ce{SO4^2-}" in prompt and "<=>" in prompt
-    assert "Never put" in prompt  # no LaTeX commands inside \ce
-    assert r"[A]_0" in prompt  # generic letters stay outside

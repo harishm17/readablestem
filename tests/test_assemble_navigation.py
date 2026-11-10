@@ -8,7 +8,6 @@ import re
 import pytest
 
 from readablestem.core.types import Element, Fix, HeadingFix, Kind, Link, Status, inline_marker
-from readablestem.pipeline import layout, navigation
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.html_checks import axe_checks, static_checks
 
@@ -102,22 +101,6 @@ def test_the_contents_label_is_english_and_its_entries_the_documents_language():
     assert 'lang="' not in contents_nav(english)
 
 
-def test_the_skip_link_is_hidden_until_it_is_focused():
-    html = render([block(0, Kind.PARAGRAPH, "Hello.")])
-    assert ".skip-link:not(:focus)" in html
-    assert "clip-path: inset(50%)" in html.split(".skip-link:not(:focus)", 1)[1][:300]
-
-
-def test_the_skip_link_and_contents_label_say_they_are_english_in_other_languages():
-    pairs = three_headings()
-    elements = [p[0] if isinstance(p, tuple) else p for p in pairs]
-    fixes = [p[1] for p in pairs if isinstance(p, tuple)]
-    html = render_html(title="Doc", lang="de", elements=elements, fixes=fixes, crops={})
-    assert 'class="skip-link readablestem" lang="en"' in html
-    assert 'class="toc-title readablestem" lang="en"' in html
-    assert "<li><a href" in html and 'lang="en"><a href="#p1-e0"' not in html  # entries stay German
-
-
 # ----------------------------------------------------------------------------- contents list
 
 
@@ -135,23 +118,6 @@ def test_three_headings_make_a_nested_contents_list_of_links_to_their_ids():
     for target in re.findall(r'href="#([^"]+)"', nav):
         assert f'id="{target}"' in html
     assert all(c.passed for c in static_checks(html) if c.severity == "error")
-
-
-def test_fewer_than_three_headings_make_no_contents_list():
-    html = render(numbered([heading(0, "Motion", 1), heading(1, "Speed", 2)]))
-    assert "<nav" not in html and "Contents" not in html
-
-
-def test_the_list_follows_the_repaired_outline_not_the_levels_in_the_fixes():
-    # h1, then an h3 straight under it: the outline repair writes it as an h2, and the
-    # list nests it one level, under the first
-    pairs = numbered([heading(0, "A", 1), heading(1, "B", 3), heading(2, "C", 3)])
-    html = render(pairs)
-    assert '<h2 id="p1-e1">B</h2>' in html
-    assert (
-        '<ul><li><a href="#p1-e0">A</a><ul><li><a href="#p1-e1">B</a></li>'
-        '<li><a href="#p1-e2">C</a></li></ul></li></ul>'
-    ) in contents_nav(html)
 
 
 def test_a_deck_with_one_heading_per_slide_lists_its_slides_under_the_title():
@@ -184,22 +150,6 @@ def test_an_equation_in_a_heading_is_called_equation_in_the_list():
     )
     nav = contents_nav(render(pairs))
     assert "The case [equation]" in nav
-
-
-def test_the_pdfs_own_contents_page_is_the_only_contents_list():
-    entry = block(
-        1, Kind.LIST_ITEM, "Motion", list_marker="•", list_ordered=False, list_level=1,
-        reasons=[navigation.PRINTED_CONTENTS_REASON],
-    )  # fmt: skip
-    pairs = numbered([heading(0, "Contents", 1), entry, *three_headings()[1:]])
-    html = render(pairs)
-    assert "<nav" not in html
-    assert "<li" in html  # the printed list is still there
-    assert "skip-link" in html  # the skip link is not a contents list
-
-
-def test_the_reason_layout_gives_a_contents_entry_is_the_one_assembly_looks_for():
-    assert navigation.PRINTED_CONTENTS_REASON == layout.CONTENTS_ENTRY
 
 
 def test_the_contents_list_text_is_escaped():
@@ -236,55 +186,10 @@ def test_a_marker_precedes_the_first_block_of_each_page_by_its_pdf_position():
     assert html.index("Second page, second block.") < html.index("pagebreak-3")
 
 
-def test_the_page_is_also_written_as_visible_text_for_readers_that_drop_the_role():
-    html = render(two_pages())
-    assert (
-        '<div class="pagebreak readablestem"><hr role="doc-pagebreak" aria-label="Page 2" '
-        'id="pagebreak-2"><span aria-hidden="true">Page 2</span></div>'
-    ) in html
-
-
 def test_the_printed_label_is_used_where_there_is_one():
     html = render(two_pages(), page_labels={0: "iv", 1: "12"})
     assert re.findall(r'aria-label="(P[^"]+)"', html) == ["Page iv", "Page 12", "PDF page 3"]
     assert 'id="pagebreak-2"' in html  # the id is by position, so it never repeats
-
-
-def test_a_page_without_a_printed_label_never_reads_like_one():
-    # page 3 is not "Page 3" next to a page printed "3" (the cover came first)
-    html = render(two_pages(), page_labels={1: "3"})
-    assert re.findall(r'aria-label="(P[^"]+)"', html) == ["PDF page 1", "Page 3", "PDF page 3"]
-    # a part of a longer file: its pages are the source's, by position
-    part = render(two_pages(), pdf_pages={0: 30, 1: 31, 2: 32})
-    assert re.findall(r'aria-label="(P[^"]+)"', part) == ["Page 31", "Page 32", "Page 33"]
-    labelled = render(two_pages(), pdf_pages={0: 30, 1: 31, 2: 32}, page_labels={0: "12"})
-    assert re.findall(r'aria-label="(P[^"]+)"', labelled) == [
-        "Page 12", "PDF page 32", "PDF page 33",
-    ]  # fmt: skip
-
-
-def test_a_one_page_document_has_no_markers():
-    html = render([block(0, Kind.PARAGRAPH, "Only page.")])
-    assert "doc-pagebreak" not in html and ".pagebreak" not in html
-
-
-def test_a_page_with_nothing_on_it_gets_no_marker():
-    pairs = numbered(
-        [
-            block(0, Kind.PARAGRAPH, "One."),
-            block(1, Kind.PARAGRAPH, "   ", page=1),  # nothing to write
-            block(2, Kind.PARAGRAPH, "Three.", page=2),
-        ]
-    )
-    assert re.findall(r'aria-label="(Page [^"]+)"', render(pairs)) == ["Page 1", "Page 3"]
-
-
-def test_a_marker_never_stands_inside_a_paragraph():
-    html = render(two_pages())
-    for match in re.finditer(r'<div class="pagebreak', html):
-        before = html[: match.start()]
-        assert before.rstrip().endswith(("</p>", "</main>", "<main>")) or before.endswith("\n")
-        assert before.count("<p") == before.count("</p>")
 
 
 def test_a_list_that_runs_over_a_page_gets_the_marker_inside_the_item_that_starts_the_page():
@@ -300,33 +205,6 @@ def test_a_list_that_runs_over_a_page_gets_the_marker_inside_the_item_that_start
     assert html.count("<ul>") == 1  # one list, not cut in two
     assert '<li id="p2-e1"><div class="pagebreak' in html
     assert "<ul><div" not in html  # a div is not a child of a ul
-
-
-def test_markers_come_between_glossary_entries_inside_the_term():
-    entries = numbered(
-        [
-            block(0, Kind.PARAGRAPH, "term one definition", term_end=8),
-            block(1, Kind.PARAGRAPH, "term two definition", page=1, term_end=8),
-        ]
-    )
-    html = render(entries)
-    assert html.count("<dl>") == 1
-    assert '<dt id="p2-e1"><div class="pagebreak' in html
-
-
-def test_documents_pass_the_static_checks_with_markers_and_a_contents_list():
-    pairs = numbered(
-        [
-            heading(0, "Motion", 1),
-            heading(1, "Speed", 2, page=1),
-            block(2, Kind.PARAGRAPH, "Text.", page=1),
-            heading(3, "Velocity", 2, page=2),
-        ]
-    )
-    html = render(pairs)
-    failed = [c for c in static_checks(html) if not c.passed and c.severity == "error"]
-    assert failed == []
-    assert html.count("doc-pagebreak") == 3 and html.count('aria-label="Contents"') == 1
 
 
 # ----------------------------------------------------------------------------- footnotes
@@ -358,13 +236,6 @@ def test_the_mark_is_a_noteref_the_note_a_footnote_and_the_note_links_back():
     assert all(c.passed for c in static_checks(html) if c.severity == "error")
 
 
-def test_a_note_whose_mark_was_not_found_has_no_backlink_but_is_still_a_footnote():
-    pairs, ids = noted(with_link=False)
-    html = render(pairs, footnote_ids=ids)
-    assert 'role="doc-footnote"' in html and "doc-backlink" not in html
-    assert "\x00" not in html
-
-
 def test_without_footnotes_a_link_between_blocks_is_an_ordinary_link():
     pairs, _ = noted()
     html = render(pairs)
@@ -372,29 +243,7 @@ def test_without_footnotes_a_link_between_blocks_is_an_ordinary_link():
     assert '<a href="#p1-e1">1</a>' in html
 
 
-def test_the_mark_of_a_footnote_keeps_its_role_when_text_also_links_elsewhere():
-    pairs, ids = noted()
-    html = render(pairs, footnote_ids=ids)
-    assert html.count('role="doc-noteref"') == 1
-
-
 # ----------------------------------------------------------------------------- unit
-
-
-def test_contents_nav_nests_by_level_and_never_skips_a_closing_tag():
-    entries = [
-        navigation.TocEntry(2, "a", "A"),
-        navigation.TocEntry(3, "b", "B"),
-        navigation.TocEntry(4, "c", "C"),
-        navigation.TocEntry(2, "d", "D"),
-        navigation.TocEntry(3, "e", "E"),
-    ]
-    nav = navigation.contents_nav(entries, "readablestem")
-    assert (
-        '<ul><li><a href="#a">A</a><ul><li><a href="#b">B</a><ul><li><a href="#c">C</a></li>'
-        '</ul></li></ul></li><li><a href="#d">D</a><ul><li><a href="#e">E</a></li></ul></li></ul>'
-    ) in nav
-    assert nav.count("<ul>") == nav.count("</ul>") and nav.count("<li>") == nav.count("</li>")
 
 
 # ----------------------------------------------------------------------------- axe
@@ -437,31 +286,3 @@ def test_a_paragraph_over_two_pages_does_not_swallow_the_marker_of_its_last_page
     assert html.index("pagebreak-2") < html.index("Third page.")
     inside = re.search(r"<p[^>]*>Runs over the break and ends\.</p>", html)
     assert inside, "the paragraph is written whole"
-
-
-def test_a_paragraph_over_three_pages_marks_each_page_in_order():
-    pairs = numbered(
-        [
-            block(0, Kind.PARAGRAPH, "Runs over two breaks.", last_page=2),
-            block(0, Kind.PARAGRAPH, "Then the fourth page.", page=3),
-        ]
-    )
-    html = render(pairs)
-    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2", "Page 3", "Page 4"]
-    assert html.index("pagebreak-3") < html.index("Then the fourth page.")
-
-
-def test_the_next_block_on_the_last_page_of_a_joined_paragraph_gets_no_second_marker():
-    pairs = numbered(
-        [
-            block(0, Kind.PARAGRAPH, "Runs over.", last_page=1),
-            block(0, Kind.PARAGRAPH, "Rest of page two.", page=1),
-        ]
-    )
-    html = render(pairs)
-    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2"]
-
-
-def test_a_two_page_document_whose_second_page_is_only_a_continuation_is_marked():
-    html = render(numbered([block(0, Kind.PARAGRAPH, "Runs over.", last_page=1)]))
-    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2"]

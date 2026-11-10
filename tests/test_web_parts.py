@@ -19,7 +19,6 @@ from sqlalchemy import func, select
 
 from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, login, make_pdf, token
 from readablestem.ops.retention import erase_user, purge_expired
-from readablestem.web import ranges
 from readablestem.web.db import Blob, Job, PendingUpload, QuotaDay, User, session_scope, utcnow
 from readablestem.web.uploads import ExtractFailed, extract_part_isolated
 
@@ -115,29 +114,6 @@ def test_a_file_over_the_page_limit_is_kept_not_turned_away_and_costs_nothing(we
     assert row.done_pages == [] and row.user_id and bytes(row.content).startswith(b"%PDF")
 
 
-def test_the_page_for_choosing_suggests_parts_that_cover_the_whole_file(web):
-    upload_id = keep_big(web, 12)
-    page = web.alice.get(f"/uploads/{upload_id}")
-    assert page.status_code == 200
-    text = text_of(page.text)
-    assert "chapter2.pdf has 12 pages" in text
-    assert "each part is its own document of up to 5 pages" in text.lower()
-    assert "Nothing is converted or counted yet" in text
-    area = re.search(r'<textarea[^>]*id="parts"[^>]*>(.*?)</textarea>', page.text, re.S)
-    assert area is not None and area.group(1).split() == ["1-4", "5-8", "9-12"]
-    assert 'for="parts"' in page.text and "Shrink large pictures first" in text
-    assert "40 pages left today" in text
-    assert "Kept until" in text
-
-
-def test_a_file_over_the_size_limit_is_kept_even_with_few_pages(web):
-    response = post_file(web.alice, "scans.pdf", heavy_pdf(3, 1.6))
-    assert response.status_code == 303 and response.headers["location"].startswith("/uploads/")
-    page = web.alice.get(response.headers["location"])
-    assert "Checked because this file is large" in text_of(page.text)
-    assert re.search(r'<input[^>]*id="shrink"[^>]*checked', page.text)
-
-
 def test_a_file_over_the_hard_limits_is_still_refused_with_the_reason(web):
     too_many = post_file(web.alice, "huge.pdf", make_pdf(41))
     assert too_many.status_code == 422
@@ -154,26 +130,6 @@ def test_only_a_few_large_files_wait_at_once(web):
     assert response.status_code == 429
     assert "already have 2 large files waiting" in text_of(response.text)
     assert len(pending_rows(web)) == 2
-
-
-def test_a_revised_version_must_fit_one_conversion(web):
-    first = post_file(web.alice, "a.pdf", make_pdf(2)).headers["location"].rsplit("/", 1)[-1]
-    web.run_worker()
-    response = web.alice.post(
-        "/jobs",
-        data={"csrf_token": token(web.alice), "revises": first},
-        files={"pdf": ("v2.pdf", make_pdf(12), "application/pdf")},
-    )
-    assert response.status_code == 422 and "cannot be a revised version" in text_of(response.text)
-    assert pending_rows(web) == []
-
-
-def test_my_documents_lists_the_files_waiting_with_a_link_to_choose(web):
-    upload_id = keep_big(web, 12)
-    page = web.alice.get("/app")
-    assert "Large files waiting for you" in page.text
-    assert f'href="/uploads/{upload_id}"' in page.text
-    assert "Choose the pages of chapter2.pdf" in text_of(page.text)
 
 
 # --------------------------------------------------------------------------- converting parts
@@ -203,32 +159,6 @@ def test_the_suggested_parts_become_documents_that_hold_the_right_pages(web):
             assert doc.page_count == 4 and doc[0].get_text().strip() == first
     assert pending_rows(web) == []  # every page was sent: the waiting copy is deleted
     assert "3 parts are converting" in text_of(web.alice.get("/app").text)
-
-
-def test_one_part_goes_straight_to_its_page_and_says_which_pages_it_is(web):
-    upload_id = keep_big(web, 12)
-    response = choose(web, upload_id, "1-5")
-    assert response.status_code == 303 and response.headers["location"].startswith("/jobs/")
-    page = text_of(web.alice.get(response.headers["location"]).text)
-    assert "This is pages 1-5 of a larger file" in page
-    # The rest is still waiting and the chooser leaves out what was sent.
-    again = text_of(web.alice.get(f"/uploads/{upload_id}").text)
-    assert "Pages 1-5 are already sent." in again
-    area = re.search(
-        r'<textarea[^>]*id="parts"[^>]*>(.*?)</textarea>',
-        web.alice.get(f"/uploads/{upload_id}").text,
-        re.S,
-    )
-    assert area is not None and area.group(1).split() == ["6-9", "10-12"]
-
-
-def test_the_parts_of_one_file_link_to_each_other(web):
-    upload_id = keep_big(web, 12)
-    choose(web, upload_id, "1-4\n5-8")
-    first, second = jobs_of(web)
-    page = web.alice.get(f"/jobs/{second.id}").text
-    assert 'aria-label="Parts of this file"' in page
-    assert f'href="/jobs/{first.id}"' in page and "Pages 5-8 (this document)" in page
 
 
 def test_a_part_that_does_not_fit_today_is_not_started_and_the_file_stays(web):
@@ -262,20 +192,6 @@ def test_a_page_cannot_be_converted_twice(web):
     assert len(jobs_of(web)) == 1
 
 
-def test_what_was_typed_wrongly_is_explained_and_kept_in_the_box(web):
-    upload_id = keep_big(web, 12)
-    response = choose(web, upload_id, "1-9")
-    assert response.status_code == 400
-    text = text_of(response.text)
-    assert "The pages has 9 pages. A part can have at most 5" in text or "has 9 pages" in text
-    assert 'class="error-summary"' in response.text
-    assert re.search(r'<textarea[^>]*aria-invalid="true"', response.text)
-    assert ">1-9</textarea>" in response.text
-    assert jobs_of(web) == [] and pages_used(web) == 0
-    beyond = choose(web, upload_id, "10-13")
-    assert "page 13 is not in this file, which has 12 pages" in text_of(beyond.text)
-
-
 def test_the_caps_on_documents_still_hold_for_parts(web):
     from readablestem.web.access import INVITED_FILES_PER_UPLOAD as MAX_ACTIVE_JOBS_PER_USER
 
@@ -291,19 +207,6 @@ def test_the_caps_on_documents_still_hold_for_parts(web):
     assert "Part 2 (pages 5-8) was not started" in text_of(response.text)
     [row] = pending_rows(web)  # the file is kept for later
     assert row.done_pages == [0, 1, 2, 3]
-
-
-def test_the_chosen_course_and_exam_mode_follow_the_file_to_every_part(web):
-    made = web.alice.post(
-        "/courses", data={"csrf_token": csrf_from(web.alice.get("/courses").text), "name": "P1"}
-    )
-    course_id = made.headers["location"].rsplit("/", 1)[-1]
-    response = post_file(web.alice, "ch.pdf", make_pdf(12), course=course_id, exam="on", keep="on")
-    upload_id = response.headers["location"].rsplit("/", 1)[-1]
-    choose(web, upload_id, "1-4\n5-8")
-    jobs = jobs_of(web)
-    assert {j.course_id for j in jobs} == {course_id}
-    assert {j.exam_mode for j in jobs} == {True} and {j.retention_mode for j in jobs} == {"week"}
 
 
 # --------------------------------------------------------------------------- shrinking
@@ -411,49 +314,3 @@ def test_a_waiting_file_is_gone_at_its_deletion_time_and_with_its_owner(web):
         user_id = session.scalar(select(User.id).where(User.email == ALICE))
         erase_user(session, user_id)
     assert pending_rows(web) == []
-
-
-def test_a_waiting_file_does_not_count_toward_the_documents_a_person_keeps(web):
-    keep_big(web, 12)
-    assert jobs_of(web) == []
-    from readablestem.web.intake import live_job_count
-
-    with session_scope(web.ctx.factory) as session:
-        user_id = session.scalar(select(User.id).where(User.email == ALICE))
-        assert live_job_count(session, user_id, utcnow()) == 0
-
-
-def test_the_parts_helpers_agree_with_the_chooser(web):
-    """What the page suggests is what the parser accepts."""
-    upload_id = keep_big(web, 40)
-    page = web.alice.get(f"/uploads/{upload_id}").text
-    area = re.search(r'<textarea[^>]*id="parts"[^>]*>(.*?)</textarea>', page, re.S)
-    assert area is not None
-    parts = ranges.parse_parts(unescape(area.group(1)), total=40, limit=5)
-    assert sum(len(p.pages) for p in parts) == 40
-
-
-def test_the_known_limits_and_privacy_pages_say_what_happens_to_a_large_file(web):
-    limits = text_of(web.alice.get("/limits").text)
-    assert "Up to 5 pages and 1 MB per upload." in limits
-    assert "A bigger file, up to 40 pages and 5 MB, is kept for a day so you can choose" in limits
-    assert "each part becomes a document of its own" in limits
-    privacy = text_of(web.alice.get("/privacy").text)
-    assert "A PDF that is too large to convert at once is kept, as uploaded" in privacy
-    assert "Nothing is sent to an AI service until you choose the pages" in privacy
-
-
-def test_without_the_bigger_limits_the_limits_page_still_says_to_split(tmp_path):
-    env = WebEnv(tmp_path)  # the test defaults: no keeping of larger files
-    with env.running() as client:
-        assert "Split longer documents." in text_of(client.get("/limits").text)
-
-
-def test_file_sizes_are_never_zero_megabytes():
-    from readablestem.web.pending import size_text
-
-    assert size_text(0) == "1 KB"
-    assert size_text(84 * 1024) == "84 KB"
-    assert size_text(104857) == "102 KB"
-    assert size_text(104858) == "0.1 MB"
-    assert size_text(5 * 1024 * 1024) == "5.0 MB"

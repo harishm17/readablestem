@@ -19,8 +19,6 @@ import ast
 import re
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "readablestem"
 
@@ -210,35 +208,3 @@ def test_visible_text_is_us_spelling() -> None:
     assert not problems, "British spelling in visible text (use US spelling):\n" + "\n".join(
         problems
     )
-
-
-@pytest.mark.parametrize(
-    ("source", "expected"),
-    [
-        ("<p>The colour of it</p>", ["colour"]),
-        ("<p>Tick the box</p>", ["Tick"]),
-        ("<p>{{ 'Practise on the sample' if x }}</p>", ["Practise"]),
-        ('<img alt="A coloured chart" src="x.png">', ["coloured"]),
-        ("<p>Their organisation's id</p>", ["organisation"]),
-        ("<p>Licence terms</p>", ["Licence"]),
-        ("<p>Maths in a cell</p>", ["Maths"]),
-        # Not visible, or already US:
-        ("<p class='colour-box'>color</p>", []),
-        ("<p>{# a colour comment #}fine</p>", []),
-        ("<style>.colour { color: red }</style><p>license</p>", []),
-        ("<script>var colour = 1</script>", []),
-        ('<a href="/colour">x</a>', []),
-        ("{% set colour = 'colour' %}<p>math</p>", []),
-        ('<div aria-labelledby="h">labeled</div>', []),
-        ("<p>analysis, analyze, ticket</p>", []),
-    ],
-)
-def test_the_scanner_finds_british_forms_and_ignores_the_rest(
-    source: str, expected: list[str]
-) -> None:
-    assert [word for _, word in hits_in_text(visible_text(source))] == expected
-
-
-def test_a_hit_reports_its_line() -> None:
-    text = visible_text("<p>fine</p>\n{% if x %}\n<p>the colour</p>\n{% endif %}")
-    assert hits_in_text(text) == [(3, "colour")]

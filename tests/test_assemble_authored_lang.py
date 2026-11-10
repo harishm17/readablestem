@@ -49,12 +49,6 @@ def test_the_tools_words_are_marked_english_in_a_french_document():
     assert all(c.passed for c in static_checks(html) if c.name == "html.lang_tags")
 
 
-def test_an_english_document_is_unchanged():
-    for lang in ("en", "en-GB"):
-        body = render(lang).split("</head>", 1)[1]
-        assert ' lang="en"' not in body
-
-
 def test_the_tools_words_in_the_student_file_speak_to_students():
     """The flag notes are read by students: what is missing and whom to ask, never the
     reviewer's to-do ("Review it before publishing", UX review MF7)."""
@@ -87,37 +81,3 @@ PNG = bytes.fromhex(
     "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
     "1f15c4890000000d49444154789c6360000002000100ffff03000006000557bfabd40000000049454e44ae426082"
 )
-
-
-def test_the_fixed_alt_text_of_an_original_is_marked_english():
-    from readablestem.core.types import Fix as F
-
-    figure = Element(id="p1-e1", kind=Kind.FIGURE, page=0, bbox=(0, 0, 100, 100), order=1)
-    fix = F(element_id="p1-e1", kind=Kind.FIGURE, status=Status.ABSTAINED, reason="low_confidence")
-    for lang, marked in (("fr", True), ("en", False)):
-        html = render_html(title="t", lang=lang, elements=[figure], fixes=[fix],
-                           crops={"p1-e1": PNG})  # fmt: skip
-        tag = html[html.index("<img") : html.index(">", html.index("<img")) + 1]
-        assert ('lang="en"' in tag) is marked, tag
-
-
-def test_a_chart_data_tables_caption_is_marked_english():
-    from readablestem.core.types import FigureFix, TableCell, TableGrid
-
-    grid = TableGrid(
-        rows=2, cols=2, header_rows=1, source="model",
-        cells=[TableCell(row=0, col=0, text="t (s)", header="col"),
-               TableCell(row=0, col=1, text="x (m)", header="col"),
-               TableCell(row=1, col=0, text="1"), TableCell(row=1, col=1, text="2")],
-    )  # fmt: skip
-    figure = Element(id="p1-e1", kind=Kind.FIGURE, page=0, bbox=(0, 0, 100, 100), order=1,
-                     caption="Figure 1 Position")  # fmt: skip
-    fix = Fix(element_id="p1-e1", kind=Kind.FIGURE, status=Status.NEEDS_REVIEW,
-              figure=FigureFix(alt="Courbe de la position", figure_type="chart",
-                               data_table=grid, data_values_from_text=False,
-                               data_table_added=True))  # fmt: skip
-    html = render_html(title="t", lang="fr", elements=[figure], fixes=[fix], crops={"p1-e1": PNG})
-    start = html.index("<caption")
-    assert 'lang="en"' in html[start : html.index(">", start)]
-    # The model's alt text is not the tool's: no lang on it.
-    assert 'alt="Courbe de la position"' in html

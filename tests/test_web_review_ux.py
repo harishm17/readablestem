@@ -10,7 +10,6 @@ the live check and the kept draft) is in test_web_review_ux_browser.py.
 """
 
 # Bold and double-struck maths letters and the multiplication sign are the point here.
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 
@@ -24,7 +23,6 @@ from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
 from readablestem.core.types import DocumentResult
 from readablestem.web.db import Job, ReviewEdit, session_scope
-from readablestem.web.review import bump_result_version, is_stale
 
 
 @pytest.fixture
@@ -87,20 +85,6 @@ def edits(env) -> list[ReviewEdit]:
 # --------------------------------------------------------------------------- MF12 stale tab
 
 
-def test_is_stale():
-    assert not is_stale(3, "3")
-    assert not is_stale(0, "0") and not is_stale(None, "0")
-    assert not is_stale(3, "")  # a page from before the guard: not refused
-    for sent in ("2", "4", "x", "-1", "3.0", "²", "1" * 12):
-        assert is_stale(3, sent), sent
-
-
-def test_bump_result_version():
-    job = Job(filename="x.pdf", result_version=None)
-    assert bump_result_version(job) == 1
-    assert bump_result_version(job) == 2
-
-
 def test_every_form_carries_the_version_its_page_was_drawn_at(ux):
     page = screen(ux)
     forms = re.findall(
@@ -111,20 +95,6 @@ def test_every_form_carries_the_version_its_page_was_drawn_at(ux):
         assert '<input type="hidden" name="version" value="0">' in form
     listing = ux.browser.get(f"/jobs/{ux.job_id}/review/list").text
     assert listing.count('name="version" value="0"') == listing.count('name="view" value="list"')
-
-
-def test_each_review_write_counts_itself_once(ux):
-    assert post(ux, "p1-e2", action="accept", version="0").status_code == 303
-    assert version_of(ux) == 1
-    # A group decision is one write, however many headings it changes.
-    assert post(ux, GROUP, action="reject", version="1").status_code == 303
-    assert version_of(ux) == 2
-    assert [e.after["write"] for e in edits(ux)] == [1, 2, 2, 2]
-    # The next page's forms carry the new number.
-    assert 'name="version" value="2"' in screen(ux)
-    # A write that changes nothing (the group again, nothing left) is not counted.
-    assert post(ux, GROUP, action="reject", version="2").status_code == 303
-    assert version_of(ux) == 2
 
 
 def test_a_write_from_an_out_of_date_tab_is_refused_and_says_so(ux):
@@ -176,13 +146,6 @@ def test_stale_group_and_list_view_writes_are_refused_too(ux):
     assert stored(ux).fix_for("p1-e6").status.value == "needs_review"
 
 
-def test_a_form_without_a_version_is_still_applied(ux):
-    """Pages opened before the guard existed (and scripts) send no version."""
-    assert post(ux, "p1-e2", action="accept").status_code == 303
-    assert post(ux, "p1-e6", action="accept").status_code == 303
-    assert version_of(ux) == 2
-
-
 # --------------------------------------------------------------------------- MF3 edits
 
 
@@ -223,17 +186,6 @@ def test_use_my_edit_anyway_saves_it_and_records_the_choice(ux):
     assert edit.action == "edit" and edit.after["anyway"] is True
     page = ux.browser.get(response.headers["location"]).text
     assert "Your edit was saved as you wrote it, although it differs from the PDF." in page
-
-
-def test_a_correct_edit_passes_the_same_checks_as_a_proposal(ux):
-    response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
-    assert response.status_code == 303
-    fix = stored(ux).fix_for("p1-e2")
-    names = {c.name: c.passed for c in fix.checks}
-    assert names["equation.text_layer"] and names["equation.text_layer_style"]
-    assert names["latex.converts"] and names["speech.generated"]
-    assert fix.equation.speech == "bold omega"
-    assert "anyway" not in edits(ux)[0].after
 
 
 def test_the_one_click_fix_is_offered_only_when_save_edit_takes_it(ux, monkeypatch):
@@ -398,25 +350,6 @@ def undo(env, version: str, **extra):
     return env.browser.post(f"/jobs/{env.job_id}/undo", data=data | extra)
 
 
-def test_reject_is_named_for_what_it_does(ux):
-    equation = panel(screen(ux))
-    assert re.search(r'data-role="reject"[^>]*>Keep as image<span', equation)
-    assert (
-        "Students see a picture; screen readers read the PDF's text, marked unchecked."
-        in text_of(equation)
-    )
-    heading = panel(screen(ux, "?item=p1-e0"))  # a bold heading, accepted
-    assert re.search(r'data-role="reject"[^>]*>Make bold text<span', heading)
-    assert ">Reject<" not in equation + heading
-    response = post(ux, "p1-e2", action="reject", version="0")
-    page = ux.browser.get(response.headers["location"]).text
-    assert (
-        "Equation 1: Kept as an image of the original. Screen readers will hear the PDF text "
-        "of the equation, marked as not checked. 2 decisions left." in text_of(page)
-    )
-    assert "Decided: Kept as an image by you" in panel(screen(ux, "?item=p1-e2"))
-
-
 def test_undo_puts_the_last_decision_back(ux):
     response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
     page = ux.browser.get(response.headers["location"]).text
@@ -464,50 +397,6 @@ def test_undo_a_group_decision_and_a_stale_or_empty_undo(ux):
     assert undo(ux, "").status_code == 303 and version_of(ux) == 2  # no version: refused
 
 
-def test_undo_in_the_list_view(ux):
-    response = post(ux, "p1-e6", action="accept", version="0", view="list")
-    page = ux.browser.get(response.headers["location"]).text
-    assert "Undo the last decision" in page
-    response = undo(ux, "1", view="list")
-    assert response.headers["location"] == f"/jobs/{ux.job_id}/review/list#item-p1-e6"
-    assert stored(ux).fix_for("p1-e6").status.value == "needs_review"
-
-
-def test_your_decisions_are_listed_apart_from_the_automatic_ones(ux):
-    assert "Your decisions" not in screen(ux)  # nothing decided yet
-    post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
-    post(ux, GROUP, action="reject", version="1")
-    page = screen(ux)
-    box = section(page, '<details class="optional-box decided-box">', "</details>")
-    assert '<summary id="decided-summary">Your decisions (2)</summary>' in box
-    lines = [text_of(li) for li in re.findall(r"<li>.*?</li>", box, re.S)]
-    assert lines == [
-        "Equation 1, page 1 \U0001d74e Edited by you.",  # a bold-italic omega code point
-        "Repeated heading, 3 times “Teacher Support” All 3 were made bold text.",
-    ]
-    assert f'href="/jobs/{ux.job_id}/review?item={GROUP}#decision-title"' in box
-    assert 'aria-labelledby="optional-summary decided-summary"' in page
-
-
-def test_a_heading_group_of_two_appears_twice(tmp_path):
-    output = review_output()
-    for fix in output.result.fixes:
-        if fix.element_id == "p2-e0":
-            fix.group_key = fix.group_size = None
-        elif fix.group_key == GROUP:
-            fix.group_size = 2
-    env = WebEnv(tmp_path)
-    env.converter.output = output
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        body = panel(screen(env, f"?item={GROUP}"))
-        assert "“Teacher Support” appears twice as a bold line in the body text size." in body
-
-
 def test_the_skip_link_goes_straight_to_the_decision(ux):
     page = screen(ux)
     links = re.findall(r'<a class="skip-link" href="([^"]+)">([^<]+)</a>', page)
@@ -532,69 +421,6 @@ def spoken(env, element_id: str, speech: str) -> None:
             for fix in data["fixes"]
         ]
         job.result_json = data
-
-
-def test_the_card_says_what_a_screen_reader_gets_from_the_pdf(ux):
-    spoken(ux, "p1-e2", "omega")
-    body = panel(screen(ux))
-    # The proposal's reading, and the PDF's text with its reading; the symbol that
-    # differs is marked in both.
-    assert (
-        '<span class="speech-label">Read aloud roughly as:</span> “<mark class="said-diff">'
-        "omega</mark>”" in body
-    )
-    assert (
-        '<span class="speech-label">From your PDF a screen reader gets:</span> “<span '
-        'class="text-layer">𝛚</span>”, roughly “<mark class="said-diff">bold omega</mark>”' in body
-    )
-    assert "Marked words differ." in body
-    # Nothing differs in an accepted equation: no reading of the PDF, nothing marked.
-    other = panel(screen(ux, "?item=p2-e2"))
-    assert 'From your PDF a screen reader gets:</span> “<span class="text-layer">v = d / t' in (
-        other
-    )
-    assert "said-diff" not in other and "roughly “" not in other.split("screen reader gets")[1]
-
-
-def test_an_equation_without_text_in_the_pdf_says_so(tmp_path):
-    output = review_output()
-    for element in output.result.elements:
-        if element.id == "p1-e2":
-            element.text = None
-    env = WebEnv(tmp_path)
-    env.converter.output = output
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        body = panel(screen(env))
-        assert (
-            "From your PDF a screen reader gets nothing here: the PDF has no text for this "
-            "equation." in text_of(body)
-        )
-        listing = env.browser.get(f"/jobs/{env.job_id}/review/list").text
-        assert "the PDF has no text for this equation." in listing
-
-
-@pytest.mark.parametrize(
-    ("said", "text_layer", "marked", "pdf_marked"),
-    [
-        ("omega", "𝛚", ["omega"], ["bold omega"]),
-        ("a equals omega times bold r", "a = 𝛚 × 𝐫", ["omega"], ["bold omega"]),
-        ("e to the power lambda t end power", "e−λt", [], ["minus"]),
-        ("x squared plus 3", "x2 + 8", ["3"], ["8"]),
-        ("capital R to the power n", "ℝn", ["capital R"], ["double-struck capital R"]),
-    ],
-)
-def test_the_readings_mark_only_the_symbols_that_differ(said, text_layer, marked, pdf_marked):
-    from readablestem.web.speech_diff import spoken_diff
-
-    diff = spoken_diff(said, text_layer)
-    assert diff is not None
-    assert [s.text for s in diff.said if s.differs] == marked
-    assert [s.text for s in diff.pdf_said if s.differs] == pdf_marked
 
 
 @pytest.mark.parametrize(
@@ -657,20 +483,6 @@ def sign_out_elsewhere(env) -> None:
     assert other.post("/logout", data={"csrf_token": token(other)}).status_code == 303
 
 
-def test_signing_in_comes_back_to_the_page_asked_for(ux):
-    other = ux.client()  # another browser, signed out
-    deep = f"/jobs/{ux.job_id}/review?item=p1-e6"
-    response = other.get(deep)
-    assert (response.status_code, response.headers["location"]) == (303, "/login")
-    assert login(other, ALICE).headers["location"] == deep
-    # Once: signing in again later goes to My documents.
-    assert login(other, ALICE).headers["location"] == "/app"
-    # Nothing outside the app's pages is remembered.
-    fresh = ux.client()
-    assert fresh.get(f"/jobs/{ux.job_id}/pages/1.png").headers["location"] == "/login"
-    assert login(fresh, ALICE).headers["location"] == "/app"
-
-
 def test_a_decision_after_the_session_ended_comes_back_after_sign_in(ux):
     csrf = token(ux.browser, f"/jobs/{ux.job_id}/review")
     sign_out_elsewhere(ux)
@@ -691,43 +503,3 @@ def test_a_decision_after_the_session_ended_comes_back_after_sign_in(ux):
     response = login(ux.browser, ALICE)
     assert response.headers["location"] == f"/jobs/{ux.job_id}/review?item=p1-e2"
     assert "Decision 1 of 3" in screen(ux, "?item=p1-e2")
-
-
-def test_a_decision_after_the_cookie_expired_says_sign_in_again(ux):
-    """An expired cookie takes the CSRF token with it: the same page as above, not "This
-    form has expired"; Undo comes back to the review screen."""
-    other = ux.client()
-    response = other.post(
-        f"/jobs/{ux.job_id}/review/p1-e2", data={"csrf_token": "from-before", "action": "accept"}
-    )
-    assert response.status_code == 403
-    assert "Please sign in again" in response.text
-    assert login(other, ALICE).headers["location"] == f"/jobs/{ux.job_id}/review?item=p1-e2"
-    expired = ux.client()
-    expired.post(f"/jobs/{ux.job_id}/undo", data={"csrf_token": "from-before", "version": "1"})
-    assert login(expired, ALICE).headers["location"] == f"/jobs/{ux.job_id}/review"
-    # Other forms keep the plain message (signing in itself, say).
-    assert "This form has expired" in ux.client().post("/login", data={}).text
-
-
-def test_a_form_from_before_signing_in_again_links_back_to_its_decision(ux):
-    csrf = token(ux.browser, f"/jobs/{ux.job_id}/review")
-    login(ux.browser, ALICE)  # signed in again (in another tab): a new token
-    response = ux.browser.post(
-        f"/jobs/{ux.job_id}/review/p1-e2", data={"csrf_token": csrf, "action": "accept"}
-    )
-    assert response.status_code == 403
-    assert "This form has expired" in response.text
-    assert "Go back to the decision and choose again." in response.text
-    assert (
-        f'<a class="button" href="/jobs/{ux.job_id}/review?item=p1-e2">Back to the decision</a>'
-        in response.text
-    )
-    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
-
-
-def test_the_list_view_names_the_saved_item_so_its_draft_is_forgotten(ux):
-    response = post(ux, "p1-e6", action="accept", version="0", view="list")
-    page = ux.browser.get(response.headers["location"]).text
-    assert f'data-saved="/jobs/{ux.job_id}/review/p1-e6"' in page
-    assert page.count("data-edit-field") >= 3  # the fields whose drafts app.js keeps

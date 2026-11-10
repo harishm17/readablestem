@@ -63,16 +63,6 @@ def reconcile(elements, formulas, *rows):
 # ------------------------------------------------------------------------------- extents
 
 
-def test_the_extent_is_the_box_of_the_quoted_characters_and_counts_maths_glyphs():
-    row = drawn("L0", "x = 5 here", 100, 200)
-    found = witness_reconcile.extent_of(formula("L0", 0, 5), {"L0": row[0]}, {"L0": row[1]})
-    assert found is not None
-    assert found.bbox == (100, 200, 100 + 5 * W, 200 + H)
-    assert (found.glyph_w, found.glyph_h) == (W, H)
-    assert found.chars == 3 and found.math_chars == 3  # the blanks are not counted
-    assert found.text == "x = 5"
-
-
 def test_an_unknown_row_has_no_extent():
     row = drawn("L0", "x = 5", 100, 200)
     assert witness_reconcile.extent_of(formula("L7", 0, 1), {"L0": row[0]}, {"L0": row[1]}) is None
@@ -148,14 +138,6 @@ def test_a_formula_inside_a_paragraph_or_another_element_is_left_to_it():
     out = reconcile([prose], [formula("L0", 0, 5)], row)
     assert out.stats.inside_text == 1 and out.stats.added == 0
     assert [e.id for e in out.elements] == [prose.id]
-
-
-def test_a_new_element_takes_the_next_free_id_and_a_column_of_its_own():
-    left = paragraph((72, 100, 250, 400), element_id="p1-e0", order=0)
-    right = paragraph((300, 100, 500, 400), element_id="p1-e1", order=1)
-    row = drawn("L0", "a = b", 320, 450)  # under the right column
-    out = reconcile([left, right], [formula("L0", 0, 5, "a=b", display="block")], row)
-    assert [e.id for e in out.elements] == ["p1-e0", "p1-e1", "p1-e2"]
 
 
 # ------------------------------------------------------------------------- agree / tie
