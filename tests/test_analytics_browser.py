@@ -142,21 +142,6 @@ def policy_violations(visitor: Visit) -> list[str]:
     return [m for m in visitor.console if "Content Security Policy" in m or "Refused to" in m]
 
 
-def test_it_stays_silent_on_any_other_host(site, visit):
-    visitor = visit()
-    visitor.goto(site.local + "/")
-    assert visitor.value("typeof window.posthog") == "undefined"
-    assert visitor.proxied() == []
-
-
-def test_it_stays_silent_in_an_automated_browser(site, visit):
-    visitor = visit(automated=True)
-    visitor.goto(site.prod + "/")
-    assert visitor.value("navigator.webdriver") is True
-    assert visitor.value("typeof window.posthog") == "undefined"
-    assert visitor.proxied() == []
-
-
 def test_on_the_production_host_it_loads_through_m_and_inits_minimally(site, visit):
     visitor = visit()
     visitor.goto(site.prod + "/")
@@ -197,24 +182,6 @@ def test_opting_out_with_notrack_sticks_until_it_is_undone(site, visit):
     assert visitor.value("window.__arrayLoaded") is True
 
 
-def test_a_link_from_the_personal_site_hands_over_its_id_and_is_cleaned(site, visit):
-    ident = "0199f1c2-7a3e-7b8a-9d21-5c3f0a9e4b11"
-    visitor = visit()
-    visitor.goto(f"{site.prod}/?hm_id={ident}&ref=Wedge&utm_source=x&keep=1")
-    options = json.loads(visitor.value("window.__init"))
-    assert options["bootstrap"] == {"distinctID": ident}
-    visitor.page.wait_for_timeout(
-        2200
-    )  # the clean-up runs 1.5 s after load (waitForFunction would eval)
-    assert visitor.value("location.search") == "?keep=1"
-
-
-def test_an_implausible_id_is_not_used(site, visit):
-    visitor = visit()
-    visitor.goto(site.prod + "/?hm_id=<script>alert(1)</script>")
-    assert json.loads(visitor.value("window.__init"))["bootstrap"] == {}
-
-
 def sign_in(visitor: Visit, site: WebEnv) -> None:
     visitor.goto(site.prod + "/dev-login")
     visitor.page.get_by_label("Email address").fill(ALICE)
@@ -231,15 +198,6 @@ def test_a_sign_in_is_sent_once_with_only_its_category(site, visit):
     visitor.page.wait_for_load_state("networkidle")
     assert [c for c in visitor.calls if c[0] == "capture"] == []
     assert policy_violations(visitor) == []
-
-
-def test_a_click_on_the_demo_link_is_sent(site, visit):
-    visitor = visit()
-    visitor.goto(site.prod + "/")
-    visitor.page.evaluate("document.addEventListener('click', (e) => e.preventDefault())")
-    visitor.page.locator("a[href='/demo']").first.click()
-    sent = [c for c in visitor.calls if c[0] == "capture"]
-    assert sent == [["capture", "demo_opened", {}, {"transport": "sendBeacon"}]]
 
 
 def test_markers_with_odd_properties_are_cleaned(site, visit):

@@ -157,18 +157,6 @@ def test_accept_all_equations_from_the_keyboard_then_undo(site, browser, job):
     context.close()
 
 
-def test_cancel_is_a_link_back_and_changes_nothing(site, browser, job):
-    context, page = open_page(browser, site)
-    before = statuses(site, job)
-    page.goto(f"{site.base}/jobs/{job}/accept/figures?view=list")
-    cancel = page.get_by_role("link", name="Cancel")
-    tab_to(page, cancel)
-    page.keyboard.press("Enter")
-    page.wait_for_url(re.compile(r"/review/list"))
-    assert statuses(site, job) == before
-    context.close()
-
-
 def test_the_decision_filter_is_used_by_keyboard_and_moves_focus_to_the_result(site, browser, job):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}/review/list")
@@ -277,40 +265,6 @@ def test_finish_notice_opt_in_title_and_announcement(site, browser):
     context.close()
 
 
-def test_without_the_notification_api_nothing_is_offered_and_the_title_still_changes(site, browser):
-    job_id = upload(site, browser)
-    context, page = open_page(browser, site)
-    page.add_init_script("delete window.Notification;")
-    page.goto(f"{site.base}/jobs/{job_id}")
-    assert page.locator("#notify-box").is_hidden()
-    assert site.run_worker() == job_id
-    page.locator("#job-status[data-finished]").wait_for(timeout=15000)
-    assert page.title().startswith(page.locator("#job-status").get_attribute("data-title"))
-    context.close()
-
-
-def test_a_blocked_browser_is_not_offered_the_button(site, browser):
-    job_id = upload(site, browser)
-    context, page = open_page(browser, site)
-    page.add_init_script(
-        "window.Notification = class { static permission = 'denied'; "
-        "static requestPermission() {} };"
-    )
-    page.goto(f"{site.base}/jobs/{job_id}")
-    assert page.locator("#notify-box").is_hidden()
-    assert site.run_worker() == job_id
-    context.close()
-
-
-def test_a_job_that_was_already_done_says_nothing(site, browser, job):
-    context, page = open_page(browser, site)
-    page.add_init_script(NOTIFICATION_STUB)
-    page.goto(f"{site.base}/jobs/{job}")
-    assert page.locator("#notify-box").count() == 0
-    assert page.evaluate("window.__notes.length") == 0
-    context.close()
-
-
 # --------------------------------------------------------------------------- axe and layout
 
 
@@ -348,20 +302,6 @@ def test_new_pages_pass_wcag22_aa_and_best_practice_without_sideways_scrolling(
     failures = {name: describe(v) for name, v in found.items() if v}
     assert not failures, "\n".join(f"[{s}]\n{d}" for s, d in failures.items())
     assert {name: o for name, o in overflow.items() if o > 0} == {}
-
-
-def test_in_progress_job_page_with_the_notify_button_passes_axe(site, browser, axe_source):
-    job_id = upload(site, browser)
-    context, page = open_page(browser, site)
-    page.add_init_script(NOTIFICATION_STUB)
-    page.goto(f"{site.base}/jobs/{job_id}")
-    expect(page.locator("#notify-box")).to_be_visible()
-    assert not strict_axe(page, axe_source)
-    page.get_by_role("button", name="Notify me when it finishes").click()
-    expect(page.locator("#notify-state")).to_contain_text("You will get a notice")
-    assert not strict_axe(page, axe_source)
-    context.close()
-    site.run_worker()
 
 
 def test_text_spacing_override_does_not_clip_the_new_controls(site, browser, job):

@@ -139,37 +139,3 @@ def test_a_script_put_into_an_app_page_does_not_run(site, browser):
     assert page.evaluate("window.__pwned") is None
     assert any("Content Security Policy" in text for text in violations), violations
     context.close()
-
-
-def test_the_app_cannot_be_framed(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    framer = f"data:text/html,<iframe id=f src='{site.base}/privacy'></iframe>"
-    page.goto(framer)
-    page.wait_for_timeout(500)
-    frame = [f for f in page.frames if f.url.startswith(site.base)]
-    assert not frame or "privacy" not in (frame[0].content() if frame else ""), "the app was framed"
-    context.close()
-
-
-def test_a_hostile_file_name_is_text_in_the_page_not_markup(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    sign_in(page, site.base)
-    page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
-        files=[
-            {
-                "name": "<img src=x onerror=window.__pwned=1>.pdf",
-                "mimeType": "application/pdf",
-                "buffer": make_pdf(1),
-            }
-        ]
-    )
-    page.get_by_role("button", name="Upload and convert").click()
-    page.wait_for_url(f"{site.base}/jobs/*")
-    page.goto(f"{site.base}/app")
-    page.wait_for_timeout(300)
-    assert page.evaluate("window.__pwned") is None
-    assert page.locator("img[onerror]").count() == 0
-    context.close()

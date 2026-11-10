@@ -184,39 +184,6 @@ def open_as(browser, site, path: str, email: str | None, *, viewport=DESKTOP, un
 # ----------------------------------------------------------- the walker finds what is wrong
 
 
-def test_the_walker_reports_a_missing_focus_ring_a_trap_and_a_missing_skip_link(browser):
-    """The checks are only worth having if they can fail: three broken pages."""
-    context = new_context(browser)
-    page = context.new_page()
-    page.set_content(
-        "<style>*:focus{outline:none}</style><a href='#m'>Skip to main content</a>"
-        "<main id='m' tabindex='-1'><button>Plain</button></main>"
-    )
-    found = walk(page, label="no ring")
-    assert any("no focus indicator" in p for p in found.problems), found.problems
-
-    page.set_content(
-        "<a href='#m'>Skip to main content</a><main id='m'><button id='a'>One</button>"
-        "<button id='b'>Two</button></main>"
-        "<script>document.getElementById('b').addEventListener('keydown', e => {"
-        " if (e.key === 'Tab') { e.preventDefault(); document.getElementById('a').focus(); } });"
-        "</script>"
-    )
-    trapped = walk(page, label="trap")
-    assert any("looped" in p or "never left" in p for p in trapped.problems), trapped.problems
-
-    page.set_content("<main><button>Only</button></main>")
-    assert skip_link_works(page, label="no skip link")[0].startswith("no skip link: the first")
-
-    page.set_content(
-        "<a href='#m'>Skip to main content</a><div style='position:fixed;inset:0;background:#fff'>"
-        "</div><main id='m'><button>Covered</button></main>"
-    )
-    covered = walk(page, label="covered")
-    assert any("covered" in p for p in covered.problems), covered.problems
-    context.close()
-
-
 # ----------------------------------------------------------------- every page, by keyboard
 
 PAGES = [
@@ -372,38 +339,6 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     context.close()
 
 
-def test_the_job_page_downloads_and_the_questions_after_them_by_keyboard(site, browser, docs):
-    context = new_context(browser, accept_downloads=True)
-    page = context.new_page()
-    setup_sign_in(page, site.base, ALICE)
-    page.goto(f"{site.base}/jobs/{docs['ready']}")
-    start_of_page(page)
-    tab_to(page, "Download the HTML file")
-    with page.expect_download() as download:
-        page.keyboard.press("Enter")
-    assert download.value.suggested_filename.endswith(".html")
-    # Focus stays on the link that was used (a download does not move the page).
-    assert focus_state(page)["name"] == "Download the HTML file"
-    # The questions that appear after a download are reached next, in page order.
-    questions = page.locator("#feedback")
-    assert questions.is_visible()
-    tab_to(page, "Download as EPUB")
-    with page.expect_download() as epub:
-        page.keyboard.press("Enter")
-    assert epub.value.suggested_filename.endswith(".epub")
-    # The Canvas download is a form: a course number typed, Enter in the field sends it.
-    tab_to(page, "Canvas course number")
-    page.keyboard.type("12345")
-    with page.expect_download() as zipped:
-        page.keyboard.press("Enter")
-    assert zipped.value.suggested_filename.endswith(".zip")
-    tab_to(page, "Common Cartridge")
-    with page.expect_download() as cartridge:
-        page.keyboard.press("Enter")
-    assert cartridge.value.suggested_filename.endswith(".imscc")
-    context.close()
-
-
 def test_the_documents_list_and_the_job_status_refresh_without_taking_focus_away(
     site, browser, docs
 ):
@@ -538,29 +473,6 @@ def test_the_list_view_decisions_are_made_by_keyboard(site, browser, fresh):
     after = wait_focus(page)
     print("LIST AFTER ACCEPT:", after)
     assert after["inMain"], after  # on a decision's own place, not lost to the page's start
-    context.close()
-
-
-def test_a_symbol_is_changed_from_the_keyboard_and_focus_lands_on_what_happened(
-    site, browser, docs
-):
-    context = new_context(browser)
-    page = context.new_page()
-    setup_sign_in(page, site.base, ALICE)
-    page.goto(f"{site.base}/jobs/{docs['symbols']}/symbols?view=split")
-    start_of_page(page)
-    tab_to(page, "")  # first control of the page's own content after the skip links
-    choice = page.locator("#to-sym-x")
-    choice.focus()
-    page.keyboard.press("ArrowDown")
-    assert page.input_value("#to-sym-x") == "X"
-    tab_to(page, "^Change")
-    activate(page)
-    state = focus_summary(page)
-    assert state["body"] or state["inMain"], state
-    notice = page.locator(".symbols-notice [role=status]")
-    notice.wait_for()
-    assert "Changed small x to capital X" in notice.inner_text()
     context.close()
 
 

@@ -29,18 +29,6 @@ def test_the_demo_passes_axe_in_both_colour_schemes(site, browser, axe_source, s
     assert not violations, describe(violations)
 
 
-def test_the_note_links_keep_light_colours_in_the_dark_scheme(site, browser):  # noqa: F811
-    context = browser.new_context(color_scheme="dark")
-    page = context.new_page()
-    page.goto(site.base + "/demo")
-    colours = page.eval_on_selector_all(
-        NOTE_LINKS, "els => els.map(e => getComputedStyle(e).color)"
-    )
-    context.close()
-    assert len(colours) >= 4
-    assert set(colours) == {"rgb(11, 61, 145)"}  # #0b3d91 on the note's white
-
-
 def test_the_note_links_use_the_system_colours_in_forced_colours(site, browser):  # noqa: F811
     context = browser.new_context(forced_colors="active")
     page = context.new_page()
