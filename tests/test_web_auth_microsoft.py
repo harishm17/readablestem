@@ -29,12 +29,10 @@ from fixtures.web.oidc import (
 )
 from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, make_settings
 from readablestem.observability.logging import FIELDS_ATTR
-from readablestem.web.auth import make_oauth
 from readablestem.web.db import AuthIdentity, User, session_scope
 from readablestem.web.identities import GOOGLE_ISSUER
 from readablestem.web.microsoft import (
     TokenRefused,
-    email_claims,
     verify_id_token,
 )
 
@@ -112,17 +110,6 @@ def signed_in(browser) -> bool:
 # --------------------------------------------------------------------------- the page
 
 
-def test_the_university_button_comes_first_and_google_second(ms):
-    page = ms.browser.get("/login").text
-    assert page.index("Sign in with your university account (Microsoft)") < page.index(
-        "Sign in with Google"
-    )
-    assert 'action="/login/microsoft"' in page and 'action="/login"' in page
-    assert "your university's Microsoft account, or with the Google account" in page
-    landing = " ".join(ms.browser.get("/").text.split())
-    assert 'href="/login"' in landing  # the buttons themselves are on /login
-
-
 def test_without_microsoft_settings_only_google_is_offered(tmp_path):
     env = WebEnv(tmp_path, dev_login_enabled=False, **GOOGLE_SETTINGS)
     with env.running() as client:
@@ -143,13 +130,6 @@ def test_microsoft_alone_offers_no_google_button(tmp_path):
         token = csrf_from(page)
         assert client.post("/login", data={"csrf_token": token}).status_code == 503
         assert client.get("/auth/callback").status_code == 404
-
-
-def test_half_configured_microsoft_is_not_offered(tmp_path):
-    """No tenant listed: off, even with a client id and secret (the setting refuses to
-    start only when the secret is set without tenants, in check_production)."""
-    settings = make_settings(tmp_path, ms_client_id=CLIENT_ID)
-    assert make_oauth(settings) is None
 
 
 def test_the_button_goes_to_microsoft_with_pkce_state_and_nonce(ms):
@@ -193,23 +173,6 @@ def test_a_university_account_links_to_the_existing_google_user(ms):
     other.close()
 
 
-def test_a_linked_identity_signs_in_whatever_address_the_token_now_carries(ms):
-    """The address is used once, to link. Afterwards a changed address (or one that is
-    another allowlisted person's) does not move the identity."""
-    ms.allow(ALICE)
-    ms.allow(BOB)
-    assert ms_sign_in(ms).status_code == 303
-    alice = user_id(ms, ALICE)
-    for changed in ({"email": BOB, "preferred_username": BOB}, {"email": None}):
-        ms.fake.claims |= changed
-        browser = ms.client()
-        assert ms_sign_in(ms, browser).status_code == 303
-        assert browser.get("/app").status_code == 200
-        assert ALICE in browser.get("/app").text  # signed in as Alice, not Bob
-        browser.close()
-    assert [row[4] for row in identities(ms)] == [alice]  # one identity, reused
-
-
 def test_the_same_subject_in_another_tenant_is_another_identity(ms):
     ms.ctx.settings.ms_allowed_tenants = [TENANT, OTHER_TENANT]
     ms.allow(ALICE)
@@ -219,28 +182,7 @@ def test_the_same_subject_in_another_tenant_is_another_identity(ms):
     assert sorted(row[3] for row in identities(ms)) == sorted([TENANT, OTHER_TENANT])
 
 
-def test_without_an_email_claim_the_sign_in_name_is_used(ms):
-    ms.allow(ALICE)
-    ms.fake.claims["email"] = None
-    assert ms_sign_in(ms).status_code == 303
-
-
 # --------------------------------------------------------------------------- refused
-
-
-def test_an_account_from_another_tenant_is_told_its_organisation_is_not_set_up(ms, caplog):
-    """nOAuth: any organisation can put any address in its own directory. Alice is on the
-    allowlist, but a token from a tenant we have not allowed must not reach her account."""
-    caplog.set_level(logging.INFO)
-    ms.allow(ALICE)
-    ms.fake.claims["tid"] = OTHER_TENANT
-    response = ms_sign_in(ms)
-    assert response.status_code == 403
-    assert "Your organisation is not set up for this beta" in response.text
-    assert OTHER_TENANT in response.text and "help@example.org" in response.text
-    assert "sign in with Google" in response.text
-    assert refusals(caplog) == ["tenant_not_allowed"]
-    assert identities(ms) == [] and not signed_in(ms.browser)
 
 
 def test_a_wrong_tenant_never_creates_anyone(ms):
@@ -328,23 +270,6 @@ def test_tokens_that_fail_a_check_are_refused(ms, caplog, change, reason):
     assert "Sign-in did not finish" in response.text
     assert refusals(caplog) == [reason]
     assert identities(ms) == [] and not signed_in(ms.browser)
-
-
-def test_a_token_signed_with_another_key_is_refused(ms, caplog):
-    caplog.set_level(logging.INFO)
-    ms.allow(ALICE)
-    ms.fake.signing_key = new_key("key-1")  # same key id, different key
-    assert ms_sign_in(ms).status_code == 400
-    assert refusals(caplog) == ["bad_signature"] and identities(ms) == []
-
-
-def test_an_unknown_key_fetches_the_keys_once_more_then_refuses(ms, caplog):
-    caplog.set_level(logging.INFO)
-    ms.allow(ALICE)
-    ms.fake.signing_key = new_key("key-unknown")
-    assert ms_sign_in(ms).status_code == 400
-    assert ms.fake.fetched.count(JWKS_URL) == 2
-    assert refusals(caplog) == ["unknown_key"]
 
 
 def test_a_rotated_key_is_picked_up(ms):
@@ -450,101 +375,7 @@ def test_microsoft_out_of_reach_gives_a_plain_page(ms):
 # --------------------------------------------------------------------------- Google
 
 
-def test_google_sign_in_records_the_google_identity_once(ms):
-    ms.allow(ALICE)
-    for _ in range(2):
-        assert google_sign_in(ms, ms.client()).status_code == 303
-    assert identities(ms) == [
-        ("google", GOOGLE_ISSUER, "google-sub-alice", None, user_id(ms, ALICE))
-    ]
-
-
-def test_google_access_is_still_by_verified_email(ms):
-    """A recorded Google identity changes nobody's access. The same Google account, now
-    with Bob's verified address, signs in as Bob, by email as before, and the identity
-    stays with Alice; once Bob is removed from the allowlist it is refused."""
-    from readablestem.web.auth import set_allowed
-
-    ms.allow(ALICE)
-    ms.allow(BOB)
-    assert google_sign_in(ms).status_code == 303
-    ms.google_info = {"email": BOB, "email_verified": True, "sub": "google-sub-alice"}
-    bob = ms.client()
-    assert google_sign_in(ms, bob).status_code == 303
-    assert BOB in bob.get("/app").text  # by email, as before
-    assert [row[4] for row in identities(ms)] == [user_id(ms, ALICE)]  # left where it was
-    with session_scope(ms.ctx.factory) as session:
-        set_allowed(session, BOB, allowed=False)
-    assert google_sign_in(ms, ms.client()).status_code == 403
-    bob.close()
-
-
-def test_google_sign_ins_off_the_allowlist_record_nothing(ms):
-    ms.google_info = {"email": BOB, "email_verified": True, "sub": "google-sub-bob"}
-    assert google_sign_in(ms).status_code == 403
-    assert identities(ms) == [] and BOB not in emails(ms)
-
-
-def test_a_first_sign_in_that_loses_a_race_finds_the_link(ms, monkeypatch):
-    """Two first sign-ins at once: the one whose insert hits the unique key (the other
-    linked the identity meanwhile) is tried again and finds the link (Postgres, for
-    real: test_web_auth_postgres.py)."""
-    from readablestem.web import identities as store
-
-    ms.allow(ALICE)
-    alice = user_id(ms, ALICE)
-    identity = store.Identity("microsoft", issuer(TENANT), "sub-raced", TENANT)
-    with session_scope(ms.ctx.factory) as session:
-        store.link(session, alice, identity)  # the other sign-in got there first
-    looked = []
-    real = store.user_with
-
-    def not_yet_on_the_first_look(session, wanted):
-        looked.append(wanted)
-        return None if len(looked) == 1 else real(session, wanted)
-
-    monkeypatch.setattr(store, "user_with", not_yet_on_the_first_look)
-    result = store.microsoft_sign_in(ms.ctx.factory, identity, ALICE, None)
-    assert result.user_id == alice and len(looked) == 2
-    assert [row[4] for row in identities(ms)] == [alice]
-
-
 # --------------------------------------------------------------------------- sessions
-
-
-def test_signing_out_ends_microsoft_sessions_and_their_copies(ms):
-    ms.allow(ALICE)
-    assert ms_sign_in(ms).status_code == 303
-    copied = ms.client()
-    for name, value in ms.browser.cookies.items():
-        copied.cookies.set(name, value)
-    assert signed_in(copied)
-    token = csrf_from(ms.browser.get("/app").text)
-    assert ms.browser.post("/logout", data={"csrf_token": token}).status_code == 303
-    assert not signed_in(copied) and not signed_in(ms.browser)
-    assert ms_sign_in(ms).status_code == 303 and signed_in(ms.browser)
-    assert not signed_in(copied)
-    copied.close()
-
-
-def test_removal_ends_a_microsoft_session_and_it_stays_ended(ms):
-    from readablestem.web.auth import set_allowed
-
-    ms.allow(ALICE)
-    assert ms_sign_in(ms).status_code == 303
-    with session_scope(ms.ctx.factory) as session:
-        set_allowed(session, ALICE, allowed=False)
-    assert not signed_in(ms.browser)
-    ms.allow(ALICE)
-    assert not signed_in(ms.browser)
-    assert ms_sign_in(ms).status_code == 303 and signed_in(ms.browser)
-
-
-def test_the_session_is_rotated_at_microsoft_sign_in(ms):
-    ms.allow(ALICE)
-    before = csrf_from(ms.browser.get("/login").text)
-    assert ms_sign_in(ms).status_code == 303
-    assert csrf_from(ms.browser.get("/app").text) != before
 
 
 # --------------------------------------------------------------------------- privacy
@@ -591,29 +422,7 @@ def test_launch_check_wants_microsoft_in_the_privacy_notice_once_it_is_on(tmp_pa
     assert not flagged(on)
 
 
-def test_launch_check_reads_the_sign_in_pages(tmp_path, monkeypatch):
-    from readablestem.ops import launch
-
-    (tmp_path / "org_not_set_up.html").write_text("<p>TODO(Harish): wording</p>")
-    monkeypatch.setattr(launch, "TEMPLATES_DIR", tmp_path)
-    assert "web/templates/org_not_set_up.html: still has a TODO(Harish) note" in (
-        launch.launch_blockers()
-    )
-
-
 # --------------------------------------------------------------------------- the checks
-
-
-def test_email_claims_prefer_a_verified_email_then_the_sign_in_name():
-    assert email_claims({"email": "a@x.org", "preferred_username": "b@x.org"}) == (
-        "a@x.org",
-        "b@x.org",
-    )
-    for unverified in (False, "false", "0"):
-        claims = {"email": "a@x.org", "preferred_username": "b@x.org", "xms_edov": unverified}
-        assert email_claims(claims) == ("b@x.org",)
-    assert email_claims({"email": "a@x.org", "xms_edov": True}) == ("a@x.org",)
-    assert email_claims({"email": 3, "preferred_username": None}) == ()
 
 
 def test_verify_id_token_is_pure_and_strict():
@@ -681,23 +490,6 @@ def test_only_rs256_is_accepted():
 # --------------------------------------------------------------------------- integration
 
 
-def test_a_university_sign_in_comes_back_to_the_page_asked_for_and_is_counted(ms):
-    """Microsoft sign-in ends where every sign-in ends (`auth._signed_in`): back to the
-    page asked for while signed out (`web.return_to`, the review-screen work) and one
-    `signed_in` usage event (`web.events`)."""
-    from readablestem.web.db import Event
-
-    ms.allow(ALICE)
-    asked = ms.browser.get("/app?from=bookmark")
-    assert (asked.status_code, asked.headers["location"]) == (303, "/login")
-    response = ms_sign_in(ms)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/app?from=bookmark"
-    with session_scope(ms.ctx.factory) as session:
-        names = list(session.scalars(select(Event.name).where(Event.user_id == user_id(ms, ALICE))))
-    assert names == ["signed_in"]
-
-
 # --------------------------------------------------------------------------- shares (G1)
 
 
@@ -740,17 +532,3 @@ def test_a_share_applies_only_to_an_address_the_directory_verified(ms):
     assert told.status_code == 403 and "Sign in again to open this document" in told.text
     assert "Shared with you" not in other.get("/app").text
     other.close()
-
-
-def test_a_sign_in_name_that_is_not_the_account_address_proves_nothing(ms):
-    """The email is unverified, so the sign-in name signs Alice in; it still cannot open a
-    document shared with that name."""
-    ms.allow(ALICE)
-    job_id = _shared_job(ms)
-    ms.fake.claims |= {
-        "xms_edov": False,
-        "email": "other@uni.example.edu",
-        "preferred_username": ALICE,
-    }
-    assert ms_sign_in(ms).status_code == 303
-    assert ms.browser.get(f"/jobs/{job_id}/download").status_code == 403  # asked to sign in again

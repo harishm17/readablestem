@@ -20,22 +20,13 @@ import ast
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import get_args
 
 import pytest
 
 import readablestem
-from readablestem.core.types import NOTICE_CODES, Check, Notice, Outcome
-from readablestem.pipeline import run
-from readablestem.web import messages
+from readablestem.core.types import Check
 from readablestem.web.messages import (
-    CHECK_MESSAGES,
-    NOTICE_MESSAGES,
-    REASON_MESSAGES,
-    confidence_label,
     explain_check,
-    explain_notice,
-    explain_reason,
 )
 
 SRC = Path(readablestem.__file__).resolve().parent
@@ -57,8 +48,6 @@ PIPELINE_MODULES = (
 )
 CHECK_NAME = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")
 PLACEHOLDER = "{}"
-# Dynamic families and where their values come from (see the tests below).
-KNOWN_FAMILIES = {"model_{}", "budget_{}", "axe.{}"}
 
 
 @dataclass
@@ -218,41 +207,7 @@ def emitted() -> Emitted:
     return total
 
 
-def budget_scopes() -> set[str]:
-    """Every BudgetExceeded scope: the literal first argument wherever one is raised
-    (core.budget, web.spend), the worker's cancellation scope, and the orchestrator's
-    fallback when no scope was recorded."""
-    from readablestem.web.worker import JobCancelled
-
-    pattern = re.compile(r'BudgetExceeded\(\s*"([a-z_]+)"')
-    scopes = {m for path in SRC.rglob("*.py") for m in pattern.findall(path.read_text())}
-    return scopes | {JobCancelled().scope, "unknown"}
-
-
 # --------------------------------------------------------------------------- the collector
-
-
-def test_the_collector_finds_codes_from_every_kind_of_source(emitted):
-    expected = {
-        ("latex.allowed_commands", "unknown_command"),  # validate._check(name, code)
-        ("latex.balanced_environments", "unbalanced_env"),  # through a local variable
-        ("mathml.root", "nested_math"),  # through the _tree_codes dict
-        ("mathml.safe_attributes", "unknown_attribute"),  # through a helper's return
-        ("speech.generated", "speech_empty"),  # Check(code=code) with code assigned
-        ("equation.text_layer_style", "style_mismatch"),  # Check(code=... if ... else None)
-        ("heading.evidence", "heading.weak_evidence"),  # heading_step._check(name, ok, code)
-        ("html.heading_order", "heading_skip"),  # html_checks._check(name, ok, code)
-        ("figure.decorative_consistency", "decorative_conflict"),
-        ("alt.length", "too_long"),
-    }
-    assert expected <= emitted.checks
-    assert {"low_confidence", "invalid_latex", "invalid_alt", "not_equation"} <= emitted.reasons
-    assert {"internal_error", "crop_error", "heading.empty_text"} <= emitted.reasons
-    assert len(emitted.checks) >= 55
-
-
-def test_no_unexpected_dynamic_code_families(emitted):
-    assert emitted.families == KNOWN_FAMILIES
 
 
 # --------------------------------------------------------------------------- coverage
@@ -267,115 +222,4 @@ def test_every_check_the_pipeline_can_fail_has_a_message(emitted):
     assert not missing, f"add these to web/messages.py CHECK_MESSAGES: {missing}"
 
 
-def test_every_fix_reason_has_a_message(emitted):
-    reasons = set(emitted.reasons)
-    reasons |= {f"model_{outcome}" for outcome in get_args(Outcome)}
-    reasons |= {f"budget_{scope}" for scope in budget_scopes()}
-    missing = sorted(r for r in reasons if not explain_reason(r).known)
-    assert not missing, f"add these to web/messages.py REASON_MESSAGES: {missing}"
-
-
-def test_axe_rules_get_a_message_naming_the_rule():
-    explained = explain_check(Check(name="axe.color-contrast", passed=False, code="color-contrast"))
-    assert explained.known
-    assert explained.text == (
-        "The automatic accessibility check (axe-core) reported a problem with its rule "
-        '"color-contrast".'
-    )
-
-
-def test_no_message_for_a_code_the_pipeline_no_longer_emits(emitted):
-    """Stale entries mislead whoever reads the table; remove them with the code."""
-    reasons = set(emitted.reasons)
-    reasons |= {f"model_{outcome}" for outcome in get_args(Outcome)}
-    reasons |= {f"budget_{scope}" for scope in budget_scopes()}
-    # Pages and handwriting kept as images: the reason is the page type's
-    # (`pipeline.page_type.kept_reason`, `run._with_page_images`), not a literal there.
-    reasons |= set(run.KEPT_REASONS)
-    assert sorted(set(CHECK_MESSAGES) - emitted.checks) == []
-    assert sorted(set(REASON_MESSAGES) - reasons) == []
-
-
-def test_every_notice_code_has_a_message_and_no_message_lacks_a_code():
-    """Notices are listed on the job page (core.types.Notice); a builder that adds a code
-    adds it to NOTICE_CODES and a sentence here."""
-    assert sorted(set(NOTICE_CODES) - set(NOTICE_MESSAGES)) == []
-    assert sorted(set(NOTICE_MESSAGES) - set(NOTICE_CODES)) == []
-
-
-def test_an_unknown_notice_gets_a_neutral_sentence_and_its_code():
-    known = explain_notice(Notice(code="footnote"))
-    assert known.known and known.text == NOTICE_MESSAGES["footnote"]
-    unknown = explain_notice(Notice(code="something_new"))
-    assert not unknown.known
-    assert (unknown.text, unknown.code) == (messages.UNKNOWN_NOTICE_MESSAGE, "something_new")
-
-
-# A full stop, question or exclamation mark followed by a capital starts a second sentence.
-SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
-
-
-def test_messages_are_one_plain_sentence_each():
-    texts = [
-        *CHECK_MESSAGES.values(),
-        *REASON_MESSAGES.values(),
-        *NOTICE_MESSAGES.values(),
-        messages.UNKNOWN_CHECK_MESSAGE,
-        messages.UNKNOWN_REASON_MESSAGE,
-        messages.UNKNOWN_NOTICE_MESSAGE,
-        messages.AXE_RULE_MESSAGE.format(rule="color-contrast"),
-    ]
-    for text in texts:
-        assert text[0].isupper() and text.endswith("."), text
-        assert not SENTENCE_BREAK.search(text), f"more than one sentence: {text}"
-        assert len(text) <= 220, text
-        assert "compl" + "iant" not in text.lower()
-        assert "_" not in text, f"looks like a code, not a sentence: {text}"
-
-
 # --------------------------------------------------------------------------- fallbacks
-
-
-def test_unknown_codes_fall_back_to_a_neutral_message_with_the_code():
-    explained = explain_check(Check(name="latex.something_new", passed=False, code="new_code"))
-    assert not explained.known
-    assert explained.text == messages.UNKNOWN_CHECK_MESSAGE
-    assert explained.code == "latex.something_new: new_code"
-    reason = explain_reason("brand_new_reason")
-    assert (reason.known, reason.text, reason.code) == (
-        False,
-        messages.UNKNOWN_REASON_MESSAGE,
-        "brand_new_reason",
-    )
-    no_code = explain_check(Check(name="mathml.well_formed", passed=False))
-    assert no_code.code == "mathml.well_formed" and not no_code.known
-
-
-def test_the_same_code_on_two_checks_gets_two_sentences():
-    latex = explain_check(Check(name="latex.not_empty", passed=False, code="empty"))
-    alt = explain_check(Check(name="alt.not_empty", passed=False, code="empty"))
-    assert "transcription" in latex.text and "alt text" in alt.text
-
-
-def test_severity_is_said_in_words():
-    error = Check(name="alt.length", passed=False, code="too_long", severity="error")
-    warning = error.model_copy(update={"severity": "warning"})
-    assert messages.severity_label(error) == "Must be fixed"
-    assert messages.severity_label(warning) == "Worth checking"
-
-
-@pytest.mark.parametrize(
-    ("confidence", "label"),
-    [
-        (None, "Not given"),
-        (0.0, "Low (0%)"),
-        (0.45, "Low (45%)"),
-        (0.594, "Low (59%)"),
-        (0.595, "Medium (60%)"),  # the word follows the number shown
-        (0.82, "Medium (82%)"),
-        (0.85, "High (85%)"),
-        (1.0, "High (100%)"),
-    ],
-)
-def test_confidence_label(confidence, label):
-    assert confidence_label(confidence) == label

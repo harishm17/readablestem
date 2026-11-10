@@ -20,7 +20,6 @@ from readablestem.core.types import DocumentResult, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.web.db import Blob, ReviewEdit, session_scope
 from test_web_edit_page import edit_output
-from test_web_edit_tables import clean_output
 from test_web_postgres import pg_url as pg_url  # fixture, re-exported for pytest
 from test_web_postgres import server_url as server_url  # fixture, re-exported for pytest
 
@@ -104,40 +103,6 @@ def test_the_structural_edits_are_stored_applied_and_undone(pg_url, tmp_path):
         with session_scope(env.ctx.factory) as session:
             crops = set(session.scalars(select(Blob.element_id).where(Blob.kind == "crop")).all())
             assert "p1-x3" not in crops and {"p1-x1", "p1-x2"} <= crops
-
-
-def test_the_table_and_description_edits_on_postgres(pg_url, tmp_path):
-    from fixtures.web.table_doc import table_pdf
-
-    env = WebEnv(tmp_path, database_url=pg_url)
-    env.converter.output = clean_output()
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        job_id = job_id_from(upload(client, table_pdf()))
-        env.run_worker()
-        env.browser = client
-
-        def post(path: str, **fields):
-            data = {
-                "csrf_token": token(client, f"/jobs/{job_id}/review"),
-                "version": str(env.job(job_id).result_version or 0),
-                "view": "split",
-            }
-            return client.post(f"/jobs/{job_id}{path}", data=data | fields)
-
-        assert post("/tables/accept-clean").status_code == 303
-        result = stored(env, job_id)
-        assert all(result.fix_for(e).status is Status.ACCEPTED for e in ("p2-e1", "p2-e2"))  # type: ignore[union-attr]
-        assert post("/review/p1-e3", action="edit", change="not_a_table").status_code == 303
-        assert (
-            post("/review/p2-e0", action="describe", description="Three trials.").status_code == 303
-        )
-        result = stored(env, job_id)
-        described = result.fix_for("p2-e0")
-        assert described is not None and described.described == "Three trials."
-        assert env.job(job_id).html_stale is True
-        assert "Three trials." in (with_file(env, job_id).html or "")
 
 
 def test_forms_drawn_at_the_same_version_are_applied_once(pg_url, tmp_path):

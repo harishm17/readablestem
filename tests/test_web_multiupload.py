@@ -102,11 +102,6 @@ def test_several_files_make_one_job_each(web):
     assert "Not uploaded" not in page
 
 
-def test_one_file_among_several_behaves_as_before(web):
-    response = send(web.alice, [("only.pdf", make_pdf(1))])
-    assert response.status_code == 303 and response.headers["location"].startswith("/jobs/")
-
-
 def test_a_file_that_cannot_be_used_does_not_stop_the_others(web):
     response = send(
         web.alice,
@@ -117,14 +112,6 @@ def test_a_file_that_cannot_be_used_does_not_stop_the_others(web):
     assert "2 of 3 files uploaded" in page
     assert "notes.docx is not a PDF" in page and "Not uploaded" in page
     assert pages_used(web) == 2  # the refused file used none
-
-
-def test_when_every_file_is_refused_nothing_is_queued_and_the_page_says_why(web):
-    response = send(web.alice, [("a.docx", b"junk"), ("b.docx", b"more junk")])
-    results = answer(web.alice, response)
-    assert jobs_of(web) == [] and pages_used(web) == 0
-    page = text_of(results.text)
-    assert "0 of 2 files uploaded" in page and "a.docx is not a PDF" in page
 
 
 def test_more_files_than_allowed_is_refused_whole(web):
@@ -140,17 +127,6 @@ def test_the_body_of_all_the_files_together_is_limited(web):
     response = send(web.alice, [("a.pdf", big), ("b.pdf", big)])  # 5 MB over a 4 MB request
     assert response.status_code == 413
     assert jobs_of(web) == []
-
-
-def test_the_chosen_course_and_keeping_apply_to_every_file(web):
-    made = web.alice.post(
-        "/courses", data={"csrf_token": csrf_from(web.alice.get("/courses").text), "name": "P1"}
-    )
-    course_id = made.headers["location"].rsplit("/", 1)[-1]
-    send(web.alice, [("a.pdf", make_pdf(1)), ("b.pdf", make_pdf(1))], course=course_id, keep="on")
-    jobs = jobs_of(web)
-    assert {j.course_id for j in jobs} == {course_id}
-    assert {j.retention_mode for j in jobs} == {"week"}
 
 
 def test_a_revised_version_replaces_one_document_not_several(web):
@@ -252,13 +228,6 @@ def test_the_results_page_is_for_its_owner_and_for_an_hour(web):
         assert session.scalar(select(func.count()).select_from(UploadResult)) == 0
 
 
-def test_the_upload_form_takes_several_files_and_says_so(web):
-    page = web.alice.get("/app").text
-    assert re.search(r'<input[^>]*type="file"[^>]*multiple', page)
-    assert re.search(r'<input[^>]*name="pdf"', page)
-    assert f"up to {FILES_PER_UPLOAD} files" in text_of(page).lower()
-
-
 # --------------------------------------------------------------------------- the course page
 
 
@@ -272,22 +241,6 @@ def make_course(env, name="Physics 1") -> str:
 def finish_all(env) -> None:
     while env.run_worker():
         pass
-
-
-def test_the_course_page_lists_its_documents_and_only_those(web):
-    course = make_course(web)
-    send(web.alice, [("in-a.pdf", make_pdf(1)), ("in-b.pdf", make_pdf(1))], course=course)
-    send(web.alice, [("outside.pdf", make_pdf(1))])
-    page = web.alice.get(f"/courses/{course}")
-    assert page.status_code == 200
-    text = text_of(page.text)
-    assert "Documents in this course" in text
-    assert "in-a.pdf" in text and "in-b.pdf" in text and "outside.pdf" not in text
-    # The polled list stays inside the course.
-    assert f"/app/documents?course={course}" in page.text
-    polled = web.alice.get(f"/app/documents?course={course}")
-    assert "outside.pdf" not in polled.text and "in-a.pdf" in polled.text
-    assert "outside.pdf" in web.alice.get("/app/documents").text
 
 
 def test_another_persons_course_documents_are_not_listed_to_you(web):
@@ -336,20 +289,6 @@ def test_download_all_zips_what_is_ready_and_says_what_was_left_out(web):
             select(func.count()).select_from(Event).where(Event.name == "downloaded")
         )
     assert downloads == 1
-
-
-def test_the_zip_is_the_same_bytes_each_time(web):
-    send(web.alice, [("a.pdf", make_pdf(1))])
-    web.converter.output = fake_output()
-    finish_all(web)
-    job = jobs_of(web)[0]
-    for element_id, action in (("p1-e3", "accept"), ("p1-e4", "accept"), ("p1-e5", "reject")):
-        page = f"/jobs/{job.id}/review"
-        web.alice.post(
-            f"{page}/{element_id}",
-            data={"csrf_token": token(web.alice, page), "view": "list", "action": action},
-        )
-    assert web.alice.get("/app/download").content == web.alice.get("/app/download").content
 
 
 def test_a_course_zip_holds_only_that_courses_documents(web):

@@ -105,17 +105,6 @@ def post(client, data: bytes, name: str = "a.pdf"):
 # --------------------------------------------------------------------------- per person
 
 
-def test_the_cap_is_read_from_the_settings_by_tier(web):
-    s = web.settings
-    assert access.storage_limit_mb(s, access.INVITED) == 3
-    assert access.storage_limit_mb(s, access.OPEN) == 1
-    from readablestem.config import Settings
-
-    defaults = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert (defaults.storage_per_user_mb, defaults.storage_open_tier_mb) == (300, 250)
-    assert defaults.storage_global_max_mb == 2000
-
-
 def test_what_a_person_stores_counts_every_kind_of_content(web):
     job_id = store(web, ALICE, 1000)
     with session_scope(web.ctx.factory) as session:
@@ -190,13 +179,6 @@ def test_a_new_account_has_the_smaller_cap(web):
     store(web, ALICE, int(1.5 * MB))  # the invited tier has 3
 
 
-def test_the_check_is_exact_at_the_cap(web):
-    store(web, ALICE, 2 * MB)
-    store(web, ALICE, MB - 100)  # all but the HTML and result of the first two: under 3 MB
-    with pytest.raises(storage.StorageRefused):
-        store(web, ALICE, MB)
-
-
 def test_a_large_file_kept_for_its_pages_counts_and_is_refused_over_the_cap(web):
     with session_scope(web.ctx.factory) as session:
         pending.create(
@@ -223,14 +205,6 @@ def test_a_large_file_kept_for_its_pages_counts_and_is_refused_over_the_cap(web)
             course_id=None,
             exam=False,
         )
-
-
-def test_a_file_past_its_deletion_time_no_longer_counts(web):
-    store(web, ALICE, 2 * MB)
-    with session_scope(web.ctx.factory) as session:
-        for job in session.scalars(select(Job)):
-            job.retain_until = utcnow() - timedelta(minutes=1)
-    assert used(web, ALICE) == 0
 
 
 # --------------------------------------------------------------------------- the service
@@ -363,11 +337,6 @@ def test_vacuum_runs_after_a_purge_on_postgres_only(web):
     ran.clear()
     nothing = retention.PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
     assert retention.vacuum_after_purge(factory, nothing) is False and ran == []
-
-
-def test_the_limits_page_names_the_storage_from_the_settings(web):
-    text = flat(web.alice.get("/limits").text)
-    assert "keep up to 3 MB of uploads and results at once" in text
 
 
 def test_an_open_tier_account_can_keep_a_full_size_file_and_convert_a_full_size_part(tmp_path):

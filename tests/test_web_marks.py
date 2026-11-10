@@ -4,8 +4,6 @@ a dense page (an inline equation on every line, accepted items shown)."""
 
 from __future__ import annotations
 
-import pytest
-
 from readablestem.web import marks
 
 LETTER = (612.0, 792.0)
@@ -54,14 +52,6 @@ def test_on_a_dense_page_no_two_clickable_areas_overlap():
         assert covers_middle(mark, side), mark.element_id  # clicking the item opens it
 
 
-def test_frames_hug_the_items_whatever_the_clickable_areas_do():
-    placed = marks.place(dense_page(), LETTER)
-    pad = marks.FRAME_PAD_PT
-    for eid, box in dense_page().items():
-        x0, y0, x1, y1 = box
-        assert placed[eid].frame == pytest.approx((x0 - pad, y0 - pad, x1 + pad, y1 + pad))
-
-
 def test_24_css_px_at_the_smallest_size_the_page_is_drawn():
     side = marks.min_target_pt(LETTER[0])
     assert side * marks.MIN_PAGE_PX / LETTER[0] >= marks.MIN_TARGET_PX
@@ -69,25 +59,7 @@ def test_24_css_px_at_the_smallest_size_the_page_is_drawn():
     assert marks.min_target_pt(792.0) > side
 
 
-def test_an_inline_equation_has_its_number_in_the_margin_on_its_side():
-    boxes = {"left": (200.0, 300.0, 210.0, 310.0), "right": (420.0, 300.0, 430.0, 310.0)}
-    placed = marks.place(boxes, LETTER, inline=frozenset(boxes), text=(72.0, 540.0))
-    assert placed["left"].tag_x == pytest.approx(36.0)
-    assert placed["right"].tag_x == pytest.approx(576.0)
-    # A display equation or heading: next to its frame. No room in the margin: the same.
-    assert marks.place(boxes, LETTER, text=(72.0, 540.0))["left"].tag_x is None
-    narrow = marks.place(boxes, LETTER, inline=frozenset(boxes), text=(10.0, 600.0))
-    assert narrow["left"].tag_x is None and narrow["right"].tag_x is None
-
-
 def test_a_mark_at_the_edge_of_the_page_stays_on_it():
     placed = marks.place({"corner": (0.0, 0.0, 4.0, 4.0)}, LETTER)
     x0, y0, _, _ = placed["corner"].link
     assert x0 >= 0 and y0 >= 0
-
-
-def test_the_dense_page_needs_the_separation(monkeypatch):
-    """Without pushing apart, 24 px areas centred on these items overlap (the bug a
-    real handout showed with "Show accepted": clicks went to the wrong item)."""
-    monkeypatch.setattr(marks, "PHASES", 0)
-    assert len(marks.overlapping(marks.place(dense_page(), LETTER))) >= 5

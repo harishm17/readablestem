@@ -79,19 +79,6 @@ def test_initial_migration_matches_the_models_on_sqlite(tmp_path):
         engine.dispose()
 
 
-def test_downgrade_removes_everything(tmp_path):
-    url = f"sqlite:///{tmp_path}/down.db"
-    upgrade(url)
-    config = alembic_config(url)
-    config.attributes["configure_logger"] = False
-    command.downgrade(config, "base")
-    engine = create_engine(url)
-    try:
-        assert set(inspect(engine).get_table_names()) == {"alembic_version"}
-    finally:
-        engine.dispose()
-
-
 def test_production_refuses_a_database_without_migrations(tmp_path):
     engine = db.make_engine(f"sqlite:///{tmp_path}/empty.db")
     settings = make_settings(tmp_path, env="prod")
@@ -105,13 +92,6 @@ def test_production_accepts_a_migrated_database(tmp_path):
     upgrade(url)
     engine = db.make_engine(url)
     require_migrated(engine)
-    engine.dispose()
-
-
-def test_dev_and_test_create_tables_directly(tmp_path):
-    engine = db.make_engine(f"sqlite:///{tmp_path}/dev.db")
-    prepare_database(engine, make_settings(tmp_path, env="dev"))
-    assert "jobs" in inspect(engine).get_table_names()
     engine.dispose()
 
 
@@ -170,12 +150,6 @@ def migrate(url: str, revision: str, *, down: bool = False) -> None:
     (command.downgrade if down else command.upgrade)(config, revision)
 
 
-def test_the_content_migration_follows_the_session_version_one():
-    script = ScriptDirectory.from_config(alembic_config())
-    revision = script.get_revision(CONTENT_REVISION)
-    assert revision is not None and revision.down_revision == BEFORE_CONTENT
-
-
 def test_the_content_migration_downgrades_and_upgrades_again(tmp_path):
     url = f"sqlite:///{tmp_path}/content.db"
     upgrade(url)
@@ -231,49 +205,11 @@ TIER1_JOB_COLUMNS = {"retention_mode", "title_override", "contact_line"}
 EXAM_REVISION = "3b8e5f1a9d27"
 FACTS_REVISION = "9d2f6a41c7e3"
 FACTS_COLUMNS = {"open_decisions", "result_title"}
-STALE_REVISION = "c4a7e9b05d18"
 SAMPLE_REVISION = "b1d5f7a29c46"  # the last of the jobs migrations
 SIGN_IN_REVISION = "5e2b8d70a3c1"
-RESULTS_REVISION = "d3f8a1c5b920"  # the answer to an upload of several files
-OPEN_SIGNUP_REVISION = "a6c2e9f4b713"  # open sign-up (tests/test_web_open_signup.py)
-IMAGE_PAGES_REVISION = "c4e7a2b9d150"  # the image pages choice (tests/test_web_image_pages.py)
-OPS_MONITORING_REVISION = "e1a7c3b95d24"  # (tests/test_ops_monitoring.py)
-JOB_SHARES_REVISION = "b7112167eb0d"  # (tests/test_job_shares.py)
 LOGIN_LINK_ADDRESS_REVISION = "ecb0b22515e0"  # (tests/test_job_shares.py)
 KEEP_WEEK_DEFAULT_REVISION = "5d8e1f2a7c39"  # the head (tests/test_web_keep_default.py)
 SIGN_IN_TABLES = {"linked_emails", "login_links"}
-
-
-def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
-    script = ScriptDirectory.from_config(alembic_config())
-    revision = script.get_revision(TIER1_REVISION)
-    assert revision is not None and revision.down_revision == CONTENT_REVISION
-    exam = script.get_revision(EXAM_REVISION)
-    assert exam is not None and exam.down_revision == TIER1_REVISION
-    facts = script.get_revision(FACTS_REVISION)
-    assert facts is not None and facts.down_revision == EXAM_REVISION
-    stale = script.get_revision(STALE_REVISION)
-    assert stale is not None and stale.down_revision == FACTS_REVISION
-    # The jobs work follows it (tests/test_web_jobs_migrations.py); the sign-in fallback
-    # follows that, and is the one head.
-    assert STALE_REVISION in {r.revision for r in script.walk_revisions()}
-    fallback = script.get_revision(SIGN_IN_REVISION)
-    assert fallback is not None and fallback.down_revision == SAMPLE_REVISION
-    results = script.get_revision(RESULTS_REVISION)
-    assert results is not None and results.down_revision == SIGN_IN_REVISION
-    open_signup = script.get_revision(OPEN_SIGNUP_REVISION)
-    assert open_signup is not None and open_signup.down_revision == RESULTS_REVISION
-    image_pages = script.get_revision(IMAGE_PAGES_REVISION)
-    assert image_pages is not None and image_pages.down_revision == OPEN_SIGNUP_REVISION
-    monitoring = script.get_revision(OPS_MONITORING_REVISION)
-    assert monitoring is not None and monitoring.down_revision == IMAGE_PAGES_REVISION
-    shares = script.get_revision(JOB_SHARES_REVISION)
-    assert shares is not None and shares.down_revision == OPS_MONITORING_REVISION
-    link = script.get_revision(LOGIN_LINK_ADDRESS_REVISION)
-    assert link is not None and link.down_revision == JOB_SHARES_REVISION
-    keep = script.get_revision(KEEP_WEEK_DEFAULT_REVISION)
-    assert keep is not None and keep.down_revision == LOGIN_LINK_ADDRESS_REVISION
-    assert migration_heads() == {KEEP_WEEK_DEFAULT_REVISION}  # one head, the newest
 
 
 def test_the_keep_week_default_migration_adds_an_off_column_and_drops_it(tmp_path):

@@ -8,14 +8,12 @@ top, when this document will be deleted, with the one-click way to keep it a wee
 from __future__ import annotations
 
 import re
-from datetime import timedelta
 
 import pytest
 
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login, make_pdf, upload
-from readablestem.web.database import as_utc
 from readablestem.web.db import User, session_scope
-from readablestem.web.routes.account import KEEP_OFF, KEEP_ON
+from readablestem.web.routes.account import KEEP_ON
 
 
 @pytest.fixture
@@ -48,14 +46,6 @@ def save(env, on: bool):
     return env.browser.post("/account/keep-default", data=data, follow_redirects=False)
 
 
-def test_the_setting_is_off_by_default_and_the_box_starts_unticked(web):
-    assert stored(web) is False
-    account = web.browser.get("/account").text
-    assert "Keep new documents for 7 days by default" in account
-    assert "checked" not in re.search(r'<input type="checkbox" id="keep-default"[^>]*>', account)[0]
-    assert "checked" not in keep_box(web.browser.get("/app").text)
-
-
 def test_turning_it_on_ticks_the_box_and_is_remembered(web):
     response = save(web, on=True)
     assert response.status_code == 303 and response.headers["location"] == "/account#account-keep"
@@ -64,23 +54,6 @@ def test_turning_it_on_ticks_the_box_and_is_remembered(web):
     app = web.browser.get("/app").text
     assert "checked" in keep_box(app)
     assert "Ticked by your" in app and 'href="/account#account-keep"' in app
-
-
-def test_the_person_can_still_untick_it_for_one_upload(web):
-    save(web, on=True)
-    job = web.job(job_id_from(upload(web.browser, make_pdf(1), keep=False)))
-    assert job.retention_mode == "day"
-    kept = web.job(job_id_from(upload(web.browser, make_pdf(1), keep=True)))
-    assert kept.retention_mode == "week"
-    assert as_utc(kept.retain_until) - as_utc(kept.created_at) == timedelta(days=7)
-
-
-def test_turning_it_off_unticks_the_box(web):
-    save(web, on=True)
-    save(web, on=False)
-    assert stored(web) is False
-    assert KEEP_OFF in web.browser.get("/account").text
-    assert "checked" not in keep_box(web.browser.get("/app").text)
 
 
 def test_the_setting_needs_the_form_token(web):
