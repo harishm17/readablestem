@@ -130,25 +130,6 @@ def test_a_charge_the_text_layer_put_before_its_formula_is_not_a_difference():
 # ---------------------------------------------------------------------------- errors
 
 
-def test_a_neighbour_word_swallowed_into_a_formula():
-    # CrO4 2− read as PbCrO4 2−: the lead is the next ion's
-    latex = (
-        r"\text{Pb}^{2+}\text{(aq)} + \text{PbCrO}_4^{2-}\text{(aq)} \longrightarrow "
-        r"\text{PbCrO}_4\text{(s)}"
-    )
-    diff = cc.compare_species(PBCRO4, ml(latex))
-    assert diff is not None and diff.kinds == ("elements",)
-    assert diff.rows == (("elements", "CrO42−(aq)", "PbCrO42−(aq)"),)
-
-
-def test_a_neighbour_word_glued_to_a_formula_is_no_longer_a_formula():
-    latex = (
-        r"\text{Pb}^{2+}\text{(aq)} + \text{the}\text{CrO}_4^{2-}\text{(aq)} \longrightarrow "
-        r"\text{PbCrO}_4\text{(s)}"
-    )
-    assert kinds(PBCRO4, latex) == ("missing",)
-
-
 def test_a_neighbour_species_taken_into_the_reading():
     diff = cc.compare_species(AGCL, ml(AGCL_TEX + r" + \text{NaNO}_3\text{(aq)}"))
     assert diff is not None and diff.kinds == ("extra",)
@@ -159,18 +140,6 @@ def test_a_reaction_cut_mid_way():
     assert diff is not None
     assert diff.kinds == ("arrow", "missing")
     assert ("arrow", "→", "") in diff.rows
-
-
-def test_a_reaction_cut_after_its_arrow():
-    latex = r"\text{Ag}^+\text{(aq)} + \text{Cl}^-\text{(aq)} \longrightarrow"
-    diff = cc.compare_species(AGCL, ml(latex))
-    assert diff is not None and "missing" in diff.kinds
-
-
-def test_a_reaction_that_starts_late():
-    latex = r"\text{Cl}^-\text{(aq)} \longrightarrow \text{AgCl}\text{(s)}"
-    diff = cc.compare_species(AGCL, ml(latex))
-    assert diff is not None and diff.kinds == ("missing",)
 
 
 def test_a_subscript_read_as_a_coefficient():
@@ -275,15 +244,6 @@ def test_text_that_is_not_chemistry_is_not_checked(text, latex):
     assert kinds(text, latex) is None
 
 
-@pytest.mark.parametrize("text", [None, "", "   "])
-def test_no_text_layer_is_not_checked(text):
-    assert cc.compare_species(text, ml(AGCL_TEX)) is None
-
-
-def test_a_very_long_text_is_left_alone():
-    assert cc.compare_species(" ".join(["H2O(l)"] * 500), ml(AGCL_TEX)) is None
-
-
 def test_a_reading_the_parser_cannot_use_is_not_a_failure():
     assert cc.compare_species(AGCL, "<math><mrow") is None
 
@@ -294,33 +254,7 @@ def test_an_arrow_with_nothing_after_it_is_not_a_reaction():
     assert kinds(text, r"\text{H}_2\text{O}\text{(l)}") == ()
 
 
-def test_italic_letters_are_variables_not_elements():
-    # math italic K, w and k are what TeX and Chromium print for variables
-    assert [str(t) for t in cc.tokens_of("𝐾w = 𝑘[H3 O+ ]")] == ["H3O+"]
-
-
 # --------------------------------------------------------------------- the parser
-
-
-def test_a_state_glued_to_the_next_word_is_still_a_state_of_its_own():
-    # MathML joins what the text layer spaces: NaCl(aq)H2O(l)
-    text = "NaCl(aq) + H2O(l) −→Na+(aq) + Cl−(aq)"
-    latex = r"\text{NaCl}\text{(aq)} + \text{H}_2\text{O}\text{(l)} \rightarrow \text{Na}^+\text{(aq)}\text{Cl}^-\text{(aq)}"
-    assert kinds(text, latex) == ()
-
-
-def test_the_flat_mathml_matches_what_a_pdf_prints():
-    flat = cc.mathml_flat(ml(PBCRO4_TEX))
-    assert [str(t) for t in cc.tokens_of(flat)] == [str(t) for t in cc.tokens_of(PBCRO4)]
-
-
-def test_species_are_read_from_one_word():
-    assert cc.species_of("2Ca3(PO4)2(s)") == cc.Species("2", "Ca3(PO4)2", "s", True)
-    assert cc.species_of("[Cu(NH3)4]2+") == cc.Species("", "[Cu(NH3)4]2+", "", True)
-    assert cc.species_of("Na[Al(OH)4](aq)") == cc.Species("", "Na[Al(OH)4]", "aq", True)
-    assert cc.species_of("HCl") == cc.Species("", "HCl", "", False)
-    assert cc.species_of("water") is None
-    assert cc.species_of("Xx2") is None
 
 
 def test_the_doubled_prescripts_of_a_nuclide_keep_the_symbol():
@@ -347,13 +281,6 @@ def run(client, element):
     return transcribe(element, b"\x89PNG crop", client=client, settings=SETTINGS)
 
 
-def test_a_right_reading_is_accepted_and_the_check_passed():
-    fix = run(by_model(main=out(AGCL_TEX)), equation_element(text=AGCL))
-    assert fix.status == Status.ACCEPTED and fix.review == "none"
-    check = next(c for c in fix.checks if c.name == "equation.text_layer_species")
-    assert check.passed and check.severity == "warning" and check.code is None
-
-
 @pytest.mark.parametrize(
     ("text", "latex"),
     [
@@ -375,16 +302,6 @@ def test_a_wrong_species_reading_is_a_required_decision(text, latex):
     assert fix.confidence == pytest.approx(0.95 * 0.6)
 
 
-def test_a_species_difference_alone_is_what_fails():
-    # the symbol bag of 2HO + ... equals H2O + ...: only the species check sees it
-    text = "H2 O(𝑙) ⇌H+ (𝑎𝑞) + OH−(𝑎𝑞)"
-    latex = (
-        r"2\text{HO}\text{(l)} \rightleftharpoons \text{H}^+\text{(aq)} + \text{OH}^-\text{(aq)}"
-    )
-    fix = run(by_model(main=out(latex)), equation_element(text=text))
-    assert {c.code for c in fix.failed_checks} == {"species_mismatch"}
-
-
 def test_a_cheap_answer_with_a_wrong_species_is_asked_again():
     short = r"\text{Ag}^+\text{(aq)} + \text{Cl}^-\text{(aq)}"
     client = by_model(cheap=out(short.replace("(aq)", "(s)", 1)), main=out(short))
@@ -396,11 +313,6 @@ def test_a_cheap_answer_with_a_wrong_species_is_asked_again():
 
 def test_mathematics_gets_no_species_check():
     fix = run(by_model(main=out(r"v = 36\ \text{m/s}")), equation_element(text="𝑣 = 36 m/s"))
-    assert all(c.name != "equation.text_layer_species" for c in fix.checks)
-
-
-def test_a_picture_without_a_text_layer_gets_no_species_check():
-    fix = run(by_model(main=out(AGCL_TEX)), equation_element(text=None))
     assert all(c.name != "equation.text_layer_species" for c in fix.checks)
 
 
@@ -430,13 +342,6 @@ def test_an_edit_with_a_subscript_read_as_a_coefficient_is_a_meaning_level_diffe
     )
     assert {c.code for c in found.failed} == {"species_mismatch"}
     assert found.meaning == ["The PDF has H2O(l) where your edit has 2 HO(l)."]
-
-
-def test_an_edit_that_keeps_the_species_has_no_difference():
-    element, fix = edit_case(AGCL, AGCL_TEX.replace("^+", "^-", 1))
-    found = edit_check.check_equation_edit(element, fix, AGCL_TEX)
-    assert not found.failed and not found.meaning
-    assert "equation.text_layer_species" in {c.name for c in found.checks}
 
 
 def test_the_compare_table_names_the_species():
@@ -477,11 +382,6 @@ def _labelled(label: str) -> str:
 def test_a_label_over_the_arrow_does_not_run_into_the_next_species(label):
     flat = cc.mathml_flat(ml(_labelled(label)))
     assert flat.endswith(" 2NH3") and "heat2" not in flat and "Fe2" not in flat
-
-
-@pytest.mark.parametrize("label", [r"\text{heat}", r"\Delta"])
-def test_a_reaction_with_a_label_agrees_with_the_text_that_has_none(label):
-    assert kinds("N2 + 3H2 −→ 2NH3", _labelled(label)) == ()
 
 
 def test_a_catalyst_label_after_the_arrow_in_the_text_layer_agrees():

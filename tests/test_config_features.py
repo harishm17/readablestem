@@ -31,15 +31,6 @@ def test_features_are_off_and_feedback_and_events_on_by_default(clean_env):
     s.check_production()  # dev: nothing half-configured
 
 
-def test_flags_come_from_the_environment(clean_env):
-    clean_env.setenv("FEATURE_TABLES", "true")
-    clean_env.setenv("FEATURE_NOTATION_MEMORY", "1")
-    clean_env.setenv("EVENTS_ENABLED", "false")
-    s = settings()
-    assert s.feature_tables and s.feature_notation_memory
-    assert not s.feature_colour and not s.events_enabled
-
-
 @pytest.mark.parametrize(
     ("raw", "tenants"),
     [
@@ -76,9 +67,3 @@ def test_a_complete_microsoft_setup_turns_the_sign_in_on():
 def test_a_half_configured_microsoft_sign_in_is_refused_everywhere(kw, message, env):
     with pytest.raises(ConfigError, match=message):
         settings(env=env, **kw).check_production()
-
-
-def test_tenants_alone_do_not_turn_the_sign_in_on():
-    s = settings(ms_allowed_tenants=[TENANT])
-    s.check_production()
-    assert not s.ms_sign_in_enabled

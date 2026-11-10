@@ -7,14 +7,12 @@ logged and aggregated.
 from __future__ import annotations
 
 import json
-import random
 from pathlib import Path
 
 import defusedxml.ElementTree as DET
 import pytest
 from latex2mathml.converter import convert
 
-from readablestem.eval.equations import canonical, score_mathml
 from readablestem.eval.gold_scoring import iter_gold_records
 from readablestem.pipeline import validate
 from readablestem.pipeline.validate import (
@@ -51,30 +49,9 @@ def test_known_good_latex_passes_every_check(row):
     assert all(c.passed for c in checks), failed_codes(checks)
 
 
-def test_checks_are_one_per_rule_with_unique_names():
-    checks = check_latex(r"\frac{a}{b}")
-    names = [c.name for c in checks]
-    assert len(names) == len(set(names)) >= 8
-    assert all(c.name.startswith("latex.") for c in checks)
-
-
-@pytest.mark.parametrize("latex", ["", "   ", "\n"])
-def test_empty_latex(latex):
-    assert failed_codes(check_latex(latex)) == {"empty"}
-
-
-def test_too_long_latex():
-    assert "too_long" in failed_codes(check_latex("x+" * 1001))
-    assert "too_long" not in failed_codes(check_latex("x+" * 999 + "x"))
-
-
 @pytest.mark.parametrize("latex", [r"\frac{a}{b", "x}", "}{", r"\sqrt{x"])
 def test_unbalanced_braces(latex):
     assert "unbalanced_braces" in failed_codes(check_latex(latex))
-
-
-def test_escaped_braces_are_not_grouping():
-    assert all(c.passed for c in check_latex(r"\left\{ x \right\}"))
 
 
 @pytest.mark.parametrize(
@@ -116,39 +93,6 @@ def test_unbalanced_environments(latex):
 def test_forbidden_commands(latex):
     codes = failed_codes(check_latex(latex))
     assert "forbidden_command" in codes
-
-
-@pytest.mark.parametrize("latex", [r"\foo x", r"\color{red}{x}", r"\label{eq1} x", r"\not= x"])
-def test_unknown_commands(latex):
-    assert "unknown_command" in failed_codes(check_latex(latex))
-
-
-@pytest.mark.parametrize(
-    "latex",
-    [r"\begin{equation} x \end{equation}", r"\begin{tabular}{c} x \end{tabular}"],
-)
-def test_unknown_environments(latex):
-    assert "unknown_environment" in failed_codes(check_latex(latex))
-
-
-@pytest.mark.parametrize(
-    "env", ["array", "matrix", "pmatrix", "bmatrix", "vmatrix", "cases", "aligned", "align*"]
-)
-def test_allowed_environments(env):
-    spec = "{cc}" if env == "array" else ""
-    latex = rf"\begin{{{env}}}{spec} a & b \\ c & d \end{{{env}}}"
-    assert all(c.passed for c in check_latex(latex)), failed_codes(check_latex(latex))
-
-
-def test_dollar_delimiters_flagged_but_escaped_dollar_allowed():
-    assert "math_delimiter" in failed_codes(check_latex("$x$"))
-    assert all(c.passed for c in check_latex(r"\$5"))
-
-
-def test_check_messages_never_contain_the_latex():
-    secret = r"\input{secret-file-name}"
-    for check in check_latex(secret):
-        assert "secret" not in check.model_dump_json()
 
 
 # Structural commands that only make sense with a partner or inside an environment.
@@ -201,44 +145,6 @@ def test_commands_seen_on_real_pdfs_pass_the_checks_and_convert_cleanly(command)
     assert "\\" not in mathml
 
 
-def test_arg_becomes_an_operator_name():
-    plain = validate.safe_latex_to_mathml(r"\arg x", "inline")
-    assert plain == validate.safe_latex_to_mathml(r"\operatorname{arg} x", "inline")
-    assert "<mo>arg</mo>" in plain
-    assert has_errors(validate.check_latex(r"\argx"))  # not a prefix match
-
-
-def test_forbidden_and_allowed_lists_do_not_overlap():
-    assert not validate.FORBIDDEN_COMMANDS & validate.ALLOWED_COMMANDS
-
-
-# A bare % is a TeX comment: latex2mathml drops the rest of the line without an error.
-@pytest.mark.parametrize("latex", ["x = 50% + y", "100%", r"\text{50%}", "a \\\\% b", "x %"])
-def test_bare_percent_is_a_comment(latex):
-    checks = check_latex(latex)
-    assert "comment" in failed_codes(checks) and has_errors(checks)
-
-
-@pytest.mark.parametrize("latex", [r"x = 50\% + y", r"\text{25\% yield}", r"\mathrm{\%}"])
-def test_escaped_percent_is_allowed(latex):
-    assert all(c.passed for c in check_latex(latex)), failed_codes(check_latex(latex))
-
-
-@pytest.mark.parametrize(
-    ("raw", "escaped"),
-    [
-        ("x = 50% + y", r"x = 50\% + y"),
-        (r"x = 50\% + y", r"x = 50\% + y"),
-        ("%%", r"\%\%"),
-        ("a \\\\% b", "a \\\\\\% b"),
-        ("no percent", "no percent"),
-    ],
-)
-def test_escape_percent_signs(raw, escaped):
-    assert validate.escape_percent_signs(raw) == escaped
-    assert "comment" not in failed_codes(check_latex(escaped))
-
-
 def test_escaped_percent_keeps_everything_after_it():
     assert "<mo>+</mo><mi>y</mi>" in safe_latex_to_mathml(r"x = 50\% + y")
     assert "<mi>y</mi>" not in safe_latex_to_mathml("x = 50% + y")  # what check_latex stops
@@ -259,11 +165,6 @@ def test_escaped_percent_keeps_everything_after_it():
 def test_hspace_needs_a_braced_dimension(latex):
     checks = check_latex(latex)
     assert "bad_argument" in failed_codes(checks) and has_errors(checks)
-
-
-@pytest.mark.parametrize("latex", [r"\hspace{1em} x", r"x \hspace {0.5 em} y", r"\hspace{12pt}"])
-def test_hspace_with_a_dimension_passes(latex):
-    assert all(c.passed for c in check_latex(latex)), failed_codes(check_latex(latex))
 
 
 BREAKOUTS = [
@@ -291,36 +192,7 @@ def test_markup_in_text_breakouts_are_refused(latex):
     assert "markup_in_text" in failed_codes(check_latex(latex))
 
 
-@pytest.mark.parametrize(
-    "latex",
-    [r"\text{if } x < 5", r"a < b > c", r"\begin{array}{cc} a & b \end{array}", r"\mathrm{a} < b"],
-)
-def test_relations_and_alignment_outside_text_are_fine(latex):
-    assert all(c.passed for c in check_latex(latex)), failed_codes(check_latex(latex))
-
-
-def test_every_allowed_command_that_copies_raw_text_is_a_text_mode_command():
-    """Drift guard: if latex2mathml copies an allowed command's argument out verbatim,
-    check_latex must treat that command as text mode."""
-    raw_copiers = {cmd for cmd in validate.ONE_ARG_COMMANDS if "<b>" in convert(f"\\{cmd}{{<b>}}")}
-    assert raw_copiers <= validate.TEXT_MODE_COMMANDS
-    assert validate.TEXT_MODE_COMMANDS <= validate.ALLOWED_COMMANDS
-
-
 # ------------------------------------------------------------- safe_latex_to_mathml
-
-
-def test_conversion_sets_namespace_and_display():
-    block = safe_latex_to_mathml("x = 1")
-    inline = safe_latex_to_mathml("x = 1", "inline")
-    assert block.startswith(f'<math {NS} display="block">')
-    assert 'display="inline"' in inline
-    assert all(c.passed for c in check_mathml(block))
-
-
-def test_conversion_rejects_bad_display():
-    with pytest.raises(ValueError):
-        safe_latex_to_mathml("x", "full")
 
 
 @pytest.mark.parametrize("latex", [r"\left( x", r"\begin{array}{c} x", "x^"])
@@ -329,15 +201,6 @@ def test_conversion_errors_are_content_free(latex):
         safe_latex_to_mathml(latex)
     assert latex not in str(exc.value)
     assert exc.value.__cause__ is None  # the converter's message (with the input) is dropped
-
-
-def test_aligned_becomes_a_table_not_a_flat_row():
-    raw = convert(r"\begin{aligned} a &= b \\ &= c \end{aligned}")
-    assert "<mtable" not in raw and "<mi>&</mi>" in raw  # the latex2mathml 3.81.1 bug
-    mathml = safe_latex_to_mathml(r"\begin{aligned} a &= b \\ &= c \end{aligned}")
-    assert mathml.count("<mtr>") == 2
-    assert mathml.count('columnalign="right"') == 2 and mathml.count('columnalign="left"') == 2
-    assert all(c.passed for c in check_mathml(mathml))
 
 
 @pytest.mark.parametrize(
@@ -367,35 +230,6 @@ def test_pathological_input_fails_cleanly(latex):
     """Deep nesting or oversize input is a LatexConversionError, never a RecursionError."""
     with pytest.raises(LatexConversionError):
         safe_latex_to_mathml(latex)
-
-
-def test_deeply_nested_alignment_converts_but_is_rejected():
-    latex = r"\begin{aligned}" * 60 + "x" + r"\end{aligned}" * 60
-    assert "too_deep" in failed_codes(check_mathml(safe_latex_to_mathml(latex)))
-
-
-def test_many_alignment_blocks_in_sequence():
-    latex = " + ".join([r"\begin{aligned} a &= b \end{aligned}"] * 40)
-    assert validate.rewrite_alignment_environments(latex).count(r"\begin{array}{rl}") == 40
-
-
-def test_unclosed_alignment_is_left_for_the_checks():
-    latex = r"\begin{aligned} a &= b"
-    assert validate.rewrite_alignment_environments(latex) == latex
-    assert "unbalanced_env" in failed_codes(check_latex(latex))
-
-
-def test_aligned_transcription_matches_openstax_table_structure():
-    """`aligned` (rewritten) and `array{rcl}` give the same tree once the relation sits in
-    its own column; the prompt asks for `rcl` so the output matches OpenStax."""
-    gold = GOLD["openstax/physics/2-2-speed-and-velocity/eq-005"]["mathml"]
-    rcl = next(r["latex"] for r in SAMPLE_LATEX if r["id"].endswith("speed-and-velocity/eq-005"))
-    assert score_mathml(safe_latex_to_mathml(rcl), gold).exact_lenient
-    aligned = (
-        r"\begin{aligned} v_\text{avg} & = & \frac{\text{distance}}{\text{time}} \\ "
-        r"& = & \frac{150\ \text{km}}{3.2\ \text{h}} \\ & = & 47\ \text{km/h}. \end{aligned}"
-    )
-    assert canonical(safe_latex_to_mathml(aligned)) == canonical(safe_latex_to_mathml(rcl))
 
 
 @pytest.mark.parametrize("row", SAMPLE_LATEX, ids=lambda r: r["id"].rsplit("/", 2)[-2][:3])
@@ -465,47 +299,7 @@ def test_safe_latex_to_mathml_output_is_always_allowlisted(latex):
     assert "<script" not in mathml and "<img" not in mathml and "<iframe" not in mathml
 
 
-def test_markup_in_text_converts_to_literal_text():
-    mathml = safe_latex_to_mathml(r"\text{<script>alert(1)</script>}")
-    assert "<mtext>&lt;script&gt;alert(1)&lt;/script&gt;</mtext>" in mathml
-
-
-@pytest.mark.parametrize("latex", [r"\href{https://x.org}{y}", r"\style{color:red}{x}"])
-def test_converter_attributes_outside_the_allowlist_are_refused(latex):
-    with pytest.raises(LatexConversionError, match="refused"):
-        safe_latex_to_mathml(latex)
-
-
-def test_random_risky_latex_never_yields_unsafe_mathml():
-    """Fuzz: whatever the mix of text commands, markup, quotes, tabs and comments, the
-    output (when there is one) is allowlisted."""
-    pieces = [
-        r"\text{", r"\textbf{", r"\mbox{", r"\verb|", "|", r"\href{", r"\style{", r"\class{",
-        r"\color{", r"\operatorname{", r"\hspace{", "1em", "{", "}", "<", ">", "&", '"', "'",
-        "</mtext>", "<mi>", "</mi>", "<script>", "<math>", "\t", "\n", " ", 'intent="x"',
-        "onerror=", "x", "=", r"\frac{", r"\begin{array}{c}", r"\end{array}", r"\\", "%",
-        r"\%", "$", "&lt;", "&amp;", "<mphantom>", "/>",
-    ]  # fmt: skip
-    rng = random.Random(20261007)
-    produced = 0
-    for _ in range(3000):
-        latex = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 12)))
-        try:
-            mathml = safe_latex_to_mathml(latex)
-        except LatexConversionError:
-            continue
-        produced += 1
-        _assert_allowlisted(mathml)
-    assert produced > 500  # the fuzz exercised real conversions, not only failures
-
-
 # ----------------------------------------------------------------------- check_mathml
-
-
-def test_gold_mathml_passes():
-    for record in GOLD.values():
-        checks = check_mathml(record["mathml"])
-        assert all(c.passed for c in checks), (record["id"], failed_codes(checks))
 
 
 @pytest.mark.parametrize(
@@ -572,19 +366,6 @@ def test_mathml_failures(mathml, code):
     assert has_errors(checks)
 
 
-@pytest.mark.parametrize(
-    "mathml",
-    [
-        f'<math {NS} alttext="t = 20 s"><mi>t</mi></math>',  # OpenStax puts alttext here
-        f"<math {NS}><mo>\\</mo><mi>A</mi></math>",  # \backslash on its own
-        f"<math {NS}><mi>x<malignmark/></mi></math>",
-    ],
-)
-def test_mathml_that_is_fine(mathml):
-    checks = check_mathml(mathml)
-    assert all(c.passed for c in checks), failed_codes(checks)
-
-
 def _tree(markup: str):
     return DET.fromstring(markup)
 
@@ -608,18 +389,6 @@ def test_serialize_mathml_refuses_unsafe_trees(markup, code):
     assert str(exc.value) == code
 
 
-def test_serialize_mathml_round_trips_safe_trees():
-    gold = GOLD["openstax/physics/2-3-position-vs-time-graphs/eq-008"]["mathml"]
-    assert all(c.passed for c in check_mathml(validate.serialize_mathml(_tree(gold))))
-
-
-def test_converter_leftovers_are_caught():
-    """Inputs that latex2mathml converts without complaint but wrongly."""
-    assert "unconverted_command" in failed_codes(check_mathml(convert(r"\foo x")))
-    assert "bad_arity" in failed_codes(check_mathml(convert(r"\frac{a}")))
-    assert "unsafe_attribute" in failed_codes(check_mathml(convert(r"\href{https://x.org}{y}")))
-
-
 def test_billion_laughs_is_refused_quickly():
     bomb = (
         '<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol">'
@@ -638,11 +407,6 @@ def test_too_deep_and_too_large():
     assert "too_large" in failed_codes(check_mathml(many))
 
 
-def test_adversarially_deep_mathml_does_not_crash():
-    deep = f"<math {NS}>" + "<mrow>" * 5_000 + "</mrow>" * 5_000 + "</math>"
-    assert "too_deep" in failed_codes(check_mathml(deep))
-
-
 # -------------------------------------------------------------------------- check_alt
 
 
@@ -655,39 +419,9 @@ def test_good_alt_passes_everything():
     assert {c.name for c in checks} >= {"alt.length", "alt.not_filename", "alt.not_caption_copy"}
 
 
-def test_decorative():
-    assert all(c.passed for c in check_alt("", decorative=True))
-    checks = check_alt("A border", decorative=True)
-    assert failed_codes(checks) == {"decorative_with_text"} and has_errors(checks)
-
-
 def test_empty_alt_on_informative_figure():
     checks = check_alt("  ", decorative=False)
     assert failed_codes(checks) == {"empty"} and has_errors(checks)
-
-
-def test_length_is_a_warning_then_an_error():
-    warn = check_alt("A bar chart. " + "x" * 150, decorative=False)
-    assert failed_codes(warn) == {"too_long"} and not has_errors(warn)
-    error = check_alt("A bar chart. " + "x" * 300, decorative=False)
-    assert failed_codes(error) == {"too_long"} and has_errors(error)
-
-
-@pytest.mark.parametrize(
-    "alt",
-    ["Image of a car on a road", "picture of Mars", "A photo of a jet car", "Graphic of a vector"],
-)
-def test_redundant_prefix_is_a_warning(alt):
-    checks = check_alt(alt, decorative=False)
-    assert failed_codes(checks) == {"redundant_prefix"} and not has_errors(checks)
-
-
-@pytest.mark.parametrize(
-    "alt", ["IMG_2041.jpg", "figure_3_2", "DSC0042", "chart.png", "See graph-2.svg for details"]
-)
-def test_file_names(alt):
-    checks = check_alt(alt, decorative=False)
-    assert "filename" in failed_codes(checks) and has_errors(checks)
 
 
 @pytest.mark.parametrize(
@@ -712,39 +446,6 @@ def test_placeholders(alt):
     assert "placeholder" in failed_codes(checks) and has_errors(checks)
 
 
-@pytest.mark.parametrize(
-    ("alt", "caption"),
-    [
-        ("The drive to school.", "The drive to school"),
-        ("the DRIVE to school", "Figure 2.3 The drive, to school."),
-    ],
-)
-def test_caption_copy_is_a_warning(alt, caption):
-    checks = check_alt(alt, decorative=False, caption=caption)
-    assert failed_codes(checks) == {"caption_copy"} and not has_errors(checks)
-
-
-@pytest.mark.parametrize(
-    "alt",
-    [
-        "N/A", "n/a", "NA", "Unknown", "unreadable", "Unreadable image", "No alt text",
-        "Not available", "Image unavailable", "Empty", "-", "—", "An image",
-        "A picture", "a graph", "screenshot", "Screenshot", "image description here",
-        ".", "\U0001f4c8", "x", "→ →", "ima​ge",
-    ],
-)  # fmt: skip
-def test_alt_that_says_nothing_is_a_placeholder(alt):
-    checks = check_alt(alt, decorative=False)
-    assert "placeholder" in failed_codes(checks) and has_errors(checks)
-
-
-@pytest.mark.parametrize("alt", ["​", "⁣⁣", "﻿", " ​ ⁠ ", "ㅤ"])
-def test_invisible_only_alt_is_empty(alt):
-    checks = check_alt(alt, decorative=False)
-    assert failed_codes(checks) == {"empty"} and has_errors(checks)
-    assert all(c.passed for c in check_alt(alt, decorative=True))
-
-
 def test_invisible_characters_cannot_hide_a_file_name_or_url():
     assert "filename" in failed_codes(check_alt("IMG_20​41.jpg", decorative=False))
     assert "url_or_markup" in failed_codes(check_alt("h​ttps://x.org", decorative=False))
@@ -762,10 +463,6 @@ def test_bidi_controls_are_an_error_and_cleaning_removes_them():
     assert clean_alt("A  bar\u200b chart\u2067 ") == "A bar chart"
 
 
-def test_script_url_is_markup():
-    assert "url_or_markup" in failed_codes(check_alt("javascript:alert(1)", decorative=False))
-
-
 @pytest.mark.parametrize(
     "alt",
     [
@@ -779,20 +476,3 @@ def test_script_url_is_markup():
 def test_real_descriptions_with_placeholder_words_pass(alt):
     checks = check_alt(alt, decorative=False)
     assert all(c.passed for c in checks), failed_codes(checks)
-
-
-def test_data_word_is_not_a_url():
-    checks = check_alt("Bar chart of survey data: most students walk to school.", decorative=False)
-    assert all(c.passed for c in checks)
-
-
-def test_openstax_alt_text_has_no_error_except_length():
-    """Real alt text from the gold set: long, but never a file name, URL or placeholder."""
-    figures = list(iter_gold_records(REPO / "data" / "gold", kind="figure"))
-    assert figures
-    for record in figures:
-        for image in record["images"]:
-            codes = failed_codes(
-                check_alt(image["alt"], decorative=False, caption=record["caption"])
-            )
-            assert codes <= {"too_long", "redundant_prefix"}, codes

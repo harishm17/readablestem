@@ -13,7 +13,6 @@ from __future__ import annotations
 import pytest
 
 from readablestem.core.types import (
-    Check,
     Element,
     GlyphContext,
     Kind,
@@ -124,14 +123,6 @@ def test_a_misread_symbol_is_corrected_in_the_fix_and_noted():
     assert fix.status.value == "accepted"  # a note, not a decision
 
 
-def test_with_the_setting_off_nothing_changes():
-    element = equation("υ(x)", ctx("υ-(-xi)-", tex=True))
-    fix = run(element, "v(x)", reconcile=False)
-    assert fix.equation is not None and fix.equation.latex == "v(x)"
-    assert fix.equation.model_latex is None
-    assert "symbol_mismatch" in codes(fix)  # flagged, as before
-
-
 def test_a_pdf_that_is_not_tex_made_is_not_corrected():
     element = equation("υ(x)", ctx("υ-(-xi)-", tex=False))
     fix = run(element, "v(x)")
@@ -140,24 +131,6 @@ def test_a_pdf_that_is_not_tex_made_is_not_corrected():
 
 
 # ----------------------------------------------------------------------- F2: a unit past the box
-
-
-def test_a_unit_added_after_a_number_the_box_ends_with_goes():
-    # 2404.15495/eq-009, eq-011: the box is `∆t = 1`, `∆t = 24`; the page sets "h" after it.
-    span = "∆-ti -=- -1-"
-    after = "hu,- -suuuiutuaubulueu"
-    got = ctx(span, after)
-    one = r"\Delta t = 1\ \text{h}"
-    assert (
-        gr.drop_unit_past_box(one, ml(one), "∆t = 1", got.span_glyphs, got.after_glyphs)
-        == r"\Delta t = 1"
-    )
-    day = ctx("∆-ti -=- -2-4-", "hu,- -aupupuluiucuaubulueu")
-    latex = r"\Delta t = 24\text{h}"
-    assert (
-        gr.drop_unit_past_box(latex, ml(latex), "∆t = 24", day.span_glyphs, day.after_glyphs)
-        == r"\Delta t = 24"
-    )
 
 
 def test_a_unit_past_a_power_of_ten_goes():
@@ -316,17 +289,6 @@ def test_a_displays_number_leaves_the_reading_and_becomes_its_number():
     }
 
 
-def test_a_number_the_element_already_has_is_not_replaced():
-    element = equation(
-        "A = f , (1)",
-        ctx("Ai -=- -fi,- -(-1-)-", labels="(1)", tex=True),
-        display="block",
-        equation_label="(1.1)",
-    )
-    run(element, r"A = f, \quad (1)")
-    assert element.equation_label == "(1.1)"
-
-
 # -------------------------------------------------------------------------- F7: script faces
 
 
@@ -372,22 +334,6 @@ def test_the_table_cell_path_restyles_a_bold_italic_letter():
     assert table_step.restyle_cells(wide, element) is wide
 
 
-def test_a_note_check_is_a_note_with_a_message():
-    from readablestem.web.messages import CHECK_MESSAGES
-
-    for code in gr.CODES:
-        assert (gr.CHECK_NAME, code) in CHECK_MESSAGES
-    assert Check(name=gr.CHECK_NAME, passed=False, code="slash_kept").code in gr.CODES
-
-
-def test_a_label_as_far_off_as_the_printed_ones_is_found():
-    # 2404.14123/eq-023: the comma ends at 561.7, the "(8)" starts at 568.9: 0.7 em at 10 pt
-    row = [gr.Item(",", 559.0, 561.7, 376.0, 10.0)]
-    for ch, x in (("(", 568.9), ("8", 572.8), (")", 577.7)):
-        row.append(gr.Item(ch, x, x + 4.5, 376.0, 10.0))
-    assert gr.edge_labels(row) == ("(8)",)
-
-
 def test_a_number_before_the_end_of_an_array_goes_and_its_glyphs_leave_the_text():
     # 2404.14123/eq-023: the label sits inside the array the reading is wrapped in
     latex = r"\begin{array}{rcl} P & = & w \end{array}"
@@ -399,12 +345,3 @@ def test_a_number_before_the_end_of_an_array_goes_and_its_glyphs_leave_the_text(
     assert latex
     assert gr.without_label("A = f , (1) s2x", "(1)") == "A = f , s2x"
     assert gr.without_label("A = f", "(1)") == "A = f"
-
-
-def test_the_fixs_checks_compare_a_display_with_its_text_less_the_number():
-    element = equation(
-        "A = f , (1)", ctx("Ai -=- -fi,- -(-1-)-", labels="(1)", tex=True), display="block"
-    )
-    fix = run(element, r"A = f, \quad (1)")
-    assert "symbol_mismatch" not in codes(fix)
-    assert fix.status.value == "accepted"

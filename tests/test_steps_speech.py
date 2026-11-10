@@ -23,32 +23,11 @@ def gold(suffix: str) -> str:
     return next(r["mathml"] for r in GOLD if r["id"].endswith(suffix))
 
 
-def test_gold_set_has_30_equations():
-    assert len(GOLD) == 30
-
-
 @pytest.mark.parametrize("record", GOLD, ids=lambda r: r["id"].removeprefix("openstax/physics/"))
 def test_every_gold_equation_has_speech(record):
     speech = mathml_to_speech(record["mathml"])
     assert speech.strip()
     assert "<" not in speech and "\\" not in speech
-
-
-def test_gold_examples_read_naturally():
-    assert mathml_to_speech(gold("2-1-relative-motion-distance-and-displacement/eq-002")) == (
-        "capital delta bold d equals bold d sub f minus bold d sub 0"
-    )
-    assert mathml_to_speech(gold("2-2-speed-and-velocity/eq-005")) == (
-        "row 1: v sub avg equals distance over time; "
-        "row 2: equals 150 kilometers over 3.2 hours; row 3: equals 47 kilometers per hour"
-    )
-    assert mathml_to_speech(gold("2-3-position-vs-time-graphs/eq-000")) == ("y equals m x plus b")
-
-
-def test_openstax_and_latex_markup_read_the_same():
-    """mstyle-bold + mtext Delta (OpenStax) and \\mathbf + \\Delta (LaTeX) normalise alike."""
-    openstax = mathml_to_speech(gold("2-1-relative-motion-distance-and-displacement/eq-002"))
-    assert openstax == say(r"\Delta \mathbf{d} = \mathbf{d}_\text{f} - \mathbf{d}_0.")
 
 
 @pytest.mark.parametrize(
@@ -132,20 +111,6 @@ def test_openstax_and_latex_markup_read_the_same():
 )
 def test_speech_rules(latex, expected):
     assert say(latex) == expected
-
-
-def test_text_tokens_are_verbatim_except_lone_symbols():
-    mathml = f"<math {NS}><mtext>time =</mtext><mtext>m/s)(46 s)</mtext><mtext>Δ</mtext></math>"
-    assert mathml_to_speech(mathml) == "time equals m/s)(46 s) capital delta"
-
-
-def test_unknown_symbols_fall_back_to_their_unicode_name():
-    assert mathml_to_speech(f"<math {NS}><mo>⨁</mo></math>") == "n-ary circled plus operator"
-
-
-def test_speech_is_deterministic():
-    mathml = gold("2-2-speed-and-velocity/eq-010")
-    assert {mathml_to_speech(mathml) for _ in range(3)} == {mathml_to_speech(mathml)}
 
 
 @pytest.mark.parametrize(

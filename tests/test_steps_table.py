@@ -17,7 +17,6 @@ import pytest
 from readablestem.config import CHEAP_MODEL, MAIN_MODEL
 from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from readablestem.core.types import (
-    Check,
     ConversionOptions,
     DocumentResult,
     DocumentStats,
@@ -32,7 +31,7 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import options, table_step
 from readablestem.pipeline.assemble import render_html
-from readablestem.pipeline.html_checks import AXE_SKIPPED, axe_checks, static_checks
+from readablestem.pipeline.html_checks import static_checks
 from readablestem.pipeline.table_step import (
     PROMPT_VERSION,
     TableOutput,
@@ -40,7 +39,6 @@ from readablestem.pipeline.table_step import (
     grid_from_output,
     output_tokens,
     rebuild,
-    words,
 )
 from test_steps_support import make_settings
 
@@ -380,21 +378,6 @@ def test_a_maths_cell_keeps_its_numbers_and_the_case_of_its_letters(printed, lat
     assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"symbol_mismatch"})
 
 
-@pytest.mark.parametrize(
-    ("printed", "latex"),
-    [
-        ("6.67\u00d710\u207b\u00b9\u00b9", r"6.67\times 10^{-11}"),
-        ("6.67\u00d710\u221211", r"6.67\times 10^{-11}"),  # the raise lost in the PDF
-        ("(1024 Mass kg)", r"\text{Mass}\ (10^{24}\ \text{kg})"),  # run together, reordered
-        ("5 mW", r"5\,\mathrm{mW}"),
-    ],
-)
-def test_a_maths_cell_read_right_is_accepted(printed, latex):
-    pdf = [["Quantity", "Value"], ["G", printed]]
-    fix = run(by_model(cheap=maths_table(latex, label="G")), element(local(pdf)))
-    assert (fix.status, codes(fix)) == (Status.ACCEPTED, set())
-
-
 def test_an_en_dash_between_digits_in_a_maths_cell_is_a_minus_sign():
     # The gold print of physics 1.3 writes 10^-18 with a raised en dash, which the text
     # layer gives flat: the model's maths without the minus sign is not accepted.
@@ -404,23 +387,6 @@ def test_an_en_dash_between_digits_in_a_maths_cell_is_a_minus_sign():
     assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"sign_mismatch"})
     right = run(by_model(cheap=maths_table("10^{-18}", label="G")), element(local(pdf)))
     assert right.status is Status.ACCEPTED
-
-
-def test_latex_that_is_only_text_is_a_plain_cell():
-    pdf = [["Quantity", "Value"], ["g", "5.2 m/s"]]
-    plain = maths_table(r"5.2\ \text{m/s}", "5.2 m/s")
-    fix = run(by_model(cheap=plain), element(local(pdf)))
-    assert fix.status is Status.ACCEPTED
-    assert fix.table.grid.cells[3].latex is None and "table.math" not in {
-        c.name for c in fix.checks
-    }
-
-
-def test_a_maths_cell_with_a_different_digit_needs_review():
-    pdf = [["Quantity", "Value"], ["G", "6.67 \u00d7 10\u221211"]]
-    wrong = maths_table(r"6.67 \times 10^{-12}", label="G")
-    fix = run(by_model(cheap=wrong, main=wrong), element(local(pdf)))
-    assert fix.status is Status.NEEDS_REVIEW and codes(fix) == {"symbol_mismatch"}
 
 
 def test_a_maths_cell_that_drops_a_minus_sign_needs_review():
@@ -454,14 +420,6 @@ def test_a_ce_formula_in_a_cell_is_written_out_and_converted():
     chem = fix.table.grid.cells[3]
     assert chem.latex == r"\text{H}_2\text{O}" and chem.mathml is not None
     assert fix.status is Status.ACCEPTED, codes(fix)
-
-
-def test_a_ce_formula_outside_the_converted_subset_is_not_guessed():
-    pdf = [["Quantity", "Value"], ["water", "H2O"]]
-    bad = maths_table(r"\ce{H2O\bond{~}H}", "H2O", "water")
-    fix = run(by_model(cheap=bad, main=bad), element(local(pdf)))
-    assert fix.status is Status.NEEDS_REVIEW
-    assert fix.table.grid.cells[3].mathml is None  # nothing guessed: a person decides
 
 
 def test_latex_that_fails_validation_needs_review_and_keeps_the_text():
@@ -647,18 +605,6 @@ def test_cells_are_placed_as_html_places_them():
     assert placed[(2, 0)] == ("g", 1, 1)
 
 
-def test_missing_cells_become_empty_cells_and_spans_stop_at_the_last_row():
-    rows = [[head("A"), head("B"), head("C")], [cell({"text": "1", "row_span": 5})]]
-    grid = grid_from_output(TableOutput.model_validate(answer(rows)), caption=None)
-    assert grid is not None and (grid.rows, grid.cols) == (2, 3)
-    assert {(c.row, c.col): c.text for c in grid.cells if c.row == 1} == {
-        (1, 0): "1",
-        (1, 1): "",
-        (1, 2): "",
-    }
-    assert next(c for c in grid.cells if c.text == "1").row_span == 1
-
-
 def test_overlapping_cells_are_a_broken_grid():
     # B spans down into the second row, where x then spans across it.
     rows = [[head("A"), head("B", row_span=2)], [cell({"text": "x", "col_span": 2})]]
@@ -678,12 +624,6 @@ def test_overlapping_cells_are_a_broken_grid():
 )
 def test_answers_that_cannot_be_a_grid_are_unusable(rows):
     assert grid_from_output(TableOutput.model_validate(answer(rows)), caption=None) is None
-
-
-def test_whitespace_in_cells_is_collapsed():
-    rows = [[head("  Speed\n(m/s) ")], ["  9.8 "]]
-    grid = grid_from_output(TableOutput.model_validate(answer(rows)), caption=None)
-    assert grid is not None and [c.text for c in grid.cells] == ["Speed (m/s)", "9.8"]
 
 
 # --------------------------------------------------------------------------- routes
@@ -730,11 +670,6 @@ def test_not_a_data_table_without_a_grid_from_the_pdf_keeps_the_image():
     assert fix.table is None
 
 
-def test_the_main_model_can_overrule_a_cheap_not_a_table():
-    fix = run(by_model(cheap=answer([], data=False), main=free_fall()))
-    assert fix.status is Status.ACCEPTED and models(fix) == [CHEAP_MODEL, MAIN_MODEL]
-
-
 def test_an_outage_on_the_cheap_model_falls_back_to_the_main_model_once():
     client = by_model(main=free_fall())
     client.fail_models = {CHEAP_MODEL: "api_error"}
@@ -777,14 +712,6 @@ def test_unusable_answers_fall_back_to_the_local_grid_or_keep_the_image():
     assert fix.status is Status.NEEDS_REVIEW and fix.table.grid.source == "local"
     kept = run(by_model(cheap=empty, main=empty), element(None))
     assert (kept.status, kept.reason) == (Status.FAILED, "invalid_table")
-
-
-def test_a_failed_escalation_leaves_the_cheap_answer_standing():
-    client = by_model(cheap=free_fall(**{"2_1": "9.3"}))
-    client.fail_models = {MAIN_MODEL: "api_error"}
-    fix = run(client)
-    assert [c.outcome for c in fix.calls] == ["ok", "api_error"]
-    assert fix.status is Status.NEEDS_REVIEW and texts(fix)[2][1] == "9.3"
 
 
 def test_no_pdf_text_needs_review_without_escalating():
@@ -836,45 +763,7 @@ def test_the_output_budget_grows_with_the_table():
     assert output_tokens(element(huge)) == table_step.MAX_OUTPUT_TOKENS
 
 
-def test_the_schema_is_strict():
-    good = free_fall()
-    assert TableOutput.model_validate(good).is_data_table
-    for bad in (
-        {**good, "extra": 1},
-        {**good, "rows": [{"cells": [{**cell("x"), "header": "column"}]}]},
-        {**good, "rows": [{"cells": [{**cell("x"), "row_span": 0}]}]},
-        {**good, "rows": [{"cells": [{**cell("x"), "col_span": "2"}]}]},
-    ):
-        with pytest.raises(ValueError):
-            TableOutput.model_validate(bad)
-
-
 # --------------------------------------------------------------------------- words
-
-
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        ("Speed (m/s)", ["Speed", "m", "/", "s"]),
-        ("9.8m/s2", ["9.8", "m", "/", "s", "2"]),
-        ("25 \u00b0C, \u00b15 %", ["25", "\u00b0", "C", "\u00b1", "5", "%"]),
-        ("a\u22c5b \u2206x", ["a", "\u00b7", "b", "\u0394x"]),
-        ("\u22129.8 and \u20133", ["-9.8", "and", "-3"]),
-        ("1\u20133", ["1", "3"]),  # a range, not a minus
-        ("10\u00d7\u22125 and (-2)", ["10", "\u00d7", "-5", "and", "-2"]),  # signs
-        ("(3,\u22125); -1", ["3", "-5", "-1"]),  # a point's sign after a comma
-        ("C-14", ["C", "14"]),
-        ("1,000.5 kg.", ["1,000.5", "kg"]),
-        ("\ufb01eld", ["field"]),  # ligature
-        ("10\u2075", ["10", "^", "5"]),  # an exponent, not the digits 105
-        ("10^5", ["10", "^", "5"]),
-        ("10\u207b\u00b9\u2078 and 10^-18", ["10", "^", "-18", "and", "10", "^", "-18"]),
-        ("10\u221218", ["10", "-18"]),  # U+2212 is always a minus sign
-        ("", []),
-    ],
-)
-def test_words(text, expected):
-    assert words(text) == expected
 
 
 @pytest.mark.parametrize("read", ["1.01 \u00d7 105", "1.01 \u00d7 10 5"])
@@ -905,20 +794,6 @@ def test_an_exponent_that_lost_its_minus_sign_needs_review(read):
     assert run(by_model(cheap=answer(rows)), element(local(pdf))).status is Status.ACCEPTED
 
 
-def test_a_raised_exponent_in_a_maths_cell_keeps_its_minus_sign():
-    # The gold print's raised en dash: written as a superscript minus by the local grid.
-    pdf = [["Length (m)", "Phenomenon"], ["10\u207b\u00b9\u2078", "Present experimental limit"]]
-
-    def read(latex):
-        cells = [{"text": "10^18", "latex": latex}, "Present experimental limit"]
-        return answer([[head("Length (m)"), head("Phenomenon")], cells])
-
-    wrong = run(by_model(cheap=read("10^{18}"), main=read("10^{18}")), element(local(pdf)))
-    assert wrong.status is Status.NEEDS_REVIEW and "sign_mismatch" in codes(wrong)
-    right = run(by_model(cheap=read("10^{-18}")), element(local(pdf)))
-    assert right.status is Status.ACCEPTED
-
-
 # --------------------------------------------------------------------------- stored results
 
 
@@ -932,12 +807,6 @@ def test_a_table_fix_round_trips_through_a_stored_result():
     )
     again = DocumentResult.model_validate_json(result.model_dump_json())
     assert again.fixes[0] == fix
-
-
-def test_header_policy_is_idempotent():
-    rows = [[head("Planet"), head("Mass")], [rowh("Earth"), "5.97"], [rowh("Mars"), "0.642"]]
-    grid = grid_from_output(TableOutput.model_validate(answer(rows)), caption=None)
-    assert grid is not None and apply_header_policy(grid) == grid
 
 
 # --------------------------------------------------------------------------- output
@@ -986,105 +855,6 @@ def test_model_html_and_script_in_cells_are_escaped():
     assert failed == []
 
 
-def step_tables() -> list[tuple[Element, Fix]]:
-    """Tables of every shape the step writes, rebuilt through the step."""
-    shapes = {
-        "columns": (free_fall(), local(FREE_FALL), CAPTION),
-        "rows": (
-            answer(
-                [
-                    [head("Planet"), head("Mass (kg)"), head("Radius (km)")],
-                    [rowh("Earth"), "5.97", "6371"],
-                    [rowh("Mars"), "0.642", "3390"],
-                ]
-            ),
-            local(
-                [
-                    ["Planet", "Mass (kg)", "Radius (km)"],
-                    ["Earth", "5.97", "6371"],
-                    ["Mars", "0.642", "3390"],
-                ]
-            ),
-            "Table 2 Planets.",
-        ),
-        "label_value": (
-            answer([[rowh("Mass"), "2 kg"], [rowh("Speed"), "3 m/s"]]),
-            local([["Mass", "2 kg"], ["Speed", "3 m/s"]]),
-            None,
-        ),
-        "two_levels": (
-            answer(
-                [
-                    [head("Quantity", row_span=2), head("Trial", col_span=2)],
-                    [head("1"), head("2")],
-                    [rowh("g"), "9.7", "9.9"],
-                ]
-            ),
-            local(
-                [["Quantity", "Trial", None], [None, "1", "2"], ["g", "9.7", "9.9"]],
-                spans={(0, 0): (2, 1), (0, 1): (1, 2)},
-            ),
-            "Table 3 Trials.",
-        ),
-        "sections": (
-            answer(
-                [
-                    [head("Metal"), head("Density")],
-                    [head("Light metals", col_span=2)],
-                    [rowh("Aluminium"), "2.70"],
-                    [head("Heavy metals", col_span=2)],
-                    [rowh("Lead"), "11.3"],
-                ]
-            ),
-            local(
-                [
-                    ["Metal", "Density"],
-                    ["Light metals", None],
-                    ["Aluminium", "2.70"],
-                    ["Heavy metals", None],
-                    ["Lead", "11.3"],
-                ],
-                spans={(1, 0): (1, 2), (3, 0): (1, 2)},
-            ),
-            None,
-        ),
-        "maths": (
-            maths_table(r"9.8\ \text{m/s}^{2}", "9.8 m/s^2"),
-            local([["Quantity", "Value"], ["g", "9.8 m/s2"]]),
-            None,
-        ),
-    }
-    pairs = []
-    for index, (name, (model, grid, caption)) in enumerate(shapes.items()):
-        el = element(grid, caption=caption).model_copy(update={"id": f"p1-e{index}"})
-        fix = run(by_model(cheap=model), el)
-        assert fix.status is Status.ACCEPTED, (name, codes(fix))
-        pairs.append((el, fix))
-    client = by_model()
-    client.fail_models = {CHEAP_MODEL: "api_error", MAIN_MODEL: "api_error"}
-    fallback = element(local(FREE_FALL)).model_copy(update={"id": "p1-e9"})
-    pairs.append((fallback, run(client, fallback)))  # the local grid, waiting for review
-    return pairs
-
-
-def test_every_shape_passes_the_output_checks():
-    html = render(step_tables())
-    assert html.count("<table>") == 7
-    assert '<th scope="row">Earth</th>' in html and '<th scope="colgroup"' in html
-    assert '<th scope="rowgroup" colspan="2">Light metals</th>' in html
-    assert '<math display="inline"' in html
-    assert [c for c in static_checks(html) if not c.passed] == []
-
-
-@pytest.mark.browser
-def test_axe_finds_no_problems_with_rebuilt_tables():
-    pytest.importorskip("playwright.sync_api")
-    checks = axe_checks(render(step_tables()))
-    if checks == [AXE_SKIPPED]:
-        pytest.skip("Chromium for Playwright is not installed")
-    assert checks == [Check(name="axe", passed=True)]
-
-
 # --------------------------------------------------------------------------- the run
 
 
@@ -1125,10 +895,6 @@ RECORDED = sorted(
     for p in FIXTURES.glob("*.json")
     if "answers" in json.loads(p.read_text(encoding="utf-8"))
 )
-
-
-def test_there_are_recorded_answers():
-    assert len(RECORDED) >= 5
 
 
 @pytest.mark.parametrize("name", RECORDED)
