@@ -25,7 +25,7 @@ from fixtures.web.support import (
     token,
     upload,
 )
-from readablestem.core.budget import BudgetExceeded
+from readablestem.core.budget import BudgetExceeded, JobBudget
 from readablestem.models.fake import FakeVisionClient
 from readablestem.web import db, reread
 from readablestem.web.database import utc_today
@@ -276,3 +276,15 @@ def mark_region(env):
     version = str(env.job(env.job_id).result_version or 0)
     data = {"csrf_token": token(env.browser, path), "version": version, "kind": "equation"}
     return env.browser.post(f"/jobs/{env.job_id}/pages/1/add", data=data | box)
+
+
+def test_a_pooled_view_reserves_in_the_pool_and_settles_through_any_view(factory):
+    guard = DbSpendGuard(factory, 5.0, open_cap_usd=1.0)
+    assert guard.pooled(None) is guard
+    view = guard.pooled(OPEN)
+    held = JobBudget(guard=view, max_usd=1.0, max_calls=5).reserve(0.3)
+    assert day_row(factory, utc_today()) == pytest.approx((0.0, 0.3, 0.0, 0.3))
+    guard.settle(held, 0.1)  # settled through the plain guard: the pool is still released
+    assert day_row(factory, utc_today()) == pytest.approx((0.1, 0.0, 0.1, 0.0))
+    assert view.spent_usd() == pytest.approx(0.1)
+    assert view.snapshot().open_spent_usd == pytest.approx(0.1)
