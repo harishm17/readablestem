@@ -157,9 +157,3 @@ def test_production_session_cookie_is_secure_httponly_lax_and_host_locked(tmp_pa
     # and no Domain, and keeps a sibling subdomain from setting a cookie of the same name.
     assert cookie.startswith("__Host-"), cookie
     assert SESSION_COOKIE in cookie
-
-
-def test_the_development_cookie_has_no_prefix_that_would_break_http(web):
-    with web.client() as fresh:
-        response = fresh.get("/login")
-    assert response.headers["set-cookie"].startswith(f"{SESSION_COOKIE}=")

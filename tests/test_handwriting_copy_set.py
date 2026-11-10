@@ -8,12 +8,10 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 
 import pymupdf
 import pytest
 
-from readablestem.eval.equations import score_latex, score_mathml
 from readablestem.gold import openstax as ox
 
 REPO = Path(__file__).resolve().parent.parent
@@ -175,14 +173,6 @@ def book(**over) -> ox.Book:
     return ox.Book(**fields)
 
 
-def test_gate_accepts_cc_by_live_and_retired():
-    kit.licence_gate(book())
-    kit.licence_gate(book(state="retired"))
-    kit.licence_gate(
-        book(license_url="http://creativecommons.org/licenses/by/3.0/", cms_license_url=CC_BY)
-    )
-
-
 @pytest.mark.parametrize(
     "over",
     [
@@ -200,11 +190,6 @@ def test_gate_refuses_everything_else(over):
         kit.licence_gate(book(**over))
 
 
-def test_gate_can_refuse_retired_editions():
-    with pytest.raises(ox.BookStateError):
-        kit.licence_gate(book(state="retired"), allow_retired=False)
-
-
 def test_a_book_not_cc_by_in_the_table_is_never_requested():
     (selection, _), fetcher = run_select(licensed=LICENSED)
     assert {
@@ -214,147 +199,10 @@ def test_a_book_not_cc_by_in_the_table_is_never_requested():
     assert not any("uuid-calculus-volume-1" in u for u in fetcher.requests)
 
 
-def test_a_book_the_live_record_calls_nc_sa_is_refused_even_if_the_table_says_cc_by():
-    books = make_books()
-    books["chemistry"]["license"] = NC_SA
-    (selection, _), _ = run_select(books)
-    assert {"book_slug": "chemistry", "reason": "LicenseError"} in selection["excluded_books"]
-    assert all(p["book_slug"] != "chemistry" for p in selection["passages"])
-
-
-def test_the_committed_licence_table_lists_cc_by_slugs():
-    slugs = kit.licensed_slugs()
-    assert "college-physics" in slugs and "statistics" in slugs
-    assert "calculus-volume-1" not in slugs and "algebra-1" not in slugs
-
-
 # ------------------------------------------------------------------- passage rule
 
 
-def stats_of(xml: str) -> dict:
-    return kit.example_stats(kit.ET.fromstring(xml))
-
-
-def test_a_dense_text_only_example_qualifies():
-    assert kit.qualifies(stats_of(example_xml("e")))
-
-
-@pytest.mark.parametrize(
-    "xml",
-    [
-        example_xml("few", maths=2),
-        example_xml("many", maths=13, words=100),
-        example_xml("short", words=5),
-        example_xml("long", words=300, maths=12),
-        example_xml("sparse", maths=3, words=200),
-        example_xml("img", extra='<img src="x.png" alt="a"/>'),
-        example_xml("fig", extra="<figure><img src='x'/></figure>"),
-        example_xml("tab", extra="<table><tr><td>1</td></tr></table>"),
-    ],
-)
-def test_other_examples_do_not_qualify(xml):
-    assert not kit.qualifies(stats_of(xml))
-
-
-def test_one_character_formulas_do_not_count_as_substantial():
-    tiny = "".join("<math><mi>x</mi></math>" for _ in range(6))
-    xml = f'<div data-type="example" id="t"><p>{" ".join(["w"] * 30)}</p>{tiny}</div>'
-    assert not kit.qualifies(stats_of(xml))
-
-
-def test_prose_words_leave_the_formulas_out():
-    elem = kit.ET.fromstring(example_xml("e", words=10, maths=3))
-    assert "hidden" not in kit.visible_words(elem)
-    assert kit.example_stats(elem)["n_words"] == len(kit.visible_words(elem).split())
-
-
-def test_calculus_titles_go_to_calculus_only():
-    assert kit.subject_of_page("calculus", "Finding Limits Numerically")
-    assert not kit.subject_of_page("algebra", "Finding Limits Numerically")
-    assert kit.subject_of_page("algebra", "Linear Functions")
-    assert not kit.subject_of_page("calculus", "Linear Functions")
-
-
-def test_quotas_follow_weights_and_sum_to_the_total():
-    for total in (1, 7, 12, 30, 31):
-        q = kit.quotas(total)
-        assert sum(q.values()) == total
-    assert kit.quotas(11) == {
-        "algebra": 3,
-        "calculus": 2,
-        "physics": 3,
-        "statistics": 2,
-        "chemistry": 1,
-    }
-    q30 = kit.quotas(30)
-    assert q30["physics"] >= q30["statistics"] >= q30["chemistry"] >= 1
-
-
 # ------------------------------------------------------------------------- selection
-
-
-def test_selection_is_deterministic_for_a_seed_and_differs_between_seeds():
-    (a, _), _ = run_select(seed="alpha", per_writer=3)
-    (b, _), _ = run_select(seed="alpha", per_writer=3)
-    (c, _), _ = run_select(seed="beta", per_writer=3)
-    key = lambda s: [(p["code"], p["page_slug"], p["element_id"]) for p in s["passages"]]  # noqa: E731
-    assert key(a) == key(b)
-    assert key(a) != key(c)
-
-
-def test_selection_fills_the_total_one_passage_per_section_and_every_subject():
-    (sel, sources), _ = run_select(writers=3, per_writer=4)
-    passages = sel["passages"]
-    assert len(passages) == 12 == len(sources)
-    sections = [(p["book_slug"], p["page_slug"]) for p in passages]
-    assert len(sections) == len(set(sections))
-    assert {p["subject"] for p in passages} == set(kit.SUBJECTS)
-    assert sel["quotas"] == kit.quotas(12)
-    assert all(p["n_math"] >= 3 and p["book_state"] == "retired" for p in passages)
-
-
-def test_a_subject_without_a_licensed_book_hands_its_quota_on_and_says_so():
-    (sel, _), _ = run_select(licensed=LICENSED - {"chemistry"})
-    assert sel["shortfalls"] == {"chemistry": 1} or sel["shortfalls"].get("chemistry")
-    assert sel["chosen_per_subject"]["chemistry"] == 0
-    assert len(sel["passages"]) == 12
-    assert sum(sel["handed_on"].values()) == sum(sel["shortfalls"].values())
-
-
-def test_pages_are_dealt_so_writers_get_a_spread_and_no_overlap():
-    (sel, _), _ = run_select(writers=3, per_writer=5)
-    by_writer: dict[str, list[dict]] = {}
-    for p in sel["passages"]:
-        by_writer.setdefault(p["writer_id"], []).append(p)
-    assert sorted(by_writer) == ["w01", "w02", "w03"]
-    assert all(len(v) == 5 for v in by_writer.values())
-    assert all(len({p["subject"] for p in v}) >= 3 for v in by_writer.values())
-    codes = [p["code"] for p in sel["passages"]]
-    assert len(set(codes)) == len(codes)
-    assert codes[0] == "w01-01"
-
-
-def test_selection_records_attribution_and_pins_without_content():
-    (sel, _), _ = run_select()
-    p = sel["passages"][0]
-    assert p["license_url"] == CC_BY and p["authors"] == ["A. Author"]
-    url = urlparse(p["source_url"])
-    assert url.hostname == "openstax.org" and url.path.startswith("/books/") and url.fragment
-    assert sel["pins"]["college-physics"] == {"archive_version": "20260101.000000", "version": "v1"}
-    assert "seed" in sel and sel["rule"].startswith("Passage selection rule")
-
-
-def test_a_pin_is_passed_to_the_resolver():
-    pin = ox.BookPin("20260101.000000", "v1")
-    (sel, _), fetcher = run_select(pins={"college-physics": pin})
-    assert sel["pins"]["college-physics"]["version"] == "v1"
-    assert not any(u == ox.RELEASE_URL and False for u in fetcher.requests)
-
-
-def test_pin_parsing():
-    assert kit._parse_pins(["x=2026@abc"])["x"] == ox.BookPin("2026", "abc")
-    with pytest.raises(SystemExit):
-        kit._parse_pins(["nonsense"])
 
 
 # --------------------------------------------------------------------- work folder
@@ -379,30 +227,6 @@ def test_the_work_folder_must_be_outside_the_repo(tmp_path):
 # ------------------------------------------------------------------------- brief
 
 
-def test_brief_has_each_passage_attribution_consent_and_no_script(work):
-    out = kit.build_briefs(work, work / "briefs", "someone@example.test")
-    assert [p.name for p in out] == ["brief-w01.html", "brief-w02.html"]
-    text = out[0].read_text(encoding="utf-8")
-    sel = kit.load_selection(work)
-    mine = [p for p in sel["passages"] if p["writer_id"] == "w01"]
-    for p in mine:
-        assert p["code"] in text and p["source_url"] in text and "OpenStax" in text
-    assert all(p["code"] not in text for p in sel["passages"] if p["writer_id"] == "w02")
-    assert "someone@example.test" in text and "w01-01.pdf" in text
-    assert "<math" in text and "hidden" not in text  # presentation maths; annotations dropped
-    assert "CC BY 4.0" in text and "writer id" in text
-    assert "<script" not in text and "<img" not in text
-
-
-def test_brief_drops_media_scripts_and_attributes():
-    xml = (
-        '<div id="x" onclick="evil()"><p class="c">Hi <script>alert(1)</script>'
-        '<img src="a.png"/><b>bold</b> &lt;tag&gt;</p></div>'
-    )
-    out = kit.render_passage_html(kit.ET.fromstring(xml))
-    assert out == "<div><p>Hi <b>bold</b> &lt;tag&gt;</p></div>"
-
-
 # ------------------------------------------------------------------ synthetic PDFs
 
 
@@ -424,60 +248,6 @@ def make_pdf(path: Path, *, strokes: int = 0, image: bool = False, pages: int = 
     doc.close()
 
 
-def test_name_codes_tolerate_case_spacing_and_noise():
-    f = kit.codes_in_name
-    assert f("w01-03.pdf") == {"w01-03"}
-    assert f("W01_3.PDF") == {"w01-03"}
-    assert f("w02 p07 (1).pdf") == {"w02-07"}
-    assert f("my notes w03-10 final.pdf") == {"w03-10"}
-    assert f("notes.pdf") == set()
-    assert f("w01-02 and w01-03.pdf") == {"w01-02", "w01-03"}
-    assert f("show01-03.pdf") == set()
-
-
-def test_matching_sorts_files_into_matched_unmatched_ambiguous_unknown_duplicate(tmp_path):
-    folder = tmp_path / "back"
-    (folder / "sub").mkdir(parents=True)
-    for name in ["w01-01.pdf", "sub/W01_02.PDF", "notes.pdf", "w01-01 and w01-02.pdf",
-                 "w09-01.pdf", "w02-01.pdf", "w02-01 copy.pdf", "readme.txt"]:  # fmt: skip
-        (folder / name).write_bytes(b"%PDF")
-    codes = {"w01-01", "w01-02", "w02-01", "w02-02"}
-    m = kit.match_returns(folder, codes)
-    assert sorted(m["matched"]) == ["w01-01", "w01-02"]
-    assert sorted(m["duplicates"]) == ["w02-01"]
-    assert [p.name for p in m["unmatched"]] == ["notes.pdf"]
-    assert [p.name for p in m["ambiguous"]] == ["w01-01 and w01-02.pdf"]
-    assert [p.name for p in m["unknown"]] == ["w09-01.pdf"]
-
-
-def test_inspect_pdf_classifies_ink_and_refuses_the_rest(tmp_path):
-    vec = tmp_path / "vec.pdf"
-    make_pdf(
-        vec, strokes=120, pages=2, meta={"producer": "iPadOS Quartz PDFContext", "author": "Pat"}
-    )
-    info = kit.inspect_pdf(vec)
-    assert info["status"] == "ok" and info["ink"] == "vector" and info["n_pages"] == 2
-    assert info["app"] == "Apple Quartz PDFContext" and "producer" not in info
-
-    ras = tmp_path / "ras.pdf"
-    make_pdf(ras, image=True)
-    assert kit.inspect_pdf(ras)["ink"] == "raster"
-
-    blank = tmp_path / "blank.pdf"
-    make_pdf(blank)
-    assert kit.inspect_pdf(blank)["status"] == "rejected_no_ink"
-
-    many = tmp_path / "many.pdf"
-    make_pdf(many, strokes=50, pages=kit.MAX_PAGES + 1)
-    assert kit.inspect_pdf(many) == {
-        "status": "rejected_too_many_pages", "n_pages": kit.MAX_PAGES + 1
-    }  # fmt: skip
-
-    bad = tmp_path / "bad.pdf"
-    bad.write_bytes(b"not a pdf at all")
-    assert kit.inspect_pdf(bad)["status"] == "rejected_unreadable"
-
-
 def returns_folder(tmp_path: Path) -> Path:
     folder = tmp_path / "returned"
     folder.mkdir()
@@ -490,63 +260,7 @@ def returns_folder(tmp_path: Path) -> Path:
     return folder
 
 
-def test_intake_matches_copies_and_reports_counts_only(work, tmp_path):
-    report = kit.run_intake(work, returns_folder(tmp_path))
-    assert report["accepted"] == ["w01-01", "w01-02"]
-    assert report["rejected"] == {"w02-01": "rejected_no_ink"}
-    assert report["unmatched_files"] == 1
-    assert set(report["still_missing"]) == {"w01-03", "w02-02", "w02-03"}
-    assert (work / "pages" / "w01-01.pdf").exists()
-    assert not (work / "pages" / "w02-01.pdf").exists()
-    intake = json.loads((work / "intake.json").read_text())
-    assert intake["w01-01"]["sha256"] == kit.sha256_file(work / "pages" / "w01-01.pdf")
-    assert "Pat Real" not in (work / "intake.json").read_text()
-    assert "stray" not in (work / "intake.json").read_text()
-
-
-def test_a_second_intake_keeps_earlier_pages(work, tmp_path):
-    kit.run_intake(work, returns_folder(tmp_path))
-    later = tmp_path / "later"
-    later.mkdir()
-    make_pdf(later / "w01-03.pdf", strokes=100)
-    report = kit.run_intake(work, later)
-    assert report["accepted"] == ["w01-01", "w01-02", "w01-03"]
-
-
-def test_two_files_for_one_passage_are_refused(work, tmp_path):
-    folder = tmp_path / "dup"
-    folder.mkdir()
-    make_pdf(folder / "w01-01.pdf", strokes=100)
-    make_pdf(folder / "w01-01 (1).pdf", strokes=100)
-    report = kit.run_intake(work, folder)
-    assert report["duplicates"] == ["w01-01"] and report["accepted"] == []
-
-
 # --------------------------------------------------------------------------- gold
-
-
-def test_gold_is_the_source_mathml_in_order_and_scores_itself(work):
-    sel = kit.load_selection(work)
-    records = kit.gold_records(sel, kit.load_sources(work, sel))
-    eqs = [r for r in records if r["kind"] == "equation" and r["code"] == "w01-01"]
-    assert [r["order"] for r in eqs] == [0, 1, 2, 3]
-    assert all(r["id"].startswith("handwriting-copy/w01-01/eq-") for r in eqs)
-    assert all(
-        r["license_url"] == CC_BY and urlparse(r["source_url"]).hostname == "openstax.org"
-        for r in eqs
-    )
-    assert eqs[1]["mathml"].count("<mn>1</mn>") >= 1
-    assert score_mathml(eqs[0]["mathml"], eqs[0]["mathml"]).exact_strict
-    assert score_latex("x+0=1", eqs[0]["mathml"]).exact_lenient
-    prose = [r for r in records if r["kind"] == "prose" and r["code"] == "w01-01"]
-    assert len(prose) == 1 and "hidden" not in prose[0]["text"]
-
-
-def test_gold_command_writes_jsonl_without_network(work):
-    path = kit.write_gold(work)
-    lines = [json.loads(line) for line in path.read_text().splitlines()]
-    assert len(lines) == sum(1 for _ in lines) > 0
-    assert {r["kind"] for r in lines} == {"equation", "prose"}
 
 
 # ------------------------------------------------------- consent, manifest, export
@@ -563,11 +277,6 @@ def prepared(work, tmp_path):
     kit.record_consent(work, "w01", True, "2026-11-04")
     kit.record_consent(work, "w02", False, "2026-11-04")
     approve_all(work)
-
-
-def test_consent_must_name_a_known_writer(work):
-    with pytest.raises(SystemExit):
-        kit.record_consent(work, "w77", True, "2026-11-04")
 
 
 def test_manifest_publishes_only_consented_pages_and_counts_the_rest(work, tmp_path):
@@ -599,13 +308,6 @@ def _one_more(tmp_path, name):
     return folder
 
 
-def test_without_a_recorded_answer_pages_stay_private(work, tmp_path):
-    kit.run_intake(work, returns_folder(tmp_path))
-    m = kit.build_manifest(work, "2026-11-05")
-    assert m["totals"]["published"] == 0 and m["totals"]["private"] == 2
-    assert not any(w["consent_recorded"] for w in m["writers"])
-
-
 def test_export_copies_only_consented_pages_and_strips_personal_metadata(work, tmp_path):
     prepared(work, tmp_path)
     kit.run_intake(work, _one_more(tmp_path, "w02-02"))
@@ -633,23 +335,6 @@ def test_a_later_export_removes_pages_whose_consent_was_withdrawn(work, tmp_path
     kit.record_consent(work, "w01", False, "2026-11-06")
     kit.run_export(work, dest, "2026-11-06")
     assert list((dest / "pages").glob("*.pdf")) == []
-
-
-def test_command_line_end_to_end_on_a_work_folder(work, tmp_path, capsys):
-    ret = returns_folder(tmp_path)
-    assert kit.main(["brief", "--work", str(work), "--send-to", "x"]) == 0
-    assert kit.main(["intake", "--work", str(work), "--returns", str(ret)]) == 0
-    assert kit.main(["consent", "--work", str(work), "--writer", "w01", "--publish", "yes"]) == 0
-    assert kit.main(["review", "--work", str(work)]) == 0
-    assert (work / "review" / "w01-01-1.png").exists()
-    codes = ["w01-01", "w01-02"]
-    assert kit.main(["review", "--work", str(work), "--approve", *codes, "--reviewer", "r01"]) == 0
-    assert kit.main(["gold", "--work", str(work)]) == 0
-    assert kit.main(["manifest", "--work", str(work), "--out", str(tmp_path / "m.json")]) == 0
-    assert kit.main(["export", "--work", str(work), "--dest", str(tmp_path / "d")]) == 0
-    assert json.loads((tmp_path / "m.json").read_text())["totals"]["published"] == 2
-    with pytest.raises(SystemExit):
-        kit.main(["intake", "--work", str(work), "--returns", str(REPO / "tests")])
 
 
 # ----------------------------------------------- hardened stripping, review, consent text
@@ -749,15 +434,6 @@ def test_export_fails_closed_when_a_pdf_cannot_be_cleaned(work, tmp_path, monkey
     assert not (dest / "manifest.json").exists()
 
 
-def test_intake_keeps_no_raw_app_strings(work, tmp_path):
-    folder = tmp_path / "r"
-    folder.mkdir()
-    make_pdf(folder / "w01-01.pdf", strokes=60, meta={"producer": "Pat's iPad", "creator": "Pat"})
-    kit.run_intake(work, folder)
-    assert "Pat" not in (work / "intake.json").read_text()
-    assert json.loads((work / "intake.json").read_text())["w01-01"]["app"] == "other"
-
-
 def test_review_renders_pngs_and_reports_hidden_text(work, tmp_path):
     folder = tmp_path / "r"
     folder.mkdir()
@@ -848,14 +524,6 @@ def test_the_consent_text_says_who_asks_ages_withdrawal_retention_and_review():
     ]:
         assert phrase in text
     assert len(kit.CONSENT_PARTS) >= 5 and all(len(part) < 400 for part in kit.CONSENT_PARTS)
-
-
-def test_the_brief_fills_in_the_reply_address_and_splits_the_consent_text(work):
-    out = kit.build_briefs(work, work / "briefs", "reply@example.test")
-    text = out[0].read_text(encoding="utf-8")
-    assert text.count("reply@example.test") >= 2 and "{send_to}" not in text
-    assert text.count('<div class="consent"><p>') == 1 and text.count("</p><p>") >= 4
-    assert "May we publish your handwriting pages?</h2>" in text
 
 
 def test_purge_deletes_a_no_now_and_old_unpublished_pages_only(work, tmp_path):

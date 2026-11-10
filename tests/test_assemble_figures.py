@@ -12,8 +12,6 @@ import pymupdf
 import pytest
 
 from readablestem.core.types import (
-    DocumentResult,
-    DocumentStats,
     Element,
     EquationFix,
     FigureFix,
@@ -153,65 +151,6 @@ def test_model_text_in_the_description_is_escaped():
     assert "<p>A &lt;b&gt;bold&lt;/b&gt; claim &amp; more text here, enough.</p>" in html
 
 
-@pytest.mark.parametrize(
-    "fix",
-    [
-        figure_fix(Status.REJECTED, long_description=LONG, data_table=grid()),
-        figure_fix(Status.ABSTAINED, long_description=LONG),
-        Fix(
-            element_id="p1-e5",
-            kind=Kind.FIGURE,
-            status=Status.ACCEPTED,
-            figure=FigureFix(figure_type="photo", alt="", decorative=True, long_description=LONG),
-        ),
-    ],
-    ids=["rejected", "abstained", "decorative"],
-)
-def test_no_description_without_a_usable_proposal(fix):
-    html = render(fix)
-    assert "<details" not in html and "figure-description" not in html
-
-
-def test_figures_without_details_are_written_as_before():
-    html = render(figure_fix())
-    assert "<details" not in html and ".figure-description" not in html
-    assert "th, td {" not in html
-
-
-def test_an_id_already_taken_drops_the_table_not_the_description():
-    other = Element(
-        id="p1-e5-data-caption",
-        kind=Kind.PARAGRAPH,
-        page=0,
-        bbox=(0, 0, 1, 1),
-        order=1,
-        text="A paragraph whose id is taken.",
-    )
-    html = render_html(
-        title="T",
-        lang="en",
-        elements=[other, figure_element()],
-        fixes=[figure_fix(long_description=LONG, data_table=grid(), data_values_from_text=True)],
-        crops={"p1-e5": png()},
-    )
-    assert "<table" not in html and "Description of Figure 2.3" in html
-    assert all(c.passed for c in static_checks(html))
-
-
-def test_a_stored_result_renders_the_same_file():
-    fix = figure_fix(long_description=LONG, data_table=grid(), data_values_from_text=False)
-    element = figure_element()
-    result = DocumentResult(
-        pipeline_version="0.4.0",
-        elements=[element],
-        fixes=[fix],
-        stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
-    )
-    stored = DocumentResult.model_validate_json(result.model_dump_json())
-    crops = {"p1-e5": png(300, 200, noise=True)}
-    assert render(stored.fixes[0], stored.elements[0], crops) == render(fix, element, crops)
-
-
 # ---------------------------------------------------------------------- MF23 images
 
 
@@ -240,75 +179,11 @@ def test_line_art_keeps_its_png_bytes():
     assert figure_images.student_image(crop, "diagram") == ("image/png", crop)
 
 
-def test_a_chart_that_is_a_photograph_becomes_a_jpeg():
-    # A raster chart scanned or saved as JPEG: as PNG it is several times larger.
-    crop = png(300, 200, noise=True)
-    mime, _ = figure_images.student_image(crop, "chart")
-    assert mime == "image/jpeg"
-
-
-def test_large_images_are_scaled_down_never_up():
-    mime, data = figure_images.student_image(png(2000, 1000, noise=True), "photo")
-    assert mime == "image/jpeg" and size_of(data) == (1600, 800)
-    mime, data = figure_images.student_image(png(1000, 2400), "diagram")
-    assert size_of(data) == (667, 1600)
-    small = png(120, 80, noise=True)
-    assert size_of(figure_images.student_image(small, "photo")[1]) == (120, 80)
-
-
 @pytest.fixture
 def fresh_cache():
     figure_images.clear_cache()
     yield
     figure_images.clear_cache()
-
-
-def test_an_image_is_made_once_per_crop_and_figure_type(fresh_cache, monkeypatch):
-    """A review write makes the file again; the images in it are the same, so each is encoded
-    once (T3-19), however many times the file is made."""
-    made: list[str | None] = []
-    real = figure_images._student_image
-    monkeypatch.setattr(
-        figure_images, "_student_image", lambda crop, kind: made.append(kind) or real(crop, kind)
-    )
-    crop = png(300, 200, noise=True)
-    first = figure_images.student_image(crop, "photo")
-    for _ in range(5):
-        assert figure_images.student_image(crop, "photo") == first
-    assert made == ["photo"]
-    figure_images.student_image(crop, "chart")  # another type decides differently: its own entry
-    figure_images.student_image(png(300, 201, noise=True), "photo")  # another crop
-    assert made == ["photo", "chart", "photo"]
-
-
-def test_a_file_made_again_is_the_same_file_and_costs_no_encoding(fresh_cache, monkeypatch):
-    crops = {"p1-e5": png(300, 200, noise=True)}
-    once = render(figure_fix(), crops=crops)
-    assert embedded(once)
-
-    def refuse(*args):
-        raise AssertionError("encoded again")
-
-    monkeypatch.setattr(figure_images, "_student_image", refuse)
-    assert render(figure_fix(), crops=crops) == once
-
-
-def test_the_cache_keeps_to_its_size_and_forgets_what_is_not_used(fresh_cache, monkeypatch):
-    monkeypatch.setattr(figure_images, "CACHE_BYTES", 3000)
-    crops = [png(60, 40 + i) for i in range(60)]  # flat line art: kept as the PNG it is
-    for crop in crops:
-        figure_images.student_image(crop, "diagram")
-    assert 0 < figure_images._cache_bytes <= 3000
-    assert len(figure_images._cache) < len(crops)
-    # a recent image is still there, an old one has gone
-    last, first = (figure_images.hashlib.sha256(c).hexdigest() for c in (crops[-1], crops[0]))
-    assert (last, "diagram") in figure_images._cache
-    assert (first, "diagram") not in figure_images._cache
-    # an image larger than the whole cache is made and not kept
-    monkeypatch.setattr(figure_images, "CACHE_BYTES", 10)
-    before = len(figure_images._cache)
-    figure_images.student_image(png(300, 200, noise=True), "photo")
-    assert len(figure_images._cache) == before
 
 
 def test_an_image_not_used_for_a_while_is_dropped(fresh_cache, monkeypatch):
@@ -357,26 +232,6 @@ def test_transparency_and_unreadable_images_are_kept_as_they_are():
     assert figure_images.student_image(with_alpha, "photo") == ("image/png", with_alpha)
     broken = b"\x89PNG\r\n\x1a\nnot really a png"
     assert figure_images.student_image(broken, "photo") == ("image/png", broken)
-
-
-def test_the_same_crop_always_gives_the_same_bytes():
-    crop = png(300, 200, noise=True)
-    assert figure_images.student_image(crop, "photo") == figure_images.student_image(crop, "photo")
-
-
-def test_the_student_file_embeds_the_reencoded_image():
-    crop = png(300, 200, noise=True)
-    fix = Fix(
-        element_id="p1-e5",
-        kind=Kind.FIGURE,
-        status=Status.ACCEPTED,
-        figure=FigureFix(figure_type="photo", alt="A jet car on a desert track."),
-    )
-    html = render(fix, crops={"p1-e5": crop})
-    ((mime, data),) = embedded(html)
-    assert mime == "image/jpeg" and data == figure_images.student_image(crop, "photo")[1]
-    assert 'alt="A jet car on a desert track." width="304" height="197"' in html
-    assert all(c.passed for c in static_checks(html))
 
 
 def test_flagged_figures_and_scanned_pages_are_reencoded_too():

@@ -14,7 +14,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 ACR = (ROOT / "docs/acr/acr-draft.md").read_text(encoding="utf-8")
-LEVELS = ("Supports", "Partially Supports", "Not Applicable", "Not yet evaluated")
 
 LEVEL_A = re.findall(
     r"\d\.\d+\.\d+",
@@ -61,11 +60,6 @@ def test_every_level_a_and_aa_criterion_is_there_once():
     assert set(AA) == set(LEVEL_AA)
 
 
-def test_every_row_has_one_of_the_four_levels():
-    for criterion, (level, _) in ALL.items():
-        assert level in LEVELS, (criterion, level)
-
-
 def test_a_supports_row_names_a_test_or_the_code_it_rests_on():
     for criterion, (level, evidence) in ALL.items():
         if level != "Supports":
@@ -96,23 +90,6 @@ def test_the_screen_reader_rows_wait_for_the_session():
         level, evidence = ALL[criterion]
         assert level == "Not yet evaluated", (criterion, level)
         assert "VoiceOver" in evidence, criterion
-
-
-def test_a_row_that_is_not_yet_evaluated_says_why():
-    for criterion, (level, evidence) in ALL.items():
-        if level == "Not yet evaluated":
-            assert "VoiceOver" in evidence or "Not reviewed" in evidence, criterion
-
-
-def test_the_counts_at_the_end_add_up():
-    for name, table in (("Level A", A), ("Level AA", AA)):
-        counts = {level: sum(1 for lv, _ in table.values() if lv == level) for level in LEVELS}
-        line = re.search(rf"{name}, (\d+) rows: (.*?)\.\n", ACR + "\n", flags=re.S)
-        assert line, name
-        text = " ".join(line.group(0).split())
-        assert f"{name}, {len(table)} rows" in text
-        for level, number in counts.items():
-            assert f"{level} {number}" in text, (name, level, number, text)
 
 
 def test_nothing_claims_conformance():

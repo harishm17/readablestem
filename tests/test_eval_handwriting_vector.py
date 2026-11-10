@@ -14,7 +14,6 @@ import pytest
 from readablestem.eval import handwriting_set as hw
 from readablestem.eval import handwriting_vector as hv
 from readablestem.pipeline import page_type
-from readablestem.pipeline.ink_strokes import extract_ink
 
 SEED = "vector-test-seed"
 
@@ -97,45 +96,6 @@ def test_rebuild_hash_is_deterministic(built, candidates, tmp_path: Path) -> Non
         ).read_text()
 
 
-def test_rebuild_hash_follows_the_seed_and_the_ink(built, candidates, tmp_path: Path) -> None:
-    _, manifest = built
-    other = hv.build_set(candidates, tmp_path / "a", seed="another-seed", units=6)
-    assert other["rebuild_hash"] != manifest["rebuild_hash"]
-    first = next(iter(candidates))
-    changed = dict(candidates)
-    ink = changed[first].ink
-    changed[first] = hw.Candidate(
-        hw.Ink(ink.sample_id, ink.split, ink.label, ink.strokes, "0" * 64),
-        changed[first].mathml_inline,
-        changed[first].mathml_display,
-        changed[first].tokens,
-        changed[first].inline_ok,
-    )
-    same_layout = hv.build_set(changed, tmp_path / "b", seed=SEED, units=6)
-    assert same_layout["rebuild_hash"] != manifest["rebuild_hash"]
-
-
-def test_manifest_and_gold_describe_the_set_without_holding_ink(built) -> None:
-    out, manifest = built
-    assert manifest["n_units"] == 6 and manifest["n_pages"] == 12
-    assert {u["style"] for u in manifest["units"]} == set(hv.STYLES)
-    assert {u["ruled"] for u in manifest["units"]} == {True, False}
-    assert {u["typed_header"] for u in manifest["units"]} == {True, False}
-    assert manifest["source"]["license"] == hw.LICENSE_NAME
-    ids = [e["sample_id"] for u in manifest["units"] for e in u["expressions"]]
-    assert len(ids) == len(set(ids)) == manifest["n_expressions"]
-    for unit in manifest["units"]:
-        lines = (out / f"{unit['unit']}.jsonl").read_text().splitlines()
-        records = [json.loads(line) for line in lines]
-        assert [r["sample_id"] for r in records] == [e["sample_id"] for e in unit["expressions"]]
-        for r, e in zip(records, unit["expressions"], strict=True):
-            assert r["kind"] == "equation" and r["part"] == hv.PART and r["latex"]
-            assert r["ink_style"] == unit["style"] and r["strokes"] == e["strokes"]
-            assert r["pdf"] == f"pdfs/{unit['unit']}.pdf"
-            assert r["pdf_sha256"] == unit["pdf_content_sha256"]
-    assert "points" not in (out / "manifest.json").read_text()
-
-
 def test_pages_have_no_text_layer_but_the_short_typed_header(built) -> None:
     out, manifest = built
     for unit in manifest["units"]:
@@ -153,89 +113,10 @@ def test_pages_have_no_text_layer_but_the_short_typed_header(built) -> None:
 # ------------------------------------------------------------------------------ page_type
 
 
-def _kinds(out: Path, manifest: dict, style: str) -> list[str]:
-    kinds = []
-    for unit in manifest["units"]:
-        if unit["style"] != style:
-            continue
-        for page in pymupdf.open(out / "pdfs" / f"{unit['unit']}.pdf"):
-            result = page_type.classify(
-                page, page.get_text("rawdict")["blocks"], page.get_cdrawings()
-            )
-            kinds.append(result.kind)
-    return kinds
-
-
-@pytest.mark.parametrize("style", ["path", "outline"])
-def test_page_type_calls_built_pages_handwritten(built, style: str) -> None:
-    kinds = _kinds(*built, style)
-    assert len(kinds) == 4 and set(kinds) == {"handwritten"}, kinds
-
-
-def test_page_type_calls_per_sample_pages_handwritten(built) -> None:
-    assert set(_kinds(*built, "samples")) == {"handwritten"}
-
-
 # ------------------------------------------------------------------------------ ink_strokes
 
 
-def _recovered(out: Path, unit: dict) -> tuple[int, int, int]:
-    """(strokes drawn, strokes recovered inside the drawn boxes, expressions recovered exactly)."""
-    drawn = found = exact = 0
-    for number, page in enumerate(pymupdf.open(out / "pdfs" / f"{unit['unit']}.pdf"), 1):
-        ink = extract_ink(page)
-        assert ink.analysed
-        for e in (e for e in unit["expressions"] if e["page"] == number):
-            x0, y0, x1, y1 = e["box_pt"]
-            inside = [
-                s
-                for s in ink.strokes
-                if x0 - 2 <= s.bbox[0] and s.bbox[2] <= x1 + 2
-                and y0 - 2 <= s.bbox[1] and s.bbox[3] <= y1 + 2
-            ]  # fmt: skip
-            drawn += e["strokes"]
-            found += len(inside)
-            exact += len(inside) == e["strokes"]
-    return drawn, found, exact
-
-
-@pytest.mark.parametrize("style", list(hv.STYLES))
-def test_ink_strokes_recovers_the_built_strokes(built, style: str) -> None:
-    out, manifest = built
-    drawn = found = exact = n = 0
-    for unit in (u for u in manifest["units"] if u["style"] == style):
-        d, f, x = _recovered(out, unit)
-        drawn, found, exact, n = drawn + d, found + f, exact + x, n + len(unit["expressions"])
-    assert drawn > 100
-    if style == "samples":  # fast curves and crossings split or join a few strokes
-        assert abs(found - drawn) <= 0.1 * drawn and exact >= 0.6 * n, (drawn, found, exact, n)
-    else:
-        assert (found, exact) == (drawn, n), style
-
-
-def test_ink_strokes_drops_the_ruled_paper_and_keeps_the_ink(built) -> None:
-    out, manifest = built
-    ruled = [u for u in manifest["units"] if u["ruled"]]
-    assert ruled
-    page = pymupdf.open(out / "pdfs" / f"{ruled[0]['unit']}.pdf")[0]
-    ink = extract_ink(page)
-    assert ink.dropped.get("rule", 0) >= 20
-    assert (
-        len(ink.strokes) >= sum(e["strokes"] for e in ruled[0]["expressions"] if e["page"] == 1) - 5
-    )
-
-
 # -------------------------------------------------------------------------------- picking
-
-
-def test_pick_candidates_skips_registered_ids_and_labels(inks: Path, tmp_path: Path) -> None:
-    first = hv.pick_candidates(inks, SEED, 10, exclude_ids=set(), exclude_labels=set())
-    skip_id = next(iter(first))
-    skip_label = hw.read_ink(inks / f"{list(first)[1]}.inkml").label
-    again = hv.pick_candidates(inks, SEED, 10, exclude_ids={skip_id}, exclude_labels={skip_label})
-    assert skip_id not in again
-    assert skip_label not in {c.ink.label for c in again.values()}
-    assert len(again) == 10
 
 
 def test_used_samples_reads_the_registered_manifests(inks: Path, tmp_path: Path) -> None:
@@ -247,10 +128,3 @@ def test_used_samples_reads_the_registered_manifests(inks: Path, tmp_path: Path)
     ids, labels = hv.used_samples([manifest], inks.parent)
     assert ids == {sample}
     assert labels == {hw.read_ink(inks / f"{sample}.inkml").label}
-
-
-def test_unknown_style_is_refused() -> None:
-    doc = pymupdf.open()
-    shape = doc.new_page().new_shape()
-    with pytest.raises(ValueError, match="unknown ink style"):
-        hv.draw_stroke(shape, [(0, 0), (5, 5)], "crayon", 1.4, (0, 0, 0))

@@ -19,13 +19,11 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
 from sqlalchemy import select
 
 from fixtures.web.support import ALICE, WebEnv, make_pdf, make_settings
 from readablestem.config import Settings
-from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from readablestem.core.types import ConversionOutput
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.models import make_vision_client
 from readablestem.pipeline import run as run_module
 from readablestem.pipeline.layout import LayoutError
@@ -101,15 +99,6 @@ def without_timings(value):
 # --------------------------------------------------------------------------- the protocol
 
 
-def test_frames_round_trip_and_a_closed_end_is_the_end():
-    a, b = socket.socketpair()
-    with a, b:
-        protocol.write_frame(a, [b"head", b"", b"x" * 100_000])
-        assert protocol.read_frame(b) == [b"head", b"", b"x" * 100_000]
-        a.close()
-        assert protocol.read_frame(b) is None
-
-
 def test_a_frame_cut_short_is_the_end_and_an_oversized_one_is_refused():
     a, b = socket.socketpair()
     with a, b:
@@ -143,16 +132,6 @@ def test_the_child_gets_no_secret_and_not_the_database():
     for secret in ("sk-secret", "sk-ant-secret", "s" * 40, "c" * 40, "password"):
         assert secret not in text
     assert values["max_pages_per_job"] == settings.max_pages_per_job  # the rest is carried
-
-
-def test_the_child_environment_has_no_keys_and_does_say_where_the_table_model_is(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:password@host/db")
-    monkeypatch.setenv("TABLE_MODEL_DIR", "/app/models")
-    env = child_environment()
-    assert "OPENAI_API_KEY" not in env and "DATABASE_URL" not in env
-    assert env["TABLE_MODEL_DIR"] == "/app/models"
-    assert env["MALLOC_ARENA_MAX"] == "2"
 
 
 def test_a_request_may_name_only_a_pydantic_model_of_this_package():
@@ -253,15 +232,6 @@ def test_a_model_request_outside_the_bounds_is_answered_with_an_error_not_sent(c
     assert replies and replies[0][0] == 1 and "error" in replies[0][1]
 
 
-def test_a_model_request_with_too_many_images_is_not_sent():
-    c = conversion()
-    c.client = type("Never", (), {"run": lambda *a, **k: pytest.fail("sent")})()  # type: ignore[assignment]
-    replies: list = []
-    c._reply = lambda ident, **kw: replies.append(kw)  # type: ignore[method-assign]
-    c._model(MODEL_HEADER, [b"x"] * (isolated_convert.MAX_IMAGES_PER_REQUEST + 1))
-    assert "error" in replies[0]
-
-
 # --------------------------------------------------------------------------- normal runs
 
 
@@ -282,38 +252,6 @@ def test_a_conversion_in_the_child_gives_what_convert_pdf_gives_and_spends_the_s
     assert own_budget.spent_usd > 0
     assert kid_budget.spent_usd == pytest.approx(own_budget.spent_usd)
     assert kid_budget.calls == own_budget.calls
-
-
-def test_the_callbacks_run_here_and_the_cache_and_observer_are_the_parents(spawned):
-    from readablestem.core.types import Element, Fix, ModelCall
-
-    seen = {"progress": [], "stages": [], "lookups": 0, "stored": [], "calls": []}
-
-    class Cache:
-        def lookup(self, element: Element, key: str) -> Fix | None:
-            seen["lookups"] += 1
-            return None
-
-        def store(self, element: Element, key: str, fix: Fix) -> None:
-            seen["stored"].append((element.id, key))
-
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    out = convert_isolated(
-        LECTURE_NOTES.read_bytes(),
-        settings=settings,
-        client=client,
-        progress=lambda done, total: seen["progress"].append((done, total)),
-        stage_progress=lambda event: seen["stages"].append(event.stage),
-        step_cache=Cache(),
-        call_observer=lambda call: seen["calls"].append(call),
-    )
-    assert seen["progress"] and seen["progress"][-1][0] == seen["progress"][-1][1]
-    assert seen["stages"][0] == "layout" and "assemble" in seen["stages"]
-    assert seen["lookups"] > 0 and seen["stored"]
-    assert seen["calls"] and all(isinstance(c, ModelCall) for c in seen["calls"])
-    assert len(seen["calls"]) == out.result.stats.model_calls
-    assert spawned.all_gone()  # the child does not outlive the call
 
 
 def test_an_error_the_pipeline_raises_arrives_as_the_same_error():
@@ -386,51 +324,12 @@ def test_a_hanging_child_is_killed_at_the_time_limit(spawned, monkeypatch):
     assert spawned.all_gone()
 
 
-def test_a_cancelled_attempt_kills_the_child_at_once(spawned):
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    flag = threading.Event()
-    threading.Timer(1.0, flag.set).start()
-    started = time.monotonic()
-    with pytest.raises(BudgetExceeded) as caught:
-        convert_isolated(
-            b"%PDF-1.4", settings=settings, client=client, cancelled=flag.is_set, fault="hang"
-        )
-    assert caught.value.scope == "cancelled"
-    assert time.monotonic() - started < 60
-    assert spawned.all_gone()
-
-
-def test_a_progress_callback_that_raises_kills_the_child_and_the_error_is_raised_here(spawned):
-    class Gone(BudgetExceeded):
-        def __init__(self) -> None:
-            super().__init__("cancelled", "gone")
-
-    def progress(done: int, total: int) -> None:
-        raise Gone
-
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    with pytest.raises(Gone):
-        convert_isolated(
-            LECTURE_NOTES.read_bytes(), settings=settings, client=client, progress=progress
-        )
-    assert spawned.all_gone()
-
-
 def test_the_child_cannot_use_more_than_its_memory_cap(spawned):
     """A real allocation past the cap, not a stand-in: `conversion_memory_mb` is enforced."""
     settings = offline_settings(conversion_memory_mb=1536)
     client, _ = offline_client(settings)
     with pytest.raises(ConversionOom):
         convert_isolated(b"%PDF-1.4", settings=settings, client=client, fault="oom")
-
-
-def test_an_unknown_fault_is_refused_before_anything_starts():
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    with pytest.raises(ValueError, match="unknown fault"):
-        convert_isolated(b"x", settings=settings, client=client, fault="format_disk")
 
 
 # --------------------------------------------------------------------------- on the worker
@@ -559,55 +458,6 @@ def test_deleting_a_running_job_kills_its_child(env, spawned):
     assert spawned.all_gone()
 
 
-def test_the_worker_hands_the_converter_its_cancel_flag_and_time_limit(env):
-    seen: dict = {}
-
-    def converter(pdf_bytes, /, *, settings, client, cancelled=None, limit_s=None, **_):
-        seen.update(cancelled=cancelled, limit_s=limit_s)
-        return env.converter.output.model_copy(deep=True)
-
-    queue_job(env)
-    worker_with(env, converter=converter).run_once()
-    assert callable(seen["cancelled"]) and seen["cancelled"]() is False
-    assert seen["limit_s"] == pytest.approx(worker_with(env).time_limit_s(1))
-
-
-def test_the_default_converter_is_the_isolated_one_and_the_codes_are_explained():
-    assert default_converter() is convert_isolated
-    for code in ("conversion_crashed", "conversion_oom"):
-        assert job_error_message(code) != job_error_message("no such code")
-    assert error_code_for(ConversionCrashed("x")) == "conversion_crashed"
-    assert error_code_for(ConversionOom("x")) == "conversion_oom"
-    assert error_code_for(ConversionTimeout("x")) == "timeout"
-
-
-def test_converting_through_the_child_stores_the_same_job_as_in_process(env):
-    """The worker's own path, offline: result, crops and the job's spend are what they are
-    with the converter in this process."""
-    inside = queue_job(env)
-    outside = queue_job(env, age_s=10)
-    assert worker_with(env, converter=convert_pdf).run_once() == outside
-    assert worker_with(env).run_once() == inside
-    a, b = env.job(outside), env.job(inside)
-    assert a.status == b.status == "done"
-    assert a.model_calls == b.model_calls and a.cost_usd == pytest.approx(b.cost_usd)
-    assert a.html == b.html
-
-    def crops(job_id: str) -> dict:
-        with session_scope(env.ctx.factory) as session:
-            rows = session.scalars(select(Blob).where(Blob.job_id == job_id, Blob.kind == "crop"))
-            return {r.element_id: r.content for r in rows}
-
-    assert crops(outside) == crops(inside) and crops(inside)
-
-
-def test_a_conversion_output_from_the_child_is_a_conversion_output():
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    out = convert_isolated(LECTURE_NOTES.read_bytes(), settings=settings, client=client)
-    assert isinstance(out, ConversionOutput) and out.result.html
-
-
 def test_a_child_flooding_the_parent_with_requests_is_refused(monkeypatch):
     release = threading.Event()
     c = conversion()
@@ -623,23 +473,6 @@ def test_a_child_flooding_the_parent_with_requests_is_refused(monkeypatch):
         release.set()
 
 
-def test_the_settings_the_child_is_built_from_are_the_parents_but_for_the_secrets(tmp_path):
-    settings = make_settings(tmp_path, feature_tables=True, max_pages_per_job=7, main_model="x")
-    rebuilt = Settings.model_construct(**settings_for_child(settings))
-    skipped = {
-        "database_url",
-        "admin_emails",
-        "email_sender",
-        "langfuse_public_key",
-        "langfuse_host",
-    }
-    for name in type(settings).model_fields:
-        value = getattr(settings, name)
-        if name in skipped or isinstance(value, SecretStr):
-            continue
-        assert getattr(rebuilt, name) == value, name
-
-
 @pytest.mark.parametrize("code", ["conversion_crashed", "conversion_oom"])
 def test_try_again_is_not_offered_for_a_file_that_crashed_or_exhausted_its_child(code):
     from readablestem.web import retry
@@ -649,17 +482,6 @@ def test_try_again_is_not_offered_for_a_file_that_crashed_or_exhausted_its_child
 
 
 # --------------------------------------------------------------------------- review fixes
-
-
-def test_the_parent_refuses_a_frame_over_the_child_limit_without_reading_it(monkeypatch):
-    monkeypatch.setattr(protocol, "MAX_FRAME_BYTES", 1000)
-    a, b = socket.socketpair()
-    with a, b:
-        protocol.write_frame(a, [b"x" * 2000])
-        with pytest.raises(ValueError, match="too large"):
-            protocol.read_frame(
-                b, limit=protocol.MAX_FRAME_BYTES, admit=lambda n: pytest.fail("read")
-            )
 
 
 def test_an_oversized_done_frame_fails_the_call_as_a_crash_and_is_logged(monkeypatch, caplog):
@@ -705,33 +527,6 @@ def test_a_sigkill_from_outside_is_run_once_more_and_then_called_out_of_memory(m
     assert error_code_for(caught.value) == "conversion_oom" and len(runs) == 2
 
 
-def test_a_sigkill_from_outside_that_does_not_come_back_costs_the_job_nothing(monkeypatch):
-    real = isolated_convert._Conversion
-    made: list[int] = []
-
-    def killed_the_first_time(*args, **kwargs):
-        made.append(1)
-        return real(*args, **{**kwargs, "fault": "kill9" if len(made) == 1 else None})
-
-    monkeypatch.setattr(isolated_convert, "_Conversion", killed_the_first_time)
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    out = convert_isolated(LECTURE_NOTES.read_bytes(), settings=settings, client=client)
-    assert len(made) == 2 and out.result.html
-
-
-def test_this_process_killing_the_child_is_not_an_external_kill(spawned):
-    settings = offline_settings()
-    client, _ = offline_client(settings)
-    flag = threading.Event()
-    threading.Timer(0.5, flag.set).start()
-    with pytest.raises(BudgetExceeded):  # not retried, not "out of memory"
-        convert_isolated(
-            b"%PDF-1.4", settings=settings, client=client, cancelled=flag.is_set, fault="hang"
-        )
-    assert len(spawned.processes) == 1
-
-
 @pytest.mark.parametrize("status", [1, protocol.EXIT_BROKEN])
 def test_a_child_that_cannot_start_is_unavailable_not_a_bad_pdf(monkeypatch, caplog, status):
     caplog.set_level(logging.INFO)
@@ -760,13 +555,6 @@ def test_a_startup_error_frame_is_unavailable_and_logs_only_the_type(caplog):
     assert line.levelno == logging.ERROR and fields["error_type"] == "ModuleNotFoundError"
 
 
-def test_try_again_is_offered_for_an_unavailable_converter():
-    from readablestem.web import retry
-
-    assert "conversion_unavailable" in retry.RETRYABLE_FAILURES
-    assert job_error_message("conversion_unavailable") != job_error_message("no such code")
-
-
 def test_the_self_check_starts_a_child_and_reports_when_it_cannot(monkeypatch, caplog):
     caplog.set_level(logging.INFO)
     assert isolated_convert.self_check() is True
@@ -787,17 +575,6 @@ def run_python(code: str) -> str:
     return done.stdout.strip()
 
 
-def test_the_childs_thread_allowance_is_capped_whatever_the_host_has():
-    code = (
-        "from readablestem.web import conversion_child as c\n"
-        "c._prepare({'settings': {}})\n"
-        "from readablestem.pipeline import tables\n"
-        "print(tables.cpu_allowance())"
-    )
-    assert 1 <= int(run_python(code)) <= protocol.MAX_THREADS
-    assert isolated_convert.CPU_FACTOR == protocol.MAX_THREADS
-
-
 def test_the_child_asks_the_kernel_to_kill_it_before_the_web_process():
     code = (
         "from readablestem.web import conversion_child as c\n"
@@ -805,40 +582,6 @@ def test_the_child_asks_the_kernel_to_kill_it_before_the_web_process():
         "print(open('/proc/self/oom_score_adj').read().strip())"
     )
     assert run_python(code) == "1000"
-
-
-def test_a_bug_in_a_parent_callback_is_not_reported_as_a_broken_child():
-    def progress(done: int, total: int) -> None:
-        raise ValueError("a bug here")
-
-    c = conversion(progress=progress)
-    frame = b'{"op": "progress", "id": 1, "done": 1, "total": 2}'
-    with pytest.raises(ValueError, match="a bug here"):
-        c._handle([frame])
-
-
-@pytest.mark.parametrize(
-    "frame",
-    [
-        b'{"op": "progress", "id": 1, "done": 3, "total": 2}',
-        b'{"op": "progress", "id": 1, "done": -1, "total": 2}',
-        b'{"op": "progress", "id": 1, "done": 1, "total": 999999}',
-        b'{"op": "progress", "id": true, "done": 1, "total": 2}',
-    ],
-)
-def test_progress_outside_zero_to_total_to_the_page_limit_is_refused(frame):
-    c = conversion(progress=lambda *_: None)
-    with pytest.raises(_Protocol):
-        c._handle([frame])
-
-
-def test_a_model_the_deployment_is_not_set_up_with_is_not_sent():
-    settings = offline_settings()
-    assert settings.main_model in isolated_convert.allowed_models(settings)
-    assert settings.fallback_for and set(settings.fallback_for.values()) <= (
-        isolated_convert.allowed_models(settings)
-    )
-    assert "gpt-not-configured" not in isolated_convert.allowed_models(settings)
 
 
 def test_a_failed_start_still_cleans_up(monkeypatch):

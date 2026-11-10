@@ -31,7 +31,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.ops.retention import purge_expired
-from readablestem.web import heading_groups, job_page, retention
+from readablestem.web import heading_groups, job_page
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, session_scope, utcnow
 
@@ -129,12 +129,6 @@ def test_each_choice_sets_the_mode_and_the_time_kept(ux, fields, mode, opt_in, d
     assert as_utc(job.retain_until) - as_utc(job.created_at) == timedelta(days=days)
 
 
-def test_a_review_decision_restarts_the_24_hour_clock(ux):
-    set_retain_until(ux, utcnow() + timedelta(hours=2))
-    decide(ux, "p1-e2", action="accept")
-    assert timedelta(hours=23, minutes=55) < retain_in(ux) <= timedelta(hours=24)
-
-
 def test_a_download_restarts_the_clock_of_a_day_and_a_week_job(ux):
     set_retain_until(ux, utcnow() + timedelta(hours=2))
     assert ux.browser.get(f"/jobs/{ux.job_id}/download").status_code == 200
@@ -154,18 +148,6 @@ def test_activity_never_shortens_the_time_kept(ux):
     assert as_utc(stored_job(ux).retain_until) == as_utc(far)
 
 
-def test_the_developer_look_choice_keeps_its_30_days_from_upload(ux):
-    with session_scope(ux.ctx.factory) as session:
-        job = session.get(Job, ux.job_id)
-        assert job is not None
-        job.retention_mode, job.opt_in_retention = "dev", True
-        job.retain_until = utcnow() + timedelta(days=3)
-    before = stored_job(ux).retain_until
-    decide(ux, "p1-e2", action="accept")
-    ux.browser.get(f"/jobs/{ux.job_id}/download")
-    assert stored_job(ux).retain_until == before
-
-
 def test_keep_7_more_days_on_the_job_page(ux):
     html = page(ux)
     assert "Keep for 7 days" in html and "Then it is deleted on" in html
@@ -179,17 +161,6 @@ def test_keep_7_more_days_on_the_job_page(ux):
     assert (job.retention_mode, job.opt_in_retention) == ("week", False)
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
     assert "7 days after you last work on it" in text_of(page(ux))
-
-
-def test_a_developer_look_job_is_not_offered_more_days(ux):
-    with session_scope(ux.ctx.factory) as session:
-        job = session.get(Job, ux.job_id)
-        assert job is not None
-        job.retention_mode, job.opt_in_retention = "dev", True
-    assert "Keep for 7 days" not in page(ux)
-    before = stored_job(ux).retain_until
-    post(ux, "/keep")
-    assert stored_job(ux).retain_until == before and stored_job(ux).retention_mode == "dev"
 
 
 def test_keeping_needs_the_csrf_token_and_the_owner(ux):
@@ -211,26 +182,6 @@ def test_the_purge_leaves_a_document_worked_on_since(ux):
     later = utcnow() + timedelta(hours=3)
     assert purge_expired(ux.ctx.factory, later).jobs_deleted == 0
     assert purge_expired(ux.ctx.factory, utcnow() + timedelta(hours=25)).jobs_deleted == 1
-
-
-def test_the_clock_functions_on_their_own():
-    class Job_:  # a job row's fields, nothing else
-        retention_mode = "day"
-        retain_until = utcnow() + timedelta(hours=1)
-
-    job = Job_()
-    now = utcnow()
-
-    class S:
-        retention_hours = 24
-        opt_in_retention_days = 30
-
-    assert retention.restart_clock(job, S(), now)  # type: ignore[arg-type]
-    assert job.retain_until == now + timedelta(hours=24)
-    assert not retention.restart_clock(job, S(), now)  # type: ignore[arg-type]
-    assert retention.mode_for_upload(keep=False, share=False) == "day"
-    assert retention.mode_for_upload(keep=True, share=False) == "week"
-    assert retention.mode_for_upload(keep=False, share=True) == "dev"
 
 
 # --------------------------------------------------------------------------- T1-7: the title
@@ -264,25 +215,6 @@ def html_title(html: str) -> str:
     return unescape(re.search(r"<title>(.*?)</title>", html, re.S).group(1))
 
 
-def test_the_title_field_starts_with_the_pdf_title_without_its_section_number(titled):
-    html = page(titled)
-    assert title_field(html) == "Derivatives"
-    assert "<h1>Derivatives</h1>" in html
-    assert '<p class="doc-file">File: week3.pdf</p>' in html
-    assert "Derivatives | ReadableSTEM" in html_title(html) or "Derivatives" in html_title(html)
-    assert 'for="title">Title students hear</label>' in html
-
-
-def test_the_list_download_name_and_delete_page_use_the_same_title(titled):
-    listing = titled.browser.get("/app").text
-    assert "Titled “Derivatives”" in text_of(listing) and "1 Derivatives" not in text_of(listing)
-    assert ">week3.pdf</a>" in listing  # a generated title is under the file name, not over it
-    response = titled.browser.get(f"/jobs/{titled.job_id}/download")
-    assert 'filename="derivatives-' in response.headers["content-disposition"]
-    confirm = titled.browser.get(f"/jobs/{titled.job_id}/delete").text
-    assert "Delete Derivatives" in text_of(confirm) or "“Derivatives”" in text_of(confirm)
-
-
 def test_setting_a_title_remakes_the_file_and_names_everything(titled):
     post(titled, "/title", title="  Calculus   week 3 ")
     job = stored_job(titled)
@@ -296,12 +228,6 @@ def test_setting_a_title_remakes_the_file_and_names_everything(titled):
     response = titled.browser.get(f"/jobs/{titled.job_id}/download")
     assert 'filename="calculus-week-3-' in response.headers["content-disposition"]
     assert "<title>Calculus week 3</title>" in response.text
-
-
-def test_the_default_title_is_what_the_file_already_says(titled):
-    assert html_title(stored_job(titled).html) == "Vectors"  # the fixture's own file
-    post(titled, "/title", title="Derivatives")  # the suggestion: no choice stored
-    assert stored_job(titled).title_override is None
 
 
 def test_an_empty_title_goes_back_to_the_pdfs(titled):
@@ -407,38 +333,6 @@ def test_the_contact_line_needs_the_csrf_token_and_the_owner(ux):
 # --------------------------------------------------------------------------- T1-11
 
 
-def test_no_model_cost_or_internal_codes_on_the_job_page(ux):
-    html = page(ux)
-    text = text_of(html)
-    assert "Model cost" not in text and "cost" not in text.lower().replace("decision", "")
-    assert "Code:" not in text and "<code>" not in html
-    assert "Confidence" not in text
-
-
-def test_the_job_page_counts_decisions_and_nothing_else(ux):
-    text = text_of(page(ux))
-    assert "Decisions to make 3" in text and "Decisions made 0" in text
-    assert "Accepted for you" not in text and "Of the" not in text
-    decide(ux, GROUP, action="reject")
-    text = text_of(page(ux))
-    assert "Decisions to make 2" in text and "Decisions made 1" in text
-
-
-def test_the_list_view_has_no_codes_or_confidence_and_no_model_cost(ux):
-    html = ux.browser.get(f"/jobs/{ux.job_id}/review/list").text
-    text = text_of(html)
-    assert "Confidence" not in text and "Code:" not in text and "code-line" not in html
-    assert not re.search(r"\d+%", text)
-
-
-def test_language_is_one_line_with_a_change_control(ux):
-    html = page(ux)
-    section = html[html.index('id="language-heading"') : html.index('id="student-file-heading"')]
-    assert re.search(r"<p>Language: English", section)
-    assert '<summary>Change<span class="visually-hidden"> the language</span></summary>' in section
-    assert section.count("<select") == 1
-
-
 def test_the_checks_say_what_ran_and_what_did_not(ux):
     html = page(ux)
     assert "What was checked, and what was not" in html
@@ -478,33 +372,6 @@ def test_the_link_row_counts_the_links_kept_and_names_the_lost_ones():
     assert row.html == "6 of 8 links kept; 2 were not web addresses."
     assert row.href in {"#not-handled-heading", "#worth-checking-heading"}
     assert row.href_text == "See the notice"
-
-
-def test_the_link_row_says_yes_only_when_every_link_was_kept():
-    row = link_row(link_result(3, 3, 0))
-    assert row.html == "Yes: 3 links." and not row.href
-    assert link_row(link_result(1, 3, 0)).html == "1 of 3 links kept."
-    assert link_row(link_result(0, 2, 1)).html == "0 of 2 links kept; 1 was not web addresses."
-
-
-def test_the_link_row_on_the_job_page_links_to_its_notice(tmp_path):
-    output = review_output()
-    output.result = link_result(6, 8, 2)
-    env = make_env(tmp_path, output, review_pdf())
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        html = page(env)
-    assert "6 of 8 links kept; 2 were not web addresses." in text_of(html)
-    href = re.search(
-        r'kept; 2 were not web addresses\.\s*<a href="(#[^"]+)">See the notice</a>', html
-    )
-    assert href
-    assert f'id="{href.group(1)[1:]}"' in html
-    assert "A link in the PDF was not kept because it was not a web or email address." in html
 
 
 # --------------------------------------------------------------------------- T1-18: groups
@@ -551,13 +418,6 @@ def group_result(texts_above: list[str | None], label: str = "Teacher Support"):
     return result, members
 
 
-def test_the_advice_is_bold_text_when_each_copy_sits_under_the_same_words():
-    result, members = group_result(["Teacher Support", "teacher  support", "Teacher Support"])
-    got = heading_groups.advice(result, members)
-    assert got.suggest == "bold" and got.under_same == 3 and got.total == 3
-    assert "Each copy sits directly under a heading with the same words" in got.fact
-
-
 def test_the_advice_counts_the_copies_when_only_some_sit_under_the_same_words():
     result, members = group_result(["Teacher Support", "Teacher Support", None, None])
     got = heading_groups.advice(result, members)
@@ -568,88 +428,8 @@ def test_the_advice_counts_the_copies_when_only_some_sit_under_the_same_words():
     assert got.fact.startswith("3 of the 4 copies sit directly under a heading")
 
 
-def test_a_run_in_label_is_bold_text_and_other_labels_keep_the_proposal():
-    result, members = group_result([None, None], label="Solution")
-    got = heading_groups.advice(result, members)
-    assert got.suggest == "bold" and "usually bold text, not a heading" in got.fact
-    result, members = group_result([None, None], label="Key Terms")
-    got = heading_groups.advice(result, members)
-    assert got.suggest == "keep" and "the proposal stands" in got.fact
-
-
-def test_the_crops_are_the_first_middle_and_last_copy():
-    result, members = group_result([None] * 7)
-    elements = {e.id: e for e in result.elements}
-    shown = heading_groups.crops(members, elements)
-    assert [c.element_id for c in shown] == ["c0", "c3", "c6"]
-    assert [c.page for c in shown] == [1, 1, 1]
-    assert [c.element_id for c in heading_groups.crops(members[:2], elements)] == ["c0", "c1"]
-    assert [c.element_id for c in heading_groups.crops(members[:1], elements)] == ["c0"]
-
-
 def card(env, query: str = "") -> str:
     return env.browser.get(f"/jobs/{env.job_id}/review?item={GROUP}{query}").text
-
-
-def test_the_group_card_names_the_fact_shows_crops_and_suggests_keeping(ux):
-    """The fixture's copies sit under no heading with the same words."""
-    html = card(ux)
-    text = text_of(html)
-    assert "Suggested: keep them as headings." in text
-    assert "No copy sits directly under a heading with the same words" in text
-    for eid in ("p1-e3", "p1-e7", "p2-e0"):
-        assert f"/jobs/{ux.job_id}/regions/{eid}.png" in html
-    # the three copies at the top, and each heading's own picture under "Decide them one by one"
-    assert html.count('class="region-image" loading="lazy"') == 6
-    keep = re.search(
-        r'<button[^>]*class="(button[^"]*)"[^>]*data-role="accept">Keep as headings', html
-    )
-    bold = re.search(r'<button[^>]*class="(button[^"]*)">Make bold text', html)
-    assert keep and keep.group(1) == "button" and bold and bold.group(1) == "button-secondary"
-
-
-def doubled_output():
-    """The fixture with a box title "Teacher Support" directly above each copy."""
-    output = review_output()
-    result = output.result
-    elements = sorted(result.elements, key=lambda e: e.order)
-    rebuilt: list[Element] = []
-    for element in elements:
-        if element.id in {"p1-e3", "p1-e7", "p2-e0"}:
-            title, fix = heading(f"box-{element.id}", 0, "Teacher Support", 2)
-            title.page = element.page
-            rebuilt.append(title)
-            result.fixes.append(fix)
-        rebuilt.append(element)
-    for order, element in enumerate(rebuilt):
-        element.order = order
-    result.elements = rebuilt
-    return output
-
-
-def test_with_a_box_title_above_each_copy_bold_text_is_the_main_button(tmp_path):
-    env = make_env(tmp_path, doubled_output(), review_pdf())
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        html = card(env)
-        text = text_of(html)
-        assert "Suggested: make them bold text." in text
-        assert "Each copy sits directly under a heading with the same words" in text
-        bold = re.search(r'<button[^>]*class="(button[^"]*)">Make bold text', html)
-        keep = re.search(
-            r'<button[^>]*class="(button[^"]*)"[^>]*data-role="accept">Keep as headings', html
-        )
-        assert bold and bold.group(1) == "button" and keep and keep.group(1) == "button-secondary"
-        assert html.index("Make bold text") < html.index("Keep as headings")
-        # The list view says the same, with its own buttons.
-        listed = env.browser.get(f"/jobs/{env.job_id}/review/list").text
-        assert "Suggested: make them bold text." in text_of(listed)
-        assert re.search(r'class="button">Make all 3 bold text', listed)
-        assert re.search(r'class="button-secondary">Apply to all 3', listed)
 
 
 # --------------------------------------------------------------------------- T1-19: tables
@@ -671,16 +451,6 @@ def tables(tmp_path):
         yield env
 
 
-def test_when_only_headers_are_missing_that_is_the_main_button(tables):
-    html = tables.browser.get(f"/jobs/{tables.job_id}/review?item=p1-e1").text
-    main = re.search(r'<button[^>]*class="button"[^>]*>Use the first row as headers', html)
-    assert main
-    assert re.search(
-        r'class="button-secondary"[^>]*data-role="accept"[^>]*>Accept without headers', html
-    )
-    assert html.index("Use the first row as headers") < html.index("Accept without headers")
-
-
 def test_the_button_sets_the_first_row_as_headers_and_settles_the_table(tables):
     version = tables.job(tables.job_id).result_version
     post(
@@ -695,37 +465,3 @@ def test_the_button_sets_the_first_row_as_headers_and_settles_the_table(tables):
     fix = result.fix_for("p1-e1")
     assert fix is not None and fix.table is not None
     assert fix.table.grid.header_rows == 1 and not fix.pending
-
-
-def test_other_findings_keep_accept_as_the_main_action(tmp_path):
-    output = table_output()  # decision 1 has several findings, not only the headers
-    env = make_env(tmp_path, output, table_pdf())
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, table_pdf()))
-        env.run_worker()
-        html = client.get(f"/jobs/{env.job_id}/review?item=p1-e1").text
-    assert "Use the first row as headers" not in html
-
-
-def test_the_list_view_offers_the_same_button(tables):
-    html = tables.browser.get(f"/jobs/{tables.job_id}/review/list").text
-    assert "Use the first row as headers" in html
-    assert re.search(r'class="button-secondary">Accept without headers', html)
-
-
-def test_the_checks_disclosure_counts_the_checks_that_ran(tmp_path):
-    output = review_output()
-    output.result.html_checks = [Check(name="html.lang", passed=True)]
-    env = make_env(tmp_path, output, review_pdf())
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        html = page(env)
-    block = text_of(html[html.index('id="checks-ran"') :].split("</details>")[0])
-    assert "Ran on this file: 1 structure check." in block

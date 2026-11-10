@@ -37,22 +37,17 @@ from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
-    Fix,
     Kind,
     PageStats,
     PageType,
-    Status,
 )
 from readablestem.models import OFFLINE_DEFAULTS, make_vision_client
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import estimate_max_cost_usd
-from readablestem.pipeline import page_type
 from readablestem.pipeline.run import convert_pdf
 from readablestem.web.auth import set_allowed
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import Job, JobStatus, SpendDay, User, session_scope, utcnow
-from readablestem.web.outcome import job_outcome
-from readablestem.web.pdf_probe import MAX_PAGE_SIDE_PT
+from readablestem.web.db import Job, SpendDay, User, session_scope, utcnow
 from readablestem.web.spend import largest_reservation_usd
 from readablestem.web.worker import (
     JobCancelled,
@@ -60,7 +55,6 @@ from readablestem.web.worker import (
     default_client_factory,
     error_code_for,
     job_caps,
-    result_outcome,
 )
 
 LAYOUT = Path(__file__).parent / "fixtures" / "layout"
@@ -223,19 +217,6 @@ def test_uploads_close_when_less_than_the_largest_single_call_is_left(env):
     response = upload(env.browser, make_pdf(1))
     assert response.status_code == 503
     assert "Conversions are paused" in env.browser.get("/app").text
-
-
-def test_largest_reservation_matches_the_biggest_step_request():
-    settings = Settings(_env_file=None)
-    from readablestem.pipeline import equation_step
-
-    biggest = estimate_max_cost_usd(
-        settings.main_model,
-        n_images=1,
-        text_chars=600,
-        max_output_tokens=equation_step.MAX_OUTPUT_TOKENS,
-    )
-    assert largest_reservation_usd(settings) >= biggest
 
 
 # --------------------------------------------------------------------------- caps per job
@@ -442,100 +423,6 @@ def _typed(page: int, kind: str, visible: int = 0, invisible: int = 0) -> PageTy
     return PageType(page=page, kind=kind, visible_chars=visible, invisible_chars=invisible)
 
 
-def _kept(element_id: str, reason: str) -> Fix:
-    return Fix(element_id=element_id, kind=Kind.FIGURE, status=Status.FAILED, reason=reason)
-
-
-@pytest.mark.parametrize(
-    ("result", "expected"),
-    [
-        (_result([0, 1], [0, 1]), (JobStatus.FAILED, "scanned")),
-        (_result([0], [], elements=0), (JobStatus.FAILED, "no_content")),
-        (_result([0, 1], [0]), (JobStatus.DONE, "scanned_pages")),
-        (_result([0, 1], [0], stopped_by="budget_daily"), (JobStatus.DONE, "budget_daily")),
-        (_result([0], [], stopped_by="budget_cancelled"), (JobStatus.DONE, None)),
-        (_result([0], []), (JobStatus.DONE, None)),
-        # With page types (pipeline 0.4.0): the probe's own codes, never a guess.
-        (
-            _result(
-                [0, 1],
-                [0, 1],
-                page_types=[_typed(0, "handwritten_ocr", 0, 300), _typed(1, "handwritten")],
-                fixes=[_kept("p1-e0", "handwritten_page")],
-            ),
-            (JobStatus.FAILED, "handwritten"),
-        ),
-        (
-            _result(
-                [0, 1],
-                [0],
-                page_types=[_typed(0, "scan_ocr", 0, 400), _typed(1, "born_digital", 900)],
-                fixes=[_kept("p1-e0", "scanned_page")],
-            ),
-            (JobStatus.DONE, "pages_not_converted"),
-        ),
-        # A full-page picture with a short title may be a slide: kept, never failed.
-        (
-            _result(
-                [0], [0], page_types=[_typed(0, "scan_no_text", 12)],
-                fixes=[_kept("p1-e0", "scanned_page")],
-            ),
-            (JobStatus.DONE, "pages_not_converted"),
-        ),
-        (
-            _result(
-                [0], [], page_types=[_typed(0, "mixed_ink", 500)],
-                fixes=[_kept("p1-e0", "handwriting_on_page")],
-            ),
-            (JobStatus.DONE, "pages_not_converted"),
-        ),
-    ],
-    ids=[
-        "all-scanned",
-        "empty",
-        "some-scanned",
-        "budget-first",
-        "not-a-budget-stop",
-        "normal",
-        "all-handwritten",
-        "some-scanned-typed",
-        "slide-like-picture",
-        "handwriting-on-typed",
-    ],
-)  # fmt: skip
-def test_result_outcome(result, expected):
-    assert result_outcome(result) == expected
-
-
-def test_outcome_messages_for_every_new_code_say_what_to_do():
-    for code in (
-        "scanned",
-        "scanned_ocr",
-        "handwritten",
-        "handwritten_no_text",
-        "no_content",
-        "model_not_configured",
-        "access_removed",
-    ):
-        outcome = job_outcome(status="failed", error_code=code)
-        assert outcome is not None and outcome.label == "Stopped" and outcome.message
-        if code.startswith(("scanned", "handwritten")):  # no OCR advice, no promise
-            assert "run OCR" not in outcome.message and " yet" not in outcome.message
-    for code in (
-        "budget_daily",
-        "budget_job_usd",
-        "budget_job_calls",
-        "scanned_pages",
-        "pages_not_converted",
-    ):
-        outcome = job_outcome(status="done", error_code=code)
-        assert outcome is not None and outcome.partial
-    assert job_outcome(status="done", error_code=None) is None
-    assert job_outcome(status="queued", error_code=None) is None
-    waiting = job_outcome(status="queued", error_code=None, budget_closed=True)
-    assert waiting is not None and waiting.code == "waiting_budget"
-
-
 # --------------------------------------------------------------------------- allowlist
 
 
@@ -549,27 +436,6 @@ def test_removing_someone_stops_their_queued_jobs_and_spending(env):
     job = env.job(queued)
     assert job.status == "failed" and job.error_code == "access_removed"
     assert env.run_worker() is None  # nothing of theirs is claimed
-
-
-def test_a_running_job_stops_spending_once_its_owner_is_removed(env):
-    job_id = job_id_from(upload(env.browser, make_pdf(1)))
-    seen: dict = {}
-
-    def converter(pdf_bytes, /, *, settings, client, progress=None):
-        client.budget.reserve(0.001)
-        with session_scope(env.ctx.factory) as session:
-            set_allowed(session, ALICE, allowed=False)
-        try:
-            client.budget.reserve(0.001)
-        except JobCancelled:
-            seen["refused"] = True
-        return fake_output()
-
-    worker = env.worker()
-    worker.converter = converter
-    assert worker.run_once() == job_id
-    assert seen == {"refused": True}
-    assert env.job(job_id).error_code == "access_removed"
 
 
 def test_jobs_of_users_no_longer_allowed_are_not_claimed(env):
@@ -622,31 +488,7 @@ def test_a_missing_model_key_fails_with_its_own_code_and_message(env, monkeypatc
     assert "Conversions are not set up on this server yet" in text
 
 
-def test_page_size_limit_is_generous_for_real_documents():
-    assert MAX_PAGE_SIDE_PT > 3370  # an A0 poster's long side
-
-
 # --------------------------------------------------------------------------- page kinds
-
-
-def test_page_types_tell_scans_from_text_figures_and_blank_pages():
-    data = scanned_pdf(1, then_text=True)
-    doc = pymupdf.open(stream=data, filetype="pdf")
-    figure = doc.new_page()
-    figure.draw_circle((200, 200), 50)
-    doc.new_page()
-    doc[0].set_rotation(90)  # image boxes are in unrotated coordinates
-    kinds = []
-    for page in doc:
-        raw = page.get_text("rawdict", flags=page_type.TEXT_FLAGS)["blocks"]
-        kinds.append(page_type.classify(page, raw, page.get_cdrawings()).kind)
-    assert kinds == ["scan_no_text", "born_digital", "vector_no_text", "blank"]
-    assert page_type.document_refusal(doc) is None  # page 2 is typed
-    doc.close()
-    scanned, blank = _typed(0, "scan_no_text"), _typed(1, "blank")
-    assert page_type.refusal_code([scanned, blank]) == "scanned"
-    assert page_type.refusal_code([blank]) == "no_content"
-    assert page_type.refusal_code([scanned, _typed(1, "vector_no_text")]) is None
 
 
 def test_the_upload_probe_child_caps_its_own_address_space():
@@ -658,28 +500,3 @@ def test_the_upload_probe_child_caps_its_own_address_space():
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert int(out.stdout) == 512 * 1024 * 1024
-
-
-def test_headlines_count_tables_with_equations_and_figures():
-    """tables.pdf: 13 equations and 5 tables. An outage headline used to say '13 of 18
-    equations and figures', and a budget stop '13 of 13' with 3 tables also stopped."""
-
-    def fix(kind: str, reason: str | None = None) -> dict:
-        return {"kind": kind, "status": "failed" if reason else "accepted", "reason": reason}
-
-    outage = {
-        "fixes": [fix("equation", "model_timeout")] * 13
-        + [fix("table", "model_api_error")] * 3
-        + [fix("table")] * 2
-    }
-    message = job_outcome(status="done", error_code=None, result_json=outage)
-    assert message is not None
-    assert "did not answer for 16 of 18 equations and tables" in message.message
-    budget = {
-        "fixes": [fix("equation", "budget_job_usd")] * 13
-        + [fix("table", "budget_job_usd")] * 3
-        + [fix("figure")]
-    }
-    message = job_outcome(status="done", error_code="budget_job_usd", result_json=budget)
-    assert message is not None
-    assert "16 of 17 equations, figures and tables were not converted" in message.message

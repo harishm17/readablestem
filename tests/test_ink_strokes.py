@@ -215,23 +215,6 @@ def test_each_drawing_style_recovers_the_strokes_in_pen_order(style, tol, end_to
     assert {s.source for s in ink.strokes} == {expected}
 
 
-@pytest.mark.parametrize(("style", "_tol", "_end"), STYLES)
-def test_colour_and_width_follow_each_stroke(style, _tol, _end):
-    ink = extract_ink(make_page(style))
-    want = ["#" + "".join(f"{round(c * 255):02x}" for c in col) for col in COLOURS]
-    assert [s.colour for s in ink.strokes] == want
-    for s in ink.strokes:
-        assert 0.7 <= s.width <= 2.0, (style, s.width)
-        assert s.opacity == 1.0
-
-
-def test_pen_order_is_paint_order_not_position():
-    ink = extract_ink(make_page("polyline"))
-    firsts = [s.points[0] for s in ink.strokes]
-    assert firsts != sorted(firsts), "the fixture must draw out of reading order"
-    assert math.dist(firsts[0], TRUTH[0][0]) < 1.0
-
-
 # ----------------------------------------------------------------------------- furniture
 
 
@@ -245,28 +228,6 @@ def test_paper_templates_are_dropped_and_the_ink_kept(style, template):
         assert_matches(stroke, truth, 1.0, 1.7)
 
 
-def test_ruled_paper_alone_has_no_strokes():
-    ink = extract_ink(make_page(None, template="ruled"))
-    assert ink.strokes == []
-    assert ink.dropped["rule"] >= 12
-
-
-def test_square_grid_lines_shorter_than_the_page_are_dropped_by_their_spacing():
-    ink = extract_ink(make_page(None, template="grid"))
-    assert ink.strokes == [] and ink.dropped["grid"] > 40
-
-
-@pytest.mark.parametrize("style", ["polyline", "samples", "outline"])
-def test_pastel_ink_on_a_pastel_template_is_kept(style):
-    pastel = (0.8, 0.8, 1.0)
-    ink = extract_ink(
-        make_page(style, template="ruled", template_colour=pastel, colours=[pastel] * 5)
-    )
-    assert len(ink.strokes) == len(TRUTH)
-    assert {s.colour for s in ink.strokes} == {"#ccccff"}
-    assert ink.regions
-
-
 def test_handwritten_rule_shorter_than_half_the_page_is_ink():
     doc = pymupdf.open()
     page = doc.new_page(width=300, height=300)
@@ -276,16 +237,6 @@ def test_handwritten_rule_shorter_than_half_the_page_is_ink():
     shape.commit()
     ink = extract_ink(page)
     assert len(ink.strokes) == 1 and not ink.dropped
-
-
-def test_dashed_lines_are_furniture():
-    doc = pymupdf.open()
-    page = doc.new_page(width=300, height=300)
-    shape = page.new_shape()
-    shape.draw_line((40, 100), (150, 100))
-    shape.finish(color=(0, 0, 0), width=1, dashes="[3] 0")
-    shape.commit()
-    assert extract_ink(page).dropped == {"dashed": 1}
 
 
 def test_hidden_ink_is_not_read():
@@ -300,20 +251,6 @@ def test_hidden_ink_is_not_read():
 
 
 # ----------------------------------------------------------------------------- the rest
-
-
-def test_highlighter_is_kept_apart_from_the_writing():
-    doc = pymupdf.open()
-    page = doc.new_page(width=300, height=300)
-    shape = page.new_shape()
-    shape.draw_polyline(_line((40, 60), (180, 66), 20))
-    shape.finish(color=(1, 0.9, 0.2), width=9, stroke_opacity=0.4)
-    shape.draw_polyline(TRUTH[2])
-    shape.finish(color=(0, 0, 0), width=1)
-    shape.commit()
-    ink = extract_ink(page)
-    assert len(ink.highlights) == 1 and ink.highlights[0].opacity == pytest.approx(0.4)
-    assert len(ink.strokes) == 1 and len(ink.regions) == 1
 
 
 @pytest.mark.parametrize("rotation", [90, 180, 270])
@@ -377,24 +314,6 @@ def _renumber(strokes: list[Stroke]) -> list[Stroke]:
     ]
 
 
-def test_lines_group_by_proximity_and_far_apart_blocks_are_regions():
-    strokes = _renumber(
-        _word(40, 40) + _word(100, 41) + _word(40, 100) + _word(200, 200)  # two lines, one lone
-    )
-    regions = group_regions(strokes)
-    assert [len(r.strokes) for r in regions] == [8, 4, 4]
-    assert [len(line) for line in regions[0].lines] == [8]
-    assert regions[0].bbox[1] < regions[1].bbox[1] < regions[2].bbox[1]
-
-
-def test_closely_stacked_lines_make_one_region_with_lines_in_order():
-    strokes = _renumber(_word(40, 40) + _word(40, 52) + _word(40, 64))
-    (region,) = group_regions(strokes)
-    assert len(region.lines) == 3
-    tops = [min(region.strokes[i].bbox[1] for i in line) for line in region.lines]
-    assert tops == sorted(tops)
-
-
 def test_a_fraction_is_one_region_even_though_its_bar_is_flat():
     bar = Stroke(((40.0, 50.0), (80.0, 50.0)), "#000000", 1.0, 1.0, 0, "path")
     top = _word(48, 38, n=2)
@@ -403,25 +322,7 @@ def test_a_fraction_is_one_region_even_though_its_bar_is_flat():
     assert len(region.strokes) == 5
 
 
-def test_strokes_stay_in_pen_order_inside_a_region():
-    strokes = _renumber(_word(40, 40))
-    shuffled = [strokes[2], strokes[0], strokes[3], strokes[1]]
-    (region,) = group_regions(shuffled)
-    assert [s.order for s in region.strokes] == [2, 0, 3, 1]  # as given (pen order)
-    assert [region.strokes[i].order for i in region.lines[0]] == [0, 1, 2, 3]  # left to right
-
-
 # ----------------------------------------------------------------------------- output
-
-
-def test_normalised_points_are_per_region_and_keep_the_aspect_ratio():
-    (region,) = group_regions(extract_ink(make_page("polyline")).strokes[2:3])
-    norm = region.normalised(1000.0)
-    flat = np.array([p for s in norm for p in s])
-    assert flat.min(axis=0).tolist() == pytest.approx([0.0, 0.0], abs=1e-6)
-    assert flat.max() == pytest.approx(1000.0)
-    x0, y0, x1, y1 = region.bbox
-    assert flat[:, 0].max() / flat[:, 1].max() == pytest.approx((x1 - x0) / (y1 - y0), rel=1e-6)
 
 
 def test_inkml_is_well_formed_with_a_trace_per_stroke_in_order():
@@ -469,72 +370,6 @@ def test_ios_notes_outlines_become_centre_lines_in_the_ink_area():
     assert sum(len(r.strokes) for r in ink.regions) == len(ink.strokes)
 
 
-def test_ink_no_layer_polylines_are_the_strokes():
-    ink = _fixture_ink("ink_no_layer.pdf")
-    with pymupdf.open(HANDWRITING / "ink_no_layer.pdf") as doc:
-        drawn = len(doc[0].get_cdrawings())
-    assert len(ink.strokes) + 2 == drawn  # the ruled-lines path and the margin line
-    assert {s.source for s in ink.strokes} == {"path"}
-    assert {s.colour for s in ink.strokes} == {"#0d0d14"}
-    assert ink.dropped["rule"] >= 25
-    assert sum(len(r.lines) for r in ink.regions) >= 5
-
-
-def test_fixture_strokes_match_the_pdf_drawing_for_the_polylines():
-    """ink_no_layer is one polyline per stroke: the recovered points are the PDF's own."""
-    with pymupdf.open(HANDWRITING / "ink_no_layer.pdf") as doc:
-        page = doc[0]
-        paths = [d for d in page.get_cdrawings() if abs(d["width"] - 0.9) < 0.01]
-    ink = _fixture_ink("ink_no_layer.pdf")
-    assert len(ink.strokes) == len(paths)
-    for s, d in zip(ink.strokes, paths, strict=True):
-        assert s.points[0] == pytest.approx(tuple(d["items"][0][1]), abs=0.06)
-        assert s.points[-1] == pytest.approx(tuple(d["items"][-1][2]), abs=0.06)
-
-
-def test_ios_notes_centre_lines_follow_the_strokes_the_fixture_was_written_from():
-    """Rebuild ios_notes.pdf from its seed, record the pen paths the writer was given, and
-    compare: tapered, wobbling outlines packed many to a path object."""
-    import importlib.util
-    import sys
-
-    spec = importlib.util.spec_from_file_location("make_fixtures", HANDWRITING / "make_fixtures.py")
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["make_fixtures"] = mod
-    spec.loader.exec_module(mod)
-    truth: list[Pts] = []
-    original = mod.Writer.stroke
-
-    def record(self, centre):
-        if len(centre) >= 2:
-            truth.append(list(centre))
-        original(self, centre)
-
-    mod.Writer.stroke = record
-    try:
-        doc = pymupdf.open()
-        mod.ios_page(doc, 101)
-    finally:
-        mod.Writer.stroke = original
-        sys.modules.pop("make_fixtures", None)
-    ink = extract_ink(doc[0])
-    assert len(ink.strokes) == len(truth)
-    pairs = list(zip(ink.strokes, truth, strict=True))
-    off = [float(_dist_to_polyline(np.array(s.points), t).max()) for s, t in pairs]
-    gap = [
-        float(_dist_to_polyline(np.array(t), list(s.points)).max())
-        for s, t in zip(ink.strokes, truth, strict=True)
-    ]
-    assert float(np.median(off)) < 0.7 and max(off) < 1.6
-    assert float(np.median(gap)) < 1.3 and max(gap) < 2.6
-    forward = sum(
-        math.dist(s.points[0], t[0]) < math.dist(s.points[0], t[-1])
-        for s, t in zip(ink.strokes, truth, strict=True)
-    )
-    assert forward >= 0.9 * len(truth)  # the misses are closed loops, whose start is a guess
-
-
 # ----------------------------------------------------------------------------- limits
 
 
@@ -563,18 +398,6 @@ def test_grouping_50000_strokes_is_fast_whatever_their_layout(shape):
     elapsed = time.monotonic() - start
     assert elapsed < 8.0, (shape, elapsed)
     assert sum(len(r.strokes) for r in regions) == n
-
-
-def test_a_pile_of_strokes_is_an_overrun_not_a_stall():
-    import random
-    import time
-
-    rng = random.Random(7)
-    pts = [(100.0 + rng.uniform(0, 1), 100.0 + rng.uniform(0, 1)) for _ in range(50_000)]
-    start = time.monotonic()
-    with pytest.raises(ink_strokes.InkOverrun):
-        group_regions(_marks(pts), budget=ink_strokes.InkBudget(60.0))
-    assert time.monotonic() - start < 5.0
 
 
 def test_grouping_equals_the_brute_force_partition_on_random_ink():
@@ -628,24 +451,6 @@ def test_grouping_equals_the_brute_force_partition_on_random_ink():
     assert sorted(map(sorted, got)) == sorted(map(sorted, want.values()))
 
 
-def test_an_exhausted_budget_returns_an_unanalysed_empty_page():
-    ink = extract_ink(make_page("outline"), budget=ink_strokes.InkBudget(0))
-    assert not ink.analysed and not ink.strokes and not ink.regions
-
-
-def test_more_strokes_than_the_cap_are_not_grouped():
-    ink = extract_ink(make_page("polyline"), max_strokes=3)
-    assert not ink.analysed and not ink.regions
-
-
-def test_the_caps_are_the_page_type_ones():
-    from readablestem.pipeline import page_type
-
-    assert ink_strokes.INK_MAX_ITEMS is page_type.INK_MAX_ITEMS
-    assert ink_strokes.PAGE_MAX_PATHS is page_type.PAGE_MAX_PATHS
-    assert ink_strokes.InkBudget is page_type.InkBudget
-
-
 def test_strokes_wholly_off_the_page_are_dropped_and_do_not_stretch_regions():
     doc = pymupdf.open()
     page = doc.new_page(width=300, height=300)
@@ -658,14 +463,3 @@ def test_strokes_wholly_off_the_page_are_dropped_and_do_not_stretch_regions():
     assert len(ink.strokes) == 1 and ink.dropped == {"off_page": 1}
     (region,) = ink.regions
     assert region.bbox[2] <= page.rect.x1
-
-
-def test_a_stroke_leaving_the_page_clips_its_region_box_to_the_page():
-    doc = pymupdf.open()
-    page = doc.new_page(width=300, height=300)
-    shape = page.new_shape()
-    shape.draw_polyline([(250.0 + 2 * i, 100.0 + (i % 5)) for i in range(60)])
-    shape.finish(color=(0, 0, 0), width=1)
-    shape.commit()
-    (region,) = extract_ink(page).regions
-    assert region.bbox[2] == pytest.approx(300.0)

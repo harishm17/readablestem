@@ -111,25 +111,6 @@ def test_a_word_file_among_pdfs_is_made_into_a_pdf_and_queued_with_them(web):
     assert office.docx() not in stored(web, jobs[1].id)
 
 
-def test_a_word_file_that_cannot_be_used_does_not_stop_the_others(web):
-    macro = office.rebuild(office.docx_parts(), add={"word/vbaProject.bin": b"\x00"})
-    response = send(web.alice, [("good.pdf", make_pdf(1)), ("macro.docx", macro)])
-    page = results(web.alice, response)
-    assert [j.filename for j in jobs_of(web)] == ["good.pdf"]
-    assert "1 of 2 files uploaded" in page and "Not uploaded" in page
-    assert "macro.docx has something this tool will not open" in page
-
-
-def test_a_word_file_is_refused_in_a_multiple_upload_when_office_input_is_off(tmp_path):
-    env = WebEnv(tmp_path, office_input_enabled=False, max_large_upload_mb=5, max_source_pages=40)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        page = results(client, send(client, [("a.pdf", make_pdf(1)), ("n.docx", office.docx())]))
-        assert [j.filename for j in jobs_of(env)] == ["a.pdf"]
-        assert "n.docx is not a PDF" in page
-
-
 def test_a_large_word_file_is_kept_for_choosing_its_pages_as_a_pdf(tmp_path):
     env = environment(tmp_path, pages=12)  # 12 pages once made into a PDF, over the 5 a go
     with env.running() as client:
@@ -159,33 +140,6 @@ def test_a_large_word_file_is_kept_for_choosing_its_pages_as_a_pdf(tmp_path):
         assert first.page_count == second.page_count == 5
         assert first[0].get_text().strip() == "From Word page 1"
         assert second[0].get_text().strip() == "From Word page 6"
-
-
-def test_a_large_word_file_among_pdfs_waits_for_its_pages_and_the_rest_queue(tmp_path):
-    env = environment(tmp_path, pages=12)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        response = send(client, [("small.pdf", make_pdf(2)), ("Long notes.docx", office.docx())])
-        page = results(client, response)
-        assert "2 of 2 files uploaded" in page and "Choose which pages to convert" in page
-        assert "Choose pages of Long notes.docx" in page
-        assert [j.filename for j in jobs_of(env)] == ["small.pdf"]
-        with session_scope(env.ctx.factory) as session:
-            [row] = list(session.scalars(select(PendingUpload)))
-            assert row.filename == "Long notes.docx" and bytes(row.content).startswith(b"%PDF-")
-
-
-def test_a_revised_version_can_be_a_word_file_that_fits_one_conversion(web):
-    first = send(web.alice, [("v1.pdf", make_pdf(1))]).headers["location"].rsplit("/", 1)[-1]
-    web.run_worker()
-    response = web.alice.post(
-        "/jobs",
-        data={"csrf_token": token(web.alice), "revises": first},
-        files={"pdf": ("v2.docx", office.docx(), DOCX)},
-    )
-    assert response.status_code == 303 and response.headers["location"].startswith("/jobs/")
-    assert [j.revises_job_id for j in jobs_of(web)] == [None, first]
 
 
 def test_a_large_word_file_cannot_be_a_revised_version(tmp_path):

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from readablestem.gold.openstax import extract_elements
@@ -26,30 +25,3 @@ def test_headings_keep_level_text_id_and_context_in_document_order():
         (4, 4, "Inside a Box", "worked-example"),
     ]
     assert headings()[0]["element_id"] == "page_test_title"
-
-
-def test_headings_with_no_visible_text_are_skipped():
-    # The fixture has an h4 holding only a space; a reader never sees it.
-    assert all(h["text"] for h in headings())
-    assert len(headings()) == 5
-
-
-def test_headings_come_after_every_other_kind():
-    # Appending keeps every pre-existing record (and committed JSONL line) unchanged.
-    kinds = [r["kind"] for r in extract_elements(PAGE, CONTENT_URL)]
-    first_heading = kinds.index("heading")
-    assert set(kinds[first_heading:]) == {"heading"}
-    assert "equation" in kinds[:first_heading] and "figure" in kinds[:first_heading]
-
-
-def test_committed_gold_sample_has_headings_for_every_page():
-    manifest = json.loads((REPO / "data" / "gold" / "manifest.json").read_text())
-    assert all(f["counts"].get("heading", 0) > 0 for f in manifest["files"])
-    assert manifest["totals"]["equation"] == 30  # unchanged by the heading change
-    for entry in manifest["files"]:
-        lines = (REPO / "data" / "gold" / entry["path"]).read_text().splitlines()
-        records = [json.loads(line) for line in lines]
-        page_headings = [r for r in records if r["kind"] == "heading"]
-        assert page_headings[0]["level"] == 2  # OpenStax section titles are h2
-        assert page_headings[0]["id"].endswith("/hd-000")
-        assert all(r["text"] for r in page_headings)

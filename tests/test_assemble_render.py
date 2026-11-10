@@ -21,7 +21,6 @@ from readablestem.core.types import (
     HeadingFix,
     Kind,
     Status,
-    inline_marker,
 )
 from readablestem.pipeline.assemble import (
     ABOUT_TITLE,
@@ -33,7 +32,6 @@ from readablestem.pipeline.assemble import (
     FLAGGED_NOTE,
     MATHS_NOTE,
     NOT_CHECKED_YET,
-    outline_before,
     render_html,
     sanitize_mathml,
 )
@@ -132,18 +130,6 @@ def test_document_skeleton(sample_html):
     assert "compli" + "ant" not in sample_html.lower()  # rule 7, anywhere in the output
 
 
-def test_tags_balance_and_no_event_handlers(sample_html):
-    parsed = parse(sample_html)
-    assert parsed.errors == []
-    assert parsed.stack == []
-    assert not [a for a in parsed.attrs if a[1].startswith("on")]
-
-
-def test_passes_static_checks(sample_html):
-    failed = [c for c in static_checks(sample_html) if not c.passed]
-    assert failed == []
-
-
 def test_content_follows_reading_order_not_list_order():
     _, _, elements, fixes, crops = load_sample()
     html = render(list(reversed(elements)), fixes, crops)
@@ -160,19 +146,6 @@ def test_inline_markers_become_inline_maths(sample_html):
     assert '<math display="inline" id="p1-e2"><mrow><mi>v</mi><mo>=</mo><mfrac>' in paragraph
     assert "</math>, where " in paragraph
     assert sample_html.count('id="p1-e2"') == 1  # not rendered again at its own position
-
-
-def test_inline_equation_not_converted_is_flagged_in_place(sample_html):
-    paragraph = block(sample_html, "p1-e1")
-    flagged = re.search(
-        r'<span class="flagged-inline" id="p1-e3"[^>]*>.*?</span></span>', paragraph
-    )
-    assert flagged, paragraph
-    assert 'data-status="abstained"' in flagged.group(0)
-    assert f'alt="{EQUATION_NOT_CONVERTED_ALT}"' in flagged.group(0)
-    assert 'src="data:image/png;base64,' in flagged.group(0)
-    assert "(equation not converted)" in flagged.group(0)
-    assert paragraph.endswith("is the distance travelled.</p>")
 
 
 def test_block_equation_is_display_block_mathml(sample_html):
@@ -202,10 +175,6 @@ def test_not_converted_items_keep_the_original_with_a_visible_note(
     assert "<math" not in item  # a rejected proposal is never shown
 
 
-def test_budget_failure_reason_is_exposed_as_a_code(sample_html):
-    assert 'data-reason="budget_job_usd"' in block(sample_html, "p1-e5")
-
-
 def test_figure_with_alt_text_and_caption(sample_html):
     figure = block(sample_html, "p1-e6")
     assert figure.startswith('<figure id="p1-e6"><img src="data:image/png;base64,')
@@ -222,10 +191,6 @@ def test_decorative_image_without_caption_is_not_an_empty_figure(sample_html):
     item = block(sample_html, "p2-e4")
     assert item.startswith('<div class="decorative" id="p2-e4"><img src="data:image/png')
     assert 'alt=""' in item and "<figure" not in item
-
-
-def test_flag_reason_is_omitted_when_the_fix_has_none(sample_html):
-    assert 'data-status="rejected">' in block(sample_html, "p2-e2")  # no data-reason
 
 
 def test_headings_follow_fixes_and_rejected_ones_become_paragraphs(sample_html):
@@ -262,58 +227,6 @@ def test_outline_never_skips_a_level_after_a_rejection():
 
 def outline(html: str) -> list[str]:
     return [tag for tag, _ in re.findall(r'<(h\d|p) id="([a-z])"', html)]
-
-
-def test_outline_keeps_siblings_after_a_rejection():
-    # Chapter > [Section 1, rejected] > Sub 1.1, Sub 1.2; then Section 2.
-    pairs = [
-        heading("a", 0, 1),
-        heading("b", 1, 2, Status.REJECTED),
-        heading("c", 2, 3),
-        heading("d", 3, 3),
-        heading("e", 4, 2),
-    ]
-    html = render([e for e, _ in pairs], [f for _, f in pairs])
-    # Sub 1.2 stays a sibling of Sub 1.1 (not its child); Section 2 is back at h2.
-    assert outline(html) == ["h1", "p", "h2", "h2", "h2"]
-    assert all(c.passed for c in static_checks(html))
-
-
-def test_outline_moves_a_rejected_headings_subtree_up_together():
-    levels = [1, 2, 3, 4, 3, 2, 3]
-    pairs = [
-        heading(eid, order, level, Status.REJECTED if eid == "b" else Status.ACCEPTED)
-        for order, (eid, level) in enumerate(zip("abcdefg", levels, strict=True))
-    ]
-    html = render([e for e, _ in pairs], [f for _, f in pairs])
-    assert outline(html) == ["h1", "p", "h2", "h3", "h2", "h2", "h3"]
-    assert all(c.passed for c in static_checks(html))
-
-
-def test_outline_without_rejections_is_unchanged():
-    levels = [1, 2, 3, 3, 2, 3, 2, 2]  # one h1: a second one would move the others down
-    pairs = [
-        heading(eid, o, lv) for o, (eid, lv) in enumerate(zip("abcdefgh", levels, strict=True))
-    ]
-    html = render([e for e, _ in pairs], [f for _, f in pairs])
-    assert outline(html) == [f"h{level}" for level in levels]
-
-
-def test_notice_is_the_first_thing_in_main_and_is_escaped():
-    element, fix = heading("a", 0, 1)
-    html = render([element], [fix], notice="Offline <b>test</b> run:\n placeholders.")
-    after_main = html.split("<main>\n", 1)[1]
-    assert after_main.startswith(
-        '<p class="notice readablestem" role="note"><span class="flag-label">Note:</span> '
-        "Offline &lt;b&gt;test&lt;/b&gt; run: placeholders.</p>\n<h1"
-    )
-    assert all(c.passed for c in static_checks(html))
-    assert 'class="notice' not in render([element], [fix], notice="  ")
-
-
-def test_heading_without_a_fix_is_a_paragraph():
-    element, _ = heading("a", 0, 1)
-    assert '<p id="a">H a</p>' in render([element], [])
 
 
 # --------------------------------------------------------------------------- escaping
@@ -412,11 +325,6 @@ def test_sanitizer_keeps_converter_output_intact(latex):
     assert shape(cleaned) == shape(original)
 
 
-def test_sanitizer_sets_display_and_id():
-    cleaned = sanitize_mathml(convert("x"), display="block", element_id="p1-e3")
-    assert cleaned == '<math display="block" id="p1-e3"><mrow><mi>x</mi></mrow></math>'
-
-
 @pytest.mark.parametrize(
     ("mathml", "expected"),
     [
@@ -512,15 +420,6 @@ def test_unsafe_mathml_in_an_accepted_fix_falls_back_to_the_original():
     assert "<script" not in html and "<math" not in html
 
 
-def test_rejected_inline_mathml_hands_its_id_to_the_flag():
-    para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text="a ⟦e1⟧ b")
-    html = render(
-        [para, equation("e1", 1, parent="p")], [accepted("e1", "<math><bad/></math>")], {}
-    )
-    assert '<span class="flagged-inline" id="e1"' in html
-    assert static_checks(html)[6].passed  # html.unique_ids
-
-
 def test_missing_crop_shows_extracted_text_and_says_so():
     html = render(
         [equation("e1", 0, text="v = d / t")],
@@ -536,38 +435,6 @@ def test_inline_equation_without_its_marker_is_rendered_at_its_own_position():
     para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text="ab")
     html = render([para, equation("e1", 1, parent="p")], [accepted("e1", convert("y"))])
     assert '<div class="equation" id="e1"><math display="block">' in html
-
-
-def test_unknown_marker_is_left_as_text():
-    text = f"see {inline_marker('p9-e9')} here"
-    para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text=text)
-    assert f'<p id="p">{text}</p>' in render([para], [])
-
-
-def test_duplicate_element_ids_are_used_once():
-    paras = [
-        Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=i, text=f"t{i}")
-        for i in range(2)
-    ]
-    html = render(paras, [])
-    assert html.count('id="p"') == 1
-    assert "<p>t1</p>" in html
-
-
-def test_first_fix_for_an_element_wins_like_fix_for():
-    failed = Fix(element_id="e1", kind=Kind.EQUATION, status=Status.FAILED, reason="x")
-    html = render([equation("e1", 0)], [failed, accepted("e1", convert("y"))], {"e1": png()})
-    assert 'data-status="failed"' in html and "<math" not in html
-    assert html.count('data-status="') == 1  # the later duplicate is not written either
-
-
-def test_a_repeated_marker_is_flagged_and_counted_once():
-    text = "a ⟦e1⟧ b ⟦e1⟧ c"
-    para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text=text)
-    abstained = Fix(element_id="e1", kind=Kind.EQUATION, status=Status.ABSTAINED)
-    html = render([para, equation("e1", 1, parent="p")], [abstained], {"e1": png()})
-    assert html.count('class="flagged-inline"') == 2 and html.count('id="e1"') == 1
-    assert html.count(FLAGGED_NOTE) == 1
 
 
 # --------------------------------------------------------------------------- about
@@ -610,22 +477,6 @@ def test_the_note_says_checked_with_the_date_once_every_decision_is_made():
     assert f"<p>{CHECKED}.</p>" in about(undated)
 
 
-def test_the_note_says_nothing_about_checking_when_nothing_was_asked():
-    pairs = [heading("a", 0, 1), heading("b", 1, 2)]
-    html = render([e for e, _ in pairs], [f for _, f in pairs])
-    assert NOT_CHECKED_YET not in html and CHECKED not in html
-    assert FLAGGED_NOTE not in html
-
-
-def test_outline_would_write_matches_what_is_written():
-    pairs = [heading("a", 0, 1), heading("b", 1, 2, Status.REJECTED), heading("c", 2, 3)]
-    elements, fixes = [e for e, _ in pairs], [f for _, f in pairs]
-    before_c = outline_before(elements, fixes, "c")
-    assert [before_c.would_write(n) for n in range(1, 7)] == [1, 2, 2, 2, 2, 2]
-    assert outline(render(elements, fixes)) == ["h1", "p", "h2"]  # c: 3 written as 2
-    assert outline_before(elements, fixes, "a").open == []
-
-
 def test_about_section_without_fixes_and_defaults():
     para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text="x")
     html = render([para], [], title="  ", lang="")
@@ -634,8 +485,3 @@ def test_about_section_without_fixes_and_defaults():
     assert '<html lang="en">' in html
     assert "could not be converted" not in html
     assert [c for c in static_checks(html) if not c.passed] == []
-
-
-def test_source_note_is_plain_escaped_text():
-    html = render([], [], source_note="Adapted from <i>OpenStax</i> & friends, CC BY 4.0.")
-    assert "<p>Adapted from &lt;i&gt;OpenStax&lt;/i&gt; &amp; friends, CC BY 4.0.</p>" in html

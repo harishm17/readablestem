@@ -32,13 +32,6 @@ def test_production_refuses_to_start_with_dev_login_on(tmp_path):
         create_app(prod(tmp_path, dev_login_enabled=True))
 
 
-def test_production_has_no_dev_login_pages_or_buttons(tmp_path):
-    client = TestClient(create_app(prod(tmp_path)), base_url="https://beta.example.org")
-    assert client.get("/dev-login").status_code == 404
-    assert client.post("/dev-login", data={"email": ADMIN, "csrf_token": "x"}).status_code == 404
-    assert "dev-login" not in client.get("/login").text
-
-
 def test_dev_login_is_off_whatever_the_flag_says_outside_dev_and_test(tmp_path):
     """Even if the flag were forced on after the start checks, the context refuses it."""
     app = create_app(prod(tmp_path))

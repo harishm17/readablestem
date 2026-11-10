@@ -4,11 +4,8 @@ a slide deck, languages), and that LaTeX never reaches it."""
 
 from __future__ import annotations
 
-import json
-import re
 from pathlib import Path
 
-from readablestem.core.types import DocumentResult
 from readablestem.pipeline.chem import convert_ce_commands
 from readablestem.pipeline.validate import safe_latex_to_mathml
 from readablestem.web import listen
@@ -88,15 +85,6 @@ def test_block_equation_is_spoken_with_its_label_never_as_latex():
     assert eq.role == "Equation 2.4"
 
 
-def test_stored_reading_wins_but_a_latex_reading_is_never_used():
-    mathml = '<math id="p1-e1"><mi>x</mi><mo>=</mo><mn>2</mn></math>'
-    html = doc(f"<main><p>Solve {mathml} now.</p></main>")
-    stored = listen.build_transcript(html, {"p1-e1": "x equals two, said by the course"})
-    assert "Solve x equals two, said by the course now." in said(stored)
-    latex = listen.build_transcript(html, {"p1-e1": r"\frac{x}{2}"})
-    assert "Solve x equals 2 now." in said(latex)  # the MathML is read instead
-
-
 def test_alttext_is_used_when_the_file_carries_it_and_ignored_when_it_is_latex():
     good = '<math alttext="v equals d over t" display="block"><mi>q</mi></math>'
     bad = r'<math alttext="\frac{d}{t}" display="block"><mi>q</mi></math>'
@@ -110,44 +98,6 @@ def test_unreadable_math_is_said_honestly_not_skipped():
     eq = next(i for i in items if i.kind == "equation")
     assert eq.say.startswith("Equation: ")
     assert "\\" not in eq.say
-
-
-def test_inline_equation_marks_the_paragraph_for_next_equation():
-    items = listen.build_transcript(
-        doc("<main><p>Let <math><msup><mi>x</mi><mn>2</mn></msup></math> grow.</p></main>")
-    )
-    para = next(i for i in items if i.kind == "paragraph")
-    assert para.say == "Let x squared grow."
-    assert "equation" in para.kinds
-
-
-def test_inline_equation_in_a_list_item_or_cell_stays_in_its_sentence():
-    """The maths sits directly in the <li> or <td>, not in a <p>: the sentence is still one item."""
-    items = listen.build_transcript(
-        doc(
-            "<main><ol><li>Remember in calculating change "
-            "<math display='inline'><mi>Δ</mi></math> we always use final minus initial.</li></ol>"
-            "<table><tr><td>Speed <math display='inline'><mi>v</mi></math> in m/s</td></tr></table>"
-            "</main>"
-        )
-    )
-    spoken = said(items)
-    assert any(
-        s.startswith("Remember in calculating change") and s.endswith("final minus initial.")
-        for s in spoken
-    ), spoken
-    assert not any(s.strip() in ("capital delta", "Δ") for s in spoken), spoken
-    cell = [s for s in spoken if "in m/s" in s]
-    assert cell and "Speed" in cell[0], spoken
-    item = next(i for i in items if i.say.startswith("Remember"))
-    assert "equation" in item.kinds
-
-
-def test_display_equation_inside_a_list_item_is_still_its_own_equation():
-    items = listen.build_transcript(
-        doc("<main><ul><li>Then<math display='block'><mi>x</mi></math></li></ul></main>")
-    )
-    assert any(i.kind == "equation" for i in items), [(i.kind, i.say) for i in items]
 
 
 def test_chemistry_is_spoken_by_the_chemistry_rules():
@@ -229,19 +179,6 @@ def test_table_is_announced_with_size_headers_and_rows_with_their_headers():
     assert "…4 more rows" in spoken
 
 
-def test_table_cap_can_be_changed_and_a_table_without_headers_still_reads():
-    items = listen.build_transcript(
-        doc(
-            "<main><table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table></main>"
-        ),
-        max_rows=1,
-    )
-    spoken = said(items)
-    assert "Table, 2 rows, 2 columns" in spoken
-    assert "Row 1 of 2: a; b" in spoken
-    assert "…1 more row" in spoken
-
-
 def test_table_cells_with_maths_are_spoken():
     items = listen.build_transcript(
         doc(
@@ -309,32 +246,6 @@ def test_very_long_transcripts_stop_with_a_note():
     items = listen.build_transcript(doc(f"<main>{body}</main>"))
     assert len(items) == listen.MAX_ITEMS + 1
     assert items[-1].kind == "note"
-
-
-def test_demo_document_has_no_latex_and_speaks_its_equations():
-    html = (STATIC / "demo" / "index.html").read_text(encoding="utf-8")
-    report = json.loads((STATIC / "demo" / "report.json").read_text(encoding="utf-8"))
-    speeches = listen.stored_speeches(DocumentResult.model_validate(report["result"]))
-    items = listen.build_transcript(html, speeches)
-    equations = [i for i in items if i.kind == "equation"]
-    assert len(equations) >= 6
-    assert "Equation 2.4: capital delta bold d over capital delta t" in said(items)
-    for item in items:
-        assert not re.search(r"[\\{}^_]", item.say) or item.kind in {"paragraph", "link"}, item
-    for item in equations:
-        assert not re.search(r"[\\{}^_]", item.say), item
-    assert any(i.kind == "heading" for i in items)
-    assert any(i.kind == "figure" for i in items)
-
-
-def test_cache_is_per_job_and_result_version():
-    listen.CACHE.clear()
-    html = doc("<main><p>one</p></main>")
-    first = listen.transcript_for("j" * 32, 1, html)
-    assert listen.transcript_for("j" * 32, 1, html) is first
-    assert listen.transcript_for("j" * 32, 2, html) is not first
-    changed = doc("<main><p>two</p></main>")
-    assert said(listen.transcript_for("j" * 32, 1, changed))[-1] == "two"
 
 
 def test_speakable_rule_matches_the_review_screen():

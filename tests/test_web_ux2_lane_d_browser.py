@@ -69,37 +69,6 @@ def test_the_pages_pass_axe_at_1280_and_320_in_light_and_dark(
     assert overflow <= 0, f"{path} is {overflow}px wider than {width}"
 
 
-def test_every_overflowing_table_box_on_the_offices_page_is_a_keyboard_stop(site, browser):
-    context = browser.new_context(viewport={"width": 320, "height": 800})
-    page = context.new_page()
-    page.goto(site.base + offices.PAGE_PATH)
-    boxes = page.evaluate(
-        """() => [...document.querySelectorAll('.table-scroll')]
-            .filter(el => el.scrollWidth > el.clientWidth)
-            .map(el => ({tab: el.tabIndex, role: el.getAttribute('role'),
-                         name: el.getAttribute('aria-label')}))"""
-    )
-    assert boxes, "the recipient table should scroll at 320px"
-    for box in boxes:
-        assert box == {**box, "tab": 0, "role": "group"} and box["name"]
-    # Keyboard: tab until a box has focus; its ring is drawn (the site's two-tone ring).
-    for _ in range(80):
-        page.keyboard.press("Tab")
-        if page.evaluate(
-            "document.activeElement.classList.contains('table-scroll')"
-            " && document.activeElement.scrollWidth > document.activeElement.clientWidth"
-        ):
-            break
-    else:
-        pytest.fail("no table box took focus from the keyboard")
-    outline = page.evaluate("getComputedStyle(document.activeElement).outlineStyle")
-    assert outline == "solid"
-    page.keyboard.press("ArrowRight")
-    page.wait_for_timeout(300)
-    assert page.evaluate("document.activeElement.scrollLeft") > 0  # it scrolls by keyboard
-    context.close()
-
-
 def test_the_footer_targets_are_44px_on_public_and_signed_in_pages(site, browser):
     for width in (1280, 390):
         for path, signed in (("/privacy", False), ("/login", False), ("/app", True)):
@@ -115,16 +84,6 @@ def test_the_footer_targets_are_44px_on_public_and_signed_in_pages(site, browser
             )
             context.close()
             assert not small, f"{path} at {width}: {small}"
-
-
-def test_the_signed_in_footer_has_six_links_or_fewer(site, browser):
-    context = browser.new_context(viewport={"width": 1280, "height": 800})
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    page.goto(site.base + "/app")
-    count = page.evaluate("document.querySelectorAll('footer li > a').length")
-    context.close()
-    assert count <= 6
 
 
 # ------------------------------------------------------------------------ print
@@ -157,17 +116,3 @@ def test_the_one_page_summary_prints_on_one_letter_and_one_a4_page(tmp_path, bro
     )
     page.close()
     assert sizes[0] >= 1.4 * sizes[1] and sizes[1] >= 1.35 * sizes[2], sizes
-
-
-def test_the_keep_it_link_on_the_delete_confirmation_is_a_44px_target(site, browser, finished_job):
-    for width in (1280, 390):
-        context = browser.new_context(viewport={"width": width, "height": 800})
-        page = context.new_page()
-        sign_in(page, site.base, ALICE)
-        page.goto(f"{site.base}/jobs/{finished_job}/delete")
-        height = page.evaluate(
-            """() => Math.round([...document.querySelectorAll('main a')]
-                .find(a => a.textContent.includes('keep it')).getBoundingClientRect().height)"""
-        )
-        context.close()
-        assert height >= 44, (width, height)

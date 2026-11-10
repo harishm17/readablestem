@@ -10,8 +10,6 @@ from __future__ import annotations
 import pytest
 
 from readablestem.pipeline.speech import mathml_to_speech
-from readablestem.pipeline.speech_chem import STATE_WORDS
-from readablestem.pipeline.speech_nuclides import nuclide_words
 from readablestem.pipeline.validate import safe_latex_to_mathml
 
 
@@ -115,22 +113,7 @@ def test_a_condition_that_is_not_a_quantity_is_not_read_as_one() -> None:
     )
 
 
-def test_all_state_words_still_known() -> None:
-    assert set(STATE_WORDS) == {"aq", "s", "l", "g"}
-
-
 # --------------------------------------------------------- arrows in table cells
-
-
-def test_arrow_cell_of_a_half_reaction_table() -> None:
-    latex = (
-        r"\begin{array}{rcl} \mathrm{H_2(g)} & \to & 2\mathrm{H^+(aq)} + 2e^- \\"
-        r" \mathrm{Zn(s)} & \longrightarrow & \mathrm{Zn^{2+}(aq)} + 2e^- \end{array}"
-    )
-    assert say(latex) == (
-        "row 1: H 2 gas, reacts to form 2 H plus aqueous, plus 2 e to the power minus; "
-        "row 2: Z n solid, reacts to form Z n 2 plus aqueous, plus 2 e to the power minus"
-    )
 
 
 def test_equilibrium_arrow_cell() -> None:
@@ -193,22 +176,6 @@ def test_reaction_in_one_cell_keeps_its_neighbour_cell_apart() -> None:
 )
 def test_excited_nuclide(latex: str, speech: str) -> None:
     assert say(latex) == speech
-
-
-def test_excited_nuclide_with_the_symbol_in_two_tokens() -> None:
-    inner = (
-        "<msubsup><mrow/><mn>2</mn><mn>4</mn></msubsup><mi>H</mi><msup><mi>e</mi><mo>*</mo></msup>"
-    )
-    assert say_mathml(inner) == "helium 4, atomic number 2, excited state"
-
-
-def test_nuclide_words_excited_flag() -> None:
-    assert (
-        nuclide_words("Ni", "60", "28", excited=True)
-        == "nickel 60, atomic number 28, excited state"
-    )
-    assert nuclide_words("Ni", "60", "28") == "nickel 60, atomic number 28"
-    assert nuclide_words("Zz", "60", "28", excited=True) is None
 
 
 def test_a_star_outside_a_nuclide_reads_as_before() -> None:

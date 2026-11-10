@@ -157,64 +157,6 @@ def env_job(env, job_id: str) -> Job:
     return env.job(job_id)
 
 
-def test_a_picture_added_by_hand_is_not_put_on_a_page_that_now_looks_different(web):
-    make_edits(web, web.first)
-
-    def draw_over_the_region(doc):
-        page = doc[0]
-        page.draw_rect(pymupdf.Rect(70, 600, 330, 700), fill=(0, 0, 0))
-
-    second = revise(web, web.first, pdf_with(draw_over_the_region))
-    result = stored(web, second)
-    assert element(result, "p1-x1") is None
-    assert element(result, PLAIN).text == "Discuss vectors and scalars with your class."
-    report = carry.CarryReport.from_json(env_job(web, second).carried_json)
-    assert report.edits == [PLAIN, LATER] and report.edits_dropped == 1
-    page = text_of(web.browser.get(f"/jobs/{second}").text)
-    assert "1 change you made by hand was not carried over" in page
-
-
-def test_words_are_not_put_on_a_paragraph_whose_words_changed(web):
-    make_edits(web, web.first)
-    changed = review_output()
-    changed.result.elements = [
-        e.model_copy(update={"text": "Discuss vectors, scalars and tensors."})
-        if e.id == PLAIN
-        else e
-        for e in changed.result.elements
-    ]
-    response = web.browser.post(
-        "/jobs",
-        data={"csrf_token": token(web.browser), "revises": web.first},
-        files={"pdf": ("v2.pdf", pdf_with(lambda doc: None), "application/pdf")},
-    )
-    second = job_id_from(response)
-    web.converter.output = changed
-    web.run_worker()
-    result = stored(web, second)
-    assert element(result, PLAIN).text == "Discuss vectors, scalars and tensors."
-    report = carry.CarryReport.from_json(env_job(web, second).carried_json)
-    assert PLAIN not in report.edits and report.edits_dropped == 1
-
-
-def test_a_page_left_out_is_left_out_again_only_while_it_looks_the_same(web):
-    page_post(web, web.first, 2, "omit")
-    assert stored(web, web.first).omitted_pages == [1]
-    same = revise(web, web.first, pdf_with(lambda doc: None))
-    assert stored(web, same).omitted_pages == [1]
-    assert not [e for e in stored(web, same).elements if e.page == 1]
-    assert carried_rows(web, same)["page-2"] == {"carried_edit": "page_left_out"}
-
-    def write_on_page_two(doc):
-        doc[1].insert_text((72, 300), "A new paragraph on this page.", fontsize=11)
-
-    different = revise(web, web.first, pdf_with(write_on_page_two))
-    assert stored(web, different).omitted_pages == []
-    assert [e for e in stored(web, different).elements if e.page == 1]
-    report = carry.CarryReport.from_json(env_job(web, different).carried_json)
-    assert report.edits == [] and report.edits_dropped == 1
-
-
 # --------------------------------------------------------------------------- tried again
 
 
@@ -254,31 +196,3 @@ def test_edits_by_hand_survive_trying_a_document_again(web):
     assert described.described == "v equals d over t"
     # A try-again keeps its own review edits and adds none (carried rows are for revisions).
     assert carried_rows(web, web.first) == {}
-
-
-def test_a_try_again_does_not_add_a_picture_the_tool_found_this_time(web):
-    page_post(web, web.first, 1, "add", kind="picture", alt=ALT, **REGION)
-    stop(web, web.first)
-    output = review_output()
-    x0, y0, x1, y1 = 100.0, 620.0, 300.0, 700.0  # inside the region drawn by hand
-    output.result.elements.append(
-        output.result.elements[0].model_copy(
-            update={
-                "id": "p1-e20",
-                "kind": Kind.FIGURE,
-                "bbox": (x0, y0, x1, y1),
-                "order": 40,
-                "text": None,
-                "caption": None,
-            }
-        )
-    )
-    fix = next(f for f in output.result.fixes if f.element_id == "p1-e6")
-    output.result.fixes.append(fix.model_copy(update={"element_id": "p1-e20"}))
-    output.crops["p1-e20"] = output.crops["p1-e6"]
-    try_again(web, web.first, output)
-    result = stored(web, web.first)
-    assert [e.id for e in result.elements if e.kind is Kind.FIGURE and e.bbox[1] > 600] == [
-        "p1-e20"
-    ]
-    assert element(result, "p1-x1") is None

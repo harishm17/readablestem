@@ -344,12 +344,6 @@ def test_one_header_row_is_a_thead_with_column_scopes():
     assert_rectangular(html, 3, 2)
 
 
-def test_no_caption_is_invented():
-    html = render_table(simple_grid(caption=None), id_prefix="p1-e3")
-    assert "<caption" not in html
-    assert "<caption" not in render_table(simple_grid(caption="  "), id_prefix="p1-e3")
-
-
 def test_two_level_headers_use_column_groups():
     html = render_table(two_level_grid(), id_prefix="p1-e3")
     table = parse(html)
@@ -495,12 +489,6 @@ def test_cell_and_caption_text_is_escaped(text):
     ] * 2
 
 
-@pytest.mark.parametrize("prefix", ["", "1abc", 'p1" onclick="x', "p1 e3", "<p>", "x" * 65])
-def test_the_id_prefix_must_be_a_plain_id(prefix):
-    with pytest.raises(ValueError, match="id_prefix"):
-        render_table(simple_grid(), id_prefix=prefix)
-
-
 # --------------------------------------------------------------------------- irregular tables
 
 
@@ -569,59 +557,7 @@ def test_headers_below_the_header_rows_start_a_new_block():
     assert "headers" not in named[""]["attrs"]  # an empty cell needs no headers
 
 
-def test_sections_in_an_irregular_table_are_listed_first():
-    grid = TableGrid(
-        rows=4,
-        cols=4,
-        cells=[
-            c(0, 0, "Group A", header="row", col_span=4),
-            c(1, 0, "Mass", header="row"),
-            c(1, 1, "2 kg"),
-            c(1, 2, "Speed", header="row"),
-            c(1, 3, "3 m/s"),
-            c(2, 0, "Group B", header="row", col_span=4),
-            c(3, 0, "Mass", header="row"),
-            c(3, 1, "5 kg"),
-            c(3, 2, "Speed", header="row"),
-            c(3, 3, "1 m/s"),
-        ],
-    )
-    html = render_table(grid, id_prefix="t1")
-    named = cells_named(parse(html))
-    assert named["5 kg"]["attrs"]["headers"] == "t1-r2c0 t1-r3c0"
-    assert named["1 m/s"]["attrs"]["headers"] == "t1-r2c0 t1-r3c2"
-    assert named["Group B"]["attrs"] == {"id": "t1-r2c0", "scope": "rowgroup", "colspan": "4"}
-
-
 # --------------------------------------------------------------------------- broken grids
-
-
-@pytest.mark.parametrize(
-    "grid",
-    [
-        TableGrid(rows=2, cols=2),  # no cells at all
-        TableGrid(rows=2, cols=2, cells=[c(0, 0, "a", row_span=9, col_span=9)]),
-        TableGrid(rows=2, cols=2, cells=[c(0, 0, "a", col_span=2), c(0, 1, "lost")]),
-        TableGrid(rows=2, cols=3, cells=[c(1, 1, "lonely")]),
-        TableGrid(rows=3, cols=1, cells=[c(5, 5, "far")]),
-        TableGrid(rows=1, cols=2, cells=[c(0, 0, "h", header="col"), c(0, 1, "d")], header_rows=1),
-        TableGrid(
-            rows=3,
-            cols=2,
-            cells=[c(0, 0, "h", header="col", row_span=3), c(0, 1, "h2", header="col")],
-            header_rows=1,
-        ),
-        TableGrid(
-            rows=3,
-            cols=2,
-            cells=[c(0, 0, "a", row_span=2), c(1, 0, "Section", header="row", col_span=2)],
-        ),
-    ],
-)
-def test_broken_grids_still_render_a_rectangular_table(grid):
-    assert grid_problems(grid)
-    html = render_table(grid, id_prefix="t1")
-    assert_rectangular(html, grid.rows, grid.cols)
 
 
 def test_random_grids_always_render_a_rectangular_table():

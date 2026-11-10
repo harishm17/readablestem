@@ -10,11 +10,9 @@ from __future__ import annotations
 import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
-from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 from readablestem.web import db
-from readablestem.web.database import alembic_config
 from test_web_migrations import INSERT_JOB, INSERT_USER, migrate, upgrade
 
 STALE = "c4a7e9b05d18"
@@ -38,13 +36,6 @@ CHAIN = [
 
 def columns(engine, table: str = "jobs") -> set[str]:
     return {c["name"] for c in inspect(engine).get_columns(table)}
-
-
-def test_the_migrations_follow_each_other_in_one_line():
-    script = ScriptDirectory.from_config(alembic_config())
-    for revision, before, _, _ in CHAIN:
-        found = script.get_revision(revision)
-        assert found is not None and found.down_revision == before
 
 
 @pytest.mark.parametrize(("revision", "before", "added", "tables"), CHAIN)

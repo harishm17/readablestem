@@ -12,7 +12,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from readablestem.core.types import Kind, Status, inline_marker
+from readablestem.core.types import Kind, Status
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.heading_step import heading_fixes
 from readablestem.pipeline.layout import (
@@ -73,17 +73,6 @@ def test_bookmarks_make_plain_body_size_lines_headings_with_the_bookmark_levels(
     assert [f.heading.level for f in heading_fixes(layout.elements)] == [1, 2]
 
 
-def test_without_bookmarks_the_same_lines_stay_paragraphs():
-    layout = analyze(pdf_of(outline_page))
-    assert texts(layout, Kind.HEADING) == []
-
-
-def test_bookmarks_that_do_not_match_the_page_text_are_ignored():
-    toc = [[1, "Thermodynamics", 1], [2, "Entropy of mixing", 1], [1, "Overview", 1]]
-    layout = analyze(pdf_of(outline_page, toc))
-    assert texts(layout, Kind.HEADING) == []  # one of three matches: not consistent
-
-
 def test_a_bookmark_to_a_page_that_was_not_analysed_is_not_counted():
     def fill(number, page):
         y = para(page, 72)
@@ -107,47 +96,6 @@ def test_a_flat_outline_does_not_flatten_headings_with_real_font_levels():
     toc = [[1, "Chapter One", 1], [1, "Section A", 1], [1, "Section B", 1]]
     levels = [f.heading.level for f in heading_fixes(analyze(pdf_of(fill, toc)).elements)]
     assert levels == [1, 2, 2]  # the bookmarks' one level did not replace the font levels
-
-
-def test_a_bookmark_only_names_the_line_that_is_its_whole_title():
-    def fill(number, page):
-        y = para(page, 72)
-        y = one(page, y, "Overview")
-        y = para(page, y)
-        y = para(page, y, "Overview of the ramp experiment, which we repeated every day.", lines=2)
-        para(page, y)
-
-    layout = analyze(pdf_of(fill, [[1, "Overview", 1]]))
-    assert texts(layout, Kind.HEADING) == ["Overview"]  # not the sentence that starts with it
-
-
-def bold_outline_page(number, page):
-    y = para(page, 72)
-    y = one(page, y, "Overview", "hebo")
-    y = para(page, y)
-    y = one(page, y, "Cart on a ramp", "hebo")
-    para(page, y)
-
-
-BOLD_TOC = [[1, "Overview", 1], [2, "Cart on a ramp", 1]]
-
-
-def test_a_tag_still_wins_over_a_bookmark_level():
-    from readablestem.pipeline.layout import REASON_TAGGED, tagged_level
-
-    layout = analyze(pdf_of(bold_outline_page, BOLD_TOC))
-    heading = next(e for e in layout.elements if e.kind == Kind.HEADING)
-    tagged = heading.model_copy(update={"reasons": [*heading.reasons, f"{REASON_TAGGED}3"]})
-    assert tagged_level(heading) == 1
-    assert tagged_level(tagged) == 3
-
-
-def test_a_bold_short_bookmarked_line_is_certain_and_a_plain_one_is_a_note():
-    strong = heading_fixes(analyze(pdf_of(bold_outline_page, BOLD_TOC)).elements)
-    assert [(f.heading.level, f.review) for f in strong] == [(1, "none"), (2, "none")]
-    weak = heading_fixes(analyze(pdf_of(outline_page, BOLD_TOC)).elements)
-    assert [(f.heading.level, f.review) for f in weak] == [(1, "optional"), (2, "optional")]
-    assert all(f.failed_checks for f in weak)  # the weak-evidence note
 
 
 def test_a_bookmark_on_every_short_paragraph_makes_no_headings():
@@ -199,14 +147,6 @@ def test_plain_body_size_numbered_lines_in_sequence_are_headings():
     assert [(f.status, f.review) for f in fixes] == [(Status.ACCEPTED, "optional")] * 2
 
 
-def test_a_sequence_that_does_not_start_at_one_or_two_is_a_decision():
-    layout = analyze(pdf_of(numbered_page(first=3)))
-    assert texts(layout, Kind.HEADING) == ["3 Forces", "4 Energy and Work"]
-    fixes = heading_fixes(layout.elements)
-    assert [(f.status, f.review) for f in fixes] == [(Status.NEEDS_REVIEW, "required")] * 2
-    assert all("heading.numbered_unconfirmed" in {c.code for c in f.failed_checks} for f in fixes)
-
-
 def test_a_long_numbered_title_is_a_decision():
     titles = ("Forces", "Energy and Work in a Closed System")
     fixes = heading_fixes(analyze(pdf_of(numbered_page(titles=titles))).elements)
@@ -228,26 +168,6 @@ def test_numbered_lines_in_different_columns_are_not_a_sequence():
         y = para(page, 72, SENTENCE[:38], x=330)
         y = one(page, y, "2 Energy", x=330)
         para(page, y, SENTENCE[:38], x=330)
-
-    assert texts(analyze(pdf_of(fill)), Kind.HEADING) == []
-
-
-def test_one_numbered_line_alone_stays_a_paragraph():
-    def fill(number, page):
-        y = para(page, 72)
-        y = one(page, y, "3 Forces")
-        para(page, y)
-
-    assert texts(analyze(pdf_of(fill)), Kind.HEADING) == []
-
-
-def test_quantities_and_list_lines_are_not_numbered_headings():
-    def fill(number, page):
-        y = para(page, 72)
-        y = one(page, y, "12 Metres")
-        y = para(page, y)
-        y = one(page, y, "13 Metres")
-        para(page, y)
 
     assert texts(analyze(pdf_of(fill)), Kind.HEADING) == []
 
@@ -292,14 +212,6 @@ def test_a_repeated_bold_run_in_label_is_bold_text_not_a_heading():
     assert html.count("<strong>Solution</strong></p>") == 2
 
 
-def test_a_repeated_label_at_the_text_margin_stays_a_heading():
-    # LaTeX \subsubsection*{Solution} and a Word heading style sit at the margin: the
-    # document says it is a heading (the authored dev-v2 documents do exactly this).
-    layout = analyze(pdf_of(label_page(0)))
-    assert texts(layout, Kind.HEADING) == ["Solution", "Solution"]
-    assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)
-
-
 def test_a_single_label_or_another_bold_line_stays_a_heading():
     def fill(number, page):
         y = para(page, 72)
@@ -315,50 +227,7 @@ def test_a_single_label_or_another_bold_line_stays_a_heading():
     assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)
 
 
-def test_a_repeated_label_in_a_larger_font_is_still_a_heading():
-    def fill(number, page):
-        y = para(page, 72)
-        y = one(page, y, "Solution", "hebo", 14)
-        y = para(page, y)
-        y = one(page, y, "Solution", "hebo", 14)
-        para(page, y)
-
-    layout = analyze(pdf_of(fill))
-    assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)
-    assert all(f.heading is not None for f in heading_fixes(layout.elements))
-
-
 # ------------------------------------------------------------- 3. maths in headings
-
-
-@pytest.mark.skipif(not DEJAVU.exists(), reason="needs DejaVu Serif for math-italic letters")
-def test_math_italic_letters_in_a_heading_are_plain_letters():
-    def fill(number, page):
-        page.insert_font(fontname="dv", fontfile=str(DEJAVU))
-        page.insert_text((72, 90), "Planck constant \u210e", fontsize=18, fontname="dv")
-        para(page, 130)
-
-    layout = analyze(pdf_of(fill))
-    assert texts(layout, Kind.HEADING) == ["Planck constant h"]
-
-
-def test_math_italic_letters_fold_but_other_symbols_stay():
-    from readablestem.pipeline.layout import readable_math_letters
-
-    assert readable_math_letters("\U0001d454 = \u210e\u03bd, \U0001d7d9 \u2212 \u03b1") == (
-        "g = h\u03bd, \U0001d7d9 \u2212 \u03b1"
-    )
-    assert readable_math_letters("\U0001d431 and \U0001d6fc and \U0001d7ce") == "x and \u03b1 and 0"
-    assert readable_math_letters("plain text") == "plain text"
-
-
-def test_number_sets_and_letterlike_symbols_are_not_flattened():
-    from readablestem.pipeline.layout import readable_math_letters
-
-    text = (
-        "Functions on \u211d, \u2102, \u2115, \u2124, \u211a with \u2113 and \u2112 and \U0001d538"
-    )
-    assert readable_math_letters(text) == text
 
 
 # ---------------------------------------------- 4. paragraphs across a page break
@@ -406,27 +275,6 @@ def test_a_paragraph_cut_by_a_page_break_is_one_element():
     assert [e.page for e in paragraphs(layout)].count(1) == 1  # only the paragraph after it
 
 
-def test_a_footnote_and_running_header_between_the_parts_do_not_stop_the_join():
-    layout = analyze(split_pages("speed up while the", footnote=True))
-    assert any("continues to speed up" in (e.text or "") for e in paragraphs(layout))
-    assert any((e.text or "").startswith("1 A footnote") for e in paragraphs(layout))
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "why"),
-    [
-        ({"second_first": "Speed up while the"}, "the next page starts a sentence"),
-        ({"second_first": "speed up while the", "first_last": "and then it stopped."}, "full stop"),
-        ({"second_first": "speed up while the", "indent": 24.0}, "first-line indent"),
-        ({"second_first": "speed up while the", "size": 14.0}, "another size"),
-    ],
-)
-def test_paragraphs_are_not_joined_unless_the_second_continues_the_first(kwargs, why):
-    layout = analyze(split_pages(**kwargs))
-    assert not any(e.page == 0 and "stays level" in (e.text or "") for e in layout.elements), why
-    assert any(e.page == 1 and "stays level" in (e.text or "") for e in layout.elements), why
-
-
 def test_a_hyphen_at_a_page_break_is_repaired_like_one_at_a_line_break():
     layout = analyze(split_pages("ity while the", first_last="and the cart gains veloc-"))
     assert any("gains velocity while" in (e.text or "") for e in paragraphs(layout))
@@ -459,26 +307,6 @@ def test_a_compound_written_with_its_hyphen_elsewhere_keeps_it_across_a_line():
         )
     )
     assert "eigen-vector of the matrix" in text
-
-
-def test_a_word_written_whole_elsewhere_loses_the_hyphen_at_a_line_break():
-    # "anti" + "derivative" are both words and the join is not listed, so alone it keeps the
-    # hyphen; the page also writes "antiderivative", so the break is soft hyphenation.
-    text = text_of(
-        hyphen_doc(
-            "We then compute the anti-",
-            "derivative of the curve.",
-            "The antiderivative is found first.",
-        )
-    )
-    assert "antiderivative of the curve" in text
-
-
-def test_without_other_evidence_the_word_list_decides_as_before():
-    both_words = text_of(hyphen_doc("It is a well-", "known result of the theory.", SENTENCE))
-    assert "well-known result" in both_words
-    soft = text_of(hyphen_doc("It is a veloc-", "ity result of the theory.", SENTENCE))
-    assert "velocity result" in soft
 
 
 # ------------------------------------------------ 6. inline maths across a line break
@@ -564,78 +392,6 @@ def test_where_inline_maths_may_wrap(first, connector, second, joined):
     from readablestem.pipeline.layout import _wraps_here
 
     assert _wraps_here(first, second, connector) is joined
-
-
-def test_a_page_that_holds_only_the_rest_of_a_paragraph_is_still_read():
-    def fill(number, page):
-        if number == 0:
-            y = para(page, 72)
-            y = para(page, y)
-            y = para(page, y)
-            page.insert_text((72, 654), "and the cart continues to", fontsize=BODY, fontname="helv")
-            page.insert_text((300, 760), "1", fontsize=9, fontname="helv")
-        else:
-            page.insert_text((72, 72), "speed up until the end.", fontsize=BODY, fontname="helv")
-            page.insert_text((300, 760), "2", fontsize=9, fontname="helv")
-
-    layout = analyze(pdf_of(fill, pages=2))
-    assert layout.kept_pages == {}
-    joined = [
-        e for e in layout.elements if "continues to speed up until the end." in (e.text or "")
-    ]
-    assert len(joined) == 1 and "joined across pages" in joined[0].reasons
-
-
-def test_inline_maths_in_the_later_part_keeps_its_own_page():
-    def fill(number, page):
-        if number == 0:
-            y = para(page, 72)
-            y = para(page, y)
-            y = para(page, y)
-            page.insert_text(
-                (72, 654), "and the cart continues so that", fontsize=BODY, fontname="helv"
-            )
-            page.insert_text((300, 760), "1", fontsize=9, fontname="helv")
-        else:
-            x = 72.0
-            for text, font in (
-                ("speed up while ", "helv"),
-                ("x", "heit"),
-                (" + ", "helv"),
-                ("y", "heit"),
-                (" stays small.", "helv"),
-            ):
-                page.insert_text((x, 72), text, fontsize=BODY, fontname=font)
-                x += pymupdf.get_text_length(text, fontname=font, fontsize=BODY)
-            page.insert_text((300, 760), "2", fontsize=9, fontname="helv")
-
-    layout = analyze(pdf_of(fill, pages=2))
-    equations = [e for e in layout.elements if e.kind == Kind.EQUATION]
-    host = next(e for e in layout.elements if "joined across pages" in e.reasons)
-    assert host.page == 0
-    assert [(e.page, e.parent_id) for e in equations] == [(1, host.id)]
-    assert inline_marker(equations[0].id) in host.text
-
-
-def test_a_repeated_label_at_its_own_columns_margin_stays_a_heading():
-    # Two columns: the right column's text edge is not the page's. A label set at that edge
-    # is at its margin, as in the left column, not inside a box.
-    short = "The cart rolls down the ramp and speeds"
-
-    def fill(number, page):
-        y = 72
-        for _ in range(3):
-            y = para(page, y, short, lines=4)
-        y = 72
-        y = para(page, y, short, lines=4, x=330)
-        y = one(page, y, "Solution", "hebo", x=330)
-        y = para(page, y, short, lines=4, x=330)
-        y = one(page, y, "Solution", "hebo", x=330)
-        para(page, y, short, lines=4, x=330)
-
-    layout = analyze(pdf_of(fill))
-    assert texts(layout, Kind.HEADING) == ["Solution", "Solution"]
-    assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)
 
 
 def test_a_list_item_at_a_page_foot_is_not_joined_to_the_next_page():

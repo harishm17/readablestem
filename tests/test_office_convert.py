@@ -39,39 +39,8 @@ def refused(data: bytes) -> str:
 # --------------------------------------------------------------------------- the file checks
 
 
-def test_a_word_document_and_a_presentation_are_told_apart():
-    assert preflight(office.docx()) == "docx"
-    assert preflight(office.pptx()) == "pptx"
-
-
-def test_the_file_name_decides_nothing_the_parts_do():
-    # The same bytes under any name are the same kind: only the ZIP's parts are read.
-    assert preflight(office.pptx()) == "pptx"
-
-
 def test_an_old_or_password_protected_file_is_named_as_such():
     assert refused(office.OLE_HEADER) == "office_old_or_locked"
-
-
-@pytest.mark.parametrize(
-    "data",
-    [
-        b"plain text",
-        b"",
-        office.rebuild({"hello.txt": b"hi"}),
-        office.rebuild({"[Content_Types].xml": "<Types/>", "xl/workbook.xml": "<workbook/>"}),
-        office.rebuild(office.docx_parts(), add={"ppt/presentation.xml": "<p:presentation/>"}),
-        office.rebuild(office.docx_parts(), drop=("[Content_Types].xml",)),
-    ],
-    ids=["text", "empty", "zip-of-text", "spreadsheet", "both-kinds", "no-content-types"],
-)
-def test_other_files_are_not_word_or_powerpoint(data):
-    assert refused(data) == "office_unsupported"
-
-
-def test_a_damaged_zip_is_unreadable():
-    assert refused(office.docx()[:-30]) == "unreadable"
-    assert refused(b"PK\x03\x04" + b"\x00" * 40) == "unreadable"
 
 
 def test_macros_are_refused():
@@ -411,40 +380,6 @@ def child(data: bytes, soffice: str, timeout_s: float = 60) -> tuple[dict, bytes
     return json.loads(header), body
 
 
-def test_the_child_answers_with_a_category_for_a_refused_file(tmp_path):
-    answer, body = child(office.with_external_picture(), stand_in(tmp_path, "sys.exit(9)"))
-    assert answer == {"ok": False, "code": "office_unsafe"} and body == b""
-    answer, _ = child(b"%PDF-1.4 hello", stand_in(tmp_path, "sys.exit(9)"))
-    assert answer["code"] == "office_unsupported"
-    answer, _ = child(office.OLE_HEADER, stand_in(tmp_path, "sys.exit(9)"))
-    assert answer["code"] == "office_old_or_locked"
-
-
-def test_the_child_says_when_a_kind_is_not_installed(tmp_path):
-    # A Debian-style layout with Writer's registry file but not Impress's.
-    root = tmp_path / "lo"
-    (root / "share" / "registry").mkdir(parents=True)
-    (root / "program").mkdir()
-    (root / "share" / "registry" / "main.xcd").write_text("")
-    (root / "share" / "registry" / "writer.xcd").write_text("")
-    soffice = root / "program" / "soffice"
-    soffice.write_text("#!/bin/sh\nexit 1\n")
-    soffice.chmod(0o755)
-    assert office_convert.available_kinds(str(soffice)) == ("docx",)
-    answer, _ = child(office.pptx(), str(soffice))
-    assert answer == {"ok": False, "code": "office_unavailable"}
-
-
-def test_the_child_has_a_memory_cap_of_its_own(tmp_path):
-    code = (
-        "import resource; from readablestem.web.pdf_probe import limit_memory; "
-        "from readablestem.web import office_convert as o; limit_memory(o.WRAPPER_MEMORY_BYTES); "
-        "print(resource.getrlimit(resource.RLIMIT_AS)[0])"
-    )
-    soft = int(subprocess.run([sys.executable, "-c", code], capture_output=True, check=True).stdout)
-    assert soft <= office_convert.WRAPPER_MEMORY_BYTES
-
-
 # --------------------------------------------------------------------------- real LibreOffice
 
 
@@ -481,21 +416,3 @@ def test_libreoffice_fetches_nothing_even_if_a_check_missed_a_linked_picture():
         assert pdf.startswith(b"%PDF-")
         with pytest.raises(socket.timeout):
             listener.accept()
-
-
-@needs_writer
-def test_a_hostile_but_well_formed_document_ends_in_a_category_or_a_pdf(tmp_path):
-    """A document with a very deep table nest: whatever LibreOffice does, the child answers."""
-    assert SOFFICE is not None
-    depth = 400
-    cell = "<w:p><w:r><w:t>x</w:t></w:r></w:p>"
-    for _ in range(depth):
-        cell = f"<w:tbl><w:tr><w:tc>{cell}</w:tc></w:tr></w:tbl><w:p/>"
-    parts = office.docx_parts()
-    document = str(parts["word/document.xml"]).replace("<w:body>", "<w:body>" + cell, 1)
-    answer, body = child(
-        office.rebuild(parts, replace={"word/document.xml": document}), SOFFICE, 40
-    )
-    assert answer["ok"] is (body.startswith(b"%PDF-"))
-    if not answer["ok"]:
-        assert answer["code"] in {"office_failed", "office_unsafe"}

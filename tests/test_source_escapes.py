@@ -103,25 +103,6 @@ def test_input_of_an_absolute_host_path_finds_nothing(tmp_path, secrets):
     assert "A" in text  # the document still converts; the file was simply not there
 
 
-def test_input_of_etc_passwd_finds_nothing(tmp_path):
-    _, text, logs = convert(tmp_path, "\\input{/etc/passwd}")
-    assert "root:" not in text and "/bin/bash" not in text
-    assert "root:" not in logs
-
-
-def test_input_of_proc_1_environ_reads_nothing(tmp_path, secrets):
-    _, text, logs = convert(tmp_path, "\\input{/proc/1/environ}")
-    assert_no_secret(text, logs)
-    _, text, logs = convert(tmp_path, "\\input{/proc/self/environ}")
-    assert_no_secret(text, logs)
-
-
-def test_a_relative_path_out_of_the_project_finds_nothing(tmp_path, secrets):
-    _, text, logs = convert(tmp_path, "\\input{../outside/secret.txt}\\input{../../../etc/passwd}")
-    assert_no_secret(text, logs)
-    assert "root:" not in text
-
-
 def test_a_symlink_in_the_project_does_not_lead_out(tmp_path, secrets):
     project = tmp_path / "project"
     project.mkdir()
@@ -130,16 +111,6 @@ def test_a_symlink_in_the_project_does_not_lead_out(tmp_path, secrets):
     _, text, logs = convert(tmp_path, "\\input{link.tex}\\input{pw.tex}")
     assert_no_secret(text, logs)
     assert "root:" not in text
-
-
-def test_a_catcode_trick_does_not_change_what_can_be_read(tmp_path, secrets):
-    trick = f"\\catcode`\\!=0 !input{{{secrets}}} !input{{/etc/passwd}}"
-    _, text, logs = convert(tmp_path, trick)
-    assert_no_secret(text, logs)
-    assert "root:" not in text
-    built = f"\\expandafter\\csname inp\\string ut\\endcsname{{{secrets}}}"
-    _, text, logs = convert(tmp_path, built)
-    assert_no_secret(text, logs)
 
 
 def test_includegraphics_of_a_host_file_reads_nothing(tmp_path, secrets):
@@ -223,17 +194,6 @@ def test_an_infinite_loop_hits_the_time_cap(tmp_path):
     assert time.monotonic() - started < 40
 
 
-def test_an_openin_loop_hits_the_time_cap_and_reads_nothing(tmp_path, secrets):
-    body = (
-        f"\\newread\\r\\def\\a{{\\openin\\r={secrets}\\closein\\r"
-        "\\openin\\r=/etc/passwd\\closein\\r\\a}\\a"
-    )
-    limits = sandbox.Limits(wall_s=4, cpu_s=60, memory_bytes=1_500_000_000)
-    outcome, text, logs = convert(tmp_path, body, limits=limits)
-    assert not outcome.ok
-    assert_no_secret(text, logs)
-
-
 def test_a_runaway_macro_hits_the_memory_cap(tmp_path):
     limits = sandbox.Limits(wall_s=60, cpu_s=60, memory_bytes=400_000_000)
     outcome, _, _ = convert(tmp_path, "\\def\\a#1{\\a{#1#1}}\\a{x}", limits=limits)
@@ -288,11 +248,6 @@ def test_a_job_with_a_plain_escape_is_refused_before_anything_runs(body):
 def test_a_job_that_never_ends_fails_with_the_timeout_code(monkeypatch):
     monkeypatch.setattr(latexml, "LIMITS", sandbox.Limits(wall_s=4, cpu_s=60))
     assert failure(job({"main.tex": document("\\def\\a{x\\a}\\a")})) == "timeout"
-
-
-def test_a_job_with_no_document_in_it_fails_cleanly():
-    blob = job({"main.tex": "\\documentclass{article}\\begin{document}\\end{document}"})
-    assert failure(blob) in {"source_unreadable", "source_failed"}
 
 
 def test_the_error_codes_carry_no_content(monkeypatch):

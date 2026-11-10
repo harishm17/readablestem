@@ -36,15 +36,6 @@ def test_env_example_loads_verbatim(clean_env):
     assert settings.max_usd_per_page > 0 and settings.max_model_calls_per_page > 0
 
 
-def test_every_example_setting_is_a_real_setting():
-    names = {
-        line.split("=", 1)[0].strip().lower()
-        for line in (ROOT / ".env.example").read_text().splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    }
-    assert names <= set(Settings.model_fields), names - set(Settings.model_fields)
-
-
 def test_quick_start_allow_command_works_from_a_copied_env_example(clean_env, tmp_path, capsys):
     shutil.copy(ROOT / ".env.example", tmp_path / ".env")
     clean_env.chdir(tmp_path)

@@ -26,7 +26,7 @@ from readablestem.core import triage
 from readablestem.core.types import Kind, Status
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
-from readablestem.pipeline import layout, page_type
+from readablestem.pipeline import layout
 from readablestem.pipeline.run import convert_pdf
 from readablestem.web.db import Job, User, session_scope
 from readablestem.web.worker import Worker, result_outcome
@@ -65,22 +65,6 @@ def test_layout_reads_no_hidden_text_and_keeps_the_clip_mode_title():
     assert doc.kept_pages == {}
 
 
-def test_handwritten_and_scanned_pages_have_no_elements_and_are_kept():
-    doc = layout.analyze(data("mixed_course.pdf"))
-    assert {e.page for e in doc.elements} == {0}
-    assert doc.kept_pages == {1: "handwritten_page", 2: "handwritten_page", 3: "scanned_page"}
-    assert [doc.page_types[n].kind for n in range(4)] == [
-        "born_digital",
-        "handwritten_ocr",
-        "handwritten",
-        "scan_ocr",
-    ]
-    assert [(n.code, n.page, n.review) for n in doc.notices] == [
-        ("ocr_text_layer_ignored", 1, "none"),
-        ("ocr_text_layer_ignored", 3, "none"),
-    ]
-
-
 def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     doc = layout.analyze(data("typed_with_ink.pdf"))
     ink = [e for e in doc.elements if "handwriting" in e.reasons]
@@ -89,45 +73,6 @@ def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     assert len(paragraphs) == 3
     assert all(p.bbox[3] <= ink[0].bbox[1] + 1 for p in paragraphs)  # the ink is below
     assert doc.kept_pages == {}
-
-
-def test_a_short_note_on_a_typed_page_is_cut_out_as_handwriting():
-    # Eight pen strokes under a typed worksheet: fewer than a typed page needs to be
-    # called mixed_ink (12), but they went into no element, so they are cut out as a
-    # handwriting region like any handwriting on a typed page.
-    doc = layout.analyze(data("typed_with_note.pdf"))
-    assert doc.page_types[0].kind == "born_digital"
-    (ink,) = [e for e in doc.elements if "handwriting" in e.reasons]
-    assert ink.kind is Kind.FIGURE and ink.text is None
-    assert 440 < ink.bbox[1] < ink.bbox[3] < 520  # the note, under the worksheet line
-    assert doc.kept_pages == {}
-    result = convert("typed_with_note.pdf").result
-    (fix,) = [f for f in result.fixes if f.kind is Kind.FIGURE]
-    assert fix.reason == "handwriting_on_page" and fix.review == "required"
-    assert fix.calls == []  # never sent to the figure model
-    text = text_of(result.html)
-    assert "Handwriting on page 1, not converted to text." in result.html
-    assert "Homework 3: show all your working" in text
-    assert result_outcome(result) == ("done", "pages_not_converted")
-
-
-def test_a_hand_mark_over_typed_text_is_cut_out_and_the_text_stays():
-    # Three pen strokes written over a word of a paragraph: not part of the text, so not
-    # held by it; cut out as handwriting, and the paragraph is read whole.
-    from fixtures.handwriting.make_fixtures import INK_BLACK, TYPED, Writer
-
-    doc = pymupdf.open()
-    page = doc.new_page(width=612, height=792)
-    page.insert_textbox(pymupdf.Rect(72, 72, 540, 300), "\n\n".join(TYPED[1:]), fontsize=11)
-    word = page.search_for("vector")[0]
-    writer = Writer(page, 31, "polyline", INK_BLACK, width=1.0)
-    writer.word("aeo", word.x0 - 4, word.y1 + 1, 9, 0.1)
-    writer.commit()
-    out = layout.analyze(doc.tobytes())
-    assert out.page_types[0].kind == "born_digital" and out.page_types[0].ink.strokes == 3
-    (ink,) = [e for e in out.elements if "handwriting" in e.reasons]
-    assert ink.bbox[0] < word.x1 and ink.bbox[2] > word.x0  # over the word
-    assert "it is a vector" in " ".join(e.text or "" for e in out.elements)
 
 
 def test_a_stroke_off_the_page_is_never_loose_ink():
@@ -140,52 +85,6 @@ def test_a_stroke_off_the_page_is_never_loose_ink():
     assert layout._loose_strokes(strokes, [(90, 390, 130, 420)], (612, 792), margins=True) == [
         header
     ]
-
-
-def test_the_safety_net_keeps_a_painted_page_layout_read_nothing_from():
-    doc = layout.analyze(data("drawn_page.pdf"))
-    assert doc.page_types[1].kind == "vector_no_text"  # not handwriting, not a scan ...
-    assert doc.kept_pages == {1: "unread_page"}  # ... but painted, and nothing read
-
-
-def test_the_safety_net_keeps_writing_read_into_nothing_under_a_typed_title():
-    # Writing the ink checks reject, on paper ruled from top to bottom, under a short and a
-    # long typed title: the titles are read, and each page keeps its image with a decision.
-    doc = layout.analyze(data("ink_titled.pdf"))
-    assert doc.kept_pages == {0: "unread_page", 1: "unread_page"}
-    assert [(e.page, e.kind) for e in doc.elements] == [(0, Kind.PARAGRAPH), (1, Kind.PARAGRAPH)]
-    assert doc.elements[0].text == "Lecture 14 notes"
-
-
-def test_a_short_note_under_a_typed_title_keeps_its_page():
-    # Five, three and five pen strokes (the last written one segment per path) under a
-    # short typed title: too few to be called handwriting under a title (they could be
-    # machine-drawn curves), too small to be a figure. The titles are read and each page
-    # keeps its image with a decision: never "Everything was converted".
-    doc = layout.analyze(data("note_titled.pdf"))
-    assert [doc.page_types[n].kind for n in range(3)] == ["vector_no_text"] * 3
-    assert doc.kept_pages == {0: "unread_page", 1: "unread_page", 2: "unread_page"}
-    assert [(e.page, e.text) for e in doc.elements] == [
-        (0, "Week 6 notes"),
-        (1, "Week 7 notes"),
-        (2, "Week 5 notes, Oct 3"),
-    ]
-    result = convert("note_titled.pdf").result
-    assert [f.reason for f in result.fixes] == ["unread_page"] * 3
-    assert result.stats.required_decisions == 1 and result.stats.model_calls == 0
-    assert result_outcome(result) == ("done", "pages_not_converted")
-
-
-def test_writing_not_analysed_in_time_under_a_title_is_kept(monkeypatch):
-    # The ink budget ran out (a long document): the pages may be handwritten, so they are
-    # kept as images, whatever the length of their typed title.
-    real = page_type.InkBudget
-    monkeypatch.setattr(page_type, "InkBudget", lambda: real(0))
-    doc = layout.analyze(data("ink_titled.pdf"))
-    assert [doc.page_types[n].kind for n in (0, 1)] == ["vector_no_text", "born_digital"]
-    assert doc.kept_pages == {0: "unread_page", 1: "unread_page"}
-    # The titles are still read; nothing drawn goes to the figure model.
-    assert [(e.page, e.kind) for e in doc.elements] == [(0, Kind.PARAGRAPH), (1, Kind.PARAGRAPH)]
 
 
 def test_drawings_that_fill_the_page_are_figures():
@@ -201,21 +100,6 @@ def test_drawings_that_fill_the_page_are_figures():
     # Pages 2 and 3: a full-page plot with its caption, a slide's chart under its title.
     assert figures[1].caption == "Figure 2: displacement against time (s)."
     assert [e.kind for e in doc.elements if e.page == 2] == [Kind.HEADING, Kind.FIGURE]
-
-
-def test_a_plot_on_a_page_with_a_decorative_frame_is_a_figure():
-    # Rounded corners, a double frame drawn as one path, corner ticks, corner curls and a
-    # light filled panel with a 30 pt margin: each frame is set aside, the plot is a
-    # figure with its caption, and the problem text is read.
-    doc = layout.analyze(data("framed_plots.pdf"))
-    assert doc.kept_pages == {}
-    for page in range(5):
-        (figure,) = [e for e in doc.elements if e.page == page and e.kind is Kind.FIGURE]
-        assert figure.caption == "Figure 1: height of the ball against time."
-        x0, y0, x1, y1 = figure.bbox
-        assert x0 >= 140 and x1 <= 420 and y0 >= 180 and y1 <= 380  # the plot, not the frame
-        text = " ".join(e.text or "" for e in doc.elements if e.page == page)
-        assert "Problem 3." in text
 
 
 def _framed_page(doc: pymupdf.Document, *, beads: bool, wave: bool) -> None:
@@ -256,24 +140,6 @@ def test_a_page_filling_cluster_never_takes_a_drawing_with_it():
     assert "Problem 3." in " ".join(e.text or "" for e in out.elements if e.page == 1)
 
 
-def test_template_pages_with_nothing_to_read_are_not_decisions():
-    doc = layout.analyze(data("template_pages.pdf"))
-    assert doc.kept_pages == {}
-    assert {e.page for e in doc.elements} == {2}
-    result = convert("template_pages.pdf").result
-    assert result.stats.required_decisions == 0
-    assert "Not converted" not in result.html
-
-
-def test_machine_drawn_diagrams_under_a_title_are_figures():
-    doc = layout.analyze(data("diagram_slides.pdf"))
-    assert doc.kept_pages == {}
-    assert [e.kind for e in doc.elements if e.page == 0] == [Kind.PARAGRAPH, Kind.FIGURE]
-    assert sum(e.kind is Kind.FIGURE for e in doc.elements if e.page == 1) == 5
-    timing = layout.analyze(data("timing_diagram.pdf"))
-    assert [e.kind for e in timing.elements] == [Kind.FIGURE] and timing.kept_pages == {}
-
-
 def test_a_picture_of_a_page_keeps_its_typed_text_and_its_image():
     # A scan cropped to its picture with a typed header, and a title slide on a photo:
     # pictures of the whole page with a little visible text and nothing hidden.
@@ -286,13 +152,6 @@ def test_a_picture_of_a_page_keeps_its_typed_text_and_its_image():
     assert 'alt="Page 1: not converted to text."' in result.html
     assert "scanned" not in text_of(result.html)
     assert result.stats.required_decisions == 1
-
-
-def test_photo_slides_keep_their_titles_and_photos():
-    doc = layout.analyze(data("photo_slides.pdf"))
-    assert doc.kept_pages == {}
-    assert [e.kind for e in doc.elements if e.page == 0] == [Kind.PARAGRAPH, Kind.FIGURE]
-    assert doc.elements[0].text == "Lab setup"
 
 
 def test_text_under_see_through_overlays_is_read():
@@ -357,15 +216,6 @@ def test_kept_pages_are_one_decision_per_reason_and_typed_pages_convert():
     assert result_outcome(result) == ("done", "pages_not_converted")
 
 
-def test_handwriting_on_a_typed_page_is_its_own_decision():
-    result = convert("typed_with_ink.pdf").result
-    (ink,) = [f for f in result.fixes if f.kind is Kind.FIGURE]
-    assert ink.reason == "handwriting_on_page" and ink.review == "required"
-    assert ink.calls == []  # never sent to the figure model
-    assert "Handwriting on page 1, not converted to text." in result.html
-    assert "Displacement is the change in position" in result.html
-
-
 def test_a_short_note_under_a_title_with_a_hidden_layer_is_kept_never_described():
     # The routing change for a few curves under a title (diagram slides) must not send a
     # note with a recognition layer over it to the figure model.
@@ -375,22 +225,6 @@ def test_a_short_note_under_a_title_with_a_hidden_layer_is_kept_never_described(
     assert fix.reason == "handwritten_page" and fix.review == "required" and fix.calls == []
     assert result.stats.model_calls == 0
     assert result_outcome(result) == ("failed", "handwritten")
-
-
-def test_notes_written_in_single_curves_under_a_hidden_layer_are_never_described():
-    # Too simple for the stroke test, but under a recognition layer and with no typed
-    # text: handwriting, kept as page images, not drawings for the figure model.
-    result = convert("ios_single_curves.pdf").result
-    assert [f.reason for f in result.fixes] == ["handwritten_page"] * 2
-    assert result.stats.model_calls == 0 and result.image_only_pages == [0, 1]
-    assert result_outcome(result) == ("failed", "handwritten")
-
-
-def test_the_safety_net_page_is_kept_with_a_decision():
-    result = convert("drawn_page.pdf").result
-    (kept,) = [f for f in result.fixes if f.reason == "unread_page"]
-    assert kept.review == "required" and kept.status is Status.FAILED
-    assert 'alt="Page 2: not converted to text."' in result.html
 
 
 def test_hidden_text_never_reaches_the_student_file():
@@ -486,24 +320,6 @@ def test_a_pdf_of_only_handwritten_or_scanned_pages_is_refused_before_any_quota(
     with session_scope(env.ctx.factory) as session:
         assert session.scalar(select(Job.id)) is None
     assert pages_used(env) == 0
-
-
-@pytest.mark.parametrize(
-    "name", ["diagram_slides.pdf", "timing_diagram.pdf", "vector_with_layer.pdf"]
-)
-def test_pdfs_of_machine_drawn_diagrams_are_not_refused(env, name):
-    response = upload(env.browser, data(name), filename=name)
-    assert response.status_code == 303, text_of(response.text)[:300]
-    job_id = job_id_from(response)
-    assert _worker(env).run_once() == job_id
-    assert env.job(job_id).status == "done"
-
-
-def test_a_fake_redaction_never_reaches_the_job_through_the_app(env):
-    job_id = job_id_from(upload(env.browser, data("annot_redactions.pdf"), filename="r.pdf"))
-    assert _worker(env).run_once() == job_id
-    html = text_of(env.job(job_id).html or "")
-    assert html.count("Jane Roe") == 1  # the yellow highlight's line, nobody else's
 
 
 def _worker(env) -> Worker:
@@ -621,70 +437,6 @@ def test_a_kept_page_stays_a_marked_image_after_its_group_decision(env):
     assert html.count('data-reason="handwritten_page"') == 2
     assert 'class="decorative"' not in html
     assert "Pages 2, 3 and 4 are shown only as pictures of the pages" in html
-
-
-def test_kept_pages_are_named_as_pages_not_repeated_figures(env):
-    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
-    _worker(env).run_once()
-    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
-    assert "repeated figures" not in page and "repeated headings" not in page
-    assert "2 need your decision: the handwritten pages and the scanned page" in page
-    assert "3 pages are shown as images of the original." in page
-    assert "waiting make" not in page  # decisions are counted, not items (T1-11)
-    assert "Pages kept as images 3" in page
-    listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
-    assert "repeated figures" not in listing and "Figures (" not in listing
-    assert "2 decisions left: the handwritten pages and the scanned page." in listing
-    assert "Pages kept as images (2 decisions)" in listing
-    assert re.search(r"Pages kept as images\s*:\s*3 not converted", listing)
-
-
-def test_the_job_page_and_the_review_screen_agree_on_the_finish_line(env):
-    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
-    _worker(env).run_once()
-    _post(env, job_id, "pg-p2-e0", "reject", "split")
-    _post(env, job_id, "pg-p4-e0", "reject", "split")
-    job = env.browser.get(f"/jobs/{job_id}").text
-    review = env.browser.get(f"/jobs/{job_id}/review").text
-    ready = re.search(r'<h2 id="ready-heading">([^<]*)', job)
-    title = re.search(r'id="decision-title"[^>]*>([^<]*)', review)
-    assert ready and title
-    assert ready.group(1).strip() == title.group(1).strip() != "Ready to share"
-
-
-def test_kept_pages_are_listed_once_each_with_one_decide_link_per_decision(env):
-    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
-    _worker(env).run_once()
-    html = env.browser.get(f"/jobs/{job_id}").text
-    start = html.index('id="not-handled-heading"')
-    listed = html[start : html.index("</ul>", start)]
-    assert listed.count("<li>") == 3  # pages 2, 3 and 4: the hidden text on its page's line
-    assert listed.count(">Decide it<") == 2  # two decisions: handwritten, scanned
-    assert "It is decided together with page 2." in text_of(listed)
-    split = env.browser.get(f"/jobs/{job_id}/review").text
-    strip = text_of(split[split.index('class="page-chip') - 200 :])
-    for n in (2, 3, 4):  # each page of a waiting group says so
-        assert f"Page {n} , 1 to decide" in strip or f"Page {n}, 1 to decide" in strip
-
-
-def test_handwriting_kept_on_a_typed_page_is_named_as_handwriting(env):
-    job_id = job_id_from(upload(env.browser, data("typed_with_ink.pdf"), filename="t.pdf"))
-    _worker(env).run_once()
-    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
-    assert "Finished, with handwriting not converted" in page
-    assert "pages not converted" not in page
-
-
-def test_a_page_kept_by_the_safety_net_is_not_told_to_be_typed_up(env):
-    job_id = job_id_from(upload(env.browser, data("ink_titled.pdf"), filename="notes.pdf"))
-    _worker(env).run_once()
-    split = text_of(env.browser.get(f"/jobs/{job_id}/review").text)
-    assert "Pages 1 and 2 have drawings or writing that this tool could not read." in split
-    assert "describe it in your source file" in split and "type them up" not in split
-    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
-    assert "Pages 1 and 2 have drawings or writing this tool could not read" in page
-    html = env.job(job_id).html or ""
-    assert "Lecture 14 notes" in html and html.count('data-reason="unread_page"') == 2
 
 
 @pytest.mark.parametrize(

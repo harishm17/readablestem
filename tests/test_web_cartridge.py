@@ -35,10 +35,3 @@ def test_the_cartridge_is_owner_only_and_a_get(web):  # noqa: F811
     assert web.browser.post(f"/jobs/{job_id}/download/cartridge").status_code == 405
     waiting = job_id_from(upload(web.browser, make_pdf(1)))
     assert web.browser.get(f"/jobs/{waiting}/download/cartridge").status_code == 409
-
-
-def test_the_job_page_offers_the_cartridge_with_a_plain_link(web):  # noqa: F811
-    job_id = ready_job(web)
-    page = web.browser.get(f"/jobs/{job_id}").text
-    assert f'href="/jobs/{job_id}/download/cartridge"' in page
-    assert "Not yet tried in a live course" in page

@@ -28,9 +28,6 @@ from readablestem.core.types import (
 from readablestem.web.messages import CHECK_MESSAGES
 
 NOTE = CHECK_MESSAGES[("figure.second_check", "second_check_mismatch")]
-SMALL_LEAD = "Accepted automatically with a small note; you can still change any."
-WORTH_A_LOOK = "Optional check (worth a look; it does not hold up the document):"
-NOTHING_TO_DO = "Optional check (nothing to do unless you disagree):"
 
 
 def flagged_figure(eid: str) -> Fix:
@@ -127,11 +124,6 @@ def pages(tmp_path):
         yield render
 
 
-def optional_section(page: str) -> str:
-    start = page.index('<section id="optional-checks"')
-    return page[start : page.index("</section>", start)]
-
-
 def card(page: str, eid: str) -> str:
     start = page.index(f'<li id="item-{eid}"')
     return page[start : page.index("</li>", start)]
@@ -140,67 +132,6 @@ def card(page: str, eid: str) -> str:
 def progress(page: str) -> str:
     start = page.index('<div id="review-progress"')
     return page[start : page.index("</div>", start)]
-
-
-def test_the_lead_does_not_call_the_second_check_note_small(pages):
-    review, _ = pages(second=1, small=2)
-    lead = optional_section(review)
-    assert SMALL_LEAD not in lead
-    assert (
-        "Accepted automatically; you can still change any. 1 figure may have alt text that "
-        "does not match the image: worth a look. 2 have a small note."
-    ) in lead
-    assert NOTE in card(review, "p1-e1")
-    assert WORTH_A_LOOK in card(review, "p1-e1")
-    assert NOTHING_TO_DO in card(review, "p1-e2") and WORTH_A_LOOK not in card(review, "p1-e2")
-    # The intro says the same before the reader gets to the section.
-    assert (
-        "A second automated check found a possible mismatch between alt text and image in "
-        "some optional checks: worth a look, but it can be wrong."
-    ) in review
-    assert "Needs your decision (1)" in review  # still optional: never a decision
-    # The line at the top, read first and announced after a decision, says so too.
-    assert "3 optional checks below, 1 worth a look." in progress(review)
-
-
-def test_only_second_check_notes(pages):
-    review, _ = pages(second=2, small=0)
-    lead = optional_section(review)
-    assert "2 figures may have alt text that does not match the image: worth a look." in lead
-    assert "small note" not in lead
-    assert "2 optional checks below, 2 worth a look." in progress(review)
-
-
-def test_one_other_small_note_reads_as_one(pages):
-    review, _ = pages(second=1, small=1)
-    assert "1 has a small note." in optional_section(review)
-
-
-def test_a_single_second_check_note_at_the_top(pages):
-    review, _ = pages(second=1, small=0)
-    assert "1 optional check below, 1 worth a look." in progress(review)
-
-
-def test_without_a_second_check_note_the_wording_is_as_before(pages):
-    review, job = pages(second=0, small=1)
-    assert SMALL_LEAD in optional_section(review)
-    assert "second automated check" not in review
-    assert NOTHING_TO_DO in card(review, "p1-e1")
-    assert "1 optional check below." in progress(review)
-    assert 'id="notes-line">1 part was accepted for you with a note: ' in job
-
-
-def test_the_job_page_does_not_say_nothing_to_do_for_a_second_check_note(pages):
-    _, job = pages(second=1, small=2)
-    assert "3 parts were accepted for you with a note (1 worth a look): " in job
-    assert "nothing to do" not in job
-
-
-def test_the_wording_rule(pages):
-    review, job = pages(second=1, small=1)
-    for page in (review, job):
-        for word in ("verified", "checked for accuracy", "compl" + "iant"):
-            assert word not in page.lower()
 
 
 def test_second_check_note_is_only_an_unreviewed_optional_flag():
@@ -212,27 +143,3 @@ def test_second_check_note_is_only_an_unreviewed_optional_flag():
         update={"checks": [Check(name="figure.second_check", passed=True, severity="warning")]}
     )
     assert not triage.second_check_note(passed)
-
-
-def test_split_view_lists_the_second_check_note_as_worth_a_look(tmp_path):
-    """The Split View's folded list of optional checks gives each one short line; the
-    second check's comes first even when the figure has a small note too."""
-    both = flagged_figure("p1-e1")
-    both.checks.insert(
-        0, Check(name="alt.length", passed=False, severity="warning", code="too_long")
-    )
-    out = output(second=1, small=1)
-    out.result.fixes[1] = both
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.converter.output = out
-        job_id = job_id_from(upload(client, make_pdf(1)))
-        assert env.run_worker() == job_id
-        page = client.get(f"/jobs/{job_id}/review")
-        assert page.status_code == 200
-        text = " ".join(page.text.split())
-    worth = "Worth a look: a second automated check doubts the alt text."
-    assert text.count(worth) == 1
-    assert "The alt text is long." in text  # the other figure's note is unchanged

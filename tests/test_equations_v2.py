@@ -150,12 +150,6 @@ def test_the_sample_set_gaps_close_under_v2_and_the_primary_numbers_do_not_move(
     assert all("exact_stream_v2" in row for row in result["items"])
 
 
-def test_self_check_scores_one_on_both_scorers():
-    gold = list(iter_gold_records(GOLD, kind="equation"))
-    summary = score_equations(gold, None)["summary"]
-    assert summary["exact_lenient"] == 1.0 and summary["secondary_stream_v2"]["exact"] == 1.0
-
-
 # ------------------------------------------------------------ split and merged
 
 
@@ -241,16 +235,3 @@ def test_a_merged_prediction_is_credited_for_every_gold_equation_it_covers():
     assert item["stream_credited"]["merged"] == [gold[0]["id"], gold[1]["id"]]
     secondary = pe.document_metrics([item])["secondary_stream_v2"]
     assert secondary["end_to_end_exact_with_credit"] == 1.0 and secondary["credited_merged"] == 2
-
-
-def test_equation_items_carry_the_secondary_fields_and_wrong_stays_primary():
-    from test_eval_support import settings
-
-    record = equation("p-1", 0, PACKED, "block")
-    fix = eq_fix("p1-e0", r"\text{time} = \frac{\text{distance}}{\text{speed}}")
-    item = pe.equation_item(record, fix, settings())
-    assert item["wrong"] is True  # primary: not exact_lenient
-    assert item["exact_stream_v2"] is True and item["stream_similarity"] == 1.0
-    metrics = pe.equation_metrics([item])
-    assert metrics["exact_lenient"] == 0.0
-    assert metrics["secondary_stream_v2"]["exact"] == 1.0

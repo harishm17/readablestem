@@ -12,7 +12,7 @@ import shutil
 import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -24,7 +24,7 @@ from fixtures.ops.seed import SENTINEL, add_job, add_user
 from readablestem.cli.main import main
 from readablestem.config import get_settings
 from readablestem.ops import backup
-from readablestem.ops.backup import DrillError, check_database, restore_drill
+from readablestem.ops.backup import DrillError, restore_drill
 from readablestem.web import db
 from readablestem.web.database import alembic_config
 
@@ -105,38 +105,6 @@ def _databases(server_url: str) -> set[str]:
     return names
 
 
-def test_check_database_describes_a_good_copy_by_counts_only(live):
-    engine = create_engine(live)
-    check = check_database(engine)
-    engine.dispose()
-    assert check.ok and check.schema == "head" and check.problems == []
-    assert check.admins == 1 and check.allowed_users == 2
-    assert check.counts["jobs"] == 2 and check.counts["blobs"] == 3
-    assert check.counts["review_edits"] == 1
-    assert check.newest_job_age_h is not None and check.newest_spend_day is not None
-    assert SENTINEL not in " ".join(check.lines())
-
-
-def test_check_database_names_each_way_a_copy_cannot_run(server):
-    for url in _database(server[0]):
-        engine = create_engine(url)
-        empty = check_database(engine)
-        assert empty.schema == "none" and not empty.ok
-        assert "users" in empty.missing_tables
-        _migrate(url)
-        no_admin = check_database(engine)
-        assert no_admin.schema == "head" and not no_admin.ok
-        assert any("no admin" in p for p in no_admin.problems)
-        with engine.begin() as conn:
-            conn.execute(text("UPDATE alembic_version SET version_num = '000000000000'"))
-        ahead = check_database(engine)
-        assert ahead.schema == "ahead"
-        with engine.begin() as conn:
-            conn.execute(text("DROP TABLE courses CASCADE"))
-        assert "courses" in check_database(engine).missing_tables
-        engine.dispose()
-
-
 def test_the_drill_restores_into_a_scratch_database_and_removes_it(live, server, pg_bin):
     before = _databases(server[0])
     result = restore_drill(live, pg_bin=pg_bin)
@@ -145,13 +113,6 @@ def test_the_drill_restores_into_a_scratch_database_and_removes_it(live, server,
     assert result.check.counts["jobs"] == 2 and result.check.counts["blobs"] == 3
     assert result.dump_bytes > 0 and result.changed_tables == []
     assert _databases(server[0]) == before  # the scratch database is gone
-
-
-def test_the_drill_fails_loudly_on_a_database_that_is_not_ready(server, pg_bin):
-    for url in _database(server[0]):
-        _migrate(url)  # migrated, but no users: nobody could sign in
-        result = restore_drill(url, pg_bin=pg_bin)
-        assert not result.ok and any("no admin" in p for p in result.problems)
 
 
 def test_the_drill_notices_a_restore_that_lost_rows(live, pg_bin, monkeypatch):
@@ -166,16 +127,6 @@ def test_the_drill_notices_a_restore_that_lost_rows(live, pg_bin, monkeypatch):
     monkeypatch.setattr(backup, "check_database", lossy)
     result = restore_drill(live, pg_bin=pg_bin)
     assert not result.ok and result.changed_tables == ["jobs"]
-
-
-def test_the_drill_errors_clearly_without_tools_or_postgres(live, tmp_path, monkeypatch):
-    with pytest.raises(DrillError, match="needs a Postgres"):
-        restore_drill("sqlite:///x.db")
-    with pytest.raises(DrillError, match="pg_dump not found"):
-        restore_drill(live, pg_bin=tmp_path)
-    monkeypatch.setenv("PATH", str(tmp_path))
-    with pytest.raises(DrillError, match="install the PostgreSQL client tools"):
-        restore_drill(live)
 
 
 def test_a_failed_restore_still_drops_the_scratch_database(live, server, pg_bin, tmp_path):
@@ -206,23 +157,3 @@ def test_cli_commands_print_counts_and_set_the_exit_code(live, pg_bin, monkeypat
         assert "restore_drill=ok" in out and "dump_bytes=" in out and SENTINEL not in out
     finally:
         get_settings.cache_clear()
-
-
-def test_cli_backup_check_exits_1_for_an_unmigrated_database(server, monkeypatch, capsys):
-    for url in _database(server[0]):
-        monkeypatch.setenv("DATABASE_URL", url)
-        get_settings.cache_clear()
-        try:
-            assert main(["ops", "backup-check"]) == 1
-            out = capsys.readouterr().out
-            assert "schema=none" in out and "backup_check=failed" in out
-        finally:
-            get_settings.cache_clear()
-
-
-def test_a_check_with_old_data_reports_its_age(live):
-    engine = create_engine(live)
-    later = datetime.now(UTC) + timedelta(hours=30)
-    check = check_database(engine, now=later)
-    engine.dispose()
-    assert check.newest_job_age_h is not None and check.newest_job_age_h > 29

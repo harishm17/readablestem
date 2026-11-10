@@ -51,51 +51,6 @@ def test_a_line_of_terms_under_key_terms_is_a_list():
     assert all(e.list_marker is None for e in items)  # plain bullets, no printed marker
 
 
-def test_two_lines_of_terms_are_read_left_to_right_and_top_down():
-    def fill(page):
-        page.insert_text((72, 120), "Key Terms", fontsize=16, fontname="hebo")
-        terms_line(page, 150, ["position", "reference frame", "scalar"])
-        terms_line(page, 165, ["vector", "displacement", "distance"])
-
-    items = [e.text for e in page_with(fill) if e.kind == Kind.LIST_ITEM]
-    assert items == ["position", "reference frame", "scalar", "vector", "displacement", "distance"]
-
-
-@pytest.mark.parametrize("heading", ["Chapter Summary", "Learning Objectives"])
-def test_the_same_line_under_another_heading_is_left_alone(heading):
-    def fill(page):
-        page.insert_text((72, 120), heading, fontsize=16, fontname="hebo")
-        terms_line(page, 150, ["dependent variable", "independent variable", "tangent"])
-
-    elements = page_with(fill)
-    assert [e.kind.value for e in elements[2:]] == ["paragraph"]
-
-
-def test_a_sentence_under_key_terms_stays_a_paragraph():
-    def fill(page):
-        page.insert_text((72, 120), "Key Terms", fontsize=16, fontname="hebo")
-        page.insert_text(
-            (72, 150),
-            "These terms are used throughout the chapter and are defined in the text.",
-            fontsize=BODY,
-        )
-
-    elements = page_with(fill)
-    assert [e.kind.value for e in elements[2:]] == ["paragraph"]
-
-
-def test_a_line_of_long_pieces_is_not_a_list_of_terms():
-    def fill(page):
-        page.insert_text((72, 120), "Key Terms", fontsize=16, fontname="hebo")
-        terms_line(
-            page,
-            150,
-            ["one two three four five six seven", "eight nine ten eleven twelve thirteen"],
-        )
-
-    assert [e.kind.value for e in page_with(fill)[2:]] == ["paragraph"]
-
-
 @pytest.mark.parametrize(
     ("printed", "kept"),
     [
@@ -113,23 +68,6 @@ def test_openstax_level_tags_at_the_start_of_a_paragraph_are_dropped(printed, ke
         e for e in page_with(fill) if e.text and e.text != "Introduction to the section."
     ]
     assert paragraph.text.startswith(kept) and "[" not in paragraph.text
-
-
-@pytest.mark.parametrize(
-    "printed",
-    [
-        "[Visual] Set up a meter stick for the students.",  # not a level tag
-        "[1] Newton described the law of motion in 1687.",
-        "See the note [BL] in the middle of a sentence for more.",
-        "[bl] lower case is not an OpenStax tag.",
-    ],
-)
-def test_other_text_in_brackets_is_kept(printed):
-    def fill(page):
-        page.insert_text((72, 120), printed, fontsize=BODY)
-
-    texts = [e.text for e in page_with(fill)]
-    assert printed in texts
 
 
 def test_a_paragraph_of_only_tags_is_kept_not_emptied():

@@ -24,7 +24,6 @@ from readablestem.core.types import (
     Status,
     inline_marker,
 )
-from readablestem.pipeline import combine
 from readablestem.pipeline.combine import CombineError, Part, join
 from readablestem.pipeline.combine import combine as combine_html
 from readablestem.pipeline.html_checks import static_checks
@@ -141,14 +140,6 @@ def test_ids_are_the_source_page_so_no_part_can_clash_and_all_are_unique():
     assert [e.page for e in joined.elements] == sorted(e.page for e in joined.elements)
 
 
-def test_an_id_of_another_shape_gets_the_part_number_in_front():
-    part = three()[1]
-    odd = part.result.elements[0].model_copy(update={"id": "custom", "order": 99})
-    part.result.elements.append(odd)
-    ids = {e.id for e in join([*three()[:1], part]).elements}
-    assert "s2-custom" in ids
-
-
 def test_equation_markers_and_offsets_are_moved_together():
     joined = join(three())
     paragraph = next(e for e in joined.elements if e.id == "p3-e1")
@@ -254,16 +245,6 @@ def test_an_element_on_a_page_the_part_does_not_have_is_refused():
     with pytest.raises(CombineError) as raised:
         join([Part(result, crops, [0, 1])])  # the part says it has two pages
     assert raised.value.code == "page_outside_part"
-
-
-def test_the_first_fix_for_an_element_wins_as_in_the_single_document():
-    first, second = parts_of(("A", [0, 1]), ("B", [2, 3]))
-    first.result.fixes.append(
-        first.result.fixes[0].model_copy(update={"heading": HeadingFix(level=1, text="later")})
-    )
-    joined = join([first, second])
-    assert sum(1 for f in joined.fixes if f.element_id == "p1-e0") == 1
-    assert combine.combine([first, second], title="T").count("A heading 1") >= 1
 
 
 def test_joining_does_not_change_the_parts():

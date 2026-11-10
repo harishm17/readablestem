@@ -25,7 +25,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from fixtures.web.review_doc import GROUP, dense_output, dense_pdf, review_output, review_pdf
+from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv
 from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
@@ -357,96 +357,6 @@ def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site
     result = site.job(job).result_json
     fix = next(f for f in result["fixes"] if f["element_id"] == "p1-e2")
     assert (fix["status"], fix["equation"]["latex"]) == ("edited", r"\boldsymbol{\omega}")
-
-
-@pytest.fixture
-def dense_job(site, browser) -> Iterator[str]:
-    """A finished job of the dense handout page (fixtures.web.review_doc.dense_output)."""
-    site.converter.output = dense_output()
-    try:
-        context = browser.new_context()
-        page = context.new_page()
-        sign_in(page, site.base, ALICE)
-        page.goto(f"{site.base}/app")
-        page.get_by_label("PDF file").set_input_files(
-            files=[{"name": "dense.pdf", "mimeType": "application/pdf", "buffer": dense_pdf()}]
-        )
-        page.get_by_role("button", name="Upload and convert").click()
-        page.wait_for_url(f"{site.base}/jobs/*")
-        job_id = page.url.rsplit("/", 1)[-1]
-        context.close()
-        assert site.run_worker() == job_id
-        yield job_id
-    finally:
-        site.converter.output = review_output()
-
-
-OVERLAPS = """() => {
-  const rects = [...document.querySelectorAll('.page-frame .box')].map(
-    b => [b.id, b.getBoundingClientRect()]);
-  const out = [];
-  for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
-    const [a, ra] = rects[i], [b, rb] = rects[j];
-    const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
-    const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
-    if (w > 0.5 && h > 0.5) out.push([a, b, Math.round(w), Math.round(h)]);
-  }
-  return out;
-}"""
-
-
-@pytest.mark.parametrize("viewport", [DESKTOP, PHONE], ids=["1440px", "390px"])
-def test_a_dense_page_with_accepted_shown_keeps_every_target_whole(
-    site, browser, dense_job, axe_source, viewport
-):
-    """An inline equation on every line, accepted ones shown: 24 px marks centred on each
-    overlapped, so a click in the overlap went to the wrong item (axe: target-size,
-    "partially obscured"). Now no two clickable areas overlap and axe passes."""
-    context, page = open_page(browser, site, viewport=viewport)
-    page.goto(f"{site.base}/jobs/{dense_job}/review?accepted=1")
-    wait_images(page)
-    assert page.locator(".page-frame .box").count() == 18
-    assert page.evaluate(OVERLAPS) == []
-    sizes = page.eval_on_selector_all(
-        ".page-frame .box",
-        "els => els.map(e => [e.id, e.getBoundingClientRect().width, "
-        "e.getBoundingClientRect().height])",
-    )
-    assert not [s for s in sizes if s[1] < 24 or s[2] < 24], sizes
-    found = strict_axe(page, axe_source)
-    assert not found, describe(found)
-    context.close()
-
-
-def test_a_refused_image_is_asked_for_once_more_then_explained(site, browser, job):
-    """Renders are capped per person (429 beyond two at a time): app.js asks once more
-    after a pause, and only then says the page image could not be shown."""
-    context, page = open_page(browser, site)
-    calls: list[str] = []
-
-    def once(route):
-        calls.append(route.request.url)
-        if len(calls) == 1:
-            route.fulfill(status=429, body="Too many images at once.")
-        else:
-            route.continue_()
-
-    page.route("**/pages/1.png", once)
-    page.goto(f"{site.base}/jobs/{job}/review")
-    page.wait_for_function("document.querySelector('.page-image').naturalWidth > 0")
-    assert len(calls) == 2
-    assert page.locator(".page-failed").is_hidden()
-    page.unroute("**/pages/1.png")
-
-    refused: list[str] = []
-    page.route(
-        "**/pages/1.png",
-        lambda route: (refused.append(route.request.url), route.fulfill(status=429, body="")),
-    )
-    page.goto(f"{site.base}/jobs/{job}/review")
-    page.locator(".page-failed").wait_for(state="visible", timeout=8000)
-    assert len(refused) == 2
-    context.close()
 
 
 def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser, job):

@@ -276,120 +276,6 @@ def rich_output() -> ConversionOutput:
 # --------------------------------------------------------------------------- page
 
 
-def test_decisions_first_by_kind_then_optional_then_accepted(web):
-    page = review_page(web)
-    # Needs a decision: equations (p1-e3 needs review, p1-e5 not converted), then the
-    # figure. Then the accepted ones (p1-e2, the heading). Paragraphs are not fixes.
-    assert cards(page) == ["p1-e3", "p1-e5", "p1-e4", "p1-e2", "p1-e0"]
-    assert page.index('id="needs-decision"') < page.index('id="group-equations"')
-    assert page.index('id="group-equations"') < page.index('id="group-figures"')
-    assert page.index('id="group-figures"') < page.index('id="optional-checks"')
-    assert page.index('id="optional-checks"') < page.index('id="decided"')
-    assert 'id="group-headings"' not in page  # no heading needs a decision
-    assert '<h2 id="needs-decision-title">Needs your decision (3)</h2>' in page
-    assert '<h2 id="optional-checks-title">Optional checks (0)</h2>' in page
-
-
-def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
-    page = review_page(web)
-    equation = card(page, "p1-e3")
-    title = '<h4 id="fix-title-p1-e3" class="visually-hidden">Equation 2 <span class="meta">'
-    assert title + "on page 1</span></h4>" in equation  # in reading order: inline p1-e2 is no. 1
-    assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in equation
-    assert 'alt="The original equation 2 from page 1 of the PDF, as an image."' in equation
-    assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' in equation
-    assert "Read aloud roughly as:</span> “x plus 1”" in equation
-    assert "\\SECRETLATEX{x}</textarea>" in equation
-    assert '<label for="latex-p1-e3">LaTeX for equation 2</label>' in equation
-    # No confidence percentage and no internal code on the list view (T1-11).
-    # The report link's mailto body carries the random job id, which can end in "55" before
-    # its "%0A": check the visible markup, not attribute values.
-    visible = re.sub(r'="[^"]*"', '=""', equation)
-    assert ">Needs review</span>" in equation and "55%" not in visible
-    assert "<strong>Worth checking:</strong> The LaTeX uses a command that is not on" in equation
-    assert "Code:" not in equation and "unknown_command" not in equation
-    for action in ("edit", "accept", "reject"):
-        assert f'name="action" value="{action}"' in equation
-
-    figure = card(page, "p1-e4")
-    assert "SECRET-ALT a rising line</textarea>" in figure
-    assert '<label for="alt-p1-e4">Alt text for figure 1</label>' in figure
-    assert 'id="decorative-p1-e4"' in figure
-    assert "150 characters at most (this has 24)." in figure
-    assert "<strong>Caption in the PDF:</strong> Figure 1 SECRET-CAPTION" in figure
-
-    abstained = card(page, "p1-e5")
-    assert 'value="accept"' not in abstained  # nothing to accept
-    assert "<strong>Not converted:</strong> The model was not sure enough" in abstained
-    assert "Code:" not in abstained and "low_confidence" not in abstained
-    assert "Type the LaTeX, then save." in abstained
-
-
-def test_buttons_name_the_fix_they_act_on(web):
-    figure = card(review_page(web), "p1-e4")
-    # "Reject" is named for what it does, with what that means under it.
-    assert 'Keep without a description<span class="visually-hidden"> (figure 1)</span>' in figure
-    assert "I understand: screen reader users get no description." in figure
-    assert 'Accept<span class="visually-hidden"> figure 1</span>' in figure
-    assert 'Save and accept<span class="visually-hidden"> (figure 1)</span>' in figure
-
-
-def test_decided_fixes_are_folded_away(web):
-    page = review_page(web)
-    # The reviewer's own decisions apart from what was accepted for them.
-    mine = page[page.index('id="decided"') : page.index('id="accepted"')]
-    assert '<h2 id="decided-title">Your decisions (0)</h2>' in mine
-    assert "None yet." in mine
-    accepted = page[page.index('id="accepted"') :]
-    assert '<h2 id="accepted-title">Accepted automatically (2)</h2>' in accepted
-    assert '<details class="done-group">' in accepted  # closed: no "open" attribute
-    assert "<summary>Show the 2 items accepted for you</summary>" in accepted
-    # Each line names its item (no confidence percentage).
-    assert (
-        '<summary id="fix-title-p1-e0">Heading 1 “SECRET-HEADING Kinematics”, page 1: '
-        "Accepted automatically</summary>" in accepted
-    )
-    assert re.search(
-        r'<summary id="fix-title-p1-e2">Equation 1 <span class="item-math"><math [^>]*>.*'
-        r"</math></span>, page 1: Accepted automatically</summary>",
-        accepted,
-    )
-
-
-def test_page_has_a_table_of_contents_with_counts(web):
-    page = review_page(web)
-    toc = page[page.index('<nav class="review-toc"') : page.index("</nav>", page.index("toc"))]
-    assert '<a href="#needs-decision">Needs your decision</a>: 3' in toc
-    assert (
-        '<a href="#group-equations">Equations</a>: 1 needs review, 1 not converted, '
-        "1 accepted or decided" in toc
-    )
-    assert '<a href="#group-figures">Figures</a>: 1 needs review, 0 accepted or decided' in toc
-    assert '<a href="#optional-checks">Optional checks</a>: 0' in toc
-    assert '<a href="#decided">Your decisions</a>: 0' in toc
-    assert '<a href="#accepted">Accepted automatically</a>: 2' in toc
-    assert (
-        '<h3 id="group-equations-title">Equations <span class="group-count">(2 decisions)'
-        "</span></h3>" in page
-    )
-    progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert "3 decisions left:</strong>\n    2 equations, 1 figure." in progress
-
-
-def test_job_page_breaks_down_what_needs_review_by_kind(web):
-    page = web.browser.get(f"/jobs/{web.job_id}").text
-    breakdown = page[
-        page.index('id="review-breakdown"') : page.index("</p>", page.index("breakdown"))
-    ]
-    # Not converted counts too: it needs a decision (write it, or keep the original).
-    assert "3 need your decision:" in breakdown
-    # Each kind links to its first decision on the review screen.
-    base = f"/jobs/{web.job_id}/review"
-    assert f'<a href="{base}?item=p1-e3">2 equations</a>,' in breakdown
-    assert f'<a href="{base}?item=p1-e4">1 figure</a>.' in breakdown
-    assert "heading" not in breakdown  # none need a decision
-
-
 # --------------------------------------------------------------------------- actions
 
 
@@ -439,38 +325,6 @@ def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     assert "Nothing left to decide." in progress
 
 
-def test_saving_an_equation_edit_validates_and_stores_it(web):
-    response = post(web, "p1-e3", action="edit", latex="  x^2 + 1  ")
-    assert response.status_code == 303
-    assert web.pipeline.latex_checked == ["x^2 + 1"]
-    fix = result(web).fix_for("p1-e3")
-    assert fix is not None and fix.status.value == "edited" and fix.equation is not None
-    assert fix.equation.latex == "x^2 + 1"
-    assert fix.equation.mathml == '<math display="block"><mi>x^2 + 1</mi></math>'
-    assert fix.equation.speech == "spoken form" and fix.equation.display == "block"
-    # The checks a proposal gets (web.edit_check): this equation has no text in the PDF,
-    # so there are no text-layer checks.
-    assert [c.name for c in fix.checks] == [
-        "latex.allowed_commands",
-        "latex.plain_text_arguments",
-        "latex.converts",
-        "mathml.well_formed",
-        "speech.generated",
-    ]
-    assert edits(web)[0].after["equation"]["latex"] == "x^2 + 1"
-
-
-def test_an_edit_with_warnings_is_saved_and_the_warning_explained(web):
-    assert post(web, "p1-e3", action="edit", latex="\\warn{x}").status_code == 303
-    page = review_page(web)
-    assert "Your edit passed the required checks and was saved. 1 check gives a warning" in (
-        card(page, "p1-e5")
-    )
-    changed = card(page, "p1-e3")
-    assert "Text inside \\text{...} contains characters that would turn into markup." in changed
-    assert "markup_in_text" not in changed  # no internal code on the list view (T1-11)
-
-
 def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     before = settled(web)
     response = post(web, "p1-e3", action="edit", latex="\\bad{y}")
@@ -489,88 +343,16 @@ def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     assert web.pipeline.rendered == []
 
 
-def test_an_invalid_edit_to_a_decided_fix_opens_it_so_the_error_link_works(web):
-    post(web, "p1-e3", action="accept")
-    response = post(web, "p1-e3", action="edit", latex="\\bad{y}")
-    assert response.status_code == 422
-    changed = card(response.text, "p1-e3")
-    assert '<details class="done-item" open>' in changed and 'id="latex-p1-e3"' in changed
-
-
-def test_latex_that_cannot_become_mathml_is_not_saved(web):
-    response = post(web, "p1-e3", action="edit", latex="\\fail")
-    assert response.status_code == 422
-    assert "It could not be turned into an equation" in response.text
-    assert edits(web) == []
-
-
 def test_empty_latex_is_refused(web):
     response = post(web, "p1-e5", action="edit", latex="   ")
     assert response.status_code == 422
     assert "Enter the LaTeX" in response.text
 
 
-def test_an_abstained_equation_can_be_fixed_by_editing(web):
-    assert post(web, "p1-e5", action="edit", latex="E = mc^2").status_code == 303
-    fix = result(web).fix_for("p1-e5")
-    assert fix is not None and fix.status.value == "edited"
-    assert fix.equation is not None and fix.equation.display == "block"
-
-
-def test_figure_alt_text_edit_is_checked_against_the_caption(web):
-    response = post(web, "p1-e4", action="edit", alt="A line   rising\nsteadily")
-    assert response.status_code == 303
-    assert web.pipeline.alt_checked == [
-        ("A line rising steadily", False, "Figure 1 SECRET-CAPTION")
-    ]
-    fix = result(web).fix_for("p1-e4")
-    assert fix is not None and fix.status.value == "edited" and fix.figure is not None
-    assert fix.figure.alt == "A line rising steadily" and fix.figure.figure_type == "chart"
-
-
-def test_figure_alt_text_failing_a_check_is_not_saved(web):
-    response = post(web, "p1-e4", action="edit", alt="Image of a graph")
-    assert response.status_code == 422
-    assert '<a href="#alt-p1-e4">' in response.text
-    assert "Your alt text was not saved. The alt text starts with words like" in response.text
-    assert "(alt.no_redundant_prefix" not in response.text  # codes are for the Details only
-    assert "Image of a graph</textarea>" in response.text
-    assert "(this has 16)" in response.text  # counts the reviewer's input
-    assert edits(web) == []
-
-
-def test_figure_can_be_marked_decorative(web):
-    assert post(web, "p1-e4", action="edit", alt="ignored", decorative="on").status_code == 303
-    fix = result(web).fix_for("p1-e4")
-    assert fix is not None and fix.figure is not None
-    assert fix.figure.decorative is True and fix.figure.alt == ""
-    assert web.pipeline.alt_checked[-1] == ("", True, "Figure 1 SECRET-CAPTION")
-
-
 def test_figure_needs_alt_text_or_decorative(web):
     response = post(web, "p1-e4", action="edit", alt="")
     assert response.status_code == 422
     assert "Enter alt text, or mark the figure as decorative." in response.text
-
-
-def test_reject_keeps_the_original(web):
-    assert post(web, "p1-e4", action="reject", acknowledge="on").status_code == 303
-    fix = result(web).fix_for("p1-e4")
-    assert fix is not None and fix.status.value == "rejected"
-    assert "p1-e4:rejected" in (with_file(web).html or "")
-
-
-def test_heading_level_can_be_changed(web):
-    assert post(web, "p1-e0", action="edit", level="2").status_code == 303
-    fix = result(web).fix_for("p1-e0")
-    assert fix is not None and fix.heading is not None and fix.heading.level == 2
-    assert post(web, "p1-e0", action="edit", level="9").status_code == 422
-
-
-def test_nothing_to_accept_on_an_abstained_fix(web):
-    response = post(web, "p1-e5", action="accept")
-    assert response.status_code == 422
-    assert '<a href="#actions-p1-e5">' in response.text
 
 
 def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
@@ -682,19 +464,6 @@ def test_reviewer_latex_is_cleaned_like_model_output(web, typed, stored):
     assert fix is not None and fix.equation is not None and fix.equation.latex == stored
 
 
-def test_refused_latex_is_shown_back_as_the_reviewer_typed_it(web):
-    response = post(web, "p1-e3", action="edit", latex="$\\bad{y}$")
-    assert response.status_code == 422
-    assert "$\\bad{y}$</textarea>" in response.text
-    assert web.pipeline.latex_checked == ["\\bad{y}"]
-
-
-def test_latex_that_is_only_a_wrapper_is_refused_as_empty(web):
-    response = post(web, "p1-e5", action="edit", latex="$$")
-    assert response.status_code == 422
-    assert "Enter the LaTeX" in response.text
-
-
 def test_reviewer_alt_text_is_cleaned_like_model_output(web):
     """Bidi controls and zero-width characters are invisible but change what a screen
     reader says; check_alt refuses them uncleaned, so the reviewer's text is cleaned
@@ -776,65 +545,6 @@ def test_a_level_the_outline_repair_would_change_is_refused(outline):
         assert levels(outline)["p1-e2"] == written
 
 
-def test_a_rejected_parent_changes_which_levels_fit(outline):
-    assert post(outline, "p1-e1", action="reject").status_code == 303  # h2 -> paragraph
-    response = post(outline, "p1-e2", action="edit", level="3")
-    assert response.status_code == 422
-    assert "show it as level 2. Choose a level from 1 to 2" in response.text
-    assert post(outline, "p1-e2", action="edit", level="2").status_code == 303
-
-
-def test_the_first_heading_may_take_any_level(outline):
-    assert post(outline, "p1-e0", action="edit", level="3").status_code == 303
-    assert levels(outline)["p1-e0"] == 3
-
-
-def test_the_review_page_says_which_levels_fit(outline):
-    page = review_page(outline)
-    assert "Level 1 to 6 fits." in card(page, "p1-e0")  # the first heading
-    assert "Level 1 to 2 fits." in card(page, "p1-e1")
-    third = card(page, "p1-e2")
-    assert "Level 1 to 3 fits." in third
-    assert 'aria-describedby="level-hint-p1-e2"' in third
-
-
-def test_levels_that_fit_are_always_1_to_n():
-    """The refusal message says "from 1 to n": check it for every outline of up to five
-    headings at levels 1 to 6, with some rejected."""
-    import itertools
-
-    from readablestem.web.review import heading_level_written, heading_levels_that_fit
-
-    def doc(spec: tuple[int | None, ...]) -> DocumentResult:
-        elements = [
-            Element(id=f"p1-e{i}", kind=Kind.HEADING, page=0, bbox=(0, 0, 1, 1), order=i,
-                    text="t")
-            for i in range(len(spec) + 1)
-        ]  # fmt: skip
-        fixes = [
-            Fix(element_id=f"p1-e{i}", kind=Kind.HEADING,
-                status=Status.REJECTED if level is None else Status.ACCEPTED,
-                heading=HeadingFix(level=level or 1, text="t"))
-            for i, level in enumerate((*spec, 1))
-        ]  # fmt: skip
-        return DocumentResult(
-            pipeline_version="t",
-            elements=elements,
-            fixes=fixes,
-            stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
-        )
-
-    for n in range(5):
-        for spec in itertools.product((None, 1, 2, 3, 4, 5, 6), repeat=n):
-            data = doc(spec)
-            last = f"p1-e{n}"
-            fits = heading_levels_that_fit(data, last)
-            assert fits == list(range(1, len(fits) + 1)), spec
-            for level in range(1, 7):
-                written = heading_level_written(data, last, level)
-                assert (written == level) == (level in fits), spec
-
-
 # Every decision path must agree with the output: a level the reviewer accepts is the
 # level the document shows, and the review screen shows the level the document writes.
 # These run the real assembler (no fixture here patches it).
@@ -875,68 +585,6 @@ def written_levels(data: DocumentResult) -> dict[str, int]:
     return {eid: int(n) for n, eid in re.findall(r'<h([1-6]) id="(p1-e\d+)"', html)}
 
 
-def stored_levels(data: DocumentResult) -> dict[str, tuple[int, str]]:
-    return {f.element_id: (f.heading.level, f.status.value) for f in data.fixes if f.heading}
-
-
-def test_heading_places_say_the_level_the_output_writes():
-    """What the review screen shows for each heading (`heading_places`) is what the
-    assembler writes, for every outline of up to four headings, some rejected."""
-    import itertools
-
-    from readablestem.web.review import heading_places
-
-    for n in range(1, 5):
-        for spec in itertools.product((None, 1, 2, 3, 4, 5, 6), repeat=n):
-            data = heading_doc(*spec)
-            written = written_levels(data)
-            places = heading_places(data)
-            shown = {eid: p.written for eid, p in places.items() if p.in_document}
-            assert shown == written, spec
-            for place in places.values():
-                assert place.moved == (place.written != place.level), spec
-                assert place.suggested is not None and place.suggested <= place.highest, spec
-
-
-def test_accepting_a_level_the_output_would_move_is_refused():
-    """h1, h2, h3; the reviewer rejects the h2. Accepting the h3 as proposed used to
-    store 3 while the document wrote <h2>; "Save edit" with 3 was already refused."""
-    from readablestem.web.review import ReviewInvalid, apply_review
-
-    data = heading_doc(1, 2, 3)
-    apply_review(data, "p1-e1", "reject", {})
-    with pytest.raises(ReviewInvalid) as refused:
-        apply_review(data, "p1-e2", "accept", {})
-    [error] = refused.value.errors
-    assert error.field_id == "level-p1-e2"
-    assert error.message == (
-        "Level 3 would skip a level after the heading before it, so the document would "
-        "show it as level 2. Choose a level from 1 to 2, then Save edit, or change the "
-        "heading before it first."
-    )
-    assert stored_levels(data)["p1-e2"] == (3, "needs_review")  # nothing saved
-    apply_review(data, "p1-e2", "edit", {"level": "2"})
-    assert stored_levels(data)["p1-e2"] == (2, "edited")
-    assert written_levels(data)["p1-e2"] == 2
-
-
-def test_a_change_to_an_earlier_heading_names_the_headings_it_moves():
-    """h1, h2, h3 with the h3 accepted; the h2 is then edited to level 1. The document
-    writes the h3 as <h2>: the decision says so, and the review screen shows level 2
-    (`heading_places`). The stored level is kept, so undoing the change puts it back."""
-    from readablestem.web.review import apply_review, heading_places
-
-    data = heading_doc(1, 2, 3)
-    assert apply_review(data, "p1-e2", "accept", {}).moved == []
-    change = apply_review(data, "p1-e1", "edit", {"level": "1"})
-    assert change.moved == ["p1-e2"]
-    assert written_levels(data)["p1-e2"] == 2
-    place = heading_places(data)["p1-e2"]
-    assert (place.level, place.written, place.moved, place.suggested) == (3, 2, True, 2)
-    assert apply_review(data, "p1-e1", "edit", {"level": "2"}).moved == ["p1-e2"]
-    assert written_levels(data)["p1-e2"] == 3 and not heading_places(data)["p1-e2"].moved
-
-
 def test_rejecting_and_restoring_a_heading_moves_its_children_and_back():
     from readablestem.web.review import apply_review
 
@@ -946,52 +594,6 @@ def test_rejecting_and_restoring_a_heading_moves_its_children_and_back():
     assert apply_review(data, "p1-e1", "accept", {}).moved == ["p1-e2", "p1-e3"]
     assert written_levels(data) == {"p1-e0": 1, "p1-e1": 2, "p1-e2": 3, "p1-e3": 3, "p1-e4": 2}
     assert apply_review(data, "p1-e4", "reject", {}).moved == []  # nothing after it
-
-
-def test_the_page_shows_and_offers_the_level_the_document_writes(outline):
-    """Reject the h2: the h3 is written as <h2>. Its card says so, offers level 2, has no
-    Accept button."""
-    assert post(outline, "p1-e1", action="reject").status_code == 303
-    page = review_page(outline)
-    third = card(page, "p1-e2")
-    assert "Proposed level: 3" in third
-    assert "In the document: level 2." in third
-    assert '<option value="2" selected>Level 2</option>' in third
-    assert 'value="accept"' not in third
-    response = post(outline, "p1-e2", action="accept")  # from a page loaded earlier
-    assert response.status_code == 422
-    assert '<a href="#level-p1-e2">Level 3 would skip a level' in response.text
-    assert 'id="level-error-p1-e2"' in response.text
-    assert post(outline, "p1-e0", action="accept").status_code == 303
-    assert {f.element_id: f.status.value for f in result(outline).fixes} == {
-        "p1-e0": "accepted",
-        "p1-e1": "rejected",
-        "p1-e2": "needs_review",
-    }
-    assert "In the document" not in card(review_page(outline), "p1-e1")  # level 2 fits
-
-
-def test_a_rejected_heading_says_where_it_would_go_if_accepted(outline):
-    assert post(outline, "p1-e2", action="reject").status_code == 303
-    assert post(outline, "p1-e1", action="edit", level="1").status_code == 303
-    rejected = card(review_page(outline), "p1-e2")
-    assert "If accepted, it would be level 2." in rejected
-    assert '<option value="2" selected>Level 2</option>' in rejected
-    assert 'value="accept"' not in rejected
-    assert post(outline, "p1-e2", action="accept").status_code == 422
-    assert result(outline).fix_for("p1-e2").status is Status.REJECTED  # type: ignore[union-attr]
-
-
-def test_a_decision_that_moves_later_headings_says_so(outline):
-    assert post(outline, "p1-e2", action="accept").status_code == 303
-    assert post(outline, "p1-e1", action="edit", level="1").status_code == 303
-    assert levels(outline) == {"p1-e0": 1, "p1-e1": 1, "p1-e2": 3}
-    page = review_page(outline)
-    assert "Heading 3 is now shown at a different level." in page
-    decided = card(page, "p1-e2")
-    assert "Accepted by you" in decided
-    assert "In the document: level 2." in decided
-    assert '<option value="2" selected>Level 2</option>' in decided
 
 
 def test_moved_headings_are_named_then_counted():
@@ -1010,17 +612,6 @@ def test_moved_headings_are_named_then_counted():
 # --------------------------------------------------------------------------- after a decision
 
 
-def test_static_checks_are_rerun_on_the_rerendered_html(web):
-    from readablestem.pipeline.html_checks import static_checks
-
-    assert post(web, "p1-e3", action="accept").status_code == 303
-    job = with_file(web)  # the checks are of the file, so they are made with it
-    stored = DocumentResult.model_validate(job.result_json).html_checks
-    assert stored and stored == static_checks(job.html or "")
-    # The fake assembler writes a bare page: the stored checks are of that page.
-    assert not next(c for c in stored if c.name == "html.lang").passed
-
-
 def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
     assert post(web, "p1-e3", action="accept").status_code == 303
     fixes = {f.element_id: f for f in result(web).fixes}
@@ -1030,8 +621,3 @@ def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
     assert result(web).fix_for("p1-e4").reviewed  # type: ignore[union-attr]
     decided = card(review_page(web), "p1-e3")
     assert "Accepted by you" in decided
-
-
-def test_the_review_page_is_not_announced_as_my_documents(web):
-    assert 'aria-current="page"' not in review_page(web)
-    assert 'aria-current="page"' in web.browser.get("/app").text

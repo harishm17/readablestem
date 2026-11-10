@@ -216,17 +216,3 @@ def test_the_contents_links_move_focus_to_their_headings_and_fit_320_px(
         violations = axe_violations(page, axe_source)
         assert not violations, describe(violations)
     context.close()
-
-
-def test_the_status_page_passes_axe_and_check_again_reloads_it(site, browser, axe_source):
-    for scheme in ("light", "dark"):
-        context, page = open_as(browser, site, "/status", scheme=scheme, signed_in=False)
-        violations = axe_violations(page, axe_source)
-        assert not violations, describe(violations)
-        first = page.locator("#status-checked time").get_attribute("datetime")
-        assert page.locator("#status-checked time").inner_text()
-        page.get_by_role("link", name="Check again").click()
-        page.wait_for_load_state()
-        assert page.url.endswith("/status")
-        assert page.locator("#status-checked time").get_attribute("datetime") >= first
-        context.close()

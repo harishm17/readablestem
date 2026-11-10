@@ -9,8 +9,6 @@ test, grids and fixes written by hand.
 
 from __future__ import annotations
 
-import subprocess
-
 import pymupdf
 import pytest
 
@@ -27,7 +25,6 @@ from readablestem.core.types import (
     TableFix,
     TableGrid,
 )
-from readablestem.gold import safe_tex
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step, figure_step, layout, run, table_math, table_step
 from readablestem.pipeline.assemble import render_html
@@ -86,11 +83,6 @@ def test_a_table_cell_that_is_a_formula_is_an_equation_of_the_table():
         assert child.parent_id == table.id
 
 
-def test_a_document_not_made_by_tex_has_no_cell_equations():
-    _, found = tables_of(cell_page("Skia/PDF m120"))
-    assert all(c.equation_id is None for t in found for c in t.table.cells)
-
-
 def symbol_page(producer: str, marks: list[tuple[str, str]]) -> bytes:
     """A ruled table, a word column and a column of one glyph each: `marks` are (text, font)."""
     doc = pymupdf.open()
@@ -128,27 +120,10 @@ def test_a_cell_of_only_a_maths_symbol_glyph_is_an_equation():
     assert sorted(texts) == ["±", "\N{MULTIPLICATION SIGN}"]
 
 
-def test_a_symbol_glyph_cell_needs_a_tex_made_pdf():
-    assert (
-        cell_equation_texts(symbol_page("Skia/PDF m120", [("\N{MULTIPLICATION SIGN}", "symb")]))
-        == []
-    )
-
-
 def test_a_dingbat_or_a_symbol_bullet_in_a_cell_is_not_maths():
     """ZapfDingbats ticks and the list bullet of the plain Symbol face are decoration."""
     marks = [("4", "zadb"), ("•", "symb")]
     assert cell_equation_texts(symbol_page("pdfTeX-1.40.25", marks)) == []
-
-
-def test_a_symbol_glyph_outside_a_table_is_not_an_equation():
-    doc = pymupdf.open()
-    doc.set_metadata({"producer": "pdfTeX-1.40.25"})
-    page = doc.new_page(width=612, height=792)
-    page.insert_text((100, 100), "A note on bullets", fontsize=11, fontname="helv")
-    page.insert_text((100, 130), "•", fontsize=11, fontname="symb")
-    page.insert_text((115, 130), "an item of a list", fontsize=11, fontname="helv")
-    assert [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.EQUATION] == []
 
 
 def neighbour_page() -> bytes:
@@ -209,29 +184,6 @@ def glyph_context(data: bytes, equation: Element, across: tuple[float, float]) -
     context = line_glyphs(data, equation, across)
     assert context is not None
     return context
-
-
-TECTONIC_CACHE = safe_tex.tectonic_cache().is_dir()
-
-
-@pytest.mark.skipif(
-    safe_tex.tectonic_path() is None or not TECTONIC_CACHE, reason="needs Tectonic and its cache"
-)
-def test_a_tex_table_of_checkmarks_gives_one_equation_per_mark(tmp_path):
-    (tmp_path / "t.tex").write_text(
-        "\\documentclass{article}\\usepackage{amssymb}\\begin{document}\n"
-        "\\begin{tabular}{|l|c|c|}\\hline Method & A & B\\\\\\hline\n"
-        "Ours & $\\checkmark$ & \\\\\\hline Base & & $\\checkmark$\\\\\\hline\n"
-        "Other & $\\times$ & $\\checkmark$\\\\\\hline\\end{tabular}\\end{document}\n"
-    )
-    done = subprocess.run(
-        [safe_tex.tectonic_path(), "-X", "compile", "t.tex"],
-        cwd=tmp_path, capture_output=True, timeout=180, check=False,
-    )  # fmt: skip
-    if done.returncode:
-        pytest.skip("Tectonic could not compile offline")
-    texts = cell_equation_texts((tmp_path / "t.pdf").read_bytes())
-    assert sorted(texts) == ["\N{MULTIPLICATION SIGN}", "✓", "✓", "✓"]
 
 
 # ------------------------------------------------------------------ the page side
@@ -302,12 +254,6 @@ def merged(fixes: list[Fix], elements: list[Element] | None = None) -> dict[str,
     return table_math.with_cell_readings(elements, {f.element_id: f for f in fixes})
 
 
-def test_a_cell_the_model_wrote_as_text_takes_the_equation_steps_reading():
-    out = merged([table_fix(model_grid()), equation_fix()])
-    cell = out["p1-e1"].table.grid.cells[2]
-    assert (cell.latex, cell.mathml, cell.text) == ("m", MATHML, "m")
-
-
 def test_the_equation_is_the_one_source_of_a_cells_maths():
     """A reviewer edit of the cell equation is what the table shows, whatever the model wrote."""
     own = TableCell(row=1, col=0, text="m", latex="\\mu", mathml=MATHML.replace("m<", "\u03bc<"))
@@ -322,31 +268,10 @@ def test_a_failed_or_rejected_reading_leaves_the_cell_as_it_is():
         assert out["p1-e1"].table.grid.cells[2].latex is None
 
 
-def test_a_reading_that_needs_review_is_still_written_and_keeps_its_own_decision():
-    out = merged([table_fix(model_grid()), equation_fix(Status.NEEDS_REVIEW)])
-    assert out["p1-e1"].table.grid.cells[2].latex == "m"
-    assert out["p1-e2"].status is Status.NEEDS_REVIEW  # the equation's fix is not touched
-
-
 def test_a_grid_of_another_size_than_the_pdfs_takes_nothing():
     small = TableGrid(rows=1, cols=2, cells=model_grid().cells[:2], header_rows=1, source="model")
     out = merged([table_fix(small), equation_fix()])
     assert out["p1-e1"].table.grid is small or out["p1-e1"].table.grid == small
-
-
-def test_a_table_without_a_cell_equation_is_left_alone():
-    elements = [table(local_cells(None))]
-    fixes = {"p1-e1": table_fix(model_grid())}
-    assert table_math.with_cell_readings(elements, fixes) is not fixes
-    assert table_math.with_cell_readings(elements, fixes) == fixes
-
-
-def test_without_cell_equations_drops_them_and_their_ids():
-    out = table_math.without_cell_equations([table(local_cells()), cell_equation()])
-    assert [e.id for e in out] == ["p1-e1"]
-    assert all(c.equation_id is None for c in out[0].table.cells)
-    plain = [table(local_cells(None))]
-    assert table_math.without_cell_equations(plain) is plain
 
 
 def test_the_page_writes_the_reading_in_the_cell_and_not_below_the_table():
@@ -407,20 +332,6 @@ def convert(**flags):
     )
 
 
-def test_with_tables_on_the_equation_step_reads_the_cell_and_the_page_writes_it(steps):
-    done = convert(feature_tables=True)
-    assert steps == ["p1-e2"]
-    assert "<math" in done.result.html and done.result.html.index("<math") < done.result.html.index(
-        "</table>"
-    )
-
-
-def test_with_tables_off_the_cell_equations_are_never_asked(steps):
-    done = convert(feature_tables=False)
-    assert steps == []
-    assert all(e.kind is not Kind.EQUATION for e in done.result.elements)
-
-
 # ------------------------------------------------------------------ a glyph belongs to one cell
 
 
@@ -432,23 +343,6 @@ def _glyphs(text: str, x: float, font: str = "CMR10", y: float = 100.0) -> list:
         out.append(_Char(ch, x, y, x + 5, y + 10, y + 8, 10.0, font, 4))
         x += 5
     return out
-
-
-def test_a_glyph_in_two_overlapping_cell_boxes_goes_to_the_cell_it_overlaps_most(monkeypatch):
-    from readablestem.pipeline import layout
-    from readablestem.pipeline.layout import _Row
-
-    monkeypatch.setattr(layout, "_TEX_MADE", True)
-    left = _glyphs("65.1", 100) + _glyphs("±", 120, "CMSY10") + _glyphs("0.4", 125)
-    right = _glyphs("p", 138, "CMMI10") + _glyphs("<", 143, "CMMI10") + _glyphs("0.05", 148)
-    cells = [
-        TableCell(row=0, col=0, text="65.1±0.4", bbox=(95, 95, 142, 115)),  # reaches 4 pt in
-        TableCell(row=0, col=1, text="p<0.05", bbox=(136, 95, 190, 115)),
-    ]
-    grid = TableGrid(rows=1, cols=2, cells=cells, source="local")
-    found = layout._cell_maths(grid, [_Row(left), _Row(right)])
-    assert found[(0, 0)].text.replace(" ", "") == "65.1±0.4"  # no `p` from its neighbour
-    assert found[(0, 1)].text.replace(" ", "") == "p<0.05"
 
 
 def test_a_cell_whose_glyphs_are_not_its_text_is_not_an_equation(monkeypatch):

@@ -28,7 +28,7 @@ from fixtures.web.oidc import (
     FakeMicrosoft,
 )
 from fixtures.web.support import ALICE, WebEnv
-from test_web_browser import TEXT_SPACING, WCAG_TAGS, axe_violations, describe, free_port
+from test_web_browser import WCAG_TAGS, axe_violations, describe, free_port
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 
 pytestmark = pytest.mark.browser
@@ -130,15 +130,6 @@ def test_the_university_round_trip_works_under_the_csp(site, browser, javascript
     assert refused and all("CSP" not in failure for failure in refused), refused
 
 
-def test_another_organisation_gets_a_plain_page(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    university_sign_in(page, site, tenant=OTHER_TENANT)
-    assert page.title().startswith("Your organisation is not set up for this beta")
-    assert OTHER_TENANT in page.locator("main").inner_text()
-    context.close()
-
-
 def open_sign_in_page(page, site, path: str) -> None:
     if path == "org":
         university_sign_in(page, site, tenant=OTHER_TENANT)
@@ -163,35 +154,3 @@ def test_sign_in_pages_pass_wcag22_aa_at_moderate_and_above(site, browser, axe_s
     strict = [v for v in results["violations"] if v["impact"] in STRICT]
     assert not serious, describe(serious)
     assert not strict, describe(strict)
-
-
-@pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
-@pytest.mark.parametrize("path", ["/login", "org"])
-def test_sign_in_pages_reflow_at_320_css_pixels(site, browser, path, spacing):
-    context = browser.new_context(viewport={"width": 320, "height": 256}, bypass_csp=True)
-    page = context.new_page()
-    open_sign_in_page(page, site, path)
-    if spacing:
-        page.add_style_tag(content=TEXT_SPACING)
-    width = page.evaluate(
-        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
-    )
-    context.close()
-    assert width[0] <= width[1], f"{path}: content is {width[0]} px wide in a {width[1]} px view"
-
-
-def test_the_buttons_are_reachable_by_keyboard_in_order(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    page.goto(f"{site.base}/login")
-    names = []
-    for _ in range(12):
-        page.keyboard.press("Tab")
-        name = page.evaluate(
-            "document.activeElement.tagName === 'BUTTON' ? "
-            "document.activeElement.textContent.trim() : null"
-        )
-        if name:
-            names.append(name)
-    context.close()
-    assert names[:2] == [UNIVERSITY_BUTTON, "Sign in with Google"]

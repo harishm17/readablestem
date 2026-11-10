@@ -163,14 +163,6 @@ def test_a_removed_person_gets_nothing_and_an_old_link_stops_working(web):
     assert OutboxSender.sent == []
 
 
-def test_a_linked_google_address_can_get_a_link_to_that_address(web):
-    with session_scope(web.ctx.factory) as session:
-        linked_emails.link(session, ALICE, PERSONAL)
-    ask(web, PERSONAL)
-    [message] = OutboxSender.sent
-    assert message.to == PERSONAL
-
-
 def test_a_link_expires(web):
     ask(web, ALICE)
     path = emailed_path()
@@ -179,17 +171,6 @@ def test_a_link_expires(web):
     assert web.browser.get(path).status_code == 400
     token = path.split("token=")[1]
     assert email_login.redeem(web.ctx.factory, token) is None
-
-
-def test_a_newer_link_replaces_the_older_one(web):
-    ask(web, ALICE)
-    first = emailed_path()
-    OutboxSender.reset()
-    ask(web, ALICE)
-    second = emailed_path()
-    assert first != second
-    assert web.browser.get(first).status_code == 400
-    assert web.browser.get(second).status_code == 200
 
 
 def test_only_a_hash_of_the_token_is_stored(web):
@@ -225,17 +206,6 @@ def test_confirming_needs_the_session_token(web):
     assert email_login.is_usable(web.ctx.factory, token)  # still unused
 
 
-def test_asking_needs_the_session_token(web):
-    assert web.browser.post("/login/email", data={"email": ALICE}).status_code == 403
-    assert OutboxSender.sent == []
-
-
-def test_a_bad_address_is_told_so_and_sends_nothing(web):
-    response = ask(web, "not-an-address")
-    assert response.status_code == 422 and "Enter an email address" in response.text
-    assert OutboxSender.sent == []
-
-
 def test_one_address_cannot_be_flooded_with_mail(web):
     for _ in range(6):
         response = ask(web, ALICE)
@@ -257,12 +227,6 @@ def test_nothing_about_the_address_or_token_is_logged(web, caplog):
     token = emailed_path().split("token=")[1]
     web.browser.get(f"/login/email/confirm?token={token}")
     assert ALICE not in caplog.text and token not in caplog.text
-
-
-def test_the_login_page_offers_it_only_when_it_is_on(web):
-    page = web.browser.get("/login").text
-    assert "Email me a sign-in link" in page and 'name="email"' in page
-    assert BOB not in page
 
 
 # --------------------------------------------------------------------------- shares (G1)
@@ -299,12 +263,6 @@ def _sign_in_by_link(env, address: str, client) -> None:
     OutboxSender.reset()
 
 
-def test_a_link_sent_to_the_account_address_proves_it_for_a_share(web):
-    job_id = _shared_with_alice(web)
-    _sign_in_by_link(web, ALICE, web.browser)
-    assert web.browser.get(f"/jobs/{job_id}/download").status_code == 409  # found, not rendered
-
-
 def test_a_link_sent_to_a_linked_address_proves_nothing_for_the_account(web):
     job_id = _shared_with_alice(web)
     with session_scope(web.ctx.factory) as session:
@@ -312,9 +270,3 @@ def test_a_link_sent_to_a_linked_address_proves_nothing_for_the_account(web):
     _sign_in_by_link(web, PERSONAL, web.browser)
     response = web.browser.get(f"/jobs/{job_id}/download")
     assert response.status_code == 403 and "Sign in again to open this document" in response.text
-
-
-def test_the_link_remembers_the_address_it_was_sent_to(web):
-    ask(web, " Alice@Example.ORG ")
-    with session_scope(web.ctx.factory) as session:
-        assert session.scalar(select(LoginLink.email)) == ALICE

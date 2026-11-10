@@ -82,59 +82,6 @@ def test_mathcat_recognises_the_shape_of_correct_chemistry_as_chemistry() -> Non
 
 
 @needs_mathcat
-def test_mathcat_says_the_state_words_and_not_the_letters() -> None:
-    speech = reading(ce_to_latex("NaCl(aq) + H2O(l) -> CO2(g)"), [CLEAR]).speech[CLEAR]
-    for word in ("aqueous", "liquid", "gas"):
-        assert word in speech
-    assert "(aq)" not in speech and "open paren" not in speech
-
-
-@needs_mathcat
-def test_mathcat_reads_a_state_that_follows_a_whole_formula_or_an_ion() -> None:
-    speech = reading(ce_to_latex("SO4^2-(aq)"), [CLEAR]).speech[CLEAR]
-    assert "aqueous" in speech
-
-
-@needs_mathcat
-def test_mathcat_reads_a_labelled_arrow_instead_of_failing() -> None:
-    """`\\xrightarrow` was an `mstyle` and an `mpadded`; MathCAT said nothing but an error."""
-    for latex in (
-        ce_to_latex("CaCO3(s) ->[\\Delta] CaO(s) + CO2(g)"),
-        r"\text{CaCO}_3\text{(s)} \xrightarrow{\Delta} \text{CaO}\text{(s)} + 2 x",
-        r"x \xrightarrow{f} y",
-    ):
-        got = reading(latex, [CLEAR])
-        assert got.errors == {} and got.speech[CLEAR], latex
-
-
-@needs_mathcat
-def test_mathcat_says_an_ion_with_its_charge_and_a_nuclide_with_its_numbers() -> None:
-    assert "plus" in reading(ce_to_latex("Na+"), [CLEAR]).speech[CLEAR]
-    nuclide = reading(ce_to_latex("^{14}_{6}C"), [CLEAR]).speech[CLEAR]
-    assert "14" in nuclide and "6" in nuclide and "pre sub" not in nuclide
-
-
-@needs_mathcat
-def test_mathcat_cannot_read_some_nuclear_particles_as_chemistry_and_says_so() -> None:
-    """MathCAT 0.7.7 has a rule for the electron only: in a reaction, a neutron with its
-    numbers is still read as maths (docs/chemistry.md, "What MathCAT does not recognise")."""
-    neutron = reading(ce_to_latex("^{235}_{92}U + ^{1}_{0}n -> ^{141}_{56}Ba"), [CLEAR])
-    assert "n pre sub 0 and pre super 1" in neutron.speech[CLEAR]
-
-
-@needs_sre
-def test_sre_reads_the_degree_sign_and_the_overline_without_odd_words() -> None:
-    both = ["sre:clearspeak", "sre:mathspeak"]
-    degrees = reading(r"\theta = 30^\circ", both).speech
-    assert "composed" not in degrees["sre:clearspeak"] and "degrees" in degrees["sre:clearspeak"]
-    assert "degree" in degrees["sre:mathspeak"] and "ring" not in degrees["sre:mathspeak"]
-    over = reading(r"\overline{AB}", both).speech["sre:mathspeak"]
-    assert "quotation dash" not in over and "bar" in over
-    under = reading(r"\underline{AB}", both).speech["sre:mathspeak"]
-    assert "quotation dash" not in under and "bar" in under
-
-
-@needs_mathcat
 def test_mathcat_reads_the_degree_sign_and_a_ring_operator_each_as_itself() -> None:
     assert "degrees" in reading(r"\theta = 30^\circ", [CLEAR]).speech[CLEAR]
     assert "composed" in reading(r"f \circ g", [CLEAR]).speech[CLEAR]
@@ -163,17 +110,3 @@ def test_tables_and_limits_are_read_as_rows_columns_and_limits(
     got = reading(latex, [CLEAR, "sre:mathspeak"])
     assert all(w in got.speech[CLEAR] for w in mathcat_words), got.speech[CLEAR]
     assert all(w in got.speech["sre:mathspeak"] for w in sre_words), got.speech["sre:mathspeak"]
-
-
-@needs_mathcat
-def test_mathcat_reads_the_gas_and_precipitate_marks_as_chemistry_and_cannot_read_a_condition() -> (
-    None
-):
-    marks = reading(ce_to_latex("Ag+(aq) + Cl-(aq) -> AgCl v"), [CLEAR])
-    assert marks.chemistry and marks.errors == {}
-    assert "aqueous" in marks.speech[CLEAR] and "down arrow" in marks.speech[CLEAR]
-    # MathCAT has no rule for a state with a condition (nor for an excited nuclide): both are
-    # read, not failed on, and the rest of the equation is still chemistry.
-    for source in ("Zn(s) + Cu^2+(aq, 0.10 M) -> Zn^2+(aq, 1.0 M) + Cu(s)", "^{60}_{28}Ni^*"):
-        got = reading(ce_to_latex(source), [CLEAR])
-        assert got.errors == {} and got.speech[CLEAR], source

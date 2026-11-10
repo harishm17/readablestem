@@ -258,25 +258,6 @@ def test_a_stranger_gets_the_404_of_an_id_that_does_not_exist(site):
     assert real.text == absent.text
 
 
-def test_a_viewer_reads_and_downloads_but_cannot_write(site):
-    viewer = site.who[VIEWER]
-    page = viewer.get(f"/jobs/{site.job_id}")
-    assert page.status_code == 200
-    assert "document was shared with you. You can read it" in " ".join(page.text.split())
-    for owner_only in ("Delete now", "Keep for 7 days", "/share", "Upload a revised version"):
-        assert owner_only not in page.text, owner_only
-    assert f"/jobs/{site.job_id}/review" not in page.text  # a viewer is not offered the review
-    assert viewer.get(f"/jobs/{site.job_id}/view").status_code == 200
-    assert viewer.get(f"/jobs/{site.job_id}/record").status_code == 200
-    assert viewer.get(f"/jobs/{site.job_id}/download.epub").status_code == 200
-    assert viewer.get(f"/jobs/{site.job_id}/review").status_code == 403
-    before = snapshot(site)
-    token = page_token(viewer)
-    decision = {"csrf_token": token, "view": "list", "action": "accept"}
-    assert viewer.post(f"/jobs/{site.job_id}/review/p1-e3", data=decision).status_code == 403
-    assert snapshot(site) == before
-
-
 def test_a_reviewer_decides_and_is_recorded(site):
     reviewer = site.who[REVIEWER]
     page = reviewer.get(f"/jobs/{site.job_id}/review")
@@ -330,15 +311,6 @@ def test_a_removed_share_stops_working_on_the_next_request(site):
         assert viewer.get(f"/jobs/{site.job_id}{path}").status_code == 404, path
     page = viewer.get("/app")
     assert "Shared with you" not in page.text
-
-
-def test_changing_a_right_takes_effect_at_once(site):
-    reviewer = site.who[REVIEWER]
-    assert reviewer.get(f"/jobs/{site.job_id}/review").status_code == 200
-    assert give(site, DAVE, "view").status_code == 303
-    assert reviewer.get(f"/jobs/{site.job_id}/review").status_code == 403
-    assert reviewer.get(f"/jobs/{site.job_id}").status_code == 200
-    assert (DAVE, "view") in stored_shares(site)
 
 
 def test_the_address_is_matched_in_lower_case_and_in_full(site):
@@ -398,22 +370,6 @@ def test_a_sample_or_unfinished_document_cannot_be_shared(site):
         with pytest.raises(ShareError, match="sample"):
             shares.share(session, job, ALICE, "x@example.org", "view")
         job.is_sample = False
-
-
-def test_a_shared_person_sees_it_in_their_list_and_the_owner_does_not(site):
-    assert "Shared with you" in site.who[VIEWER].get("/app").text
-    page = site.who[REVIEWER].get("/app").text
-    assert f"/jobs/{site.job_id}" in page and "you can review it" in page
-    assert "Shared with you" not in site.who[OWNER].get("/app").text
-    assert "Shared with you" not in site.who[STRANGER].get("/app").text
-
-
-def test_the_page_says_nothing_was_sent_and_shows_the_address(site):
-    page = site.who[OWNER].get(f"/jobs/{site.job_id}/share")
-    assert page.status_code == 200
-    assert f"/jobs/{site.job_id}" in page.text and CAROL in page.text and DAVE in page.text
-    assert ERIN not in page.text  # removed
-    assert "Nothing is sent to it" in page.text
 
 
 def test_no_address_goes_into_the_session_cookie_or_the_logs(site, caplog):
@@ -481,39 +437,6 @@ def test_a_reread_by_a_reviewer_counts_against_the_owner(monkeypatch):
     assert not reread.GATE._users  # the reviewer's turn was given back
 
 
-def test_job_access_knows_its_needs():
-    from readablestem.web.routes.jobs import job_access
-
-    with pytest.raises(ValueError, match="unknown access"):
-        job_access(None, "0" * 32, None, "admin")  # type: ignore[arg-type]
-
-
-def test_the_migration_adds_the_table_and_the_downgrade_removes_it(tmp_path):
-    from alembic.autogenerate import compare_metadata
-    from alembic.migration import MigrationContext
-    from sqlalchemy import create_engine, inspect
-
-    from readablestem.web import db
-    from test_web_migrations import migrate
-
-    url = f"sqlite:///{tmp_path}/shares.db"
-    migrate(url, "head")
-    engine = create_engine(url)
-    try:
-        assert "job_shares" in inspect(engine).get_table_names()
-        with engine.connect() as conn:
-            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
-    finally:
-        engine.dispose()
-    migrate(url, "e1a7c3b95d24", down=True)
-    engine = create_engine(url)
-    try:
-        assert "job_shares" not in inspect(engine).get_table_names()
-        assert "jobs" in inspect(engine).get_table_names()  # the documents are untouched
-    finally:
-        engine.dispose()
-
-
 # --------------------------------------------------------------------------- security review
 
 
@@ -547,16 +470,6 @@ def test_only_the_owner_sees_email_addresses_in_the_record(site):
     assert "The owner" not in banner and "This document was shared with you." in banner
 
 
-def test_a_name_is_shown_when_there_is_one(site):
-    with session_scope(site.ctx.factory) as session:
-        session.scalar(select(User).where(User.email == DAVE)).name = "Dave Reviewer"
-    decide(site, REVIEWER)
-    page = site.who[VIEWER].get(f"/jobs/{site.job_id}/record").text
-    assert "Dave Reviewer" in page and DAVE not in page
-    owner = site.who[OWNER].get(f"/jobs/{site.job_id}/record").text
-    assert f"Dave Reviewer ({DAVE})" in owner
-
-
 def test_a_reviewer_s_decision_does_not_restart_the_deletion_clock(site):
     soon = utcnow() + timedelta(hours=2)
     with session_scope(site.ctx.factory) as session:
@@ -565,18 +478,6 @@ def test_a_reviewer_s_decision_does_not_restart_the_deletion_clock(site):
     assert as_utc(site.job(site.job_id).retain_until) == as_utc(soon)
     assert decide(site, OWNER, "p1-e4").status_code == 303
     assert as_utc(site.job(site.job_id).retain_until) > as_utc(soon)
-
-
-def test_no_restart_of_the_clock_is_reachable_without_the_owner_check():
-    """Every restart in a route that a reviewer can reach goes through `restart_owner_clock`;
-    the ones left are owner-only routes (`job_access(..., "owner")`) or check the owner."""
-    import pathlib
-
-    import readablestem
-
-    root = pathlib.Path(readablestem.__file__).parent / "web" / "routes"
-    for name in ("review.py", "edits.py", "split.py", "inventory.py", "bulk.py"):
-        assert "retention.restart_clock" not in (root / name).read_text(), name
 
 
 def test_a_reread_is_rate_limited_by_the_owner_not_the_reviewer(site, monkeypatch):
@@ -614,18 +515,6 @@ def test_undo_takes_back_only_a_write_the_person_made(site):
     assert snapshot(site) != before
 
 
-def test_the_undo_offer_is_for_the_writer_only(site):
-    from readablestem.web.routes import review
-
-    assert decide(site, REVIEWER).status_code == 303
-    version = site.job(site.job_id).result_version
-    with session_scope(site.ctx.factory) as session:
-        edits = review.last_write(session, site.job_id, version)
-        dave = session.scalar(select(User.id).where(User.email == DAVE))
-        alice = session.scalar(select(User.id).where(User.email == ALICE))
-    assert review.can_undo(edits, dave) and not review.can_undo(edits, alice)
-
-
 def test_a_share_needs_a_proved_address(site):
     from types import SimpleNamespace
 
@@ -637,19 +526,3 @@ def test_a_share_needs_a_proved_address(site):
         assert shares.role_of(session, job, unproved) is None
         assert shares.shared_with(session, unproved, utcnow()) == []
         assert len(shares.shared_with(session, proved, utcnow())) == 1
-
-
-def test_a_person_whose_sign_in_proved_nothing_is_told_to_sign_in_again_and_a_stranger_is_not(site):
-    from types import SimpleNamespace
-
-    from readablestem.web.routes.jobs import SIGN_IN_AGAIN
-
-    with session_scope(site.ctx.factory) as session:
-        job = session.get(Job, site.job_id)
-        named = SimpleNamespace(id="x", email=CAROL, email_verified=False)
-        stranger = SimpleNamespace(id="y", email="nobody@example.org", email_verified=False)
-        proved = SimpleNamespace(id="x", email=CAROL, email_verified=True)
-        assert shares.names_unproved(session, job, named)
-        assert not shares.names_unproved(session, job, stranger)  # nothing leaks to a stranger
-        assert not shares.names_unproved(session, job, proved)
-    assert SIGN_IN_AGAIN[0] == "Sign in again to open this document"

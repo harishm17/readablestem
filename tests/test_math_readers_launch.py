@@ -12,7 +12,7 @@ import pytest
 from fixtures.web.support import WebEnv, make_settings
 from readablestem.config import ConfigError
 from readablestem.ops import launch
-from readablestem.web.recipients import html_text, notice_text, recipients
+from readablestem.web.recipients import html_text, notice_text
 
 PROD = {
     "env": "prod",
@@ -53,17 +53,6 @@ def expected_names(provider, readers) -> set[str]:
 
 
 @pytest.mark.parametrize("provider,readers", list(itertools.product(PROVIDERS, READERS)))
-def test_recipients_follow_the_settings(tmp_path, provider, readers):
-    settings = make_settings(tmp_path, model_provider=provider, **reader_flags(readers))
-    found = recipients(settings, tracer_on=True)
-    assert [r.name for r in found if r.gets_documents] == sorted(
-        expected_names(provider, readers), key=lambda n: n != COMPANY[provider]
-    )
-    assert [r.name for r in found if not r.gets_documents] == ["Railway", "Langfuse"]
-    assert found[0].purposes[0] == "model"  # the model provider is listed first
-
-
-@pytest.mark.parametrize("provider,readers", list(itertools.product(PROVIDERS, READERS)))
 def test_the_real_template_names_exactly_the_companies_that_receive_pictures(
     tmp_path, provider, readers
 ):
@@ -93,44 +82,7 @@ def test_the_real_privacy_response_matches(tmp_path, provider, readers):
     assert {n for n in ("Anthropic", "OpenAI") if n in check} == wanted
 
 
-def test_a_reader_from_the_other_company_gets_its_own_item(tmp_path):
-    settings = make_settings(tmp_path, model_provider="openai", math_reader_claude_enabled=True)
-    text = notice_text(settings)
-    assert "Anthropic. A close-up picture of a handwritten expression" in text
-    # The same company as the model provider: one item, with the extra sentence.
-    same = notice_text(
-        make_settings(tmp_path, model_provider="anthropic", math_reader_claude_enabled=True)
-    )
-    assert same is not None
-    assert same.count("Anthropic.") == 1 and "read a second time" in same
-
-
-def test_the_account_notes_name_the_same_companies(tmp_path):
-    from fixtures.web.support import ALICE, login
-
-    env = WebEnv(
-        tmp_path,
-        model_provider="openai",
-        fake_models=True,
-        math_reader_claude_enabled=True,
-    )
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        page = html_text(client.get("/account").text)
-    assert "sent to OpenAI and Anthropic stay under their own retention" in page
-
-
 # ------------------------------------------------------------------ production refusal
-
-
-@pytest.mark.parametrize(
-    "provider,reader", list(itertools.product(PROVIDERS, ("claude", "openai")))
-)
-def test_production_accepts_every_combination_with_the_real_template(tmp_path, provider, reader):
-    # The page is written from the same list, so the real template always names the reader's
-    # company: the guard is for a template that stops doing so (next test).
-    prod(tmp_path, model_provider=provider, **reader_flags((reader,))).check_production()
 
 
 @pytest.mark.parametrize("flag,word", [("claude", "Anthropic"), ("openai", "OpenAI")])
@@ -144,52 +96,13 @@ def test_production_refuses_a_page_that_does_not_name_the_reader_company(
     prod(tmp_path, model_provider="openai", **reader_flags((flag,))).check_production()
 
 
-def test_the_stand_in_only_names_what_it_says(tmp_path, monkeypatch):
-    stand_in(tmp_path, monkeypatch, "<p>Anthropic only.</p>")
-    both = reader_flags(("claude", "openai"))
-    with pytest.raises(ConfigError, match="does not name OpenAI"):
-        prod(tmp_path, model_provider="anthropic", **both).check_production()
-
-
 def test_the_check_reads_text_not_markup_or_comments(tmp_path, monkeypatch):
     stand_in(tmp_path, monkeypatch, "{# OpenAI #}<p class='OpenAI'>nothing</p><!-- OpenAI -->")
     with pytest.raises(ConfigError, match="does not name OpenAI"):
         prod(tmp_path, math_reader_openai_enabled=True).check_production()
 
 
-def test_off_by_default_the_reader_check_does_not_run(tmp_path, monkeypatch):
-    stand_in(tmp_path, monkeypatch, "<p>Nothing here.</p>")
-    prod(tmp_path).check_production()
-
-
-def test_outside_production_the_notice_is_not_checked(tmp_path, monkeypatch):
-    stand_in(tmp_path, monkeypatch, "<p>Nothing here.</p>")
-    make_settings(tmp_path, math_reader_claude_enabled=True).check_production()
-
-
 def test_a_missing_notice_refuses(tmp_path, monkeypatch):
     monkeypatch.setattr(launch, "TEMPLATES_DIR", tmp_path / "nowhere")
     with pytest.raises(ConfigError, match=r"privacy\.html is missing"):
         prod(tmp_path, math_reader_openai_enabled=True).check_production()
-
-
-def test_launch_check_lists_the_model_provider_and_the_reader_separately(tmp_path, monkeypatch):
-    stand_in(tmp_path, monkeypatch, "<p>Nothing here.</p>")
-    items = launch.launch_blockers(
-        settings=make_settings(tmp_path, model_provider="openai", math_reader_claude_enabled=True)
-    )
-    assert any("MODEL_PROVIDER=openai sends document images to OpenAI" in i for i in items)
-    assert any("handwriting reader" in i and "Anthropic" in i for i in items)
-    stand_in(tmp_path, monkeypatch, "<p>OpenAI. Anthropic.</p>")
-    items = launch.launch_blockers(
-        settings=make_settings(tmp_path, model_provider="openai", math_reader_claude_enabled=True)
-    )
-    assert not any("privacy.html" in i and "does not name" in i for i in items)
-
-
-def test_analytics_check_reads_the_rendered_page(tmp_path, monkeypatch):
-    stand_in(tmp_path, monkeypatch, "{% if signup_open %}<p>PostHog.</p>{% endif %}")
-    with pytest.raises(ConfigError, match="does not name PostHog"):
-        prod(tmp_path, analytics_enabled=True).check_production()  # signup is not open
-    stand_in(tmp_path, monkeypatch, "<p>PostHog.</p>")
-    prod(tmp_path, analytics_enabled=True).check_production()

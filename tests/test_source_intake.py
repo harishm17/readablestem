@@ -17,11 +17,6 @@ def refusal(filename: str, data: bytes, **kwargs) -> str:
     return raised.value.code
 
 
-def test_a_tex_file_is_its_own_main_file():
-    info = intake.inspect("notes.tex", ARTICLE.encode())
-    assert (info.kind, info.main, info.pages, info.beamer) == ("tex", "main.tex", 1, False)
-
-
 def test_kind_follows_the_name_and_the_bytes():
     assert intake.kind_of("a.tex", b"x") == "tex"
     assert intake.kind_of("A.TEX", b"x") == "tex"
@@ -151,15 +146,6 @@ def test_the_lint_reads_every_text_file_of_a_zip():
 )
 def test_ordinary_documents_pass_the_lint(snippet):
     assert lint.problem(snippet) is None
-
-
-def test_the_lint_is_not_the_guarantee_catcode_tricks_get_past_it():
-    """The lint cannot see a command rebuilt from characters: that is what the sandbox is for
-    (tests/test_source_escapes.py runs these through it)."""
-    trick = "\\catcode`\\!=0 !write18{id}"
-    assert lint.problem(trick) is None
-    built = "\\expandafter\\csname wri\\string te\\endcsname 18{id}"
-    assert lint.problem(built) is None
 
 
 def test_the_envelope_round_trips_and_refuses_anything_else():

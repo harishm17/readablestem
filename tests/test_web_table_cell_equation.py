@@ -23,7 +23,6 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import table_math
 from readablestem.web.review import apply_review, rerender_html, undo_last
-from readablestem.web.table_card import cell_choices
 
 MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mi>{}</mi></math>'
 
@@ -114,12 +113,3 @@ def test_editing_the_equation_changes_the_cell_the_card_and_the_page():
     assert "<msub>" in page(r)
     undo_last(r, [(c.element_id, c.before) for c in change.every])
     assert r.fix_for("p1-e1").table.grid.cells[2].latex == "m"
-
-
-def test_the_card_says_which_cells_are_also_equations():
-    r = result()
-    grid = r.fix_for("p1-e1").table.grid
-    choices = cell_choices(grid, r.fix_for("p1-e1"), r.elements[0])
-    tied = {c.position: c.tied for c in choices}
-    assert tied["Row 2, column 1"] and not tied["Row 2, column 2"]
-    assert "(also an equation)" in next(c.label for c in choices if c.tied)

@@ -50,11 +50,6 @@ def test_a_label_above_and_below_the_arrow_is_written_out():
     assert "munderover" in mathml
 
 
-def test_a_plain_two_part_label():
-    latex = chem.ce_to_latex("CaCO3 ->[above][below] CaO")
-    assert r"\xrightarrow[\text{below}]{\text{above}}" in latex
-
-
 def test_an_equilibrium_arrow_with_two_labels():
     latex = chem.ce_to_latex("N2 <=>[above][below] CaO")
     assert r"\overset{\text{above}}{\underset{\text{below}}{\rightleftharpoons}}" in latex

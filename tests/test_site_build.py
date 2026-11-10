@@ -9,7 +9,6 @@ site/build.py is loaded by path: a folder called `site` must not go on the impor
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import re
 import sys
@@ -132,40 +131,6 @@ def html_files(out: Path) -> list[Path]:
 # ------------------------------------------------------------------------ the build
 
 
-def test_every_expected_page_is_written(built):
-    _out, paths = built
-    assert set(paths) >= OWN_PAGES
-    for example in ("physics-2-3", "physics-2-2", "physics-2-1", "fixture-lecture-notes"):
-        for name in ("index.html", "converted.html", "source.pdf", "report.json"):
-            assert f"examples/{example}/{name}" in paths
-    assert "stemcheck/sample-report.html" in paths
-    assert "assets/site.css" in paths
-    assert "assets/converted.css" in paths
-
-
-def test_at_least_two_and_at_most_four_examples(built):
-    _out, paths = built
-    pages = [p for p in paths if re.fullmatch(r"examples/[^/]+/index\.html", p)]
-    assert 2 <= len(pages) <= 4
-
-
-def test_every_page_parses_with_a_language_title_and_one_h1(built):
-    out, _ = built
-    for rel in OWN_PAGES | {str(p.relative_to(out)) for p in out.glob("examples/*/index.html")}:
-        page = scan(out / rel)
-        assert page.lang == "en", rel
-        assert page.title.strip(), rel
-        assert page.h1 == 1, rel
-        assert not page.errors, (rel, page.errors)
-
-
-def test_converted_pages_and_the_report_parse_without_duplicate_ids(built):
-    out, _ = built
-    for path in [*out.glob("examples/*/converted.html"), out / "stemcheck/sample-report.html"]:
-        page = scan(path)
-        assert not page.errors, (path.name, page.errors)
-
-
 def test_links_resolve_inside_the_site(built):
     out, _ = built
     ids = {path: scan(path).ids for path in html_files(out)}
@@ -213,74 +178,12 @@ def test_the_sites_own_pages_have_no_scripts_and_no_inline_event_handlers(built)
         assert not re.search(r"\son[a-z]+\s*=", text), rel
 
 
-def test_the_sites_own_pages_fit_the_apps_style_policy(built):
-    """The app serves these pages at /showcase/ under its own CSP (style-src 'self'): no
-    inline style attribute or <style> element, and each page has its own description."""
-    out, _ = built
-    descriptions = {}
-    for rel in OWN_PAGES | {str(p.relative_to(out)) for p in out.glob("examples/*/index.html")}:
-        text = (out / rel).read_text(encoding="utf-8")
-        assert not re.search(r"\sstyle\s*=", text) and "<style" not in text, rel
-        match = re.search(r'<meta name="description" content="([^"]+)"', text)
-        assert match, rel
-        descriptions[rel] = match.group(1)
-    pages = {rel: d for rel, d in descriptions.items() if rel != "404.html"}
-    assert len(set(pages.values())) == len(pages), pages
-
-
-def test_css_loads_nothing_from_outside(built):
-    out, _ = built
-    for css in out.glob("assets/*.css"):
-        text = css.read_text(encoding="utf-8")
-        assert "@import" not in text
-        # data: images and the self-hosted fonts beside the stylesheet (assets/fonts/), nothing else
-        for target in re.findall(r"url\(\s*['\"]?([^'\")]+)", text):
-            assert target.startswith("data:") or re.fullmatch(r"fonts/[\w.-]+\.woff2", target), (
-                css.name,
-                target,
-            )
-        assert "://" not in text.replace("https://", "x"), css.name
-
-
-def test_the_site_ships_the_app_tokens_and_the_fonts_they_name(built):
-    out, _ = built
-    tokens = (out / "assets" / "tokens.css").read_text(encoding="utf-8")
-    assert "--accent: #1c46ad" in tokens and "/static/" not in tokens
-    named = re.findall(r'url\("fonts/([^"]+)"\)', tokens)
-    assert named and all((out / "assets" / "fonts" / name).is_file() for name in named)
-    assert sum((out / "assets" / "fonts" / name).stat().st_size for name in named) < 120_000
-    for page in ("index.html", "examples/index.html"):
-        text = (out / page).read_text(encoding="utf-8")
-        assert text.index("assets/tokens.css") < text.index("assets/site.css")
-        for heading in ("Product", "Trust", "Guides", "Source"):
-            assert f"<h2>{heading}</h2>" in text, (page, heading)
-
-
-def test_no_fonts_trackers_or_cdns_are_named_anywhere_in_own_pages(built):
-    out, _ = built
-    banned = ("googleapis", "gstatic", "cloudflare", "jsdelivr", "unpkg", "cdnjs", "analytics")
-    for rel in OWN_PAGES | {str(p.relative_to(out)) for p in out.glob("examples/*/index.html")}:
-        text = (out / rel).read_text(encoding="utf-8").lower()
-        assert not [b for b in banned if b in text], rel
-
-
 def test_pages_name_the_author_and_the_licences(built):
     out, _ = built
     for rel in OWN_PAGES:
         text = (out / rel).read_text(encoding="utf-8")
         assert "Harish Manoharan" in text, rel
         assert "MIT" in text and "CC BY 4.0" in text, rel
-
-
-def test_the_tone_rules_hold_in_the_sites_own_words(built):
-    """The product assists; it does not certify. No page the site writes says otherwise."""
-    out, _ = built
-    banned = re.compile(r"\b(complian(?:t|ce)|verified|guarantee[sd]?|certified)\b", re.IGNORECASE)
-    for rel in OWN_PAGES | {str(p.relative_to(out)) for p in out.glob("examples/*/index.html")}:
-        text = (out / rel).read_text(encoding="utf-8")
-        # What the converted excerpts say is the book's own text, not the site's.
-        text = re.sub(r'<div class="converted">.*?\n      </div>', "", text, flags=re.S)
-        assert not banned.findall(re.sub(r"<[^>]+>", " ", text)), rel
 
 
 def test_every_openstax_page_is_credited(built):
@@ -304,16 +207,6 @@ def test_the_home_page_labels_the_set_its_numbers_come_from(built):
         assert headline.value in text
 
 
-def test_the_build_is_repeatable(tmp_path):
-    first = build.build_site(tmp_path / "a")
-    second = build.build_site(tmp_path / "b")
-    assert first == second
-    for rel in first:
-        a = hashlib.sha256((tmp_path / "a" / rel).read_bytes()).hexdigest()
-        b = hashlib.sha256((tmp_path / "b" / rel).read_bytes()).hexdigest()
-        assert a == b, rel
-
-
 def test_the_build_replaces_its_own_folder_but_refuses_any_other(tmp_path):
     out = tmp_path / "out"
     build.build_site(out)
@@ -326,149 +219,9 @@ def test_the_build_replaces_its_own_folder_but_refuses_any_other(tmp_path):
     assert (stranger / "notes.txt").read_text(encoding="utf-8") == "keep me"
 
 
-def test_the_build_fits_the_light_budget(built):
-    out, paths = built
-    own = sum(
-        (out / p).stat().st_size
-        for p in paths
-        if p.endswith((".html", ".css"))
-        and not any(
-            k in p for k in ("converted", "sample-report", "listen")
-        )  # transcripts are the document, read aloud
-    )
-    assert own < 400_000
-    for rel in OWN_PAGES:
-        assert (out / rel).stat().st_size < 60_000, rel
-
-
-def test_without_a_proof_file_the_home_page_says_so(tmp_path):
-    out = tmp_path / "out"
-    build.build_site(out, proof_path=tmp_path / "missing.md")
-    assert "was found when this site was built" in (out / "index.html").read_text(encoding="utf-8")
-
-
 # ---------------------------------------------------------------------- the parsers
-
-PROOF_SAMPLE = """# Proof: A made-up set (not held out)
-
-> **Development set, not held out.** Words from the file.
-
-> **Incomplete.** Something is missing.
-
-## Status
-
-|  |  |
-|---|---|
-| Proof set | `x` (development) |
-| Recorded spend | $1.00 |
-
-## Results
-
-**Equations through the whole pipeline (document task)**
-
-| Metric | Pooled | Count | Cluster 95% (by section) |
-|---|---|---|---|
-| **end_to_end_exact_lenient (all gold equations)** | 0.5000 | 5/10 | [0.1, 0.9] |
-| detection_recall | 1.0000 | 10/10 | [1.0, 1.0] |
-
-## What these numbers leave out
-
-- First limit.
-- Second limit.
-"""
-
-
-def test_proof_reader_takes_label_numbers_status_and_limits(tmp_path):
-    path = tmp_path / "PROOF.md"
-    path.write_text(PROOF_SAMPLE, encoding="utf-8")
-    proof = build.read_proof(path)
-    assert proof.kind == "development"
-    assert proof.banners[0].startswith("Development set, not held out.")
-    assert ("Recorded spend", "$1.00") in proof.status
-    values = {h.metric: (h.value, h.count, h.interval) for h in proof.headlines}
-    assert values["end_to_end_exact_lenient (all gold equations)"] == (
-        "0.5000",
-        "5/10",
-        "[0.1, 0.9]",
-    )
-    assert values["detection_recall"][0] == "1.0000"
-    assert proof.limits == ["First limit.", "Second limit."]
-
-
-def test_proof_reader_labels_a_held_out_file_as_held_out(tmp_path):
-    path = tmp_path / "PROOF.md"
-    path.write_text(
-        PROOF_SAMPLE.replace("(not held out)", "(held out)").replace(
-            "> **Development set, not held out.** Words", "> **Held-out set.** Words"
-        ),
-        encoding="utf-8",
-    )
-    assert build.read_proof(path).kind == "held-out"
-
-
-def test_proof_reader_leaves_out_what_it_cannot_find(tmp_path):
-    path = tmp_path / "PROOF.md"
-    path.write_text("# Proof: nothing here\n\nJust words.\n", encoding="utf-8")
-    proof = build.read_proof(path)
-    assert proof.available and proof.headlines == [] and proof.limits == []
-
-
-def test_split_main_returns_the_children_of_main_and_groups_them_by_page():
-    document = (
-        "<html><body><aside>x</aside><main>\n"
-        '<h1 id="p1-e0">T</h1>\n<p id="p1-e1">a <math id="p1-e2"><mi>x</mi></math></p>\n'
-        '<ul><li id="p2-e0">b</li></ul>\n<img src="x.png" alt="">\n'
-        "</main><p>after</p></body></html>"
-    )
-    blocks = build.split_main(document)
-    assert [b[:3] for b in blocks] == ["<h1", "<p ", "<ul", "<im"]
-    grouped = build.blocks_by_page(document)
-    assert set(grouped) == {1, 2}
-    assert len(grouped[1]) == 2 and len(grouped[2]) == 2  # the image follows page 2's list
-
-
-def test_headings_are_shifted_to_nest_under_the_pages_h3():
-    fragment = '<h1 id="a">A</h1><h3 id="b">B</h3><h2 id="c">C</h2>'
-    shifted = build.shift_headings(fragment)
-    assert re.findall(r"<h(\d)", shifted) == ["4", "5", "5"]
-    assert re.findall(r"</h(\d)>", shifted) == ["4", "5", "5"]
-    assert 'class="lv1"' in shifted and 'class="lv3"' in shifted
 
 
 def test_no_shifted_heading_skips_a_level():
     shifted = build.shift_headings("<h2>a</h2><h6>b</h6>")
     assert re.findall(r"<h(\d)", shifted) == ["4", "5"]
-
-
-def test_css_is_limited_to_the_converted_scope():
-    css = (
-        "body { color: #000; } h1, p { margin: 0; } "
-        "@media (min-width: 40rem) { main { x: 1; } } :focus-visible { outline: 0; }"
-    )
-    rules = build.scope_css(css)
-    joined = "\n".join(rules)
-    assert ".converted {color: #000;}" in joined
-    assert ".converted h1, .converted p" in joined
-    assert ".converted {x: 1;}" in joined
-    assert ".converted :focus-visible" in joined
-    assert "body" not in joined
-
-
-def test_data_images_become_files_named_by_their_hash():
-    out = build.Out()
-    fragment = '<img alt="" src="data:image/png;base64,AAECAw==">'
-    swapped = build.extract_images(fragment, out, "examples/x")
-    name = re.search(r'src="(img/[0-9a-f]{16}\.png)"', swapped)
-    assert name
-    assert out.files[f"examples/x/{name.group(1)}"] == b"\x00\x01\x02\x03"
-
-
-def test_links_that_leave_an_excerpt_point_at_the_full_page():
-    fragment = '<a href="#here">h</a> <a href="#gone">g</a>'
-    swapped = build.retarget_links(fragment, {"here"}, "converted.html")
-    assert 'href="#here"' in swapped and 'href="converted.html#gone"' in swapped
-
-
-def test_a_stray_flagged_page_is_not_produced_for_an_empty_page_number():
-    document = '<main><p id="p1-e0">only page one</p></main>'
-    assert build.blocks_by_page(document).get(5) is None

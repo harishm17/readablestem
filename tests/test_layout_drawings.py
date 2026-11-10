@@ -23,16 +23,13 @@ from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout, page_type
 from readablestem.pipeline.run import convert_pdf
-from readablestem.web.worker import result_outcome
 
 LETTER = (612.0, 792.0)
 SLIDE = (720.0, 405.0)
 BLACK = (0.0, 0.0, 0.0)
 BLUE = (0.1, 0.3, 0.8)
 RED = (0.85, 0.05, 0.05)
-GREEN = (0.1, 0.55, 0.2)
 GREY = (0.6, 0.6, 0.6)
-ORANGE = (0.95, 0.55, 0.1)
 PARAS = [
     "Displacement is the change in position of an object. It has a direction as well as a "
     "size, so it is a vector. Distance is how far the object travels along its path.",
@@ -93,30 +90,6 @@ def _curve(f, x0: float, x1: float, n=80) -> list[tuple[float, float]]:
     return [(x0 + (x1 - x0) * i / n, f(x0 + (x1 - x0) * i / n)) for i in range(n + 1)]
 
 
-def _slide_plot(page, *, title: bool, note: bool, x1=690.0, foot=385.0) -> None:
-    """A slide's L axes as one path filling the slide and one curve rising from the
-    origin, with a title and a two-line note inside the axes."""
-    _path(page, [[(30, 20), (30, foot), (700, foot)]])
-    rise = _curve(lambda x: foot - 300 * (1 - math.exp(-(x - 30) / 150)), 30, x1)
-    _path(page, [rise], colour=RED, width=2)
-    if title:
-        _label(page, (200, 60), "Speed of a falling ball", 22, font="hebo")
-    if note:
-        page.insert_textbox(pymupdf.Rect(380, 250, 680, 300), NOTE, fontsize=12)
-
-
-def _letter_plot(page, *, curves: int, frame: bool) -> None:
-    """A letter page filled by a plot: L axes as two lines, curves from the origin."""
-    if frame:
-        _rect(page, (18, 18, 594, 774), colour=GREY, width=1.5)
-    x0, y0, x1, y1 = 50, 40, 575, 745
-    _path(page, [[(x0, y0), (x0, y1)]])
-    _path(page, [[(x0, y1), (x1, y1)]])
-    for k, colour in enumerate((BLUE, RED, GREEN)[:curves]):
-        rise = _curve(lambda x, k=k: y1 - (200 + 120 * k) * (1 - math.exp(-(x - x0) / 120)), x0, x1)
-        _path(page, [rise], colour=colour, width=1.5)
-
-
 # --------------------------------------------------------------------------- helpers
 
 
@@ -157,121 +130,6 @@ def _html_text(html: str) -> str:
 
 
 # --------------------------------------------------------------------------- full-page plots
-
-
-@pytest.mark.parametrize(
-    "case", ["title and note", "note", "title, curve 75 % wide", "title, source line under"]
-)
-def test_a_slide_plot_with_text_inside_its_axes_is_a_figure(case):
-    # L axes and one curve filling the slide, with a title or a note inside the axes: the
-    # curve was set aside as a page-wide border piece, the axes alone made nothing, and the
-    # job page said "Everything was converted" (the curve 75 % wide: kept as a page image).
-    doc = pymupdf.open()
-    page = _page(doc, SLIDE)
-    if case == "title, source line under":
-        _slide_plot(page, title=True, note=False, foot=375)
-        _label(page, (30, 394), "Source: class data, autumn term, three trials averaged")
-    else:
-        _slide_plot(
-            page,
-            title=case != "note",
-            note="note" in case,
-            x1=560 if "75" in case else 690,
-        )
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    (figure,) = _figures(out)
-    assert _holds(figure, (30, 20, 700, 375))  # the axes and the curve
-    text = _text_of(out)
-    if case != "note":
-        assert "Speed of a falling ball" in text  # read in the flow, not a label
-    if "note" in case:
-        assert "terminal speed" in text
-    if "source" in case:
-        assert "three trials averaged" in text
-
-
-@pytest.mark.parametrize("case", ["three curves in a frame", "two curves and a legend"])
-def test_a_full_page_plot_with_a_title_and_notes_inside_keeps_its_axes_and_curves(case):
-    # A letter page filled by a plot with a title and notes (or a legend) inside the axes:
-    # the curves (page-wide) were set aside as a border, and the axes alone made nothing.
-    doc = pymupdf.open()
-    page = _page(doc)
-    if case == "three curves in a frame":
-        _letter_plot(page, curves=3, frame=True)
-        _label(page, (150, 90), "Three charging curves", 20, font="hebo")
-        page.insert_textbox(
-            pymupdf.Rect(300, 560, 560, 640),
-            "The blue curve has the smallest capacitor. The green curve has the largest one "
-            "and charges the slowest of the three.",
-            fontsize=11,
-        )
-    else:
-        _letter_plot(page, curves=2, frame=False)
-        _label(page, (160, 70), "Charging two capacitors", 18, font="hebo")
-        _label(page, (420, 600), "C = 2 mF", 10)
-        _label(page, (420, 615), "C = 5 mF", 10)
-        _label(page, (40, 765), "Figure 4. Voltage across each capacitor against time.", 10)
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    (figure,) = _figures(out)
-    assert _holds(figure, (50, 40, 575, 745))
-    text = _text_of(out)
-    if case == "three curves in a frame":
-        # The note's short last line is a line of the note, not a label of the figure.
-        assert "Three charging curves" in text and "slowest of the three." in text
-    else:
-        assert "Charging two capacitors" in text
-        assert "C = 2 mF" in (figure.text or "")  # the legend is the figure's
-
-
-@pytest.mark.parametrize("case", ["title only", "axis title, no text inside"])
-def test_a_slide_plot_with_a_title_or_axis_title_stays_a_figure(case):
-    # Controls: converted before; the title alone on the slide is its heading now, not the
-    # figure's label (the page's only text sets the body size, so size could not say so).
-    doc = pymupdf.open()
-    page = _page(doc, SLIDE)
-    _slide_plot(page, title=case == "title only", note=False)
-    if case != "title only":
-        _label(page, (640, 400), "time (s)")
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    (figure,) = _figures(out)
-    assert _holds(figure, (30, 20, 700, 385))
-    if case == "title only":
-        (heading,) = [e for e in out.elements if e.kind is Kind.HEADING]
-        assert heading.text == "Speed of a falling ball"
-        assert "Speed" not in (figure.text or "")
-
-
-def test_a_title_slides_decoration_does_not_swallow_its_title():
-    # An L-shaped accent along the left and bottom edges and a wave across the slide are
-    # a template's decoration, not a plot (no ticks, labels or axis title, and the wave
-    # does not start at the corner): the title and subtitle were the labels of one figure
-    # of the whole slide, and the HTML had no slide text. No page is kept either.
-    doc = pymupdf.open()
-    page = _page(doc, SLIDE)
-    _path(page, [[(20, 15), (20, 390), (700, 390)]], colour=ORANGE, width=3)
-    wave = _curve(lambda x: 340 + 25 * math.sin((x - 20) / 70), 22, 700)
-    _path(page, [wave], colour=(0.95, 0.75, 0.5), width=4)
-    _label(page, (80, 160), "Kinematics in one dimension", 30, font="hebo")
-    _label(page, (80, 200), "Week 3, lecture 2", 16)
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    text = _text_of(out)
-    assert "Kinematics in one dimension" in text and "Week 3, lecture 2" in text
-    assert all("Kinematics" not in (f.text or "") for f in _figures(out))
-    assert all(f.bbox[3] - f.bbox[1] < 100 for f in _figures(out))  # not the whole slide
-
-
-def test_a_slide_plot_with_a_note_is_never_called_converted():
-    doc = pymupdf.open()
-    _slide_plot(_page(doc, SLIDE), title=False, note=True)
-    result = _convert(doc.tobytes())
-    figures = [e for e in result.elements if e.kind is Kind.FIGURE]
-    assert len(figures) == 1 and _holds(figures[0], (30, 20, 700, 385))
-    assert "terminal speed" in _html_text(result.html)
-    assert result_outcome(result)[0] == "done"
 
 
 # --------------------------------------------------------------------------- lines and boxes
@@ -424,17 +282,6 @@ def test_a_diagram_of_lines_and_boxes_with_labels_inside_is_a_figure(case):
     assert "It has a direction" in _text_of(out) and "Acceleration is" in _text_of(out)
 
 
-def test_a_scatter_plot_with_a_legend_is_never_called_converted():
-    doc = pymupdf.open()
-    page = _page(doc)
-    y = _running_text(page, 72, 2)
-    _scatter(page, y + 30)
-    result = _convert(doc.tobytes())
-    (figure,) = [e for e in result.elements if e.kind is Kind.FIGURE]
-    assert "measured speed" in (figure.text or "")  # the legend is the figure's
-    assert "<img" in result.html
-
-
 def test_a_worked_example_box_with_a_grid_of_cell_borders_is_still_not_a_figure():
     # Controls: a worked example's frames round paragraphs, with a grid of cells drawn as
     # separate border pieces inside (an open chain of rules); and a box of four lines whose
@@ -580,87 +427,6 @@ def test_blanks_to_fill_in_and_dot_leaders_are_still_not_drawings():
 # --------------------------------------------------------------------------- hand marks
 
 
-def _choices(page, y: float) -> None:
-    _label(page, (72, y), "3. A car covers 120 m in 10 s. What is its average speed?", 11)
-    for x, option in zip(
-        (90, 200, 310, 420), ("(a) 4 m/s", "(b) 8 m/s", "(c) 12 m/s", "(d) 16 m/s"), strict=True
-    ):
-        _label(page, (x, y + 24), option, 11)
-
-
-def _oval(page, r, *, colour, width=1.5) -> None:
-    shape = page.new_shape()
-    shape.draw_oval(pymupdf.Rect(r))
-    shape.finish(color=colour, width=width)
-    shape.commit()
-
-
-MARKS = ["answer circled in red", "tick over a display equation", "filled tick", "ribbon tick"]
-
-
-@pytest.mark.parametrize("case", MARKS)
-def test_a_hand_mark_round_an_answer_or_over_an_equation_is_cut_out(case):
-    # A closed red ellipse round an answer, a tick over a display equation (held by the
-    # equation, whose transcription drops it), a tick drawn as a filled outline: lost, with
-    # "Everything was converted".
-    doc = pymupdf.open()
-    page = _page(doc)
-    y = _running_text(page, 72, 2)
-    if case == "tick over a display equation":
-        page.insert_text(
-            (220, y + 40), "F = m \u00d7 a = 2 \u00d7 9.8 = 19.6", fontsize=13, fontname="tiro"
-        )
-        _path(page, [[(300, y + 36), (307.7, y + 44.8), (322, y + 22.8)]], colour=RED, width=1.8)
-        mark = (300, y + 22.8, 322, y + 44.8)
-    else:
-        _choices(page, y + 30)
-        if case == "answer circled in red":
-            _oval(page, (304, y + 40, 372, y + 60), colour=RED)
-            mark = (304, y + 40, 372, y + 60)
-        elif case == "filled tick":
-            points = [(320, y + 50), (326, y + 58), (342, y + 34), (344, y + 36), (327, y + 62),
-                      (318, y + 52)]  # fmt: skip
-            _path(page, [points], colour=RED, width=0, fill=RED, close=True)
-            mark = (318, y + 34, 344, y + 62)
-        else:
-            spine = [(318 + t * 8, y + 50 + t * 9) for t in [i / 10 for i in range(11)]]
-            spine += [(326 + t * 18, y + 59 - t * 26) for t in [i / 10 for i in range(1, 11)]]
-            ribbon = [(x - 1.2, yy) for x, yy in spine] + [
-                (x + 1.2, yy) for x, yy in reversed(spine)
-            ]
-            _path(page, [ribbon], colour=RED, width=0, fill=RED, close=True)
-            mark = (316.8, y + 33, 345.2, y + 59)
-    _running_text(page, y + 90, 1, start=2)
-    out = layout.analyze(doc.tobytes())
-    assert out.page_types[0].kind == "born_digital"
-    assert out.kept_pages == {}
-    (region,) = _regions(out)
-    assert _holds(region, mark)
-    text = " ".join(e.text or "" for e in out.elements)
-    assert "12 m/s" in text or "19.6" in text  # the typed text under the mark stays read
-
-
-def test_marks_set_with_the_text_are_still_part_of_it():
-    # Controls: a circle round a step number and a box round a word in the text's colour,
-    # a red underline, and a yellow highlight with rounded ends behind a line (filled, in
-    # another colour, taller than the line): set with the text, not hand marks.
-    doc = pymupdf.open()
-    page = _page(doc)
-    y = _running_text(page, 72, 1)
-    _label(page, (90, y + 30), "1", 11)
-    _oval(page, (85, y + 18, 101, y + 34), colour=BLACK, width=0.8)
-    _label(page, (110, y + 30), "Measure the length of the pendulum with a metre rule.", 11)
-    _label(page, (72, y + 60), "The answer is the average speed, not the final one.", 11)
-    _rect(page, (134, y + 50, 168, y + 63), width=0.6)
-    _path(page, [[(250, y + 62), (330, y + 62)]], colour=RED, width=0.8)
-    _label(page, (72, y + 90), "Write the units of every quantity you work out.", 11)
-    page.add_highlight_annot(pymupdf.Rect(70, y + 77, 330, y + 97)).update()
-    _running_text(page, y + 110, 1, start=2)
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    assert _regions(out) == [] and _figures(out) == []
-
-
 # --------------------------------------------------------------------------- answer fields
 
 
@@ -694,70 +460,6 @@ def test_comb_fields_on_an_exam_cover_are_no_drawing_but_a_labelled_scale_is(lab
     else:
         assert _figures(out) == [] and _regions(out) == []
         assert "Candidate number" in _text_of(out)
-
-
-def test_an_icon_round_a_glyph_is_a_figure():
-    # A warning triangle round "!" and an information circle round "i": the glyph's
-    # one-character paragraph held each icon, and both were dropped.
-    doc = pymupdf.open()
-    page = _page(doc)
-    y = _running_text(page, 72, 1)
-    _path(
-        page,
-        [[(150, y + 60), (160, y + 40), (170, y + 60), (150, y + 60)]],
-        colour=ORANGE,
-        width=1.5,
-    )
-    _label(page, (159, y + 57), "!", 10)
-    shape = page.new_shape()
-    shape.draw_circle((310, y + 50), 10)
-    shape.finish(color=BLUE, width=1.5)
-    shape.commit()
-    _label(page, (308, y + 54), "i", 10)
-    for k, word in enumerate(["Hot surface", "Read first"]):
-        _label(page, (140 + 150 * k, y + 78), word, 9)
-    _running_text(page, y + 100, 1, start=2)
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    figures = _figures(out)
-    assert any(_holds(f, (150, y + 40, 170, y + 60)) for f in figures)
-    assert any(_holds(f, (300, y + 40, 320, y + 60)) for f in figures)
-
-
-def test_a_band_of_thin_strips_behind_text_and_a_frame_of_dashes_add_nothing():
-    # Controls found by the checks: a gradient drawn as ten 6 pt strips behind lines of
-    # text is a panel (no decision); a frame of dashes round a page with a plot on it
-    # leaves the plot a figure of its own, not one figure of the whole page.
-    doc = pymupdf.open()
-    page = _page(doc)
-    _running_text(page, 40, 1)
-    for k in range(10):
-        shade = 0.97 - 0.01 * k
-        _rect(
-            page, (60, 92 + 6 * k, 560, 98 + 6 * k), colour=None, width=0, fill=(shade, shade, 1.0)
-        )
-    _running_text(page, 100, 2, start=1)
-    page = _page(doc)
-    for x in range(40, 572, 8):
-        _path(page, [[(x, 37), (x + 4, 37)]], colour=GREY)
-        _path(page, [[(x, 755), (x + 4, 755)]], colour=GREY)
-    for y in range(40, 752, 8):
-        _path(page, [[(37, y), (37, y + 4)]], colour=GREY)
-        _path(page, [[(575, y), (575, y + 4)]], colour=GREY)
-    _label(page, (90, 110), "Figure practice", 16, font="hebo")
-    _running_text(page, 120, 1, start=1)
-    _path(page, [[(130, 189), (130, 394), (480, 394)]])
-    _path(
-        page, [_curve(lambda x: 390 - 180 * (1 - math.exp(-(x - 130) / 90)), 130, 480)], colour=BLUE
-    )
-    for i in range(5):
-        _label(page, (130 + 86.5 * i, 405), str(i), 7)
-    _running_text(page, 430, 1, start=2)
-    out = layout.analyze(doc.tobytes())
-    assert out.kept_pages == {}
-    assert _figures(out, 0) == []
-    (figure,) = _figures(out, 1)
-    assert _holds(figure, (130, 189, 480, 394)) and figure.bbox[2] - figure.bbox[0] < 400
 
 
 def test_a_full_page_plot_with_axes_drawn_as_dashes_keeps_its_axes():

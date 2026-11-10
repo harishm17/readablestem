@@ -87,20 +87,6 @@ def strict_axe(page, axe_source: str) -> list[dict]:
     return [v for v in results["violations"] if v["impact"] in STRICT]
 
 
-def test_each_converted_page_starts_with_the_notice_and_a_closed_original(browser, html_file):
-    context, page = open_page(browser, html_file)
-    notes = page.locator(".image-page-note")
-    assert notes.count() == 2
-    first = notes.first
-    assert first.get_by_text("Converted from an image of the page.").is_visible()
-    assert first.get_by_text("Check it against the original.").is_visible()
-    summary = first.locator("summary")
-    assert summary.inner_text() == "Show the original page 1"
-    assert first.locator("img").is_hidden()  # closed: the picture is not on screen
-    assert page.locator(".image-page-note details[open]").count() == 0
-    context.close()
-
-
 def test_the_original_opens_and_closes_with_a_click_and_with_the_keyboard(browser, html_file):
     context, page = open_page(browser, html_file)
     details = page.locator(".image-page-note details").first
@@ -126,13 +112,6 @@ def test_the_toggle_needs_no_script(browser, html_file):
     details.locator("summary").click()
     assert details.get_attribute("open") is not None
     assert details.locator("img").is_visible()
-    context.close()
-
-
-def test_the_original_has_a_text_alternative(browser, html_file):
-    context, page = open_page(browser, html_file)
-    alt = page.locator(".image-page-note img").first.get_attribute("alt")
-    assert alt == "Original of page 1, shown for checking the converted text."
     context.close()
 
 

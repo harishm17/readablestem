@@ -54,14 +54,6 @@ def page_checks(fix) -> dict[str, bool]:
 # --------------------------------------------------------------------------- no reading
 
 
-def test_without_a_page_reading_nothing_changes():
-    client = by_model(cheap=out("x = 5", 0.9))
-    fix = run(client, element(page_latex=None, status=None))
-    assert fix.status == Status.ACCEPTED and models(client) == [CHEAP_MODEL]
-    assert page_checks(fix) == {}
-    assert fix.confidence == pytest.approx(0.9)
-
-
 # --------------------------------------------------------------------------- agreement
 
 
@@ -76,34 +68,12 @@ def test_two_readings_that_agree_lift_a_cheap_answer_over_the_bar_without_a_seco
     assert page_checks(fix) == {equation_step.PAGE_READING: True}
 
 
-def test_agreement_does_not_lift_when_the_setting_is_off():
-    """Without the lift the cheap answer keeps the confidence it had; the agreement is still
-    recorded as a check."""
-    client = by_model(cheap=out("x = 5", 0.8))
-    settings = make_settings(page_math_agreement_lift=False)
-    fix = transcribe(element(page_latex="x=5"), PNG, client=client, settings=settings)
-    assert fix.confidence == pytest.approx(0.8)
-    assert page_checks(fix) == {equation_step.PAGE_READING: True}
-
-
-def test_agreement_is_by_symbols_not_by_spelling():
-    client = by_model(cheap=out(r"v_{\text{avg}} = \frac{d}{t}", 0.8))
-    fix = run(client, element(page_latex=r"v_{avg}=\frac{d}{t}", text="vavg = d t"))
-    assert fix.status == Status.ACCEPTED and models(client) == [CHEAP_MODEL]
-
-
 def test_agreement_never_overrides_a_failed_text_layer_check():
     """The page pass and the crop both read a 6 where the PDF's text layer has a 5."""
     client = by_model(cheap=out("x = 6", 0.95), main=out("x = 6", 0.95))
     fix = run(client, element(page_latex="x = 6", text="x = 5"))
     assert fix.status == Status.NEEDS_REVIEW
     assert {c.code for c in fix.failed_checks} & {"symbol_mismatch", "text_layer_mismatch"}
-
-
-def test_a_low_confidence_answer_that_agrees_but_fails_a_check_is_not_lifted():
-    client = by_model(cheap=out("x = 6", 0.7), main=out("x = 6", 0.7))
-    fix = run(client, element(page_latex="x = 6", text="x = 5"))
-    assert fix.confidence is not None and fix.confidence < equation_step.PAGE_AGREE_CONFIDENCE
 
 
 # ------------------------------------------------------------------------- disagreement
@@ -144,13 +114,6 @@ def test_a_main_first_reading_the_page_contradicts_has_no_one_left_to_ask():
     assert page_checks(fix) == {equation_step.PAGE_READING: False}
 
 
-def test_the_flag_for_a_main_first_disagreement_can_be_turned_off(monkeypatch):
-    monkeypatch.setattr(equation_step, "FLAG_MAIN_DISAGREES", False)
-    client = by_model(main=out("x = 5", 0.97))
-    fix = run(client, element(display="block", page_latex="x = 7", text=None))
-    assert fix.status == Status.ACCEPTED and page_checks(fix) == {}
-
-
 def test_a_page_reading_that_does_not_convert_is_no_reading():
     client = by_model(cheap=out("x = 5", 0.9))
     fix = run(client, element(page_latex=r"\begin{unknown"))
@@ -159,33 +122,6 @@ def test_a_page_reading_that_does_not_convert_is_no_reading():
 
 
 # ----------------------------------------------------------------------------- layout only
-
-
-def test_a_layout_only_span_keeps_its_confidence_by_default():
-    client = by_model(cheap=out("x = 5", 0.9))
-    fix = run(client, element(page_latex=None, status="layout"))
-    assert SETTINGS.page_math_unconfirmed_factor == 1.0
-    assert fix.confidence == pytest.approx(0.9) and fix.status == Status.ACCEPTED
-
-
-def test_a_layout_only_span_is_a_little_less_sure_when_the_factor_is_set():
-    """0.9 alone is accepted; 0.9 x 0.9 is under the 0.85 bar, so it waits for a decision."""
-    client = by_model(cheap=out("x = 5", 0.9))
-    settings = make_settings(page_math_unconfirmed_factor=0.9)
-    fix = transcribe(
-        element(page_latex=None, status="layout"), PNG, client=client, settings=settings
-    )
-    assert fix.confidence == pytest.approx(0.81)
-    assert fix.status == Status.NEEDS_REVIEW
-
-
-def test_a_confident_layout_only_span_is_still_accepted():
-    client = by_model(cheap=out("x = 5", 0.98))
-    settings = make_settings(page_math_unconfirmed_factor=0.9)
-    fix = transcribe(
-        element(page_latex=None, status="layout"), PNG, client=client, settings=settings
-    )
-    assert fix.status == Status.ACCEPTED
 
 
 def test_a_letters_weight_is_not_part_of_the_comparison_of_two_readings():

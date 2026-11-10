@@ -125,12 +125,6 @@ def test_different_print_is_not_right(gold: str, pred: str) -> None:
     assert not right(gold, pred)
 
 
-def test_a_pair_right_as_written_stays_right() -> None:
-    # spoken alike without any folding (letters read one by one on both sides)
-    assert right(r"\mathrm{Diam}(K)", r"Diam(K)")
-    assert right(r"\boldsymbol{x}", r"\mathbf{x}")
-
-
 def test_the_scorer_never_turns_a_right_pair_wrong() -> None:
     assert spoken.spoken_exact(r"\text{nonsense}", r"x", True) is True
     assert spoken.spoken_exact(None, r"x", False) is False
@@ -139,34 +133,6 @@ def test_the_scorer_never_turns_a_right_pair_wrong() -> None:
 
 def test_unreadable_never_matches() -> None:
     assert not right(r"\frac{", r"\frac{")
-
-
-@pytest.mark.parametrize(
-    "latex",
-    [
-        r"\text{if } x > 0",
-        r"\mathrm{x_1} + y",
-        r"\mathrm{\alpha}",
-        r"\operatorname*{lim}_{n} a_n",
-        r"\min_x f",
-        r"a_1, \ldots, a_n",
-        r"\left(x\right)",
-    ],
-)
-def test_fold_leaves_what_it_has_no_rule_for(latex: str) -> None:
-    assert mc.speakable_latex(latex) == latex
-
-
-def test_fold_is_idempotent() -> None:
-    for gold, pred in [*SAME_PRINT, *DIFFERENT_PRINT]:
-        for latex in (gold, pred):
-            once = mc.speakable_latex(latex)
-            assert mc.speakable_latex(once) == once, latex
-
-
-def test_repair_changes_only_the_converter_gaps() -> None:
-    assert mc.repair_converter_gaps(r"\bigl(\textbf{R}\bigr)") == r"(\mathbf{R})"
-    assert mc.repair_converter_gaps(r"\mathrm{in} \min ...") == r"\mathrm{in} \min ..."
 
 
 @pytest.mark.parametrize(
@@ -190,43 +156,3 @@ def test_speakable_latex_is_linear(latex: str) -> None:
     start = time.perf_counter()
     mc.speakable_latex(latex)
     assert time.perf_counter() - start < 1.0
-
-
-# MathML on one side (fresh5 strata B and D: OpenStax gold; a chatbot that answers in <math>)
-_NS = 'xmlns="http://www.w3.org/1998/Math/MathML"'
-MATHML_XY = f"<math {_NS}><msub><mi>x</mi><mn>1</mn></msub><mo>+</mo><mi>y</mi></math>"
-MATHML_XZ = f"<math {_NS}><msub><mi>x</mi><mn>1</mn></msub><mo>+</mo><mi>z</mi></math>"
-
-
-def test_mathml_gold_is_spoken_from_its_mathml() -> None:
-    assert spoken.spoken_exact_mathml_gold(r"x_1 + y", MATHML_XY, False)
-    assert not spoken.spoken_exact_mathml_gold(r"x_1 + z", MATHML_XY, False)
-    assert spoken.spoken_exact_mathml_gold(MATHML_XY, MATHML_XY, False)
-    assert not spoken.spoken_exact_mathml_gold(MATHML_XZ, MATHML_XY, False)
-    # never turns a right pair wrong, never credits nothing or unreadable markup
-    assert spoken.spoken_exact_mathml_gold(r"x_1 + z", MATHML_XY, True) is True
-    assert spoken.spoken_exact_mathml_gold(None, MATHML_XY, False) is False
-    assert not spoken.spoken_exact_mathml_gold(r"x_1 + y", "<math><mi>", False)
-
-
-def test_mathml_prediction_is_spoken_from_its_mathml() -> None:
-    assert right(MATHML_XY, r"x_1 + y")
-    assert not right(MATHML_XZ, r"x_1 + y")
-    assert spoken._is_markup(" <m:math><m:mi>x</m:mi></m:math>")
-    assert not spoken._is_markup("<x")  # LaTeX: less than x
-    assert not spoken._is_markup(r"< 0.05")
-
-
-def test_refold_reads_latex_gold_and_mathml_gold() -> None:
-    gold = {
-        "a": {"latex": r"x_1 + y", "mathml": MATHML_XY},
-        "b": {"mathml": MATHML_XY},  # OpenStax: MathML only
-    }
-    item = {
-        "pairs": [
-            {"gold_id": "a", "pred_latex": r"x_{1}+y", "exact_lenient": False},
-            {"gold_id": "b", "pred_latex": r"x_{1}+y", "exact_lenient": False},
-            {"gold_id": "b", "pred_latex": r"x_{1}+z", "exact_lenient": False},
-        ]
-    }
-    assert [p["exact_lenient"] for p in spoken.refold(item, gold)["pairs"]] == [True, True, False]

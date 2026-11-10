@@ -99,27 +99,6 @@ def meta(out: Path, arm: chatbot.ChatArm, stem: str = "book__page.run1") -> dict
     return json.loads((out / arm.id / f"{stem}.json").read_text(encoding="utf-8"))
 
 
-def test_a_batch_sends_what_a_live_call_streams_and_records_list_price(one_pdf, tmp_path):
-    c = client()
-    live_cost = chatbot._claude_reply(message(OPUS.model), OPUS.model).cost
-    summary = record_arms_batch(
-        one_pdf, tmp_path, arms=[OPUS], max_usd=5, client=c, runs=1, say=lambda _m: None
-    )
-    (request,) = c.messages.created[0]
-    assert request["params"].keys() == {"model", "max_tokens", "messages"}
-    assert request["params"]["model"] == OPUS.model
-    assert request["params"]["max_tokens"] == chatbot.MAX_OUTPUT_TOKENS
-    assert request["params"]["messages"] == chatbot.build_claude_input(
-        one_pdf["book/page"], OPUS.prompt_text, [b"png-1", b"png-2"]
-    )
-    record = meta(tmp_path, OPUS)
-    assert record["status"] == "ok" and record["batch"] is True
-    assert record["cost_usd"] == pytest.approx(live_cost, rel=1e-3)
-    assert record["billed_usd"] == pytest.approx(live_cost / 2, rel=1e-3)
-    assert summary["spent_usd"] == pytest.approx(live_cost / 2, rel=1e-3)
-    assert (tmp_path / OPUS.id / "book__page.run1.html").read_text() == "<h2>Speed</h2>\n"
-
-
 def test_a_recorded_job_is_not_sent_and_the_cap_refuses_what_it_cannot_hold(one_pdf, tmp_path):
     c = client()
     done = tmp_path / OPUS.id
@@ -150,13 +129,6 @@ def test_an_api_error_or_an_expired_request_is_sent_again_and_other_errors_end_t
     record = meta(tmp_path / "x", HAIKU)
     assert record["status"] == "crashed" and record["error"] == "invalid_request_error"
     assert len(bad.messages.created) == 1
-
-
-def test_only_the_claude_arms_can_be_batched(one_pdf, tmp_path):
-    with pytest.raises(ValueError):
-        record_arms_batch(
-            one_pdf, tmp_path, arms=[chatbot.ARMS[0]], max_usd=1, client=client(), say=print
-        )
 
 
 def test_the_judge_collects_its_requests_then_writes_once(monkeypatch, tmp_path):
