@@ -36,6 +36,16 @@ from readablestem.models.base import T, VisionRequest
 from readablestem.proof.bundle import dump_line
 from readablestem.proof.replay import AnswerSet, request_key
 
+_FILE_LOCKS: dict[Path, threading.Lock] = {}
+_FILE_LOCKS_GUARD = threading.Lock()
+
+
+def _file_lock(path: Path) -> threading.Lock:
+    """The process-wide lock for appending to `path`."""
+    key = path.resolve()
+    with _FILE_LOCKS_GUARD:
+        return _FILE_LOCKS.setdefault(key, threading.Lock())
+
 
 def effective_effort(settings: Settings, request: VisionRequest) -> str | None:
     """The thinking effort a Claude client will send for `request` (None: not Claude)."""
@@ -149,7 +159,9 @@ class CachedClient:
             "call": call.model_dump(mode="json"),
         }
         self._answers.add(row)
-        with self._lock:
+        # One lock per file for the process: the web app builds a client per job and per
+        # re-read, and two of them may append to the same file at once.
+        with _file_lock(self._path):
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as handle:
                 handle.write(dump_line(row) + "\n")

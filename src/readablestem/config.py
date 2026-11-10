@@ -169,6 +169,13 @@ class Settings(BaseSettings):
     # Answer every model request with the offline FakeVisionClient (placeholder output),
     # so the web app can be tried end to end without an OpenAI key. Dev and test only.
     fake_models: bool = False
+    # Dev and test only: answer model requests from this JSON-lines file of recorded answers
+    # (`eval/answers.py`), asking the real model only for a request the file lacks and
+    # appending its answer, so a walkthrough or a browser test pays for each answer once.
+    # With MODEL_ANSWERS_OFFLINE=true a miss is refused instead of asked, so a replay spends
+    # nothing. Ignored with FAKE_MODELS. Refused in production.
+    model_answers_file: Path | None = None
+    model_answers_offline: bool = False
 
     # --- second automated check: the OpenAI Decisions API (ADR 0005, docs/steps.md)
     # All the DECISIONS_* settings take effect only with MODEL_PROVIDER=openai
@@ -799,6 +806,8 @@ class Settings(BaseSettings):
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
         if self.fake_models:
             raise ConfigError("FAKE_MODELS must be false in production")
+        if self.model_answers_file is not None:
+            raise ConfigError("MODEL_ANSWERS_FILE must be unset in production")
         if not self.rate_limits_enabled:
             raise ConfigError("RATE_LIMITS_ENABLED must be true in production")
         if (self.feature_image_pages or self.image_pages_accept_agreed) and (
