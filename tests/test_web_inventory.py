@@ -184,7 +184,7 @@ def test_each_place_shows_the_equation_picture_and_where_the_symbol_is(symbols):
     assert 'name="places" value="chosen"' in form
     # where it lands is said in words before the list is opened, and what to do first
     assert "Changes: Equation 1 (page 1), Equation 2 (page 1, 2 times)." in text_of(form)
-    assert "Places (3 of 3 ticked)" in text_of(form)
+    assert "Places (3 of 3 checked)" in text_of(form)
     status = section(form, "data-symbol-affect", "</p>")
     assert 'role="status"' in form and "Choose a symbol first." in status
     # no replacement is chosen before the person acts
@@ -304,7 +304,7 @@ def test_everything_left_out_changes_nothing_and_says_so(symbols):
     written = symbols.job(symbols.job_id).result_version
     response = change(symbols, "x", "X", leave=("p1-e2:1", "p1-e5:1", "p1-e5:2"))
     assert response.status_code == 422
-    assert "Nothing to change: no place is ticked, or every one is already decided." in text_of(
+    assert "Nothing to change: no place is checked, or every one is already decided." in text_of(
         response.text
     )
     assert latex_of(symbols, "p1-e5") == "x + x = \\rho v"
@@ -478,7 +478,7 @@ def test_nothing_ticked_changes_nothing_and_says_so(symbols):
     written = symbols.job(symbols.job_id).result_version
     response = choose(symbols, "x", "X", include=())
     assert response.status_code == 422
-    assert "no place is ticked" in text_of(response.text)
+    assert "no place is checked" in text_of(response.text)
     assert symbols.job(symbols.job_id).result_version == written
 
 

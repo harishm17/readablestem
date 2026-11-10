@@ -258,7 +258,7 @@ def test_upload_messages_name_the_file_and_the_numbers(web):
     response = upload(web.browser, make_pdf(7), filename="chapter2.pdf")
     assert "chapter2.pdf has 7 pages; the limit is 5 per upload." in text(response.text)
     response = upload(web.browser, b"PK zip", filename="slides.pptx")
-    assert "slides.pptx is not a PDF." in response.text
+    assert "slides.pptx is not a PDF file." in response.text
 
 
 def test_the_upload_form_carries_what_the_browser_needs_to_check_first(web):
@@ -295,8 +295,8 @@ def test_times_are_time_elements_in_utc_until_a_script_localises_them():
         t=datetime(2026, 10, 9, 23, 32, tzinfo=UTC)
     )
     assert rendered == (
-        '<time class="local-time" datetime="2026-10-09T23:32:00Z">9 Oct 2026, 23:32 UTC</time>'
-        " 9 Oct 2026, 23:32 UTC []"
+        '<time class="local-time" datetime="2026-10-09T23:32:00Z">Oct 9, 2026, 23:32 UTC</time>'
+        " Oct 9, 2026, 23:32 UTC []"
     )
 
 

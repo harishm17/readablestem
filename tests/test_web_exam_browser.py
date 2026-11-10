@@ -58,7 +58,7 @@ def test_the_box_is_described_by_its_hint_and_toggles_from_the_label(site, brows
 def test_an_upload_with_the_box_ticked_is_an_exam_job(site, browser):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "quiz.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
     page.locator("#group-convert > summary").click()

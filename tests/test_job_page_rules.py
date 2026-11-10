@@ -470,7 +470,7 @@ def test_language_choices_keep_a_tag_the_list_does_not_have():
 def test_the_finish_sentence_says_who_decided_and_when():
     made = job_page.Finish(decided_units=3, last_decision=date(2026, 10, 9), notes=0,
                            not_handled=0)  # fmt: skip
-    assert made.sentence == "You made 3 decisions on 9 October."
+    assert made.sentence == "You made 3 decisions on October 9."
     none = job_page.Finish(decided_units=0, last_decision=None, notes=0, not_handled=0)
     assert none.sentence == "Nothing in this file needed your decision."
 

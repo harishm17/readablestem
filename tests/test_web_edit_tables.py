@@ -344,13 +344,13 @@ def test_a_cell_the_model_cannot_read_is_left_for_the_reviewer(tables):
     with_model(tables, None)
     response = read_post(tables)
     assert response.status_code == 422
-    assert "could not read this cell as maths" in text_of(response.text)
+    assert "could not read this cell as math" in text_of(response.text)
 
 
 def test_only_a_maths_cell_with_a_place_on_the_page_is_read(tables):
     with_model(tables, {"is_equation": True, "latex": "x", "confidence": 0.99})
     plain = read_post(tables, row="1", col="0")
-    assert plain.status_code == 422 and "holds maths" in text_of(plain.text)
+    assert plain.status_code == 422 and "holds math" in text_of(plain.text)
     missing = read_post(tables, row="9", col="9")
     assert missing.status_code == 422 and "not in the table any more" in text_of(missing.text)
     junk = read_post(tables, row="x", col="1")

@@ -113,7 +113,7 @@ def test_the_scan_box_says_first_what_it_is_for(offered):
     page = flat(offered.browser.get("/app").text)
     first = page.split("Convert scanned or handwritten pages", 1)[1][:260]
     assert "Needed for a PDF that is all scans or handwriting" in first
-    assert "scanned pages stay pictures marked “Not converted” unless you tick it" in page
+    assert "scanned pages stay pictures marked “Not converted” unless you check it" in page
     assert "Without it, such pages stay as pictures" not in page  # the old, half-true line
 
 
@@ -490,7 +490,7 @@ def test_a_stopped_scan_job_is_feature_aware_and_the_message_is_not_repeated():
     assert "such pages are read only when you ask" in asked and outcome.OPT_IN_ROUTE in asked
     # the job outcome carries it, for the status box
     stopped = outcome.job_outcome(status="failed", error_code="scanned", image_pages_offered=True)
-    assert stopped and stopped.label == "Stopped" and "ticked" in stopped.message
+    assert stopped and stopped.label == "Stopped" and "checked" in stopped.message
     other = outcome.job_outcome(status="failed", error_code="no_content", image_pages_offered=True)
     assert other and other.message == outcome.FAILED_MESSAGES["no_content"]
 

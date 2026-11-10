@@ -134,7 +134,7 @@ def test_a_file_over_the_size_limit_is_kept_even_with_few_pages(web):
     response = post_file(web.alice, "scans.pdf", heavy_pdf(3, 1.6))
     assert response.status_code == 303 and response.headers["location"].startswith("/uploads/")
     page = web.alice.get(response.headers["location"])
-    assert "Ticked because this file is large" in text_of(page.text)
+    assert "Checked because this file is large" in text_of(page.text)
     assert re.search(r'<input[^>]*id="shrink"[^>]*checked', page.text)
 
 

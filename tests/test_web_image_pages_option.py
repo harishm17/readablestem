@@ -386,7 +386,7 @@ def test_the_scan_refusal_summary_says_what_to_do_and_that_the_file_is_chosen_ag
     page = upload(offered.browser, scan_pdf()).text
     summary = page.split('id="error-summary-title"', 1)[1].split("</div>", 1)[0]
     flat = " ".join(re.sub(r"<[^>]+>", " ", summary).split())
-    assert "Tick “Convert scanned or handwritten pages” and choose the file again." in flat
+    assert "Check “Convert scanned or handwritten pages” and choose the file again." in flat
     assert 'href="#image_pages"' in summary  # the link goes to the box to tick
     assert "cannot convert it" not in flat  # no permanent-sounding verdict in the summary
     assert "choose the file again" in page.split('id="pdf-error"', 1)[1]  # the field says it too

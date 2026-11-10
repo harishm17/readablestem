@@ -131,10 +131,10 @@ FAILED_MESSAGES = {
     "It has no text this tool can use. Export a PDF from the original file (LaTeX, Word or "
     "PowerPoint) and upload that instead.",
     "scanned_ocr": "Every page of this PDF is a scanned image, so this tool cannot convert "
-    "it. Its text was guessed by OCR, which is often wrong in maths, so it is not used. "
+    "it. Its text was guessed by OCR, which is often wrong in math, so it is not used. "
     "Export a PDF from the original file (LaTeX, Word or PowerPoint) and upload that instead.",
     "handwritten": "This PDF is handwritten, so this tool cannot convert it. Its hidden text, "
-    "guessed from the handwriting, is often wrong in maths, so it is not used. Export a PDF "
+    "guessed from the handwriting, is often wrong in math, so it is not used. Export a PDF "
     "from a typed version (LaTeX, Word or PowerPoint) and upload that instead.",
     "handwritten_no_text": "This PDF is handwritten, so this tool cannot convert it. "
     "It has no text this tool can use. Export a PDF from a typed version (LaTeX, Word or "
@@ -161,7 +161,7 @@ IMAGE_PAGE_FAILS = {
     "handwritten_no_text": "This PDF is handwritten",
 }
 OPT_IN_ROUTE = (
-    "Upload it again with “Convert scanned or handwritten pages” ticked, or export a PDF from "
+    "Upload it again with “Convert scanned or handwritten pages” checked, or export a PDF from "
     "the original."
 )
 

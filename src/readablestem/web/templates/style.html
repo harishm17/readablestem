@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Style{% endblock %}
 {% block body_class %}mode-read{% endblock %}
-{% block description %}The colours, type and components the site is built from.{% endblock %}
+{% block description %}The colors, type and components the site is built from.{% endblock %}
 {% block content %}
 {# A working page for the people who build the site, not a public page: it is noindex (it is
    not in web.seo.PUBLIC_PAGES) and nothing links to it. Its strings are labels for the
@@ -10,7 +10,7 @@
    and each box of examples says so. #}
 <h1>Style</h1>
 <p class="lede">The tokens and components every page is built from, in the theme your browser
-  asks for. Colours are the CSS custom properties in <code>tokens.css</code>.</p>
+  asks for. Colors are the CSS custom properties in <code>tokens.css</code>.</p>
 <div class="notice" role="note"><p><strong>Everything in a dashed box is an inert example.</strong>
   Its buttons, fields and links do nothing and no form is sent. Where a component is in use,
   the line under it links to the page.</p></div>
@@ -18,7 +18,7 @@
 {% from "_contents.html" import contents %}
 {{ contents([
   ("type", "Type"),
-  ("colour", "Colour"),
+  ("color", "Color"),
   ("states", "Light, dark and forced colours"),
   ("buttons", "Buttons and links"),
   ("fields", "Form fields and errors"),
@@ -40,7 +40,7 @@
   <p><code>\frac{\Delta d}{\Delta t}</code> in Source Code Pro. <a href="#type">A link is always underlined</a>.</p>
 </div>
 
-<h2 id="colour">Colour</h2>
+<h2 id="color">Color</h2>
 <ul class="style-swatches">
   <li><span class="swatch swatch-ink"></span>Ink</li>
   <li><span class="swatch swatch-ink-muted"></span>Ink muted</li>
@@ -55,10 +55,10 @@
   <span class="tag tag-err">Not converted</span>
 </p>
 
-<h2 id="states">Light, dark and forced colours</h2>
-<p>The same sample in the three colour states. The page itself follows your browser's setting
-  (there is no toggle); the dark panel carries the dark tokens, and the forced-colour panel
-  approximates the system colours. For the real thing, switch on forced colours or Windows high
+<h2 id="states">Light, dark and forced colors</h2>
+<p>The same sample in the three color states. The page itself follows your browser's setting
+  (there is no toggle); the dark panel carries the dark tokens, and the forced-color panel
+  approximates the system colors. For the real thing, switch on forced colors or Windows high
   contrast and read this page.</p>
 {% macro sample(name, ident) %}
 <h3 id="{{ ident }}">{{ name }}</h3>
@@ -79,7 +79,7 @@
 <div class="style-states">
   <section class="style-scheme" aria-labelledby="state-light">{{ sample("Light", "state-light") }}</section>
   <section class="style-scheme style-scheme-dark" aria-labelledby="state-dark">{{ sample("Dark", "state-dark") }}</section>
-  <section class="style-scheme style-scheme-forced" aria-labelledby="state-forced">{{ sample("Forced colours (approximation)", "state-forced") }}</section>
+  <section class="style-scheme style-scheme-forced" aria-labelledby="state-forced">{{ sample("Forced colors (approximation)", "state-forced") }}</section>
 </div>
 
 <h2 id="buttons">Buttons and links</h2>

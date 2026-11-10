@@ -102,7 +102,7 @@ def data_items(context: dict[str, Any]) -> list[DataItem]:
     if context["image_pages_on"]:
         items.append(
             DataItem(
-                "A picture of each scanned or handwritten page, only if the instructor ticks "
+                "A picture of each scanned or handwritten page, only if the instructor checks "
                 "“Convert scanned or handwritten pages”",
                 ("Railway", *model),
                 f"{same}. {with_company(model)}",

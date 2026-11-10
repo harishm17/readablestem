@@ -147,7 +147,7 @@ ERROR_TEXT = {
 
 def _utc_text(value: datetime | None) -> str:
     value = as_utc(value)
-    return f"{value.day} {value:%b %Y, %H:%M} UTC" if value else ""
+    return f"{value:%b} {value.day}, {value.year}, {value:%H:%M} UTC" if value else ""
 
 
 def _speakable(text: str | None) -> str:

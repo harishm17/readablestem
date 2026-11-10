@@ -452,6 +452,6 @@ def test_the_upload_form_for_a_revision_names_the_document_and_keeps_its_choices
     # Another person's id, or nonsense, gives the ordinary form.
     for who, ident in ((env.bob, first), (env.alice, "nonsense")):
         other = who.get(f"/app?revises={ident}")
-        assert 'name="revises"' not in other.text and "Convert a PDF" in other.text
+        assert 'name="revises"' not in other.text and "Convert a document" in other.text
     # The job page offers it.
     assert f"/app?revises={first}" in env.alice.get(f"/jobs/{first}").text

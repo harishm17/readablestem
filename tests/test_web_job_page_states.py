@@ -144,7 +144,7 @@ def test_after_the_last_decision_the_page_says_who_decided_and_when(web):
     assert "1 equation is shown as an image that screen readers cannot read." in page_text(html)
     today = utcnow().date()
     ready = page_text(section(html, "ready-heading"))
-    assert f"You made 3 decisions on {today.day} {today:%B}." in ready
+    assert f"You made 3 decisions on {today:%B} {today.day}." in ready
 
 
 def test_an_ai_outage_is_not_shown_as_finished(web):
@@ -381,7 +381,7 @@ def test_a_colour_notice_does_not_link_to_a_decision_about_something_else(web):
     figure.figure.colour_only = True  # the notice follows from the fix
     job_id = convert(web)
     worth = section(web.browser.get(f"/jobs/{job_id}").text, "worth-checking-heading")
-    assert "tells things apart by colour alone" in page_text(worth)
+    assert "tells things apart by color alone" in page_text(worth)
     assert "Decide it" not in worth and "You have decided it" not in worth
 
 
@@ -505,7 +505,7 @@ def test_changing_the_language_keeps_the_date_of_the_last_decision(web):
                                created_at=utcnow() - timedelta(days=3)))  # fmt: skip
     assert post_language(web, job_id, "de").status_code == 303
     day = (utcnow() - timedelta(days=3)).date()
-    assert f"on {day.day} {day:%B %Y}." in (web.job(job_id).html or "")
+    assert f"on {day:%B} {day.day}, {day.year}." in (web.job(job_id).html or "")
 
 
 # --------------------------------------------------------------------------- delete

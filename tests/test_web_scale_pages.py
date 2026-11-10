@@ -111,7 +111,7 @@ def test_the_landing_page_says_what_review_costs_from_the_settings(tmp_path):
     with env.running() as client:
         text = flat(client.get("/").text)
         limits = flat(client.get("/limits").text)
-    assert "up to 30 pages at a time" in text  # max_pages_per_job, not written in
+    assert "Up to 30 pages at a time" in text  # max_pages_per_job, not written in
     assert "New accounts have daily limits: 17 pages a day" in text
     assert "deleted 24 hours after you last work on it" in text
     # The review load and the planning detail live on /limits.
@@ -288,6 +288,5 @@ def test_latex_source_is_listed_only_when_its_flag_is_on(tmp_path):
     on = WebEnv(tmp_path / "on", feature_latex_source=True)
     with on.running() as client:
         landing, limits = flat(client.get("/").text), flat(client.get("/limits").text)
-    assert "LaTeX source files (.tex) and project zips" in landing
-    assert "A LaTeX file (.tex) or a zip of a LaTeX project is also taken" in limits
-    assert "Only PDF files are taken" not in limits
+    assert "You can upload a PDF or LaTeX file." in landing
+    assert "You can upload a PDF or LaTeX file." in limits

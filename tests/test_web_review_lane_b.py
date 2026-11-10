@@ -114,7 +114,7 @@ def test_the_figure_card_names_what_each_choice_does_and_guides_the_alt_text(env
     body = screen(env, "?item=p1-e6")
     for words in ("Accept", "Save and accept", "Save, decide later"):
         assert f">{words}<" in body
-    assert "how its labelled parts connect" in body  # a diagram's guidance, not a general one
+    assert "how its labeled parts connect" in body  # a diagram's guidance, not a general one
     # the list view uses the same markup
     listing = env.browser.get(f"/jobs/{env.job_id}/review/list").text
     assert 'data-role="save-later"' in listing and 'id="acknowledge-p1-e6"' in listing

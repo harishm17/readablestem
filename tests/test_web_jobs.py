@@ -580,7 +580,8 @@ def test_app_lists_the_users_jobs_newest_first(web):
 
 def test_retention_date_is_shown(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    expected = (datetime.now(UTC) + timedelta(hours=24)).strftime("%b %Y")
+    when = datetime.now(UTC) + timedelta(hours=24)
+    expected = f"{when:%b} {when.day}, {when.year}"
     assert expected in web.browser.get(f"/jobs/{job_id}").text
 
 

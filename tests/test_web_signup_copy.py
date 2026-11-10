@@ -227,7 +227,7 @@ def test_the_sign_in_link_pages_say_who_gets_one_in_both_modes(tmp_path):
             assert "this page does not tell anyone who" in body
 
 
-def test_the_microsoft_organisation_page_in_both_modes(tmp_path):
+def test_the_microsoft_organization_page_in_both_modes(tmp_path):
     from fixtures.web.oidc import CLIENT_ID, CLIENT_SECRET, OTHER_TENANT, TENANT, FakeMicrosoft
 
     for mode in ("allowlist", "open"):

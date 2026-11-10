@@ -106,7 +106,7 @@ _TICKED = {"on", "true", "1"}
 # "Keep without a description" is the one choice that takes a description away from students
 # who use a screen reader, so it is made with a tick box, not by one click.
 FIGURE_KEEP_ACK = (
-    "Tick the box to confirm. Students who use a screen reader will get no description of "
+    "Check the box to confirm. Students who use a screen reader will get no description of "
     "this figure."
 )
 # A chart's data table read from the image is an optional extra, not in the student file
@@ -991,7 +991,7 @@ def _refuse_unsaved_details(fix: Fix, form: Mapping[str, str], values: dict[str,
             message = "You changed the longer description. " + UNSAVED.format(undo="undo it")
             raise ReviewInvalid([FieldError(field_id("longdesc", eid), message)], values)
     if form.get("remove_data_table") in _CHECKED and figure_details.data_table_shown(figure):
-        message = "You chose to remove the data table. " + UNSAVED.format(undo="untick it")
+        message = "You chose to remove the data table. " + UNSAVED.format(undo="uncheck it")
         raise ReviewInvalid([FieldError(field_id("datatable", eid), message)], values)
 
 
@@ -1319,7 +1319,7 @@ def _already(fix: Fix, action: str, level: int | None) -> bool:
 TABLE_CHANGES = ("cell", "headers", "use_local", "not_a_table")
 NOT_A_TABLE_NOTE = "It is now written as text, one cell after another, not as a table."
 NO_TEXT_GRID = (
-    "There is no text to write for this grid (it has none, or holds maths the PDF gives flat). "
+    "There is no text to write for this grid (it has none, or holds math the PDF gives flat). "
     "Keep the image instead."
 )
 USE_LOCAL_NOTE = "The table now uses the grid read from the PDF."
@@ -1529,7 +1529,7 @@ def cell_region(
     if cell is None:
         return "That cell is not in the table any more. Choose it again from the list."
     if not is_maths_cell(grid, cell):
-        return "Only a cell that holds maths is read as an equation."
+        return "Only a cell that holds math is read as an equation."
     box = cell.bbox
     if box is None and element.table is not None:
         counterpart = find_cell(element.table, cell.row, cell.col)
@@ -1584,7 +1584,7 @@ def _edit_headers(
     col = form.get("header_col") in {"on", "true", "1"}
     values = {"header_row": "on" if row else "", "header_col": "on" if col else ""}
     if row == first_row_is_header(grid) and col == first_col_is_header(grid):
-        message = "The headers are already like that. Tick or untick a box, then Save headers."
+        message = "The headers are already like that. Check or uncheck a box, then Save headers."
         raise ReviewInvalid([FieldError(fid, message)], values)
     edited = with_header_col(with_header_row(grid, row), col)
     _refuse_new_problems(grid, edited, fid, "The headers were", values)

@@ -57,5 +57,5 @@ def test_a_returning_user_has_a_compact_sample_link_beside_convert_a_pdf(tmp_pat
         env.run_worker()
         page = client.get("/app").text
         row = page.split('id="upload-heading"', 1)[1].split("</div>", 1)[0]
-        assert "Practise on the sample" in flat(row)
+        assert "Practice on the sample" in flat(row)
         assert 'id="sample-heading"' not in page  # no second, full sample section

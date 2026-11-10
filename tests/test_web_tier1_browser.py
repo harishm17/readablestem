@@ -179,7 +179,7 @@ def test_the_table_card_offers_the_first_row_as_headers(site, browser, axe_sourc
     try:
         context, page = open_page(browser, site, viewport=viewport)
         page.goto(f"{site.base}/app")
-        page.get_by_label("PDF file").set_input_files(
+        page.locator("#pdf").set_input_files(
             files=[{"name": "tables.pdf", "mimeType": "application/pdf", "buffer": table_pdf()}]
         )
         page.get_by_role("button", name="Upload and convert").click()

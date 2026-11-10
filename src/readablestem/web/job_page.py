@@ -623,7 +623,7 @@ def _equation_row(facts: SourceFacts, result: DocumentResult) -> Row:
     html = f"{maths} of {len(equations) or n} are MathML, read with their structure"
     html += f"; {images} {'is' if images == 1 else 'are'} shown as an image." if images else "."
     if facts.tagged:
-        pdf = "Your PDF is tagged; we did not check how its tags give the maths. " + pdf
+        pdf = "Your PDF is tagged; we did not check how its tags give the math. " + pdf
     return Row("hear equations with their structure", pdf, html)
 
 
@@ -777,10 +777,10 @@ def before_after(result: DocumentResult) -> Card | None:
         rows.append(
             Row(
                 "tell a bold vector from a plain letter",
-                f"No: {plural(facts.bold_maths_letters, 'bold letter')} in the maths "
+                f"No: {plural(facts.bold_maths_letters, 'bold letter')} in the math "
                 f"{'is' if facts.bold_maths_letters == 1 else 'are'} stored as plain "
                 "letters, so a vector reads like any other letter.",
-                "Yes: bold letters are written as bold maths. A letter the tool read "
+                "Yes: bold letters are written as bold math. A letter the tool read "
                 "differently from your PDF is one of your decisions.",
             )
         )
@@ -995,7 +995,7 @@ def finish_sentence(finish: Finish) -> str:
     if not finish.decided_units:
         return "Nothing in this file needed your decision."
     when = (
-        f" on {finish.last_decision.day} {finish.last_decision:%B}" if finish.last_decision else ""
+        f" on {finish.last_decision:%B} {finish.last_decision.day}" if finish.last_decision else ""
     )
     return f"You made {plural(finish.decided_units, 'decision')}{when}."
 

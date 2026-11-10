@@ -190,7 +190,7 @@ def test_a_new_account_sees_its_limit_on_the_upload_page(site, browser):
     sign_in(page, site.base, "uploader@example.org")
     page.goto(site.base + "/app")
     assert "a new account can convert 5 pages a day" in " ".join(page.content().split())
-    page.get_by_label("PDF files").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "big.pdf", "mimeType": "application/pdf", "buffer": make_pdf(5)}]
     )
     page.get_by_role("button", name="Upload and convert").click()

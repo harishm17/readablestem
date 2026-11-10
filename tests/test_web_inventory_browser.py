@@ -69,7 +69,7 @@ def job(site, browser) -> str:
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
     page.get_by_role("button", name="Upload and convert").click()
@@ -205,7 +205,7 @@ def test_change_all_waits_for_a_replacement_and_says_what_will_change(site, brow
     assert line.inner_text().startswith(f"{total - 1} of")
     for box in form.locator("input[name=include]").all():
         box.uncheck()
-    assert line.inner_text() == "No place is ticked. Tick at least one."
+    assert line.inner_text() == "No place is checked. Check at least one."
     assert button.get_attribute("aria-disabled") == "true"
     context.close()
 
@@ -227,12 +227,12 @@ def test_the_ticked_count_is_announced_politely_when_it_changes(site, browser, j
     assert box is not None and box["width"] <= 1 and box["height"] <= 1
     # Before a replacement is chosen the summary count changes; the status says it.
     boxes.first.uncheck()
-    assert count.inner_text() == f"{total - 1} of {total} places ticked."
+    assert count.inner_text() == f"{total - 1} of {total} places checked."
     assert form.locator(".symbol-places > summary").inner_text() == (
-        f"Places ({total - 1} of {total} ticked)"
+        f"Places ({total - 1} of {total} checked)"
     )
     boxes.first.check()
-    assert count.inner_text() == f"{total} of {total} places ticked."
+    assert count.inner_text() == f"{total} of {total} places checked."
     # With a replacement chosen the status line under it already says the count: this stays
     # quiet, so a screen reader does not say it twice.
     form.locator("select[name=to]").select_option("X")

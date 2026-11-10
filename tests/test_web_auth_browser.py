@@ -130,11 +130,11 @@ def test_the_university_round_trip_works_under_the_csp(site, browser, javascript
     assert refused and all("CSP" not in failure for failure in refused), refused
 
 
-def test_another_organisation_gets_a_plain_page(site, browser):
+def test_another_organization_gets_a_plain_page(site, browser):
     context = browser.new_context()
     page = context.new_page()
     university_sign_in(page, site, tenant=OTHER_TENANT)
-    assert page.title().startswith("Your organisation is not set up for this beta")
+    assert page.title().startswith("Your organization is not set up for this beta")
     assert OTHER_TENANT in page.locator("main").inner_text()
     context.close()
 

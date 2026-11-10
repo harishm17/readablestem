@@ -45,10 +45,10 @@ from readablestem.pipeline import options
 # Element.reasons of an inline equation layout made from one bold letter in running text.
 # The reason after it says what made it maths (`layout._settle_bold_letters`).
 BOLD_LETTER_REASON = "bold letter in prose"
-EVIDENCE_MATHS_FONT = "maths font"
-EVIDENCE_DOCUMENT = "bold in the document's maths"
+EVIDENCE_MATHS_FONT = "math font"
+EVIDENCE_DOCUMENT = "bold in the document's math"
 EVIDENCE_COURSE = "course notation"
-EVIDENCE_NEARBY = "maths in the paragraph"
+EVIDENCE_NEARBY = "math in the paragraph"
 # A deterministic fix: the letter and its weight come from the PDF's own text layer.
 BOLD_LETTER_CONFIDENCE = 0.95
 

@@ -193,7 +193,7 @@ def test_nothing_ticked_adds_nothing(web):
     response = submit(web, f"/courses/{course_id}", [])
     assert response.status_code == 303 and entries(web) == []
     after = web.browser.get(response.headers["location"]).text
-    assert "Tick the symbols to add first" in text_of(after)
+    assert "Check the symbols to add first" in text_of(after)
 
 
 def test_from_the_job_page_it_comes_back_to_the_job_page(web):

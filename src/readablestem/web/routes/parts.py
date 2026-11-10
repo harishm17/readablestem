@@ -236,7 +236,7 @@ def _start_parts(
             if len(cut) > limit_bytes:
                 out.error = (
                     f"{named} is {pending.size_text(len(cut))}, over the {s.max_upload_mb} MB "
-                    "limit for one document. Tick “Shrink large pictures first”, or split it into "
+                    "limit for one document. Check “Shrink large pictures first”, or split it into "
                     "smaller parts."
                 )
                 out.status = 413

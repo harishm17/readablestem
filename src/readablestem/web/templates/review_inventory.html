@@ -55,7 +55,7 @@
 {% if not inv.families %}
 <section class="symbols-empty" aria-labelledby="symbols-empty-title">
   <h2 id="symbols-empty-title">No symbols to change yet</h2>
-  <p>Symbols appear once handwritten equations have been read, so one misread symbol can be changed everywhere. This document has none. Tick “Convert scanned or handwritten pages” when you upload.</p>
+  <p>Symbols appear once handwritten equations have been read, so one misread symbol can be changed everywhere. This document has none. Check “Convert scanned or handwritten pages” when you upload.</p>
   <figure class="symbols-example">
     <figcaption>Example, not part of your document</figcaption>
     <div class="symbols-example-card">
@@ -66,7 +66,7 @@
 </section>
 {% else %}
 <div class="symbols-intro">
-  <p>{{ inv.symbols }} {{ "symbol" if inv.symbols == 1 else "symbols" }}, {{ inv.places }} places, in {{ inv.equations }} {{ "equation" if inv.equations == 1 else "equations" }}. Look-alikes are grouped. Choose the right symbol to change it everywhere; untick a place to keep it. Changed equations stay open for your decision, and Undo reverses the change.</p>
+  <p>{{ inv.symbols }} {{ "symbol" if inv.symbols == 1 else "symbols" }}, {{ inv.places }} places, in {{ inv.equations }} {{ "equation" if inv.equations == 1 else "equations" }}. Look-alikes are grouped. Choose the right symbol to change it everywhere; uncheck a place to keep it. Changed equations stay open for your decision, and Undo reverses the change.</p>
 </div>
 
 {% for family in inv.families %}
@@ -93,7 +93,7 @@
     </div>
     <p class="symbol-where" id="{{ rid }}-where"><span class="symbol-where-label">Changes:</span> {{ affected(row)|trim }}.</p>
     <details class="symbol-places">
-      <summary>Places ({{ row.changeable }} of {{ row.times }} ticked)</summary>
+      <summary>Places ({{ row.changeable }} of {{ row.times }} checked)</summary>
       {{ places_list(row, True) }}
     </details>
     <p class="visually-hidden" role="status" aria-live="polite" data-symbol-count></p>

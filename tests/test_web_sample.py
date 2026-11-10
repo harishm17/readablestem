@@ -245,11 +245,11 @@ def test_my_documents_offers_it_first_to_someone_with_nothing_then_after_the_upl
     job_id = open_sample(web.alice)
     upload(web.alice, make_pdf(1))
     page = web.alice.get("/app").text
-    assert "Practise on the sample" in page
-    # a compact link beside "Convert a PDF", not a second full section
+    assert "Practice on the sample" in page
+    # a compact link beside "Convert a document", not a second full section
     assert 'id="sample-heading"' not in page
     link = page.split('class="sample-link"', 1)[1].split("</a>", 1)[0]
-    assert f'href="/jobs/{job_id}"' in page and "Practise on the sample" in link
+    assert f'href="/jobs/{job_id}"' in page and "Practice on the sample" in link
 
 
 def test_a_sample_is_not_a_document_to_revise(web):

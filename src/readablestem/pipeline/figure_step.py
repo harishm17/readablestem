@@ -194,7 +194,7 @@ class FigureLongOutput(FigureOutput):
         description="True only when every table value is printed as a number in the figure."
     )
     colour_only: bool = Field(
-        description="True when series or parts are told apart by colour alone."
+        description="True when series or parts are told apart by color alone."
     )
 
 

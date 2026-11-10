@@ -523,7 +523,7 @@ def relabel(
             "Nothing was changed: no equation with this symbol passed its checks with the new "
             "symbol, and each is left as it was."
             if left
-            else "Nothing to change: no place is ticked, or every one is already decided."
+            else "Nothing to change: no place is checked, or every one is already decided."
         )
         raise ReviewInvalid([FieldError(f"to-{row.element_id}", message)])
     for change in changes:

@@ -116,7 +116,7 @@ def sign_in(page, base: str, email: str) -> None:
 
 def upload_pdf(page, base: str, pages: int = 1) -> str:
     page.goto(f"{base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": make_pdf(pages)}]
     )
     page.get_by_role("button", name="Upload and convert").click()
@@ -249,7 +249,7 @@ def test_error_states_have_no_serious_axe_violations(site, browser, axe_source):
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "x.pdf", "mimeType": "application/pdf", "buffer": b"not a pdf"}]
     )
     page.get_by_role("button", name="Upload and convert").click()
@@ -472,7 +472,7 @@ def long_named_job(site, browser) -> str:
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": make_pdf(1)}]
     )
     page.get_by_role("button", name="Upload and convert").click()

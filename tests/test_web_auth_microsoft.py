@@ -228,15 +228,15 @@ def test_without_an_email_claim_the_sign_in_name_is_used(ms):
 # --------------------------------------------------------------------------- refused
 
 
-def test_an_account_from_another_tenant_is_told_its_organisation_is_not_set_up(ms, caplog):
-    """nOAuth: any organisation can put any address in its own directory. Alice is on the
+def test_an_account_from_another_tenant_is_told_its_organization_is_not_set_up(ms, caplog):
+    """nOAuth: any organization can put any address in its own directory. Alice is on the
     allowlist, but a token from a tenant we have not allowed must not reach her account."""
     caplog.set_level(logging.INFO)
     ms.allow(ALICE)
     ms.fake.claims["tid"] = OTHER_TENANT
     response = ms_sign_in(ms)
     assert response.status_code == 403
-    assert "Your organisation is not set up for this beta" in response.text
+    assert "Your organization is not set up for this beta" in response.text
     assert OTHER_TENANT in response.text and "help@example.org" in response.text
     assert "sign in with Google" in response.text
     assert refusals(caplog) == ["tenant_not_allowed"]

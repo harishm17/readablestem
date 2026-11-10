@@ -3,15 +3,15 @@
 {% block content %}
 <h1>{{ title }}</h1>
 {% if signup_open %}
-<p>You signed in with a Microsoft work or school account from an organisation that is not
+<p>You signed in with a Microsoft work or school account from an organization that is not
   set up for ReadableSTEM yet.</p>
 {% else %}
-<p>You signed in with a Microsoft work or school account from an organisation that is not
+<p>You signed in with a Microsoft work or school account from an organization that is not
   part of this beta yet.</p>
 {% endif %}
 {% if contact_email %}
 <p>Ask us to add it: email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> and
-  include your organisation's directory id, <code>{{ tenant }}</code>.</p>
+  include your organization's directory id, <code>{{ tenant }}</code>.</p>
 {% endif %}
 {% if google_login %}
 {% if signup_open %}

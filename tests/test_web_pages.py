@@ -273,10 +273,10 @@ def test_limits_page_lists_the_facts_that_hold_today(pages):
         and 'id="accuracy"' in limits
     )
     assert "Development set, not held out" in limits  # a development number says so
-    topics = ("Tables.", "Links.", "Colour.", "Language.", "File types", "Maths in headings")
+    topics = ("Tables.", "Links.", "Color.", "Language.", "File types", "Math in headings")
     for topic in (*topics, "Slides.", "Figures.", "Equations."):
         assert topic in limits
-    assert "Only PDF files are taken" in limits or "turned into a PDF first" in limits
+    assert "You can upload a PDF" in limits
 
 
 def test_launch_check_reports_no_unfinished_public_copy(capsys):
@@ -443,7 +443,7 @@ def test_pages_do_not_offer_word_when_libreoffice_is_missing(tmp_path):
         limits = " ".join(client.get("/limits").text.split())
     assert "data-office" not in app and ".docx" not in app
     assert "Word or PowerPoint" not in privacy and "LibreOffice" not in privacy
-    assert "Only PDF files are taken" in limits
+    assert "You can upload a PDF file. For a Word or PowerPoint file, save a copy" in limits
 
 
 def test_launch_check_lists_a_half_set_microsoft_sign_in(tmp_path):

@@ -241,7 +241,7 @@ def test_a_batch_zip_places_its_pdfs_but_not_its_projects_unless_the_probe_passe
 def test_the_pages_offer_latex_source_only_after_a_pass(source_env):
     source_env.ctx.sandbox.set("fail")
     assert 'data-latex="1"' not in source_env.browser.get("/app").text
-    assert "LaTeX source files (.tex)" not in source_env.browser.get("/").text
+    assert "You can upload a PDF or LaTeX file" not in source_env.browser.get("/").text
     source_env.ctx.sandbox.set("pass")
     assert 'data-latex="1"' in source_env.browser.get("/app").text
-    assert "LaTeX source files (.tex)" in source_env.browser.get("/").text
+    assert "You can upload a PDF or LaTeX file" in source_env.browser.get("/").text

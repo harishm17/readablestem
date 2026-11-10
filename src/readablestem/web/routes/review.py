@@ -901,7 +901,7 @@ def _item(
 # One sentence each, to sit under the field; the length goes after it.
 ALT_GUIDANCE = {
     "chart": "Name the chart type, what each axis measures (with units) and the trend.",
-    "diagram": "Say what it shows and how its labelled parts connect.",
+    "diagram": "Say what it shows and how its labeled parts connect.",
     "photo": "Say what matters to this lesson; leave out the rest.",
     "illustration": "Say what it shows and what it teaches.",
     "table_image": "Say what the table holds and shows.",

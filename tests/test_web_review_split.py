@@ -252,7 +252,7 @@ def test_the_figure_decision_shows_the_image_and_the_alt_field(split):
     assert re.search(r'name="action" value="edit"[^>]*data-role="save"[^>]*>Save and accept<', body)
     assert re.search(r'name="action" value="save"[^>]*data-role="save-later"', body)
     # The alt-text help is for the kind of figure it is (the fixture's is a diagram).
-    assert "how its labelled parts connect" in body
+    assert "how its labeled parts connect" in body
     # "Keep without a description" is apart from those, says what students get, and is made
     # with a tick box that says the same.
     fallback = section(body, 'class="fallback fallback-figure"', "</fieldset>")
