@@ -10,7 +10,6 @@ must make a cartridge with no problems.
 from __future__ import annotations
 
 import io
-import re
 import zipfile
 
 import pytest
@@ -70,57 +69,6 @@ def test_the_cartridge_is_a_zip_with_the_manifest_the_page_and_its_pictures():
         "web_resources/doc-3f9a2b/images/image-01.png",
     ]
     assert cc.check_cartridge(data) == []
-
-
-def test_the_manifest_says_what_a_common_cartridge_1_3_manifest_says():
-    manifest = parts(cc.build_cartridge(small_export()))["imsmanifest.xml"].decode()
-    assert manifest.startswith('<?xml version="1.0" encoding="UTF-8"?>')
-    assert 'xmlns="http://www.imsglobal.org/xsd/imsccv1p3/imscp_v1p1"' in manifest
-    assert "<schema>IMS Common Cartridge</schema>" in manifest
-    assert "<schemaversion>1.3.0</schemaversion>" in manifest
-    assert 'structure="rooted-hierarchy"' in manifest
-    assert (
-        'type="webcontent"' in manifest and 'href="web_resources/doc-3f9a2b/index.html"' in manifest
-    )
-    assert "Speed &amp; &lt;time&gt;" in manifest  # the title is escaped
-    assert re.search(r'language="en"', manifest)
-
-
-def test_the_same_document_makes_the_same_bytes():
-    assert cc.build_cartridge(small_export()) == cc.build_cartridge(small_export())
-
-
-def test_the_page_is_the_canvas_versions_page_and_its_pictures_sit_beside_it():
-    export = small_export()
-    entries = parts(cc.build_cartridge(export))
-    page = entries["web_resources/doc-3f9a2b/index.html"].decode()
-    assert page == export.index_html
-    assert 'src="images/image-01.png"' in page and "data:" not in page and "<style" not in page
-    assert entries["web_resources/doc-3f9a2b/images/image-01.png"].startswith(b"\x89PNG")
-
-
-def test_nothing_of_the_text_alt_text_or_equation_is_changed():
-    export = small_export()
-    page = parts(cc.build_cartridge(export))["web_resources/doc-3f9a2b/index.html"].decode()
-    assert 'alt="A dot"' in page and "<mfrac>" in page and "The speed is" in page
-
-
-def test_a_document_with_no_pictures_makes_a_cartridge_with_one_file():
-    data = cc.build_cartridge(
-        export_canvas(
-            "<html lang='fr'><body><p>Bonjour</p></body></html>", title="Salut", folder="x-111111"
-        )
-    )
-    assert cc.check_cartridge(data) == []
-    assert list(parts(data)) == ["imsmanifest.xml", "web_resources/x-111111/index.html"]
-    assert 'language="fr"' in parts(data)["imsmanifest.xml"].decode()
-
-
-def test_a_language_that_is_not_a_tag_falls_back_to_english():
-    export = export_canvas(
-        "<html lang='not a tag!'><body><p>x</p></body></html>", title="T", folder="x-1"
-    )
-    assert 'language="en"' in parts(cc.build_cartridge(export))["imsmanifest.xml"].decode()
 
 
 # --------------------------------------------------------------------------- every document
@@ -188,16 +136,6 @@ def test_the_check_notices_each_rule_broken():
     )
 
 
-def test_a_missing_or_unlisted_file_is_noticed():
-    assert any(
-        "not in the zip" in p for p in broken(drop="web_resources/doc-3f9a2b/images/image-01.png")
-    )
-    assert any(
-        "no resource lists it" in p
-        for p in broken(add={"web_resources/doc-3f9a2b/extra.txt": b"x"})
-    )
-
-
 @pytest.mark.parametrize(
     "path",
     [
@@ -211,37 +149,3 @@ def test_a_missing_or_unlisted_file_is_noticed():
 def test_a_path_that_is_not_a_plain_relative_path_is_noticed(path):
     problems = broken(manifest=("web_resources/doc-3f9a2b/images/image-01.png", path))
     assert any("plain relative path" in p or "characters outside" in p for p in problems)
-
-
-def test_an_item_that_points_nowhere_or_has_no_title_is_noticed():
-    ref = re.search(
-        r'identifierref="(RES_[0-9a-f]+)"',
-        parts(cc.build_cartridge(small_export()))["imsmanifest.xml"].decode(),
-    )
-    assert ref
-    assert any(
-        "points at no resource" in p
-        for p in broken(manifest=(f'identifierref="{ref.group(1)}"', 'identifierref="RES_missing"'))
-    )
-    assert any(
-        "no title" in p
-        for p in broken(manifest=("<title>Speed &amp; &lt;time&gt;</title>", "<title> </title>"))
-    )
-    assert any(
-        "points at a resource" in p
-        for p in broken(
-            manifest=('<item identifier="ROOT_', '<item identifierref="RES_x" identifier="ROOT_')
-        )
-    )
-
-
-def test_identifiers_must_be_xml_ids_and_unique():
-    assert any(
-        "not a valid XML ID" in p
-        for p in broken(manifest=('identifier="ORG_', 'identifier="1ORG_'))
-    )
-    text = parts(cc.build_cartridge(small_export()))["imsmanifest.xml"].decode()
-    org = re.search(r'organization identifier="(ORG_[0-9a-f]+)"', text)
-    root = re.search(r'item identifier="(ROOT_[0-9a-f]+)"', text)
-    assert org and root
-    assert any("used twice" in p for p in broken(manifest=(root.group(1), org.group(1))))

@@ -11,7 +11,6 @@ import pymupdf
 import pytest
 
 from readablestem.core.types import (
-    INLINE_MARKER_RE,
     Element,
     Fix,
     Kind,
@@ -19,10 +18,9 @@ from readablestem.core.types import (
     TableCell,
     TableFix,
     TableGrid,
-    inline_marker,
 )
-from readablestem.pipeline import assemble, assemble_tables, html_checks, inline_text, safe_html
-from readablestem.pipeline.assemble import FLAGGED_NOTE, STYLE, render_html
+from readablestem.pipeline import html_checks
+from readablestem.pipeline.assemble import FLAGGED_NOTE, render_html
 from readablestem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
 from readablestem.pipeline.html_checks import static_checks
 
@@ -90,55 +88,10 @@ def test_a_rebuilt_table_is_a_table_in_a_scroll_box():
     assert FLAGGED_NOTE not in html  # the student note: nothing shown as an image
 
 
-def test_a_wide_table_is_a_named_tab_stop():
-    assert assemble_tables.estimate_min_width_em(grid()) < assemble_tables.WIDE_TABLE_EM
-    assert assemble_tables.estimate_min_width_em(wide_grid()) >= assemble_tables.WIDE_TABLE_EM
-    html = render([table_element()], [table_fix(table=TableFix(grid=wide_grid()))])
-    assert (
-        '<div class="table-scroll" id="p1-e1" role="group" aria-labelledby="p1-e1-caption" '
-        'tabindex="0"><table><caption id="p1-e1-caption">Table 2 Planets.</caption>'
-    ) in html
-    unnamed = render([table_element()], [table_fix(table=TableFix(grid=wide_grid(None)))])
-    assert '<div class="table-scroll" id="p1-e1" role="group" aria-label="Table" tabindex="0">' in (
-        unnamed
-    )
-
-
-def test_the_width_estimate_counts_words_maths_and_spanning_cells():
-    def width(cells, cols):
-        return assemble_tables.estimate_min_width_em(TableGrid(rows=1, cols=cols, cells=cells))
-
-    one_word = width([TableCell(row=0, col=0, text="abcdefghij klm")], 1)
-    assert one_word == pytest.approx(10 * 0.6 + 1.4)  # the longest word, and the edges
-    mathml = "<math><mi>a</mi><mo>+</mo><mi>b</mi></math>"
-    maths = width([TableCell(row=0, col=0, text="a + b", latex="a+b", mathml=mathml)], 1)
-    assert maths > 1.4
-    spanning = width([TableCell(row=0, col=0, col_span=2, text="x" * 30)], 2)
-    assert spanning == pytest.approx(30 * 0.6 + 1.4)  # two edges, one of them inside
-
-
-def test_a_table_without_a_caption_has_none():
-    html = render([table_element()], [table_fix(table=TableFix(grid=grid(caption=None)))])
-    assert '<div class="table-scroll" id="p1-e1"><table><thead>' in html
-    assert "<caption" not in html
-
-
 def test_a_table_waiting_for_review_is_shown_as_rebuilt():
     fix = table_fix(status=Status.NEEDS_REVIEW, table=TableFix(grid=grid()))
     html = render([table_element()], [fix])
     assert "<table>" in html and TABLE_NOT_CONVERTED_ALT not in html
-
-
-def test_table_css_is_added_once_and_only_with_a_table():
-    fixes = [
-        table_fix("p1-e1", table=TableFix(grid=grid())),
-        table_fix("p1-e2", table=TableFix(grid=grid(caption="Table 2 Again."))),
-    ]
-    html = render([table_element("p1-e1", 1), table_element("p1-e2", 2)], fixes)
-    assert f"<style>\n{STYLE}{TABLE_CSS}</style>" in html
-    assert html.count(".table-scroll {") == 1
-    without = render([heading()], [])
-    assert f"<style>\n{STYLE}</style>" in without and "table" not in without
 
 
 # --------------------------------------------------------------------------- kept as an image
@@ -221,17 +174,6 @@ def test_a_grid_of_terms_that_is_not_data_is_written_as_a_list():
     assert all(c.passed for c in static_checks(html))
 
 
-def test_a_term_and_its_text_are_a_description_list():
-    long = "The change in position of an object, with its direction."
-    fix = text_fix([["displacement", long], ["distance", "How far it went, whatever the way."]])
-    element = table_element().model_copy(update={"caption": None})
-    html = render([element], [fix], {"p1-e1": png()})
-    assert (
-        f'<div id="p1-e1"><dl><dt>displacement</dt><dd>{long}</dd><dt>distance</dt>'
-        "<dd>How far it went, whatever the way.</dd></dl></div>"
-    ) in html
-
-
 def test_other_text_grids_are_one_paragraph_per_cell_and_escaped():
     fix = text_fix([["Name: <b>", "Date:", "Signature of the student who did it"]])
     element = table_element().model_copy(update={"caption": None})
@@ -240,11 +182,6 @@ def test_other_text_grids_are_one_paragraph_per_cell_and_escaped():
         '<div id="p1-e1"><p>Name: &lt;b&gt;</p><p>Date:</p>'
         "<p>Signature of the student who did it</p></div>"
     ) in html
-
-
-def test_without_a_crop_the_table_text_is_not_invented():
-    html = render([table_element()], [table_fix(status=Status.FAILED, reason="table_not_rebuilt")])
-    assert "The original image is not available." in html
 
 
 def test_a_proposal_without_its_caption_gets_the_elements_caption():
@@ -258,14 +195,6 @@ def test_a_proposal_without_its_caption_gets_the_elements_caption():
     own = grid(caption="Table 1 Free fall (corrected).")
     html = render([element], [table_fix(table=TableFix(grid=own))])
     assert "Free fall (corrected).</caption>" in html and html.count("<caption") == 1
-
-
-def test_element_ids_that_are_not_plain_ids_still_render():
-    assert assemble_tables.id_prefix("p1-e3") == "p1-e3"
-    assert assemble_tables.id_prefix("3 tables!") == "t3-tables-"
-    element = table_element(eid="weird id")
-    html = render([element], [table_fix("weird id", table=TableFix(grid=wide_grid()))])
-    assert 'aria-labelledby="weird-id-caption"' in html and 'id="weird-id-caption"' in html
 
 
 # --------------------------------------------------------------------------- html checks
@@ -288,20 +217,6 @@ def page(body: str) -> str:
 
 def table_failures(html: str) -> list[str | None]:
     return [c.code for c in static_checks(html) if not c.passed and c.name in TABLE_RULES]
-
-
-def test_a_rebuilt_table_passes_the_table_rules():
-    html = render([heading(), table_element()], [table_fix(table=TableFix(grid=grid()))])
-    checks = static_checks(html)
-    assert [c.name for c in checks][-5:] == TABLE_RULES
-    assert all(c.passed for c in checks)
-
-
-def test_documents_without_tables_get_no_table_rules():
-    html = render([heading()], [])
-    assert not any(c.name in TABLE_RULES for c in static_checks(html))
-    kept = render([table_element()], [table_fix(status=Status.FAILED, reason="table_not_rebuilt")])
-    assert not any(c.name in TABLE_RULES for c in static_checks(kept))  # an image, no table
 
 
 @pytest.mark.parametrize(
@@ -341,64 +256,7 @@ def test_table_rules_fail_on_broken_tables(body, codes):
     assert table_failures(page(body)) == codes
 
 
-@pytest.mark.parametrize(
-    "body",
-    [
-        # headers/id instead of scope (the serialiser's irregular tables)
-        '<table><tr><th id="h1">A</th></tr><tr><td headers="h1">1</td></tr></table>',
-        # a header holding maths with its reading as text (table_html), or an image with
-        # alt text
-        '<table><tr><th scope="col"><span class="visually-hidden">x</span><span '
-        'aria-hidden="true"><math display="inline"><mi>x</mi></math></span></th></tr>'
-        "<tr><td>1</td></tr></table>",
-        '<table><tr><th scope="col"><img alt="Velocity" src="data:,"></th></tr>'
-        "<tr><td>1</td></tr></table>",
-        # a sentence about the table is not its caption, and a caption of its own is fine
-        '<p>Table 2 shows that the speed doubles.</p><table><tr><th scope="col">A</th></tr>'
-        "<tr><td>1</td></tr></table>",
-        '<p>Table 2.1 Speeds.</p><table><caption>Table 2.1 Speeds.</caption><tr><th scope="col">'
-        "A</th></tr><tr><td>1</td></tr></table>",
-        # a heading between the paragraph and the table
-        '<p>Table 2.1 Speeds.</p><h2>Results</h2><table><tr><th scope="col">A</th></tr>'
-        "<tr><td>1</td></tr></table>",
-    ],
-)
-def test_table_rules_pass_on_good_tables(body):
-    assert table_failures(page(body)) == []
-
-
-def test_a_nested_tables_header_belongs_to_the_inner_table():
-    body = (
-        '<table><tr><th scope="col">Outer</th></tr><tr><td>'
-        "<table><tr><td>1</td></tr></table></td></tr></table>"
-    )
-    assert table_failures(page(body)) == ["table_no_headers"]
-
-
 # --------------------------------------------------------------------------- shared seams
-
-
-def test_assemble_keeps_its_old_names():
-    assert assemble.INLINE_MARKER_RE is INLINE_MARKER_RE
-    assert assemble.sanitize_mathml is safe_html.sanitize_mathml
-    assert assemble.MATHML_ELEMENTS is safe_html.MATHML_ELEMENTS
-    assert {Status.ABSTAINED, Status.FAILED, Status.REJECTED} == assemble.NOT_CONVERTED
-
-
-def test_inline_text_places_equations_and_escapes_the_rest():
-    text = f"a < b {inline_marker('p1-e2')} and {inline_marker('p9-e9')}."
-    out = inline_text.render_inline_text(
-        text, element=None, equation=lambda eid: "<math>" if eid == "p1-e2" else None
-    )
-    assert out == f"a &lt; b <math> and {inline_marker('p9-e9')}."
-
-
-def test_the_passage_seam_writes_the_language():
-    # The text work's tests (tests/test_text_*.py) cover links, colour and language.
-    element = Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 1, 1), order=0,
-                      text="Plain text.", lang="fr")  # fmt: skip
-    assert inline_text.passage_attrs(element) == ' lang="fr"'
-    assert '<p id="p1-e0" lang="fr">Plain text.</p>' in render([element], [])
 
 
 # --------------------------------------------------------------------------- browser

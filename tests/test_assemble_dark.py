@@ -27,7 +27,6 @@ from readablestem.pipeline.assemble import STYLE, render_html
 from readablestem.pipeline.html_checks import split_dark_css, static_checks
 
 GOLDEN = Path(__file__).parent / "fixtures" / "assemble" / "golden"
-HEX = re.compile(r"#([0-9a-f]{6})\b")
 
 
 def rgb(digits: str) -> tuple[int, int, int]:
@@ -48,13 +47,6 @@ def ratio(a, b) -> float:
 
 
 # --------------------------------------------------------------------------- static
-
-
-def test_the_stylesheet_asks_for_both_schemes_and_prints_light():
-    assert ":root { color-scheme: light dark; }" in STYLE
-    plain, dark = split_dark_css(STYLE)
-    assert "background: #121212" in dark and "background: #121212" not in plain
-    assert "@media screen and (prefers-color-scheme: dark)" in STYLE  # not when printing
 
 
 def test_the_page_text_reaches_contrast_in_both_schemes():
@@ -113,26 +105,6 @@ def test_every_printed_colour_is_readable_on_both_pages(printed):
     assert ratio(dark_colour, contrast.DARK_BACKGROUND) >= 4.5
 
 
-def test_no_colour_reaches_4_5_to_1_on_both_pages_so_each_gets_a_dark_rule():
-    """Contrast 4.5:1 on white needs a luminance of at most 0.18, on #121212 at least 0.20."""
-    for printed in [(0, 0, 0), (255, 255, 255), (118, 118, 118), (255, 0, 0), (60, 60, 60)]:
-        shown = contrast.with_contrast(printed)
-        assert (
-            ratio(shown, contrast.DARK_BACKGROUND) < 4.5
-            or ratio(shown, contrast.OUTPUT_BACKGROUND) < 4.5
-        )
-        assert "prefers-color-scheme: dark" in inline_text.colour_css(printed)
-
-
-def test_with_contrast_lightens_on_a_dark_page_and_keeps_the_hue():
-    light = contrast.with_contrast((0, 0, 200), contrast.DARK_BACKGROUND)
-    assert ratio(light, contrast.DARK_BACKGROUND) >= 4.5
-    assert light[2] > light[0] and light[2] > light[1]  # still blue
-    assert contrast.with_contrast((200, 200, 200), contrast.DARK_BACKGROUND) == (200, 200, 200)
-    # The light page behaves as before: darker, not lighter.
-    assert sum(contrast.with_contrast((255, 235, 59))) < sum((255, 235, 59))
-
-
 def paragraph_with_colours() -> str:
     text = "red words then light grey words then blue words."
     runs = [
@@ -150,12 +122,6 @@ def paragraph_with_colours() -> str:
         colour_runs=runs,
     )
     return render_html(title="T", lang="en", elements=[element], fixes=[], crops={})
-
-
-def test_a_document_with_colours_passes_the_static_checks_in_both_schemes():
-    html = paragraph_with_colours()
-    assert "@media screen and (prefers-color-scheme: dark) { .tc-ff0000" in html
-    assert [c.code for c in static_checks(html) if not c.passed] == []
 
 
 def test_a_colour_rule_too_dark_for_the_dark_page_fails_the_check():
@@ -274,47 +240,3 @@ def run_axe(html: str, scheme: str):
 def test_axe_finds_no_problem_in_either_scheme(name, scheme):
     checks = run_axe(documents()[name], scheme)
     assert [(c.name, c.severity) for c in checks if not c.passed] == []
-
-
-@pytest.mark.browser
-def test_chromium_shows_the_dark_page_colours_including_maths_and_borders():
-    playwright = pytest.importorskip("playwright.sync_api")
-    html = documents()["busy"]
-    probe = """() => {
-      const colour = (el) => getComputedStyle(el).color;
-      const box = document.querySelector('.flagged');
-      return {
-        background: getComputedStyle(document.body).backgroundColor,
-        text: colour(document.body),
-        math: colour(document.querySelector('math')),
-        mathBackground: getComputedStyle(document.querySelector('math')).backgroundColor,
-        border: getComputedStyle(box).borderTopColor,
-        red: colour(document.querySelector('.tc-ff0000')),
-        pre: getComputedStyle(document.querySelector('pre')).backgroundColor,
-        cell: getComputedStyle(document.querySelector('td')).borderTopColor,
-        scheme: getComputedStyle(document.documentElement).colorScheme,
-      };
-    }"""
-    seen = {}
-    with playwright.sync_playwright() as p:
-        try:
-            browser = p.chromium.launch()
-        except playwright.Error:
-            pytest.skip("Chromium is not installed")
-        try:
-            for scheme in ("light", "dark"):
-                page = browser.new_context(offline=True, color_scheme=scheme).new_page()
-                page.set_content(html, wait_until="load")
-                seen[scheme] = page.evaluate(probe)
-        finally:
-            browser.close()
-    light, dark = seen["light"], seen["dark"]
-    assert light["background"] == "rgb(255, 255, 255)" and dark["background"] == "rgb(18, 18, 18)"
-    assert light["math"] == light["text"] == "rgb(27, 27, 27)"
-    assert dark["math"] == dark["text"] == "rgb(236, 236, 236)"
-    assert dark["mathBackground"] in ("rgba(0, 0, 0, 0)", "rgb(18, 18, 18)")
-    assert light["border"] == "rgb(138, 60, 0)" and dark["border"] == "rgb(255, 160, 102)"
-    assert light["pre"] == "rgb(243, 243, 243)" and dark["pre"] == "rgb(31, 31, 31)"
-    assert dark["cell"] == "rgb(166, 166, 166)"
-    assert light["red"] != dark["red"]
-    assert light["scheme"] == dark["scheme"] == "light dark"

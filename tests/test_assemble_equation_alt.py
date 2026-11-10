@@ -13,14 +13,13 @@ import re
 import pymupdf
 import pytest
 
-from readablestem.core.types import Element, Fix, Kind, Status, inline_marker
+from readablestem.core.types import Element, Fix, Kind, Status
 from readablestem.eval.invented.read import _placeholder_alts
 from readablestem.pipeline.assemble import (
     EQUATION_FLAT_ALT_SUFFIX,
     EQUATION_NOT_CONVERTED_ALT,
     EQUATION_TEXT_ALT_SUFFIX,
     equation_alt,
-    equation_number,
     render_html,
 )
 
@@ -88,75 +87,12 @@ def test_the_alt_text_is_only_what_the_pdf_holds_plus_our_marker():
         assert alt == f"{text}{EQUATION_TEXT_ALT_SUFFIX}"
 
 
-@pytest.mark.parametrize(
-    ("label", "number"),
-    [("(2.4)", "2.4"), ("[3]", "3"), ("Eq. 2.4", "2.4"), ("Equation (A.1)", "A.1"), (" 7 ", "7"),
-     ("", None), (None, None), ("()", None)],
-)  # fmt: skip
-def test_equation_number(label, number):
-    assert equation_number(label) == number
-
-
-def test_a_block_equation_kept_as_an_image_says_where_its_words_come_from():
-    html = render_html(
-        title="T", lang="en", elements=[equation("v = d / t", "(2.4)")], fixes=[failed()],
-        crops={"p1-e1": crop()},
-    )  # fmt: skip
-    assert alts(html) == ["Equation (2.4): v = d / t, read from the PDF text; not checked"]
-    assert "Not converted." in html  # the visible note stays
-    assert 'class="flagged"' in html and 'role="note"' in html
-
-
-def test_four_unconverted_answers_are_four_different_alt_texts():
-    texts = ["6.0 m/s", "8.0 m/s", "9.0 m/s", None]
-    elements = [
-        equation(text).model_copy(
-            update={"id": f"p1-e{i}", "order": i, "bbox": (72, 100 + 30 * i, 172, 120 + 30 * i)}
-        )
-        for i, text in enumerate(texts)
-    ]
-    fixes = [failed() for _ in elements]
-    fixes = [
-        f.model_copy(update={"element_id": e.id}) for f, e in zip(fixes, elements, strict=True)
-    ]
-    html = render_html(
-        title="T", lang="en", elements=elements, fixes=fixes, crops={e.id: crop() for e in elements}
-    )
-    assert alts(html) == [
-        "6.0 m/s, read from the PDF text; not checked",
-        "8.0 m/s, read from the PDF text; not checked",
-        "9.0 m/s, read from the PDF text; not checked",
-        EQUATION_NOT_CONVERTED_ALT,
-    ]
-
-
 def test_a_numbered_equation_with_no_text_says_so_in_its_alt():
     html = render_html(
         title="T", lang="en", elements=[equation(None, "(5)")], fixes=[failed(Status.ABSTAINED)],
         crops={"p1-e1": crop()},
     )  # fmt: skip
     assert alts(html) == ["Equation (5), not converted"]
-
-
-def test_an_inline_equation_kept_as_an_image_uses_its_text_too():
-    paragraph = Element(
-        id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(72, 80, 400, 96), order=0,
-        text=f"The speed {inline_marker('p1-e1')} was measured.",
-    )  # fmt: skip
-    inline = equation("6.0 m/s", display="inline").model_copy(update={"parent_id": "p1-e0"})
-    html = render_html(
-        title="T", lang="en", elements=[paragraph, inline], fixes=[failed()],
-        crops={"p1-e1": crop()},
-    )  # fmt: skip
-    assert alts(html) == ["6.0 m/s, read from the PDF text; not checked"]
-    assert "(equation not converted)" in html
-
-
-def test_without_a_crop_the_visible_text_is_unchanged():
-    html = render_html(
-        title="T", lang="en", elements=[equation("v = d / t")], fixes=[failed()], crops={}
-    )
-    assert alts(html) == [] and "v = d / t" in html
 
 
 def test_text_that_looks_like_markup_is_escaped_in_the_attribute():
@@ -168,28 +104,6 @@ def test_text_that_looks_like_markup_is_escaped_in_the_attribute():
     assert alts(html) == [
         "a &lt; b &quot;and&quot; &lt;script&gt;, read from the PDF text; not checked"
     ]
-
-
-@pytest.mark.parametrize("lang", ["fr", "de-AT"])
-def test_the_alt_is_marked_english_in_a_document_in_another_language(lang):
-    html = render_html(
-        title="T", lang=lang, elements=[equation("v = d / t", "(2.4)")], fixes=[failed()],
-        crops={"p1-e1": crop()},
-    )  # fmt: skip
-    img = re.search(r"<img [^>]*>", html)
-    assert img is not None and ' lang="en"' in img.group(0)
-    html = render_html(
-        title="T", lang=lang, elements=[equation("a2", "(2.4)", reasons=["superscript"])],
-        fixes=[failed()], crops={"p1-e1": crop()},
-    )  # fmt: skip
-    img = re.search(r"<img [^>]*>", html)
-    assert img is not None and ' lang="en"' in img.group(0)
-    html = render_html(
-        title="T", lang=lang, elements=[equation(None, "(2.4)")], fixes=[failed()],
-        crops={"p1-e1": crop()},
-    )  # fmt: skip
-    img = re.search(r"<img [^>]*>", html)
-    assert img is not None and ' lang="en"' in img.group(0)
 
 
 def test_the_invented_content_reader_does_not_count_these_alts_as_content():

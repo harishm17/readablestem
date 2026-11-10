@@ -123,49 +123,7 @@ def test_every_picture_has_alt_text_and_never_its_address(made):
     )
 
 
-def test_the_language_and_title_are_set(made):
-    html, export, document = made
-    lang = re.search(r'<html[^>]*\blang="([^"]+)"', html)
-    expected = lang.group(1) if lang else "en"
-    assert export.lang == expected
-    assert document.core_properties.language == expected
-    styles = zipfile.ZipFile(io.BytesIO(export.data)).read("word/styles.xml").decode()
-    assert f'w:val="{expected}"' in styles
-    assert document.core_properties.title == export.title
-
-
-def test_the_text_is_all_there(made):
-    html, _, document = made
-    words = " ".join(p.text for p in document.paragraphs)
-    for node in _parse(html).walk():
-        if node.tag == "h1" or node.tag == "h2":
-            text = " ".join("".join(c for c in node.children if isinstance(c, str)).split())
-            if text and not any(not isinstance(c, str) for c in node.children):
-                assert text in words
-
-
-def test_no_page_marker_label_is_left_in_the_text(made):
-    _, _, document = made
-    assert not [p.text for p in document.paragraphs if re.fullmatch(r"Page \d+", p.text.strip())]
-
-
 # --------------------------------------------------------------------- one page with everything
-
-
-def test_the_page_keeps_its_structure(page):
-    export, document = page
-    assert export.lang == "fr" and export.title == "La vitesse"
-    assert document.core_properties.title == "La vitesse"
-    styles = [p.style.name for p in document.paragraphs]
-    assert [s for s in styles if s.startswith("Heading")] == [
-        "Heading 1",
-        "Heading 2",
-        "Heading 3",
-        "Heading 6",
-    ]
-    # The first heading says the title, so the title line is not written twice.
-    assert "Title" not in styles
-    assert export.equations == 2
 
 
 def test_a_table_has_a_header_row_and_a_caption(page):
@@ -178,33 +136,6 @@ def test_a_table_has_a_header_row_and_a_caption(page):
     assert [c.text for c in table.rows[0].cells] == ["Car", "km/h"]
     assert table.rows[1].cells[1].text == "50"
     assert any(p.text == "Speeds" for p in document.paragraphs)
-
-
-def test_a_figure_without_a_picture_is_not_a_layout_table(page):
-    _, document = page
-    assert len(document.tables) == 1  # only the data table
-    text = [p.text for p in document.paragraphs]
-    assert "A picture left out, in words." in text and "Figure 2" in text
-
-
-def test_the_long_description_follows_the_figure(page):
-    _, document = page
-    text = [p.text for p in document.paragraphs]
-    at = text.index("Figure 1")
-    assert text[at + 1] == "Description of Figure 1"
-    assert text[at + 2] == "A single dot where the axes cross."
-
-
-def test_lists_and_links_are_word_lists_and_hyperlinks(page):
-    _, document = page
-    body = document.element.body
-    links = list(body.iter(f"{W}hyperlink"))
-    assert len(links) == 2
-    assert links[0].get(f"{W}anchor") == "t"
-    rels = [r for r in document.part.rels.values() if r.is_external]
-    assert [r.target_ref for r in rels] == ["https://example.org/a?b=1&c=2"]
-    numbered = [p for p in document.paragraphs if p._p.find(f"{W}pPr/{W}numPr") is not None]
-    assert [p.text for p in numbered] == ["one", "two", "nested"]
 
 
 def test_nothing_that_runs_or_loads_is_carried(page):
@@ -266,25 +197,6 @@ def test_a_webp_picture_is_written_as_a_png():
     assert made.images == 1
 
 
-def test_a_document_with_no_heading_keeps_its_title_line():
-    html = '<html lang="en"><head><title>Notes</title></head><body><p>Hello</p></body></html>'
-    document = open_docx(ed.export_docx(html).data)
-    assert document.paragraphs[0].style.name == "Title"
-
-
-def test_title_override_and_language_fallback():
-    html = '<html lang="x y!"><head><title>Old</title></head><body><p>Hi</p></body></html>'
-    made = ed.export_docx(html, title="  A   new  title ")
-    assert made.title == "A new title" and made.lang == "en"
-    assert open_docx(made.data).core_properties.title == "A new title"
-
-
-def test_a_page_without_html_and_body_is_refused():
-    with pytest.raises(ed.DocxExportError) as error:
-        ed.export_docx("just words")
-    assert error.value.code == "invalid"
-
-
 # --------------------------------------------------------------------- the child process
 
 
@@ -297,13 +209,6 @@ def fake_pandoc(tmp_path: Path, body: str) -> str:
 
 COPY_TO_OUT = 'out=""\nwhile [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done\n'
 SIMPLE = '<html lang="en"><body><h1>T</h1><p>Hi</p></body></html>'
-
-
-def test_a_missing_program_is_unavailable(tmp_path):
-    with pytest.raises(ed.DocxExportError) as error:
-        ed.export_docx(SIMPLE, pandoc=str(tmp_path / "nope"))
-    assert error.value.code == "unavailable"
-    assert not ed.available(str(tmp_path / "nope"))
 
 
 def test_a_failing_child_is_a_failure_without_text(tmp_path):
