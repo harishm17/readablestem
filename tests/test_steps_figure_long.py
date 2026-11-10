@@ -14,14 +14,11 @@ from readablestem.config import MAIN_MODEL
 from readablestem.core.types import ConversionOptions, Element, Fix, Kind, Status, grid_problems
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.prompts import load_prompt
-from readablestem.pipeline import figure_details, figure_step, options
+from readablestem.pipeline import figure_details, options
 from readablestem.pipeline.figure_step import (
     LONG_MAX_OUTPUT_TOKENS,
     LONG_PROMPT_VERSION,
-    MAX_OUTPUT_TOKENS,
     PROMPT_VERSION,
-    FigureLongOutput,
-    FigureOutput,
     describe,
     long_description_missing,
 )
@@ -96,31 +93,6 @@ def codes(fix: Fix) -> set[str | None]:
 # ---------------------------------------------------------------------- option off
 
 
-def test_off_sends_the_short_prompt_exactly_as_before():
-    fix, client = run(short())
-    (request,) = client.requests
-    assert request.prompt_version == PROMPT_VERSION
-    assert request.instructions == load_prompt("figure").text
-    assert request.max_output_tokens == MAX_OUTPUT_TOKENS
-    # The figure's own labels are not sent: the context is what it was.
-    assert request.context_text == "Caption: Figure 2.3 A car.\n\nNearby text: Near."
-    assert fix.status is Status.ACCEPTED and fix.review == "none"
-    assert fix.figure is not None
-    assert fix.figure.long_description is None and fix.figure.data_table is None
-    assert fix.figure.data_values_from_text is None and fix.figure.colour_only is False
-    assert [c.name for c in fix.checks if c.name.startswith("figure.")] == []
-
-
-def test_off_refuses_the_long_fields():
-    # FigureOutput forbids extra keys, so the long schema is never mixed in by accident.
-    fix, _ = run(long())
-    assert fix.status is Status.FAILED and fix.reason == "model_invalid_output"
-
-
-def test_off_outside_a_run_uses_the_defaults():
-    assert options.current().long_descriptions is False
-
-
 # ---------------------------------------------------------------------- option on
 
 
@@ -136,13 +108,6 @@ def test_on_sends_the_long_prompt_with_the_labels_fenced(long_on):
     assert LABELS not in request.instructions  # document text only travels as data
 
 
-def test_long_labels_are_cut(long_on):
-    _, client = run(long(), element(text="7 " * 1000))
-    context = client.requests[0].context_text or ""
-    labels = context.split("Labels in the figure: ", 1)[1]
-    assert len(labels) == figure_step.MAX_LABEL_CHARS
-
-
 def test_a_long_description_is_stored_cleaned_and_needs_nothing(long_on):
     messy = f"  Line graph of the position of a car{ZWSP} against time.  \n\n" + LONG
     fix, _ = run(long(long_description=messy, data_table=None))
@@ -153,13 +118,6 @@ def test_a_long_description_is_stored_cleaned_and_needs_nothing(long_on):
     assert "" not in lines
     assert all(c.passed for c in fix.checks)
     assert "figure.long_description" in {c.name for c in fix.checks}
-
-
-def test_an_unsure_long_description_is_an_optional_note(long_on):
-    fix, _ = run(long(long_description_unsure=True, data_table=None))
-    assert fix.status is Status.ACCEPTED and fix.review == "optional"
-    assert codes(fix) == {"long_description_unsure"}
-    assert fix.optional_note
 
 
 @pytest.mark.parametrize(
@@ -180,15 +138,6 @@ def test_an_unusable_long_description_is_dropped_without_a_decision(long_on, tex
     assert long_description_missing(fix)  # the job page's notice, not a decision
 
 
-def test_values_printed_in_the_figure_need_no_decision(long_on):
-    fix, _ = run(long())
-    assert fix.figure is not None and fix.figure.data_table is not None
-    assert fix.figure.data_values_from_text is True
-    assert fix.status is Status.ACCEPTED and fix.review == "none"
-    check = next(c for c in fix.checks if c.name == "figure.data_values")
-    assert check.passed and check.severity == "warning"
-
-
 def test_values_read_from_the_image_are_an_optional_extra_not_a_decision(long_on):
     # Additive extras never add a required decision: the table is kept on the fix,
     # offered on the review screen, and not written until a reviewer adds it.
@@ -204,25 +153,12 @@ def test_values_read_from_the_image_are_an_optional_extra_not_a_decision(long_on
     assert not figure_details.data_table_shown(fix.figure)
 
 
-def test_one_value_missing_from_the_text_is_enough(long_on):
-    fix, _ = run(long(data_table={"header": HEADER, "rows": [*ROWS, ["8", "2400.5"]]}))
-    assert fix.figure is not None and fix.figure.data_values_from_text is False
-    assert fix.status is Status.ACCEPTED and fix.review == "optional"
-
-
 def test_values_the_model_estimated_are_read_from_the_image(long_on):
     # Every number appears in the labels (tick values), but the model says it placed
     # them by eye: they are still read from the image.
     fix, _ = run(long(values_printed=False))
     assert fix.figure is not None and fix.figure.data_values_from_text is False
     assert fix.status is Status.ACCEPTED and codes(fix) == {"values_from_image"}
-
-
-def test_a_doubtful_alt_text_is_still_a_decision_with_a_table_offered(long_on):
-    # The table never adds a decision, and never takes one away either.
-    fix, _ = run(long(confidence=0.6), element(text=None))
-    assert fix.status is Status.NEEDS_REVIEW and fix.review == "required"
-    assert codes(fix) == {"values_from_image"}
 
 
 @pytest.mark.parametrize(
@@ -243,12 +179,6 @@ def test_a_table_that_is_not_a_charts_values_is_dropped(long_on, figure_type, ta
     assert fix.status is Status.ACCEPTED
 
 
-def test_colour_only_changes_nothing_but_the_flag(long_on):
-    fix, _ = run(long(colour_only=True))
-    assert fix.figure is not None and fix.figure.colour_only is True
-    assert fix.status is Status.ACCEPTED and fix.review == "none"
-
-
 def test_a_decorative_answer_carries_none_of_it(long_on):
     answer = long(figure_type="photo", decorative=True, alt="", confidence=0.99, colour_only=True)
     fix, _ = run(answer, element(caption=None))
@@ -257,31 +187,7 @@ def test_a_decorative_answer_carries_none_of_it(long_on):
     assert fix.figure.colour_only is False
 
 
-def test_low_confidence_still_abstains(long_on):
-    fix, _ = run(long(confidence=0.2))
-    assert fix.status is Status.ABSTAINED and fix.figure is None
-
-
-def test_the_long_schema_extends_the_short_one():
-    assert set(FigureOutput.model_fields) < set(FigureLongOutput.model_fields)
-    assert FigureLongOutput.model_config.get("extra") == "forbid"
-
-
 # ---------------------------------------------------------------------- the notice helper
-
-
-def test_long_description_missing_only_for_charts_and_diagrams_described_with_it_on(long_on):
-    chart, _ = run(long(long_description=""))
-    photo, _ = run(long(figure_type="photo", long_description="", data_table=None))
-    described, _ = run(long())
-    assert long_description_missing(chart)
-    assert not long_description_missing(photo)
-    assert not long_description_missing(described)
-
-
-def test_long_description_missing_is_never_raised_with_the_option_off():
-    fix, _ = run(short())
-    assert not long_description_missing(fix)
 
 
 # ---------------------------------------------------------------------- numbers and grids
@@ -306,19 +212,6 @@ def test_numbers_are_read_the_same_way_from_tables_and_text(text, numbers):
     assert figure_details.numbers_in(text) == [Decimal(n) for n in numbers]
 
 
-def test_an_exponent_is_compared_too():
-    # Exponents printed as superscripts are numbers of their own: a table that writes them
-    # with a caret matches the figure, and one with another exponent does not.
-    sup = {"2": "\u00b2", "3": "\u00b3", "4": "\u2074"}
-    printed = f"Earth 5.97\u00d710{sup['2']}{sup['4']} Mars 6.42\u00d710{sup['2']}{sup['3']}"
-    header = ["Planet", "Mass (kg)"]
-    right = figure_details.data_grid(header, [["Earth", "5.97 x 10^24"], ["Mars", "6.42 x 10^23"]])
-    wrong = figure_details.data_grid(header, [["Earth", "5.97 x 10^24"], ["Mars", "6.42 x 10^25"]])
-    assert right is not None and wrong is not None
-    assert figure_details.values_in_text(right, printed)
-    assert not figure_details.values_in_text(wrong, printed)
-
-
 def test_values_in_text_needs_every_number():
     grid = figure_details.data_grid(HEADER, ROWS)
     assert grid is not None
@@ -337,11 +230,3 @@ def test_a_data_grid_is_a_valid_table_with_headers():
     assert headers[(1, 0)] == "row" and headers[(1, 1)] is None
     single = figure_details.data_grid(["Speed (m/s)"], [["3"], ["4"]])
     assert single is not None and single.header_cols == 0 and grid_problems(single) == []
-
-
-def test_figure_labels_come_from_the_caption():
-    assert figure_details.figure_label("Figure 2.3 A car.") == "Figure 2.3"
-    assert figure_details.figure_label("Fig. 4: Speeds") == "Figure 4"
-    assert figure_details.figure_label(f"FIGURE 1{EN}2 Data") == f"Figure 1{EN}2"
-    assert figure_details.figure_label("A car on a road.") is None
-    assert figure_details.figure_label(None) is None

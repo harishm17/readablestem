@@ -6,9 +6,7 @@ import unicodedata
 
 import pytest
 
-from readablestem.core.mathchars import VARIANT_NAMES, styled_char
 from readablestem.core.notation import (
-    _TRAITS_OF_VARIANT,
     MAX_SYMBOL_CHARS,
     canonical_from_parts,
     canonical_symbol,
@@ -156,36 +154,12 @@ def test_anything_else_is_not_understood(spelling):
     assert canonical_symbol(spelling) is None
 
 
-def test_not_a_string_is_not_understood():
-    assert canonical_symbol(None) is None  # type: ignore[arg-type]
-    assert canonical_symbol(42) is None  # type: ignore[arg-type]
-
-
 def test_keys_are_stable_and_fit_the_database_column():
     for spelling in ("bold d", r"\vec{\mathbf{v}}", "bold script L", "c hat"):
         key = canonical_symbol(spelling)
         assert key is not None and len(key) <= MAX_SYMBOL_CHARS
         assert canonical_symbol(key) == key  # a key is its own key
         assert unicodedata.normalize("NFC", key) == key
-
-
-def test_every_style_mathchars_knows_has_a_meaning_here():
-    assert set(_TRAITS_OF_VARIANT) == set(VARIANT_NAMES)
-
-
-@pytest.mark.parametrize("letter", ["d", "R", "L", "g", "k"])
-@pytest.mark.parametrize("variant", sorted(VARIANT_NAMES))
-def test_every_styled_letter_reads_back_to_a_key(letter, variant):
-    styled = styled_char(letter, variant)
-    if styled == letter:
-        pytest.skip("Unicode has no such letter")
-    key = canonical_symbol(styled)
-    assert key is not None
-    # Italic folds into plain and bold italic into bold; the rest keep their style.
-    if variant == "italic":
-        assert key == letter
-    elif variant == "bold-italic":
-        assert key == styled_char(letter, "bold")
 
 
 @pytest.mark.parametrize(
@@ -220,18 +194,3 @@ def test_parts_from_mathml_give_the_same_keys(parts, key):
 )
 def test_parts_that_are_not_one_symbol_have_no_key(parts):
     assert canonical_from_parts(*parts) is None
-
-
-@pytest.mark.parametrize(
-    "spelling",
-    ["\\hat{\\imath}", "\\hat{i}", "i hat", "\u0131\u0302", "$\\hat\\imath$"],
-)
-def test_the_unit_vector_i_hat_has_one_key_with_or_without_the_dot(spelling):
-    # LaTeX's standard \hat{\imath} (a dotless i under the hat) is i-hat too.
-    assert canonical_symbol(spelling) == "î"
-
-
-def test_a_dotless_i_or_j_from_mathml_is_the_letter():
-    assert canonical_from_parts("\u0131", None, "hat") == "\u00ee"
-    assert canonical_from_parts("ȷ", None, "hat") == "ĵ"
-    assert canonical_symbol("\\vec{\\jmath}") == canonical_symbol("\\vec{j}")

@@ -18,8 +18,8 @@ from readablestem.core.types import Check, EquationFix, Fix, Status
 from readablestem.pipeline import equation_step
 from readablestem.web import reading_chips, record
 from readablestem.web.db import ReviewEdit, session_scope
-from readablestem.web.review import CHOICE_KEY, WITNESS_KEY, WITNESS_ORIGIN, apply_review
-from test_web_review_split import panel, screen, section, stored, text_of
+from readablestem.web.review import CHOICE_KEY, WITNESS_KEY, WITNESS_ORIGIN
+from test_web_review_split import screen, section, stored, text_of
 
 ID = "p2-e2"
 PROPOSAL = "x + y = 2"
@@ -108,82 +108,11 @@ def other(body: str) -> str:
 # --------------------------------------------------------------------------- the card
 
 
-def test_the_card_shows_the_other_reading_why_and_a_button_for_all_of_it(witnessed):
-    html = other(card(witnessed))
-    assert text_of(section(html, "<h3", "</h3>")) == "The other reading"
-    text = text_of(html)
-    assert "read this formula differently" in text and "Nothing is chosen for you." in text
-    assert "Other reading, read from the whole page" in text
-    assert "<math" in html  # rendered, not LaTeX source
-    assert "Read aloud roughly as: “x plus y equals 3”" in text
-    buttons = re.findall(r'<button[^>]*data-role="other"[^>]*>.*?</button>', html, re.S)
-    assert len(buttons) == 1
-    assert text_of(buttons[0]) == "Use the other reading for equation 3"
-    assert 'name="latex" value="x + y = 3"' in buttons[0]
-    described = re.search(r'aria-describedby="([^"]+)"', buttons[0]).group(1)  # type: ignore[union-attr]
-    assert f'id="{described}"' in html
-
-
-def test_the_proposal_and_the_other_reading_are_both_on_the_card(witnessed):
-    body = card(witnessed)
-    assert 'aria-label="Proposed equation 3"' in body
-    assert 'aria-label="Other reading of equation 3"' in body
-    assert body.index("Proposed equation 3") < body.index("Other reading of equation 3")
-    assert body.index("other-reading") < body.index('class="decide-form')  # choose first
-
-
-def test_nothing_is_chosen_and_showing_the_card_changes_nothing(witnessed):
-    html = other(card(witnessed))
-    for chosen in ("checked", "selected", "aria-pressed", "aria-checked", 'type="radio"'):
-        assert chosen not in html
-    fix = stored(witnessed).fix_for(ID)
-    assert fix is not None and fix.status is Status.NEEDS_REVIEW
-    assert fix.equation.latex == PROPOSAL  # type: ignore[union-attr]
-
-
-def test_a_difference_in_one_symbol_is_one_button_not_two_of_the_same(witnessed):
-    assert 'data-role="chip"' not in other(card(witnessed))  # 2 -> 3 is the whole reading
-
-
-def test_symbols_that_differ_are_chips_beside_the_whole_button(tmp_path):
-    with case(tmp_path, witness_output("X + y = 3"), feature_page_witness=True) as env:
-        html = other(card(env))
-        chips = re.findall(r'<button[^>]*data-role="chip"[^>]*>.*?</button>', html, re.S)
-        assert [text_of(c) for c in chips] == [
-            "Use capital X in equation 3",
-            "Use 3 in equation 3",
-        ]
-        assert 'name="latex" value="X + y = 2"' in chips[0]
-        assert "the other reading had:" in text_of(html)
-        assert 'name="origin" value="page_witness_choice"' in html
-        assert 'name="origin" value="second_reader_choice"' not in html
-
-
 def test_the_witness_as_proposal_says_the_other_reading_is_the_crops(tmp_path):
     with case(tmp_path, witness_output(source="crop"), feature_page_witness=True) as env:
         text = text_of(other(card(env)))
         assert "Other reading, read from the picture of the formula" in text
         assert "and it is the proposal above" in text
-
-
-def test_a_boundary_difference_is_said(tmp_path):
-    output = witness_output(code="witness_extent_differs")
-    with case(tmp_path, output, feature_page_witness=True) as env:
-        assert "starts and ends differently" in text_of(other(card(env)))
-
-
-def test_nothing_shows_while_the_page_witness_is_off(tmp_path):
-    with case(tmp_path, witness_output(), feature_page_witness=False) as env:
-        body = panel(screen(env, f"?item={ID}"))
-        assert "other-reading" not in body and "The other reading" not in body
-
-
-def test_there_is_no_section_without_another_reading(tmp_path):
-    output = witness_output()
-    fix = next(f for f in output.result.fixes if f.element_id == ID)
-    fix.equation.other_latex = None  # type: ignore[union-attr]
-    with case(tmp_path, output, feature_page_witness=True) as env:
-        assert "other-reading" not in panel(screen(env, f"?item={ID}"))
 
 
 # --------------------------------------------------------------------------- choosing
@@ -245,27 +174,6 @@ def test_a_reading_that_does_not_convert_is_not_offered(tmp_path):
         assert fix is not None and fix.status is Status.NEEDS_REVIEW  # and it is refused anyway
 
 
-def test_the_mark_is_only_for_a_reading_the_card_offered():
-    for latex, marked in (("x + y = 3", True), ("x + y = 4", False)):
-        result = witness_output().result
-        change = apply_review(
-            result, ID, "edit", {"latex": latex, "origin": WITNESS_ORIGIN}, witness=True
-        )
-        assert change.after.get(WITNESS_KEY, False) is marked, latex
-    result = witness_output().result  # no say-so from the form: an ordinary edit
-    change = apply_review(result, ID, "edit", {"latex": "x + y = 3"}, witness=True)
-    assert WITNESS_KEY not in change.after
-    result = witness_output().result  # the page witness off: nothing was offered
-    change = apply_review(result, ID, "edit", {"latex": "x + y = 3", "origin": WITNESS_ORIGIN})
-    assert WITNESS_KEY not in change.after
-
-
-def test_the_other_readings_symbols_are_offered_choices_too():
-    fix = next(f for f in witness_output("X + y = 3").result.fixes if f.element_id == ID)
-    offered = reading_chips.offered_witness_latex(fix)
-    assert offered == {"X + y = 3", "X + y = 2", "x + y = 3"}
-
-
 # --------------------------------------------------------------------------- the pieces
 
 
@@ -283,8 +191,3 @@ def test_other_reading_for_is_none_unless_it_is_open_enabled_and_different():
     decided = fix_with()
     decided.status = Status.ACCEPTED
     assert reading_chips.other_reading_for(decided) is None
-
-
-def test_a_reading_with_too_many_differences_has_a_button_and_no_chips():
-    other = reading_chips.other_reading_for(fix_with(other_latex=r"\frac{a}{b} = \sqrt{c} + d^2"))
-    assert other is not None and other.chips is None

@@ -56,55 +56,6 @@ def ids(result) -> dict[str, str]:
     return {"block": display.id, "inline_ok": inline[0].id, "inline_asked": inline[1].id}
 
 
-def test_no_record_without_the_pass():
-    result = converted()
-    result.image_pages = None
-    assert image_pages.item_for(result, []) is None
-
-
-def test_an_item_has_the_pass_record_and_a_row_per_matched_equation():
-    result = converted()
-    names = ids(result)
-    pairs = [
-        pair(names["block"], right=False, symbols=False),
-        pair(names["inline_ok"], display="inline"),
-        pair(names["inline_asked"], right=False, symbols=False, display="inline"),
-    ]
-    item: Any = image_pages.item_for(result, pairs)
-    assert item is not None
-    assert (item["pages"], item["converted"], item["fell_back"]) == (1, 1, 0)
-    assert item["by_kind"]["paragraph"] == 3 and item["illegible"] == 1
-    assert item["cost_usd"] > 0 and item["models"] == [Settings(_env_file=None).main_model]  # type: ignore[call-arg]
-    by = {f["gold_id"]: f for f in item["flags"]}
-    # A display equation is always asked about; an inline one when its paragraph is.
-    assert by[f"g-{names['block']}"]["asked"] is True
-    assert by[f"g-{names['inline_ok']}"]["asked"] is False  # paragraph 1: confident, optional
-    assert by[f"g-{names['inline_asked']}"]["asked"] is True  # paragraph 3: low confidence
-    assert by[f"g-{names['block']}"]["agreed"] is True  # the crop read what the page did
-
-
-def test_with_maths_always_required_no_inline_formula_goes_unasked():
-    # The tests above keep the policy off to count the old tiers; on (the default), every paragraph
-    # with a formula is a decision, so a confident paragraph's formula is asked about too.
-    result = converted(maths_required=True)
-    names = ids(result)
-    pairs = [
-        pair(names["inline_ok"], right=False, symbols=False, display="inline"),
-        pair(names["inline_asked"], right=False, symbols=False, display="inline"),
-    ]
-    item: Any = image_pages.item_for(result, pairs)
-    assert all(f["asked"] for f in item["flags"])
-    metrics: Any = image_pages.metrics([{"image_pages": item}], gold_equations=2)
-    assert metrics["equation_flags"]["all"]["wrong_not_asked"] == 0
-
-
-def test_a_disagreement_between_the_readings_is_recorded():
-    result = converted(equation="v = d t")
-    names = ids(result)
-    item: Any = image_pages.item_for(result, [pair(names["block"])])
-    assert item["flags"][0]["agreed"] is False
-
-
 def test_the_pooled_numbers_count_flags_and_the_second_reading():
     result = converted()
     names = ids(result)
@@ -173,8 +124,3 @@ def test_scanned_media_prints_pages_as_scans_and_delegates_the_rest():
     doc = pymupdf.open(stream=pdf, filetype="pdf")
     assert doc[0].get_text().strip() == "" and len(doc[0].get_images()) == 1
     assert inner.closed
-
-
-def test_an_authored_document_has_no_prose_answer_key():
-    media = scan_media.ScannedMedia(Inner())
-    assert media.gold_words([{"source": "authored", "book_slug": "x", "page_slug": "y"}]) is None

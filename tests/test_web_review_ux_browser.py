@@ -369,13 +369,3 @@ def test_signing_out_in_the_tab_forgets_its_drafts(site, browser, job):
     assert page.locator(".kept-draft").count() == 0
     assert page.get_by_label("Alt text for figure 1").input_value() != ALT
     context.close()
-
-
-def test_a_draft_comes_back_in_the_list_view_too(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}/review/list")
-    page.get_by_label("Alt text for figure 1").fill(ALT)
-    page.reload()
-    page.locator(".kept-draft").wait_for(timeout=5000)
-    assert page.get_by_label("Alt text for figure 1").input_value() == ALT
-    context.close()

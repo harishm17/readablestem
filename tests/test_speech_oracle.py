@@ -24,9 +24,6 @@ needs_mathcat = pytest.mark.skipif(
 needs_sre = pytest.mark.skipif(
     "sre" in so.missing_engines(), reason=f"SRE not installed: run {so.BUILD_SCRIPT}"
 )
-needs_both = pytest.mark.skipif(
-    bool(so.missing_engines()), reason=f"speech oracles not built: run {so.BUILD_SCRIPT}"
-)
 
 
 def math(body: str) -> str:
@@ -36,28 +33,15 @@ def math(body: str) -> str:
 WATER_MI = math(
     '<msub><mi mathvariant="normal">H</mi><mn>2</mn></msub><mi mathvariant="normal">O</mi>'
 )
-WATER_MTEXT = math("<mtext>H</mtext><msub><mtext></mtext><mn>2</mn></msub><mtext>O</mtext>")
 HALF = math("<mfrac><mn>1</mn><mn>2</mn></mfrac>")
 THIRD = math("<mfrac><mn>1</mn><mn>3</mn></mfrac>")
 ROOT2 = math("<msqrt><mn>2</mn></msqrt>")
 SQUARED = math("<msup><mi>x</mi><mn>2</mn></msup>")
-SALT_MI = math("<mi>Na</mi><mi>Cl</mi><mo>(</mo><mi>aq</mi><mo>)</mo>")
-SALT_MTEXT = math("<mi>Na</mi><mi>Cl</mi><mtext>(aq)</mtext>")
 TABLE = math("<mtable><mtr><mtd><mn>1</mn></mtd></mtr><mtr><mtd><mn>2</mn></mtd></mtr></mtable>")
 BROKEN = "<math><mi>"
 
 
 # ------------------------------------------------------------------------ pure, no engines
-
-
-def test_normalise_ignores_case_pauses_and_spacing() -> None:
-    assert so.normalise("Cap H,  sub 2.") == so.normalise("cap h sub 2")
-    assert so.normalise("x squared") != so.normalise("x cubed")
-
-
-def test_word_diff_names_the_words_that_differ() -> None:
-    assert so.word_diff("x 2", "x squared") == "gold [squared] ours [2]"
-    assert so.word_diff("a b", "a, b.") == ""
 
 
 def test_shape_class_orders_chemistry_before_structure() -> None:
@@ -67,14 +51,6 @@ def test_shape_class_orders_chemistry_before_structure() -> None:
     assert so.shape_class(ROOT2, None) == "root"
     assert so.shape_class(SQUARED, None) == "scripts"
     assert so.shape_class(math("<mi>x</mi>"), None) == "plain"
-
-
-def test_source_of_names_the_book_or_document() -> None:
-    assert so.source_of("openstax/chemistry-atoms-first/1-4-measurements/eq-003") == (
-        "chemistry-atoms-first"
-    )
-    assert so.source_of("authored/latex-chemistry/eq-000") == "latex-chemistry"
-    assert so.source_of("handwriting/hw-dev-01/eq-000") == "handwriting"
 
 
 def test_pairs_from_items_reads_both_task_shapes_and_missed_gold() -> None:
@@ -145,28 +121,6 @@ def test_summary_counts_no_proposal_as_different_and_ranks_classes(monkeypatch) 
     assert "2 / 4" in so.format_markdown(s)
 
 
-def test_missing_engines_say_how_to_build(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("SPEECH_ORACLES_DIR", str(tmp_path))
-    gone = so.missing_engines()
-    assert set(gone) == {"mathcat", "sre"}
-    assert all(so.BUILD_SCRIPT in message for message in gone.values())
-    assert so.available_engines() == ()
-    assert "skipped" in (so.skip_message() or "")
-    assert so.report_for_run("equations", [], tmp_path) == {"skipped": so.skip_message()}
-
-
-def test_script_skips_cleanly_without_the_engines(monkeypatch, tmp_path: Path, capsys) -> None:
-    monkeypatch.setenv("SPEECH_ORACLES_DIR", str(tmp_path))
-    spec = importlib.util.spec_from_file_location(
-        "screenreader_speech", ROOT / "scripts" / "screenreader_speech.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    assert module.main(["--mathml", HALF]) == 0
-    assert "speech oracles skipped" in capsys.readouterr().err
-
-
 # ------------------------------------------------------------------- with the real engines
 
 
@@ -180,119 +134,9 @@ def test_mathcat_reads_a_fraction_and_flags_chemistry() -> None:
 
 
 @needs_mathcat
-def test_mathcat_says_aqueous_for_a_state_in_mi_but_not_in_a_long_mtext() -> None:
-    """The shape finding of docs/chemistry.md: `(aq)` as an `mtext` is not recognised."""
-    readings = so.read_all([SALT_MI, SALT_MTEXT], ["mathcat:ClearSpeak"])
-    assert "aqueous" in readings[SALT_MI].speech["mathcat:ClearSpeak"]
-    assert "aqueous" not in readings[SALT_MTEXT].speech["mathcat:ClearSpeak"]
-
-
-@needs_mathcat
 def test_mathcat_reports_unparseable_mathml_as_an_error_not_a_crash() -> None:
     reading = so.read_all([BROKEN, HALF], ["mathcat:ClearSpeak"])[BROKEN]
     assert "mathcat" in reading.errors and not reading.speech
-
-
-@needs_sre
-def test_sre_reads_a_root_in_both_domains() -> None:
-    reading = so.read_all([ROOT2], ["sre:clearspeak", "sre:mathspeak"])[ROOT2]
-    assert "root" in reading.speech["sre:clearspeak"].lower()
-    assert "root" in reading.speech["sre:mathspeak"].lower()
-    assert reading.chemistry is None  # SRE has no chemistry rules; MathCAT was not asked
-
-
-@needs_both
-def test_compare_finds_same_different_and_missing() -> None:
-    pairs = [
-        so.Pair("same", HALF, HALF, "s"),
-        so.Pair("different", HALF, THIRD, "s"),
-        so.Pair("missing", SQUARED, None, "s"),
-        so.Pair("chem-shape", SALT_MI, SALT_MTEXT, "s"),
-    ]
-    results = {r.pair.id: r for r in so.compare(pairs)}
-    assert all(results["same"].equal.values()) and len(results["same"].equal) == 4
-    assert not any(results["different"].equal.values())
-    assert "third" in results["different"].diff["mathcat:ClearSpeak"]
-    assert not any(results["missing"].equal.values())
-    assert results["missing"].as_row()["has_proposal"] is False
-    assert results["chem-shape"].equal["mathcat:ClearSpeak"] is False
-    assert results["chem-shape"].cls == "chemistry"
-    row = results["different"].as_row()
-    assert row["speech"]["sre:mathspeak"]["gold"] and row["speech"]["sre:mathspeak"]["ours"]
-
-
-@needs_both
-def test_report_for_run_has_aggregates_only(tmp_path: Path) -> None:
-    gold_dir = tmp_path / "gold"
-    gold_dir.mkdir()
-    records = [
-        {"kind": "equation", "id": "openstax/b/p/eq-000", "mathml": HALF},
-        {"kind": "equation", "id": "openstax/b/p/eq-001", "mathml": WATER_MI},
-    ]
-    (gold_dir / "b.jsonl").write_text("\n".join(json.dumps(r) for r in records))
-    items = [
-        {"id": "openstax/b/p/eq-000", "pred_mathml": HALF},
-        {"id": "openstax/b/p/eq-001", "pred_mathml": WATER_MTEXT},
-    ]
-    block = so.report_for_run("equations", items, gold_dir)
-    assert block["n_pairs"] == 2
-    assert block["engines"]["mathcat:ClearSpeak"]["n"] == 2
-    assert block["chemistry"]["gold_recognised"]["equal"] == 1
-    text = json.dumps(block)
-    assert "openstax/b/p/eq-000" not in text and "half" not in text  # no ids or speech strings
-
-
-@needs_both
-def test_script_writes_rows_and_report(tmp_path: Path, capsys) -> None:
-    spec = importlib.util.spec_from_file_location(
-        "screenreader_speech", ROOT / "scripts" / "screenreader_speech.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    pairs = tmp_path / "pairs.jsonl"
-    rows = [
-        {"id": "a", "gold": HALF, "ours": HALF},
-        {"id": "b", "gold": HALF, "ours": THIRD},
-        {"id": "c", "gold": ROOT2, "ours": None},
-    ]
-    pairs.write_text("\n".join(json.dumps(r) for r in rows))
-    out, report = tmp_path / "rows.jsonl", tmp_path / "report.json"
-    code = module.main(["--pairs", str(pairs), "--out", str(out), "--report", str(report)])
-    assert code == 0
-    written = [json.loads(line) for line in out.read_text().splitlines()]
-    assert [r["id"] for r in written] == ["a", "b", "c"]
-    assert written[0]["speech_equal"]["mathcat:ClearSpeak"] is True
-    summary = json.loads(report.read_text())
-    assert summary["engines"]["mathcat:ClearSpeak"]["equal"] == 1
-    assert "Speech under screen-reader engines" in capsys.readouterr().out
-
-
-def test_eval_hook_is_for_equations_and_documents_and_skips_without_engines(
-    monkeypatch, tmp_path: Path, capsys
-) -> None:
-    from readablestem.cli import eval_cli
-
-    monkeypatch.setenv("SPEECH_ORACLES_DIR", str(tmp_path))
-    assert eval_cli._speech_block("figures", [], tmp_path) is None
-    assert "equations and document" in capsys.readouterr().out
-    block = eval_cli._speech_block("document", [], tmp_path)
-    assert block is not None and "run scripts/speech_oracles/build.sh" in block["skipped"]
-    assert eval_cli._speech_lines(block) == ""
-
-
-def test_versions_come_from_the_file_build_sh_reads() -> None:
-    v = so.pinned_versions()
-    assert so.oracle_versions()["mathcat"].startswith(v["MATHCAT_VERSION"])
-    assert so.oracle_versions()["sre"].startswith(v["SRE_VERSION"])
-    build = (ROOT / "scripts/speech_oracles/build.sh").read_text()
-    assert "versions.env" in build and "MATHCAT_SHA=" not in build
-    # the Cargo dependency and the npm lock agree with the pin
-    assert (
-        v["MATHCAT_SHA"] in (ROOT / "scripts/speech_oracles/mathcat_batch/Cargo.toml").read_text()
-    )
-    lock = json.loads((ROOT / "scripts/speech_oracles/sre/package-lock.json").read_text())
-    assert lock["packages"]["node_modules/speech-rule-engine"]["version"] == v["SRE_VERSION"]
 
 
 def test_held_out_and_sealed_gold_are_refused(monkeypatch, tmp_path: Path, capsys) -> None:

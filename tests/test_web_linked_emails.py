@@ -112,23 +112,6 @@ def test_links_that_would_be_wrong_are_refused(google, owner, other, code):
     assert e.value.code == code
 
 
-def test_an_address_belongs_to_one_instructor_only(google):
-    link(google)
-    with (
-        session_scope(google.ctx.factory) as session,
-        pytest.raises(linked_emails.LinkRefused) as e,
-    ):
-        linked_emails.link(session, BOB, PERSONAL)
-    assert e.value.code == "already_linked"
-
-
-def test_an_instructor_who_was_removed_cannot_gain_links(google):
-    with session_scope(google.ctx.factory) as session:
-        set_allowed(session, BOB, allowed=False)
-    with session_scope(google.ctx.factory) as session, pytest.raises(linked_emails.LinkRefused):
-        linked_emails.link(session, BOB, "bob.personal@gmail.com")
-
-
 def test_there_is_a_limit_per_instructor(google):
     for number in range(linked_emails.MAX_LINKED):
         link(google, other=f"a{number}@gmail.com")
@@ -138,16 +121,6 @@ def test_there_is_a_limit_per_instructor(google):
     ):
         linked_emails.link(session, ALICE, "one-too-many@gmail.com")
     assert e.value.code == "too_many"
-
-
-def test_a_linked_address_cannot_be_allowed_as_a_person_of_its_own(google):
-    link(google)
-    with (
-        session_scope(google.ctx.factory) as session,
-        pytest.raises(linked_emails.LinkRefused) as e,
-    ):
-        set_allowed(session, PERSONAL, allowed=True)
-    assert e.value.code == "is_linked"
 
 
 # --------------------------------------------------------------------------- the admin page

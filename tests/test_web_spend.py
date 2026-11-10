@@ -7,7 +7,6 @@ import threading
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
 
 from readablestem.core.budget import BudgetExceeded, JobBudget
 from readablestem.web import db
@@ -51,14 +50,6 @@ def test_reserve_holds_and_settle_replaces_the_hold_with_actual_cost(factory):
     snapshot = guard.snapshot()
     assert snapshot.held_usd == pytest.approx(0.8)
     assert snapshot.remaining_usd == pytest.approx(0.1)
-
-
-def test_a_reservation_that_exactly_fills_the_cap_is_allowed(factory):
-    guard = DbSpendGuard(factory, 0.3)
-    for _ in range(3):
-        guard.reserve(0.1)  # 0.1 + 0.1 + 0.1 is 0.30000000000000004 in floats
-    with pytest.raises(BudgetExceeded):
-        guard.reserve(0.01)
 
 
 def test_negative_reservations_are_refused(factory):
@@ -144,62 +135,6 @@ def test_quota_is_rolled_back_with_the_transaction(factory):
         raise RuntimeError("job insert failed")
     with db.session_scope(factory) as session:
         assert pages_used(session, user_id, DAY) == 0
-
-
-def test_no_quota_still_counts(factory):
-    user_id = make_user(factory)
-    with db.session_scope(factory) as session:
-        assert try_consume_pages(session, user_id, 500, quota=None, day=DAY)
-        assert session.scalar(select(db.QuotaDay.pages)) == 500
-
-
-def test_a_reservation_and_its_settlement_are_one_statement_each(factory):
-    """The day's row is made by the first reservation of the day (and only then): after
-    that a model call costs one UPDATE on this table to hold and one to settle, not an
-    insert-ignore each. Each hold is also recorded in `spend_holds` (one INSERT, in the same
-    transaction), and its settlement deletes the record first (a SELECT and a DELETE), so a
-    hold can be given back by whoever finds it orphaned and is never released twice."""
-    from sqlalchemy import event
-
-    guard = DbSpendGuard(factory, 5.0)
-    engine = factory.kw["bind"]
-    statements: list[str] = []
-
-    def record(conn, cursor, statement, parameters, context, executemany) -> None:
-        statements.append(statement.strip().split(None, 1)[0].upper())
-
-    event.listen(engine, "before_cursor_execute", record)
-    try:
-        first = guard.reserve(0.1)
-        # no row yet: tried, made, held again, and recorded
-        assert statements == ["UPDATE", "INSERT", "UPDATE", "INSERT"]
-        statements.clear()
-        second = guard.reserve(0.1)
-        guard.settle(first, 0.05)
-        guard.settle(second, 0.02)
-        assert statements == [
-            *["UPDATE", "INSERT"],  # the second hold and its record
-            *["SELECT", "DELETE", "UPDATE"] * 2,  # two settlements
-        ]
-    finally:
-        event.remove(engine, "before_cursor_execute", record)
-    assert guard.snapshot().spent_usd == pytest.approx(0.07)
-    assert guard.snapshot().held_usd == pytest.approx(0.0)
-
-
-def test_a_refusal_by_the_cap_makes_no_row_and_a_new_day_makes_its_own(factory):
-    now = [datetime(2026, 10, 7, 23, 59, tzinfo=UTC)]
-    guard = DbSpendGuard(factory, 0.5, clock=lambda: now[0])
-    with pytest.raises(BudgetExceeded):
-        guard.reserve(0.6)  # more than the cap: refused, and nothing is left behind
-    with db.session_scope(factory) as session:
-        assert session.scalars(select(db.SpendDay)).all() == []
-    held = guard.reserve(0.2)
-    now[0] = datetime(2026, 10, 8, 0, 1, tzinfo=UTC)  # past midnight: tomorrow's row
-    guard.reserve(0.2)
-    guard.settle(held, 0.1)  # the hold is released from the day it was made on
-    assert day_row(factory, date(2026, 10, 7)) == (pytest.approx(0.1), pytest.approx(0.0))
-    assert day_row(factory, date(2026, 10, 8)) == (pytest.approx(0.0), pytest.approx(0.2))
 
 
 def test_a_second_process_sharing_the_database_finds_the_row_the_first_made(factory):

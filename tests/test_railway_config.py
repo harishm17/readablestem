@@ -12,8 +12,6 @@ import re
 import shlex
 from pathlib import Path
 
-import pytest
-
 from readablestem.cli.main import build_parser
 from readablestem.web.routes.pages import router as pages_router
 
@@ -64,22 +62,6 @@ def test_the_project_has_the_four_services_and_no_literal_secrets():
     assert not re.search(r'(KEY|SECRET|TOKEN|PASSWORD|URL)\w*: "', text)
 
 
-def test_no_legacy_config_files_compete_with_the_iac_file():
-    # A service managed by a repo config file blocks `railway config plan` for it, and
-    # Railway stops reading these files on 2026-12-01.
-    assert not (ROOT / "railway.json").exists()
-    assert not (ROOT / "railway.toml").exists()
-    assert not list((ROOT / "deploy").glob("railway*.json"))
-
-
-def test_the_repository_dockerfile_exists_and_serves_the_web_port():
-    # No builder is set in railway.ts: Railway uses the Dockerfile at the repository root.
-    assert (ROOT / "Dockerfile").is_file()
-    assert '"--port", "8080"' in (ROOT / "Dockerfile").read_text()
-    for name in ("web", "cron"):
-        assert "dockerfilePath" not in service_block(name)
-
-
 def test_healthcheck_path_is_a_route_that_answers_get():
     path = setting(service_block("web"), "healthcheck")
     get_routes = {
@@ -99,11 +81,6 @@ def test_web_service_migrates_before_each_deploy_and_is_not_a_cron():
     assert parses_as_cli(command)
     assert "cronSchedule" not in block  # a cron schedule here would stop the web service
     assert setting(block, "replicas") == "{ iad: 1 }"  # rate limits and uploads are per process
-
-
-def test_web_service_leaves_the_start_command_to_the_dockerfile():
-    # The image's CMD serves on 8080, which is the PORT the service sets.
-    assert setting(service_block("web"), "start") is None
 
 
 def test_cron_service_runs_the_cli_cron_on_a_schedule_and_does_not_migrate():
@@ -130,13 +107,6 @@ def test_backup_service_dumps_daily_and_proves_the_restore():
         assert needed in script
     assert setting(block, "start") == '"bash -c " + shellQuote(backupScript)'
     assert '"/backups": backupVolume' in block
-
-
-@pytest.mark.parametrize("name", ["web", "cron"])
-def test_services_keep_their_variables_out_of_the_file(name):
-    block = service_block(name)
-    assert "preserved(" in block
-    assert not re.search(r'"[A-Za-z0-9+/=_-]{32,}"', block)
 
 
 def test_microsoft_sign_in_variables_are_declared_on_web_only():

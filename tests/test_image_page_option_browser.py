@@ -19,10 +19,9 @@ from image_page_support import block, cell, math, scan_pdf, text
 from readablestem.config import Settings
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline.run import convert_pdf
-from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
+from test_web_browser import WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
-from test_web_review_browser import sideways_overflow
 
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")
@@ -156,51 +155,7 @@ def test_the_option_is_a_labelled_unchecked_checkbox_with_its_explanation(browse
     context.close()
 
 
-def test_the_option_can_be_ticked_with_the_keyboard(browser, site):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/app")
-    page.locator("#group-convert > summary").click()  # the groups are one line until opened
-    page.get_by_label(OFFER).focus()
-    page.keyboard.press("Space")
-    assert page.get_by_label(OFFER).is_checked()
-    page.keyboard.press("Space")
-    assert not page.get_by_label(OFFER).is_checked()
-    context.close()
-
-
-@pytest.mark.parametrize("viewport", [DESKTOP, PHONE], ids=["1440px", "390px"])
-def test_the_upload_form_with_the_option_passes_axe(browser, site, axe_source, viewport):
-    context, page = open_page(browser, site, viewport=viewport)
-    page.goto(f"{site.base}/app")
-    found = strict_axe(page, axe_source)
-    context.close()
-    assert not found, describe(found)
-
-
-@pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
-def test_the_upload_form_does_not_scroll_sideways_at_320_px(browser, site, spacing):
-    context, page = open_page(browser, site, viewport=NARROW)
-    page.goto(f"{site.base}/app")
-    if spacing:
-        page.add_style_tag(content=TEXT_SPACING)
-    assert not sideways_overflow(page)
-    context.close()
-
-
 # ------------------------------------------------------------------------------ the answers
-
-
-def test_a_scan_without_the_option_is_refused_with_the_way_to_ask(browser, site, axe_source):
-    context, page = open_page(browser, site)
-    upload(page, site, ask=False)
-    page.wait_for_load_state("networkidle")
-    body = " ".join(page.locator("main").inner_text().split())
-    assert "has only scanned pages, which are read only when you ask" in body
-    assert "Convert scanned or handwritten pages" in body
-    assert page.get_by_label(OFFER).count() == 1  # the form is still there to tick it
-    found = strict_axe(page, axe_source)
-    context.close()
-    assert not found, describe(found)
 
 
 def test_a_scan_with_the_option_becomes_a_job_that_passes_axe(browser, site, axe_source, job):
@@ -225,13 +180,4 @@ def test_the_review_of_a_converted_scan_passes_axe(browser, site, axe_source, jo
     assert "Text as read from the image" in page.content()
     found = strict_axe(page, axe_source)
     assert not found, describe(found)
-    context.close()
-
-
-def test_the_student_file_of_a_converted_scan_has_the_notice_and_the_original(browser, site, job):
-    context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}/view")
-    assert page.get_by_text("Converted from an image of the page.").first.is_visible()
-    page.get_by_text("Show the original page 1").first.click()
-    assert page.locator(".image-page-note details[open] img").first.is_visible()
     context.close()

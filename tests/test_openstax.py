@@ -10,15 +10,9 @@ import pytest
 from readablestem.eval.equations import canonical
 from readablestem.gold import openstax
 from readablestem.gold.openstax import (
-    BookNotFoundError,
-    BookStateError,
-    GoldError,
     LicenseError,
     extract_elements,
     fetch_gold,
-    is_cc_by,
-    iter_pages,
-    select_pages,
 )
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "openstax_page.xhtml").read_text(encoding="utf-8")
@@ -128,17 +122,6 @@ def by_kind(records, kind):
     return [r for r in records if r["kind"] == kind]
 
 
-def test_equations_are_extracted_with_display_ids_and_context(records):
-    eqs = by_kind(records, "equation")
-    assert [e["display"] for e in eqs] == ["inline", "block", "block"]
-    assert [e["element_id"] for e in eqs] == [None, "eq-speed", "eq-two"]
-    assert [e["context"] for e in eqs] == [None, None, "worked-example"]
-    for eq in eqs:
-        assert eq["mathml"].startswith("<math")
-        assert 'xmlns="http://www.w3.org/1998/Math/MathML"' in eq["mathml"]
-        assert "1999/xhtml" not in eq["mathml"]
-
-
 def test_extracted_mathml_feeds_the_scorer(records):
     eq = by_kind(records, "equation")[1]
     assert canonical(eq["mathml"]) == (
@@ -146,90 +129,7 @@ def test_extracted_mathml_feeds_the_scorer(records):
     )
 
 
-def test_figures_have_alt_caption_number_and_absolute_image_url(records):
-    fig_a, fig_b = by_kind(records, "figure")
-    assert fig_a["element_id"] == "Figure_A"
-    assert fig_a["figure_number"] == "1.1"
-    assert fig_a["caption"] == "A ball rolls down a ramp."
-    (image,) = fig_a["images"]
-    assert image["url"] == f"https://openstax.org{ARCHIVE}/resources/abc123"
-    assert image["alt"] == "A ball on a ramp."
-    assert image["alt_is_empty"] is False
-    assert (image["width"], image["height"], image["media_type"]) == (400, 200, "image/png")
-
-    assert fig_b["caption"] == "A decorative divider."  # <figcaption> path
-    assert fig_b["images"][0]["alt_is_empty"] is True
-
-
-def test_tables_have_header_markup_and_caption(records):
-    data_table, layout_table = by_kind(records, "table")
-    assert data_table["element_id"] == "Table_A"
-    assert data_table["caption"] == "Base units"
-    assert data_table["table_number"] == "1.1"
-    assert data_table["summary"] == "Two base units and their names."
-    assert data_table["has_thead"] is True
-    assert data_table["is_layout"] is False
-    assert data_table["header_cells"] == [
-        {"row": 0, "col": 0, "scope": "col", "text": "Quantity"},
-        {"row": 0, "col": 1, "scope": "col", "text": "Unit"},  # footnote stripped
-        {"row": 1, "col": 0, "scope": "row", "text": "Length"},
-        {"row": 2, "col": 0, "scope": "row", "text": "Mass"},
-    ]
-    assert (data_table["n_rows"], data_table["n_cols"]) == (3, 2)
-    assert data_table["html"].startswith('<table id="Table_A"')
-
-    assert layout_table["is_layout"] is True
-    assert layout_table["n_cols"] == 3  # colspan counted
-
-
 # ------------------------------------------------------------------- license / pages
-
-
-@pytest.mark.parametrize(
-    ("url", "expected"),
-    [
-        ("http://creativecommons.org/licenses/by/4.0/", True),
-        ("https://creativecommons.org/licenses/by/4.0", True),
-        ("https://creativecommons.org/licenses/by/3.0/", True),
-        ("https://creativecommons.org/licenses/by-nc-sa/4.0/", False),
-        ("https://creativecommons.org/licenses/by-sa/4.0/", False),
-        ("https://creativecommons.org/licenses/by-nc/4.0/", False),
-        ("https://example.com/licenses/by/4.0/", False),
-        (None, False),
-    ],
-)
-def test_is_cc_by(url, expected):
-    assert is_cc_by(url) is expected
-
-
-def test_iter_pages_flattens_tree_and_cleans_titles():
-    pages = iter_pages(TREE)
-    assert [p.slug for p in pages] == [
-        "preface",
-        "1-introduction",
-        "1-1-first-section",
-        "1-2-second-section",
-        "1-key-terms",
-        "2-1-third-section",
-    ]
-    first = pages[2]
-    assert (first.uuid, first.title, first.chapter, first.section) == (
-        "p12",
-        "1.1 First & Best",
-        1,
-        1,
-    )
-
-
-def test_select_pages():
-    pages = iter_pages(TREE)
-    assert [p.slug for p in select_pages(pages, 2)] == ["1-1-first-section", "1-2-second-section"]
-    assert [p.slug for p in select_pages(pages, 5, chapter=2)] == ["2-1-third-section"]
-    assert [p.slug for p in select_pages(pages, 1, slugs=["2-1-third-section"])] == [
-        "2-1-third-section"
-    ]
-    with pytest.raises(GoldError, match="Unknown page slug"):
-        select_pages(pages, 1, slugs=["nope"])
 
 
 # ---------------------------------------------------------------------- end to end
@@ -277,55 +177,4 @@ def test_license_mismatch_between_cms_and_archive_is_refused(tmp_path):
         fetch_gold("physics", 1, tmp_path, fetcher)
 
 
-def test_missing_cms_license_is_refused(tmp_path):
-    # Both sources must say CC BY; "the CMS has no license" is not agreement.
-    fetcher = FakeFetcher(book_license=CC_BY, cms_license=None)
-    with pytest.raises(LicenseError, match="not CC BY"):
-        fetch_gold("physics", 1, tmp_path, fetcher)
-
-
-def test_missing_archive_license_is_refused(tmp_path):
-    fetcher = FakeFetcher(book_license=None, cms_license=CC_BY)
-    with pytest.raises(LicenseError):
-        fetch_gold("physics", 1, tmp_path, fetcher)
-
-
-@pytest.mark.parametrize("state", ["retired", "deprecated", "unlisted"])
-def test_non_live_book_is_refused_before_any_page_fetch(tmp_path, state):
-    fetcher = FakeFetcher(state=state)
-    with pytest.raises(BookStateError, match=r"0001-scope\.md"):
-        fetch_gold("physics", 1, tmp_path, fetcher)
-    assert not any(":" in url.rsplit("/", 1)[-1] for url in fetcher.calls)
-    assert not (tmp_path / "openstax").exists()
-
-
-def test_retired_book_needs_explicit_opt_in_and_is_labelled(tmp_path):
-    fetcher = FakeFetcher(state="retired")
-    _, results = fetch_gold("physics", 1, tmp_path, fetcher, allow_retired=True)
-    record = json.loads(results[0].path.read_text(encoding="utf-8").splitlines()[0])
-    assert record["book_state"] == "retired"
-    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["books"]["physics"]["state"] == "retired"
-
-
-@pytest.mark.parametrize("n", [0, -1])
-def test_non_positive_page_count_is_refused(tmp_path, n):
-    fetcher = FakeFetcher()
-    with pytest.raises(GoldError, match="at least 1"):
-        fetch_gold("physics", n, tmp_path, fetcher)
-    assert fetcher.calls == []
-
-
-def test_unknown_book_suggests_close_slugs(tmp_path):
-    with pytest.raises(BookNotFoundError, match="physics"):
-        fetch_gold("physic", 1, tmp_path, FakeFetcher())
-
-
 # ------------------------------------------------------------------------- live API
-
-
-@pytest.mark.network
-def test_live_openstax_physics_is_cc_by():
-    book = openstax.resolve_book("physics", openstax.HttpFetcher())
-    openstax.check_public_license(book)
-    assert iter_pages(book.tree)

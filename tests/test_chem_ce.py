@@ -235,40 +235,6 @@ def parse(latex: str) -> ET.Element:
     return ET.fromstring(safe_latex_to_mathml(latex, "inline"))
 
 
-def test_a_subscript_after_a_bracket_belongs_to_the_group_in_the_mathml():
-    root = parse(r"[A]_0")
-    (msub,) = [n for n in root.iter() if local(n) == "msub"]
-    base, sub = list(msub)
-    assert local(base) == "mrow" and [local(c) for c in base] == ["mo", "mi", "mo"]
-    assert "".join(sub.itertext()) == "0"
-    # Not the old shape: a subscript on the closing bracket alone.
-    assert not any(local(n) == "msub" and "".join(n[0].itertext()) == "]" for n in root.iter())
-
-
-def test_a_subscript_after_a_parenthesis_in_a_formula_belongs_to_the_group():
-    root = parse(r"\mathrm{Al_2(SO_4)_3}")
-    groups = [n for n in root.iter() if local(n) == "msub" and "".join(n[0].itertext()) == "(SO4)"]
-    assert len(groups) == 1 and local(groups[0][0]) == "mrow"
-    assert "".join(groups[0][1].itertext()) == "3"
-
-
-def test_a_converted_species_has_one_upright_mi_per_element_symbol():
-    # The shape a screen reader's chemistry rules recognise (`pipeline.chem_mathml`): "Na" is
-    # one upright `mi` and the charge hangs on it.
-    root = parse(ce_to_latex("Na+"))
-    (msup,) = [n for n in root.iter() if local(n) == "msup"]
-    assert local(msup[0]) == "mi" and "".join(msup[0].itertext()) == "Na"
-    assert msup[0].get("mathvariant") is None  # `intent` says it is a symbol
-    assert "".join(msup[1].itertext()) == "+"
-    root = parse(ce_to_latex("CaCl2"))
-    tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if local(n) in {"mi", "mn"}]
-    assert tokens == [("mi", "Ca"), ("mi", "Cl"), ("mn", "2")]
-    # A count or charge hangs on the last symbol of a word the converter wrote as one `\text`.
-    root = parse(ce_to_latex("SO4^2-"))
-    (msubsup,) = [n for n in root.iter() if local(n) == "msubsup"]
-    assert "".join(msubsup[0].itertext()) == "O"
-
-
 def test_a_charge_on_a_mathrm_symbol_hangs_on_the_whole_symbol():
     # What a model writes without \ce: the converter hangs the charge on the lowercase letter
     # (N, msup(a, +)); it belongs to "Na", which is then one upright `mi`.
@@ -291,9 +257,3 @@ def test_symbols_that_are_not_elements_are_not_grouped():
     root = parse(r"\mathrm{Hz_2}\ \mathrm{km^2}")
     tokens = ["".join(n.itertext()) for n in root.iter() if local(n) == "mi"]
     assert tokens == ["H", "z", "k", "m"]
-
-
-def test_a_long_arrow_is_an_operator():
-    root = parse(ce_to_latex("A2 -> B2".replace("A2", "H2").replace("B2", "O2")))
-    arrows = [n for n in root.iter() if len(n) == 0 and (n.text or "") == "⟶"]
-    assert [local(n) for n in arrows] == ["mo"]

@@ -25,6 +25,9 @@ is.
   the repository. A test that calls a real model is marked `live_model` and is opt-in; use
   your own key with a spend cap, and never commit a key. OpenAI requests are sent with
   `store=False`; do not change that.
+- **Test behaviour, not code.** CLAUDE.md, "What tests to write here", says which tests
+  earn a place. In short: a bug fix gets one regression test, and copy, markup, constants,
+  private helpers and permutations of the same path do not get tests.
 - **Only inputs that can be published.** Test and example documents must be your own work
   (contributed under MIT) or OpenStax material from books published under CC BY, with
   attribution.

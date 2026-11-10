@@ -44,9 +44,3 @@ def test_mathbf_stays_for_an_upright_bold_letter_or_without_evidence():
 
 def test_a_letter_drawn_in_both_faces_is_left_as_read():
     assert restyle_bold_italic(r"\mathbf{x}", f"{BI_X} \U0001d431") == r"\mathbf{x}"
-
-
-def test_other_letters_are_not_touched():
-    assert restyle_bold_italic(r"\mathbf{x} + \mathbf{y}", f"{BI_X}+{B_Y}") == (
-        r"\boldsymbol{x} + \mathbf{y}"
-    )

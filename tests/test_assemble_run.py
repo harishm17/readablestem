@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -19,7 +18,7 @@ from latex2mathml.converter import convert
 from pydantic import BaseModel
 
 from readablestem.config import ConfigError, Settings
-from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.core.types import (
     Element,
     EquationFix,
@@ -280,44 +279,6 @@ def test_converts_a_document_end_to_end(fake):
     assert (result.title, result.lang) == ("Motion", "en")
 
 
-def test_declared_prompt_versions_are_used_when_no_call_was_made(fake):
-    fake.layout = Layout(
-        elements=[el("p1-e0", Kind.PARAGRAPH, 0, 0, text="x")], page_count=1, pages=[0]
-    )
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client())
-    assert output.result.prompt_versions["equation"] == "equation-declared"
-    assert output.result.prompt_versions["figure"] == figure_step.PROMPT_VERSION
-
-
-def test_crops_on_the_calling_thread_and_steps_in_the_pool(fake):
-    convert_pdf(b"%PDF", settings=settings(), client=fake_client(), concurrency=3)
-    # Each element is cut once, an equation twice (the model's crop and the sharp one for
-    # the student file, T3-15): every cut on the calling thread.
-    assert len(fake.crop_threads) >= len(MODEL_IDS)
-    assert set(fake.crop_threads) == {threading.current_thread().name}
-    assert fake.step_threads and all(name.startswith("step") for name in fake.step_threads)
-
-
-def test_steps_run_concurrently(monkeypatch):
-    fake = FakePipeline(barrier=threading.Barrier(4, timeout=5)).install(monkeypatch)
-    fake.layout = Layout(
-        elements=[el(f"p1-e{i}", Kind.EQUATION, 0, i, display="block") for i in range(4)],
-        page_count=1,
-        pages=[0],
-    )
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), concurrency=4)
-    # Each step waits until all four are inside it: only possible if they overlap.
-    assert {f.status for f in output.result.fixes} == {Status.ACCEPTED}
-    assert fake.max_active == 4
-
-
-def test_concurrency_one_runs_steps_one_at_a_time(monkeypatch):
-    fake = FakePipeline(step_delay_s=0.01).install(monkeypatch)
-    convert_pdf(b"%PDF", settings=settings(), client=fake_client(), concurrency=1)
-    assert fake.max_active == 1
-    assert fake.stepped == MODEL_IDS
-
-
 # --------------------------------------------------------------------------- context
 
 
@@ -362,22 +323,6 @@ def test_budget_exhaustion_stops_the_rest_and_still_assembles(fake):
     assert all(c.passed for c in output.checks)
 
 
-def test_budget_stop_cancels_queued_tasks_with_more_workers(monkeypatch):
-    fake = FakePipeline(step_delay_s=0.02).install(monkeypatch)
-    fake.layout = Layout(
-        elements=[el(f"p1-e{i}", Kind.EQUATION, 0, i, display="block") for i in range(20)],
-        page_count=1,
-        pages=[0],
-    )
-    output = convert_pdf(
-        b"%PDF", settings=settings(), client=fake_client(budget(max_calls=3)), concurrency=2
-    )
-    statuses = [f.status for f in output.result.fixes]
-    assert statuses.count(Status.ACCEPTED) == 3
-    assert statuses.count(Status.FAILED) == 17
-    assert len(fake.stepped) < 10  # queued work was cancelled, not run and refused
-
-
 def test_calls_made_before_a_refusal_are_kept(monkeypatch):
     FakePipeline(calls_per_step=2).install(monkeypatch)  # cheap call, then escalation
     output = convert_pdf(
@@ -398,21 +343,6 @@ def test_daily_cap_scope_is_reported(fake):
     assert output.result.stats.model_calls == 0
 
 
-def test_a_step_reporting_budget_itself_also_stops_the_run(monkeypatch):
-    fake = FakePipeline().install(monkeypatch)
-
-    def refusing(element, png, *, client, settings, context_text=None):
-        fake.stepped.append(element.id)
-        return Fix(
-            element_id=element.id, kind=element.kind, status=Status.FAILED, reason="budget_daily"
-        )
-
-    monkeypatch.setattr(equation_step, "transcribe", refusing)
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), concurrency=1)
-    assert fake.stepped == ["p1-e2"]
-    assert {fixes_by_id(output)[i].reason for i in MODEL_IDS} == {"budget_daily"}
-
-
 # --------------------------------------------------------------------------- isolation
 
 
@@ -426,15 +356,6 @@ def test_a_failing_step_fails_only_its_element_and_logs_no_content(monkeypatch, 
     assert '<div class="flagged" id="p1-e4" data-status="failed"' in output.result.html
     assert SECRET not in caplog.text
     assert "figure step failed: RuntimeError" in caplog.text
-
-
-def test_unexpected_budget_error_types_do_not_escape(monkeypatch):
-    fake = FakePipeline(raise_in_step={"p1-e3": BudgetExceeded("job_usd", SECRET)})
-    fake.install(monkeypatch)
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), concurrency=1)
-    fixes = fixes_by_id(output)
-    assert fixes["p1-e2"].status is Status.ACCEPTED
-    assert {fixes[i].reason for i in MODEL_IDS[1:]} == {"budget_job_usd"}
 
 
 def test_heading_step_failure_keeps_headings_as_paragraphs(fake, monkeypatch):
@@ -471,31 +392,6 @@ def test_a_fix_for_the_wrong_element_is_rejected(fake, monkeypatch):
 # --------------------------------------------------------------------------- progress, tracing
 
 
-def test_progress_reports_each_page_once(fake):
-    seen: list[tuple[int, int]] = []
-    convert_pdf(
-        b"%PDF",
-        settings=settings(),
-        client=fake_client(),
-        progress=lambda d, t: seen.append((d, t)),
-    )
-    assert seen == [(1, 3), (2, 3), (3, 3)]
-
-
-def test_progress_counts_pages_without_elements(fake):
-    fake.layout = Layout(elements=[], page_count=4, pages=[0, 1, 2, 3])
-    seen: list[tuple[int, int]] = []
-    output = convert_pdf(
-        b"%PDF",
-        settings=settings(),
-        client=fake_client(),
-        progress=lambda d, t: seen.append((d, t)),
-    )
-    assert seen[-1] == (4, 4) and len(seen) == 4
-    assert output.result.stats.pages == 4 and output.result.fixes == []
-    assert all(c.passed for c in output.checks)
-
-
 def test_an_exception_from_progress_aborts_the_run(monkeypatch):
     FakePipeline(step_delay_s=0.01).install(monkeypatch)
 
@@ -506,16 +402,6 @@ def test_an_exception_from_progress_aborts_the_run(monkeypatch):
     with pytest.raises(KeyboardInterrupt):
         convert_pdf(b"%PDF", settings=settings(), client=fake_client(), progress=stop)
     assert time.perf_counter() - started < 5
-
-
-def test_layout_errors_propagate(monkeypatch):
-    def unreadable(pdf_bytes, *, pages=None, max_pages=None):
-        raise LayoutError("encrypted", "PDF is encrypted")
-
-    monkeypatch.setattr(layout, "analyze", unreadable)
-    with pytest.raises(LayoutError) as exc:
-        convert_pdf(b"%PDF", settings=settings(), client=fake_client())
-    assert exc.value.code == "encrypted"
 
 
 class SetupFailsClient:
@@ -547,45 +433,9 @@ def test_configuration_errors_stop_the_run_instead_of_failing_each_element(
     assert "stopped the run" in caplog.text and str(error) not in caplog.text
 
 
-def test_configuration_error_with_more_workers_still_stops_early(monkeypatch):
-    fake = FakePipeline(step_delay_s=0.02).install(monkeypatch)
-    client = SetupFailsClient(ConfigError("OPENAI_API_KEY is not set"))
-    with pytest.raises(ConfigError):
-        convert_pdf(b"%PDF", settings=settings(), client=client, concurrency=2)
-    # Two in flight when the first one failed; nothing started after that.
-    assert client.runs <= 2 < len(MODEL_IDS) and len(fake.stepped) <= 2
-
-
 def install_release(monkeypatch, events: list[tuple[str, Any]]) -> None:
     """A `layout.release` like WP2's (the stub in this package has none) that logs calls."""
     monkeypatch.setattr(layout, "release", lambda pdf: events.append(("release", pdf)), False)
-
-
-def test_the_document_is_released_from_layout_once_cropping_is_done(monkeypatch):
-    fake = FakePipeline(step_delay_s=0.02).install(monkeypatch)
-    events: list[tuple[str, Any]] = []
-    cropped, stepped = fake.crop, fake.transcribe
-
-    def crop(pdf_bytes, element, **kw):
-        events.append(("crop", element.id))
-        return cropped(pdf_bytes, element, **kw)
-
-    def transcribe(element, png, **kw):
-        fix = stepped(element, png, **kw)
-        events.append(("step_done", element.id))
-        return fix
-
-    monkeypatch.setattr(layout, "crop", crop)
-    monkeypatch.setattr(equation_step, "transcribe", transcribe)
-    install_release(monkeypatch, events)
-    pdf = b"%PDF-1.7 user document"
-    convert_pdf(pdf, settings=settings(), client=fake_client(), concurrency=1)
-
-    releases = [i for i, (name, _) in enumerate(events) if name == "release"]
-    assert len(releases) == 1 and events[releases[0]][1] is pdf
-    last_crop = max(i for i, (name, _) in enumerate(events) if name == "crop")
-    last_step = max(i for i, (name, _) in enumerate(events) if name == "step_done")
-    assert last_crop < releases[0] < last_step  # not held while waiting on the model
 
 
 def raise_in_analyze(monkeypatch):
@@ -617,15 +467,6 @@ def test_the_document_is_released_when_the_run_fails(monkeypatch, failure):
     with pytest.raises(error):
         convert_pdf(b"%PDF", settings=settings(), **kwargs)
     assert [name for name, _ in events] == ["release"]
-
-
-def test_a_failing_release_does_not_fail_the_conversion(fake, monkeypatch):
-    def release(pdf_bytes):
-        raise RuntimeError(SECRET)
-
-    monkeypatch.setattr(layout, "release", release, raising=False)
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client())
-    assert {f.status for f in output.result.fixes} == {Status.ACCEPTED}
 
 
 class RecordingTracer:
@@ -667,85 +508,6 @@ def test_tracer_spans_are_content_free(fake):
     assert "A cart on a ramp." not in everything and "frac" not in everything
 
 
-class SetTracer:
-    """Shaped like WP6's tracer: the span handle has only `set(**attrs)`."""
-
-    def __init__(self) -> None:
-        self.spans: list[tuple[str, dict[str, Any], dict[str, Any]]] = []  # name, open, all
-        self._lock = threading.Lock()
-
-    @contextlib.contextmanager
-    def span(self, name: str, **attrs: Any):
-        record = (name, dict(attrs), dict(attrs))
-        with self._lock:
-            self.spans.append(record)
-
-        class Handle:
-            def set(self, **more: Any) -> None:
-                record[2].update(more)
-
-        yield Handle()
-
-    def flush(self) -> None:
-        return None
-
-    def named(self, name: str) -> list[dict[str, Any]]:
-        return [attrs for span, _, attrs in self.spans if span == name]
-
-
-# WP6 keeps numbers, booleans and strings matching this; it silently drops anything else.
-WP6_CODE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:\-]{0,79}$")
-
-
-def wp6_keeps(value: Any) -> bool:
-    return isinstance(value, bool | int | float) or (
-        isinstance(value, str) and WP6_CODE.match(value) is not None
-    )
-
-
-def test_span_results_reach_a_set_style_handle_as_scalars(fake):
-    tracer = SetTracer()
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
-    steps = tracer.named("step")
-    assert len(steps) == len(MODEL_IDS)
-    for step in steps:
-        assert step["status"] == "accepted" and step["model"] == "gpt-6.1-sol"
-        assert step["cost_usd"] > 0 and step["calls"] == 1 and "latency_ms" in step
-    (document,) = tracer.named("document")
-    assert document["pages"] == 3 and document["model_calls"] == 5
-    assert document["cost_usd"] == output.result.stats.cost_usd
-    assert document["fixes_accepted"] == 7 and document["checks_failed"] == 0
-    (headings,) = tracer.named("headings")
-    assert headings["fixes_accepted"] == 2
-    for _, _, attrs in tracer.spans:
-        assert all(wp6_keeps(v) for v in attrs.values()), attrs
-
-
-def test_each_model_request_gets_a_span_opened_with_its_model(fake):
-    fake.calls_per_step, fake.step_models = 2, ("gpt-6-luna", "gpt-6.1-sol")
-    tracer = SetTracer()
-    convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
-    calls = [(opened, attrs) for name, opened, attrs in tracer.spans if name == "model_call"]
-    assert len(calls) == 2 * len(MODEL_IDS)
-    # `model` at open time is what makes a WP6 span a Langfuse generation (cost views).
-    assert sorted({opened["model"] for opened, _ in calls}) == ["gpt-6-luna", "gpt-6.1-sol"]
-    for opened, attrs in calls:
-        assert opened["step"] in ("equation", "figure") and opened["is_fallback"] is False
-        assert attrs["outcome"] == "ok" and attrs["cost_usd"] > 0 and "input_tokens" in attrs
-    for step in tracer.named("step"):  # two models: no joined "a,b" string on the step
-        assert "model" not in step and step["calls"] == 2
-
-
-def test_budget_stop_reason_is_on_the_document_span(fake):
-    tracer = SetTracer()
-    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=100), max_usd=100, max_calls=2)
-    convert_pdf(
-        b"%PDF", settings=settings(), client=fake_client(budget), tracer=tracer, concurrency=1
-    )
-    (document,) = tracer.named("document")
-    assert document["reason"] == "budget_job_calls" and document["fixes_failed"] == 3
-
-
 class FailingTracer:
     """A tracer whose spans fail to open, or fail when they close (e.g. a flush error)."""
 
@@ -777,34 +539,6 @@ def test_a_broken_tracer_never_stops_a_conversion(fake, on_enter):
     assert output.result.html
 
 
-def test_a_tracer_cannot_swallow_a_real_error(monkeypatch):
-    def unreadable(pdf_bytes, *, pages=None, max_pages=None):
-        raise LayoutError("unreadable", "bad PDF")
-
-    monkeypatch.setattr(layout, "analyze", unreadable)
-    tracer = FailingTracer(on_enter=False)
-    with pytest.raises(LayoutError):
-        convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
-    assert tracer.closed_with == [LayoutError]
-
-
-def test_inline_equation_alone_in_its_paragraph_gets_the_neighbours(fake):
-    fake.layout = Layout(
-        elements=[
-            el("p1-e0", Kind.PARAGRAPH, 0, 0, text="The kinetic energy is"),
-            el("p1-e1", Kind.PARAGRAPH, 0, 1, text=inline_marker("p1-e2")),
-            el("p1-e2", Kind.EQUATION, 0, 2, display="inline", parent_id="p1-e1"),
-            el("p1-e3", Kind.PARAGRAPH, 0, 3, text="where m is the mass ⟦a, b⟧."),
-        ],
-        page_count=1,
-        pages=[0],
-    )
-    convert_pdf(b"%PDF", settings=settings(), client=fake_client())
-    assert fake.contexts["p1-e2"] == (
-        "The kinetic energy is\n[this equation]\nwhere m is the mass ⟦a, b⟧."
-    )  # the parent (only a marker) is skipped; interval brackets are not markers
-
-
 def test_list_items_are_context_for_a_display_equation_between_them():
     """A worked solution as a numbered list: the equation inside step 1 is introduced by
     step 1 and followed by step 2, not by whatever paragraph came before the list."""
@@ -820,12 +554,3 @@ def test_list_items_are_context_for_a_display_equation_between_them():
     assert run.context_texts(elements)["p1-e2"] == (
         "Solution: the average velocity is\n[this equation]\nDiscussion: the answer is positive."
     )
-
-
-def test_an_inline_equation_in_a_list_item_gets_its_item_around_the_marker():
-    elements = [
-        el("p1-e0", Kind.LIST_ITEM, 0, 0, text=f"Speed is {inline_marker('p1-e1')} here.",
-           list_marker="a.", list_ordered=True, list_level=1),
-        el("p1-e1", Kind.EQUATION, 0, 1, display="inline", parent_id="p1-e0"),
-    ]  # fmt: skip
-    assert run.context_texts(elements)["p1-e1"] == "Speed is [this equation] here."

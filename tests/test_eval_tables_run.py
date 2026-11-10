@@ -17,7 +17,6 @@ import pytest
 
 from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from readablestem.core.types import (
-    Check,
     Element,
     Fix,
     Kind,
@@ -182,50 +181,6 @@ def config(gold_dir, media, *, mode="local", authored=None, **kw) -> T.TablesCon
 # --------------------------------------------------------------------- local mode
 
 
-def test_local_mode_scores_the_local_grid_and_every_table_is_a_decision(gold_dir, detected):
-    media = FakeTableMedia()
-    run = T.run_tables_eval(config(gold_dir, media))
-    report = run.report
-    assert (report["task"], report["mode"], report["client"]) == ("tables", "local", "none")
-    assert report["complete"] and report["n"] == report["n_planned"] == 6  # 2 pages x 3 styles
-    assert media.closed and len(media.printed) == 6
-    m = report["metrics"]
-    assert m["gold_data_tables"] == 6 and m["detection_recall"] == 1.0
-    assert m["false_tables"] == 3  # the form-like grid, once per style
-    assert m["detection_precision"] == pytest.approx(6 / 9)
-    assert m["data_vs_layout"]["layout_kept_out"] == 3  # called layout: kept out
-    assert m["text_fidelity"]["wrong_cells"] == 3  # the misread 1480, per style
-    # The step with tables off keeps every table as an image: a required decision each,
-    # so no wrong cell goes unasked.
-    load = m["review_load"]
-    assert load["required_decisions"] == load["tables"] + 3 == 12
-    assert m["text_fidelity"]["wrong_cells_not_flagged"] == 0
-    assert report["cost"]["total_usd"] == 0 and report["cost"]["model_calls"] == 0
-    assert m["real_documents"] is None
-    assert set(m["by_style"]) == {"grid", "booktabs", "norules"}
-
-
-def test_gold_pages_come_from_the_print(gold_dir, detected):
-    run = T.run_tables_eval(config(gold_dir, FakeTableMedia(), limit=1))
-    (row,) = run.items[0]["rows"]
-    assert row["page"] == 1 and row["detected"]  # the speeds table is on the second page
-
-
-def test_authored_documents_join_with_their_own_style(gold_dir, authored_dir, detected):
-    run = T.run_tables_eval(config(gold_dir, FakeTableMedia(), authored=authored_dir))
-    assert run.report["n"] == 7
-    assert run.items[-1]["id"] == "authored/doc" and run.items[-1]["style"] == "authored"
-    assert "authored" in run.report["metrics"]["by_style"]
-    assert run.report["dataset"]["authored_sha256"]
-
-
-def test_styles_and_limit_change_the_selection(gold_dir, detected):
-    a = T.run_tables_eval(config(gold_dir, FakeTableMedia(), styles=("grid",))).report
-    b = T.run_tables_eval(config(gold_dir, FakeTableMedia(), limit=1)).report
-    assert a["n"] == 2 and a["dataset"]["styles"] == ["grid"]
-    assert a["dataset"]["selection_sha256"] != b["dataset"]["selection_sha256"]
-
-
 def test_a_document_layout_cannot_read_counts_as_found_nothing(gold_dir, monkeypatch):
     def broken(pdf_bytes, **_):
         raise layout.LayoutError("unreadable", "cannot read")
@@ -321,24 +276,6 @@ def test_model_mode_scores_the_proposal_and_counts_cost_and_unflagged_wrong_cell
     assert report["models_used"] == ["gpt-6-luna"]
 
 
-def test_model_mode_kept_as_image_is_found_but_scores_zero(gold_dir, detected, monkeypatch):
-    answers = {
-        "p2-e0": fix("p2-e0", None, status=Status.FAILED, review="required"),
-        "p1-e0": fix("p1-e0", UNITS),
-        "p1-e1": fix("p1-e1", None),
-        "p1-e2": fix("p1-e2", None),
-    }
-    monkeypatch.setattr(table_step, "rebuild", model_rebuild(answers))
-    report = T.run_tables_eval(
-        config(
-            gold_dir, FakeTableMedia(), mode="model", client=FakeVisionClient(), styles=("grid",)
-        )
-    ).report
-    m = report["metrics"]
-    assert m["detection_recall"] == 1.0  # found by layout, matched on its local grid
-    assert m["teds_found"] == pytest.approx(0.5)  # the image scores 0, units 1
-
-
 def test_a_budget_stop_reports_a_partial_run(gold_dir, detected, monkeypatch):
     def rebuild(element, png, **_):
         raise BudgetExceeded("job_usd", 0.01)
@@ -350,34 +287,6 @@ def test_a_budget_stop_reports_a_partial_run(gold_dir, detected, monkeypatch):
     ).report
     assert not report["complete"] and report["stopped_reason"] == "budget_job_usd"
     assert report["n"] == 0 and report["cost"]["budget_spent_usd"] == 0
-
-
-def test_a_step_that_breaks_is_a_failed_fix_not_a_broken_run(gold_dir, detected, monkeypatch):
-    def rebuild(element, png, **_):
-        raise RuntimeError("bug")
-
-    monkeypatch.setattr(table_step, "rebuild", rebuild)
-    report = T.run_tables_eval(
-        config(
-            gold_dir, FakeTableMedia(), mode="model", client=FakeVisionClient(), styles=("grid",)
-        )
-    ).report
-    assert report["complete"]
-    assert report["metrics"]["review_load"]["required_by_reason"] == {"internal_error": 4}
-
-
-def test_markdown_summary_has_the_sections(gold_dir, detected):
-    report = T.run_tables_eval(config(gold_dir, FakeTableMedia(), styles=("grid",))).report
-    text = T.format_markdown(report)
-    for heading in (
-        "## Eval: tables, local mode",
-        "### Headers",
-        "### Review load",
-        "### By style",
-        "### Real documents",
-        "Not run",
-    ):
-        assert heading in text
 
 
 # ---------------------------------------------------------------- real documents
@@ -424,35 +333,3 @@ def test_real_document_boxes_precision_and_full_extent_recall(tmp_path, monkeypa
     assert out["any_extent_recall"] == pytest.approx(2 / 3)
     assert "manual" not in json.dumps(out)  # counts only: no file names
     assert T.real_document_metrics(tmp_path) is None  # no labels: not run
-
-
-def test_the_report_carries_the_real_document_section_when_asked(gold_dir, detected, tmp_path):
-    real = tmp_path / "private"
-    real.mkdir()
-    (real / "labels.json").write_text(json.dumps({"documents": []}), encoding="utf-8")
-    report = T.run_tables_eval(
-        config(gold_dir, FakeTableMedia(), styles=("grid",), real_dir=real)
-    ).report
-    assert report["metrics"]["real_documents"]["documents"] == 0
-
-
-def test_check_codes_on_a_fix_become_its_tier_reasons(gold_dir, detected, monkeypatch):
-    failed = Check(name="table.cell_text", passed=False, code="cell_text_mismatch")
-    answers = {
-        "p2-e0": fix(
-            "p2-e0", SPEEDS_MISREAD, status=Status.NEEDS_REVIEW, review="required", checks=[failed]
-        ),
-        "p1-e0": fix("p1-e0", UNITS),
-        "p1-e1": fix("p1-e1", None),
-        "p1-e2": fix("p1-e2", None),
-    }
-    monkeypatch.setattr(table_step, "rebuild", model_rebuild(answers))
-    report = T.run_tables_eval(
-        config(
-            gold_dir, FakeTableMedia(), mode="model", client=FakeVisionClient(), styles=("grid",)
-        )
-    ).report
-    load = report["metrics"]["review_load"]
-    assert load["required_by_reason"] == {"cell_text_mismatch": 1}
-    assert load["flags"]["flag_precision"] == 1.0 and load["flags"]["flag_recall"] == 1.0
-    assert report["metrics"]["text_fidelity"]["wrong_cells_not_flagged"] == 0

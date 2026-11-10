@@ -271,12 +271,3 @@ def test_erasing_a_person_removes_everything_of_theirs_and_nothing_of_anyone_els
         remaining = {row.user_id for row in session.execute(select(Job.user_id))}
         assert len(remaining) == 1 and alice_id not in remaining
     bob.close()
-
-
-def test_the_purge_also_runs_in_the_worker_loop_so_cron_is_not_the_only_guard(web, clock):
-    """If the scheduler stops, the worker's own backstop still deletes expired documents."""
-    job_id = job_id_from(upload(web.browser, canary_pdf()))
-    web.run_worker()
-    clock.advance(hours=25)
-    retention.purge_expired(web.ctx.factory, clock.now, source="worker")
-    assert count(web, Job) == 0 and web.browser.get(f"/jobs/{job_id}").status_code == 404

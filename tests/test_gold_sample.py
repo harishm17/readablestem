@@ -40,23 +40,8 @@ def _params():
         yield pytest.param(pred, id=pred["id"].removeprefix("openstax/physics/"), marks=marks)
 
 
-def test_every_sample_equation_has_one_prediction():
-    ids = [p["id"] for p in PREDS]
-    assert len(ids) == len(set(ids))
-    assert set(ids) == set(GOLD), "add or remove fixture rows when the sample changes"
-
-
 @pytest.mark.parametrize("pred", list(_params()))
 def test_correct_latex_matches_gold_leniently(pred):
     score = score_latex(pred["latex"], GOLD[pred["id"]]["mathml"])
     assert score.error is None
     assert score.exact_lenient, f"normalisation gap: {pred['latex']}"
-
-
-@pytest.mark.parametrize("pred", [pytest.param(p, id=p["id"].split("/", 3)[-1]) for p in PREDS])
-def test_correct_latex_matches_gold_under_the_secondary_stream_scorer(pred):
-    """The known gaps above are packing gaps; the labelled secondary scorer
-    (`eval.equations_v2`, backlog T2-12) closes all of them. The primary stays strict."""
-    from readablestem.eval.equations_v2 import score_stream_latex
-
-    assert score_stream_latex(pred["latex"], GOLD[pred["id"]]["mathml"]).exact

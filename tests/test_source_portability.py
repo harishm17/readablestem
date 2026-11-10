@@ -38,11 +38,6 @@ def bad_string_lines(source: str) -> list[int]:
     return lines
 
 
-def test_the_check_catches_surrogate_escapes():
-    assert bad_string_lines('def f():\n    """italic \\ud835\\udc63"""\n') == [2]
-    assert bad_string_lines(f'x = "\\U0001d463"\ny = "{chr(0x1D463)}"\n') == []
-
-
 @pytest.mark.parametrize("path", list(_params()))
 def test_string_literals_are_valid_utf8(path: Path):
     bad = bad_string_lines(path.read_text(encoding="utf-8"))

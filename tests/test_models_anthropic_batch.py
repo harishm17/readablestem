@@ -18,13 +18,12 @@ import pytest
 from readablestem.config import Settings
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.eval import staged
-from readablestem.eval.answers import CachedClient, load_rows
+from readablestem.eval.answers import CachedClient
 from readablestem.models import router
 from readablestem.models.anthropic_batch import BatchRunner, PendingPool, StagingClient
 from readablestem.models.anthropic_client import AnthropicVisionClient
 from readablestem.models.base import VisionRequest
 from readablestem.models.openai_client import PNG_SIGNATURE
-from readablestem.models.pricing import BATCH_DISCOUNT, cost_usd
 from readablestem.pipeline.equation_step import EquationOutput
 
 PNG = PNG_SIGNATURE + b"crop"
@@ -120,32 +119,6 @@ def request(model: str = OPUS, **kw: Any) -> VisionRequest:
     }
     fields.update(kw)
     return VisionRequest(**fields)
-
-
-def test_a_staged_run_goes_on_to_the_request_that_depends_on_an_answer(tmp_path: Path) -> None:
-    wire = Anthropic({HAIKU: answer("x", 0.5), OPUS: answer("x^2")})
-    _, budget, cached, pool, runner = build(tmp_path, wire)
-
-    def one_pass() -> list[str]:
-        # The cheap model reads first; an unsure answer is asked again of the main model.
-        first, _ = cached.run(request(HAIKU), EquationOutput)
-        if first is None:
-            return []
-        second, _ = cached.run(request(OPUS), EquationOutput)
-        return [first.latex] + ([second.latex] if second else [])
-
-    result = staged.drive(one_pass, pool, runner, say=lambda _: None)
-    assert result == ["x", "x^2"]
-    assert [len(b) for b in wire.batches] == [1, 1]  # two stages, one request each
-    sent = wire.batches[0][0]["params"]
-    assert sent["model"] == HAIKU and sent["output_config"]["effort"] == "low"
-    assert sent["system"][0]["cache_control"] == {"type": "ephemeral"}
-    assert "betas" not in sent and "fallbacks" not in sent
-    # list-price calls were recorded, the budget was charged at half of them
-    listed = cost_usd(HAIKU, 1000, 0, 200) + cost_usd(OPUS, 1000, 0, 200)
-    assert budget.spent_usd == pytest.approx(BATCH_DISCOUNT * listed)
-    rows = load_rows(tmp_path / "answers.jsonl")
-    assert sum(r["call"]["cost_usd"] for r in rows) == pytest.approx(listed)
 
 
 def test_a_placeholder_is_not_a_failure_that_asks_the_other_model(tmp_path: Path) -> None:

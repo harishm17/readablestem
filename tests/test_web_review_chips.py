@@ -29,7 +29,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import equation_step, reading_alternatives
 from readablestem.web import reading_chips
 from readablestem.web.db import ReviewEdit, session_scope
-from test_web_review_split import panel, screen, section, stored, text_of
+from test_web_review_split import screen, section, stored
 
 ID = "p2-e2"
 
@@ -93,56 +93,6 @@ def pick(env, latex: str):
 # --------------------------------------------------------------------------- the card
 
 
-def test_the_card_offers_the_other_reading_as_a_button_named_for_what_it_means(chipped):
-    body = card(chipped)
-    chips = section(body, '<section class="chips"', "</section>")
-    assert text_of(section(chips, "<h3", "</h3>")) == "A second reading differs"
-    assert "Nothing is chosen for you." in text_of(chips)
-    buttons = re.findall(r"<button[^>]*data-role=\"chip\"[^>]*>.*?</button>", chips, re.S)
-    assert len(buttons) == 1
-    # The visible words say what the choice is; the hidden ones say which item.
-    assert text_of(buttons[0]) == "Use small x in equation 3"
-    assert 'name="latex" value="x + y = 2"' in buttons[0]
-    assert 'type="submit"' in buttons[0]
-    # Where it is, how it is said now, and how the choice would be said aloud.
-    assert "Where the proposal above has <code" in chips and "(said “capital X”)" in chips
-    assert "Then read aloud roughly as: “x plus y equals 2”" in text_of(chips)
-    described = re.search(r'aria-describedby="([^"]+)"', buttons[0]).group(1)  # type: ignore[union-attr]
-    assert f'id="{described}"' in chips
-
-
-def test_nothing_is_chosen_for_the_person(chipped):
-    chips = section(card(chipped), '<section class="chips"', "</section>")
-    for chosen in ("checked", "selected", "aria-pressed", "aria-checked", 'type="radio"'):
-        assert chosen not in chips
-    # showing the card changes nothing in the stored result
-    fix = stored(chipped).fix_for(ID)
-    assert (
-        fix is not None and fix.status is Status.NEEDS_REVIEW and fix.equation.latex == "X + y = 2"
-    )  # type: ignore[union-attr]
-
-
-def test_the_choices_are_their_own_form_so_the_edit_box_is_not_sent_with_them(chipped):
-    body = card(chipped)
-    chips = section(body, '<section class="chips"', "</section>")
-    assert 'class="chips-form"' in chips and 'name="action" value="edit"' in chips
-    assert chips.count("<form") == 1
-    assert body.index('class="chips"') < body.index('class="decide-form')  # choose first
-
-
-def test_there_are_no_chips_without_alternatives(tmp_path):
-    env = WebEnv(tmp_path)
-    env.converter.output = review_output()
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        body = panel(screen(env))
-        assert "chips" not in body and "A second reading differs" not in body
-
-
 # --------------------------------------------------------------------------- choosing
 
 
@@ -173,12 +123,6 @@ def test_a_choice_is_an_ordinary_edit_checked_audited_and_undoable(chipped):
     assert back is not None and back.status is Status.NEEDS_REVIEW
     assert back.equation.latex == "X + y = 2"  # type: ignore[union-attr]
     assert 'class="chips"' in card(chipped)  # the choice is open again
-
-
-def test_a_choice_that_does_not_validate_is_refused_like_a_typed_edit(chipped):
-    pick(chipped, r"x + \frac{")
-    fix = stored(chipped).fix_for(ID)
-    assert fix is not None and fix.status is Status.NEEDS_REVIEW  # nothing was saved
 
 
 # --------------------------------------------------------------------------- the pieces
@@ -228,31 +172,6 @@ def test_chips_only_for_the_reading_they_were_made_for_and_only_while_open():
 def test_the_words_of_a_choice_say_what_it_means(kind, symbol, option, words):
     alt = SymbolAlternative(start=0, end=len(symbol), symbol=symbol, kind=kind, options=[option])
     assert reading_chips.phrase(alt, option) == words
-
-
-def test_three_symbols_of_three_options_are_nine_choices_at_most():
-    reading = ReadingAlternatives(
-        latex="a + b + c",
-        symbols=[
-            SymbolAlternative(start=i, end=i + 1, symbol=s, options=["x", "y", "z"])
-            for i, s in ((0, "a"), (4, "b"), (8, "c"))
-        ],
-    )
-    element, fix = element_and_fix("a + b + c", reading)
-    chips = reading_chips.chips_for(element, fix)
-    assert chips is not None and chips.count == 9
-    assert chips.groups[1].chips[0].latex == "a + x + c"
-
-
-def test_a_chosen_reading_is_recorded_as_a_choice_and_a_typed_one_is_not(chipped):
-    from readablestem.web import record
-    from readablestem.web.review import CHOICE_KEY
-
-    pick(chipped, "x + y = 2")
-    with session_scope(chipped.ctx.factory) as session:
-        [edit] = [e for e in session.scalars(select(ReviewEdit)).all() if e.element_id == ID]
-    assert edit.after.get(CHOICE_KEY) is True
-    assert record.CHOICE_WORDS.startswith("Edited: chose the reading a second reader gave")
 
 
 def test_the_mark_is_only_for_a_reading_the_card_offered():

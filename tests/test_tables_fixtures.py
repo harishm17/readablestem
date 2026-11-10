@@ -84,21 +84,6 @@ def test_latex_tables_are_found_with_their_captions(latex):
     assert "Table 1:" not in other_text(latex) and "Table 6:" not in other_text(latex)
 
 
-def test_a_booktabs_table_of_numbers_is_a_table_not_an_equation(latex):
-    booktabs = found(latex)[0]
-    assert rows(booktabs) == [
-        ["Height (m)", "Time (s)", "g (m/s\u00b2)"],  # the raised 2 kept
-        ["0.50", "0.319", "9.83"],
-        ["0.75", "0.391", "9.81"],
-        ["1.00", "0.452", "9.79"],
-        ["1.25", "0.505", "9.80"],
-        ["1.50", "0.553", "9.81"],
-    ]
-    assert booktabs.table is not None and booktabs.table.header_rows == 1
-    assert "0.319" not in other_text(latex)
-    assert not [e for e in latex.elements if e.kind == Kind.HEADING and "Height" in (e.text or "")]
-
-
 def test_a_ruled_grid_is_read_from_its_drawn_cells(latex):
     ruled = found(latex)[1]
     assert rows(ruled)[0] == ["Score", "Students", "Share"]
@@ -120,32 +105,6 @@ def test_maths_in_cells_keeps_its_symbols_with_their_letters(latex):
     assert {"Momentum", "Kinetic energy", "Power"} <= texts
 
 
-def test_a_blank_worksheet_table_keeps_all_its_rows(latex):
-    blank = found(latex)[5]
-    assert (
-        rows(blank)
-        == [["Trial", "Length (m)", "Ten swings (s)", "Period (s)"]] + [["", "", "", ""]] * 4
-    )
-    assert Kind.FIGURE not in {e.kind for e in latex.elements if e.page == 2}
-
-
-def test_latex_things_that_are_not_tables_stay_as_they_were(latex):
-    assert [e.page for e in found(latex)].count(3) == 0  # prose grid, matrices, align, cases
-    assert {Kind.EQUATION, Kind.PARAGRAPH} <= {e.kind for e in latex.elements if e.page == 3}
-    assert "Displacement" in other_text(latex)  # the grid of prose keeps the paragraph path
-    toc = [e for e in latex.elements if e.page == 0 and e.bbox[1] < 300]
-    assert toc and Kind.TABLE not in {e.kind for e in toc}  # the table of contents
-
-
-def test_an_unruled_table_of_numbers_is_found_by_its_caption_and_its_columns(latex):
-    # No rules, so the layout model proposes nothing; the lines set out in columns, with a
-    # "Table 3" caption under them, are the proposal (docs/tables.md, "Recall on real
-    # documents"). Without the caption a block of numbers is a matrix, not a table.
-    [unruled] = [e for e in found(latex) if "Table 3" in (e.caption or "")]
-    assert rows(unruled)[0] == ["x", "f(x)", "f^′(x)", "Difference"]
-    assert rows(unruled)[-1][0] == "2"
-
-
 # ---------------------------------------------------------------- Word-style
 
 
@@ -158,13 +117,6 @@ def test_word_tables_are_found_with_their_captions(word):
     assert measured.table is not None and measured.table.header_rows == 1
     assert rows(blank)[0] == ["Trial", "Length (m)", "Ten swings (s)", "Period (s)"]
     assert len(rows(blank)) == 6 and all(not any(r) for r in rows(blank)[1:])
-
-
-def test_word_layout_grid_form_line_and_choices_are_not_tables(word):
-    assert len(found(word)) == 2
-    text = other_text(word)
-    for kept in ("Amplitude", "Name:", "2.54 s"):
-        assert kept in text
 
 
 def test_a_detected_table_is_kept_as_an_image_with_a_required_decision():
@@ -250,25 +202,3 @@ def test_flattened_maths_in_the_grid_read_from_the_pdf_never_reaches_the_student
 
 
 # ---------------------------------------------------------------- with the model
-
-
-@pytest.mark.skipif(not MODEL_PRESENT, reason="SLANet-plus model not fetched (make table-model)")
-def test_with_the_model_spans_and_maths_cells_come_out_whole(monkeypatch):
-    monkeypatch.delenv(table_model.MODEL_DIR_ENV)
-    tables.reset_models()
-    release()
-    layout = analyze(LATEX.read_bytes())
-    heat, quantities = found(layout)[3:5]
-    assert heat.table is not None and quantities.table is not None
-    spanning = [c for c in heat.table.cells if c.text == "Specific heat (J/kg K)"]
-    assert spanning and spanning[0].col_span == 2
-    assert quantities.table.cols == 3
-    assert "p = mv⃗" in {c.text for c in quantities.table.cells}
-    assert tables.REASON_SLANET in heat.reasons
-
-
-def test_fixture_files_are_small_and_have_their_sources():
-    for pdf, source in ((LATEX, LATEX.with_suffix(".tex")), (WORD, WORD.with_suffix(".html"))):
-        assert pdf.stat().st_size < 300_000
-        assert source.is_file()
-    assert (WORD.parent / "make_word_pdf.py").is_file()

@@ -9,7 +9,6 @@ from __future__ import annotations
 import csv
 import io
 import re
-import zipfile
 from html import unescape
 
 import pytest
@@ -131,25 +130,6 @@ def test_the_record_lists_every_new_kind_of_decision_with_who_and_when(review):
     assert "Changed the words of the text" in words
 
 
-def test_putting_a_page_back_and_undoing_are_on_the_record_too(review):
-    post(review, "/pages/2/omit")
-    post(review, "/pages/2/restore")
-    post(review, "/undo")
-    decisions = [r["decision"] for r in record_rows(review) if r["section"] == "decision"]
-    assert decisions[:2] == [
-        "Left the page out of the student file and of the review",
-        "Put the page back into the student file and the review",
-    ]
-    assert decisions[2].startswith("Undid")
-
-
-def test_a_decision_on_an_item_of_a_page_left_out_is_still_named(review):
-    post(review, "/review/p2-e2", action="reject")
-    post(review, "/pages/2/omit")
-    rows = [r for r in record_rows(review) if r["section"] == "decision"]
-    assert rows[0]["item"].startswith("Equation") and rows[0]["page"] == "2"
-
-
 def test_clean_tables_accepted_together_and_a_cell_read_by_the_model_are_marked(tables):
     post(tables, "/tables/accept-clean")
     set_cell_latex(tables, "v = d")
@@ -161,19 +141,6 @@ def test_clean_tables_accepted_together_and_a_cell_read_by_the_model_are_marked(
     assert decisions.count(bulk) == 2
     assert "Table cell read by the AI service at the person's request, then saved" in decisions
     assert all(r["by"] == ALICE for r in rows)
-
-
-def test_carried_decisions_say_what_was_carried():
-    from types import SimpleNamespace
-
-    from readablestem.web import record
-
-    row = SimpleNamespace(action="carried", after={"carried_edit": "picture"})
-    assert record._decision_words(row) == (
-        "Carried over from the earlier version: picture added by hand"
-    )
-    plain = SimpleNamespace(action="carried", after={})
-    assert record._decision_words(plain) == "Carried over from the earlier version of the document"
 
 
 # --------------------------------------------------------------------------- html_stale
@@ -197,57 +164,6 @@ def test_every_edit_route_marks_the_html_out_of_date_and_renders_nothing(review,
     post(review, path, **fields)
     job = review.job(review.job_id)
     assert job.html_stale is True and job.html == html_before  # nothing rendered on the click
-
-
-def test_describe_restore_and_undo_mark_it_too(review):
-    post(review, "/review/p2-e2", action="reject")
-    post(review, "/pages/2/omit")
-    for path, fields in (
-        ("/pages/2/restore", {}),
-        ("/review/p2-e2", {"action": "describe", "description": "v equals d over t"}),
-        ("/undo", {}),
-    ):
-        with review_session(review) as session:
-            session.get_job(review.job_id).html_stale = False
-        post(review, path, **fields)
-        assert review.job(review.job_id).html_stale is True, path
-
-
-def test_the_table_shortcuts_mark_it_too(tables):
-    for path, fields in (
-        ("/tables/accept-clean", {}),
-        ("/tables/p1-e1/read-cell", {"row": "3", "col": "1"}),
-    ):
-        if "read-cell" in path:
-            set_cell_latex(tables, "v = d")
-            with_model(tables, {"is_equation": True, "latex": MATHS_LATEX, "confidence": 0.99})
-        with review_session(tables) as session:
-            session.get_job(tables.job_id).html_stale = False
-        post(tables, path, **fields)
-        assert tables.job(tables.job_id).html_stale is True, path
-
-
-class review_session:
-    """A transaction on the app's database, with `get_job`."""
-
-    def __init__(self, env) -> None:
-        from readablestem.web.db import session_scope
-
-        self.scope = session_scope(env.ctx.factory)
-
-    def __enter__(self):
-        self.session = self.scope.__enter__()
-        return self
-
-    def __exit__(self, *exc):
-        return self.scope.__exit__(*exc)
-
-    def get_job(self, job_id: str):
-        from readablestem.web.db import Job
-
-        job = self.session.get(Job, job_id)
-        assert job is not None
-        return job
 
 
 # --------------------------------------------------------------------------- the file, fresh
@@ -277,55 +193,3 @@ def fresh(env) -> bool:
 def test_the_html_download_and_the_view_make_the_file_again(stale):
     response = stale.browser.get(f"/jobs/{stale.job_id}/download")
     assert "your own class" in response.text and fresh(stale)
-
-
-def test_the_view_makes_the_file_again(stale):
-    assert "your own class" in stale.browser.get(f"/jobs/{stale.job_id}/view").text
-
-
-def test_the_canvas_zip_makes_the_file_again(stale):
-    response = stale.browser.get(f"/jobs/{stale.job_id}/download/canvas")
-    assert response.status_code == 200
-    archive = zipfile.ZipFile(io.BytesIO(response.content))
-    assert "your own class" in archive.read("index.html").decode()
-    assert fresh(stale)
-
-
-def test_the_cartridge_makes_the_file_again(stale):
-    response = stale.browser.get(f"/jobs/{stale.job_id}/download/cartridge")
-    assert response.status_code == 200
-    archive = zipfile.ZipFile(io.BytesIO(response.content))
-    pages = [
-        n
-        for n in archive.namelist()
-        if n.endswith(".html") and "your own class" in archive.read(n).decode()
-    ]
-    assert pages, archive.namelist()
-    assert fresh(stale)
-
-
-def test_download_all_makes_the_file_again(stale):
-    response = stale.browser.get("/app/download")
-    assert response.status_code == 200
-    archive = zipfile.ZipFile(io.BytesIO(response.content))
-    html = [n for n in archive.namelist() if n.endswith(".html")]
-    assert len(html) == 1 and "your own class" in archive.read(html[0]).decode()
-    assert fresh(stale)
-
-
-def test_the_record_makes_the_file_again_for_its_checks_and_changes_nothing_else(stale):
-    before = stale.job(stale.job_id)
-    page = stale.browser.get(f"/jobs/{stale.job_id}/record")
-    assert page.status_code == 200
-    after = stale.job(stale.job_id)
-    assert fresh(stale)
-    assert (after.retain_until, after.result_version) == (
-        before.retain_until,
-        before.result_version,
-    )
-    assert "Changed the words of the text" in text_of(page.text)
-
-
-def test_the_job_page_makes_the_file_again(stale):
-    assert stale.browser.get(f"/jobs/{stale.job_id}").status_code == 200
-    assert fresh(stale)

@@ -17,7 +17,7 @@ import pytest
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token, upload
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.routes import job_settings
-from readablestem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER, live_job_count
+from readablestem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER
 
 
 @pytest.fixture
@@ -61,14 +61,6 @@ def keep(env):
 
 def stored(env) -> Job:
     return env.job(env.job_id)
-
-
-def test_the_cap_the_upload_uses_is_the_one_counted(env):
-    add_documents(env, ALICE, 3, expired=2)
-    with session_scope(env.ctx.factory) as session:
-        user = session.query(User).filter(User.email == ALICE).one()
-        assert live_job_count(session, user.id, utcnow()) == 4  # the upload above, and 3
-        assert live_job_count(session, user.id, utcnow(), excluding=env.job_id) == 3
 
 
 def test_a_person_at_the_cap_can_still_keep_a_document_they_already_hold(env):

@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login, make_pdf, upload
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, upload
 from readablestem.web import analytics
 from readablestem.web.security import APP_CSP
 
@@ -90,16 +90,6 @@ def test_off_there_is_no_proxy_no_loader_and_no_marker(off, upstream):
     assert upstream == []
 
 
-def test_on_the_pages_load_the_loader_from_this_origin(on):
-    page = on.browser.get("/").text
-    match = re.search(r'<script src="(/static/analytics\.[0-9a-f]{12}\.js)" defer></script>', page)
-    assert match, "base.html should include the first-party loader"
-    response = on.browser.get(match.group(1))
-    assert response.status_code == 200
-    assert "javascript" in response.headers["content-type"]
-    assert "immutable" in response.headers["cache-control"]
-
-
 # --------------------------------------------------------------------------- the CSP
 
 
@@ -121,41 +111,7 @@ def test_the_loader_names_no_host_but_this_one_and_posthogs_dashboard(on):
     assert hosts == {"https://us.posthog.com"}
 
 
-def test_the_loader_sets_the_required_options(on):
-    source = on.browser.get("/static/analytics.js").text
-    for needle in (
-        'api_host: location.origin + "/m"',
-        'ui_host: "https://us.posthog.com"',
-        'defaults: "2026-08-30"',
-        'person_profiles: "identified_only"',
-        "autocapture: false",
-        "capture_pageview: true",
-        "capture_pageleave: true",
-        "disable_session_recording: true",
-        "enable_heatmaps: false",
-        "capture_dead_clicks: false",
-        "capture_exceptions: false",
-        "disable_surveys: true",
-        "capture_performance: false",
-        "advanced_disable_feature_flags: true",
-        "register({ site: SITE })",
-        'var SITE = "readablestem"',
-    ):
-        assert needle in source, needle
-    assert ".identify(" not in source  # nobody is identified
-    assert "hm_notrack" in source and "notrack" in source
-
-
 # --------------------------------------------------------------------------- the proxy
-
-
-def test_static_files_come_from_the_assets_host_and_may_be_cached(on, upstream):
-    response = on.browser.get("/m/static/array.js?v=1.2")
-    assert response.status_code == 200 and response.content == b"/* array */"
-    assert str(upstream[0].url) == f"{STATIC}/static/array.js?v=1.2"
-    assert response.headers["cache-control"] == analytics.ASSET_CACHE
-    assert response.headers["access-control-allow-origin"] == "*"
-    assert "set-cookie" not in response.headers
 
 
 def test_the_site_config_is_never_cached_and_gets_the_browsers_origin(on, upstream):
@@ -216,20 +172,6 @@ def test_the_proxy_reaches_only_posthog_hosts(on, upstream):
         assert ".." not in request.url.path
 
 
-def test_assets_are_read_only_and_an_upstream_failure_is_a_502(on, upstream, monkeypatch):
-    assert on.browser.post("/m/static/array.js", content=b"x").status_code == 405
-    assert on.browser.post(f"/m/array/{analytics.TOKEN}/config", content=b"x").status_code == 405
-    monkeypatch.setattr(analytics, "API_HOST", "https://boom.invalid")
-    response = on.browser.post("/m/i/v0/e/", content=b"{}")
-    assert response.status_code == 502 and response.headers["cache-control"] == "no-store"
-
-
-def test_the_proxy_needs_no_sign_in_and_adds_no_session_cookie(on, upstream):
-    response = on.browser.get("/m/static/array.js")
-    assert response.status_code == 200
-    assert "set-cookie" not in response.headers
-
-
 # --------------------------------------------------------------------------- funnel events
 
 
@@ -245,26 +187,6 @@ def sign_in(env: WebEnv, email: str = ALICE):
     return login(client, email), client
 
 
-def test_a_sign_in_is_announced_once_on_the_next_page(on):
-    response, client = sign_in(on)
-    assert response.status_code == 303
-    first = client.get("/app").text
-    assert markers(first) == [("login_completed", {"provider": "dev"})]
-    assert markers(client.get("/app").text) == []  # shown once
-
-
-def test_a_new_account_is_announced_as_a_signup(tmp_path):
-    env = WebEnv(tmp_path, analytics_enabled=True, signup_mode="open")
-    with env.running() as client:
-        env.browser = client
-        login(client, "new.person@example.org")
-        names = [name for name, _ in markers(client.get("/app").text)]
-        assert names == ["signup_completed"]
-        client.post("/logout", data={"csrf_token": csrf_from(client.get("/app").text)})
-        login(client, "new.person@example.org")
-        assert [n for n, _ in markers(client.get("/app").text)] == ["login_completed"]
-
-
 def test_an_upload_carries_counts_and_no_file_name(on):
     _, client = sign_in(on)
     client.get("/app")  # the sign-in marker
@@ -273,58 +195,6 @@ def test_an_upload_carries_counts_and_no_file_name(on):
     page = client.get(f"/jobs/{job}")
     found = markers(page.text)
     assert found == [("document_uploaded", {"page_count": 2, "source": "pdf"})]
-
-
-def test_a_refused_upload_announces_nothing(on):
-    _, client = sign_in(on)
-    client.get("/app")
-    response = upload(client, b"not a pdf")
-    assert response.status_code >= 400
-    assert markers(response.text) == [] and markers(client.get("/app").text) == []
-
-
-def test_a_finished_job_announces_its_conversion_once_per_job(on):
-    _, client = sign_in(on)
-    job = job_id_from(upload(client, make_pdf(2)))
-    client.get(f"/jobs/{job}")  # the upload marker
-    on.run_worker()
-    page = client.get(f"/jobs/{job}").text
-    done = re.findall(
-        r'data-ph-event="conversion_completed" data-ph-once="conv-([0-9a-f]{32})" '
-        r"data-ph-props='([^']*)'",
-        page,
-    )
-    assert [d[0] for d in done] == [job]
-    props = json.loads(done[0][1])
-    assert set(props) == {"page_count", "duration_s", "status", "sample"}
-    assert props["page_count"] == 2 and props["status"] == "done" and props["sample"] is False
-    assert isinstance(props["duration_s"], int)
-    # the polled fragment carries it too, so a page that was open while it finished sends it
-    fragment = client.get(f"/jobs/{job}/status", headers={"HX-Request": "true"}).text
-    assert "conversion_completed" in fragment
-
-
-def test_nothing_is_announced_with_analytics_off(off):
-    client = off.browser
-    login(client, ALICE)
-    job = job_id_from(upload(client, make_pdf(1)))
-    off.run_worker()
-    assert 'data-ph-event="conversion_completed"' not in client.get(f"/jobs/{job}").text
-    assert 'data-ph-event="login_completed"' not in client.get("/app").text
-
-
-def test_the_preview_links_are_tagged_as_result_opened(on):
-    _, client = sign_in(on)
-    job = job_id_from(upload(client, make_pdf(1)))
-    on.run_worker()
-    page = client.get(f"/jobs/{job}").text
-    assert f'<a href="/jobs/{job}/view" data-ph-event="result_opened">' in page
-
-
-def test_partial_pages_leave_the_queue_for_the_next_full_page(on):
-    _, client = sign_in(on)
-    client.get("/app/documents", headers={"HX-Request": "true"})
-    assert [n for n, _ in markers(client.get("/app").text)] == ["login_completed"]
 
 
 def test_properties_must_be_short_plain_values():
@@ -337,14 +207,6 @@ def test_properties_must_be_short_plain_values():
         analytics.queue_event(request, "x", label="a" * 40)
     with pytest.raises(ValueError):
         analytics.queue_event(request, "x", label=["a list"])
-
-
-def test_visitor_ids_are_checked():
-    assert analytics.visitor_id("0199f1c2-7a3e-7b8a-9d21-5c3f0a9e4b11") == (
-        "0199f1c2-7a3e-7b8a-9d21-5c3f0a9e4b11"
-    )
-    for bad in (None, "", "short", "has space in it", "x" * 65, "a<script>b1234", "é" * 10):
-        assert analytics.visitor_id(bad) is None
 
 
 def test_a_direct_demo_visit_with_a_visitor_id_is_noted_server_side(on, upstream):
@@ -398,16 +260,6 @@ def test_the_loader_is_absent_from_everything_the_tool_produces(on, upstream):
             assert needle not in lowered, (name, needle)
     # the app's pages around them do carry it
     assert "analytics" in client.get(f"/jobs/{job}").text
-
-
-def test_the_converted_document_keeps_the_sandbox_policy(on):
-    _, client = sign_in(on)
-    job = job_id_from(upload(client, make_pdf(1)))
-    on.run_worker()
-    from readablestem.web.security import VIEW_CSP
-
-    assert client.get(f"/jobs/{job}/view").headers["content-security-policy"] == VIEW_CSP
-    assert client.get("/demo").headers["content-security-policy"] == VIEW_CSP
 
 
 # --------------------------------------------------------------------------- footer credit

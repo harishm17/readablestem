@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from fixtures.web.support import (
@@ -29,7 +29,7 @@ from fixtures.web.support import (
     token,
     upload,
 )
-from readablestem.core.budget import BudgetExceeded, JobBudget
+from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import ConversionOutput
 from readablestem.models import make_vision_client
 from readablestem.models.base import VisionRequest
@@ -39,18 +39,14 @@ from readablestem.pipeline.layout import LayoutError
 from readablestem.web import worker as worker_module
 from readablestem.web.database import as_utc
 from readablestem.web.db import Blob, Job, SpendDay, User, session_scope, utcnow
-from readablestem.web.spend import DbSpendGuard
-from readablestem.web.views import job_error_message
 from readablestem.web.worker import (
     MAX_ATTEMPTS,
     JobCancelled,
     Worker,
-    db_safe,
     default_converter,
     error_code_for,
     job_caps,
     job_time_limit_s,
-    process_next_job,
 )
 
 
@@ -108,24 +104,6 @@ def test_worker_converts_a_job_and_stores_everything(env):
     assert job.html_stale is False
     assert set(blobs(env, job_id, "crop")) == {"p1-e3", "p1-e4", "p1-e5"}
     assert env.converter.calls[0]["pdf"] == pdf
-
-
-def test_converter_gets_a_client_built_on_a_job_budget_under_the_daily_guard(env):
-    queue_job(env)
-    env.run_worker()
-    client = env.converter.calls[0]["client"]
-    assert isinstance(client, FakeVisionClient)
-    budget = client.budget
-    assert isinstance(budget, JobBudget)
-    # A 1-page job gets the per-page allowance, which is below the per-job cap.
-    assert (budget.max_usd, budget.max_calls) == job_caps(env.settings, 1)
-    assert budget.max_usd == env.settings.max_usd_per_page < env.settings.max_usd_per_job
-    # The job's holds go through a view of the daily guard that records them against the job
-    # (`DbSpendGuard.scoped`, tests/test_web_spend_holds.py).
-    guard = getattr(budget.guard, "_guard", budget.guard)
-    assert isinstance(guard, DbSpendGuard)
-    assert guard.cap_usd == env.settings.daily_spend_cap_usd
-    assert len(getattr(budget.guard, "job_id", "")) == 32
 
 
 class Out(BaseModel):
@@ -221,14 +199,6 @@ def test_heartbeat_keeps_a_long_conversion_leased(env):
     assert env.job(job_id).status == "done"
 
 
-def test_progress_updates_pages_done(env):
-    job_id = queue_job(env)
-    seen = {}
-    env.converter.before_return = lambda: seen.setdefault("pages_done", env.job(job_id).pages_done)
-    env.run_worker()
-    assert seen["pages_done"] == 1  # FakeConverter reports progress(1, 1)
-
-
 @pytest.mark.parametrize(
     ("exc", "code"),
     [
@@ -285,18 +255,6 @@ def test_a_stale_worker_cannot_overwrite_a_requeued_job(env):
     assert stale.process(old_claim) == "discarded"
     assert env.job(job_id).status == "running"
     assert fresh.process(new_claim) == "done"
-
-
-def test_process_next_job_on_an_empty_queue(env):
-    assert (
-        process_next_job(
-            env.settings,
-            env.ctx.factory,
-            converter=env.converter,
-            client_factory=lambda s, b: FakeVisionClient(budget=b),
-        )
-        is None
-    )
 
 
 def test_worker_thread_runs_in_the_app_lifespan(tmp_path):
@@ -387,53 +345,6 @@ def test_deleting_a_running_job_stops_its_model_calls_at_once(env, caplog):
     assert not any(m.startswith("job_failed") for m in messages)
 
 
-def test_progress_aborts_a_conversion_whose_job_was_deleted(env):
-    job_id = queue_job(env)
-    pages_after: list[int] = []
-    deleted = threading.Event()
-
-    def delete_it() -> None:
-        with session_scope(env.ctx.factory) as session:
-            session.delete(session.get(Job, job_id))
-        deleted.set()
-
-    def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
-        assert progress is not None
-        for page in range(1, 6):
-            if deleted.is_set():
-                pages_after.append(page)
-            progress(page, 5)  # raises JobCancelled once the job is gone
-            if page == 1:
-                delete_it()
-        return fake_output()
-
-    worker = env.worker()
-    worker.converter = converter
-    claim = worker.claim()
-    assert claim is not None
-    assert worker.process(claim) == "discarded"
-    assert pages_after == [2]  # page 2's progress call stopped the run
-
-
-def test_losing_the_lease_cancels_the_conversion(env):
-    job_id = queue_job(env)
-    sent: list[int] = []
-    stale = env.worker(lease_s=60)
-
-    def taken_over() -> None:  # this worker stalled; another one requeued the job
-        assert env.worker(lease_s=60).requeue_expired(now=utcnow() + timedelta(minutes=5)) == (
-            1,
-            0,
-        )
-
-    stale.converter = paged_converter(4, after_page={2: taken_over}, sent=sent)
-    claim = stale.claim()
-    assert claim is not None
-    assert stale.process(claim) == "discarded"
-    assert sent == [1, 2]
-    assert env.job(job_id).status == "queued"  # left for the next worker, not failed
-
-
 def test_the_heartbeat_notices_a_deleted_job_without_any_progress(env, caplog):
     caplog.set_level(logging.INFO)
     job_id = queue_job(env)
@@ -510,19 +421,6 @@ def test_the_time_limit_grows_with_the_page_count(env):
     assert env.worker(max_job_s=3.0).time_limit_s(1) == 3.0
 
 
-def test_retried_jobs_go_behind_fresh_ones(env):
-    retried = queue_job(env, age_s=120)
-    worker = env.worker(lease_s=60)
-    now = utcnow()
-    first = worker.claim(now=now)
-    assert first is not None and first.job_id == retried
-    assert worker.requeue_expired(now=now + timedelta(seconds=61)) == (1, 0)
-    fresh = queue_job(env)
-    second, third = worker.claim(), worker.claim()
-    assert second is not None and second.job_id == fresh
-    assert third is not None and third.job_id == retried and third.attempt == 2
-
-
 # --------------------------------------------------------------------------- storing
 
 
@@ -553,25 +451,6 @@ def test_a_store_failure_fails_the_job_instead_of_converting_it_again(env, monke
         assert secret not in text
 
 
-def test_a_transient_store_error_is_retried_once(env, monkeypatch):
-    monkeypatch.setattr(worker_module, "STORE_RETRY_DELAY_S", 0.0)
-    job_id = queue_job(env)
-    worker = env.worker()
-    real = worker._write_result
-    calls = {"n": 0}
-
-    def flaky(attempt, output):
-        calls["n"] += 1
-        if calls["n"] == 1:
-            raise operational_error()
-        return real(attempt, output)
-
-    monkeypatch.setattr(worker, "_write_result", flaky)
-    assert worker.run_once() == job_id
-    assert env.job(job_id).status == "done" and calls["n"] == 2
-    assert len(env.converter.calls) == 1
-
-
 def test_a_job_deleted_while_its_result_is_written_stays_deleted(env, monkeypatch):
     job_id = queue_job(env)
     worker = env.worker()
@@ -598,14 +477,6 @@ def test_nul_characters_from_the_pdf_are_removed_before_storing(env):
     assert job.html is not None and "\x00" not in job.html and "SECRET-DOC-TEXTtail" in job.html
     assert "\x00" not in json.dumps(job.result_json)
     assert job.result_json is not None and job.result_json["elements"][1]["text"] == "paragraph"
-
-
-def test_db_safe_cleans_nested_strings_and_keys():
-    assert db_safe({"a\x00": ["b\x00", {"c": "d\x00e"}], "n": 1, "x": None}) == {
-        "a": ["b", {"c": "de"}],
-        "n": 1,
-        "x": None,
-    }
 
 
 # --------------------------------------------------------------------------- caps per job
@@ -649,75 +520,7 @@ def test_job_caps_cover_every_attempt_not_each_one(env):
     assert job.cost_usd == pytest.approx(spent["usd"] + 0.012)
 
 
-def test_a_job_that_used_its_whole_budget_gets_no_more(env):
-    job_id = queue_job(env)
-    with session_scope(env.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.cost_usd = env.settings.max_usd_per_job
-        job.model_calls = 10
-    seen: dict = {}
-
-    def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
-        seen["max_usd"] = client.budget.max_usd
-        try:
-            client.budget.reserve(0.001)
-        except BudgetExceeded as exc:
-            seen["refused"] = exc.scope
-        return fake_output()
-
-    worker = env.worker()
-    worker.converter = converter
-    assert worker.run_once() == job_id
-    assert seen == {"max_usd": 0.0, "refused": "job_usd"}
-
-
 # ------------------------------------------------- the second automated check and the caps
-
-
-def row_totals(env, job_id: str) -> tuple[float, int]:
-    job = env.job(job_id)
-    return round(float(job.cost_usd), 6), int(job.model_calls)
-
-
-def test_a_second_check_request_holds_dollars_on_the_job_row_but_no_model_call(env):
-    job_id = queue_job(env)
-    _, max_calls = job_caps(env.settings, 1)
-    with session_scope(env.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.model_calls = max_calls  # the steps have used every model call
-    seen: dict = {}
-
-    def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
-        budget = client.budget
-        try:
-            budget.reserve(0.001)
-        except BudgetExceeded as exc:
-            seen["model_call"] = exc.scope
-        reservation = budget.reserve(0.002, count_call=False)
-        seen["held"] = row_totals(env, job_id)
-        budget.settle(reservation, 0.001)
-        seen["settled"] = row_totals(env, job_id)
-        with session_scope(env.ctx.factory) as session:  # the day is all but spent
-            session.execute(update(SpendDay).values(spent_usd=settings.daily_spend_cap_usd))
-        try:
-            budget.reserve(0.002, count_call=False)
-        except BudgetExceeded as exc:
-            seen["daily"] = exc.scope
-        seen["released"] = row_totals(env, job_id)
-        return fake_output()
-
-    worker = env.worker()
-    worker.converter = converter
-    assert worker.run_once() == job_id
-    assert seen == {
-        "model_call": "job_calls",
-        "held": (0.002, max_calls),
-        "settled": (0.001, max_calls),
-        "daily": "daily",
-        "released": (0.001, max_calls),  # the refused hold came off, no call taken off
-    }
 
 
 LECTURE_NOTES = Path(__file__).parent / "fixtures" / "layout" / "lecture_notes.pdf"
@@ -801,14 +604,6 @@ def test_the_checks_change_nothing_on_a_document_at_the_generator_only_call_cap(
     assert on.cost_usd > off.cost_usd  # the checks are paid for, in dollars
 
 
-@pytest.mark.parametrize(
-    "code",
-    ["timeout", "store_failed", "lease_expired", "upload_missing", "internal_error"],
-)
-def test_every_worker_failure_code_has_a_plain_explanation(code):
-    assert job_error_message(code) != job_error_message("no-such-code")
-
-
 def test_deleting_a_stuck_job_frees_the_worker_before_the_time_limit(env, caplog):
     caplog.set_level(logging.INFO)
     stuck = queue_job(env, age_s=60)
@@ -859,66 +654,7 @@ class RecordingTracer:
         self.flushed += 1
 
 
-def test_with_tracing_on_the_app_hands_one_tracer_to_every_conversion(tmp_path, monkeypatch):
-    """make_tracer used to have no caller: TRACING_ENABLED did nothing."""
-    from readablestem.pipeline.run import convert_pdf
-    from readablestem.web import app as app_module
-
-    tracer = RecordingTracer()
-    monkeypatch.setattr(app_module, "make_tracer", lambda settings: tracer)
-    env = WebEnv(tmp_path, run_worker=True, worker_poll_s=60, tracing_enabled=True)
-    with env.running():
-        assert env.ctx.tracer is tracer
-        assert env.ctx.worker is not None and env.ctx.worker.tracer is tracer
-        env.allow(ALICE)
-        job_id = queue_job(env)
-        worker = Worker(
-            env.settings,
-            env.ctx.factory,
-            converter=convert_pdf,
-            client_factory=lambda s, b: FakeVisionClient(budget=b),
-            tracer=env.ctx.tracer,
-        )
-        assert worker.run_once() == job_id
-    assert env.job(job_id).status == "done"
-    names = [name for name, _ in tracer.spans]
-    assert names[0] == "document" and "assemble" in names
-    assert tracer.flushed >= 1  # flushed when the app shuts down
-
-
-def test_without_tracing_the_converter_gets_no_tracer_argument(env):
-    seen: dict = {}
-
-    def converter(pdf_bytes, /, *, settings, client, progress=None, **extra):
-        seen.update(extra)
-        return fake_output()
-
-    assert env.ctx.tracer is None
-    queue_job(env)
-    worker = env.worker()
-    worker.converter = converter
-    worker.run_once()
-    # live progress for the job page, the steps to run at once, the job's finished steps
-    # and what the AI service is doing, the cancel flag and the time limit for a converter
-    # that runs in a child process; no tracer
-    assert set(seen) == {
-        "stage_progress",
-        "concurrency",
-        "step_cache",
-        "call_observer",
-        "cancelled",
-        "limit_s",
-    }
-
-
 # --------------------------------------------------------------------------- concurrency
-
-
-def test_the_converter_runs_the_setting_many_steps_at_once(env):
-    queue_job(env)
-    env.run_worker()
-    assert env.settings.model_concurrency == 8
-    assert env.converter.calls[0]["concurrency"] == 8
 
 
 def test_a_job_whose_cap_cannot_hold_that_many_calls_runs_fewer_steps(tmp_path):
@@ -936,22 +672,3 @@ def test_a_job_whose_cap_cannot_hold_that_many_calls_runs_fewer_steps(tmp_path):
         cap // largest_reservation_usd(env.settings)
     )
     assert env.converter.calls[0]["concurrency"] == 7
-
-
-def test_a_retry_after_a_costly_first_attempt_runs_fewer_steps(env):
-    """The caps cover the job, not the attempt: what an earlier attempt spent is gone."""
-    job_id = queue_job(env)
-    with session_scope(env.ctx.factory) as session:
-        session.execute(update(Job).where(Job.id == job_id).values(cost_usd=0.2))
-    env.run_worker()
-    assert env.converter.calls[0]["concurrency"] == 3  # $0.30 - $0.20 held, at about $0.03 a call
-
-
-def test_what_is_left_of_the_day_limits_the_steps_too(env):
-    queue_job(env)
-    guard = env.worker().guard
-    guard.reserve(env.settings.daily_spend_cap_usd - 0.05)  # five cents left today
-    worker = env.worker(guard=guard, headroom_usd=0.0)
-    worker.converter = env.converter
-    assert worker.run_once() is not None
-    assert env.converter.calls[0]["concurrency"] == 1

@@ -44,21 +44,6 @@ ELEMENTS = [
 ]
 
 
-def test_a_captioned_ruled_grid_of_prose_is_a_table_but_not_without_its_caption():
-    # A term and its description set out in a ruled box is layout (`is_layout_grid`) unless
-    # the document calls it a table: "Table 2: Elements of an object" over the same grid.
-    def captioned(page):
-        write(page, 100, 120, "Table 2: Elements of an object")
-        grid_table(page, ELEMENTS, x0=40, y0=130, widths=[100.0, 430.0], height=18)
-
-    def bare(page):
-        grid_table(page, ELEMENTS, x0=40, y0=130, widths=[100.0, 430.0], height=18)
-
-    found = data_tables(pdf(captioned, width=612))
-    assert [e.caption for e in found] == ["Table 2: Elements of an object"]
-    assert data_tables(pdf(bare)) == []
-
-
 # ------------------------------------------------- the real-document set, table by table
 
 
@@ -94,7 +79,6 @@ MISSED = [
     ("2409.08224.pdf", 6),  # the same, justified text with narrow gutters
     ("2505.03022.pdf", 24),  # a table typeset sideways on an upright page
 ]
-FOUND = [("2401.00649.pdf", 3), ("2409.08224.pdf", 9), ("2407.13734.pdf", 1)]
 
 
 @pytest.mark.parametrize(("file", "page"), MISSED)
@@ -116,13 +100,6 @@ def test_the_notation_lists_with_words_in_them_and_the_ones_of_relations_are_all
     assert result["true"] == result["predicted"] == 4, result
 
 
-@pytest.mark.parametrize(("file", "page"), FOUND)
-def test_the_real_tables_it_found_are_still_found(file, page):
-    result = scored(file, page)
-    assert result["full"] == result["labelled"] > 0, result
-    assert result["true"] == result["predicted"], result
-
-
 # ------------------------------------------- text set in columns, with no rules and no proposal
 
 
@@ -141,39 +118,6 @@ NOTATION = [
     ("#E", "cardinality of the set E"),
     ("N(m, s2)", "real Gaussian law with mean m and variance s2"),
 ]
-
-
-def notation_list(page, *, y0=200.0, pitch=17.0, x0=90.0, x1=170.0, rows=NOTATION):
-    for k, (left, right) in enumerate(rows):
-        write(page, x0, y0 + k * pitch, left)
-        write(page, x1, y0 + k * pitch, right)
-
-
-def test_an_unruled_list_of_symbols_and_their_meanings_is_a_table():
-    # The notation list of a set of lecture notes: a `tabular` with no rules, which the
-    # layout model never proposes (it looks for ruled, shaded or header-marked grids).
-    def fill(page):
-        write(page, 72, 150, "We list here the notation we use through the lecture notes:")
-        notation_list(page)
-        write(page, 72, 330, "A paragraph follows, set across the whole width of the page.")
-
-    found = data_tables(pdf(fill))
-    assert len(found) == 1
-    assert rows_of(found[0])[0] == ["e.g.", "for example (exempli gratia)"]
-    assert len(rows_of(found[0])) == len(NOTATION)
-    box = found[0].bbox
-    assert box[1] < 192 and box[3] > 270 and box[3] < 300  # the list, not its paragraphs
-
-
-def test_a_wrapped_line_of_the_second_column_stays_in_its_row():
-    rows = [*NOTATION[:3], ("", "in particular this is a Poisson variable"), *NOTATION[3:]]
-
-    def fill(page):
-        notation_list(page, rows=rows, pitch=15.0)
-
-    found = data_tables(pdf(fill))
-    assert len(found) == 1 and len(rows_of(found[0])) == len(rows) - 1
-    assert rows_of(found[0])[2][1] == "infinitely often in particular this is a Poisson variable"
 
 
 COLUMN_PROSE = (
@@ -286,20 +230,6 @@ def test_a_few_sideways_labels_do_not_turn_a_page():
 # ------------------------------------------------- a numbered reaction above a table
 
 
-def test_a_numbered_reaction_above_a_table_is_not_part_of_it():
-    # OpenStax sets "2NO + Cl2 -> 2NOCl   17.39" on the line above the data of a rate-law
-    # table, and the layout model boxes the two together; the reaction (an equation) is not
-    # a row.
-    def fill(page):
-        write(page, 150, 135, "2NO(g) + Cl2(g) = 2NOCl(g)")
-        write(page, 500, 135, "17.39")
-        grid_table(page, PENDULUM, y0=150)
-
-    [found] = data_tables(pdf(fill))
-    assert found.bbox[1] > 140, found.bbox
-    assert "2NOCl" not in {c.text for c in found.table.cells}
-
-
 def test_the_box_is_cut_below_a_numbered_equation_at_its_top_or_bottom():
     from test_tables_detect import view_of
 
@@ -316,58 +246,3 @@ def test_the_box_is_cut_below_a_numbered_equation_at_its_top_or_bottom():
 
 
 # ------------------------------------- captions in Roman numerals, and a caption's word for it
-
-ROMAN_CAPTIONS = [
-    "TABLE I. Final objectives, organized by category.",
-    "TABLE IV: Example evidentiary arguments for item 4.1",
-    "Table II. Experiment descriptions",
-    "TABLE XII. Aggregate student demographics",
-    "TABLE III Energetics of the cycle",
-]
-
-
-@pytest.mark.parametrize("text", ROMAN_CAPTIONS)
-def test_a_caption_in_roman_numerals_is_a_table_caption(text):
-    assert tables.TABLE_CAPTION.match(text)
-
-
-@pytest.mark.parametrize(
-    "text",
-    ["Table I shows that the model fits", "Table of contents", "Table in the appendix lists"],
-)
-def test_prose_that_starts_with_the_word_is_not_a_caption(text):
-    assert not tables.TABLE_CAPTION.match(text)
-
-
-def ruled_paragraphs(page, caption: bool):
-    # Rules above and below (and under a header line) round cells of wrapped text whose
-    # columns cannot be told apart from the glyphs alone: the justified padding is narrower
-    # than a word's space.
-    if caption:
-        write(page, 72, 100, "TABLE II. Experiment descriptions")
-    for y in (110, 128, 330):
-        page.draw_line((72, y), (540, y), width=0.8)
-    write(page, 76, 124, "Experiment descriptions and what the students are asked to do")
-    import textwrap
-
-    text = (
-        "A cart is released from rest to roll down a ramp. Students are asked to determine "
-        "the acceleration of the cart and to identify the source of the greatest uncertainty "
-        "in their measurement before they compare it with the value the model predicts."
-    )
-    for k, line in enumerate(textwrap.wrap(text, 62)):
-        write(page, 76, 146 + 14 * k, line)
-
-
-def test_a_ruled_box_under_a_table_caption_is_a_table_without_columns_to_see():
-    # The detector's box (a stand-in here: the whole ruled box) under "TABLE II.": a table.
-    # The same box with no caption has no columns to see, so it is not.
-    from test_tables_detect import proposal, view_of
-
-    box = (72.0, 110.0, 540.0, 330.0)
-    judged = {}
-    for caption in (True, False):
-        view = view_of(pdf(lambda p, c=caption: ruled_paragraphs(p, c)))
-        judged[caption] = tables.judge(proposal(box), view)
-    assert judged[True].verdict == tables.TABLE and tables.REASON_RULED in judged[True].reasons
-    assert judged[False].verdict == "no_grid"

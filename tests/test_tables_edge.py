@@ -18,9 +18,7 @@ from readablestem.core.types import ConversionOptions, Kind, Status
 from readablestem.pipeline import options, tables
 from readablestem.pipeline.layout import analyze
 from test_steps_table import (
-    CAPTION,
     FREE_FALL,
-    answer,
     by_model,
     codes,
     element,
@@ -59,30 +57,6 @@ def test_a_line_of_the_tables_size_right_under_it_in_a_column_is_flagged():
     assert tables.REASON_EDGE_TEXT in table.reasons
 
 
-def test_the_wrapped_last_line_of_a_cell_left_out_of_the_box_is_flagged():
-    # The box ends a line early: the row's second line starts where the first column does.
-    table = table_of(under("Celsius", gap=1.0, x=195.0))
-    assert tables.REASON_EDGE_TEXT in table.reasons
-
-
-@pytest.mark.parametrize(
-    "fill",
-    [
-        # an ordinary paragraph a line's gap and more below
-        under("The values agree within one per cent.", gap=26.0, x=72.0),
-        # a heading below (another size), even close
-        under("Results", gap=2.0, size=16.0),
-        # a paragraph that follows the table closely, from the first column's left edge across
-        under("Read the procedure before the lab session and record every measurement.", gap=3.0),
-        # text under it that starts nowhere a column starts
-        under("a note", gap=2.0, x=330.0),
-    ],
-    ids=["paragraph", "heading", "close-paragraph", "off-column"],
-)
-def test_text_that_is_not_a_cut_line_is_not_flagged(fill):
-    assert tables.REASON_EDGE_TEXT not in table_of(fill).reasons
-
-
 def test_a_clean_table_with_a_caption_above_and_text_after_is_not_flagged():
     def fill(page: pymupdf.Page) -> None:
         write(page, 72, 100, "The measurements are in the table below.")
@@ -93,25 +67,6 @@ def test_a_clean_table_with_a_caption_above_and_text_after_is_not_flagged():
     table = table_of(fill)
     assert table.caption == "Table 1. Pendulum measurements"
     assert tables.REASON_EDGE_TEXT not in table.reasons
-
-
-def test_a_caption_under_the_table_is_its_caption_not_edge_text():
-    def fill(page: pymupdf.Page) -> None:
-        write(page, 72, 100, "The measurements are in the table below.")
-        box = grid_table(page, ROWS, y0=130)
-        write(page, 100, box[3] + 12, "Table 2: Record your data here.")
-
-    table = table_of(fill)
-    assert table.caption == "Table 2: Record your data here."
-    assert tables.REASON_EDGE_TEXT not in table.reasons
-
-
-def test_a_title_above_the_table_is_not_flagged():
-    def fill(page: pymupdf.Page) -> None:
-        box = grid_table(page, ROWS, y0=150)
-        write(page, 105, box[1] - 4, "Quantities measured")
-
-    assert tables.REASON_EDGE_TEXT not in table_of(fill).reasons
 
 
 # ------------------------------------------------------------------------- the step
@@ -132,18 +87,3 @@ def test_the_step_asks_a_person_when_text_was_left_at_the_edge(_tables_on):
     assert fix.table is not None  # the proposal is kept for the person to compare
     # a second reading cannot see what the crop does not show: no escalation
     assert [r.model for r in client.requests] == [client.requests[0].model]
-
-
-def test_the_same_table_without_the_reason_is_accepted(_tables_on):
-    fix = run(by_model(cheap=free_fall()), element(local(FREE_FALL)))
-    assert (fix.status, fix.review) == (Status.ACCEPTED, "none")
-    assert "table.edge_text" not in [c.name for c in fix.checks]
-
-
-def test_the_check_is_named_in_the_checks_of_a_flagged_table(_tables_on):
-    target = element(local(FREE_FALL), caption=CAPTION).model_copy(
-        update={"reasons": [tables.REASON_EDGE_TEXT]}
-    )
-    fix = run(by_model(cheap=free_fall()), target)
-    assert [c.name for c in fix.checks if not c.passed] == ["table.edge_text"]
-    assert answer(FREE_FALL) is not None

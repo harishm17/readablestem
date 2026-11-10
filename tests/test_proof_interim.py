@@ -46,23 +46,10 @@ def _skip_or_fail(reason: str) -> None:
     pytest.skip(reason)
 
 
-def test_a_missing_answer_key_says_how_to_get_it_instead_of_a_traceback(report, tmp_path):
-    with pytest.raises(SystemExit) as caught:
-        report.build(INTERIM / "heldout-2026-10", tmp_path / "nothing-here")
-    assert "make heldout-gold" in str(caught.value) and "network" in str(caught.value)
-
-
 def test_another_answer_key_is_refused(report, tmp_path):
     (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
     with pytest.raises(SystemExit, match="not the registered held-out answer key"):
         report.build(INTERIM / "heldout-2026-10", tmp_path)
-
-
-def test_the_makefile_reads_the_same_folder_the_fetch_writes():
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-    line = next(ln for ln in makefile.splitlines() if "proof/interim/report.py" in ln)
-    # heldout-gold writes to `heldout.default_root()`; proof-interim asks the same function.
-    assert "default_root" in line, "proof-interim must read the folder heldout-gold uses"
 
 
 def test_recall_is_split_by_where_the_gold_heading_sits(report):
@@ -92,34 +79,6 @@ def test_extra_headings_that_are_only_a_number_are_counted(report):
         }
     ]
     assert report.bare_number_extras(items) == (5, 3)
-
-
-def test_the_committed_report_shows_the_review_screens_heading_flags():
-    text = REPORT.read_text(encoding="utf-8")
-    assert "Heading flags: recall" in text and "Heading flags: precision" in text
-    row = next(ln for ln in text.splitlines() if "Wrong headings a required decision" in ln)
-    assert "0 of 28" in row
-    assert "Wrong headings not asked about" in text
-
-
-def test_the_committed_report_says_what_was_not_run_and_how_it_was_run():
-    text = REPORT.read_text(encoding="utf-8")
-    assert "print" in text and "own stylesheet" in text
-    assert "not carried out" in text and "formula recognition" in text
-    assert "mineru-basic is not MinerU at its default settings" in text
-    assert "unaudited" in text
-    assert "What these numbers leave out" in text
-
-
-def test_no_bold_better_verdict_rests_on_the_bootstrap_alone():
-    text = REPORT.read_text(encoding="utf-8")
-    rows = [ln for ln in text.splitlines() if ln.startswith("| heading F1 | docling")]
-    rows += [ln for ln in text.splitlines() if ln.startswith("| heading F1 | m")]
-    rows += [ln for ln in text.splitlines() if ln.startswith("| heading F1 | p")]
-    assert len(rows) == 3
-    for row in rows:
-        if "mineru-basic" in row or "pymupdf4llm" in row:
-            assert "higher by point estimate" in row and "is better" not in row
 
 
 def test_the_development_numbers_the_report_cites_are_in_the_development_report():

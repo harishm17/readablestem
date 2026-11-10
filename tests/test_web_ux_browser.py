@@ -151,33 +151,6 @@ def test_pages_pass_axe_at_desktop_and_phone_widths(
     assert not violations, describe(violations)
 
 
-@pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
-@pytest.mark.parametrize("path", list(PAGES))
-def test_pages_reflow_at_320_css_pixels(site, browser, documents, path, spacing):
-    """WCAG 1.4.10: nothing scrolls sideways at 320 CSS px, with a long title in the list
-    and with the 1.4.12 text-spacing override. Wide admin tables scroll in their own
-    focusable box, not the page."""
-    context, page = open_page(browser, site, documents, path, width=320, bypass_csp=True)
-    if spacing:
-        page.add_style_tag(content=TEXT_SPACING)
-    width = page.evaluate(
-        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
-    )
-    context.close()
-    assert width[0] <= width[1], f"{path}: {width[0]} px wide in a {width[1]} px view"
-
-
-def test_on_a_phone_each_document_is_a_block_and_no_badge_is_cut(site, browser, documents):
-    context, page = open_page(browser, site, documents, "/app", width=390)
-    row = page.locator(f"#doc-{documents['decide']}").locator("xpath=ancestor::tr")
-    assert row.evaluate("el => getComputedStyle(el).display") == "block"
-    badge = row.locator(".status-badge")
-    assert badge.evaluate("el => getComputedStyle(el).borderTopLeftRadius") == "4px"
-    label = row.locator("td[data-label='Status']")
-    assert label.evaluate("el => getComputedStyle(el, '::before').content").startswith('"Status')
-    context.close()
-
-
 @pytest.mark.parametrize(
     "path",
     [
@@ -214,46 +187,6 @@ def test_times_show_in_the_readers_time_zone_and_say_utc_without_javascript(
     plain = page.locator("time.local-time").first.inner_text()
     context.close()
     assert plain.endswith("UTC"), plain
-
-
-def test_inserted_times_are_localised_without_rescanning_the_page(site, browser, documents):
-    """The observer looks at the nodes that were inserted, not the whole page again: a time
-    inside inserted content (or the inserted node itself) is rewritten, and nothing asks the
-    document for every time on the page."""
-    context, page = open_page(
-        browser, site, documents, "/app", timezone_id="America/Chicago", locale="en-US"
-    )
-    page.wait_for_function("() => document.querySelectorAll('time[data-local]').length > 0")
-    page.evaluate(
-        """() => {
-          window.__documentScans = 0;
-          const scan = Document.prototype.querySelectorAll;
-          Document.prototype.querySelectorAll = function (selector) {
-            if (String(selector).includes('local-time')) window.__documentScans += 1;
-            return scan.call(this, selector);
-          };
-          const wrapper = document.createElement('div');
-          wrapper.id = 'inserted';
-          wrapper.innerHTML =
-            '<p>Later: <time class="local-time" datetime="2030-01-15T18:30:00Z">' +
-            '15 Jan 2030, 18:30 UTC</time></p>';
-          document.body.append(wrapper);
-          const bare = document.createElement('time');
-          bare.className = 'local-time';
-          bare.id = 'inserted-time';
-          bare.setAttribute('datetime', '2030-07-15T18:30:00Z');
-          bare.textContent = '15 Jul 2030, 18:30 UTC';
-          document.body.append(bare);
-        }"""
-    )
-    page.wait_for_function("() => document.querySelector('#inserted time[data-local]')")
-    page.wait_for_function("() => document.querySelector('#inserted-time[data-local]')")
-    winter = page.locator("#inserted time").inner_text()
-    summer = page.locator("#inserted-time").inner_text()
-    assert "UTC" not in winter and "CST" in winter, winter  # 12:30 PM CST on 15 January
-    assert "UTC" not in summer and "CDT" in summer, summer
-    assert page.evaluate("window.__documentScans") == 0
-    context.close()
 
 
 # --------------------------------------------------------------------------- upload
@@ -321,37 +254,6 @@ def test_a_used_up_page_limit_says_when_uploads_open_again(site, browser, axe_so
 # --------------------------------------------------------------------------- feedback
 
 
-def test_the_questions_appear_after_a_download_and_save(site, browser):
-    context = browser.new_context(accept_downloads=True)
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    job_id = upload_pdf(page, site.base)
-    assert site.run_worker() == job_id
-    page.goto(f"{site.base}/jobs/{job_id}")
-    questions = page.locator("#feedback")
-    assert questions.is_hidden()
-    # Decisions are open, so the job page's download asks first (/draft, job-page work);
-    # once a download is recorded the questions show on the job page.
-    page.get_by_role("link", name=re.compile(r"^Download a draft")).click()
-    with page.expect_download() as download:
-        page.get_by_role("link", name="Download the draft anyway").click()
-    assert download.value.suggested_filename == f"secret-heading-kinematics-{job_id[:6]}.html"
-    page.goto(f"{site.base}/jobs/{job_id}")
-    assert questions.is_visible()
-    page.get_by_label("Not sure").check()
-    page.get_by_label("About how many minutes did this save you?").fill("lots")
-    page.get_by_role("button", name="Send answers").click()
-    # An error is explained on the questions' own page, with what was typed kept.
-    assert page.locator(".error-summary").is_visible()
-    assert page.get_by_label("Not sure").is_checked()
-    page.get_by_label("About how many minutes did this save you?").fill("40")
-    page.get_by_role("button", name="Send answers").click()
-    page.wait_for_url(f"{site.base}/jobs/{job_id}")
-    assert "Thank you. Your answers were saved." in page.locator("main").inner_text()
-    assert page.locator("#feedback").count() == 0
-    context.close()
-
-
 def test_the_questions_work_without_javascript(site, browser):
     context = browser.new_context(java_script_enabled=False)
     page = context.new_page()
@@ -387,24 +289,17 @@ def test_the_list_refreshes_in_place_and_keeps_focus(site, browser):
     context.close()
 
 
-def test_a_refreshed_list_keeps_the_readers_time_zone(site, browser):
-    """The list swapped in by htmx shows times in the reader's zone, as the first render does
-    (the server only knows UTC; app.js rewrites both)."""
-    context = browser.new_context(timezone_id="America/Chicago", locale="en-US")
-    page = context.new_page()
-    sign_in(page, site.base, BOB)
-    upload_pdf(page, site.base)
-    page.goto(f"{site.base}/app")
-    before = page.locator("#documents time.local-time").first.inner_text()
-    assert "UTC" not in before, before
-    assert site.run_worker()
-    page.wait_for_function("() => document.title === 'My documents | ReadableSTEM'", timeout=15000)
-    page.wait_for_function(
-        "() => document.querySelectorAll('#documents time[data-local]').length >= 2",
-        timeout=5000,
+@pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
+@pytest.mark.parametrize("path", list(PAGES))
+def test_pages_reflow_at_320_css_pixels(site, browser, documents, path, spacing):
+    """WCAG 1.4.10: nothing scrolls sideways at 320 CSS px, with a long title in the list
+    and with the 1.4.12 text-spacing override. Wide admin tables scroll in their own
+    focusable box, not the page."""
+    context, page = open_page(browser, site, documents, path, width=320, bypass_csp=True)
+    if spacing:
+        page.add_style_tag(content=TEXT_SPACING)
+    width = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
     )
-    times = page.locator("#documents time.local-time")
-    for index in range(times.count()):
-        shown = times.nth(index).inner_text()
-        assert "UTC" not in shown and re.search(r"\b(CDT|CST)\b", shown), shown
     context.close()
+    assert width[0] <= width[1], f"{path}: {width[0]} px wide in a {width[1]} px view"

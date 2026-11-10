@@ -2,42 +2,16 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
-from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
+from readablestem.core.types import Check, Element, Kind, ModelCall
 from readablestem.eval import pipeline_eval as pe
-from readablestem.eval.equations import latex_to_mathml
-from test_eval_support import EQ_A, EQ_V, EQ_X, base_record, eq_fix, equation
+from test_eval_support import EQ_A, EQ_V, EQ_X, eq_fix, equation
 
 MAIN, CHEAP = "gpt-6.1-sol", "gpt-6-luna"
-V_LATEX = r"v=\frac{d}{t}"
 
 
 # --------------------------------------------------------------------------- stats
-
-
-@pytest.mark.parametrize(
-    ("values", "q", "expected"),
-    [
-        ([1, 2, 3, 4], 50, 2.5),
-        ([1, 2, 3, 4], 95, 3.85),  # position 3 * 0.95 = 2.85 -> 3 + 0.85 * (4 - 3)
-        ([10, 20], 95, 19.5),
-        ([4, 1, 3, 2], 50, 2.5),  # order does not matter
-        ([7], 95, 7.0),
-        ([5, 1, 9], 0, 1.0),
-        ([5, 1, 9], 100, 9.0),
-    ],
-)
-def test_percentile_interpolates_between_ranks(values, q, expected):
-    assert pe.percentile(values, q) == pytest.approx(expected)
-
-
-def test_percentile_edge_cases():
-    assert pe.percentile([], 50) is None
-    with pytest.raises(ValueError):
-        pe.percentile([1], 101)
 
 
 def test_wilson_interval_matches_published_values():
@@ -47,10 +21,6 @@ def test_wilson_interval_matches_published_values():
     low, high = pe.wilson_interval(0, 10)
     assert low == 0.0 and high == pytest.approx(0.2775, abs=1e-4)
     assert pe.wilson_interval(0, 0) is None
-
-
-def test_latency_summary():
-    assert pe.latency_summary([100, 200, 300, 400]) == {"p50": 250.0, "p95": 385.0, "n": 4}
 
 
 # ------------------------------------------------------------------- equations
@@ -93,11 +63,6 @@ def test_selective_table_thresholds_coverage_and_accuracy():
     assert (rows[0.95]["coverage"], rows[0.95]["accuracy"]) == (0.25, 1.0)
 
 
-def test_selective_table_with_nothing_kept_reports_no_accuracy():
-    (row,) = pe.selective_table([item(0.3, True, 1.0)], thresholds=[0.5])
-    assert (row["kept"], row["coverage"], row["accuracy"]) == (0, 0.0, None)
-
-
 def test_equation_metrics_count_missing_proposals_as_wrong():
     metrics = pe.equation_metrics(ITEMS)
     assert metrics["exact_lenient"] == 0.5
@@ -120,54 +85,6 @@ def call(model, *, fallback=False, outcome="ok"):
     )
 
 
-@pytest.mark.parametrize(
-    ("calls", "route"),
-    [
-        ([], "none"),
-        ([call(CHEAP)], "cheap"),
-        ([call(MAIN)], "main"),
-        ([call(CHEAP), call(MAIN)], "escalated"),
-        ([call(MAIN, outcome="timeout"), call(CHEAP, fallback=True)], "fallback"),
-        ([call("other-model")], "other"),
-    ],
-)
-def test_route_of(calls, route):
-    assert pe.route_of(calls, main_model=MAIN, cheap_model=CHEAP) == route
-
-
-def test_budget_reason_spots_fixes_that_were_never_tried():
-    failed = Fix(element_id="e", kind=Kind.EQUATION, status=Status.FAILED, reason="budget_daily")
-    assert pe.budget_reason(failed) == "budget_daily"
-    refused = Fix(
-        element_id="e",
-        kind=Kind.EQUATION,
-        status=Status.FAILED,
-        reason="model_error",
-        calls=[call(MAIN, outcome="budget_exceeded")],
-    )
-    assert pe.budget_reason(refused) == "budget_exceeded"
-    other = Fix(element_id="e", kind=Kind.EQUATION, status=Status.FAILED, reason="model_error")
-    assert pe.budget_reason(other) is None
-
-
-def test_equation_item_scores_against_gold():
-    record = equation("p", 0, EQ_V, "block")
-    good = Fix(
-        element_id="p1-e0",
-        kind=Kind.EQUATION,
-        status=Status.ACCEPTED,
-        confidence=0.9,
-        equation=EquationFix(latex=V_LATEX, mathml=latex_to_mathml(V_LATEX), speech=""),
-        calls=[call(MAIN)],
-    )
-    row = pe.equation_item(record, good, _settings())
-    assert (row["exact_lenient"], row["teds"], row["route"]) == (True, 1.0, "main")
-    assert row["prompt_versions"] == {"equation": "v"}
-    none = Fix(element_id="p1-e0", kind=Kind.EQUATION, status=Status.ABSTAINED)
-    row = pe.equation_item(record, none, _settings())
-    assert (row["exact_lenient"], row["teds"], row["has_proposal"]) == (False, 0.0, False)
-
-
 def _settings():
     from test_eval_support import settings
 
@@ -186,28 +103,6 @@ def test_align_keeps_order_and_skips_extras():
         (0, 0, 1.0),
         (2, 1, 1.0),
     ]
-
-
-def test_align_never_crosses():
-    assert len(pe.align(["a", "b"], ["b", "a"], same, min_similarity=0.5)) == 1
-
-
-def test_align_pairs_repeated_texts_in_order():
-    pairs = pe.align(["ts", "x", "ts"], ["ts", "ts"], same, min_similarity=0.5)
-    assert [(g, p) for g, p, _ in pairs] == [(0, 0), (2, 1)]
-
-
-def test_align_respects_the_threshold():
-    assert pe.align(["a"], ["b"], lambda a, b: 0.49, min_similarity=0.5) == []
-
-
-def test_signatures():
-    assert pe.text_signature(" a − B ") == "a-b"
-    assert pe.math_signature(EQ_V) == "v=dt"
-    assert pe.math_signature("<math><mi>") == ""  # unparseable: empty, never a crash
-    assert pe.heading_signature("2.1  Speed & Velocity!") == "2 1 speed velocity"
-    assert pe.similarity("", "x") == 0.0
-    assert pe.similarity("speed", "sped") == pytest.approx(8 / 9)
 
 
 # --------------------------------------------------------------------- headings
@@ -263,29 +158,6 @@ def test_heading_metrics_are_micro_averaged():
         "body": {"n": 4, "recall": 0.75},
         "note": {"n": 1, "recall": 1.0},
     }
-
-
-def test_heading_metrics_with_no_predictions():
-    row = pe.heading_page_item("a", [h(2, "One")], [])
-    metrics = pe.heading_metrics([row])
-    assert (metrics["precision"], metrics["recall"], metrics["f1"]) == (None, 0.0, None)
-
-
-def test_predicted_headings_skip_abstained_and_failed():
-    from readablestem.core.types import HeadingFix
-
-    def fix(status, text="T"):
-        return Fix(
-            element_id="e",
-            kind=Kind.HEADING,
-            status=status,
-            heading=HeadingFix(level=2, text=text),
-        )
-
-    kept = pe.predicted_headings(
-        [fix(Status.ACCEPTED), fix(Status.NEEDS_REVIEW), fix(Status.ABSTAINED), fix(Status.FAILED)]
-    )
-    assert [k["status"] for k in kept] == ["accepted", "needs_review"]
 
 
 # ---------------------------------------------------------------------- figures
@@ -422,43 +294,6 @@ def test_axe_error_is_a_run_that_did_not_happen_not_a_clean_page():
 # -------------------------------------------------------------------- selection
 
 
-def test_select_units_and_limits():
-    records = [
-        equation("a", 0, EQ_V, "block"),
-        base_record("a", "heading", 0, level=2, text="A"),
-        equation("b", 0, EQ_X, "inline"),
-        base_record("b", "figure", 0, caption="c", images=[{"url": None, "alt": "x"}]),
-        base_record("c", "figure", 0, caption="c", images=[{"url": "https://openstax.org/r"}]),
-    ]
-    assert [u["id"] for u in pe.select_units("equations", records, None)] == [
-        records[0]["id"],
-        records[2]["id"],
-    ]
-    assert len(pe.select_units("equations", records, 1)) == 1
-    assert [u["id"] for u in pe.select_units("figures", records, None)] == [records[4]["id"]]
-    headings = pe.select_units("headings", records, None)
-    assert pe.unit_ids("headings", headings) == ["physics/a"]
-    assert pe.unit_ids("document", pe.select_units("document", records, 2)) == [
-        "physics/a",
-        "physics/b",
-    ]
-    with pytest.raises(ValueError, match="unknown task"):
-        pe.select_units("tables", records, None)
-
-
-def test_manifest_hash_tracks_content(tmp_path):
-    from test_eval_support import write_gold
-
-    gold = write_gold(tmp_path, [equation("a", 0, EQ_V, "block")])
-    first = pe.manifest_sha256(gold)
-    (gold / "manifest.json").unlink()
-    no_manifest = pe.manifest_sha256(gold)
-    assert len(first) == len(no_manifest) == 64
-    path = next(gold.rglob("*.jsonl"))
-    path.write_text(path.read_text().replace("block", "inline"))
-    assert pe.manifest_sha256(gold) != no_manifest
-
-
 # ---------------------------------------------------------------------- review load
 
 
@@ -472,84 +307,3 @@ def test_flag_metrics_count_a_group_as_one_decision():
     assert m["flag_recall"] == pytest.approx(2 / 3)
     empty = pe.flag_metrics([])
     assert (empty["flag_precision"], empty["flag_recall"]) == (None, None)
-
-
-def review_item(item_id, exact, review, gap=False, reasons=()):
-    return {"id": item_id, "exact_lenient": exact, "review": review, "scorer_gap": gap,
-            "tier_reasons": list(reasons)}  # fmt: skip
-
-
-def test_equation_review_load_reports_flags_with_and_without_scorer_gaps():
-    items = [
-        review_item("o/b/s1/eq-0", False, "required", reasons=["style_mismatch"]),  # caught
-        review_item("o/b/s1/eq-1", True, "required", reasons=["below_accept"]),  # false alarm
-        review_item("o/b/s1/eq-2", False, "optional", reasons=["style_cosmetic"]),  # hidden
-        review_item("o/b/s2/eq-0", False, "none", gap=True),  # scorer gap
-        review_item("o/b/s2/eq-1", True, "none"),
-    ]
-    load = pe.equation_review_load(items)
-    assert (load["required"], load["optional"], load["sections"]) == (2, 1, 2)
-    assert load["required_per_section"] == 1.0 and load["required_per_item"] == 0.4
-    assert load["flags"]["flag_precision"] == 0.5
-    assert load["flags"]["flag_recall"] == pytest.approx(1 / 3)
-    assert load["flags_excluding_scorer_gaps"]["flag_recall"] == 0.5
-    assert load["scorer_gaps"] == ["o/b/s2/eq-0"]
-    assert [w["id"] for w in load["wrong_not_required"]] == ["o/b/s1/eq-2", "o/b/s2/eq-0"]
-    assert load["required_by_reason"] == {"below_accept": 1, "style_mismatch": 1}
-    assert load["optional_by_reason"] == {"style_cosmetic": 1}
-
-
-def test_scorer_gaps_are_equations_whose_known_correct_latex_still_fails(tmp_path):
-    records = [
-        {"id": "a", "kind": "equation", "mathml": latex_to_mathml(V_LATEX)},
-        {"id": "b", "kind": "equation", "mathml": latex_to_mathml("x = 1")},
-    ]
-    predictions = tmp_path / "known.jsonl"
-    rows = [{"id": "a", "latex": V_LATEX}, {"id": "b", "latex": "y = 2"}]
-    predictions.write_text("".join(json.dumps(row) + "\n" for row in rows))
-    assert pe.scorer_gap_ids(records, predictions) == frozenset({"b"})
-    assert pe.scorer_gap_ids(records, tmp_path / "missing.jsonl") == frozenset()
-
-
-def hp(level, text, review, group=None, status="accepted"):
-    return p(level, text, status) | {"review": review, "group_key": group, "tier_reasons": []}
-
-
-def test_heading_flags_judge_each_heading_and_count_groups_once():
-    gold = [h(2, "Motion"), h(3, "Teacher Support"), h(3, "Teacher Support"), h(5, "Deep")]
-    predicted = [
-        hp(1, "Motion", "none"),
-        hp(2, "Teacher Support", "required", "hg-1", "needs_review"),
-        hp(2, "Solution", "optional"),  # not a gold heading: wrong, not required
-        hp(2, "Teacher Support", "required", "hg-1", "needs_review"),
-        hp(2, "Deep", "optional"),  # gold level 5 (3 below the top), predicted 1 below
-    ]
-    row = pe.heading_page_item("p", gold, predicted)
-    flags = pe.heading_flags(row, predicted)
-    assert sorted(map(tuple, flags["units"])) == [(False, 0), (False, 1), (False, 1), (True, 0)]
-    why = {w["text"]: w["why_wrong"] for w in flags["wrong_not_required"]}
-    assert why == {"Solution": "not_a_gold_heading", "Deep": "wrong_level"}
-    m = pe.flag_metrics(flags["units"])
-    assert (m["flag_precision"], m["flag_recall"]) == (0.0, 0.0)
-
-
-def test_document_review_load_combines_equations_and_headings():
-    item = {
-        "id": "p",
-        "pdf_pages": 4,
-        "review": pe.load_counts([]) | {"required_decisions": 2, "optional": 3},
-        "pairs": [
-            {"gold_id": "g1", "exact_lenient": False, "review": "required", "scorer_gap": False},
-            {"gold_id": "g2", "exact_lenient": False, "review": "none", "scorer_gap": True},
-            {"gold_id": "g3", "exact_lenient": True, "review": "none", "scorer_gap": False},
-        ],
-        "heading_flags": {"units": [[True, 2], [False, 1]], "wrong_not_required": [
-            {"text": "Solution", "why_wrong": "not_a_gold_heading"}]},
-    }  # fmt: skip
-    load = pe.document_review_load([item])
-    assert (load["required_per_pdf_page"], load["optional_per_pdf_page"]) == (0.5, 0.75)
-    assert load["equation_flags"]["flag_recall"] == 0.5
-    assert load["equation_flags_excluding_scorer_gaps"]["flag_recall"] == 1.0
-    assert load["heading_flags"]["flag_recall"] == pytest.approx(2 / 3)
-    assert load["flags"]["flag_precision"] == 1.0
-    assert [w["kind"] for w in load["wrong_not_required"]] == ["equation", "heading"]

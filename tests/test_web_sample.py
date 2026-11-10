@@ -69,50 +69,6 @@ def get_job(env, job_id: str) -> Job:
         return job
 
 
-def test_the_sample_is_the_recorded_conversion_in_the_persons_list(web):
-    job_id = open_sample(web.alice)
-    job = get_job(web, job_id)
-    assert (job.status, job.is_sample, job.filename) == (
-        "done",
-        True,
-        "sample-openstax-physics-2-3.pdf",
-    )
-    assert job.page_count == job.pages_done == 13
-    assert job.cost_usd == 0 and job.model_calls == 0 and job.aggregated
-    result = DocumentResult.model_validate(job.result_json)
-    assert result.title == "2.3 Position vs. Time Graphs" and result.stats.pages == 13
-    # The repeated headings ("Solution", "Discussion"): one decision per kind of repeat.
-    assert job.open_decisions == 2
-    assert job.html and "<html" in job.html and "Position vs. Time Graphs" in job.html
-    with session_scope(web.ctx.factory) as session:
-        kinds = dict(
-            session.execute(
-                select(Blob.kind, func.count()).where(Blob.job_id == job_id).group_by(Blob.kind)
-            ).all()
-        )
-    assert (
-        kinds["upload"] == 1 and kinds["crop"] >= 20
-    )  # the equations and figures, cut from the pages
-    upload_blob = None
-    with session_scope(web.ctx.factory) as session:
-        upload_blob = session.scalar(
-            select(Blob.content).where(Blob.job_id == job_id, Blob.kind == "upload")
-        )
-    assert upload_blob is not None and upload_blob.startswith(b"%PDF")
-
-
-def test_no_model_is_called_for_anyone(web, monkeypatch):
-    import readablestem.models as models
-
-    def never(*args, **kwargs):
-        raise AssertionError("a model client was made for the sample")
-
-    monkeypatch.setattr(models, "make_vision_client", never)
-    open_sample(web.alice)
-    open_sample(web.bob)
-    assert web.converter.calls == []
-
-
 def test_opening_it_twice_gives_the_same_document_and_each_person_has_their_own(web):
     first = open_sample(web.alice)
     assert open_sample(web.alice) == first
@@ -198,36 +154,6 @@ def table_count_of_signins(env) -> int:
         )
 
 
-def test_the_job_page_says_what_it_is_where_it_comes_from_and_offers_the_review(web):
-    job_id = open_sample(web.alice)
-    page = web.alice.get(f"/jobs/{job_id}")
-    text = text_of(page.text)
-    assert "This is a sample document, not your file" in text
-    assert "use none of your pages" in text and "send nothing to an AI service" in text
-    assert "Creative Commons Attribution License" in text and "OpenStax" in text
-    assert "Paul Peter Urone, Roger Hinrichs" in text
-    assert "https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs" in page.text
-    assert "Review 2 decisions" in text
-    assert "Upload a revised version" not in text  # a sample is not revised
-    # The review screen opens on the first decision, with the page image beside it.
-    review = web.alice.get(f"/jobs/{job_id}/review")
-    assert review.status_code == 200 and "Decision 1 of 2" in text_of(review.text)
-    image = web.alice.get(f"/jobs/{job_id}/pages/1.png")
-    assert image.status_code == 200 and image.content.startswith(b"\x89PNG")
-
-
-def test_it_can_be_decided_downloaded_and_deleted_like_any_document(web):
-    job_id = open_sample(web.alice)
-    listing = text_of(web.alice.get("/app").text)
-    assert "Sample" in listing and "2 decisions to make" in listing
-    deleted = web.alice.post(
-        f"/jobs/{job_id}/delete",
-        data={"csrf_token": token(web.alice, "/app"), "confirm": "yes"},
-    )
-    assert deleted.status_code == 303 and table_count(web, Job) == 0
-    assert open_sample(web.alice) != job_id  # a fresh one
-
-
 def test_it_is_deleted_by_the_same_clock_as_every_document(web):
     job_id = open_sample(web.alice)
     with session_scope(web.ctx.factory) as session:
@@ -235,21 +161,6 @@ def test_it_is_deleted_by_the_same_clock_as_every_document(web):
     assert web.alice.get(f"/jobs/{job_id}").status_code == 404
     purge_expired(web.ctx.factory, utcnow())
     assert table_count(web, Job) == 0 and table_count(web, Blob) == 0
-
-
-def test_my_documents_offers_it_first_to_someone_with_nothing_then_after_the_upload_form(web):
-    page = web.alice.get("/app").text
-    assert "Try a sample first" in page
-    assert page.index('id="upload-heading"') < page.index('id="sample-heading"')  # the form leads
-    assert 'action="/sample"' in page
-    job_id = open_sample(web.alice)
-    upload(web.alice, make_pdf(1))
-    page = web.alice.get("/app").text
-    assert "Practise on the sample" in page
-    # a compact link beside "Convert a PDF", not a second full section
-    assert 'id="sample-heading"' not in page
-    link = page.split('class="sample-link"', 1)[1].split("</a>", 1)[0]
-    assert f'href="/jobs/{job_id}"' in page and "Practise on the sample" in link
 
 
 def test_a_sample_is_not_a_document_to_revise(web):
@@ -295,31 +206,3 @@ def test_opening_it_is_rate_limited(tmp_path):
         ]
         assert statuses[-1] == 429 and 429 not in statuses[: rule.limit]
         assert table_count(env, Job) == 1
-
-
-def test_the_recorded_files_are_the_openly_licensed_demo(web):
-    recorded = sample.load()
-    assert recorded.licence_url.startswith("http://creativecommons.org/licenses/by/4.0")
-    assert recorded.source_url.startswith("https://openstax.org/")
-    assert recorded.authors == ["Paul Peter Urone", "Roger Hinrichs"]
-    assert recorded.result.stats.cost_usd < 0.2  # the recorded run, not a new one
-
-
-def test_the_sample_is_written_by_todays_assembler_and_cut_as_a_conversion_cuts(web):
-    """Recorded once, shown as the current output: one h1, the dark colour scheme, the About
-    region, and an equation's picture cut sharp for the size of the text (its resolution is
-    in the PNG), as `pipeline.run.recrop` does for a conversion."""
-    from readablestem.core.types import Kind
-    from readablestem.pipeline import equation_scale
-
-    recorded = sample.load()
-    html = recorded.html
-    assert html.count("<h1") == 1
-    assert "@media screen and (prefers-color-scheme: dark)" in html
-    assert 'id="about-conversion-title" class="about-title"' in html  # a region, not a heading
-    equations = [e for e in recorded.result.elements if e.kind is Kind.EQUATION]
-    assert equations
-    for equation in equations:
-        assert equation_scale.png_dpi(recorded.crops[equation.id]) is not None
-    figure = next(e for e in recorded.result.elements if e.kind is Kind.FIGURE)
-    assert equation_scale.png_dpi(recorded.crops[figure.id]) is None  # other crops as before

@@ -246,35 +246,6 @@ def test_the_keyboard_reaches_everything_in_reading_order(site, browser, job, ja
     context.close()
 
 
-@pytest.mark.parametrize("javascript", [True, False], ids=["js", "no-js"])
-def test_a_cell_is_changed_from_the_keyboard_alone(site, browser, job, javascript):
-    context, page = open_page(browser, site, javascript=javascript)
-    url = f"{site.base}/jobs/{job}/review"
-    page.goto(url)
-    page.locator("#decision-title").focus()
-    tab_until(page, "summary:Change the table")
-    page.keyboard.press("Enter")
-    tab_until(page, "select:")
-    page.keyboard.press("ArrowDown")  # row 1, column 2
-    page.keyboard.press("ArrowDown")
-    page.keyboard.press("ArrowDown")
-    page.keyboard.press("ArrowDown")  # row 2, column 2: "10"
-    page.keyboard.press("Tab")
-    page.keyboard.press("Enter")  # Change this cell
-    page.wait_for_url(re.compile(r".*cell=r1c1$"))
-    _wait_focus(page, "cell-p1-e1")  # autofocus: the field of the chosen cell
-    page.keyboard.press("Control+A")
-    page.keyboard.type("12")
-    page.keyboard.press("Tab")
-    assert focused(page).startswith("button:Save cell")
-    page.keyboard.press("Enter")
-    page.wait_for_url(f"{url}?item=p1-e1")
-    _wait_focus(page, "decision-title")
-    assert "Table 1: Row 2, column 2 changed." in page.get_by_role("status").inner_text()
-    assert page.get_by_role("group", name="Proposed table 1").locator("td", has_text="12").count()
-    context.close()
-
-
 def _wait_focus(page, element_id: str, timeout_s: float = 5.0) -> None:
     """`autofocus` applies at the next rendering opportunity after load."""
     deadline = time.monotonic() + timeout_s

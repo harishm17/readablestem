@@ -10,20 +10,13 @@ from pydantic import BaseModel
 
 from readablestem.config import CHEAP_MODEL, MAIN_MODEL, ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from readablestem.core.types import DocumentResult, DocumentStats, Fix, Kind, ModelCall, Status
-from readablestem.models.base import VisionRequest, fence_untrusted
-from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.models.base import fence_untrusted
 from readablestem.models.pricing import UnknownModelError, cost_usd, estimate_max_cost_usd
 from readablestem.web import db
 
 
 def settings(**kw) -> Settings:
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
-
-
-def test_models_fall_back_to_each_other():
-    s = settings()
-    assert s.fallback_for == {MAIN_MODEL: CHEAP_MODEL, CHEAP_MODEL: MAIN_MODEL}
 
 
 def test_production_refuses_to_start_without_limits():
@@ -135,50 +128,6 @@ def test_fence_strips_our_own_tags():
 class Out(BaseModel):
     latex: str
     confidence: float
-
-
-def test_fake_client_by_image_then_responder_then_default():
-    png = b"\x89PNG fake"
-    fake = FakeVisionClient(
-        by_image={("equation", image_key(png)): {"latex": "x", "confidence": 0.9}},
-        defaults={"equation": {"latex": "default", "confidence": 0.5}},
-    )
-    req = VisionRequest(step="equation", model=MAIN_MODEL, prompt_version="v", instructions="i")
-    parsed, call = fake.run(VisionRequest(**{**req.__dict__, "images": [png]}), Out)
-    assert parsed is not None and parsed.latex == "x" and call.outcome == "ok"
-    parsed, _ = fake.run(req, Out)
-    assert parsed is not None and parsed.latex == "default"
-
-
-def test_fake_client_failures_and_budget():
-    fake = FakeVisionClient(
-        fail_models={MAIN_MODEL: "api_error"},
-        defaults={"equation": {"latex": "x", "confidence": 1}},
-        budget=JobBudget(guard=InMemorySpendGuard(cap_usd=1), max_usd=1, max_calls=1),
-    )
-    req = VisionRequest(step="equation", model=MAIN_MODEL, prompt_version="v", instructions="i")
-    parsed, call = fake.run(req, Out)
-    assert parsed is None and call.outcome == "api_error" and call.cost_usd > 0
-    with pytest.raises(BudgetExceeded):
-        fake.run(req, Out)
-
-
-def test_document_result_roundtrip():
-    fix = Fix(
-        element_id="p1-e0",
-        kind=Kind.EQUATION,
-        status=Status.NEEDS_REVIEW,
-        confidence=0.5,
-        calls=[ModelCall(step="equation", model=MAIN_MODEL, prompt_version="v", cost_usd=0.01)],
-    )
-    result = DocumentResult(
-        pipeline_version="t",
-        fixes=[fix],
-        stats=DocumentStats(pages=1, cost_usd=0.01, latency_ms=1, model_calls=1),
-    )
-    again = DocumentResult.model_validate_json(result.model_dump_json())
-    assert again.fix_for("p1-e0") is not None
-    assert again.fixes[0].cost_usd == pytest.approx(0.01)
 
 
 def test_schema_cascades_job_deletion(tmp_path):

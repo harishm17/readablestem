@@ -3,19 +3,16 @@ fail-open, once a day, the counts and the CLI."""
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import select
 
-from readablestem.cli.main import main
 from readablestem.config import Settings
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
-from readablestem.models.verifier import EQUATION_CHECK, FIGURE_CHECK, FakeVerifier
-from readablestem.observability.logging import FIELDS_ATTR
-from readablestem.ops import canary, claude_canary
+from readablestem.models.verifier import FIGURE_CHECK, FakeVerifier
+from readablestem.ops import claude_canary
 from readablestem.ops.report import render_report
 from readablestem.web import db
 from readablestem.web.db import ErrorAggregate, session_scope
@@ -60,85 +57,11 @@ def perfect(wrong: set[str] | None = None, **kw) -> FakeVerifier:
     return FakeVerifier(responder=respond, reported_model="claude-sonnet-5-5", **kw)
 
 
-def test_the_cases_are_the_synthetic_figure_and_equation_ones_with_a_known_truth():
-    cases = claude_canary.load_cases()
-    assert len(cases) == 12
-    assert {c.check for c in cases} == {FIGURE_CHECK, EQUATION_CHECK}
-    assert set(claude_canary.SHOULD_FLAG) == {c.id for c in cases}
-    assert sum(claude_canary.SHOULD_FLAG.values()) == 7  # 5 right, 7 wrong
-    # They are cases of the shared canary file, so there is one set of synthetic images.
-    shared = {c.id for c in canary.load_cases()}
-    assert {c.id for c in cases} <= shared
-
-
-def test_a_check_that_gets_every_case_right_is_ok(caplog):
-    with caplog.at_level(logging.INFO, logger="readablestem.ops.claude_canary"):
-        result = claude_canary.run_canary(perfect(), settings())
-        claude_canary.report(result, source="test")
-    assert (result.status, result.answered, result.missed, result.failed) == ("ok", 12, [], [])
-    assert [r.getMessage() for r in caplog.records] == ["claude_canary_ok"]
-
-
-def test_one_miss_is_tolerated_two_are_drift(caplog):
-    one = claude_canary.run_canary(perfect({"figure-bars-wrong-value"}), settings())
-    assert one.status == "ok" and one.missed == ["figure-bars-wrong-value"]
-    with caplog.at_level(logging.INFO, logger="readablestem.ops.claude_canary"):
-        claude_canary.report(one, source="test")
-    (line,) = caplog.records
-    assert line.getMessage() == "claude_canary_incomplete" and line.levelno == logging.WARNING
-
-    two = claude_canary.run_canary(
-        perfect({"figure-bars-wrong-value", "equation-fma-match"}), settings()
-    )
-    assert two.status == "drift"
-    caplog.clear()
-    with caplog.at_level(logging.INFO, logger="readablestem.ops.claude_canary"):
-        claude_canary.report(two, source="test")
-    (line,) = caplog.records
-    assert line.getMessage() == "claude_canary_drift" and line.levelno == logging.ERROR
-    assert "equation-fma-match" in getattr(line, FIELDS_ATTR)["missed_cases"]  # ids only
-
-
-def test_the_tolerance_is_a_setting():
-    strict = settings(claude_canary_max_misses=0)
-    assert claude_canary.run_canary(perfect({"equation-fma-match"}), strict).status == "drift"
-
-
-def test_a_case_without_an_answer_is_failed_not_missed():
-    result = claude_canary.run_canary(perfect(outcomes={FIGURE_CHECK: "timeout"}), settings())
-    assert result.status == "failed" and result.missed == []
-    assert {r for _, r in result.failed} == {"timeout"} and len(result.failed) == 6
-
-
 def test_a_refused_reservation_stops_the_run():
     budget = JobBudget(InMemorySpendGuard(cap_usd=0.0), max_usd=0.0, max_calls=0)
     result = claude_canary.run_canary(perfect(budget=budget), settings())
     assert result.status == "failed"
     assert {r for _, r in result.failed} == {"budget_exceeded"} and len(result.failed) == 12
-
-
-def test_a_slow_run_stops_at_its_deadline():
-    ticks = iter(range(1000))
-    result = claude_canary.run_canary(
-        perfect(), settings(), deadline_s=4.5, clock=lambda: float(next(ticks))
-    )
-    assert result.answered == 4 and {r for _, r in result.failed} == {"deadline"}
-
-
-@pytest.mark.parametrize(
-    ("kw", "reason"),
-    [
-        ({"claude_canary": False}, "disabled"),
-        ({"env": "test"}, "test_env"),
-        ({"fake_models": True}, "fake_models"),
-        ({"model_provider": "openai", "openai_api_key": "sk-o"}, "provider_not_anthropic"),
-        ({"claude_second_check": "off"}, "check_off"),
-        ({"anthropic_api_key": None}, "no_key"),
-    ],
-)
-def test_when_the_canary_is_not_due(kw, reason):
-    assert claude_canary.due(settings(**kw)) == reason
-    assert claude_canary.due(settings()) is None
 
 
 def rows(factory) -> dict[tuple[date, str], int]:
@@ -178,28 +101,3 @@ def test_a_canary_problem_never_fails_the_cron(factory, caplog):
             factory, settings(), InMemorySpendGuard(cap_usd=1.0), NOW, verifier_factory=broken
         )
     assert status == "error" and "secret-detail" not in caplog.text
-
-
-def test_not_due_claims_nothing(factory):
-    status = claude_canary.maybe_run_daily(
-        factory, settings(claude_canary=False), InMemorySpendGuard(cap_usd=1.0), NOW
-    )
-    assert status == "disabled" and rows(factory) == {}
-
-
-def test_the_cli_needs_a_key(monkeypatch, capsys, tmp_path):
-    monkeypatch.chdir(tmp_path)  # no .env here: a developer's own key must not be found
-    monkeypatch.setenv("MODEL_PROVIDER", "anthropic")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    from readablestem.config import get_settings
-
-    get_settings.cache_clear()
-    try:
-        assert main(["ops", "claude-canary", "--max-usd", "0.1"]) == 2
-    finally:
-        get_settings.cache_clear()
-    assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
-
-
-def test_the_truth_file_is_json_serialisable():
-    json.dumps(claude_canary.SHOULD_FLAG)

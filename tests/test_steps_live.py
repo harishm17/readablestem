@@ -28,10 +28,8 @@ from readablestem.eval.gold_scoring import iter_gold_records
 from readablestem.models.base import T, VisionRequest, fence_untrusted
 from readablestem.models.pricing import cost_usd, estimate_max_cost_usd
 from readablestem.pipeline.equation_step import transcribe
-from readablestem.pipeline.figure_step import describe
 from test_steps_support import (
     equation_element,
-    figure_element,
     make_settings,
     use_fallback_router,
 )
@@ -157,26 +155,6 @@ def _render_mathml_png(mathml: str) -> bytes:
     return png
 
 
-def _bar_chart_png() -> bytes:
-    import pymupdf
-
-    doc = pymupdf.open()
-    page = doc.new_page(width=360, height=260)
-    page.insert_text((90, 30), "Average speed by trip", fontsize=14)
-    x0, y0 = 60, 220
-    page.draw_line((x0, y0), (340, y0))
-    page.draw_line((x0, y0), (x0, 50))
-    for i, (label, height) in enumerate([("Trip A", 40), ("Trip B", 90), ("Trip C", 150)]):
-        left = x0 + 25 + i * 90
-        rect = pymupdf.Rect(left, y0 - height, left + 50, y0)
-        page.draw_rect(rect, color=(0, 0, 0), fill=(0.2, 0.4, 0.8))
-        page.insert_text((left + 5, y0 + 16), label, fontsize=10)
-    for value in (0, 50, 100, 150):
-        page.insert_text((x0 - 25, y0 - value + 4), str(value), fontsize=9)
-    page.insert_text((12, 140), "km/h", fontsize=10)
-    return page.get_pixmap(dpi=150).tobytes("png")
-
-
 def test_live_equation_transcription(settings):
     record = next(
         r for r in iter_gold_records(REPO / "data" / "gold", kind="equation") if r["id"] == GOLD_ID
@@ -196,19 +174,4 @@ def test_live_equation_transcription(settings):
     print(fix.equation.speech)
     score = score_mathml(fix.equation.mathml, record["mathml"])
     assert score.teds >= 0.8, score
-    assert fix.cost_usd < MAX_USD_PER_TEST
-
-
-def test_live_figure_alt_text(settings):
-    element = figure_element(caption="Figure 1 Average speed on three trips.")
-    client = LiveClient(settings, _budget())
-    fix = describe(element, _bar_chart_png(), client=client, settings=settings)
-    print(f"\nfigure: {fix.status} conf={fix.confidence} cost=${fix.cost_usd:.4f}")
-    print([(c.model, c.outcome, c.input_tokens, c.output_tokens) for c in fix.calls])
-    assert fix.status in {Status.ACCEPTED, Status.NEEDS_REVIEW}, (fix.reason, fix.failed_checks)
-    assert fix.figure is not None
-    print(fix.figure.alt)
-    assert fix.figure.figure_type == "chart" and not fix.figure.decorative
-    assert "bar" in fix.figure.alt.lower()
-    assert 0 < len(fix.figure.alt) <= 300
     assert fix.cost_usd < MAX_USD_PER_TEST

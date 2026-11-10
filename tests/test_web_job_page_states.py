@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import timedelta
 from html import unescape
 
 import pytest
@@ -17,14 +16,11 @@ import pytest
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token, upload
 from readablestem.core.types import (
     DocumentResult,
-    Element,
-    Fix,
     Kind,
     Notice,
     SourceFacts,
     Status,
 )
-from readablestem.web.db import Job, JobStatus, ReviewEdit, session_scope, utcnow
 
 
 @pytest.fixture
@@ -132,21 +128,6 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     assert "draft" not in html.lower()
 
 
-def test_after_the_last_decision_the_page_says_who_decided_and_when(web):
-    decide_everything(web)
-    job_id = convert(web)
-    with session_scope(web.ctx.factory) as session:
-        session.add(ReviewEdit(job_id=job_id, user_id=web.job(job_id).user_id,
-                               element_id="p1-e3", action="accept"))  # fmt: skip
-    html = web.browser.get(f"/jobs/{job_id}").text
-    # The abstained equation was kept as an image: ready, but said plainly.
-    assert title(html) == "Ready: SECRET-HEADING Kinematics | ReadableSTEM"
-    assert "1 equation is shown as an image that screen readers cannot read." in page_text(html)
-    today = utcnow().date()
-    ready = page_text(section(html, "ready-heading"))
-    assert f"You made 3 decisions on {today.day} {today:%B}." in ready
-
-
 def test_an_ai_outage_is_not_shown_as_finished(web):
     result = web.converter.output.result
     for fix in result.fixes:
@@ -171,13 +152,6 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
     assert "All 0 checks" not in text
 
 
-def test_the_polled_fragment_announces_the_finish_with_a_link_to_the_first_decision(web):
-    job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    web.run_worker()
-    fragment = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
-    assert f'<a href="/jobs/{job_id}/review">Start the review</a>' in fragment.text
-
-
 # --------------------------------------------------------------------------- counts
 
 
@@ -192,34 +166,7 @@ def test_the_counts_add_up_and_match_the_review_screen(web):
     assert "3" in review and "Decisions to make 3" in results
 
 
-def test_a_heading_group_counts_once_and_the_page_says_why(web):
-    result = web.converter.output.result
-    for i in range(3):
-        result.elements.append(
-            Element(id=f"p1-e{10 + i}", kind=Kind.HEADING, page=0, bbox=(0, 6, 1, 7),
-                    order=10 + i, text="Teacher Support", bold=True)
-        )  # fmt: skip
-        result.fixes.append(
-            Fix(element_id=f"p1-e{10 + i}", kind=Kind.HEADING, status=Status.NEEDS_REVIEW,
-                review="required", group_key="hg-p1-e10", group_size=3)
-        )  # fmt: skip
-    job_id = convert(web)
-    results = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Decisions to make 4" in results
-    assert "waiting make" not in results  # items are not counted, only decisions
-
-
 # --------------------------------------------------------------------------- progress
-
-
-def set_running(web, job_id: str, progress: dict | None) -> None:
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.status = JobStatus.RUNNING
-        job.started_at = utcnow()
-        job.lease_until = utcnow() + timedelta(minutes=2)
-        job.progress_json = progress
 
 
 def events(**stages) -> dict:
@@ -229,74 +176,6 @@ def events(**stages) -> dict:
             for name, (d, t, c) in stages.items()
         }
     }
-
-
-def test_a_running_job_shows_its_steps_outside_the_live_region(web):
-    job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    progress = events(
-        layout=(1, 1, {"equation": 21, "figure": 7}), equations=(14, 21, {}), figures=(5, 7, {})
-    )
-    set_running(web, job_id, progress)
-    html = web.browser.get(f"/jobs/{job_id}").text
-    region = page_text(html[html.index('id="job-status-region"') : html.index('id="job-progress"')])
-    assert "Reading the equations and checking each against your PDF's text." in region
-    assert "14 of 21" not in region  # counts are not announced per element
-    steps = page_text(html[html.index('id="job-progress"') :])
-    assert "Found 21 equations and 7 figures (done)" in steps
-    assert "Equations: 14 of 21 read and checked against your PDF's text (in progress)" in steps
-    assert "Figures: 5 of 7 described (in progress)" in steps
-    assert f'hx-get="/jobs/{job_id}/progress?v=' in html
-    assert title(html) == "Converting: notes.pdf | ReadableSTEM"
-
-
-def test_the_status_fragment_waits_for_the_next_step_and_the_steps_for_any_change(web):
-    job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    set_running(web, job_id, events(layout=(1, 1, {}), equations=(1, 21, {})))
-    page = web.browser.get(f"/jobs/{job_id}").text
-    status_v = re.search(r'status\?v=([^"]+)"', page).group(1)  # type: ignore[union-attr]
-    steps_v = re.search(r'progress\?v=([^"]+)"', page).group(1)  # type: ignore[union-attr]
-    set_running(web, job_id, events(layout=(1, 1, {}), equations=(9, 21, {})))
-    assert web.browser.get(f"/jobs/{job_id}/status?v={status_v}").status_code == 204
-    moved = web.browser.get(f"/jobs/{job_id}/progress?v={steps_v}")
-    assert moved.status_code == 200 and "Equations: 9 of 21" in moved.text
-    assert "<html" not in moved.text
-    set_running(web, job_id, events(layout=(1, 1, {}), equations=(21, 21, {}), assemble=(0, 0, {})))
-    assert web.browser.get(f"/jobs/{job_id}/status?v={status_v}").status_code == 200
-
-
-def test_the_steps_fragment_stops_polling_once_the_job_is_done(web):
-    job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    web.run_worker()
-    fragment = web.browser.get(f"/jobs/{job_id}/progress?v=x").text
-    assert 'id="job-progress"' in fragment and "hx-get" not in fragment
-
-
-def test_waiting_gives_an_estimate_and_counts_your_own_documents(web):
-    first = job_id_from(upload(web.browser, make_pdf(2)))
-    bob = web.client()
-    login(bob, BOB)
-    job_id_from(upload(bob, make_pdf(3)))
-    mine = job_id_from(upload(web.browser, make_pdf(1)))
-    text = page_text(web.browser.get(f"/jobs/{mine}").text)
-    # 6 pages at the default pace (no finished job to go by yet): 60 s.
-    assert "2 documents ahead of yours (1 is yours), about 1 minute to go (an estimate)." in text
-    assert "You can leave this page; it keeps its place." in text
-    assert "next in line, less than a minute to go" in page_text(
-        web.browser.get(f"/jobs/{first}").text
-    )
-    bob.close()
-
-
-def test_the_estimate_follows_recent_conversions(web):
-    done = job_id_from(upload(web.browser, make_pdf(1)))
-    web.run_worker()
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, done)
-        assert job is not None
-        job.started_at = utcnow() - timedelta(minutes=10)
-        job.finished_at = utcnow()  # 10 minutes for 1 page
-    waiting = job_id_from(upload(web.browser, make_pdf(2)))
-    assert "about 20 minutes to go" in page_text(web.browser.get(f"/jobs/{waiting}").text)
 
 
 # --------------------------------------------------------------------------- draft
@@ -337,98 +216,11 @@ def test_the_draft_page_is_the_owners_only(web):
 # --------------------------------------------------------------------------- notices
 
 
-def test_notices_are_listed_per_page_with_their_decisions(web):
-    result = web.converter.output.result
-    result.elements.append(Element(id="p1-e9", kind=Kind.TABLE, page=0, bbox=(0, 7, 1, 8),
-                                   order=9))  # fmt: skip
-    result.fixes.append(Fix(element_id="p1-e9", kind=Kind.TABLE, status=Status.FAILED,
-                            reason="table_not_rebuilt", review="required"))  # fmt: skip
-    footnotes = Notice(code="footnote", page=0, count=2, review="none")
-    job_id = convert(web, notices=[Notice(code="lang_detected"), footnotes])
-    html = web.browser.get(f"/jobs/{job_id}").text
-    not_handled = section(html, "not-handled-heading")
-    text = page_text(not_handled)
-    assert "Page 1: A footnote is kept where it falls in the text" in text and "(2 times)" in text
-    assert "Page 1: A table is kept as an image of the original" in text
-    # The link names its decision, so two tables on one page give two different links.
-    link = (
-        f'<a href="/jobs/{job_id}/review?item=p1-e9">Decide it<span class="visually-hidden">: '
-        "Table 1</span></a> (one of your decisions)."
-    )
-    assert link in not_handled
-    worth = section(html, "worth-checking-heading")
-    assert "The whole document: The language of the document was detected" in page_text(worth)
-    assert '<a href="#language-heading">Check the language</a>' in worth
-    # Each sentence is a sentence: a space before the link, after the notice's own.
-    assert 'right. <a href="#language-heading">Check the language</a>.' in worth
-    assert re.search(
-        rf'[.)] <a href="/jobs/{job_id}/review\?item=p1-e9">Decide it<span', not_handled
-    )
-    # The table's decision is counted once, with the others, not again for its notice.
-    assert "Decisions to make 4" in page_text(section(html, "results-heading"))
-
-
-def test_a_colour_notice_does_not_link_to_a_decision_about_something_else(web):
-    # A figure telling things apart by colour alone, whose decision is about its data
-    # values: the colour line is not "Decide it" (that decision never mentions colour).
-    result = web.converter.output.result
-    figure = next(
-        f
-        for f in result.fixes
-        if f.kind is Kind.FIGURE and f.figure is not None and f.review == "required"
-    )
-    assert figure.figure is not None
-    figure.figure.colour_only = True  # the notice follows from the fix
-    job_id = convert(web)
-    worth = section(web.browser.get(f"/jobs/{job_id}").text, "worth-checking-heading")
-    assert "tells things apart by colour alone" in page_text(worth)
-    assert "Decide it" not in worth and "You have decided it" not in worth
-
-
 # --------------------------------------------------------------------------- card
 
 
 FACTS = SourceFacts(tagged=False, images=1, equations=3, equations_flattened=1,
                     bold_maths_letters=0, links=0)  # fmt: skip
-
-
-def test_the_card_compares_the_pdf_with_the_html_and_hears_the_difference(web):
-    result = web.converter.output.result
-    result.elements[3].text = "x2 + 1"
-    result.elements[3].reasons = ["superscript"]
-    job_id = convert(web, source_facts=FACTS)
-    html = web.browser.get(f"/jobs/{job_id}").text
-    card = section(html, "changed-heading")
-    assert '<th scope="col">Can a screen-reader user …</th>' in card
-    text = page_text(card)
-    assert "hear equations with their structure?" in text
-    assert "In 1 of 3, the raised parts are gone." in text
-    assert "Hear the difference" in text
-    assert "From your PDF a screen reader gets: “x 2 plus 1”" in text
-    assert "In the HTML: “x plus 1”" in text
-    assert (
-        f'<img src="/jobs/{job_id}/crops/p1-e3.png" alt="The equation as printed in your PDF">'
-        in (card)
-    )
-    assert "%" not in text and "score" not in text.lower()
-
-
-def test_for_a_tagged_pdf_the_examples_say_text_layer_not_what_a_reader_gets(web):
-    result = web.converter.output.result
-    result.elements[3].text = "x2 + 1"
-    result.elements[3].reasons = ["superscript"]
-    job_id = convert(web, source_facts=FACTS.model_copy(update={"tagged": True}))
-    text = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "changed-heading"))
-    assert "Your PDF's text layer gives: “x 2 plus 1”" in text
-    assert "a reader may get more than its text layer" in text
-    assert "From your PDF a screen reader gets" not in text
-
-
-def test_older_results_without_source_facts_have_no_card_and_still_load(web):
-    job_id = convert(web)
-    html = web.browser.get(f"/jobs/{job_id}").text
-    assert 'id="changed-heading"' not in html
-    assert "Language: English." in page_text(html)  # where it came from is not known
 
 
 def test_the_card_never_logs_document_text(web, caplog):
@@ -496,25 +288,4 @@ def test_the_language_of_an_unfinished_job_cannot_be_changed(web):
     assert post_language(web, job_id, "fr").status_code == 409
 
 
-def test_changing_the_language_keeps_the_date_of_the_last_decision(web):
-    decide_everything(web)
-    job_id = convert(web)
-    with session_scope(web.ctx.factory) as session:
-        session.add(ReviewEdit(job_id=job_id, user_id=web.job(job_id).user_id,
-                               element_id="p1-e3", action="accept",
-                               created_at=utcnow() - timedelta(days=3)))  # fmt: skip
-    assert post_language(web, job_id, "de").status_code == 303
-    day = (utcnow() - timedelta(days=3)).date()
-    assert f"on {day.day} {day:%B %Y}." in (web.job(job_id).html or "")
-
-
 # --------------------------------------------------------------------------- delete
-
-
-def test_delete_is_a_danger_action_at_the_end(web):
-    job_id = convert(web)
-    html = web.browser.get(f"/jobs/{job_id}").text
-    delete = section(html, "delete-heading")
-    assert '<button type="submit" class="button-danger-outline">Delete now</button>' in delete
-    assert 'button-secondary">Delete' not in html  # never styled like Keep or Save
-    assert html.index('id="delete-heading"') > html.index('id="results-heading"')

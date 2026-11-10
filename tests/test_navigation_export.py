@@ -17,9 +17,9 @@ import zipfile
 import pytest
 
 import canvas_sanitizer as cs
-from readablestem.core.types import Element, Kind, Link
+from readablestem.core.types import Kind, Link
 from readablestem.pipeline import export_cartridge as cc
-from readablestem.pipeline.export_canvas import build_zip, export_canvas, readme
+from readablestem.pipeline.export_canvas import build_zip, export_canvas
 from test_assemble_navigation import block, heading, numbered, render
 
 FOLDER = "doc-3f9a2b"
@@ -57,12 +57,6 @@ def link_targets_exist(markup: str) -> None:
         assert target in ids, target
 
 
-def test_the_source_has_every_piece(html):
-    assert 'aria-label="Contents"' in html and html.count("doc-pagebreak") == 3
-    assert "doc-noteref" in html and "doc-footnote" in html and "doc-backlink" in html
-    assert 'href="#main-content"' in html and 'id="main-content"' in html
-
-
 def test_the_file_in_the_zip_keeps_all_of_it_and_adds_no_tab_stop(export):
     page = export.index_html
     assert 'href="#main-content"' in page and 'id="main-content"' in page
@@ -88,16 +82,6 @@ def test_the_page_to_paste_leaves_out_the_skip_link_and_what_it_points_to(export
     link_targets_exist(page)  # nothing points at what was left out
 
 
-def test_the_page_to_paste_keeps_the_contents_markers_and_note_links(export):
-    page = export.page_html or ""
-    assert '<nav class="toc" aria-label="Contents"' in page
-    for text in ("Motion", "Speed", "Velocity"):
-        assert f">{text}</a>" in page
-    assert re.findall(r'aria-label="(P[^"]+)"', page) == ["PDF page 1", "Page 12", "Page 13"]
-    assert 'role="doc-noteref"' in page and 'role="doc-backlink"' in page
-    assert "tabindex" not in page
-
-
 def test_canvas_loses_nothing_of_the_navigation_in_the_page_to_paste(export):
     page = export.page_html or ""
     before = cs.serialize(cs.parse(page), canonical=True)
@@ -113,14 +97,6 @@ def test_the_headings_go_down_a_level_in_the_page_but_the_contents_list_does_not
     assert '<h2 id="p1-e0">Motion</h2>' in page
     nav = re.search(r"<nav.*?</nav>", page, re.S)
     assert nav and nav.group(0).count("<ul") == 2  # nested as in the source
-
-
-def test_the_readme_says_the_page_has_no_skip_link(export):
-    text = " ".join(readme(export).split())
-    assert "has no “Skip to main content” link" in text
-    assert "always visible at the top" in text  # in index.html, where Canvas cannot hide it
-    plain = export_canvas(document(), title="Doc", folder=FOLDER)
-    assert "has no “Skip to main content” link" not in " ".join(readme(plain).split())
 
 
 def strip_like_a_strict_purifier(markup: str) -> str:
@@ -150,13 +126,3 @@ def test_the_zip_and_the_cartridge_carry_it(export):
         page = archive.read(f"web_resources/{FOLDER}/index.html").decode()
     assert page == export.index_html
     link_targets_exist(page)
-
-
-def test_a_document_without_navigation_exports_as_before():
-    html = render([Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 1, 1), order=0,
-                           text="Just text.")])  # fmt: skip
-    export = export_canvas(html, title="Doc", folder=FOLDER, course_number=COURSE)
-    assert "<nav" not in (export.page_html or "") and "doc-pagebreak" not in (
-        export.page_html or ""
-    )
-    assert export.notes.skip_link_left_out

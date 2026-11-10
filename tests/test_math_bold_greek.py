@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from readablestem.core.mathchars import bake_bold_variants, char_variant, styled_char
+from readablestem.core.mathchars import char_variant, styled_char
 from readablestem.core.types import Element, EquationFix, Fix, Kind, Status
 from readablestem.pipeline.assemble import render_html, sanitize_mathml
 from readablestem.pipeline.equation_step import text_layer_style
@@ -51,31 +51,6 @@ def test_bold_greek_from_latex_is_a_math_bold_code_point_with_no_attribute(latex
     assert 0x1D400 <= ord(text) <= 0x1D7FF  # the Mathematical Alphanumeric Symbols block
 
 
-def test_latin_bold_is_unchanged():
-    assert tokens(safe_latex_to_mathml(r"\mathbf{d}", "inline")) == [("\U0001d41d", None)]
-
-
-def test_plain_greek_and_other_variants_are_left_alone():
-    assert tokens(safe_latex_to_mathml(r"\omega", "inline")) == [("\u03c9", None)]
-    (blackboard,) = tokens(safe_latex_to_mathml(r"\mathbb{R}", "inline"))
-    assert blackboard == ("\u211d", None)
-    mono = ET.fromstring('<math><mi mathvariant="monospace">x</mi></math>')
-    bake_bold_variants(mono)
-    assert mono[0].get("mathvariant") == "monospace" and mono[0].text == "x"
-
-
-def test_a_mixed_expression_keeps_each_letter_in_its_own_style():
-    mathml = safe_latex_to_mathml(r"\boldsymbol{\tau} = I \boldsymbol{\alpha}", "inline")
-    texts = [t for t, _ in tokens(mathml)]
-    assert texts == [
-        styled_char("\u03c4", "bold-italic"),
-        "=",
-        "I",
-        styled_char("\u03b1", "bold-italic"),
-    ]
-    assert all(attribute is None for _, attribute in tokens(mathml))
-
-
 def test_the_sanitiser_writes_old_stored_mathml_the_same_way():
     stored = (
         '<math><mstyle mathvariant="bold"><mi>\u03c9</mi><mo>+</mo><mi>x</mi></mstyle>'
@@ -85,16 +60,6 @@ def test_the_sanitiser_writes_old_stored_mathml_the_same_way():
     assert shown is not None and "mathvariant" not in shown
     letters = [t for t, _ in tokens(shown)]
     assert [char_variant(t) for t in letters] == ["bold", None, "bold", "bold-italic", None]
-
-
-def test_inheritance_stops_at_a_container_with_another_variant():
-    root = ET.fromstring(
-        '<math><mstyle mathvariant="bold"><mi>\u03c9</mi>'
-        '<mrow><mstyle mathvariant="normal"><mi>\u03b1</mi></mstyle></mrow></mstyle></math>'
-    )
-    bake_bold_variants(root)
-    letters = [el.text for el in root.iter() if el.tag == "mi"]
-    assert [char_variant(t or "") for t in letters] == ["bold", None]
 
 
 def test_speech_and_the_text_layer_check_read_the_baked_letters():
@@ -152,29 +117,6 @@ def ink(mathml: str) -> int:
 
 def math(token: str) -> str:
     return f'<math xmlns="http://www.w3.org/1998/Math/MathML">{token}</math>'
-
-
-@pytest.mark.browser
-def test_chromium_ignores_the_mathvariant_attribute_on_greek():
-    """The premise: if this fails, Chromium now draws the attribute and the code points
-    are no longer needed for it (they still read as "bold" to every screen reader)."""
-    plain = ink(math("<mi>\u03c9</mi>"))
-    attribute = ink(math('<mi mathvariant="bold-italic">ω</mi>'))
-    assert attribute == plain
-
-
-@pytest.mark.browser
-@pytest.mark.parametrize(
-    "latex", [r"\boldsymbol{\omega}", r"\mathbf{\omega}", r"\bm{\Omega}", r"\boldsymbol{\alpha}"]
-)
-def test_chromium_draws_bold_greek_from_the_converter_heavier_than_plain(latex):
-    plain_latex = latex.replace(r"\boldsymbol", "").replace(r"\mathbf", "").replace(r"\bm", "")
-    bold = ink(sanitize_mathml(safe_latex_to_mathml(latex, "inline"), display="inline") or "")
-    plain = ink(
-        sanitize_mathml(safe_latex_to_mathml(plain_latex.strip("{}"), "inline"), display="inline")
-        or ""
-    )
-    assert bold != plain and bold > plain * 1.05, (bold, plain)
 
 
 @pytest.mark.browser

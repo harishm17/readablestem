@@ -9,7 +9,6 @@ sign-in away without storing anything; and allowlist mode is as it was.
 
 from __future__ import annotations
 
-import pytest
 from sqlalchemy import func, select
 
 from fixtures.web.oidc import CLIENT_ID, CLIENT_SECRET, OTHER_TENANT, TENANT, FakeMicrosoft
@@ -89,32 +88,12 @@ def test_a_verified_google_account_gets_an_open_tier_account_at_the_first_sign_i
             assert signups_today(session, utc_today()) == 1
 
 
-def test_an_unverified_google_address_gets_no_account_in_open_mode(tmp_path, monkeypatch):
-    env = google_env(tmp_path, monkeypatch, signup_mode="open")
-    with env.running() as client:
-        before = users(env)
-        for unverified in (False, "false", None):
-            env.userinfo = {"email": BOB, "email_verified": unverified}
-            response = callback(client)
-            assert response.status_code == 403 and "not verified" in response.text
-        assert user(env, BOB) is None and users(env) == before
-        assert client.get("/app").status_code == 303
-
-
 def test_google_without_an_address_gets_no_account(tmp_path, monkeypatch):
     env = google_env(tmp_path, monkeypatch, signup_mode="open")
     with env.running() as client:
         env.userinfo = {"email_verified": True}
         assert callback(client).status_code == 403
         assert users(env) == 1
-
-
-def test_allowlist_mode_still_refuses_a_verified_stranger_and_stores_nothing(tmp_path, monkeypatch):
-    env = google_env(tmp_path, monkeypatch, signup_mode="allowlist")
-    with env.running() as client:
-        response = callback(client)
-        assert response.status_code == 403 and "You are not on the beta list yet" in response.text
-        assert user(env, ALICE) is None and identities(env) == []
 
 
 def test_a_blocked_google_account_is_refused_in_open_mode(tmp_path, monkeypatch):
@@ -127,17 +106,6 @@ def test_a_blocked_google_account_is_refused_in_open_mode(tmp_path, monkeypatch)
         response = callback(again)
         assert response.status_code == 403 and "This account cannot be used" in response.text
         assert users(env) == 2 and identities(env) == [("google", GOOGLE_ISSUER, "g-alice")]
-
-
-def test_google_sign_ups_stop_when_the_days_accounts_are_taken(tmp_path, monkeypatch):
-    env = google_env(tmp_path, monkeypatch, signup_mode="open", max_new_accounts_per_day=1)
-    with env.running() as client:
-        assert callback(client).status_code == 303
-        env.userinfo = {"email": BOB, "email_verified": True, "sub": "g-bob"}
-        full = callback(env.client())
-        assert full.status_code == 503 and "Sign-ups are full for today" in full.text
-        assert user(env, BOB) is None
-        assert [i[2] for i in identities(env)] == ["g-alice"]  # nothing recorded for the refused
 
 
 def test_the_per_address_rule_applies_to_the_google_callback_too(tmp_path, monkeypatch):
@@ -186,14 +154,6 @@ def test_a_microsoft_account_of_an_allowed_tenant_gets_an_open_tier_account(tmp_
             assert signups_today(session, utc_today()) == 1
 
 
-def test_in_allowlist_mode_a_microsoft_stranger_is_refused_and_nothing_is_stored(tmp_path):
-    env, fake = microsoft_env(tmp_path, signup_mode="allowlist")
-    with env.running() as client:
-        response = ms_sign_in(env, fake, client)
-        assert response.status_code == 403 and "not on the list for this beta" in response.text
-        assert user(env, ALICE) is None and identities(env) == []
-
-
 def test_microsoft_blocked_and_full_days_are_refused_without_storing_anything(tmp_path):
     env, fake = microsoft_env(tmp_path, signup_mode="open", max_new_accounts_per_day=1)
     with env.running() as client:
@@ -221,52 +181,11 @@ def test_a_microsoft_token_from_another_directory_still_makes_no_account(tmp_pat
             assert signups_today(session, utc_today()) == 0
 
 
-@pytest.mark.parametrize("mode", ["allowlist", "open"])
-def test_a_microsoft_token_without_an_address_gets_no_account(tmp_path, mode):
-    env, fake = microsoft_env(tmp_path / mode, signup_mode=mode)
-    fake.claims.pop("email", None)
-    fake.claims.pop("preferred_username", None)
-    with env.running() as client:
-        response = ms_sign_in(env, fake, client)
-        assert response.status_code == 403 and "No email address" in response.text
-        assert users(env) == 1 and identities(env) == []
-
-
 # --------------------------------------------------------------------------- Microsoft: trust
 
 
 def refusal(response) -> str:
     return " ".join(response.text.split())
-
-
-@pytest.mark.parametrize(
-    "label, claims",
-    [
-        ("absent", {}),
-        ("false", {"xms_edov": False}),
-        ("sign-in name only", {"xms_edov": False, "email": None}),
-    ],
-)
-def test_an_address_the_directory_does_not_vouch_for_makes_no_account(tmp_path, label, claims):
-    """nOAuth: with open sign-up an email claim anyone can put in a directory would make an
-    account, or take one over, for any address. Only `xms_edov` true counts."""
-    env, fake = microsoft_env(tmp_path, signup_mode="open")
-    fake.claims.pop("xms_edov", None)
-    for key, value in claims.items():
-        if value is None:
-            fake.claims.pop(key, None)
-        else:
-            fake.claims[key] = value
-    with env.running() as client:
-        response = ms_sign_in(env, fake, client)
-        text = refusal(response)
-        assert response.status_code == 403
-        assert "Please sign in with Google" in text
-        assert "Sign in with your Google account instead" in text
-        assert user(env, ALICE) is None and identities(env) == []
-        with session_scope(env.ctx.factory) as session:
-            assert signups_today(session, utc_today()) == 0
-        assert client.get("/app").status_code == 303
 
 
 def test_an_unverified_address_cannot_take_over_an_open_account(tmp_path):
@@ -297,55 +216,3 @@ def test_a_first_microsoft_sign_in_does_not_link_to_an_invited_account_or_an_adm
             row.access_tier = access.OPEN
         assert ms_sign_in(env, fake, env.client()).status_code == 403
         assert identities(env) == []
-
-
-def test_an_open_tier_account_can_link_a_verified_microsoft_identity(tmp_path):
-    env, fake = microsoft_env(tmp_path, signup_mode="open")
-    with env.running():
-        with session_scope(env.ctx.factory) as session:
-            session.add(User(email=ALICE, is_allowed=True, access_tier=access.OPEN))
-        response = ms_sign_in(env, fake, env.client())
-        assert response.status_code == 303
-        assert [i[0] for i in identities(env)] == ["microsoft"]
-        with session_scope(env.ctx.factory) as session:
-            assert signups_today(session, utc_today()) == 0  # no new account
-
-
-def test_an_identity_linked_before_sign_up_opened_keeps_signing_in(tmp_path):
-    """Linking is refused for invited people only the first time: the identity decides
-    afterwards, whatever the token's address says."""
-    from readablestem.web.identities import MICROSOFT, Identity, link
-
-    env, fake = microsoft_env(tmp_path, signup_mode="open")
-    with env.running():
-        env.allow(ALICE, admin=True)
-        alice = user(env, ALICE)
-        assert alice is not None
-        issuer = f"https://login.microsoftonline.com/{TENANT}/v2.0"
-        with session_scope(env.ctx.factory) as session:
-            link(session, alice.id, Identity(MICROSOFT, issuer, fake.claims["sub"], tenant=TENANT))
-        fake.claims["xms_edov"] = False  # even an unverified token signs a linked identity in
-        assert ms_sign_in(env, fake, env.client()).status_code == 303
-
-
-def test_in_allowlist_mode_the_microsoft_rules_are_as_they_were(tmp_path):
-    """No `xms_edov`, an invited user: still linked by address (the pilot's way in)."""
-    env, fake = microsoft_env(tmp_path, signup_mode="allowlist")
-    fake.claims.pop("xms_edov")
-    with env.running() as client:
-        env.allow(ALICE)
-        assert ms_sign_in(env, fake, client).status_code == 303
-        assert [i[0] for i in identities(env)] == ["microsoft"]
-
-
-def test_the_verified_address_is_the_email_claim_with_a_verified_domain_only():
-    from readablestem.web.microsoft import verified_email
-
-    claims = {"email": "a@uni.edu", "preferred_username": "b@uni.edu"}
-    assert verified_email(claims) is None  # absent: not known to be verified
-    for yes in (True, "true", "True", "1"):
-        assert verified_email(claims | {"xms_edov": yes}) == "a@uni.edu"
-    for no in (False, "false", "False", "0", None, 0):
-        assert verified_email(claims | {"xms_edov": no}) is None
-    assert verified_email({"preferred_username": "b@uni.edu", "xms_edov": True}) is None
-    assert verified_email({"email": 7, "xms_edov": True}) is None

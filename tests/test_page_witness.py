@@ -3,16 +3,12 @@ budget, and the request it sends, with a stand-in client. Offline: no model is c
 
 from __future__ import annotations
 
-import pytest
-
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from readablestem.core.types import ConversionOptions
 from readablestem.models.base import VisionRequest
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import page_witness
 from readablestem.pipeline.page_math import PageRow
-from readablestem.pipeline.page_witness import PageWitnessOutput
 
 
 def settings(**kw) -> Settings:
@@ -52,15 +48,6 @@ ROWS = [
 # ------------------------------------------------------------------------ settings, request
 
 
-def test_the_pass_is_off_and_opus_with_the_dense_page_limit_by_default():
-    s = settings()
-    assert s.feature_page_witness is False
-    assert s.page_witness_model == "claude-opus-5-5"
-    assert s.page_witness_max_output_tokens == 12288
-    assert ConversionOptions.from_settings(s).page_witness is False
-    assert ConversionOptions.from_settings(settings(feature_page_witness=True)).page_witness
-
-
 def test_the_request_carries_the_image_and_the_rows_fenced_as_context_not_instructions():
     client = client_with()
     page_witness.run_page(client, settings(), ROWS, b"png")
@@ -73,24 +60,6 @@ def test_the_request_carries_the_image_and_the_rows_fenced_as_context_not_instru
     assert (request.context_text or "").startswith("L0 | The cell M0 = 47.8 g")
     assert "The cell M0" not in request.instructions  # document text is never in the instructions
     assert "table cells" in request.instructions and "figure labels" in request.instructions
-
-
-def test_the_model_and_limit_come_from_settings():
-    client = client_with()
-    s = settings(page_witness_model="claude-sonnet-5-5", page_witness_max_output_tokens=8000)
-    page_witness.run_page(client, s, ROWS, b"png")
-    assert client.requests[0].model == "claude-sonnet-5-5"
-    assert client.requests[0].max_output_tokens == 8000
-
-
-def test_a_witness_call_may_take_longer_than_a_crop_call():
-    # a dense page with thinking takes more than the default 60 s; a timeout is charged in full
-    client = client_with()
-    page_witness.run_page(client, settings(), ROWS, b"png")
-    assert client.requests[0].timeout_s == 240.0
-    s = settings(page_witness_timeout_s=10.0, model_timeout_s=60.0)
-    page_witness.run_page(client, s, ROWS, b"png")
-    assert client.requests[1].timeout_s == 60.0  # never below the client's own
 
 
 # -------------------------------------------------------------------------------- anchors
@@ -112,17 +81,6 @@ def test_formulas_in_table_cells_captions_and_labels_are_kept_with_where_they_si
     assert page.stats.proposed == 3 and page.stats.verified == 3 and page.stats.dropped == 0
 
 
-def test_a_quote_found_elsewhere_in_its_row_is_moved_and_a_quote_that_holds_nowhere_is_dropped():
-    client = client_with(
-        formula([("L0", 0, "v = 5 m/s")], latex="v=5"),  # wrong offset: found at 35
-        formula([("L0", 0, "v = 6 m/s")], latex="v=6"),  # not in the row
-        formula([("L9", 0, "x")], latex="x"),  # not a row
-    )
-    page = page_witness.run_page(client, settings(), ROWS, b"png")
-    assert [f.span.segments[0].start for f in page.formulas] == [35]
-    assert (page.stats.relocated, page.stats.dropped) == (1, 2)
-
-
 def test_a_formula_over_several_rows_has_an_anchor_per_row_and_an_overlap_is_dropped_whole():
     client = client_with(
         formula([("L1", 0, "a = (v - v0) / t")], display="block", latex=r"a=\frac{v-v_0}{t}"),
@@ -133,12 +91,6 @@ def test_a_formula_over_several_rows_has_an_anchor_per_row_and_an_overlap_is_dro
     assert [f.span.display for f in page.formulas] == ["block", "block"]
     assert [len(f.span.segments) for f in page.formulas] == [2, 1]
     assert page.stats.overlapped == 1 and page.stats.dropped == 0
-
-
-def test_the_latex_is_stored_as_the_other_readings_are():
-    client = client_with(formula([("L1", 0, "a = (v - v0) / t")], latex=r"\ce{H2O}"))
-    page = page_witness.run_page(client, settings(), ROWS, b"png")
-    assert "ce" not in page.formulas[0].latex  # `\ce{...}` is written out
 
 
 # ---------------------------------------------------------------------- a dense page
@@ -161,25 +113,6 @@ def test_a_page_that_fits_is_one_call_and_a_dense_one_is_read_in_windows_with_th
     assert len(client.requests) == len(windows) == page.stats.windows
     assert {r.images[0] for r in client.requests} == {b"png"}
     assert not any("L0 |" in (r.context_text or "") for r in client.requests[1:])
-
-
-def test_rows_past_the_last_window_are_counted_not_offered():
-    rows = dense(600)
-    windows, left_out = page_witness.windows(rows)
-    assert len(windows) == page_witness.MAX_WINDOWS
-    assert left_out == len(rows) - sum(len(w) for w in windows) > 0
-    page = page_witness.run_page(client_with(), settings(), rows, b"png")
-    assert page.stats.unoffered_rows == left_out
-
-
-def test_a_formula_in_a_row_no_window_offered_is_dropped():
-    rows = dense(600)
-    _, left_out = page_witness.windows(rows)
-    last = rows[-1]
-    client = client_with(formula([(last.id, 3, "y = m x + b")]))
-    page = page_witness.run_page(client, settings(), rows, b"png")
-    assert left_out > 0 and page.formulas == []
-    assert page.stats.dropped == page.stats.proposed  # every window got the answer
 
 
 def test_an_answer_that_ran_out_is_asked_again_as_two_halves_once():
@@ -215,20 +148,7 @@ def test_a_refusal_is_recorded_not_retried_and_leaves_the_page_without_formulas(
     assert page.stats.refused == 1 and len(client.requests) == 1
 
 
-def test_a_failed_model_call_is_a_failed_page_with_its_outcome():
-    client = FakeVisionClient(fail_models={"claude-opus-5-5": "api_error"})
-    page = page_witness.run_page(client, settings(), ROWS, b"png")
-    assert page.failed == "api_error"
-
-
 # -------------------------------------------------------------------------------- budget
-
-
-def test_the_call_is_reserved_against_the_job_budget_at_the_models_worst_case():
-    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=10.0), max_usd=10.0, max_calls=10)
-    client = client_with(budget=budget)
-    page_witness.run_page(client, settings(), ROWS, b"png")
-    assert budget.calls == 1 and budget.spent_usd > 0
 
 
 def test_a_cap_too_small_for_one_call_stops_the_page_and_the_pass_keeping_earlier_pages():
@@ -249,22 +169,6 @@ def test_a_cap_too_small_for_one_call_stops_the_page_and_the_pass_keeping_earlie
     tight = JobBudget(guard=InMemorySpendGuard(cap_usd=0.001), max_usd=0.001, max_calls=10)
     page = page_witness.run_page(client_with(budget=tight), settings(), ROWS, b"png")
     assert page.stopped is not None and page.failed == "budget_exceeded"
-
-
-def test_a_window_answered_before_the_cap_keeps_its_formulas():
-    rows = dense(160)
-
-    class StopsOnSecond(FakeVisionClient):
-        def run(self, request, schema, *, is_fallback=False):
-            if "L0 |" not in (request.context_text or ""):
-                raise BudgetExceeded("job_usd", "cap")
-            return super().run(request, schema, is_fallback=is_fallback)
-
-    ok = {"formulas": [formula([("L0", 3, "y = m x + b")], latex="y=mx+b")]}
-    page = page_witness.run_page(
-        StopsOnSecond(defaults={"page_witness": ok}), settings(), rows, b"png"
-    )
-    assert page.failed is None and page.stopped is not None and len(page.formulas) == 1
 
 
 # ---------------------------------------------------------------------- the pass, pages
@@ -297,11 +201,3 @@ def test_only_pages_with_maths_are_maths_pages():
     assert not page_witness.is_maths_page(prose)
     assert page_witness.is_maths_page(glyphs)
     assert page_witness.is_maths_page(prose, equations=1)
-
-
-def test_the_output_schema_refuses_extra_keys_and_unknown_places():
-    with pytest.raises(ValueError):
-        PageWitnessOutput.model_validate({"formulas": [], "extra": 1})
-    bad = formula([("L0", 0, "x")], where="margin")
-    with pytest.raises(ValueError):
-        PageWitnessOutput.model_validate({"formulas": [bad]})

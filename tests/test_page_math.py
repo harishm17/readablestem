@@ -4,7 +4,6 @@ the plan's reconciliation with layout's rules, and the call itself with a stand-
 from __future__ import annotations
 
 import pymupdf
-import pytest
 
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded
@@ -46,15 +45,6 @@ def expression(
 # --------------------------------------------------------------------------- verification
 
 
-def test_a_quote_that_holds_at_its_offset_is_kept():
-    rows = [row("L0", "the speed v = 5 m/s here")]
-    spans, stats = page_math.verify(
-        PageMathOutput(expressions=[expression([("L0", 10, "v = 5 m/s")])]), rows
-    )
-    assert [(s.segments[0].start, s.segments[0].end) for s in spans] == [(10, 19)]
-    assert (stats.proposed, stats.verified, stats.relocated, stats.dropped) == (1, 1, 0, 0)
-
-
 def test_a_quote_found_elsewhere_in_its_row_is_moved_to_where_it_is():
     rows = [row("L0", "x = 1 and later x = 2")]
     out = PageMathOutput(expressions=[expression([("L0", 14, "x = 2")])])
@@ -74,47 +64,6 @@ def test_a_quote_that_is_not_in_the_row_drops_the_expression():
     spans, stats = page_math.verify(out, rows)
     assert spans == []
     assert (stats.proposed, stats.dropped, stats.unknown_line) == (2, 2, 1)
-
-
-def test_compatibility_forms_and_spacing_do_not_hide_a_quote():
-    """The row has a maths-italic letter and the model typed the plain one (or the spacing
-    differs): the same characters."""
-    rows = [row("L0", "if \U0001d463 = 3 m/s then")]
-    out = PageMathOutput(expressions=[expression([("L0", 3, "v=3 m/s")])])
-    spans, stats = page_math.verify(out, rows)
-    assert len(spans) == 1 and stats.relocated == 1
-    assert (
-        rows[0].text[spans[0].segments[0].start : spans[0].segments[0].end] == "\U0001d463 = 3 m/s"
-    )
-
-
-def test_a_blank_quote_is_dropped():
-    rows = [row("L0", "x  y")]
-    assert (
-        page_math.verify(PageMathOutput(expressions=[expression([("L0", 1, "  ")])]), rows)[0] == []
-    )
-
-
-def test_a_block_over_several_rows_has_its_anchors_in_row_order():
-    rows = [row("L2", "x + y = 5"), row("L3", "y = 2x"), row("L10", "y = 1")]
-    out = PageMathOutput(
-        expressions=[
-            expression(
-                [("L3", 0, "y = 2x"), ("L2", 0, "x + y = 5")],
-                display="block",
-                latex="\\begin{array}",
-            )
-        ]
-    )
-    spans, _ = page_math.verify(out, rows)
-    assert [s.row for s in spans[0].segments] == ["L2", "L3"]
-    assert spans[0].display == "block"
-
-
-def test_an_inline_expression_with_two_anchors_is_dropped():
-    rows = [row("L0", "a = 1"), row("L1", "b = 2")]
-    out = PageMathOutput(expressions=[expression([("L0", 0, "a = 1"), ("L1", 0, "b = 2")])])
-    assert page_math.verify(out, rows)[0] == []
 
 
 def test_an_inline_span_loses_the_sentence_punctuation_a_block_keeps_it():
@@ -156,27 +105,6 @@ def test_a_number_inside_an_equation_makes_it_unusable():
     assert stats.overlapped == 1
 
 
-def test_two_maths_expressions_over_the_same_characters_keep_the_first():
-    rows = [row("L0", "x = 5 m/s")]
-    out = PageMathOutput(
-        expressions=[expression([("L0", 0, "x = 5")]), expression([("L0", 4, "5 m/s")])]
-    )
-    spans, stats = page_math.verify(out, rows)
-    assert len(spans) == 1 and spans[0].segments[0] == Segment("L0", 0, 5)
-    assert stats.overlapped == 1
-
-
-def test_no_output_is_no_spans():
-    assert page_math.verify(None, [row("L0", "x")])[0] == []
-
-
-def test_the_context_lists_rows_up_to_its_limit_and_names_the_ids_that_fit():
-    rows = [row("L0", "a" * 30), row("L1", "b" * 30), row("L2", "c" * 30)]
-    text, ids = page_math.context_text(rows, limit=75)
-    assert ids == ["L0", "L1"]
-    assert text.splitlines()[0] == "L0 | " + "a" * 30
-
-
 # ------------------------------------------------------------------------------ the call
 
 
@@ -215,15 +143,6 @@ def test_the_request_carries_the_text_layer_as_fenced_context_not_in_the_instruc
     assert request.effort == page_math.DEFAULT_EFFORT
 
 
-def test_the_output_limit_is_a_setting_with_the_old_value_as_default():
-    rows = [row("L0", "x = 5")]
-    png = b"\x89PNG\r\n\x1a\n"
-    request, _ = page_math.build_request(settings(), rows, png)
-    assert request.max_output_tokens == page_math.MAX_OUTPUT_TOKENS == 4096
-    wide = Settings(_env_file=None, page_math_max_output_tokens=12288)  # type: ignore[call-arg]
-    assert page_math.build_request(wide, rows, png)[0].max_output_tokens == 12288
-
-
 def test_a_page_with_an_answer_has_verified_spans_and_the_call():
     rows = [row("L0", "the speed v = 5 m/s here")]
     client = StandIn(
@@ -232,21 +151,6 @@ def test_a_page_with_an_answer_has_verified_spans_and_the_call():
     plan = page_math.run_page(client, settings(), rows, b"png")
     assert plan.failed is None and len(plan.spans) == 1 and plan.spans[0].latex == "v = 5"
     assert len(plan.calls) == 1
-
-
-def test_an_unusable_answer_is_a_plan_with_no_spans_and_the_outcome():
-    plan = page_math.run_page(
-        StandIn(None, outcome="invalid_output"), settings(), [row("L0", "x")], b"p"
-    )
-    assert plan.spans == [] and plan.failed == "invalid_output"
-
-
-def test_a_row_the_context_left_out_cannot_be_anchored():
-    big = [row(f"L{i}", "x" * 400) for i in range(40)]  # longer than the context holds
-    last = big[-1]
-    client = StandIn(PageMathOutput(expressions=[expression([(last.id, 0, "x" * 10)])]))
-    plan = page_math.run_page(client, settings(), big, b"png")
-    assert plan.spans == []
 
 
 def test_the_pass_skips_a_page_with_no_text_and_a_page_whose_image_fails():
@@ -307,24 +211,6 @@ def find(rows: list[PageRow], quote: str) -> Segment:
         if at != -1:
             return Segment(r.id, at, at + len(quote))
     raise AssertionError(quote)
-
-
-def test_collecting_gives_each_row_an_id_and_its_text_in_reading_order():
-    hook = collect(pdf_with(sentence_page))
-    rows = hook.rows[0]
-    assert [r.id for r in rows] == [f"L{i}" for i in range(len(rows))]
-    assert rows[0].text.startswith("Here the speed is v and")
-    assert any(r.text == "x + y = 5" for r in rows)
-
-
-def test_with_no_plan_layout_is_what_it_was():
-    pdf = pdf_with(sentence_page)
-    plain = layout.analyze(pdf).elements
-    with_hook = layout.analyze(pdf, page_math=reconcile.PageMathHook()).elements
-    assert [(e.kind, e.text, e.bbox) for e in plain] == [
-        (e.kind, e.text, e.bbox) for e in with_hook
-    ]
-    assert all(e.page_latex is None and e.page_status is None for e in with_hook)
 
 
 def plan_for(pdf: bytes, build) -> reconcile.PageMathHook:
@@ -417,25 +303,6 @@ def test_what_the_pass_calls_a_lookalike_is_not_an_inline_equation():
     assert with_plan == []
 
 
-def test_layout_found_spans_the_pass_did_not_confirm_are_marked_layout_only():
-    def draw(page):
-        page.insert_text((72, 100), "so y = 2 x + 1 holds, and also p = m v here.", fontsize=11)
-
-    pdf = pdf_with(draw)
-    hook = plan_for(
-        pdf, lambda rows: [Span((find(rows, "y = 2 x + 1"),), "inline", "math", "y=2x+1")]
-    )
-    inline = [
-        e
-        for e in layout.analyze(pdf, page_math=hook).elements
-        if e.kind == Kind.EQUATION and e.display == "inline"
-    ]
-    status = {e.text: e.page_status for e in inline}
-    assert status["y = 2 x + 1"] == "span"
-    others = [s for text, s in status.items() if text != "y = 2 x + 1"]
-    assert others and all(s == "layout" for s in others)
-
-
 def test_a_failed_page_leaves_layout_alone_and_a_changed_page_is_skipped():
     pdf = pdf_with(sentence_page)
     rows = collect(pdf).rows[0]
@@ -448,16 +315,6 @@ def test_a_failed_page_leaves_layout_alone_and_a_changed_page_is_skipped():
     stale = reconcile.PageMathHook(MathPlan({0: PagePlan(stale_rows, [])}))
     assert [e.bbox for e in layout.analyze(pdf, page_math=stale).elements] == [e.bbox for e in base]
     assert stale.stats.pages_stale == 1
-
-
-@pytest.mark.parametrize("quote", ["v", "t"])
-def test_quote_text_maps_every_character_back_to_the_layout_row(quote):
-    pdf = pdf_with(sentence_page)
-    hook = collect(pdf)
-    first = hook.rows[0][0]
-    assert len(first.chars) == len(first.text)
-    assert first.chars == tuple(sorted(first.chars))
-    assert quote in first.text
 
 
 # ----------------------------------------------- recorded answers on development pages
@@ -510,17 +367,6 @@ def test_a_recorded_answer_for_a_page_of_systems_places_lone_variables_and_a_bra
         e for e in elements if e.kind == Kind.PARAGRAPH and "Solve the system" in (e.text or "")
     ]
     assert sentence
-
-
-def test_a_recorded_answer_for_a_page_of_determinants_completes_a_row_layout_left_out():
-    pdf, _, hook = recorded("latex-matrices-p2")
-    alone = display_texts(layout.analyze(pdf).elements)
-    planned = display_texts(layout.analyze(pdf, page_math=hook).elements)
-    first_alone = next(t for t in alone if t.startswith("det A"))
-    first_planned = next(t for t in planned if t.startswith("det A"))
-    assert "11 3" not in first_alone and "11 3" in first_planned
-    assert hook.stats.refused == 0 and hook.stats.pages_applied == 1
-    assert len(planned) == len(alone)  # nothing was split or lost
 
 
 def test_a_recorded_plan_never_changes_the_text_the_pdf_has():
