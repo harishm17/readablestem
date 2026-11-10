@@ -153,9 +153,9 @@ def no_js_violations(browser, site, path: str, axe_source: str) -> list[dict]:
     sign_in(page, site.base, ALICE)
     response = page.goto(site.base + path)
     assert response is not None and response.status == 200
+    page.evaluate("document.querySelectorAll('script').forEach(s => s.remove())")
     html = page.content()
     nojs.close()
-    html = re.sub(r"<script\b[^>]*>.*?</script\s*>", "", html, flags=re.S | re.I)
     html = html.replace("<noscript>", "").replace("</noscript>", "")
     context = browser.new_context(bypass_csp=True, java_script_enabled=True)
     page = context.new_page()
