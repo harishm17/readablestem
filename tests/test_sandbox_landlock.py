@@ -653,3 +653,38 @@ def test_the_probe_checks_that_growth_is_killed(tmp_path, monkeypatch):
     finally:
         monkeypatch.undo()
         sandbox.backend.cache_clear()
+
+
+def test_the_dynamic_loader_can_run_a_file_the_program_wrote_but_it_stays_confined(tmp_path):
+    """Landlock does not check PROT_EXEC mappings, and the kernel needs the right to execute the
+    loader for every program, so a file written to the output folder can be run through
+    `ld.so`. That is native code under the same ruleset and filter as Perl: it cannot read what
+    Perl cannot, and cannot make the calls Perl cannot (docs/security.md, residual risks)."""
+    loader = next(
+        (
+            p
+            for p in ("/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1")
+            if Path(p).exists()
+        ),
+        None,
+    )
+    if loader is None:
+        pytest.skip("no dynamic loader at the usual place")
+    code = (
+        'my $out = $ARGV[0]; my $dst = "$out/mycat"; open(my $s, "<", "/usr/bin/cat") or die;'
+        " binmode $s; my $d = do { local $/; scalar readline($s) };"
+        ' open(my $o, ">", $dst) or die; binmode $o; print $o $d; close $o; chmod(0755, $dst);'
+        ' $! = 0; my $direct = system($dst, "/usr/bin/true"); my $e1 = $!+0;'
+        f' my $ok = system("{loader}", $dst, "/usr/share/zoneinfo/UTC") >> 8;'
+        f' my $secret = system("{loader}", $dst, "/etc/passwd") >> 8;'
+        f' my $proc = system("{loader}", $dst, "/proc/1/environ") >> 8;'
+        ' open(my $r, ">", "$out/result"); '
+        'print $r "direct:" . ($direct == 0 ? "RAN" : "no");'
+        ' print $r ",ld_ok:$ok,passwd:$secret,proc:$proc";'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    assert outcome.ok, text
+    result = (tmp_path / "out" / "result").read_text()
+    got = dict(item.split(":") for item in result.split(","))
+    assert got["direct"] == "no"  # no execute right on the output folder
+    assert got["passwd"] != "0" and got["proc"] != "0"  # still no /etc/passwd, no /proc
