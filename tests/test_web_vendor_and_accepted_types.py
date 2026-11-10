@@ -21,12 +21,14 @@ from fixtures.web.support import ALICE, WebEnv, csrf_from, login, make_pdf
 from readablestem.web import office_convert, offices, seo
 
 ANTHROPIC_LINE = (
-    "Pictures of the equations and figures in your file, with a little nearby text, go to "
-    "Anthropic's Claude models to propose readings. They are not used to train models."
+    "Pictures of the equations, figures and tables in your file, with a little nearby text, go to "
+    "Anthropic's Claude models to propose readings, and so do whole pages you ask to have read "
+    "as scans. They are not used to train models."
 )
 OPENAI_LINE = (
-    "Pictures of the equations and figures in your file, with a little nearby text, go to "
-    "OpenAI's models to propose readings. They are not used to train models."
+    "Pictures of the equations, figures and tables in your file, with a little nearby text, go to "
+    "OpenAI's models to propose readings, and so do whole pages you ask to have read as "
+    "scans. They are not used to train models."
 )
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
