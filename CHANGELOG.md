@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
+
+- Upload: one visible line beside "Upload and convert" says who receives the pictures of equations
+  and figures (the recipient with the "model" purpose in `web.recipients`, so it follows
+  `MODEL_PROVIDER`), links to `/privacy#who-else-sees`, and is the same include
+  (`_vendor_line.html`) as the landing page's "What happens to your documents" answer. The
+  duplicate hint "Uploads are never used to train models." is gone.
+- Offices: the continuity section says what happens if the hosted service closes.
+- File types: one helper (`office_convert.accepted_types`) and one include
+  (`_accepted_types.html`) state what the installation takes (PDF, LaTeX when on, Word and
+  PowerPoint only when LibreOffice is installed, with how to save a PDF when it is not). The
+  upload form, `/limits`, the landing page, the ADA guide, the comparison guide, the refusal
+  messages and the before-submit script all use it.
+- US spelling and US date order in every visible string, with `tests/test_us_spelling.py` as a
+  guard. "Tick" for a checkbox is now "check".
+
 ## Unreleased: a shorter homepage (branch ux2/home-compact)
 
 - Landing: the before/after is one compact block, "Hear the difference": the same equation read two

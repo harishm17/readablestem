@@ -116,7 +116,7 @@ def strict_axe(page, axe_source: str) -> list[dict]:
 
 def upload(page, site, *, ask: bool) -> None:
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF files").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": SCAN}]
     )
     if ask:

@@ -73,7 +73,7 @@ def test_a_decision_is_listed_with_who_when_and_what_the_tool_had(web):
     assert "Accepted" in words and "Rejected, original kept" in words
     assert "Asked for a decision" in words  # what the tool had for the first
     assert ALICE in words  # by whom
-    assert re.search(r"\d{1,2} \w+ 20\d\d, \d\d:\d\d UTC", words)  # when
+    assert re.search(r"\w+ \d{1,2}, 20\d\d, \d\d:\d\d UTC", words)  # when
     assert "Equation 1" in words
 
 

@@ -39,21 +39,21 @@
      24-hour and 7-day clocks restart on every review decision, language, title or contact
      change, and download; "Keep for 7 days" on the job page makes a 24-hour document a
      7-day one, counted from that moment; the "let us look" choice is 30 days from upload and does not restart. #}
-  <li>If neither box is ticked on the upload form (the default, unless you saved 7 days in
+  <li>If neither box is checked on the upload form (the default, unless you saved 7 days in
     <a href="/account#account-keep">Account</a>), all of it is deleted automatically
     <strong>{{ retention_hours }} hours</strong> after you last worked on it: after your
     last review decision or download, or the upload if there is none. From that moment it
     can no longer be opened or downloaded; an hourly clean-up then removes it from the
     database, normally within the hour.</li>
-  <li>If you tick "Keep for 7 days", it is deleted
+  <li>If you check "Keep for 7 days", it is deleted
     <strong>7 days</strong> after you last worked on it instead. Nobody else looks at it.
     "Keep for 7 days" on the document's page does the same later, and shows the day it
     will then be deleted.</li>
-  <li>If you also tick "Also let us look at the results ({{ opt_in_days }} days)", it is
+  <li>If you also check "Also let us look at the results ({{ opt_in_days }} days)", it is
     deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
     who run ReadableSTEM may look at the conversion results to find and fix mistakes in the
     tool. Both boxes
-    are unticked unless you tick them; “Keep for 7 days” can be made the default for new
+    are unchecked unless you check them; “Keep for 7 days” can be made the default for new
     uploads in <a href="/account">Account</a>.</li>
   <li>Only your own work restarts these times; a person you share with does not keep it longer.</li>
   <li>You can delete a document and everything made from it at any time with
@@ -79,7 +79,7 @@
 </ul>
 </details>
 
-<h2>Who else sees your documents</h2>
+<h2 id="who-else-sees">Who else sees your documents</h2>
 <ul>
   {% for r in recipients %}
   {% if "model" in r.purposes %}
@@ -87,7 +87,7 @@
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
     nearby text, are sent to {{ r.name }}'s API{% if r.name == "Anthropic" %} (the Claude models){% endif %}.{% if notation_on %} For a document you upload
     for one of your courses, that course's notation (its symbols and what they mean) is
-    sent with the equations.{% endif %}{% if image_pages_on %} If you tick “Convert scanned or
+    sent with the equations.{% endif %}{% if image_pages_on %} If you check “Convert scanned or
     handwritten pages”, a picture of each scanned or handwritten page is sent as well.{% endif %}{% if "handwriting" in r.purposes %}
     A close-up picture of a handwritten expression can also be sent, to be read a second time.{% endif %}
     {{ retention(r.name) }}</li>
@@ -123,7 +123,7 @@
   is verified. <strong>The first time you sign in, we make an account for you.</strong> It
   stores your email address, your name, the time of your last sign-in, and the id your
   sign-in provider gives your account{% if microsoft_on %} (for Microsoft, also your
-  organisation's directory id){% endif %}, so we know it is you next time, and whether you
+  organization's directory id){% endif %}, so we know it is you next time, and whether you
   chose to keep new documents for 7 days by default. An account is
   made only for a verified address, and only while the day's sign-ups are not full.
   If a sign-in is turned away, nothing is stored about it. We also keep a count of the
@@ -149,7 +149,7 @@
   account){% endif %}. We receive your email address, your name, and whether the address
   is verified. For people on the beta list we store the email address, name, the time of
   the last sign-in, and the id your sign-in provider gives your account{% if microsoft_on %}
-  (for Microsoft, also your organisation's directory id){% endif %}, so we know it is you
+  (for Microsoft, also your organization's directory id){% endif %}, so we know it is you
   next time, and whether you chose to keep new documents for 7 days by default. If you sign in and are not on the list, nothing is stored about you. You can
   delete your account yourself from the <a href="/account">Account</a> page once you are
   signed in.</p>

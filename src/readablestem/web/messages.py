@@ -42,13 +42,13 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("latex.balanced_environments", "unbalanced_env"): "A \\begin{...} has no matching "
     "\\end{...} (or the other way round).",
     ("latex.no_math_delimiters", "math_delimiter"): "The LaTeX contains a $ sign: remove the "
-    "$...$ delimiters and keep only the maths.",
+    "$...$ delimiters and keep only the math.",
     ("latex.no_comments", "comment"): "The LaTeX contains a % comment, which hides the rest of "
     "the line (write a percent sign as \\%).",
     ("latex.no_forbidden_commands", "forbidden_command"): "The LaTeX uses a command that could "
     "read files or change settings, so it is never allowed.",
     ("latex.allowed_commands", "unknown_command"): "The LaTeX uses a command that is not on "
-    "the list of supported maths commands, so check for a typo or rewrite it.",
+    "the list of supported math commands, so check for a typo or rewrite it.",
     ("latex.allowed_commands", "unsupported_ce"): "The chemistry in \\ce{...} is outside what "
     "this tool can read, so write the formula with ordinary LaTeX.",
     ("latex.allowed_environments", "unknown_environment"): "The LaTeX uses an environment "
@@ -68,7 +68,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "shown.",
     ("mathml.root", "wrong_root"): "The MathML does not start with a <math> element.",
     ("mathml.root", "missing_namespace"): "The MathML has no MathML namespace, so browsers "
-    "would not show it as maths.",
+    "would not show it as math.",
     ("mathml.root", "nested_math"): "The MathML has a <math> element inside another one.",
     ("mathml.known_elements", "unknown_element"): "The MathML uses an element that is not on "
     "the list of supported ones.",
@@ -82,7 +82,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("mathml.structure", "bad_arity"): "A fraction, root, subscript or similar has the wrong "
     "number of parts, often because an argument is missing.",
     ("mathml.converted", "unconverted_command"): "Part of the LaTeX was copied through as text "
-    "instead of becoming maths, often because of an unsupported command.",
+    "instead of becoming math, often because of an unsupported command.",
     # Equations (pipeline.equation_step)
     ("speech.generated", "speech_failed"): "The spoken version could not be made, though the "
     "equation itself may still be right.",
@@ -104,7 +104,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "dropped), so check the minus signs, plus/minus, relations and arrows.",
     ("equation.text_layer_species", "species_mismatch"): "A formula, charge, state or arrow "
     "differs from the PDF (a count, element or minus sign changed, a reaction cut short, or "
-    "a neighbouring word taken in), so compare each formula with the image.",
+    "a neighboring word taken in), so compare each formula with the image.",
     ("equation.text_layer_style", "style_mismatch"): "A style that carries meaning differs "
     "from the PDF (a bold vector or double-struck letter shown plain, or the reverse), so "
     "check those letters.",
@@ -154,7 +154,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "picture of this equation and read it the same way; the original page is still the only "
     "thing that can confirm it.",
     ("image_page.maths_always_checked", "maths_checked"): "This was read from an image and holds "
-    "maths, and every such block is checked, however sure the reader was: compare each formula "
+    "math, and every such block is checked, however sure the reader was: compare each formula "
     "with the original page symbol by symbol.",
     ("image_page.illegible", "illegible"): "Some of this could not be read and is marked "
     "[illegible]: look at the original page and write what it says.",
@@ -200,7 +200,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "as it stands.",
     # Alt text (pipeline.validate.check_alt)
     ("alt.decorative", "decorative_with_text"): "A decorative figure must have empty alt "
-    "text, so clear the text or untick Decorative.",
+    "text, so clear the text or uncheck Decorative.",
     ("alt.not_empty", "empty"): "The alt text is empty: describe the figure, or mark it as "
     "decorative.",
     ("alt.length", "too_long"): f"The alt text is long: aim for {ALT_WARN_CHARS} characters or "
@@ -251,21 +251,21 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("table.edge_text", "text_at_edge"): "There is text right under this table, in the same "
     "size and lined up with one of its columns, that is not in a cell: probably the rest of a "
     "wrapped cell, so check the last row against the image.",
-    ("table.math", "invalid_latex"): "The maths in a cell could not be converted, so that "
+    ("table.math", "invalid_latex"): "The math in a cell could not be converted, so that "
     "cell shows plain text instead: check it against the image.",
-    ("table.math", "flattened_maths"): "Some cells of the grid read from the PDF hold maths "
+    ("table.math", "flattened_maths"): "Some cells of the grid read from the PDF hold math "
     "that its text gives flat (a fraction, or an accent such as a vector arrow), so the "
     "table cannot be used as it is: write those cells as LaTeX, or keep the image.",
-    ("table.math_symbols", "symbol_mismatch"): "A letter, digit or Greek letter in a maths "
+    ("table.math_symbols", "symbol_mismatch"): "A letter, digit or Greek letter in a math "
     "cell differs from the text stored in the PDF, so compare that cell with the image "
     "symbol by symbol.",
-    ("table.math_signs", "sign_mismatch"): "A sign or relation in a maths cell differs from "
+    ("table.math_signs", "sign_mismatch"): "A sign or relation in a math cell differs from "
     "the PDF (a minus missing or added, ± read as +, = and ≈ mixed up), so check the signs "
-    "in the maths cells.",
+    "in the math cells.",
     ("table.math_style", "style_mismatch"): "A style that carries meaning differs from the "
-    "PDF in a maths cell (a bold vector read as a plain letter, or the other way round), so "
+    "PDF in a math cell (a bold vector read as a plain letter, or the other way round), so "
     "check those letters.",
-    ("table.math_style", "style_cosmetic"): "A letter's style in a maths cell differs from "
+    ("table.math_style", "style_cosmetic"): "A letter's style in a math cell differs from "
     "the PDF only where it does not change the meaning, so this was accepted as it is.",
     ("table.row_headers", "row_headers_dropped"): "A column of row labels comes after data "
     "cells and could not be used as one, so the table has no row headers: check that each "
@@ -340,7 +340,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "or a place in the document itself.",
     ("html.lang_tags", "invalid_lang"): "A language marked in the document is not a valid "
     "language code.",
-    ("html.text_contrast", "low_contrast"): "Some coloured text is too light to read easily "
+    ("html.text_contrast", "low_contrast"): "Some colored text is too light to read easily "
     "on the white background.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
@@ -409,10 +409,10 @@ REASON_MESSAGES: dict[str, str] = {
     # Final wording for the beta (handwriting design, section 3.3).
     "handwritten_page": "This page is handwritten and was not converted, so it is kept as an "
     "image, marked “Not converted” (upload again with “Convert scanned or handwritten pages” "
-    "ticked).",
+    "checked).",
     "scanned_page": "This page is a scanned image and was not converted, so it is kept as an "
     "image, marked “Not converted” (upload again with “Convert scanned or handwritten pages” "
-    "ticked).",
+    "checked).",
     "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
     "image, marked “Not converted”.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
@@ -444,10 +444,10 @@ NOTICE_MESSAGES: dict[str, str] = {
     "indentation, without highlighting.",
     "footnote": "A footnote is kept where it falls in the text; its mark in the text links "
     "to it where the mark could be found.",
-    "colour_reference": "The text refers to a colour (for example, shown in red), so add "
-    "a cue that does not depend on seeing the colour.",
-    "colour_only": "A figure tells things apart by colour alone, so add labels or patterns "
-    "that do not depend on seeing the colour.",
+    "colour_reference": "The text refers to a color (for example, shown in red), so add "
+    "a cue that does not depend on seeing the color.",
+    "colour_only": "A figure tells things apart by color alone, so add labels or patterns "
+    "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
     "could not be kept and is written on the line, so check it reads right.",
     "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
@@ -487,10 +487,10 @@ TABLE_CHECK_PARTS = {
     "table.row_headers": "row headers",
     "table.cell_text": "words and numbers",
     "table.edge_text": "words and numbers",
-    "table.math": "maths cells",
-    "table.math_symbols": "maths cells",
-    "table.math_signs": "maths cells",
-    "table.math_style": "maths cells",
+    "table.math": "math cells",
+    "table.math_symbols": "math cells",
+    "table.math_signs": "math cells",
+    "table.math_style": "math cells",
 }
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
 UNKNOWN_NOTICE_MESSAGE = "Something in this file may need a look."

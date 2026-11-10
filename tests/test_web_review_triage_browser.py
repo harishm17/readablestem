@@ -70,7 +70,7 @@ def job(site, browser) -> str:
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": make_pdf(3)}]
     )
     page.get_by_role("button", name="Upload and convert").click()

@@ -472,7 +472,7 @@ def test_the_note_says_checked_with_the_date_once_every_decision_is_made():
     fixes[1].status, fixes[1].reviewed = Status.ACCEPTED, True
     done = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
                        checked_on=date(2026, 10, 9))  # fmt: skip
-    assert f"<p>{CHECKED} on 9 October 2026.</p>" in about(done)
+    assert f"<p>{CHECKED} on October 9, 2026.</p>" in about(done)
     undated = render(elements, fixes)
     assert f"<p>{CHECKED}.</p>" in about(undated)
 

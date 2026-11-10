@@ -226,8 +226,8 @@ def send_many(site: WebEnv, files: list[tuple[str, bytes]], **fields):
 @SIZES
 def test_the_upload_form_for_several_files_passes_axe(site, browser, axe_source, viewport):
     context, page = look(site, browser, axe_source, "/app", viewport, "upload-form", "upload form")
-    expect(page.get_by_label("PDF files")).to_be_visible()
-    assert page.get_by_label("PDF files").get_attribute("multiple") is not None
+    expect(page.locator("#pdf")).to_be_visible()
+    assert page.locator("#pdf").get_attribute("multiple") is not None
     assert not sideways_overflow(page)
     context.close()
 
@@ -239,7 +239,7 @@ def test_choosing_too_many_files_is_said_at_once_and_nothing_is_sent(site, brows
         {"name": f"f{n}.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)}
         for n in range(31)  # invited people take 30 files at a time, the open tier 10
     ]
-    page.get_by_label("PDF files").set_input_files(files=files)
+    page.locator("#pdf").set_input_files(files=files)
     expect(page.locator("#pdf-check")).to_contain_text("You chose 31 files. Upload 30 or fewer")
     page.get_by_role("button", name="Upload and convert").click()
     expect(page).to_have_url(f"{site.base}/app")
@@ -258,7 +258,7 @@ def test_the_results_of_an_upload_of_several_files_pass_axe(site, browser, axe_s
         {"name": "scan.pdf", "mimeType": "application/pdf", "buffer": make_pdf(12)},
         {"name": "notes.docx", "mimeType": "application/pdf", "buffer": b"PK not a pdf"},
     ]
-    page.get_by_label("PDF files").set_input_files(files=files)
+    page.locator("#pdf").set_input_files(files=files)
     page.get_by_role("button", name="Upload and convert").click()
     page.wait_for_selector("h1")
     expect(page.get_by_role("heading", level=1)).to_contain_text("3 of 4 files uploaded")
@@ -283,7 +283,7 @@ def test_the_batch_page_passes_axe_and_its_live_region_is_polite(
         {"name": "week1.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)},
         {"name": "week2.pdf", "mimeType": "application/pdf", "buffer": make_pdf(2)},
     ]
-    page.get_by_label("PDF files").set_input_files(files=files)
+    page.locator("#pdf").set_input_files(files=files)
     page.get_by_role("button", name="Upload and convert").click()
     page.wait_for_selector("h1")
     assert page.url.startswith(f"{site.base}/app/batch/")

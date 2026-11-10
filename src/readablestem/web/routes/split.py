@@ -303,7 +303,7 @@ class ReadyView:
 
     title: str  # "Ready to share", "Ready", or a stopped job's outcome label
     sentence: str  # what is shown as an image, or why the job stopped ("" when neither)
-    finish: str  # "You made 3 decisions on 9 October." / "Nothing in this file needed ..."
+    finish: str  # "You made 3 decisions on October 9." / "Nothing in this file needed ..."
     notes: int  # items accepted for you with a note (optional to look at)
     shareable: bool  # the file can go to students (not a job that stopped early)
 

@@ -711,7 +711,7 @@ def read_cell(
     return RedirectResponse(review_url(owned_id, item=element_id), status_code=303)
 
 
-NOT_READ = "The tool could not read this cell as maths. Type the LaTeX yourself."
+NOT_READ = "The tool could not read this cell as math. Type the LaTeX yourself."
 
 
 def _marked_model_read(change: ReviewChange) -> ReviewChange:

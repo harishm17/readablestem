@@ -279,7 +279,7 @@ def test_pages_do_not_offer_word_when_libreoffice_is_missing(tmp_path):
         limits = " ".join(client.get("/limits").text.split())
     assert "data-office" not in app and ".docx" not in app
     assert "Word or PowerPoint" not in privacy and "LibreOffice" not in privacy
-    assert "Only PDF files are taken" in limits
+    assert "You can upload a PDF file. For a Word or PowerPoint file, save a copy" in limits
 
 
 def test_launch_check_lists_a_half_set_microsoft_sign_in(tmp_path):

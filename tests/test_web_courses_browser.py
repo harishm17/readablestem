@@ -98,7 +98,7 @@ def add_symbol(page, symbol: str, meaning: str = "A vector", note: str = "") -> 
 
 def convert_for(page, site, course_name: str) -> str:
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "vectors.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
     page.locator("#group-convert > summary").click()  # the groups are one line until opened

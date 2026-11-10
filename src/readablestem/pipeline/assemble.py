@@ -1234,8 +1234,8 @@ def _notice(text: str | None) -> str | None:
 
 
 def long_date(day: date) -> str:
-    """The date as "9 October 2026", read the same on either side of the Atlantic."""
-    return f"{day.day} {day:%B %Y}"
+    """The date as "October 9, 2026" (US order, as the rest of the site)."""
+    return f"{day:%B} {day.day}, {day.year}"
 
 
 def _review_line(fixes: list[Fix], checked_on: date | None) -> str:

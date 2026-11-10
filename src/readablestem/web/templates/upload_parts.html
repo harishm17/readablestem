@@ -66,7 +66,7 @@
   <div class="field checkbox-field">
     <input type="checkbox" id="shrink" name="shrink" value="on" aria-describedby="shrink-hint"{% if shrink %} checked{% endif %}>
     <label for="shrink">Shrink large pictures first</label>
-    <p class="hint" id="shrink-hint">{% if heavy %}Ticked because this file is large. {% endif %}Pictures above {{ shrink_from }} dpi are saved at {{ shrink_to }}; text is unchanged.</p>
+    <p class="hint" id="shrink-hint">{% if heavy %}Checked because this file is large. {% endif %}Pictures above {{ shrink_from }} dpi are saved at {{ shrink_to }}; text is unchanged.</p>
   </div>
   <button type="submit" class="button">Convert these parts</button>
 </form>

@@ -21,13 +21,11 @@
    settings' (routes/pages.py `limits`, web/deps.py). #}
 <p>The limits on what you can upload and how much. How well a file converts is further down.</p>
 <dl class="limits-list">
-  <div><dt>File types</dt><dd>{% if office_on %}PDF files, and Word (.docx) or PowerPoint
-    (.pptx) files, which are turned into a PDF first.{% elif latex_source %}PDF files. For a Word or
-    PowerPoint file, save a copy as a PDF first.{% else %}Only PDF files are taken. For a Word
-    or PowerPoint file, save a copy as a PDF first.{% endif %}{% if latex_source %} A LaTeX file
-    (.tex) or a zip of a LaTeX project is also taken, and its equations are read from the
-    source. The PDF is still the main path, and the source of a Beamer slide deck is not taken
-    yet: upload the deck as a PDF.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
+  <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if office_on %}
+    A Word or PowerPoint file is turned into a PDF first.{% endif %}{% if latex_source %} A LaTeX
+    file (.tex) or a zip of a LaTeX project has its equations read from the source. The PDF is
+    still the main path, and the source of a Beamer slide deck is not taken yet: upload the deck
+    as a PDF.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
   <div><dt>Size</dt><dd>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
     {% if in_parts %}A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
     for a day so you can choose which pages to convert; each part becomes a document of its
@@ -62,7 +60,7 @@
   <li><strong>Equations.</strong> Each equation's proposal is compared with the PDF's own text
     (letters, digits, signs and letter styles), and a difference becomes a decision for you.
     A mistake that agrees with the PDF's text, or a PDF with no usable text layer, can still
-    get through. Maths inside a table cell or a figure is often missed.</li>
+    get through. Math inside a table cell or a figure is often missed.</li>
   <li><strong>Chemistry</strong> formulas and reactions are found and read out as formulas, but it is
     the weakest area: in tests on textbook sections, 0.33 of the equations were right
     as chemistry in the newest (3 sections) and 0.56 in an earlier one (5 sections). Check
@@ -82,10 +80,10 @@
     A chart or a diagram can also get a longer description, and a chart a table of its
     values; their quality has not yet been measured on a held-out set, so read them.{% else %}
     A complex diagram still needs a longer description, which you write.{% endif %} For an
-    exam or quiz, tick the exam box so descriptions leave out the answers.</li>
+    exam or quiz, check the exam box so descriptions leave out the answers.</li>
   {% if image_pages_on %}
   <li><strong>Handwritten notes and scanned pages are converted only when you ask.</strong>
-    Tick “Convert scanned or handwritten pages” when you upload. Each such page is then read
+    Check “Convert scanned or handwritten pages” when you upload. Each such page is then read
     from its picture, which is slower (about 20 to 30 seconds a page) and uses more of the
     server's budget than a typed page, and <strong>you check every converted equation and
     table</strong> before you share the file; the original page stays in the file, behind “Show
@@ -95,7 +93,7 @@
     decisions a page. On nine real papers made into scans, about 2 in
     3 equations came out exactly right. A page whose only text is a watermark, a stamp or a
     page number over a picture or handwriting counts as scanned or handwritten too. Without the
-    tick, a PDF made only of scans or handwriting is refused before it counts against your
+    check, a PDF made only of scans or handwriting is refused before it counts against your
     daily pages, and in a PDF with typed pages each scanned or handwritten page is kept as an
     image, marked “Not converted”, and you are asked about it. Handwriting on a typed page is
     kept as an image either way.</li>
@@ -112,11 +110,11 @@
   <li><strong>Links.</strong> A link over a picture or a drawing, or in a figure's caption, is
     not kept. Link text is kept as printed, even when it says nothing on its own (“click
     here”): only you can reword it.</li>
-  <li><strong>Colour.</strong> {% if colour_on %}Coloured text in paragraphs keeps its colour;
-    colour in headings is not kept.{% else %}Coloured text is not kept: the file uses its own
-    colours.{% endif %} Colour inside figures stays in the picture.</li>
+  <li><strong>Color.</strong> {% if colour_on %}Colored text in paragraphs keeps its color;
+    color in headings is not kept.{% else %}Colored text is not kept: the file uses its own
+    colors.{% endif %} Color inside figures stays in the picture.</li>
   <li><strong>Language.</strong> The language is worked out from the text and needs about 20
-    words of prose. A short handout that is mostly maths is assumed to be English unless the PDF
+    words of prose. A short handout that is mostly math is assumed to be English unless the PDF
     says otherwise. A passage in another language is marked only when it is a whole paragraph
     or list item.</li>
 </ul>
@@ -129,10 +127,10 @@
   <li><strong>Hidden text is never used.</strong> Text that a tablet or a text recognition
     (OCR) program guessed and hid in the PDF, and text that cannot be seen when the page is
     shown or printed, is left out. Running OCR does not help: OCR text is often wrong,
-    most of all in maths. Some hidden text is not detected: white text on a white page,
+    most of all in math. Some hidden text is not detected: white text on a white page,
     text under a drawn shape that only partly covers it, very small text, and OCR text
     that is visible on the page.</li>
-  <li><strong>Maths in headings</strong> stays as plain characters in the
+  <li><strong>Math in headings</strong> stays as plain characters in the
     text, not as MathML equations: check how it reads.</li>
   <li><strong>The checks look at structure, not meaning.</strong> Every file is checked for
     structure (language, title, headings, lists, image text alternatives). The full axe-core
@@ -181,7 +179,7 @@
 </ul>
 <p>We therefore do not claim that ReadableSTEM does better than a general chatbot on
   equations. This was one run on 26 documents; it says nothing about scans, handwriting, Word
-  files or maths inside figures.</p>
+  files or math inside figures.</p>
 <details>
 <summary>Earlier results, kept as history (older versions of the tool)</summary>
 <ul>

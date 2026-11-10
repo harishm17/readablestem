@@ -57,7 +57,7 @@ STATEMENT = (
     "This record lists what the tool did to this document, what a person decided and when, "
     "which parts were not converted, and which automatic checks ran. It does not say that "
     "the document meets any standard or law, and nobody at the tool has looked at the "
-    "document. The accessibility office makes that judgement."
+    "document. The accessibility office makes that judgment."
 )
 KEEP_NOTE = (
     "This record is made from what the tool keeps about the document, and that is deleted "
@@ -200,10 +200,10 @@ class Record:
 
 
 def long_when(value: datetime | None) -> str:
-    """ "9 October 2026, 14:03 UTC"."""
+    """ "October 9, 2026, 14:03 UTC"."""
     if value is None:
         return ""
-    return f"{value.day} {value:%B %Y}, {value:%H:%M} UTC"
+    return f"{value:%B} {value.day}, {value.year}, {value:%H:%M} UTC"
 
 
 def iso_when(value: datetime | None) -> str:

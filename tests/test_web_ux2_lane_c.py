@@ -188,7 +188,7 @@ def test_nothing_is_added_from_the_starter_set_unasked_or_unreadable(web):
         data={"csrf_token": token(web.browser, path), "symbol": ["bold v"], "meaning": ["vector"]},
     )
     assert none.status_code == 303
-    assert web.browser.get(path).text.count("Tick the symbols to add first") == 1
+    assert web.browser.get(path).text.count("Check the symbols to add first") == 1
     with session_scope(web.ctx.factory) as session:
         assert session.scalar(select(CourseNotation)) is None
     odd = web.browser.post(

@@ -79,7 +79,7 @@ HTML_CHECK_WORDS = {
     "html.link_text": "Every link has text.",
     "html.link_href": "Every link goes somewhere safe.",
     "html.lang_tags": "Language tags are well formed.",
-    "html.text_contrast": "Coloured text has at least 4.5:1 contrast.",
+    "html.text_contrast": "Colored text has at least 4.5:1 contrast.",
 }
 
 
@@ -1021,7 +1021,7 @@ DESCRIPTIONS = {
     "file with the PDF it came from, and one report it wrote.",
     "method/index.html": "How the ReadableSTEM numbers and examples were made, and the limits "
     "of what was measured: held-out OpenStax sections, answer keys and scoring.",
-    "attribution/index.html": "Title, authors, licence and link for every OpenStax page in the "
+    "attribution/index.html": "Title, authors, license and link for every OpenStax page in the "
     "ReadableSTEM demo, and the credits for the other material.",
 }
 

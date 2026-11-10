@@ -53,7 +53,7 @@ def test_turning_it_on_ticks_the_box_and_is_remembered(web):
     assert KEEP_ON in web.browser.get("/account").text  # the notice, once
     app = web.browser.get("/app").text
     assert "checked" in keep_box(app)
-    assert "Ticked by your" in app and 'href="/account#account-keep"' in app
+    assert "Checked by your" in app and 'href="/account#account-keep"' in app
 
 
 def test_the_setting_needs_the_form_token(web):

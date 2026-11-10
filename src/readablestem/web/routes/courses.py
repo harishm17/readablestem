@@ -360,7 +360,7 @@ def add_suggestions(
             offered = notation.course_suggestions(session, ctx.settings, course, row)
             added, skipped = notation.add_suggested(session, course, offered, chosen)
     if not chosen:
-        flash(request, "Tick the symbols to add first. Nothing was added.", undo=False)
+        flash(request, "Check the symbols to add first. Nothing was added.", undo=False)
     else:
         log_event(logger, "notation_added", course_id=course_id, source="document", n=len(added))
         if not added:
@@ -401,7 +401,7 @@ def add_starter(
         added, refused = notation.add_starter(session, course, rows[: notation.MAX_ENTRIES])
         name = course.name
     if not rows:
-        flash(request, "Tick the symbols to add first. Nothing was added.", undo=False)
+        flash(request, "Check the symbols to add first. Nothing was added.", undo=False)
     else:
         log_event(logger, "notation_added", course_id=course_id, source="user", n=len(added))
         parts = []
@@ -442,7 +442,7 @@ def add_documents(
         count = notation.attach_documents(session, course, ids) if ids else 0
         name = course.name
     if not ids:
-        flash(request, "Tick the documents to add first. Nothing was added.", undo=False)
+        flash(request, "Check the documents to add first. Nothing was added.", undo=False)
     elif count:
         log_event(logger, "course_documents_added", course_id=course_id, n=count)
         flash(

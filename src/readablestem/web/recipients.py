@@ -59,6 +59,12 @@ def recipients(settings: Settings, *, tracer_on: bool = False) -> list[Recipient
     return found
 
 
+def model_vendor(settings: Settings) -> str:
+    """The company that gets pictures of equations and figures: the recipient with the
+    "model" purpose, so a line that names it stays true if the provider changes."""
+    return next(r.name for r in recipients(settings) if "model" in r.purposes)
+
+
 def privacy_context(settings: Settings, *, tracer_on: bool = False) -> dict[str, Any]:
     """The variables /privacy renders with (besides the page-wide ones `deps.render` adds,
     which `notice_text` supplies for itself)."""

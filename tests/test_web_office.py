@@ -123,7 +123,7 @@ def test_a_presentation_when_impress_is_missing_says_this_server_cannot(tmp_path
         page = client.get("/app").text
         assert "Word (.docx)" in page and "PowerPoint (.pptx)" not in page
         response = send(client, office.pptx(), "Slides.pptx", PPTX)
-        assert response.status_code == 422 and "cannot read those yet" in response.text
+        assert response.status_code == 422 and "is not a PDF or Word (.docx) file" in response.text
 
 
 def test_a_conversion_that_fails_is_a_message_not_an_error_page(tmp_path):

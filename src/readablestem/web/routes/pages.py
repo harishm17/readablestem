@@ -261,7 +261,7 @@ def _guide_context(path: str, active: str) -> dict[str, object]:
 
 def _long_date(iso: str) -> str:
     day = date.fromisoformat(iso)
-    return f"{day.day} {day.strftime('%B %Y')}"
+    return f"{day:%B} {day.day}, {day.year}"
 
 
 @router.get(seo.GUIDES_INDEX)

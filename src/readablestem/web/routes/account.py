@@ -83,8 +83,8 @@ def account_page(request: Request, user: UserDep) -> Response:
     return render(request, "account.html", _context(request, user))
 
 
-KEEP_ON = "New uploads now start with “Keep for 7 days” ticked."
-KEEP_OFF = "New uploads now start with “Keep for 7 days” unticked."
+KEEP_ON = "New uploads now start with “Keep for 7 days” checked."
+KEEP_OFF = "New uploads now start with “Keep for 7 days” unchecked."
 
 
 @router.post("/account/keep-default", dependencies=[Depends(require_csrf)])

@@ -12,6 +12,7 @@
 {% set share_on = fv.share if fv else false %}
 {% set picked = chosen_course|default("") %}
 {% set course_name = (courses|selectattr("id", "equalto", picked)|map(attribute="name")|first|default("")) if courses else "" %}
+{% set acc = accepted_revision if revising else accepted %}
 {% set course_error = field_errors.get("course") %}
 {# A group opens by itself when it holds a choice that is not its default, or an error. #}
 {% set open_convert = exam_on or pages_on or picked or course_error or open_convert|default(false) %}
@@ -23,18 +24,18 @@
   <h2 id="upload-heading">Upload a revised version</h2>
   <p id="revises-note">A new version of <a href="/jobs/{{ revising.id }}">{{ revising.title }}</a>,
     which stays as it is. Your decisions carry over to items that did not change.
-    <a href="/app#upload-heading">Convert a different PDF instead</a></p>
+    <a href="/app#upload-heading">Convert a different document instead</a></p>
   {% else %}
   <div class="heading-row">
-    <h2 id="upload-heading">Convert a PDF</h2>
+    <h2 id="upload-heading">Convert a document</h2>
     {# ux-lane-b: for someone who has documents, the sample is a compact link here. #}
     {% if own_documents|default(false) and sample_available|default(false) %}
     {% if sample_job %}
-    <a class="sample-link" href="/jobs/{{ sample_job }}">Practise on the sample</a>
+    <a class="sample-link" href="/jobs/{{ sample_job }}">Practice on the sample</a>
     {% else %}
     <form method="post" action="/sample" class="inline-form sample-link">
       <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-      <button type="submit" class="link-button">Practise on the sample</button>
+      <button type="submit" class="link-button">Practice on the sample</button>
     </form>
     {% endif %}
     {% endif %}
@@ -63,12 +64,12 @@
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     {% if revising %}<input type="hidden" name="revises" value="{{ revising.id }}">{% endif %}
     <div class="field file-field{% if pdf_error %} field-error{% endif %}">
-      <label for="pdf">{% if revising %}PDF file{% else %}PDF files{% endif %}</label>
+      <label for="pdf">{% if revising %}File{% else %}Files{% endif %}</label>
       {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
       <div class="hint" id="pdf-hint">
         <ul>
-          <li>{% if not revising %}Up to {{ max_files }} files, each {% endif %}up to {{ max_pages }} pages and {{ max_upload_mb }} MB.{% if office_kinds %}
-            Word{% if "pptx" in office_kinds %} and PowerPoint{% endif %} work too.{% endif %}</li>
+          <li>{% with accepted_types = acc %}{% include "_accepted_types.html" %}{% endwith %}</li>
+          <li>{% if not revising %}Up to {{ max_files }} files, each {% endif %}up to {{ max_pages }} pages and {{ max_upload_mb }} MB.</li>
           {% if pages_left is not none %}
           <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
             (a new account can convert {{ page_quota }} pages a day){% endif %}; resets at {{ next_reset|utc }}.</li>
@@ -102,7 +103,7 @@
       <div id="pdf-check" aria-live="polite"></div>
       <input type="file" id="pdf" name="pdf"{% if not revising %} multiple{% endif %}
              accept="application/pdf,.pdf{% if latex_source and not revising %},.tex,.zip,application/zip{% elif batch_zip and not revising %},.zip,application/zip{% endif %}{% if "docx" in office_kinds %},.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document{% endif %}{% if "pptx" in office_kinds %},.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation{% endif %}"
-             {% if latex_source and not revising %}data-latex="1" {% endif %}{% if batch_zip and not revising %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" data-office-what="{{ office_what }}" data-office-choose="{{ office_choose }}" {% endif %}data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
+             {% if latex_source and not revising %}data-latex="1" {% endif %}{% if batch_zip and not revising %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" {% endif %}data-accepted-what="{{ acc.what }}" data-accepted-note="{{ acc.note }}" data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
              data-limit-bytes="{{ upload_limit_mb * 1024 * 1024 }}" data-limit-mb="{{ upload_limit_mb }}"
              data-max-files="{{ 1 if revising else max_files }}"
              aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
@@ -153,7 +154,7 @@
             <label for="image_pages">Convert scanned or handwritten pages</label>
             <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting;
               it is refused without it. In a mixed PDF, scanned pages stay pictures marked
-              “Not converted” unless you tick it. Slower; you check every converted equation
+              “Not converted” unless you check it. Slower; you check every converted equation
               and table.</p>
           </div>
           {% endif %}
@@ -177,11 +178,10 @@
           </span>
         </summary>
         <div class="group-body">
-          <p class="hint">Uploads are never used to train models.</p>
           <div class="field checkbox-field">
             <input type="checkbox" id="keep"name="keep" value="on" aria-describedby="keep-who"{% if keep_on %} checked{% endif %}>
             <label for="keep">Keep for 7 days</label>
-            <p class="hint" id="keep-who">{% if keep_default|default(false) %}Ticked by your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Make this the default in Account</a>.{% endif %}</p>
+            <p class="hint" id="keep-who">{% if keep_default|default(false) %}Checked by your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Make this the default in Account</a>.{% endif %}</p>
           </div>
           <div class="field checkbox-field">
             <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint"{% if share_on %} checked{% endif %}>
@@ -195,6 +195,7 @@
       <button type="submit" class="button">Upload and convert</button>
       <p id="upload-status" class="upload-status" role="status"></p>
     </div>
+    <p class="hint vendor-line" id="vendor-line">{% include "_vendor_line.html" %}</p>
   </form>
   {% endif %}
 </section>

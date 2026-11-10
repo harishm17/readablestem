@@ -179,6 +179,5 @@ def test_latex_source_is_listed_only_when_its_flag_is_on(tmp_path):
     on = WebEnv(tmp_path / "on", feature_latex_source=True)
     with on.running() as client:
         landing, limits = flat(client.get("/").text), flat(client.get("/limits").text)
-    assert "LaTeX source files (.tex) and project zips" in landing
-    assert "A LaTeX file (.tex) or a zip of a LaTeX project is also taken" in limits
-    assert "Only PDF files are taken" not in limits
+    assert "You can upload a PDF or LaTeX file." in landing
+    assert "You can upload a PDF or LaTeX file." in limits

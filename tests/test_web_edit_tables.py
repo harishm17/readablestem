@@ -169,7 +169,7 @@ def test_what_is_read_that_differs_from_the_pdf_is_shown_not_saved(tables):
 def test_only_a_maths_cell_with_a_place_on_the_page_is_read(tables):
     with_model(tables, {"is_equation": True, "latex": "x", "confidence": 0.99})
     plain = read_post(tables, row="1", col="0")
-    assert plain.status_code == 422 and "holds maths" in text_of(plain.text)
+    assert plain.status_code == 422 and "holds math" in text_of(plain.text)
     missing = read_post(tables, row="9", col="9")
     assert missing.status_code == 422 and "not in the table any more" in text_of(missing.text)
     junk = read_post(tables, row="x", col="1")

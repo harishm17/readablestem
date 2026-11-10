@@ -78,7 +78,7 @@ def upload(site, browser) -> str:
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
     page.get_by_role("button", name="Upload and convert").click()

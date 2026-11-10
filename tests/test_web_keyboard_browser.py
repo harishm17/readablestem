@@ -117,7 +117,7 @@ def convert(site, browser, email: str, output, *, pdf: bytes | None = None) -> s
     context = new_context(browser)
     page = context.new_page()
     setup_sign_in(page, site.base, email)
-    page.get_by_label(re.compile("PDF file")).set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": pdf or review_pdf()}]
     )
     page.get_by_role("button", name="Upload and convert").click()
@@ -314,7 +314,7 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     # A file that is not a PDF: the page says so as soon as it is chosen (a live region), and
     # Enter on the button does not send it but puts focus on the field that has the problem.
     start_of_page(page)
-    tab_to(page, "^PDF files?$")
+    tab_to(page, "^Files?$")
     choose_file_by_keyboard(
         page, [{"name": "notes.txt", "mimeType": "text/plain", "buffer": b"not a pdf"}]
     )
@@ -325,7 +325,7 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     assert state["id"] == "pdf" and page.url == f"{site.base}/jobs", state
     assert page.get_attribute("#pdf", "aria-invalid") == "true"
     # Now a real one: the chooser by keyboard, the button by keyboard, the job page after it.
-    tab_to(page, "^PDF files?$", shift=True)
+    tab_to(page, "^Files?$", shift=True)
     choose_file_by_keyboard(
         page, [{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )

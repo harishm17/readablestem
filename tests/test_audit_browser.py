@@ -80,7 +80,7 @@ def sign_in(page, base: str) -> None:
 
 def finished_job(site, page) -> str:
     page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
+    page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)}]
     )
     page.get_by_role("button", name="Upload and convert").click()

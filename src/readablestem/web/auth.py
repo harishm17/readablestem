@@ -346,7 +346,7 @@ def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount
             403,
             "Please sign in with Google",
             "We could not match this Microsoft account to a ReadableSTEM account by an email "
-            "address that your organisation has verified, so it cannot be used to sign in or "
+            "address that your organization has verified, so it cannot be used to sign in or "
             "to make an account. Sign in with your Google account instead.",
         )
     if result.user_id is None:
@@ -492,7 +492,7 @@ async def microsoft_callback(request: Request) -> Response:
         if refused.reason == "tenant_not_allowed":
             raise PageError(
                 403,
-                "Your organisation is not set up for this beta",
+                "Your organization is not set up for this beta",
                 "",
                 template="org_not_set_up.html",
                 context={"tenant": refused.tenant},
@@ -517,7 +517,7 @@ def _back_from_admin_consent(request: Request) -> Response:
     flash(
         request,
         "Thank you. Microsoft has sent you back from the approval step. Once your "
-        "organisation is set up for this beta, people there can sign in with their "
+        "organization is set up for this beta, people there can sign in with their "
         "university account."
         if approved
         else "Microsoft did not finish the approval. You can open the approval link again.",

@@ -1170,6 +1170,7 @@ details.option-group[open] .group-change { display: none; }
 .group-body .field:last-child { margin-bottom: var(--space-2); }
 .submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-5); }
 .submit-row .upload-status { margin: 0; }
+.vendor-line { margin-top: var(--space-3); max-width: 40rem; }
 .upload-status { font-weight: 700; }
 .upload-status:empty { display: none; }
 @media (forced-colors: active) { .option-groups, details.option-group { border-color: CanvasText; } }

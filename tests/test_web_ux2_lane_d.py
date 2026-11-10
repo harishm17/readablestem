@@ -140,10 +140,10 @@ def test_every_page_that_lists_inputs_says_the_same_about_latex_source(tmp_path)
     on = WebEnv(tmp_path / "on", feature_latex_source=True)
     off = WebEnv(tmp_path / "off")
     paths = {
-        "/": "LaTeX source files (.tex)",
-        "/limits": "A LaTeX file (.tex) or a zip of a LaTeX project is also taken",
+        "/": "You can upload a PDF or LaTeX file",
+        "/limits": "You can upload a PDF or LaTeX file",
         seo.COMPARE_GUIDE: "a zip of a LaTeX project",
-        seo.ADA_GUIDE: "It also reads LaTeX source files",
+        seo.ADA_GUIDE: "You can upload a PDF or LaTeX file",
         offices.PAGE_PATH: "a zip of a LaTeX project",
         "/privacy": "for LaTeX source, the .tex file",
     }
@@ -171,7 +171,7 @@ def test_the_demo_note_is_short_and_keeps_the_licence_and_the_teacher_support_no
     visible = note.split("<details>", 1)[0]
     assert len(text_of(visible).split()) < 75
     assert "CC BY 4.0" in visible  # the attribution stays visible
-    assert "<summary>Source, licence and notes</summary>" in note
+    assert "<summary>Source, license and notes</summary>" in note
     assert "Teacher Support" in note.split("<details>", 1)[1]
     assert note.count("Teacher Support") == 1  # explained once
     assert "AGPL" not in note

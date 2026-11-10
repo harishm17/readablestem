@@ -206,7 +206,7 @@ def test_everything_left_out_changes_nothing_and_says_so(symbols):
     written = symbols.job(symbols.job_id).result_version
     response = change(symbols, "x", "X", leave=("p1-e2:1", "p1-e5:1", "p1-e5:2"))
     assert response.status_code == 422
-    assert "Nothing to change: no place is ticked, or every one is already decided." in text_of(
+    assert "Nothing to change: no place is checked, or every one is already decided." in text_of(
         response.text
     )
     assert latex_of(symbols, "p1-e5") == "x + x = \\rho v"

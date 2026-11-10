@@ -197,12 +197,12 @@ def test_the_upload_form_refuses_a_wrong_file_before_sending_it(site, browser):
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    chooser = page.get_by_label("PDF file")
+    chooser = page.locator("#pdf")
     chooser.set_input_files(
         files=[{"name": "slides.pptx", "mimeType": "application/zip", "buffer": b"PK.."}]
     )
     check = page.locator("#pdf-check")
-    assert "slides.pptx is not a PDF." in check.inner_text()
+    assert "slides.pptx is not a PDF file." in check.inner_text()
     assert chooser.get_attribute("aria-invalid") == "true"
     assert "pdf-check-error" in (chooser.get_attribute("aria-describedby") or "")
     page.get_by_role("button", name="Upload and convert").click()

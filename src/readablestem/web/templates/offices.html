@@ -70,7 +70,7 @@
     <li>Those images and that text are sent to the API of {{ model_names }}, which returns
       proposed LaTeX and descriptions.{% if notation_on %} For a document uploaded for one of
       the instructor's courses, that course's notation (its symbols and what they mean) is sent
-      with the equations.{% endif %}{% if image_pages_on %} If the instructor ticks “Convert
+      with the equations.{% endif %}{% if image_pages_on %} If the instructor checks “Convert
       scanned or handwritten pages”, a picture of each such page is sent as well.{% endif %}
       The PDF file itself, its file name and the instructor's email address are not sent.</li>
     <li>Automatic checks compare each proposal with the PDF's own text. The instructor decides
@@ -217,10 +217,13 @@
 <ul>
   <li>The code is open source, so your institution can run its own copy:
     <a href="{{ source_url }}">the source code</a> and
-    <a href="{{ source_url }}/blob/main/docs/deploy.md">how to deploy it</a>. The licence terms
+    <a href="{{ source_url }}/blob/main/docs/deploy.md">how to deploy it</a>. The license terms
     are on the <a href="/terms#open-source">terms page</a>.</li>
   <li>Nothing is locked in. Every result can be downloaded as a web page,
     {% if word_export %}Word, {% endif %}EPUB and a Canvas package, with the review record.</li>
+  <li>If the hosted service ever closes, a notice goes on this page first. Stored documents are
+    then deleted on their usual schedule (see <a href="/privacy">Privacy</a>), so no copy is
+    left behind.</li>
   <li>There is no support contract or service-level agreement. To report a problem, use
     “Report this item” on the review screen{% if contact_email %} or email
     <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}.</li>
