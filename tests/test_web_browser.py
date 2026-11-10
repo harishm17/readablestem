@@ -356,3 +356,33 @@ def test_pages_pass_wcag22_aa_and_best_practice_at_moderate_and_above(
     context.close()
     violations = [v for v in results["violations"] if v["impact"] in STRICT_IMPACTS]
     assert not violations, describe(violations)
+
+
+def _reflow_params():
+    for spacing in (False, True):
+        suffix = " +text-spacing" if spacing else ""
+        for path in [*PUBLIC, "/app", "/admin", "/jobs/{id}"]:
+            yield pytest.param(path, spacing, id=path + suffix)
+
+
+@pytest.mark.parametrize(("path", "spacing"), list(_reflow_params()))
+def test_pages_reflow_at_320_css_pixels(site, browser, long_named_job, path, spacing):
+    """WCAG 1.4.10: at 320 CSS px (400% zoom) nothing may need sideways scrolling, also
+    with a long file name and with the 1.4.12 text-spacing override.
+
+    What it took (app.css): the long file name wraps anywhere in headings and table row
+    headers; the visually hidden "Delete <file>" text stays inside its .table-scroll box
+    (position: relative) instead of widening /app and /admin; the source URL on /terms
+    wraps (break-word on the body)."""
+    context = browser.new_context(viewport={"width": 320, "height": 256}, bypass_csp=True)
+    page = context.new_page()
+    if path not in PUBLIC:
+        sign_in(page, site.base, ADMIN if path == "/admin" else ALICE)
+    page.goto(site.base + path.replace("{id}", long_named_job))
+    if spacing:
+        page.add_style_tag(content=TEXT_SPACING)
+    width = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+    )
+    context.close()
+    assert width[0] <= width[1], f"{path}: content is {width[0]} px wide in a {width[1]} px view"

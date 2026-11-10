@@ -21,6 +21,7 @@ from readablestem.web.database import utc_today
 from readablestem.web.db import Job, QuotaDay, User, session_scope
 from test_web_browser import (
     STRICT_IMPACTS,
+    TEXT_SPACING,
     WCAG_TAGS,
     axe_violations,
     describe,
@@ -286,3 +287,19 @@ def test_the_list_refreshes_in_place_and_keeps_focus(site, browser):
     assert page.evaluate("document.activeElement.id") == f"del-{job_id}"
     assert page.locator("#documents[hx-get]").count() == 0  # nothing left to wait for
     context.close()
+
+
+@pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
+@pytest.mark.parametrize("path", list(PAGES))
+def test_pages_reflow_at_320_css_pixels(site, browser, documents, path, spacing):
+    """WCAG 1.4.10: nothing scrolls sideways at 320 CSS px, with a long title in the list
+    and with the 1.4.12 text-spacing override. Wide admin tables scroll in their own
+    focusable box, not the page."""
+    context, page = open_page(browser, site, documents, path, width=320, bypass_csp=True)
+    if spacing:
+        page.add_style_tag(content=TEXT_SPACING)
+    width = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+    )
+    context.close()
+    assert width[0] <= width[1], f"{path}: {width[0]} px wide in a {width[1]} px view"

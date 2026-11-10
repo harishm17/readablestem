@@ -530,3 +530,36 @@ def test_the_review_screens_second_skip_link_goes_to_the_decision(site, docs, br
     assert focus_summary(page)["id"] == "decision-title"
     assert GROUP  # the heading group is decision 3 of this document
     context.close()
+
+
+def test_the_walker_reports_a_missing_focus_ring_a_trap_and_a_missing_skip_link(browser):
+    """The checks are only worth having if they can fail: three broken pages."""
+    context = new_context(browser)
+    page = context.new_page()
+    page.set_content(
+        "<style>*:focus{outline:none}</style><a href='#m'>Skip to main content</a>"
+        "<main id='m' tabindex='-1'><button>Plain</button></main>"
+    )
+    found = walk(page, label="no ring")
+    assert any("no focus indicator" in p for p in found.problems), found.problems
+
+    page.set_content(
+        "<a href='#m'>Skip to main content</a><main id='m'><button id='a'>One</button>"
+        "<button id='b'>Two</button></main>"
+        "<script>document.getElementById('b').addEventListener('keydown', e => {"
+        " if (e.key === 'Tab') { e.preventDefault(); document.getElementById('a').focus(); } });"
+        "</script>"
+    )
+    trapped = walk(page, label="trap")
+    assert any("looped" in p or "never left" in p for p in trapped.problems), trapped.problems
+
+    page.set_content("<main><button>Only</button></main>")
+    assert skip_link_works(page, label="no skip link")[0].startswith("no skip link: the first")
+
+    page.set_content(
+        "<a href='#m'>Skip to main content</a><div style='position:fixed;inset:0;background:#fff'>"
+        "</div><main id='m'><button>Covered</button></main>"
+    )
+    covered = walk(page, label="covered")
+    assert any("covered" in p for p in covered.problems), covered.problems
+    context.close()

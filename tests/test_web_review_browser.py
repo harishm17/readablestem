@@ -33,6 +33,7 @@ from readablestem.web.routes.review import (
     PLAIN_TEXT_WORDS,
     REJECT_WORDS,
 )
+from readablestem.web.views import FIX_STATUS_LABELS, REVIEWER_ACCEPTED_LABEL
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import axe_violations, describe, free_port, sign_in
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
@@ -271,3 +272,19 @@ def test_decisions_work_without_javascript(site, browser, job):
     ).click()
     assert page.url == f"{url}#item-p3-e2"
     context.close()
+
+
+def test_status_is_written_in_words_not_only_colour(site, browser, job):
+    context, page = open_page(browser, site)
+    page.goto(review_url(site, job))
+    unfold_everything(page)
+    cards = page.locator("article.fix-card")
+    assert cards.count() == 15
+    words = [
+        cards.nth(i).locator(".status-badge").inner_text().strip() for i in range(cards.count())
+    ]
+    context.close()
+    assert set(words) <= STATUS_WORDS and len(set(words)) >= 5, words
+
+
+STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL, *(w.state for w in REJECTED)}
