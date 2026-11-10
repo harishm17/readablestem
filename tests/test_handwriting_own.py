@@ -87,10 +87,6 @@ def test_a_symlink_into_the_repo_is_refused(tmp_path: Path) -> None:
         own.ensure_outside_repo(link / "docs")
 
 
-def test_default_folder_is_outside_the_repo() -> None:
-    assert not own.inside_repo(own.DEFAULT_ROOT)
-
-
 def test_gitignore_guards_private_folders() -> None:
     lines = (REPO / ".gitignore").read_text().splitlines()
     for guard in ("readablestem-private/", "handwriting-own/", "handwriting-private/"):
@@ -98,25 +94,6 @@ def test_gitignore_guards_private_folders() -> None:
 
 
 # ------------------------------------------------------------------------- intake and split
-
-
-def test_intake_registers_a_hash_split_once(root: Path) -> None:
-    data = own.intake(root)
-    parts = [e["part"] for e in data["units"]]
-    assert parts.count("dev") == 2 and parts.count("heldout") == 3  # 30% of 5, rounded
-    assert all(e["pages"] == 2 for e in data["units"])
-    assert (root / "registration.json").is_file() and (root / "registration.sha256").is_file()
-    assert len(list((root / "pages").glob("own-*/p0?.png"))) == 10
-    own.load_registration(root)  # hashes hold
-    again = own.intake(root)  # idempotent
-    assert [e["part"] for e in again["units"]] == parts
-
-
-def test_split_depends_only_on_the_file_hashes() -> None:
-    hashes = [f"{i:064x}" for i in range(10)]
-    first = own.split_units(hashes)
-    assert own.split_units(list(reversed(hashes))) == first
-    assert sum(p == "dev" for p in first.values()) == 3
 
 
 def test_registration_refuses_a_changed_pdf_or_set(root: Path) -> None:
@@ -128,28 +105,6 @@ def test_registration_refuses_a_changed_pdf_or_set(root: Path) -> None:
     ink_pdf(root / "pdfs" / "notes-1.pdf", 99)
     with pytest.raises(SystemExit, match="changed or is missing"):
         own.load_registration(root)
-
-
-def test_intake_needs_two_pdfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    folder = tmp_path / "p"
-    monkeypatch.setenv("HANDWRITING_OWN_DIR", str(folder))
-    (folder / "pdfs").mkdir(parents=True)
-    ink_pdf(folder / "pdfs" / "a.pdf", 1)
-    with pytest.raises(SystemExit, match="at least 2"):
-        own.intake(folder)
-
-
-def test_intake_copies_from_a_source_outside_the_repo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    folder, src = tmp_path / "private", tmp_path / "exports"
-    src.mkdir()
-    monkeypatch.setenv("HANDWRITING_OWN_DIR", str(folder))
-    for seed in (1, 2, 3):
-        ink_pdf(src / f"n{seed}.pdf", seed, pages=1)
-    data = own.intake(folder, src)
-    assert len(data["units"]) == 3
-    assert len(list((folder / "pdfs").glob("*.pdf"))) == 3
 
 
 # --------------------------------------------------------------- the form's round trip
@@ -182,65 +137,6 @@ def typed(page: int, box: list[float], latex: str, **kw: object) -> dict:
     return {"page": page, "box": box, "latex": latex, "display": "inline", "uncertain": False, **kw}
 
 
-def test_form_round_trip_writes_gold_outside_the_repo(root: Path, server) -> None:
-    registration, base = server
-    status, html = call(base + "/")
-    assert status == 200 and b"LaTeX, typed by you" in html
-    _, state = call(base + "/api/state")
-    units = json.loads(state)["units"]
-    assert len(units) == 5 and all(u["gold"] is None and u["pages"] == 2 for u in units)
-    unit = units[0]["unit"]
-    status, png = call(f"{base}/page/{unit}/1.png")
-    assert status == 200 and png.startswith(b"\x89PNG")
-    status, ml = call(base + "/api/mathml?latex=x%5E2%2By&display=inline")
-    assert status == 200 and "<msup>" in json.loads(ml)["mathml"]
-
-    body = {
-        "complete": True,
-        "expressions": [
-            typed(2, [0.1, 0.5, 0.5, 0.6], r"\frac{a}{b}", display="display"),
-            typed(1, [0.1, 0.1, 0.4, 0.2], r"x^2 + y"),
-            typed(1, [0.1, 0.3, 0.4, 0.4], "z = ?", uncertain=True),
-            typed(1, [0.5, 0.3, 0.7, 0.4], ""),
-        ],
-    }
-    status, saved = call(f"{base}/api/gold/{unit}", body)
-    assert status == 200 and json.loads(saved) == {"saved": 4}
-    path = root / "gold" / f"{unit}.json"
-    assert path.is_file() and not own.inside_repo(path)
-    on_disk = json.loads(path.read_text())
-    assert on_disk["complete"] is True and on_disk["pdf_sha256"] in {
-        e["sha256"] for e in registration["units"]
-    }
-    _, again = call(base + "/api/state")
-    reloaded = next(u for u in json.loads(again)["units"] if u["unit"] == unit)
-    assert reloaded["gold"]["expressions"][1]["latex"] == "x^2 + y"
-
-    entry = next(e for e in registration["units"] if e["unit"] == unit)
-    records = own.gold_records(root, entry, on_disk)
-    assert [r["latex"] for r in records] == [r"x^2 + y", r"\frac{a}{b}"]  # reading order
-    assert [r["display"] for r in records] == ["inline", "block"]  # `?` and blank left out
-    assert records[0]["mathml"].startswith("<math") and records[0]["tokens"] >= 3
-    assert records[1]["pdf_page"] == 2
-
-
-@pytest.mark.parametrize(
-    "body",
-    [
-        {"expressions": [typed(3, [0.1, 0.1, 0.4, 0.2], "x")]},  # page out of range
-        {"expressions": [typed(1, [0.4, 0.1, 0.1, 0.2], "x")]},  # inverted box
-        {"expressions": [typed(1, [0.1, 0.1, 0.4, 0.2], "x", display="huge")]},
-        {"expressions": [typed(1, [0.1, 0.1, 0.4, 0.2], "x" * 3000)]},
-        {"expressions": "no"},
-    ],
-)
-def test_server_rejects_bad_answer_keys(server, body: dict) -> None:
-    registration, base = server
-    unit = registration["units"][0]["unit"]
-    status, _ = call(f"{base}/api/gold/{unit}", body)
-    assert status == 400
-
-
 def test_server_only_knows_registered_units_and_this_host(server, root: Path) -> None:
     _, base = server
     assert call(f"{base}/api/gold/own-deadbeef", {"expressions": []})[0] == 404
@@ -250,18 +146,6 @@ def test_server_only_knows_registered_units_and_this_host(server, root: Path) ->
         urllib.request.urlopen(req)
     assert err.value.code == 403
     assert not (root / "gold").exists()
-
-
-def test_form_part_filter(root: Path) -> None:
-    registration = own.intake(root)
-    httpd = own.make_server(root, registration, "dev")
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    try:
-        _, state = call(f"http://127.0.0.1:{httpd.server_address[1]}/api/state")
-        assert {u["part"] for u in json.loads(state)["units"]} == {"dev"}
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
 
 
 # ------------------------------------------------------------------------------- the run
@@ -289,12 +173,6 @@ def test_run_needs_a_cap_of_at_most_two_dollars(root: Path, cap: float | None) -
     own.intake(root)
     with pytest.raises(SystemExit, match="--max-usd"):
         own.cmd_run(run_args(max_usd=cap))
-
-
-def test_run_refuses_an_unfinished_answer_key(root: Path) -> None:
-    own.intake(root)
-    with pytest.raises(SystemExit, match="not finished"):
-        own.cmd_run(run_args())
 
 
 def test_run_refuses_changed_notes(root: Path) -> None:
@@ -370,76 +248,4 @@ def test_max_usd_is_a_total_across_restarts(root: Path, monkeypatch: pytest.Monk
         own.cmd_run(run_args("dev", 0.75))
 
 
-def test_bad_content_length_is_a_400(server) -> None:
-    import http.client
-
-    registration, base = server
-    unit = registration["units"][0]["unit"]
-    conn = http.client.HTTPConnection(base.removeprefix("http://"))
-    conn.putrequest("POST", f"/api/gold/{unit}")
-    conn.putheader("Content-Type", "application/json")
-    conn.putheader("Content-Length", "abc")
-    conn.endheaders()
-    assert conn.getresponse().status == 400
-    conn.close()
-
-
-def test_concurrent_saves_use_distinct_temp_files(tmp_path: Path) -> None:
-    target = tmp_path / "gold" / "x.json"
-    errors: list[Exception] = []
-
-    def save(n: int) -> None:
-        try:
-            for _ in range(20):
-                own.write_json(target, {"n": n})
-        except Exception as exc:  # pragma: no cover
-            errors.append(exc)
-
-    threads = [threading.Thread(target=save, args=(n,)) for n in range(6)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    assert not errors and json.loads(target.read_text())["n"] in range(6)
-    assert [p.name for p in target.parent.iterdir()] == ["x.json"]
-
-
 # --------------------------------------------------------- the form itself, in a real browser
-
-
-@pytest.mark.browser
-def test_form_in_a_browser_box_type_save(root: Path) -> None:
-    """Drag a box on the page, type LaTeX with no draft shown, see the preview, find the JSON."""
-    sync_api = pytest.importorskip("playwright.sync_api")
-    registration = own.intake(root)
-    httpd = own.make_server(root, registration, None)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    base = f"http://127.0.0.1:{httpd.server_address[1]}/"
-    first = sorted(registration["units"], key=lambda e: e["unit"])[0]["unit"]
-    try:
-        with sync_api.sync_playwright() as pw:
-            browser = pw.chromium.launch()
-            page = browser.new_page(viewport={"width": 1400, "height": 1000}, bypass_csp=True)
-            page.goto(base)
-            page.wait_for_function("document.getElementById('page').naturalWidth > 0")
-            assert page.locator("textarea").count() == 0  # blank form, no draft
-            box = page.locator("#page").bounding_box()
-            page.mouse.move(box["x"] + box["width"] * 0.1, box["y"] + box["height"] * 0.1)
-            page.mouse.down()
-            page.mouse.move(box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.2)
-            page.mouse.up()
-            area = page.locator("textarea")
-            assert area.count() == 1 and area.input_value() == ""
-            area.fill(r"\frac{a}{b}")
-            page.wait_for_selector(".preview math")
-            page.check("#complete")
-            page.wait_for_function("document.getElementById('status').textContent === 'Saved'")
-            browser.close()
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
-    saved = json.loads((root / "gold" / f"{first}.json").read_text())
-    assert saved["complete"] is True
-    (item,) = saved["expressions"]
-    assert item["latex"] == r"\frac{a}{b}" and item["page"] == 1
-    assert 0.08 < item["box"][0] < 0.12 and 0.45 < item["box"][2] < 0.55

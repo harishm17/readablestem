@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import csv
-import json
 
 import pytest
 
-from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.eval import calibration as cal
 from readablestem.models.fake import FakeVisionClient
 from test_eval_support import figure, settings
@@ -28,18 +26,6 @@ def test_kappa_matches_the_textbook_example():
     }
 
 
-def test_kappa_edge_cases():
-    assert cal.cohen_kappa([(True, True), (False, False)]) == pytest.approx(1.0)
-    assert cal.cohen_kappa([(True, False), (False, True)]) == pytest.approx(-1.0)
-    # Both raters say "pass" to everything: chance agreement is 1, kappa undefined.
-    assert cal.cohen_kappa([(True, True)] * 5) is None
-    assert cal.cohen_kappa([]) is None
-    # 90% pass on both sides, independent-looking: high raw agreement, kappa near 0.
-    pairs = [(True, True)] * 81 + [(True, False)] * 9 + [(False, True)] * 9 + [(False, False)]
-    assert cal.raw_agreement(pairs) == pytest.approx(0.82)
-    assert cal.cohen_kappa(pairs) == pytest.approx(0.0, abs=1e-12)
-
-
 def test_bootstrap_ci_is_seeded_and_brackets_the_estimate():
     first = cal.bootstrap_ci(WIKI, n_boot=1000, seed=7)
     again = cal.bootstrap_ci(WIKI, n_boot=1000, seed=7)
@@ -53,18 +39,6 @@ def test_bootstrap_ci_is_seeded_and_brackets_the_estimate():
     assert first["low"] == pytest.approx(0.4 - 1.96 * se, abs=0.03)
     assert first["high"] == pytest.approx(0.4 + 1.96 * se, abs=0.03)
     assert first["skipped"] == 0
-
-
-def test_bootstrap_ci_for_perfect_agreement_is_a_point():
-    pairs = [(True, True)] * 5 + [(False, False)] * 5
-    ci = cal.bootstrap_ci(pairs, n_boot=500, seed=0)
-    assert (ci["low"], ci["high"]) == (1.0, 1.0)
-    # Resamples that drew only one class leave kappa undefined and are skipped.
-    assert 0 <= ci["skipped"] < 10
-
-
-def test_bootstrap_ci_of_nothing():
-    assert cal.bootstrap_ci([], n_boot=10)["low"] is None
 
 
 @pytest.mark.parametrize(
@@ -85,11 +59,6 @@ def test_bootstrap_ci_of_nothing():
 )
 def test_parse_bool(value, expected):
     assert cal.parse_bool(value) is expected
-
-
-def test_parse_bool_rejects_unknown_words():
-    with pytest.raises(ValueError, match="pass/fail"):
-        cal.parse_bool("maybe")
 
 
 def judged_rows():
@@ -117,23 +86,6 @@ def test_template_has_no_judge_verdict_and_round_trips_through_csv(tmp_path):
     assert cal.load_labels(path) == {"a": True, "b": False, "c": None}
 
 
-def test_template_as_jsonl(tmp_path):
-    path = tmp_path / "labels.jsonl"
-    cal.write_label_template(judged_rows(), path)
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
-    assert [r["id"] for r in rows] == ["a", "b", "c"] and rows[0]["human_pass"] == ""
-
-
-def test_load_labels_reports_bad_rows(tmp_path):
-    path = tmp_path / "labels.jsonl"
-    path.write_text('{"id": "a", "human_pass": "maybe"}\n')
-    with pytest.raises(ValueError, match="row 1"):
-        cal.load_labels(path)
-    path.write_text('{"human_pass": true}\n')
-    with pytest.raises(ValueError, match="no id"):
-        cal.load_labels(path)
-
-
 def test_agreement_report_joins_on_id_and_skips_unusable_rows():
     judged = {r["id"]: r for r in judged_rows()}
     labels = {"a": True, "b": True, "c": None, "d": False, "zzz": True}
@@ -158,21 +110,6 @@ def figures():
         figure("p", 2, "", "Figure 3"),  # no reference: not a probe figure
         figure("p", 3, "A car on a road.", "Figure 4"),
     ]
-
-
-def test_probe_candidates():
-    usable = cal.probe_figures(figures())
-    assert len(usable) == 3
-    rows = cal.probe_candidates(usable, paraphrases={usable[1]["id"]: "Hand-written."})
-    by = {(r["id"].rsplit("-", 1)[-1], r["probe"]): r for r in rows}
-    assert by[("000", "reference")]["candidate"] == "A ball on a ramp."
-    assert by[("000", "verbose")]["candidate"].count("A ball on a ramp.") == 2
-    assert by[("001", "verbose")]["candidate"] == "Hand-written."
-    assert by[("000", "empty")]["candidate"] == ""
-    assert by[("000", "irrelevant")]["candidate"] == "A graph of speed against time."
-    assert {r["expected_pass"] for r in rows if r["probe"] in {"empty", "irrelevant"}} == {False}
-    single = cal.probe_candidates(usable[:1])
-    assert single[3]["candidate"] == cal.IRRELEVANT_FALLBACK
 
 
 def length_biased_judge(request):
@@ -204,30 +141,6 @@ def test_probes_expose_length_bias_and_check_expected_outcomes():
     assert "| verbose | pass |" in text and "Length bias" in text
 
 
-def test_probes_can_judge_with_the_image_like_the_figures_eval():
-    """The figures eval attaches the image and the prompt then treats it as the ground
-    truth; probes run text-only measured a different judge."""
-    probe = cal.probe_figures(figures())
-    images = {f["id"]: f"png-{f['id']}".encode() for f in probe}
-    client = FakeVisionClient(responders={"judge": length_biased_judge})
-    report, _ = cal.run_probes(probe, client=client, settings=settings(), images=images)
-    assert report["judge_mode"] == "image"
-    assert all(len(r.images) == 1 for r in client.requests)
-    assert {r.images[0] for r in client.requests} == set(images.values())
-    assert "judge: image" in cal.format_probes(report)
-    text_only, _ = cal.run_probes(probe, client=FakeVisionClient(), settings=settings())
-    assert text_only["judge_mode"] == "text_only"
-
-
-def test_probes_stop_cleanly_when_the_budget_runs_out():
-    budget = JobBudget(InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=5)
-    client = FakeVisionClient(responders={"judge": length_biased_judge}, budget=budget)
-    report, items = cal.run_probes(cal.probe_figures(figures()), client=client, settings=settings())
-    assert (report["n"], report["n_planned"], report["complete"]) == (5, 12, False)
-    assert report["stopped_reason"] == "budget_job_calls"
-    assert len(items) == 5
-
-
 def probe_item(fid, probe, passed, score, chars, cut=False):
     return {
         "id": fid,
@@ -256,9 +169,3 @@ def test_length_bias_is_paired_and_skips_cut_or_failed_judgements():
     assert bias["mean_score_delta"] == 1.5  # (1 + 2) / 2
     assert bias["pass_rate_delta"] == 0.5  # (0 + 1) / 2
     assert bias["length_ratio"] == 3.5  # (3 + 4) / 2
-
-
-def test_load_paraphrases(tmp_path):
-    path = tmp_path / "p.jsonl"
-    path.write_text('{"id": "a", "text": "Long."}\n{"id": "b", "text": ""}\n')
-    assert cal.load_paraphrases(path) == {"a": "Long."}

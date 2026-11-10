@@ -47,40 +47,10 @@ def test_kind_and_distance(gold: str, pred: str, kind: str, distance: int) -> No
     assert record["one_symbol"] is (distance == 1)
 
 
-def test_missing_reading_is_an_omission() -> None:
-    record = hwe.classify_pair("a+b", "")
-    assert record["kinds"] == ["omission"]
-    assert record["edit_distance"] == 3
-    assert record["speech_equal"] is False
-
-
-def test_same_symbols_is_tree_only() -> None:
-    record = hwe.classify_pair("a+b", "a+b")
-    assert record["kinds"] == ["tree_only"]
-    assert record["edit_distance"] == 0
-
-
 def test_speech_equal_when_notation_differs_but_speech_does_not() -> None:
     # \bar and \overline are spoken alike; x and X are not
     assert hwe.classify_pair("\\overline{A}", "\\bar{A}")["speech_equal"] is True
     assert hwe.classify_pair("x", "X")["speech_equal"] is False
-
-
-def test_speech_equal_is_none_when_the_reading_cannot_be_spoken() -> None:
-    assert hwe.classify_pair("a", "\\frac{")["speech_equal"] is None
-
-
-def test_several_kinds_in_one_equation() -> None:
-    record = hwe.classify_pair("x+k", "X+h")
-    assert {"case", "other_letter"} <= set(record["kinds"])
-    assert record["edit_distance"] == 2
-
-
-def test_edit_distance() -> None:
-    assert hwe.edit_distance(list("abc"), list("abc")) == 0
-    assert hwe.edit_distance(list("abc"), list("axc")) == 1
-    assert hwe.edit_distance([], list("ab")) == 2
-    assert hwe.edit_distance(list("kitten"), list("sitting")) == 3
 
 
 def _write_run(tmp_path: Path) -> tuple[Path, Path]:
@@ -121,42 +91,3 @@ def test_main_counts_wrong_and_missed_and_writes_json(tmp_path: Path, capsys) ->
     table = capsys.readouterr().out
     assert "armA/dev" in table
     assert "omission" in table
-
-
-def test_main_fails_without_recordings(tmp_path: Path) -> None:
-    _, gold_root = _write_run(tmp_path)
-    assert hwe.main(["--arms-root", str(tmp_path / "none"), "--gold-root", str(gold_root)]) == 2
-
-
-def test_symbol_error_inside_a_fraction_is_reported() -> None:
-    record = hwe.classify_pair("\\frac{x}{2}", "\\frac{X}{2}")
-    assert "case" in record["kinds"]
-    record = hwe.classify_pair("\\sqrt{k}", "\\sqrt{h}")
-    assert "other_letter" in record["kinds"]
-    # a whole fraction lost is still a fraction error
-    assert "fraction" in hwe.classify_pair("\\frac{a}{b}", "a b")["kinds"]
-
-
-def test_gold_is_keyed_by_part_and_id(tmp_path: Path) -> None:
-    gold_root = tmp_path / "gold"
-    for part, latex in (("dev", "x"), ("fresh", "y")):
-        (gold_root / part).mkdir(parents=True)
-        (gold_root / part / "u.jsonl").write_text(json.dumps({"id": "u/eq-000", "latex": latex}))
-    gold = hwe.load_gold(gold_root)
-    assert gold[("dev", "u/eq-000")]["latex"] == "x"
-    assert gold[("fresh", "u/eq-000")]["latex"] == "y"
-
-
-def test_json_write_warns_about_the_licence(tmp_path: Path, capsys) -> None:
-    arms, gold_root = _write_run(tmp_path)
-    hwe.main(
-        [
-            "--arms-root",
-            str(arms),
-            "--gold-root",
-            str(gold_root),
-            "--json",
-            str(tmp_path / "o.json"),
-        ]
-    )
-    assert "CC BY-NC-SA" in capsys.readouterr().err

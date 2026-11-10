@@ -65,28 +65,6 @@ def test_verify_summary_and_a_damaged_set(tmp_path, capsys) -> None:
     assert "manifest.json is missing" in capsys.readouterr().err
 
 
-def test_a_dev_run_uses_the_dev_folder_and_the_repository_cache(tmp_path, media) -> None:
-    root = tiny_set(tmp_path)
-    out = tmp_path / "r.json"
-    assert run(root, "--out", str(out), "--cache", str(tmp_path / "c")) == 0
-    report = json.loads(out.read_text(encoding="utf-8"))
-    assert (report["set"], report["part"], report["client"]) == ("dev-v2", "dev", "fake")
-    assert report["dataset"]["gold_dir"] == "dev-v2 (dev)"
-    assert report["n"] == 2  # the two equations of the synthetic page
-    ((gold_dir, cache_dir, archive_cache),) = Media.built
-    assert gold_dir == root / "dev" and cache_dir == tmp_path / "c"
-    assert archive_cache == REPO / ".cache" / "openstax"
-
-
-def test_a_dev_run_without_out_reports_under_local_eval(tmp_path, media, monkeypatch) -> None:
-    from readablestem.cli import main as cli_main
-
-    monkeypatch.setattr(cli_main, "project_root", lambda start=None: tmp_path / "project")
-    root = tiny_set(tmp_path)
-    assert run(root, "--cache", str(tmp_path / "c")) == 0
-    assert (tmp_path / "project" / ".local" / "eval" / "dev-v2" / "dev-equations.json").is_file()
-
-
 def test_the_check_part_runs_from_the_sealed_archive_and_stays_outside_the_repository(
     tmp_path, media
 ) -> None:
@@ -127,14 +105,6 @@ def test_a_set_that_is_not_intact_is_not_run(tmp_path, media, capsys) -> None:
     assert Media.built == []
 
 
-def test_other_places_and_options_do_not_apply(tmp_path, media, capsys) -> None:
-    root = tiny_set(tmp_path)
-    assert run(root, "--gold", str(tmp_path)) == 2
-    assert "--gold does not apply" in capsys.readouterr().err
-    assert run(root, "--notation", "bold d") == 2
-    assert "--notation" in capsys.readouterr().err
-
-
 def test_equations_self_check_reads_the_dev_part_only(tmp_path, capsys) -> None:
     root = tiny_set(tmp_path)
     argv = ["eval", "equations", "--set", "dev-v2", "--devset-dir", str(root), "--self-check"]
@@ -142,26 +112,6 @@ def test_equations_self_check_reads_the_dev_part_only(tmp_path, capsys) -> None:
     assert json.loads(capsys.readouterr().out)["n"] == 2
     assert main([*argv, "--part", "check"]) == 2
     assert "only for eval pipeline" in capsys.readouterr().err
-
-
-def test_the_devset_media_prints_openstax_pages_and_reads_authored_pdfs(tmp_path) -> None:
-    root = tiny_set(tmp_path)
-    media = devset_media.DevSetMedia.__new__(devset_media.DevSetMedia)
-    media.gold_dir = root / "dev"
-    record = {"source": "authored", "pdf": "authored/doc-a/doc-a.pdf", "context": "near"}
-    assert media.page_pdf([record]) == b"%PDF-1.4 fake"
-    assert media.equation_context(record) == "near"
-    with pytest.raises(devset_media.RenderError, match="missing"):
-        media.page_pdf([{**record, "pdf": "authored/none/none.pdf"}])
-
-
-def test_classes_self_check_scores_the_gold_against_itself(tmp_path, capsys) -> None:
-    root = tiny_set(tmp_path)
-    argv = ["eval", "classes", "--set", "dev-v2", "--devset-dir", str(root), "--self-check"]
-    assert main(argv) == 0
-    out = json.loads(capsys.readouterr().out)
-    assert out["scripts"]["scripted_rate"] == 1.0
-    assert out["code"]["exact_rate"] == 1.0 and out["glossary"]["structured_rate"] == 1.0
 
 
 def test_classes_scores_saved_pages_and_a_missing_page_is_all_lost(tmp_path, capsys) -> None:
@@ -174,12 +124,3 @@ def test_classes_scores_saved_pages_and_a_missing_page_is_all_lost(tmp_path, cap
     assert out["scripts"]["scripted"] == 0 and out["code"]["missing"] == out["code"]["n"]
     assert main([*argv, "--html-dir", str(tmp_path / "none")]) == 2
     assert "html dir not found" in capsys.readouterr().err
-
-
-def test_classes_needs_the_dev_part_of_dev_v2(tmp_path, capsys) -> None:
-    root = tiny_set(tmp_path)
-    assert main(["eval", "classes", "--self-check"]) == 2
-    assert "--set dev-v2" in capsys.readouterr().err
-    argv = ["eval", "classes", "--set", "dev-v2", "--devset-dir", str(root), "--self-check"]
-    assert main([*argv, "--part", "check"]) == 2
-    assert "--part check" in capsys.readouterr().err

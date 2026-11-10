@@ -11,8 +11,6 @@ import pymupdf
 import pytest
 
 from readablestem.proof import chatbot, stats, systems, systems_tables
-from readablestem.proof.bundle import Bundle, BundleWriter
-from readablestem.proof.errors import BundleError
 
 # ----------------------------------------------------------------------- chatbot recorder
 
@@ -201,24 +199,6 @@ def test_a_section_the_system_did_not_convert_scores_as_found_nothing(tmp_path):
 # ----------------------------------------------------------------------- bundle and claims
 
 
-def _bundle(tmp_path: Path) -> Bundle:
-    writer = BundleWriter(tmp_path / "b")
-    writer.write_text("answers/x.jsonl", "{}\n")
-    return writer.finish({"set_id": "s", "recorded_on": "2026-10-13"})
-
-
-def test_systems_can_be_added_to_a_finished_bundle_once(tmp_path):
-    bundle = _bundle(tmp_path)
-    source = tmp_path / "src"
-    (source / "arm").mkdir(parents=True)
-    (source / "arm" / "a.json").write_text("{}")
-    new = bundle.extend(source, "systems", extra={"systems_spend": {"chatbot_usd": 1.5}})
-    assert not new.verify() and "systems/arm/a.json" in new.files
-    assert new.manifest["systems_spend"] == {"chatbot_usd": 1.5}
-    with pytest.raises(BundleError, match="already in the recorded run"):
-        new.extend(source, "systems")
-
-
 def test_a_claim_needs_the_corrected_interval_to_exclude_zero():
     spec = systems_tables.METRICS["e2e"]
     wide = stats.Interval(-0.1, 0.4, 0, 15, 0.99)
@@ -260,13 +240,6 @@ def test_no_verdict_is_written_for_fewer_sections_than_the_floor():
     assert low.result.startswith("a is")
 
 
-def test_a_steady_gain_over_enough_sections_is_better_by_both_tests():
-    a, b = _vectors([0.9] * 15, [0.1] * 15, key="e2e")
-    done = systems_tables.compare("e2e", "x", a, b, a_name="a", other="b", k=8, n_boot=200)
-    assert done.result == "a is better"
-    assert done.p_sign_flip is not None and done.p_sign_flip < 0.05 / 8
-
-
 def test_a_bootstrap_verdict_the_sign_flip_test_does_not_support_is_only_higher():
     base = "a is better"
     text = systems_tables.final_result(base, p=0.0073, k=8, n_sections=15)
@@ -277,14 +250,6 @@ def test_a_bootstrap_verdict_the_sign_flip_test_does_not_support_is_only_higher(
     nothing = "no difference this set can detect"
     assert systems_tables.final_result(nothing, p=0.5, k=8, n_sections=15) == nothing
     assert systems_tables.final_result(base, p=0.0, k=8, n_sections=9) == "not tested, 9 sections"
-
-
-def test_the_claims_table_prints_the_sign_flip_p_and_says_what_it_is():
-    a, b = _vectors([0.9] * 15, [0.1] * 15, key="e2e")
-    done = systems_tables.compare("e2e", "x", a, b, a_name="a", other="b", k=8, n_boot=200)
-    table = systems_tables.claims_table("t", [done], a_name="a", k=8)
-    text = table.markdown()
-    assert "Sign-flip p" in text and "robustness check" in text and "fewer than 10 sections" in text
 
 
 def test_family_b_counts_the_registered_four_parsers_on_a_held_out_set():

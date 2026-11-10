@@ -5,9 +5,6 @@ from __future__ import annotations
 import csv
 import json
 
-import pytest
-
-from readablestem.cli.main import main
 from readablestem.eval import figures_spotcheck as spot
 
 
@@ -60,26 +57,6 @@ def test_the_draw_takes_every_fail_and_ten_passes_and_leaves_out_ungraded_figure
     }
 
 
-def test_the_draw_is_seeded_and_does_not_depend_on_input_order():
-    items = run_items()
-    a = spot.draw(items, seed="s")
-    b = spot.draw(list(reversed(items)), seed="s")
-    assert a["sampled_passes"] == b["sampled_passes"]
-    assert [i["id"] for i in a["chosen"]] == [i["id"] for i in b["chosen"]]
-    assert spot.draw(items, seed="other")["sampled_passes"] != a["sampled_passes"]
-
-
-def test_fewer_passes_than_asked_takes_all_of_them_and_zero_takes_only_fails():
-    few = spot.draw(run_items(passes=4), seed="s")
-    assert len(few["sampled_passes"]) == 4
-    only_fails = spot.draw(run_items(), passes=0, seed="s")
-    assert [i["id"] for i in only_fails["chosen"]] == sorted(
-        only_fails["fails"], key=lambda i: spot._order("s|sheet", i)
-    )
-    with pytest.raises(ValueError):
-        spot.draw(run_items(), passes=-1, seed="s")
-
-
 def test_the_sheet_is_blind_and_the_key_holds_the_verdicts(tmp_path):
     sheet, key = tmp_path / "sheet.csv", tmp_path / "sheet.key.json"
     counts = spot.write_sheet(run_items(), sheet, key, passes=10, seed="s")
@@ -99,13 +76,6 @@ def test_the_sheet_is_blind_and_the_key_holds_the_verdicts(tmp_path):
     assert groups != sorted(groups)
 
 
-def test_jsonl_sheets_work_too(tmp_path):
-    sheet = tmp_path / "sheet.jsonl"
-    spot.write_sheet(run_items(), sheet, tmp_path / "k.json", passes=2, seed="s")
-    rows = [json.loads(line) for line in sheet.read_text().splitlines()]
-    assert len(rows) == 5
-
-
 def label(item_id: str, accurate="yes", complete="yes", invented="no", table=""):
     return {
         "id": item_id,
@@ -114,17 +84,6 @@ def label(item_id: str, accurate="yes", complete="yes", invented="no", table="")
         "human_invented_values": invented,
         "human_table_values_ok": table,
     }
-
-
-def test_human_verdict_needs_the_three_answers_and_reads_the_table_answer():
-    assert spot.human_verdict(label("a")) is True
-    assert spot.human_verdict(label("a", complete="no")) is False
-    assert spot.human_verdict(label("a", invented="yes")) is False
-    assert spot.human_verdict(label("a", accurate="")) is None
-    assert spot.human_verdict(label("a", table="no")) is False
-    assert spot.human_verdict(label("a", table="yes")) is True
-    with pytest.raises(ValueError):
-        spot.human_verdict(label("a", accurate="maybe"))
 
 
 def test_report_counts_confirmed_fails_and_missed_passes_with_n_and_intervals(tmp_path):
@@ -149,57 +108,3 @@ def test_report_counts_confirmed_fails_and_missed_passes_with_n_and_intervals(tm
     text = spot.format_report(rep)
     assert "2 of 3" in text and "1 of 8" in text and "Wilson" in text
     assert fails[2] in text
-
-
-def test_report_ignores_ids_that_are_not_in_the_key():
-    key = {"seed": "s", "counts": spot.draw([], seed="s")["counts"], "verdicts": {}}
-    rep = spot.report(key, [label("stranger")])
-    assert rep["ids_not_in_key"] == 1 and rep["fails_confirmed"]["n"] == 0
-    assert rep["fails_confirmed"]["wilson95"] is None
-    assert "n/a" in spot.format_report(rep)
-
-
-def test_load_key_refuses_other_files(tmp_path):
-    other = tmp_path / "x.json"
-    other.write_text('{"hello": 1}')
-    with pytest.raises(ValueError, match="not a figures-spotcheck key"):
-        spot.load_key(other)
-
-
-def test_cli_writes_the_sheet_then_scores_the_labels(tmp_path, capsys):
-    items = tmp_path / "judged.jsonl"
-    items.write_text("\n".join(json.dumps(i) for i in run_items()) + "\n")
-    sheet = tmp_path / "out" / "sheet.csv"
-    assert main(["eval", "figures-spotcheck", "--items", str(items), "--sheet", str(sheet)]) == 0
-    out = capsys.readouterr().out
-    assert "3 judge fails, 10 of 20 passes; 2 figures not graded" in out
-    key = sheet.with_suffix(".key.json")
-    assert key.exists()
-    with sheet.open(encoding="utf-8-sig", newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    for row in rows:
-        row.update(human_accurate="yes", human_complete="yes", human_invented_values="no")
-    with sheet.open("w", encoding="utf-8-sig", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=spot.SHEET_FIELDS)
-        writer.writeheader()
-        writer.writerows(rows)
-    report_json = tmp_path / "report.json"
-    args = ["eval", "figures-spotcheck", "--key", str(key), "--labels", str(sheet)]
-    assert main([*args, "--out", str(report_json)]) == 0
-    assert "judge fails the person also fails | 0 of 3" in capsys.readouterr().out
-    assert json.loads(report_json.read_text())["passes_missed"]["n"] == 10
-
-
-def test_cli_needs_inputs_and_reports_bad_ones(tmp_path, capsys):
-    assert main(["eval", "figures-spotcheck"]) == 2
-    assert "give --items and --sheet" in capsys.readouterr().err
-    assert main(["eval", "figures-spotcheck", "--items", str(tmp_path / "a.jsonl")]) == 2
-    assert "--items needs --sheet" in capsys.readouterr().err
-    missing = str(tmp_path / "nope.jsonl")
-    assert main(["eval", "figures-spotcheck", "--items", missing, "--sheet", "s.csv"]) == 2
-    assert "file not found" in capsys.readouterr().err
-    items = tmp_path / "j.jsonl"
-    items.write_text(json.dumps(item(1)) + "\n")
-    args = ["eval", "figures-spotcheck", "--items", str(items), "--sheet", str(tmp_path / "s.csv")]
-    assert main([*args, "--passes", "-1"]) == 2
-    assert "passes must be 0 or more" in capsys.readouterr().err

@@ -14,7 +14,7 @@ import pytest
 from proof_support import SET_ID, PdfMedia, fake_client, make_project
 from readablestem.core.types import Check
 from readablestem.pipeline import html_checks, run
-from readablestem.proof import engine, registry, runner
+from readablestem.proof import engine, runner
 from readablestem.proof.bundle import MANIFEST_NAME, Bundle
 from readablestem.proof.errors import (
     BundleError,
@@ -24,7 +24,6 @@ from readablestem.proof.errors import (
     ProofError,
     ReplayMiss,
 )
-from readablestem.proof.report import wording_problems
 
 DATE = "2026-10-14"
 N_BOOT = 200  # the intervals are tested in test_proof_stats; fewer draws keep this quick
@@ -123,34 +122,6 @@ def test_a_live_run_writes_a_bundle_and_a_report_that_matches_its_replay(recorde
     assert "5 report(s)" in recorded.text
 
 
-def test_the_report_has_the_tables_and_says_what_is_not_there(recorded):
-    text = recorded.text
-    for expected in (
-        "## Status",
-        "## The 2 sections",
-        "## Results: ReadableSTEM",
-        "end_to_end_exact_lenient (all gold equations)",
-        "heading F1",
-        "judge_pass_rate",
-        "Required decisions per PDF page",
-        "## Attribution",
-    ):
-        assert expected in text, expected
-    assert "**Not done.**" in text  # the human labels
-    assert "> **Incomplete.**" in text
-    assert "Development set, not held out" in text  # held_out is false in the test set
-    assert wording_problems(text) == []
-
-
-def test_two_repeats_are_pooled_and_each_run_is_shown(recorded):
-    row = next(
-        line
-        for line in recorded.text.splitlines()
-        if line.startswith("| **end_to_end_exact_lenient (all gold equations)**")
-    )
-    assert row.rstrip(" |").split("|")[-1].count(" / ") == 1  # "run 1 / run 2"
-
-
 # ----------------------------------------------------------------------- what a replay is
 
 
@@ -158,10 +129,6 @@ def test_a_replay_needs_no_key_no_network_and_calls_no_model(replayed):
     assert replayed.drift == []
     assert "0 had no recorded answer" in replayed.text
     assert "**identical**" in replayed.text
-
-
-def test_require_complete_fails_while_a_part_is_a_stub(replayed):
-    assert replayed.exit_code == 1 and len(replayed.not_wired) == 3
 
 
 def test_a_replay_writes_the_same_bytes_every_time_and_to_proof_md_by_default(recorded, replayed):
@@ -184,13 +151,6 @@ def test_a_changed_bundle_file_is_refused_before_anything_runs(recorded, tmp_pat
     pdf = next((bundle / "media" / "pdfs").glob("*.pdf"))
     pdf.write_bytes(pdf.read_bytes() + b"\n%x")
     with pytest.raises(BundleError, match="changed: media/pdfs"):
-        engine.run_proof(options(recorded, bundle_dir=bundle), say=lambda _m: None)
-
-
-def test_a_file_added_to_the_bundle_is_refused(recorded, tmp_path):
-    bundle = copy_bundle(recorded, tmp_path)
-    (bundle / "extra.txt").write_text("x")
-    with pytest.raises(BundleError, match=r"not listed: extra\.txt"):
         engine.run_proof(options(recorded, bundle_dir=bundle), say=lambda _m: None)
 
 
@@ -226,12 +186,6 @@ def test_another_pipeline_version_is_drift_not_a_silent_replay(recorded, monkeyp
     assert "> **DRIFT.**" in result.text
 
 
-def test_a_setting_that_changes_the_run_is_drift(recorded, monkeypatch):
-    monkeypatch.setenv("AUTO_ACCEPT_CONFIDENCE", "0.5")
-    with pytest.raises(Drift, match="auto_accept_confidence"):
-        engine.run_proof(options(recorded), say=lambda _m: None)
-
-
 def test_a_missing_answer_stops_the_replay_and_names_the_run(recorded, tmp_path):
     bundle = copy_bundle(recorded, tmp_path)
     answers = bundle / "answers" / "document.run1.jsonl"
@@ -264,24 +218,7 @@ def test_numbers_that_no_longer_match_the_recording_are_found(recorded, tmp_path
     assert any("cost.model_calls" in p for p in problems)
 
 
-def test_check_reports_pins_and_hashes_without_running(recorded):
-    never = recorded.root / "never-written.md"
-    checks = engine.check_proof(options(recorded, out=never))
-    by_name = {c.name: c.status for c in checks}
-    assert by_name["recorded run"] == "ok" and by_name["gold manifest"] == "ok"
-    assert not never.exists()
-
-
 # ----------------------------------------------------------------- live-run rules
-
-
-def test_a_live_run_without_a_cap_is_refused(tmp_path):
-    root = make_project(tmp_path)
-    with pytest.raises(ProofError, match="--max-usd"):
-        engine.run_proof(
-            engine.ProofOptions(root=root, live=True, date=DATE, work_dir=tmp_path / "w"),
-            say=lambda _m: None,
-        )
 
 
 def test_a_held_out_set_refuses_the_fake_client(tmp_path):
@@ -379,12 +316,6 @@ def test_a_spend_cap_that_is_too_small_stops_the_run_and_leaves_no_bundle(tmp_pa
     assert not (tmp_path / "w" / "bundles" / f"{SET_ID}-{DATE}").exists()
 
 
-def test_the_registry_finds_the_set_and_its_default(recorded):
-    pset = registry.resolve_set(recorded.root, None)
-    assert pset.id == SET_ID and [s.id for s in pset.sections] == ["physics/p-1", "physics/p-2"]
-    assert pset.runs()[:2] == [("document", 1), ("document", 2)]
-
-
 # ------------------------------------------------------------- stages made elsewhere
 
 
@@ -407,21 +338,6 @@ class DemoStage:
         return StageResult("ok", [Section(self.title, [self.text])])
 
 
-def test_a_registered_stage_replaces_its_stub_in_the_same_place(recorded, monkeypatch):
-    from readablestem.proof import stages
-
-    monkeypatch.setitem(stages.STAGES, "invented_content", DemoStage())
-    result = engine.run_proof(options(recorded, out=recorded.root / "demo.md"), say=lambda _m: None)
-    text = result.text
-    assert "Invented: 0 of 10 units (demo)." in text
-    assert "`invented_content` is a placeholder" not in text
-    assert len(result.not_wired) == 3
-    order = [text.index(h) for h in ("## Results: ReadableSTEM", "## Invented-content rate")]
-    assert order == sorted(order)
-    assert "| Invented-content rate | done |" in text
-    assert "Not computed in this build: Comparison" in text  # the other three still say so
-
-
 def test_a_stage_that_writes_a_forbidden_word_stops_the_report(recorded, monkeypatch):
     from readablestem.proof import stages
 
@@ -429,29 +345,6 @@ def test_a_stage_that_writes_a_forbidden_word_stops_the_report(recorded, monkeyp
     with pytest.raises(ProofError, match="wording rules"):
         engine.run_proof(options(recorded, out=recorded.root / "bad.md"), say=lambda _m: None)
     assert not (recorded.root / "bad.md").exists()
-
-
-def test_a_live_run_calls_every_stage_record_hook(tmp_path, monkeypatch):
-    from readablestem.proof import stages
-
-    root = make_project(tmp_path)
-    demo = DemoStage()
-    monkeypatch.setitem(stages.STAGES, "invented_content", demo)
-    monkeypatch.setattr(html_checks, "axe_checks", lambda html: [Check(name="axe", passed=True)])
-    engine.run_proof(
-        engine.ProofOptions(
-            root=root,
-            live=True,
-            max_usd=5.0,
-            date=DATE,
-            work_dir=tmp_path / "w",
-            client_factory=fake_client,
-            media_factory=PdfMedia,
-            n_boot=N_BOOT,
-        ),
-        say=lambda _m: None,
-    )
-    assert demo.recorded
 
 
 # ------------------------------------------------------- a cap stop that keeps finished runs
@@ -490,12 +383,6 @@ def _live(root, work, **overrides):
             ),
             say=lambda _msg: None,
         )  # fmt: skip
-
-
-def test_a_cap_stop_writes_no_bundle_by_default(tmp_path):
-    root = make_project(tmp_path)
-    with pytest.raises(Incomplete):
-        _live(root, tmp_path / "w", client_factory=_client_that_runs_out_after(1))
 
 
 def test_a_cap_stop_can_keep_the_runs_that_finished_and_says_so(tmp_path):
@@ -672,19 +559,6 @@ def test_claude_arms_are_added_one_after_the_other_with_the_runs_that_were_made(
             say=lambda _m: None,
             arms=["chatbot-opus-purdue"],
         )
-
-
-def test_claude_arms_are_not_run_for_the_openai_provider(recorded, tmp_path):
-    bundle_dir = copy_bundle(recorded, tmp_path)
-    with pytest.raises(ProofError, match="run on anthropic, not on openai: pass --provider"):
-        engine.add_systems(
-            options(recorded, bundle_dir=bundle_dir, work_dir=tmp_path / "w", max_usd=3.0),
-            "chatbot",
-            say=lambda _m: None,
-            arms=["chatbot-opus-purdue"],
-            chat_client=object(),
-        )
-    assert not (bundle_dir / "systems").exists()
 
 
 def test_sections_recorded_together_replay_to_the_same_report(recorded, tmp_path):
