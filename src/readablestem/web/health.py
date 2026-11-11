@@ -65,7 +65,8 @@ def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
 
 def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
     """`(fresh, details)` for the admin: the status word, the stale names, the storage
-    report, the sandbox probe and the production profile's hash. None of it is public (`/healthz/ops` gives the word only)."""
+    report, the sandbox probe and the production profile's hash. None of it is public
+    (`/healthz/ops` gives the word only)."""
     ok, stale = ops_freshness(ctx)
     try:
         with session_scope(ctx.factory) as session:
