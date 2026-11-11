@@ -101,7 +101,8 @@ def test_the_vendor_line_names_anthropic_beside_the_upload_button_and_on_the_lan
         signed_in(env, client)
         app = client.get("/app").text
         landing = client.get("/").text
-    form = app.split('<form method="post" action="/jobs"', 1)[1].split("</form>", 1)[0]
+    # The upload form's action carries its request token (SW43): "/jobs?request_token=...".
+    form = app.split('<form method="post" action="/jobs?', 1)[1].split("</form>", 1)[0]
     after_button = form.split("Upload and convert", 1)[1]
     assert line in text_of(after_button)
     assert line in text_of(landing)
