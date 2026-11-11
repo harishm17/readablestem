@@ -111,6 +111,7 @@ def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
     import re
 
     from readablestem.pipeline import assemble, html_checks
+    from readablestem.web import output
 
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
@@ -121,13 +122,15 @@ def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
     first = site.browser.get(f"/jobs/{site.job_id}/view").text
     assert assemble.render_version(first) == assemble.RENDER_VERSION
     stored = site.job(site.job_id)
-    assert stored.html == first
+    # The view of a draft carries the draft banner as it leaves; the stored page never does.
+    assert assemble.DRAFT_STATE_META not in (stored.html or "")
+    assert first == output.marked(stored.html or "", output.export_state(stored))
     checks = DocumentResult.model_validate(stored.result_json).html_checks
-    assert checks == html_checks.static_checks(first)
+    assert checks == html_checks.static_checks(stored.html or "")
 
     # A page at the current version is served as it is stored: no second render.
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
         assert job is not None
-        job.html = first.replace("</main>", "<p>Stored as it was.</p></main>")
+        job.html = (stored.html or "").replace("</main>", "<p>Stored as it was.</p></main>")
     assert "Stored as it was." in site.browser.get(f"/jobs/{site.job_id}/view").text
