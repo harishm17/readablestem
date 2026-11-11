@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
+
+- F-509: text struck through on the page was read as live text ("October 3 October 10"
+  with the first date struck read as two dates). `Element.runs` holds runs of an element's
+  text with a meaning of their own; the one kind is `deleted`. The text pass marks glyphs
+  crossed by a thin horizontal rule or bar between 25% and 65% of their height (no thicker
+  than 0.12 of the font size), or covered by a StrikeOut annotation; underlines and rules
+  under blanks are left alone. The LaTeX reader turns ulem `\sout` and `\xout` into the
+  same runs. Struck text is kept, never removed.
+- The output writes a struck run as `<del>` with a visually hidden "deleted: " before and
+  "end deleted" after, and one `del` rule (a line-through that survives forced colors and
+  the dark page). HTML, EPUB, Canvas and the Common Cartridge carry the same markup; Word
+  shows the strike and the two phrases as words; Listen says them.
+- Each element with struck text gets the optional notice `struck_text` ("Worth checking",
+  with its page; no required decision). A text edit that changes struck words takes the run
+  off and its message counts it; the notice goes with the last run.
+- `core/inline.py` is the one place that moves, clears and adds spans: a page edit
+  (`page_edits.remap_spans`), combining parts (`combine._element`), the writer
+  (`inline_text.render_inline_text`), the LaTeX reader and a kept image page go through it,
+  so a span kind added to `Element` is not lost by code that names the fields one by one.
+- `CONTENT_RUNS` (off; production profile and `.railway/railway.ts`): off is the shadow
+  rollout, where struck runs are counted in the trace (`deleted_runs`,
+  `deleted_runs_written`) but not stored or written. Results without runs are stored and
+  written byte for byte as before (no migration; the stored-demo golden file is unchanged),
+  and a result with runs loads in the previous release, which writes the words plain.
+
 ## Unreleased: pipeline 0.5.11 (integration/wave-1a)
 
 - `PIPELINE_VERSION` 0.5.11: the font code tables and the figure label crop (both below) change
