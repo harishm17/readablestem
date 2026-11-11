@@ -32,6 +32,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from readablestem.core import uid
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     DocumentResult,
@@ -158,8 +159,15 @@ def origin_of(element: Element, rows: list[EditRow]) -> Origin | None:
     return Origin(current[0], current[1], tuple(reversed(ops)))
 
 
-def _words(text: str | None) -> str:
-    return carry._words(text)
+def _said(element: Element, origin: Origin | None = None) -> str:
+    """The content of a text item as stable ids see it (`core.uid.fingerprint`), or of what
+    it said before the edits (`origin`). Inline equations count by place, not by id, so a
+    paragraph whose equations were renumbered by an item added above it is still found."""
+    if origin is not None:
+        if origin.kind not in Kind:  # a snapshot this code cannot read: matches nothing
+            return "?"
+        element = element.model_copy(update={"kind": Kind(origin.kind), "text": origin.text})
+    return uid.fingerprint(element)
 
 
 def _same_look(a: Element, b: Element) -> bool:
@@ -218,26 +226,22 @@ def _carry_words(
             edited[element.id] = origin
     if not edited:
         return out
-    # How often each (kind, words) said the same in the earlier file, counting an edited
+    # How often each content (kind and words) was said in the earlier file, counting an edited
     # item by what it said before: two that said the same are told apart by place only
     # when the new file has the same number of them.
-    seen_old: defaultdict[tuple[str, str], int] = defaultdict(int)
+    seen_old: defaultdict[str, int] = defaultdict(int)
     for element in old.elements:
         if element.kind in page_edits.TEXT_KINDS:
-            origin = edited.get(element.id)
-            kind, text = (
-                (origin.kind, origin.text) if origin else (element.kind.value, element.text)
-            )
-            seen_old[(kind, _words(text))] += 1
-    seen_new: defaultdict[tuple[str, str], list[Element]] = defaultdict(list)
+            seen_old[_said(element, edited.get(element.id))] += 1
+    seen_new: defaultdict[str, list[Element]] = defaultdict(list)
     for element in new.elements:
         if element.kind in page_edits.TEXT_KINDS:
-            seen_new[(element.kind.value, _words(element.text))].append(element)
+            seen_new[_said(element)].append(element)
 
     pairs: list[tuple[float, str, str]] = []
     old_by = {e.id: e for e in old.elements}
     for old_id, origin in edited.items():
-        key = (origin.kind, _words(origin.text))
+        key = _said(old_by[old_id], origin)
         candidates = seen_new.get(key, [])
         if len(candidates) != seen_old[key]:
             continue  # said the same more or fewer times: which one is which is a guess

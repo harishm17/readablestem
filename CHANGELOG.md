@@ -36,6 +36,18 @@
   `web/static/demo/` to `web/demo/`, so `/static/demo/*` no longer serves it unsandboxed;
   `/demo` is its one address, and the landing page's PDF link is now `/demo/source.pdf`.
   `docs/` and `scripts/` stay out of the Docker image.
+## Unreleased: stable element ids (branch feat/stable-ids, WS9.1)
+
+- Every element has a stable id (`core/uid.py`, `u1-` and 16 hex digits) made from its kind, a
+  content fingerprint, its page and its place among equal items on that page, so adding,
+  removing or editing one element renames no other. Computed from the result when needed:
+  stored results are not rewritten and keep every decision on its element; positional ids
+  stay the label and the key, and are an alias of the uid. The version is in the prefix, and
+  uids of earlier versions keep resolving.
+- The routes that take an element id in their address also take a uid; one that names nothing
+  is a 404.
+- Decision carry-over and the carry of edits use the same fingerprint. An edit to a paragraph
+  now carries when an item added above it renumbers its inline equations (it was dropped).
 
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 

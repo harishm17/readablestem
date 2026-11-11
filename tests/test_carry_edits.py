@@ -117,6 +117,20 @@ def test_an_inline_equation_stays_where_it_is_and_must_be_the_same_picture():
     done, _, _ = carry_all(old, old_crops, again, again_crops, rows_of(change))
     assert done.items == [] and done.dropped == 1
     assert "quickly" not in (element(again, PARAGRAPH).text or "")
+    # The same picture under another id (an item added above it renumbered the page): the
+    # paragraph is still the same paragraph, and the words go on with the new id.
+    moved, moved_crops = fresh()
+    for item in moved.elements:
+        item.id = "p1-e9" if item.id == "p1-e2" else item.id
+        item.text = (item.text or "").replace("⟦p1-e2⟧", "⟦p1-e9⟧") or item.text
+    for fix in moved.fixes:
+        fix.element_id = "p1-e9" if fix.element_id == "p1-e2" else fix.element_id
+    moved_crops["p1-e9"] = moved_crops.pop("p1-e2")
+    done, _, _ = carry_all(old, old_crops, moved, moved_crops, rows_of(change))
+    assert done.items == [(carry_edits.TEXT, PARAGRAPH)] and done.dropped == 0
+    assert element(moved, PARAGRAPH).text == (
+        "A rigid body turning with angular velocity ⟦p1-e9⟧ moves a point r quickly."
+    )
 
 
 def test_a_text_that_appears_a_different_number_of_times_is_not_guessed():

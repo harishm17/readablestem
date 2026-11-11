@@ -54,7 +54,13 @@ from readablestem.web.review import (
     is_stale,
 )
 from readablestem.web.review import accept_clean_tables as accept_clean_tables_rule
-from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done, restart_owner_clock
+from readablestem.web.routes.jobs import (
+    NOT_FOUND,
+    element_ref,
+    job_access,
+    require_done,
+    restart_owner_clock,
+)
 from readablestem.web.routes.review import (
     _landing,
     _review_edit,
@@ -278,16 +284,18 @@ def _invalid_screen(
     )
 
 
-def _page_of(request: Request, job_id: str, user: CurrentUser, element_id: str) -> int:
-    """The 1-based page of an element of the user's job (404 otherwise)."""
+def _page_of(request: Request, job_id: str, user: CurrentUser, ref: str) -> tuple[int, str]:
+    """The 1-based page and the id of an element of the user's job, named by its id or its
+    stable id (404 otherwise)."""
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
+    element_id = element_ref(result, ref)
     element = next((e for e in result.elements if e.id == element_id), None)
     if element is None:
         raise PageError(404, *NOT_FOUND)
-    return element.page + 1
+    return element.page + 1, element_id
 
 
 @router.post("/jobs/{job_id}/edit/{element_id}", dependencies=[Depends(require_csrf)])
@@ -305,7 +313,7 @@ def edit_element(
     (`action=text`), or make a paragraph a heading (`action=heading`, with its `level`)."""
     if not ELEMENT_ID.match(element_id) or action not in {"text", "heading"}:
         raise PageError(404, *NOT_FOUND)
-    page = _page_of(request, job_id, user, element_id)
+    page, element_id = _page_of(request, job_id, user, element_id)
 
     def make(result: DocumentResult, job: Job, session: Session) -> StructureChange:
         if action == "text":
@@ -665,6 +673,7 @@ def read_cell(
         require_done(job)
         stale = is_stale(job.result_version, version)
         result = DocumentResult.model_validate(job.result_json or {})
+    element_id = element_ref(result, element_id)
     fix = result.fix_for(element_id)
     element = next((e for e in result.elements if e.id == element_id), None)
     if fix is None or element is None or fix.kind is not Kind.TABLE:

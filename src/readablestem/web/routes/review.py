@@ -150,7 +150,13 @@ from readablestem.web.review import (
     review_anchor,
     undo_last,
 )
-from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done, restart_owner_clock
+from readablestem.web.routes.jobs import (
+    NOT_FOUND,
+    element_ref,
+    job_access,
+    require_done,
+    restart_owner_clock,
+)
 from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
@@ -1574,6 +1580,7 @@ def review_action(
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
+            element_id = element_ref(result, element_id)
             change_made = apply_review(
                 result,
                 element_id,
