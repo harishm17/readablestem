@@ -19,6 +19,7 @@ printed pages read differently.
 | EPUB validators | `tests/test_export_epub_validators.py` skips unless EPUBCheck and DAISY Ace are installed: set `EPUBCHECK_JAR` (needs Java; `JAVA` if not on PATH) and `ACE` (for example `npx -y @daisy/ace`). CI runs them in `epub.yml` |
 | `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
+| Workflow suite | `uv run pytest -m workflow -n auto --dist loadfile -rs`: the corpus's files through the real app, from recorded model answers, at no cost (docs/eval.md, "Recording and replay"). Needs `make table-model` and `uv run python -m readablestem.eval.corpus check --fetch` once |
 | `make lint` | `ruff check` + `ruff format --check` |
 | `make fmt` | Format and auto-fix |
 | `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
@@ -87,6 +88,7 @@ UTC) and by hand. Jobs, by check name:
 | `pytest (Python 3.12, shard i/6)`, `(Python 3.14, ...)` | The offline suite, in six shards |
 | `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
 | `pytest -m browser (Playwright Chromium, shard i/4)` | Browser tests, four shards of three xdist workers each |
+| `workflow suite (replay of the recorded answers)` | `pytest -m workflow`: corpus files converted by the real app from recorded answers. Tests that need answers kept out of the repository are skipped and listed |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
 
 The other jobs (`postgres`, `docker`, `latex source`, `make proof` (on main, the nightly run, and pull requests that touch `proof/`, `PROOF.md`, `data/`, the Makefile, `src/readablestem/proof` or `cli`, or the dependency and CI files), `make site`, `pip-audit`,

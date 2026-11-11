@@ -2534,11 +2534,11 @@ the machine, which changed the layout of 2.1; it is not used.
 
 The workflow tests and the layout evals read one set of files, listed in
 `tests/workflows/corpus/corpus.json` and read through `src/readablestem/eval/corpus.py`.
-As of 2026-11-11 it has 61 entries; 47 of them have reading-order labels (91 pages).
+As of 2026-11-11 it has 72 entries; 47 of them have reading-order labels (91 pages).
 
 **Where a file may come from.** Every entry is one of three kinds.
 
-- `public` (19 entries): a file on MIT OpenCourseWare, arXiv or Wikimedia Commons. The
+- `public` (30 entries): a file on MIT OpenCourseWare (25), arXiv or Wikimedia Commons. The
   manifest pins the URL, the SHA-256, the size, the license and who to credit. The file is
   fetched into `.cache/corpus/` (not committed) and the tests use a page range cut from it.
   A download whose hash differs is refused and never reaches the cache.
@@ -2559,6 +2559,9 @@ As of 2026-11-11 it has 61 entries; 47 of them have reading-order labels (91 pag
 2. Someone else's file is committed only when its license is CC BY 4.0, CC0 or public
    domain, with the attribution in the manifest and in the corpus README, and only up to
    5,000,000 bytes. CC BY-NC-SA files (MIT OpenCourseWare) are fetched, never committed.
+   A model's recorded answer about such a file repeats what the file says (its equations,
+   its tables, a page read from a scan), so those answers are kept out of the repository
+   too ("Recording and replay" below).
 3. A URL is pinned to one version. arXiv entries name the version (`v1`, `v4`).
 4. Only files listed here, or files a builder makes, are sent to a model.
 
@@ -2584,10 +2587,64 @@ method and date for every gold file.
 
 ```bash
 uv run python -m readablestem.eval.corpus check            # committed and built files, no network
-uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 19 public files by hash
+uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 30 public files by hash
 uv run python tests/workflows/builders/record.py list      # the 71 built files and what each shows
 uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or network" for the rest
 ```
+
+### Recording and replay
+
+The workflow tests (`tests/workflows`, `pytest -m workflow`) upload each corpus file to the
+real app, with production's behaviour settings (`ops/production.profile.toml`), and convert
+it from recorded model answers. Nothing is sent to a model. A conversion that asks a
+question the recording does not hold fails its test with the step and what changed since
+the recording (a prompt, a model, a picture), so a change to what is sent to a model shows
+up as a named miss and never as a silent call.
+
+**Two files.** The recording is split by the license of the file an answer was read from:
+
+| File | Holds | As of 2026-11-11 |
+|---|---|---|
+| `tests/workflows/corpus/answers.jsonl.gz` (committed) | answers read from files made here, and from CC BY 4.0, CC0 and public-domain files | 270 answers |
+| `.cache/corpus/answers.jsonl.gz` (not committed; `$CORPUS_CACHE` moves the folder) | answers read from the 25 CC BY-NC-SA files | 1,303 answers |
+
+An answer a committable file and a kept-out file both read goes to the second file. Where
+the second file is absent, as in CI, a test that converts a CC BY-NC-SA file is skipped and
+says why; the five workflows built first (typed notes, dense solutions, slides, a chemistry
+exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only where
+that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
+replay pays nothing.
+
+**Answers still owed.** Ten files ask for 126 answers that were never recorded (pictures
+that changed since the first recording, and files added after it). `harness.OWED` lists
+them with the count for each, and the replay test fails if a file misses more or fewer than
+its count. Their conversions still finish: a part with no answer is left for the reviewer,
+as when a model is unavailable.
+
+**Refreshing.** `scripts/corpus_refresh.py` runs the same tests against a working copy of
+the recording and writes back what they read; an answer no test read is dropped.
+
+```bash
+uv run python scripts/corpus_refresh.py --check                # replay; write nothing
+uv run python scripts/corpus_refresh.py                        # replay; drop unread answers
+uv run python scripts/corpus_refresh.py --from OLD.jsonl       # move an older recording to today's keys
+uv run python scripts/corpus_refresh.py --live --max-usd 0.50  # pay for what is missing
+```
+
+Only `--live` can spend, and it needs `--max-usd`: the most the run may pay for answers the
+recording lacks, refused above $1.00. The limit is enforced where a real request is made
+(`MODEL_ANSWERS_LIVE_USD`, `eval/answers.py`), because the app's daily cap counts replayed
+costs as well. Past the limit a missing answer is refused and stays missing. The script
+prints what was read, what was missing and why, and what was paid.
+
+The answers were recorded with the table-structure model present (`make table-model`), as
+in the deployed image. Without it tables are read another way, the questions differ, and
+the tests say so instead of running.
+
+**Marking an open finding.** A workflow test that a known, unfixed finding makes false is
+marked `@harness.finding("F-nnn")`. The mark is a strict expected failure: when the fix
+lands the test passes, the run fails, and the same change removes the mark. A finding
+cannot be fixed by accident and stay marked open.
 
 ## Reading order (`eval/order.py`)
 

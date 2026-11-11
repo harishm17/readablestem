@@ -7,6 +7,9 @@ in [docs/eval.md](../../../docs/eval.md#the-test-corpus).
 - `selfmade/`: PDFs made for this repository, each next to the HTML, LaTeX, Markdown or Word
   source it was printed from. MIT, like the rest of the repository.
 - `public/`: two cuts of OpenStax textbooks (below).
+- `answers.jsonl.gz`: recorded model answers the workflow tests convert from, for the files
+  that may be committed. Answers read from CC BY-NC-SA files are kept in the fetch cache
+  instead ([docs/eval.md](../../../docs/eval.md#recording-and-replay)).
 - `gold/`: reading-order labels, one file per entry. Labels for files made here hold the
   text of each block. Labels for anyone else's file hold no text, only ranges into the
   page's own words and a hash per block.
