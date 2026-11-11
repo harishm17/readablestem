@@ -131,7 +131,7 @@ def _measure(report: Mapping[str, Any], name: str) -> float:
     return float(value)
 
 
-def _missing(report: Mapping[str, Any]) -> list[str]:
+def missing(report: Mapping[str, Any]) -> list[str]:
     """The four things a report must say, by what is absent."""
     chosen = report.get("split") or {}
     settings = report.get("profile") or {}
@@ -156,9 +156,9 @@ def judge(
     `at_most` is the bar."""
     if (at_least is None) == (at_most is None):
         raise ValueError("give one bar: at_least or at_most")
-    missing = _missing(report)
-    if missing:
-        return Verdict("refused", f"refused: the report does not say {', '.join(missing)}")
+    absent = missing(report)
+    if absent:
+        return Verdict("refused", f"refused: the report does not say {', '.join(absent)}")
     try:
         value = _measure(report, measure)
     except KeyError:

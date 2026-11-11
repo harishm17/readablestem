@@ -588,6 +588,16 @@ def run(
             return list(pool.map(one, uploads))
 
 
+def table(head: Sequence[object], rows: Sequence[Sequence[object]]) -> list[str]:
+    """Rows as lines of text, each column as wide as its widest cell."""
+    cells = [[str(cell) for cell in row] for row in (head, *rows)]
+    widths = [max(len(row[i]) for row in cells) for i in range(len(head))]
+    return [
+        "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
+        for row in cells
+    ]
+
+
 def machine() -> dict[str, Any]:
     """What the seconds were measured on: the CPU's model name and how many cores this
     process may use. Two records compare only when both are the same."""

@@ -166,9 +166,15 @@ def set_run(
 
 
 def _sums(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Every count added up over `rows`, and on how many pages each of `BESIDE` is found."""
+    """Every count added up over `rows`, on how many pages each of `BESIDE` is found, and how
+    many documents have every one of their gold pages right."""
     sums: dict[str, Any] = dict(order.total(list(rows)))
     sums["pages_with"] = {count: sum(1 for row in rows if row.get(count)) for count in BESIDE}
+    by_document: dict[str, list[bool]] = {}
+    for row in rows:
+        by_document.setdefault(row["upload"], []).append(bool(row["right"]))
+    sums["documents"] = len(by_document)
+    sums["documents_right"] = sum(all(pages) for pages in by_document.values())
     return sums
 
 
@@ -302,14 +308,6 @@ def judge(now: dict[str, Any], before: dict[str, Any], *, source: str = "html") 
     )
 
 
-def _table(head: Sequence[str], rows: Sequence[Sequence[Any]]) -> list[str]:
-    widths = [max(len(str(row[i])) for row in (head, *rows)) for i in range(len(head))]
-    return [
-        "  ".join(str(cell).ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
-        for row in (head, *rows)
-    ]
-
-
 _HEAD = (
     "pages",
     "right",
@@ -352,7 +350,7 @@ def _source_table(made: dict[str, Any]) -> list[str]:
     rows.append(_line("all", made["all"]))
     if made["apart"]["pages"]:
         rows.append(_line("apart: answers missing", made["apart"]))
-    return _table(("", *_HEAD), rows)
+    return measure.table(("", *_HEAD), rows)
 
 
 def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
@@ -378,7 +376,9 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
         "",
         f"{SAID['html']}: {student.get('right', 0)} of {student['pages']} pages right, "
         f"{student.get('faultless', 0)} faultless; {with_['furniture']} pages read furniture "
-        f"aloud, {with_['cut']} cut a block, {with_['merged']} run blocks together.",
+        f"aloud, {with_['cut']} cut a block, {with_['merged']} run blocks together. "
+        f"{student.get('documents_right', 0)} of {student.get('documents', 0)} documents have "
+        "every gold page right.",
         "Pages right is one count of several, and none of them sees a formula missing from "
         "a sentence. The page check's flag rate on these pages is not measured yet.",
     ]
@@ -397,7 +397,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
         ]
     if wrong:
         lines += ["", f"the {len(wrong)} pages not right in the page a student is given:"]
-        lines += _table(
+        lines += measure.table(
             ("upload", "page", "group", "why", "in the elements"),
             [
                 (

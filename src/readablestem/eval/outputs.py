@@ -203,15 +203,6 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
     }
 
 
-def _grid(headers: Sequence[str], rows: Sequence[Sequence[object]]) -> list[str]:
-    cells = [[str(cell) for cell in row] for row in (headers, *rows)]
-    widths = [max(len(row[i]) for row in cells) for i in range(len(headers))]
-    return [
-        "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
-        for row in cells
-    ]
-
-
 def _counts_table(table: dict[str, Any]) -> list[str]:
     rows = [
         (
@@ -222,7 +213,7 @@ def _counts_table(table: dict[str, Any]) -> list[str]:
         )
         for code in CODES
     ]
-    return _grid(("kind", *OUTPUTS, "all", "documents"), rows)
+    return measure.table(("kind", *OUTPUTS, "all", "documents"), rows)
 
 
 def render(record: dict[str, Any], worst: int = 10) -> str:
@@ -240,7 +231,7 @@ def render(record: dict[str, Any], worst: int = 10) -> str:
     lines += ["", "wrong places by kind and by output (documents: with at least one):"]
     lines += _counts_table(whole)
     lines += ["", "what was read (the built files of the uploads above, added up):"]
-    lines += _grid(
+    lines += measure.table(
         ("output", "built", "could not be built", *SIZES),
         [
             (
@@ -256,7 +247,9 @@ def render(record: dict[str, Any], worst: int = 10) -> str:
     named = [row for row in whole["by_upload"] if row["places"]][:worst]
     if named:
         lines += ["", f"the uploads with the most wrong places (of {whole['uploads']}):"]
-        lines += _grid(("upload", "places"), [(row["upload"], row["places"]) for row in named])
+        lines += measure.table(
+            ("upload", "places"), [(row["upload"], row["places"]) for row in named]
+        )
     if apart["uploads"]:
         missing = ", ".join(f"{name} ({n})" for name, n in uploads["answers_missing"].items())
         lines += [

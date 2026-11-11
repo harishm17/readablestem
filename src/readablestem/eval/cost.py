@@ -256,16 +256,6 @@ def _usd(value: float | None) -> str:
     return "-" if value is None else f"${value:.4f}"
 
 
-def _table(head: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
-    widths = [max(len(str(row[i])) for row in (head, *rows)) for i in range(len(head))]
-    lines = ["  ".join(str(cell).ljust(width) for cell, width in zip(head, widths, strict=True))]
-    lines += [
-        "  ".join(str(cell).ljust(width) for cell, width in zip(row, widths, strict=True))
-        for row in rows
-    ]
-    return [line.rstrip() for line in lines]
-
-
 def render(record: dict[str, Any]) -> str:
     """A cost record as the lines `readablestem eval cost` prints."""
     made = record["metrics"]
@@ -292,7 +282,7 @@ def render(record: dict[str, Any]) -> str:
         "",
         "by page kind (dollars of one page; a page of text alone sends nothing to a model):",
     ]
-    lines += _table(
+    lines += measure.table(
         ("kind", "pages", "documents", "median", "p95", "mean", "total"),
         [
             (
@@ -308,7 +298,7 @@ def render(record: dict[str, Any]) -> str:
         ],
     )
     lines += ["", "by step (dollars of a page the step ran on; mean over every page):"]
-    lines += _table(
+    lines += measure.table(
         ("step", "models", "calls", "pages", "median", "p95", "every page", "total"),
         [
             (
@@ -326,7 +316,7 @@ def render(record: dict[str, Any]) -> str:
     )
     names = list(made["steps"])
     lines += ["", "by page kind and step (mean dollars a page):"]
-    lines += _table(
+    lines += measure.table(
         ("kind", *names),
         [
             (kind, *(_usd(row["steps"].get(step)) for step in names))
@@ -334,7 +324,7 @@ def render(record: dict[str, Any]) -> str:
         ],
     )
     lines += ["", "steps of the accuracy round (spent in this run; estimate for one unit):"]
-    lines += _table(
+    lines += measure.table(
         ("step", "calls", "spent", "estimate", "for one", "basis"),
         [
             (

@@ -869,6 +869,53 @@ def _cmd_bar(args: argparse.Namespace) -> int:
     return verdict.exit_code
 
 
+def _cmd_ledger(args: argparse.Namespace) -> int:
+    """`eval ledger`: every row of the quality ledger, from the records the evals keep, each
+    figure with its counts, a bound and a label, held against its two bars (`eval.ledger`).
+    Measures nothing and spends nothing. Exit code 0: no held-out figure is worse than its
+    release bar; 1: one is, or `--for-release` and a row with a release bar has no held-out
+    figure of this release; 2: refused."""
+    from readablestem.eval import corpus, ledger, run_record
+    from readablestem.ops import profile
+
+    folder: Path = args.records or _default(Path("data/eval"))
+    bars_path: Path = args.bars or folder / ledger.BARS_FILE
+    try:
+        production = profile.load()
+    except (OSError, ValueError) as exc:
+        return _error(f"refused: no production profile to name the release by ({exc})")
+    stamp = {
+        "name": production.name,
+        "sha256": production.sha256,
+        "confirmed": production.confirmed,
+        "differs": [],
+        "counted_off": [],
+    }
+    sha, dirty = run_record.source_state(corpus.REPO)
+    stamps = ledger.stamps(stamp, sha + ("+changes" if dirty else ""))
+    release = f"{stamps['pipeline_version']}+{production.sha256[:12]}"
+    try:
+        bars = ledger.read_bars(bars_path)
+        made = ledger.build(ledger.read_records(folder), bars, release=release, stamps=stamps)
+        if args.register_bars or args.replace_bar:
+            bars, written = ledger.register(made, bars, replace=args.replace_bar)
+            if written:
+                _write_record(bars_path, {"bars": bars})
+                made = ledger.build(
+                    ledger.read_records(folder), bars, release=release, stamps=stamps
+                )
+            print(
+                "release bars written: " + (", ".join(written) or "none"),
+                file=sys.stderr,
+            )
+    except ledger.Refused as exc:
+        return _error(f"refused: {exc}")
+    failed = ledger.failures(made, for_release=args.for_release)
+    _write_record(args.out, made)
+    print(ledger.render(made, failed))
+    return 1 if failed else 0
+
+
 def _measured(
     args: argparse.Namespace, runs: int, *, outputs: bool = False
 ) -> tuple[list[list[Any]], Any] | int:
@@ -2022,6 +2069,37 @@ def register(
         help="how many more decisions a page a page kind may ask for than before (0)",
     )
     burden.set_defaults(func=_cmd_burden)
+
+    ledger = group.add_parser(
+        "ledger",
+        help="the quality ledger: every row from the records the evals keep, with counts, a "
+        "bound and a label, held against its release bar and its goal bar (measures nothing)",
+    )
+    ledger.add_argument(
+        "--records", type=Path, metavar="DIR", help="the kept records (default: data/eval)"
+    )
+    ledger.add_argument(
+        "--bars", type=Path, metavar="FILE", help="default: ledger-bars.json beside the records"
+    )
+    ledger.add_argument("--out", type=Path, help="write the ledger here as JSON")
+    ledger.add_argument(
+        "--for-release",
+        action="store_true",
+        help="also fail when a row that has a release bar has no held-out figure of this release",
+    )
+    ledger.add_argument(
+        "--register-bars",
+        action="store_true",
+        help="write this run's held-out figures as the release bars of rows that have none",
+    )
+    ledger.add_argument(
+        "--replace-bar",
+        action="append",
+        default=[],
+        metavar="ROW",
+        help="replace this row's release bar with this run's held-out figure (repeat)",
+    )
+    ledger.set_defaults(func=_cmd_ledger)
 
     order = group.add_parser(
         "order",
