@@ -2793,14 +2793,51 @@ matcher is fixed.
 | Set | Documents | Pages | Blocks | Use |
 |---|---|---|---|---|
 | `layout-dev-1` | 28 arXiv papers, 10 OpenStax books, 22 files made here | 267 | 4,460 | development |
+| `layout-heldout-1` | 28 arXiv papers, 8 OpenStax books, 15 course handouts | 256 | 3,811 | held-out |
 
 `layout-dev-1` was built in the second measuring round of November 2026 by research scripts,
 and `layout_gold.py` rebuilds all of it value for value from the kept sources. Half of it
 was scored once as a sealed half and its failing pages were then used as cases, so all of it
-is development now. No held-out set exists yet, so no reading-order bar can be met
-(`eval bar`). Not built yet: the fetchers with LaTeXML run in the repository's sandbox (the
-papers of this set took their HTML from ar5iv), course LaTeX and Word files as sources, and
-the held-out set drawn from other documents.
+is development now.
+
+`layout-heldout-1` was drawn on November 11, 2026 from documents that are in no other set,
+by three commands that fetch, build and choose with no model and no person in the loop:
+
+```bash
+uv run readablestem gold layout draw-papers --set layout-heldout-1 --seed SEED --pool pool.json
+uv run readablestem gold layout draw-books --set layout-heldout-1 --seed SEED
+uv run readablestem gold layout draw-course --set layout-heldout-1 --seed SEED
+uv run readablestem gold layout register --set layout-heldout-1 --side held-out --note "..."
+```
+
+- `draw-papers` walks a pool of openly licensed arXiv papers in an order the seed fixes,
+  takes four per class family (article, revtex, AMS, IEEE, conference, journal,
+  other), downloads the source, and runs LaTeXML and the PDF build in the repository's
+  sandbox (`gold/safe_tex.py`): a downloaded source is a stranger's program. 28 papers were
+  taken and 123 passed over, by rule: their family was full, the source did not build, or no
+  page met the coverage rule.
+- `draw-books` walks the CC BY OpenStax books that are in no other set (8 taken, 6 passed
+  over), and `draw-course` walks handouts and notes written in LaTeX in public repositories
+  under MIT or CC BY-SA licenses (15 taken, 49 passed over).
+- The seed is `layout-heldout-1-2026-11-11`. The registry lists every document taken, with
+  its source and license, and names every one passed over.
+
+The rebuilt fetch path was compared with the research set on the papers both can build: 91
+of 110 pages and 1,045 of 1,070 blocks are identical. The papers of `layout-dev-1` took
+their HTML from ar5iv, which runs another LaTeXML version; the differences are blocks that
+version cuts differently.
+
+No page of the held-out set was opened while it was built, and none is while the reader is
+worked on: `eval bar` reads its scores, and a failing page is not looked at. What it still
+lacks, and what a reading-order bar met on it therefore does not cover yet:
+
+- Word-made documents (at least 20 pages) and hand-labeled pages (at least 20): neither
+  source can be built by a rule, so both wait for a person.
+- The hand check: `sample` and `agreement` on 1 page in 10 of each kind, by someone other
+  than whoever changes the reader. Until it is done, a kind's gold is unchecked.
+- Three of the eight books are not science or mathematics (government, psychology,
+  economics): the walk takes books in seeded order and does not choose by subject. Their
+  pages count as textbook layout, not as mathematics.
 
 ## What the numbers do not show
 
