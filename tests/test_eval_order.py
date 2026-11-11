@@ -13,7 +13,7 @@ import pytest
 from readablestem.cli.main import main
 from readablestem.eval import corpus, measure, order
 from readablestem.eval.measure import Converted
-from readablestem.pipeline import layout
+from readablestem.pipeline import assemble, layout
 
 ENTRIES = corpus.load_manifest()
 MADE_HERE = [e for e in ENTRIES.values() if e.gold and e.kind != "public" and (e.own)]
@@ -167,9 +167,13 @@ def test_a_page_missing_from_the_output_finds_nothing() -> None:
 
 
 def test_student_html_is_heard_by_page_without_hidden_text() -> None:
-    document = """<html><body><nav><p>Skip to content</p></nav><main>
-      <h1>Cell structure</h1>
+    document = f"""<html><body><nav><p>Skip to content</p></nav><main>
+      <h1>cells.pdf</h1>
+      <h1 id="p1-e0">Cell structure</h1>
       <p>Cells have <span aria-hidden="true">decorative</span> membranes.</p>
+      <p>Water is <math><mi>H</mi><msub><mi></mi><mn>2</mn></msub><mi>O</mi></math> and
+        <img src="b.png" alt="E = mc2{assemble.EQUATION_TEXT_ALT_SUFFIX}"> holds.</p>
+      <p class="flag-note readablestem" role="note">This equation is shown as an image.</p>
       <ul><li>Organelles<ul><li>Nucleus</li></ul></li></ul>
       <hr role="doc-pagebreak" id="page-2" aria-label="Page 2">
       <table><caption>Sizes</caption><tr><th>Part</th><td>5 nm</td></tr></table>
@@ -178,17 +182,21 @@ def test_student_html_is_heard_by_page_without_hidden_text() -> None:
       <script>var x = 1;</script>
     </main><footer><p>Made with care</p></footer></body></html>"""
     pages = order.elements_from_html(document)
+    # The title the writer adds and its notes are not the document's words.
     first = [(e["kind"], " ".join(e["text"].split())) for e in pages[1]]
     assert first == [
         ("h1", "Cell structure"),
         ("p", "Cells have membranes."),
+        # A formula's letters stand side by side, and an equation left as a picture is
+        # heard as the PDF's own text of it.
+        ("p", "Water is H2O and E = mc2 holds."),
         ("li", "Organelles"),
         ("li", "Nucleus"),
     ]
     # A formula on a line of its own and a picture are each one element.
     assert [(e["kind"], e["text"].split()) for e in pages[2]] == [
         ("table", ["Sizes", "Part", "5", "nm"]),
-        ("math", ["x", "=", "2"]),
+        ("math", ["x=2"]),
         ("figure", []),
         ("figcaption", ["Figure", "1:", "a", "cell"]),
     ]

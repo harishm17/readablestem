@@ -168,8 +168,9 @@ def elements_from_layout(records: Iterable[dict]) -> Pages:
 
 def elements_from_result(elements: Iterable[Any]) -> Pages:
     """Elements by page from a conversion's elements (`DocumentResult.elements`): what the
-    pipeline holds before any file is written. A table is heard as its caption and then
-    its cells, row by row."""
+    pipeline holds before any file is written. A table with a grid is heard as the grid
+    that is written, row by row, and then its caption; the words the file has in its
+    region are not heard a second time."""
     records = []
     for element in elements:
         record = {
@@ -183,7 +184,7 @@ def elements_from_result(elements: Iterable[Any]) -> Pages:
         }
         if element.table is not None:
             cells = sorted(element.table.cells, key=lambda cell: (cell.row, cell.col))
-            record["table_text"] = " ".join(cell.text for cell in cells)
+            record["text"] = " ".join(cell.text for cell in cells)
             record["caption"] = element.table.caption
         records.append(record)
     return elements_from_layout(records)
@@ -213,6 +214,32 @@ _BLOCK_TAGS = frozenset(
 )
 _VOID = ("br", "img", "hr", "input", "meta", "link")
 _UNHEARD = ("script", "style", "annotation", "annotation-xml", "button", "details")
+_MATH_WORDS = ("mtext", "ms")  # words inside a formula, which stand apart from its letters
+# Invisible times, separator and plus: the page prints the letters they join side by side.
+_UNSEEN = str.maketrans("", "", "\u2062\u2063\u2064")
+
+
+def _own_text(alt: str) -> str:
+    """The PDF's own text of an equation kept as a picture, which is that picture's alt
+    text before the writer's mark that it was not checked; "" for any other picture."""
+    from readablestem.pipeline import assemble
+
+    for mark in assemble.EQUATION_TEXT_ALT_SUFFIXES:
+        if alt.endswith(mark):
+            return alt[: -len(mark)]
+    return ""
+
+
+def _is_writers(tag: str, given: dict) -> bool:
+    """Whether an element of the student page holds the writer's own words and none of the
+    document's: a note, a label or a page marker, which carry the writer's class, and the
+    title the writer puts above a document that has no first-level heading (every heading
+    of the document has an id, and that title has none)."""
+    from readablestem.pipeline import assemble
+
+    if assemble.AUTHORED_CLASS in (given.get("class") or "").split():
+        return True
+    return tag == "h1" and not given.get("id")
 
 
 class _Heard(html.parser.HTMLParser):
@@ -224,6 +251,8 @@ class _Heard(html.parser.HTMLParser):
         self.in_main = False
         self.skipping = 0
         self.tables = 0
+        self.math: list[str] | None = None  # the tokens of the formula being read
+        self.tag = ""  # the tag just opened
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
         given = dict(attrs)
@@ -236,9 +265,24 @@ class _Heard(html.parser.HTMLParser):
             if number:
                 self.page = int(number.group(1))
             return
-        if self.skipping or given.get("aria-hidden") == "true" or tag in _UNHEARD:
+        if (
+            self.skipping
+            or given.get("aria-hidden") == "true"
+            or tag in _UNHEARD
+            or _is_writers(tag, given)
+        ):
             self.skipping += 0 if tag in _VOID else 1
             return
+        self.tag = tag
+        if tag == "img":
+            said = _own_text(given.get("alt") or "")
+            if said and (self.open or self.tables):
+                self._say(f" {said} ")
+            elif said:
+                self.pages[self.page].append({"kind": "math", "text": said})
+            return
+        if tag == "math" and self.math is None:
+            self.math = []
         if tag == "table":
             self.tables += 1
             if self.tables == 1:
@@ -268,6 +312,10 @@ class _Heard(html.parser.HTMLParser):
             if tag not in ("br", "img", "hr", "input"):
                 self.skipping -= 1
             return
+        self.tag = ""
+        if tag == "math" and self.math is not None:
+            said, self.math = "".join(self.math).translate(_UNSEEN), None
+            self._say(f" {said} ")
         if tag == "table":
             self.tables -= 1
             if self.tables == 0:
@@ -287,6 +335,13 @@ class _Heard(html.parser.HTMLParser):
     def handle_data(self, data: str) -> None:
         if not self.in_main or self.skipping:
             return
+        if self.math is not None:
+            # A formula's letters and digits stand side by side, as the page prints them.
+            self.math.append(f" {data} " if self.tag in _MATH_WORDS else data.strip())
+            return
+        self._say(data)
+
+    def _say(self, data: str) -> None:
         if self.open:
             self.open[-1][1].append(data)
         elif data.strip():
@@ -298,6 +353,12 @@ def elements_from_html(document: str) -> Pages:
 
     A display equation is one element of kind `math`, and a `<figure>` is an element of kind
     `figure` with no words: the description a listener hears there is not the document's.
+    A formula's letters and digits are heard side by side, as the page prints them ("CH3"
+    and not "C H 3"). The picture of an equation that was not converted is heard as the
+    PDF's own text of it, which is its alt text; no other picture's alt text is heard.
+    The writer's own words are not heard either (a note that an equation was not converted,
+    a label, the title it adds above a document without one): they are a listener's to
+    hear and not a block of any page.
     """
     parser = _Heard()
     parser.feed(document)
