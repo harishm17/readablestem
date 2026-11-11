@@ -11,7 +11,7 @@ from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.source import envelope
 from readablestem.source.convert import SourceFailed, convert_source
-from source_support import fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
 
 pytestmark = needs_latexml
 
@@ -135,47 +135,26 @@ def test_conversions_one_after_another_each_get_the_gate():
 
 # ------------------------------------------------------------------ what LaTeXML reported
 
-LOSSES = {  # a source that loses content, and the line its report must hold
-    "missing_input": (
-        "\\documentclass{article}\\begin{document}\nIntro.\n\\input{problems/set3}\n"
-        "\\end{document}\n",
-        ("error", "missing_file", "problems/set3", "main.tex"),
-    ),
-    "unclosed_brace": (
-        "\\documentclass{article}\\usepackage{amsmath}\\begin{document}\n"
-        "\\begin{align}a &= \\frac{1}{2\n\\end{align}\n\\section{Harmonic series}Gone.\n"
-        "\\end{document}\n",
-        ("error", "expected", "}", "main.tex"),
-    ),
-    "undefined_text": (
-        "\\documentclass{article}\\begin{document}\nA \\term{word} and \\hw.\n\\end{document}\n",
-        ("error", "undefined", "\\term", "main.tex"),
-    ),
-    "missing_package": (
-        "\\documentclass{article}\\usepackage{coursemacros}\\begin{document}\nHi \\course.\n"
-        "\\end{document}\n",
-        ("missing", "missing_file", "coursemacros", "main.tex"),
-    ),
-    "unknown_class": (
-        "\\documentclass{exam}\\begin{document}\\begin{questions}\\question[5] Two?\n"
-        "\\begin{solution}Four.\\end{solution}\\end{questions}\\end{document}\n",
-        ("missing", "missing_file", "exam", "main.tex"),
-    ),
-}
-
 
 @pytest.mark.parametrize("name", list(LOSSES))
 def test_the_report_names_what_latexml_said(name, tmp_path):
     from readablestem.source import latexml
     from readablestem.source import report as source_report
 
-    text, (level, category, expected, where) = LOSSES[name]
+    text, code, _, (level, category, expected, where) = LOSSES[name]
     (tmp_path / "main.tex").write_text(text)
     latexml.convert(tmp_path, "main.tex", tmp_path / "out")
-    report = source_report.parse(tmp_path / "out", project=tmp_path)
+    report = source_report.parse(
+        tmp_path / "out", project=tmp_path, loaded=source_report.loaded_packages({"m": text})
+    )
     found = {(p.level, p.category, p.name, p.file) for p in [*report.problems, *report.missing]}
     assert (level, category, expected, where) in found
     assert report.log_errors >= 1
+    # and the conversion stops, with the names for the job page (SW42.2)
+    blob = envelope.wrap("tex", f"{name}.tex", None, text.encode())
+    with pytest.raises(SourceFailed) as raised:
+        convert_source(blob, settings=get_settings(), client=FakeVisionClient())
+    assert raised.value.code == code and raised.value.detail
 
 
 def test_a_clean_article_with_hyperref_has_an_empty_report():

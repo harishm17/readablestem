@@ -100,6 +100,7 @@ from readablestem.web.messages import (
     explain_check,
     explain_reason,
     severity_label,
+    source_item_notes,
 )
 from readablestem.web.page_edits import StructureChange
 from readablestem.web.review import (
@@ -468,6 +469,9 @@ class ReviewItem:
     # A page (or handwriting) kept as an image (`web.review.is_kept_image`): its card says
     # what it is now and offers no figure form (its one decision is the page group's).
     kept_image: bool = False
+    # A source job: what LaTeX reported about this item, named (`messages.source_item_notes`):
+    # the picture a figure asked for, the undefined commands in a formula. Owner's pages only.
+    source_note: str = ""
     kept_state: str = ""  # what students get, once decided
     # "Describe it in words" (T3-16): offered on an item kept as an image; what it replaces.
     can_describe: bool = False
@@ -811,8 +815,10 @@ def _item(
     crop_ids: set[str],
     place: HeadingPlace | None = None,
     label: str | None = None,
+    source_note: str = "",
 ) -> ReviewItem:
-    """`label`: the item's name (`web.review.item_labels`), else kind and `number`."""
+    """`label`: the item's name (`web.review.item_labels`), else kind and `number`;
+    `source_note`: `messages.source_item_notes` for this item."""
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
@@ -888,6 +894,7 @@ def _item(
             mathml=fix.equation.mathml if fix.equation else None,
         ),
         kept_image=is_kept_image(fix),
+        source_note=source_note,
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
         can_describe=describable,
         describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "") if describable else "",
@@ -1260,6 +1267,7 @@ def _page(
     labels = item_labels(result)
     fix_groups = kept_images_apart(group_fixes(result))
     places = heading_places(result)
+    notes = source_item_notes(result)
     items = {
         f.element_id: _item(
             f,
@@ -1269,6 +1277,7 @@ def _page(
             crop_ids,
             places.get(f.element_id),
             labels.get(f.element_id),
+            source_note=notes.get(f.element_id, ""),
         )
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)

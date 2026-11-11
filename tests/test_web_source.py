@@ -7,6 +7,7 @@ here the web routes are the subject."""
 
 from __future__ import annotations
 
+import html
 import io
 import stat
 import zipfile
@@ -20,7 +21,7 @@ from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
 from readablestem.source.convert import SourceFailed
 from readablestem.web.db import Blob, Job, JobStatus, QuotaDay, session_scope
-from source_support import fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x^2$.\n\\end{document}\n"
 
@@ -297,6 +298,31 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
 
 
 # ------------------------------------------------------------------ a real conversion
+
+
+@needs_latexml
+@pytest.mark.parametrize("name", list(LOSSES))
+def test_a_source_that_loses_content_never_ends_as_converted(name, tmp_path, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
+    text, code, shown, _ = LOSSES[name]
+    env = WebEnv(tmp_path, feature_latex_source=True)
+    env.converter = convert_pdf  # ty: ignore[invalid-assignment]
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        response = send(client, text.encode(), f"{name}.tex")
+        assert response.status_code == 303
+        job_id = job_id_from(response)
+        env.run_worker()
+        job = env.job(job_id)
+        assert job.status == JobStatus.FAILED and job.error_code == code
+        assert job.result_json is None  # nothing a student could be given
+        page = client.get(f"/jobs/{job_id}").text
+        assert "Everything was converted" not in page and "Try again" not in page
+        assert html.escape(shown, quote=False) in page  # the file or command is named
+    assert shown not in caplog.text  # names stay out of the logs
 
 
 @needs_latexml

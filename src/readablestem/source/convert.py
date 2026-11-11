@@ -16,7 +16,10 @@ PDF uses.
 5. The ordinary assembler writes the HTML; the result says `origin="latex"`.
 
 A source that cannot be converted raises `SourceFailed` with a content-free code; the job then
-fails with a plain message and nothing partial is kept (`web.views.JOB_ERROR_MESSAGES`).
+fails with a plain message and nothing partial is kept (`web.views.JOB_ERROR_MESSAGES`). A
+source that would lose content outside a formula is one of them (`source.report.stop`): a
+missing file, a brace left open, commands that are not defined. Its `detail` names the files
+and commands for the job page only; it is stored with the job and never logged.
 """
 
 from __future__ import annotations
@@ -63,6 +66,7 @@ FAILURE_CODES = {
     "source_unreadable",  # it did, and it is not usable
     "source_refused",  # the source is not allowed (the child checks again)
     "timeout",
+    *source_report.STOP_CODES,  # it would lose content outside a formula
 }
 
 
@@ -73,11 +77,13 @@ GATE_WAIT_S = 600.0
 
 
 class SourceFailed(ConversionFailed):
-    """The source could not be converted; `code` becomes the job's error code."""
+    """The source could not be converted; `code` becomes the job's error code and `detail`
+    (names from the source: `source.report.stop`) the job's `error_detail`."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, detail: dict[str, object] | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.detail = detail
 
 
 @dataclass
@@ -187,6 +193,17 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
     return document.read_bytes()
 
 
+def _stop_if_lost(report: SourceReport) -> None:
+    """Stop the job when the source would lose content outside a formula
+    (`source.report.stop`). Logs the counts, never a name."""
+    found = source_report.stop(report)
+    log.info(
+        "source report: stop=%s %s", found[0] if found else None, source_report.summary(report)
+    )
+    if found is not None:
+        raise SourceFailed(*found)
+
+
 def convert_source(
     blob: bytes,
     *,
@@ -251,7 +268,12 @@ def _convert(
             blob, tmp, beamer_ok=settings.feature_beamer_source
         )
         out = tmp / "out"
-        xhtml = run_latexml(project, main, out, beamer=beamer)
+        try:
+            xhtml = run_latexml(project, main, out, beamer=beamer)
+        except SourceFailed as failed:  # what LaTeXML said names the cause, when it can
+            if failed.code == "source_failed":
+                _stop_if_lost(source_report.parse(out, project=project, loaded=loaded))
+            raise
         # LaTeXML's messages, read now: the folder holding them goes with this block.
         report = source_report.parse(out, project=project, loaded=loaded)
         try:
@@ -259,10 +281,11 @@ def _convert(
             graphics = ltx_reader.graphics_of(xml.read_bytes()) if xml.is_file() else {}
             reading = ltx_reader.read(xhtml, project, graphics, beamer=beamer)
         except ltx_reader.ReadError:
+            _stop_if_lost(report)
             raise SourceFailed("source_unreadable") from None
     report = source_report.with_marks(report, reading.marks, reading.error_nodes)
     report.figures = list(reading.figures)
-    log.info("source report: %s", source_report.summary(report))  # counts only, never a name
+    _stop_if_lost(report)
     return _finish(
         reading,
         started=started,

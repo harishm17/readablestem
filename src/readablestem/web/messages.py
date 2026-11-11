@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from readablestem.core.types import Check, Notice
+from readablestem.core.types import Check, DocumentResult, Notice
 from readablestem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
@@ -470,8 +470,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
-    "source_error": "Part of the LaTeX source could not be read (an unknown command) and "
-    "is shown as it was written.",
+    "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
+    "is shown as it was written and is a decision for you.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
@@ -526,6 +526,35 @@ def explain_check(check: Check) -> Explained:
         part = TABLE_CHECK_PARTS.get(check.name, "contents")
         return Explained(UNKNOWN_TABLE_CHECK_MESSAGE.format(part=part), code, known=False)
     return Explained(UNKNOWN_CHECK_MESSAGE, code, known=False)
+
+
+def source_item_notes(result: DocumentResult) -> dict[str, str]:
+    """For a source job, a sentence per item that names what LaTeX reported about it (from
+    `DocumentResult.source_report`): the picture a figure asked for, the commands a formula
+    uses that are not defined. Element id -> sentence; empty for a PDF."""
+    report = result.source_report
+    if report is None:
+        return {}
+    notes: dict[str, str] = {}
+    for figure in report.figures:
+        notes[figure.element_id] = (
+            f"The picture “{figure.name}” named at this figure is not in the upload, or is a "
+            "kind this tool does not read (PNG, JPEG, GIF and PDF are read). Add it and upload "
+            "again, or describe the figure yourself."
+        )
+    commands: dict[str, list[str]] = {}
+    for mark in report.marks:
+        if mark.in_formula and mark.element_id and mark.name:
+            names = commands.setdefault(mark.element_id, [])
+            if mark.name not in names:
+                names.append(mark.name)
+    for element_id, names in commands.items():
+        listed = ", ".join(names[:5])
+        verb = "is" if len(names) == 1 else "are"
+        notes[element_id] = (
+            f"This formula uses {listed}, which {verb} not defined. It is shown as it was written."
+        )
+    return notes
 
 
 def explain_reason(reason: str) -> Explained:

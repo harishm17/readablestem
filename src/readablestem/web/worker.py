@@ -544,6 +544,7 @@ class Worker:
             "lease_until": self._lease_until(now),
             "attempts": Job.attempts + 1,
             "error_code": None,
+            "error_detail": None,
         }
         owners = [User.is_allowed.is_(True)]
         if self.open_pool_closed():  # open-tier jobs wait for the next day; others go on
@@ -1008,18 +1009,23 @@ class Worker:
             exc = run.error or RuntimeError("conversion ended without a result")
             code = error_code_for(exc)
             log_exception(logger, "job_failed", exc, job_id=claim.job_id, error_code=code)
-            return self._finish_failed(attempt, code)
+            detail = exc.detail if isinstance(exc, ConversionFailed) else None
+            return self._finish_failed(attempt, code, detail)
         status, code = result_outcome(run.output.result)
         if status == JobStatus.FAILED:
             log_event(logger, "job_failed", job_id=claim.job_id, error_code=code)
             return self._finish_failed(attempt, code or "internal_error")
         return self._store(attempt, run.output, time.monotonic() - started)
 
-    def _finish_failed(self, attempt: _Attempt, code: str) -> str:
-        """Mark the job FAILED if this worker still owns it; "discarded" if not."""
+    def _finish_failed(
+        self, attempt: _Attempt, code: str, detail: dict[str, Any] | None = None
+    ) -> str:
+        """Mark the job FAILED if this worker still owns it; "discarded" if not. `detail`:
+        the names that stopped a source (`Job.error_detail`)."""
         values: dict[str, object] = {
             "status": JobStatus.FAILED,
             "error_code": code,
+            "error_detail": detail,
             "finished_at": self.clock(),
             "lease_until": None,
         }

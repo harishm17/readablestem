@@ -115,6 +115,10 @@ class Job(Base):
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     error_code: Mapped[str | None] = mapped_column(String(64))  # category, never text
+    # A source that stopped because it would lose content (`source.report.stop`): the files
+    # and commands that stopped it, for its owner's page. Names from the document, so never
+    # logged or counted, cleared when the job is tried again, deleted with the job.
+    error_detail: Mapped[dict | None] = mapped_column(JSON)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     model_calls: Mapped[int] = mapped_column(Integer, default=0)
     result_json: Mapped[dict | None] = mapped_column(JSON)  # DocumentResult without html

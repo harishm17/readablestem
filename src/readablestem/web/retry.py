@@ -115,6 +115,7 @@ def start(job: Job, *, active_others: int, max_active: int) -> None:
         raise RetryRefused("too_many_active")
     job.status = JobStatus.QUEUED
     job.error_code = None
+    job.error_detail = None
     job.finished_at = None
     job.lease_until = None
     job.pages_done = 0

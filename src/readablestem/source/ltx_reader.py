@@ -17,7 +17,9 @@ What each part becomes:
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
   no usable picture the figure is a required decision (`source_figure_missing`);
-- text-level errors stay in the text as written and add the notice `source_error`.
+- an error node in running text stays in the text as written; the conversion stops such a
+  source (`source.report.stop`), so raw code never reaches a student. Every error counted here
+  adds the required notice `source_error`.
 
 Every error node (`ltx_ERROR`) is counted once, wherever it is, and each is tied to the element
 that holds it where the reader can (`Reading.marks`, for `source.report`): inline, inside a
@@ -1132,7 +1134,8 @@ def read(
     if not out.elements:
         raise ReadError("no content")
     if reader.errors:
-        out.notices.append(Notice(code=SOURCE_ERROR_NOTICE, count=reader.errors, review="optional"))
+        # required: a formula LaTeX could not read is shown as written and is a decision
+        out.notices.append(Notice(code=SOURCE_ERROR_NOTICE, count=reader.errors, review="required"))
     return out
 
 

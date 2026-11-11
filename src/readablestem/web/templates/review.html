@@ -45,6 +45,9 @@
   <p><strong>Not converted:</strong> {{ item.reason.text }}</p>
 </div>
 {% endif %}
+{% if item.source_note %}
+<div class="explained"><p>{{ item.source_note }}</p></div>
+{% endif %}
 {# A table's findings are with its proposal (each names the part of the table it is about). #}
 {% if item.checks and not (item.table and item.table.findings) %}
 <div class="explained">

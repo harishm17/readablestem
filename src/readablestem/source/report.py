@@ -181,3 +181,66 @@ def summary(report: SourceReport) -> dict[str, int]:
         "missing": len(report.missing),
         "warnings": report.warnings,
     }
+
+
+# ---------------------------------------------------------------------------- the stop rule
+
+# A source problem outside a formula stops the job; a problem inside a formula or a missing
+# picture is a required decision on that item; a warning never blocks. The codes, in the
+# order they are looked for (the first that applies names the cause):
+STOP_CODES = (
+    "source_missing_file",  # a file named by \input, \include, ... is not in the upload
+    "source_syntax_error",  # a brace or an environment is not closed: the rest is gone
+    "source_unsupported_class",  # a class with no binding, followed by errors
+    "source_unsupported_package",  # commands from a package this tool cannot read
+    "source_undefined",  # commands or environments that are not defined, outside a formula
+    "source_failed",  # any other error LaTeXML reported outside a formula
+)
+SYNTAX = frozenset({"expected", "unexpected"})
+MAX_DETAIL_ITEMS = 20
+
+
+def _item(problem: SourceProblem) -> dict[str, object]:
+    return {"name": problem.name, "file": problem.file, "line": problem.line}
+
+
+def _detail(
+    items: list[dict[str, object]], *, total: int | None = None, **names: str
+) -> dict[str, object]:
+    total = len(items) if total is None else total
+    kept = items[:MAX_DETAIL_ITEMS]
+    return {"items": kept, "more": max(0, total - len(kept)), **names}
+
+
+def stop(report: SourceReport) -> tuple[str, dict[str, object]] | None:
+    """The stop code for a report and its details (names from the source, for the job page
+    only), or None when the source converts. Only errors of the `latexml` step stop a job:
+    `latexmlpost` checks the result's shape, and its complaints follow from those errors."""
+    errors = [p for p in report.problems if p.step == "latexml"]
+    in_formula = {m.name for m in report.marks if m.in_formula}
+    if found := [p for p in errors if p.category == "missing_file"]:
+        return "source_missing_file", _detail([_item(p) for p in found])
+    if found := [p for p in errors if p.level == "fatal" or p.category in SYNTAX]:
+        return "source_syntax_error", _detail([_item(found[0])], total=1)
+    items: dict[str, dict[str, object]] = {}  # each command once, at its first place
+    for p in errors:
+        if p.category == "undefined" and p.name not in in_formula:
+            items.setdefault(p.name, _item(p))
+    for m in report.marks:  # an error node outside a formula the log did not name
+        if not m.in_formula and m.name:
+            items.setdefault(m.name, {"name": m.name, "file": "", "line": None})
+    total = len(items) + (report.omitted.get("undefined", 0) if items else 0)
+    classes = [p for p in report.missing if p.what == "class"]
+    if classes and (errors or report.marks):
+        return "source_unsupported_class", _detail([], total=0, **{"class": classes[0].name})
+    packages = [p for p in report.missing if p.what in ("package", "package_source")]
+    if items and packages:
+        return "source_unsupported_package", _detail(
+            list(items.values()), total=total, package=", ".join(p.name for p in packages[:5])
+        )
+    if items:
+        return "source_undefined", _detail(list(items.values()), total=total)
+    other = [p for p in errors if p.category != "undefined"]
+    if other:
+        return "source_failed", _detail([_item(p) for p in other])
+    return None

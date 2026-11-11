@@ -9,6 +9,15 @@
 <div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ headline.state }}" data-title="{{ headline.label }}: {{ job.title }}" data-summary="{{ headline.label }}. {{ headline.message }}"{% endif %}>
   <p><span class="status-badge status-{{ headline.badge }}">{{ headline.label }}</span>
     {{ headline.message }}</p>
+  {# A stopped source: every file or command that stopped it, from LaTeX's own report
+     (web/views.py, `source_stop_names`). Names from the source, escaped. #}
+  {% if job.stop_names %}
+  <ul class="stop-names">
+    {% for name, where in job.stop_names %}
+    <li>{% if name %}<code>{{ name }}</code>{% if where %} ({{ where }}){% endif %}{% else %}{{ where }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
   {% if counts and counts.decisions and headline.state != "decisions" %}
   <p>{{ open_line }}</p>
   {% endif %}

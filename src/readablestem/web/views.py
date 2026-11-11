@@ -97,12 +97,105 @@ JOB_ERROR_MESSAGES = {
     "source. Try again in a few minutes, or upload the PDF instead.",
     "source_unavailable": "LaTeX source is not available on this server at the moment, so "
     "this file was not converted. Compile it to a PDF and upload that.",
+    # A source that would lose content outside a formula (source.report.stop). With the job's
+    # `error_detail` the sentence names the file or commands (`source_stop_message`); these are
+    # the words without it.
+    "source_missing_file": "This source asks for a file that is not in the upload, so nothing "
+    "was converted. Zip the whole project folder with that file in it and upload the zip, or "
+    "upload the PDF.",
+    "source_syntax_error": "LaTeX cannot read this source past an error: a brace or an "
+    "environment is not closed. Everything after that point would be missing, so nothing was "
+    "converted. Compile it, fix the error and upload it again, or upload the PDF.",
+    "source_undefined": "This source uses commands that are not defined. They would appear to "
+    "students as raw code, so nothing was converted. Define them in the source, or upload the "
+    "PDF.",
+    "source_unsupported_class": "This source uses a document class this tool cannot read from "
+    "source yet, so nothing was converted. Upload the PDF.",
+    "source_unsupported_package": "This source uses commands from a package this tool cannot "
+    "read yet. They would appear to students as raw code, so nothing was converted. Copy the "
+    "definitions you use into the source, or upload the PDF.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
     "of your document's content. You can use “Try again”: what was already converted is kept.",
     # Codes with a longer explanation of what to do next (scanned PDFs, no model key,
     # removed access, ...) share their wording with the status box.
     **FAILED_MESSAGES,
 }
+
+
+def _where(item: dict[str, Any]) -> str:
+    file, line = item.get("file") or "", item.get("line")
+    if file and line:
+        return f"{file}, line {line}"
+    return str(file)
+
+
+def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
+    """The stop sentence of a source job, naming the file or commands from its
+    `error_detail` (`source.report.stop`); the plain sentence when there is no detail."""
+    plain = job_error_message(code)
+    if not detail:
+        return plain
+    items = [i for i in detail.get("items") or [] if isinstance(i, dict) and i.get("name")]
+    total = len(items) + int(detail.get("more") or 0)
+    first = items[0] if items else {}
+    where = _where(first)
+    at = f" ({where})" if where else ""
+    if code == "source_missing_file" and first:
+        if total == 1:
+            return (
+                f"This source asks for the file {first['name']}{at}, and it is not in the "
+                "upload. Nothing was converted. Zip the whole project folder with that file in "
+                "it and upload the zip, or upload the PDF."
+            )
+        return (
+            f"This source asks for {total} files that are not in the upload, listed below. "
+            "Nothing was converted. Zip the whole project folder with those files in it and "
+            "upload the zip, or upload the PDF."
+        )
+    if code == "source_syntax_error" and where:
+        return (
+            f"LaTeX cannot read this source past {where}: a brace or an environment is not "
+            "closed. Everything after that point would be missing, so nothing was converted. "
+            "Compile it, fix the error and upload it again, or upload the PDF."
+        )
+    if code == "source_unsupported_class" and detail.get("class"):
+        return (
+            f"This source uses the document class {detail['class']}, which this tool cannot "
+            "read from source yet, so nothing was converted. Upload the PDF."
+        )
+    if code in ("source_undefined", "source_unsupported_package") and first:
+        names = ", ".join(str(i["name"]) for i in items[:5]) + (", ..." if total > 5 else "")
+        first_at = f" (first at {where})" if where else ""
+        one = total == 1
+        count = "1 command" if one else f"{total} commands"
+        they, them = ("It", "it") if one else ("They", "them")
+        if code == "source_unsupported_package" and detail.get("package"):
+            return (
+                f"This source uses {count} from the package {detail['package']}, which this "
+                f"tool cannot read yet: {names}{first_at}. {they} would appear to students as "
+                "raw code, so nothing was converted. A package file in the upload is not read "
+                "either: copy the definitions you use into the source, or upload the PDF."
+            )
+        return (
+            f"{count.capitalize()} in this source {'is' if one else 'are'} not defined: "
+            f"{names}{first_at}. {they} would appear to students as raw code, so nothing was "
+            f"converted. Define {them} in the source (a file it reads with \\input counts), or "
+            "upload the PDF."
+        )
+    return plain
+
+
+def source_stop_names(detail: dict[str, Any] | None) -> list[tuple[str, str]]:
+    """(name, where) for the list under a stopped source job's sentence, and a last line
+    for the names left out."""
+    if not detail:
+        return []
+    items = [i for i in detail.get("items") or [] if isinstance(i, dict) and i.get("name")]
+    rows = [(str(i["name"]), _where(i)) for i in items]
+    more = int(detail.get("more") or 0)
+    if rows and more:
+        rows.append(("", f"and {more} more"))
+    return rows
 
 
 def job_error_message(code: str | None) -> str:
@@ -167,6 +260,8 @@ class JobView:
     cost_usd: float
     model_calls: int
     queue_ahead: int = 0
+    # A stopped source job: the files and commands that stopped it (`Job.error_detail`).
+    error_detail: dict[str, Any] | None = None
     summary: ResultSummary | None = None
     # `jobs.result_version` as loaded with the result: review forms send it back, so a
     # form made before another tab changed the review is refused (web.review).
@@ -282,7 +377,12 @@ class JobView:
             return job_page.stage_sentence(self.progress)
         if self.status == JobStatus.DONE:
             return "The HTML file is ready."
-        return job_error_message(self.error_code)
+        return source_stop_message(self.error_code, self.error_detail)
+
+    @property
+    def stop_names(self) -> list[tuple[str, str]]:
+        """The list under a stopped source job's sentence (`source_stop_names`)."""
+        return source_stop_names(self.error_detail) if self.status == JobStatus.FAILED else []
 
 
 @dataclass
@@ -536,6 +636,7 @@ def job_view(
         retain_until=as_utc(job.retain_until),
         opt_in=job.opt_in_retention,
         error_code=job.error_code,
+        error_detail=job.error_detail if job.status == JobStatus.FAILED else None,
         cost_usd=job.cost_usd,
         model_calls=job.model_calls,
         queue_ahead=ahead,
