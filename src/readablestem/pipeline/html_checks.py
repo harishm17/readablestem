@@ -20,6 +20,8 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.link_href | unsafe_link | an `<a>` href that is not http, https, mailto or a "#id" here |
 | html.lang_tags | invalid_lang | a `lang` value that is not a well-formed BCP 47 tag |
 | html.text_contrast | low_contrast | a colour class (`tc-...`) below 4.5:1 on white |
+| html.characters | unreadable_character | a character that is not text, or the gap for one |
+| html.sentence_holes | sentence_hole | a gap in a sentence of a page kept for unread content |
 
 A link in the text (`<a href>`) loads nothing, so it is not an external resource; the
 link rules check it instead. The last four rules are the text work's
@@ -29,6 +31,19 @@ The wording rule only reads text inside
 elements carrying `assemble.AUTHORED_CLASS` (the notes and the about section). Course
 text is the instructor's, not a claim by this tool: mechanics uses "compliance" for the
 flexibility of a beam.
+
+The sentence-hole rule is only in documents with a page kept as a picture for unread
+content whose text is written too (`assemble.UNREAD_PARTS_CLASS` opens that text). Between
+that note and the picture, a sentence with punctuation straight after a space ("the law is
+.", "Acceleration, , is") or an article before a hyphen ("the -direction") is where
+something drawn on the page (an equation drawn with lines) was read into nothing (F-451).
+Maths, pictures and the tool's own words inside the text count as something there.
+
+The character rule (`output_chars`) fails on a private-use character, U+FFFD, a
+noncharacter or a control other than tab and line end, anywhere in the file, and on the
+marked gap the student page writes in place of one: each is a place a screen reader says
+nothing or "question mark". Rules added after the first set carry the day they were added
+(`RULE_ADDED`), stored with a failed check (`Check.added_on`).
 
 Documents with a `<table>` get five more rules (`_table_rules`, docs/tables.md), so a
 document without one gets exactly the rules above:
@@ -59,6 +74,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date
 from functools import cache
 from html.parser import HTMLParser
 from importlib import resources
@@ -66,8 +82,8 @@ from itertools import pairwise
 from typing import Any, Literal
 
 from readablestem.core.types import Check, is_safe_href
-from readablestem.pipeline import contrast
-from readablestem.pipeline.assemble import AUTHORED_CLASS
+from readablestem.pipeline import contrast, output_chars
+from readablestem.pipeline.assemble import AUTHORED_CLASS, UNREAD_PARTS_CLASS
 from readablestem.pipeline.inline_text import COLOUR_CLASS_PREFIX
 from readablestem.pipeline.language import is_language_tag
 
@@ -91,7 +107,21 @@ _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
 _COLOUR_RULE = re.compile(
     rf"\.({re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}})\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
 )
+# A gap in a sentence: punctuation straight after a space, or an article before a hyphen.
+_HOLE = re.compile(r"(?:^|(?<=\s))[.,;:](?=\s|$)|\b(?:a|an|the)\s+-[^\W\d_]", re.IGNORECASE)
+# Blocks of text the sentence-hole rule reads one by one.
+_TEXT_BLOCKS = frozenset(
+    {"p", "li", "dt", "dd", "td", "th", "figcaption", "h1", "h2", "h3", "h4", "h5", "h6"}
+)
+_SOMETHING = "\ufffc"  # stands for maths, a picture or the tool's words inside a sentence
 _DARK_BLOCK = re.compile(r"@media[^{}]*prefers-color-scheme\s*:\s*dark[^{}]*\{")
+
+# The day each rule added after the first set came in. A failed check stores it, so a
+# document that was ready and fails a new rule can say since when the rule exists.
+RULE_ADDED: dict[str, date] = {
+    "html.sentence_holes": date(2026, 11, 11),
+    "html.characters": date(2026, 11, 11),
+}
 
 AXE_VERSION = "4.14.0"
 AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
@@ -136,6 +166,12 @@ class _Collector(HTMLParser):
         self.langs: list[str] = []
         self.style: list[str] = []
         self._link: tuple[str | None, list[str]] | None = None
+        # The sentence-hole rule: notes opening the text of a page kept as a picture for
+        # unread content, and that text, block by block, until the picture.
+        self.unread_notes = 0
+        self.unread_text: list[list[str]] = []
+        self._unread = False
+        self._maths = 0
 
     # ----- parser callbacks
 
@@ -158,6 +194,8 @@ class _Collector(HTMLParser):
         elif tag == "a" and self._link is not None:
             self.links.append((self._link[0], "".join(self._link[1])))
             self._link = None
+        if tag == "math" and self._maths:
+            self._maths -= 1
         names = [name for name, _ in self._stack]
         if tag in names:  # pop to the matching start tag (closes anything left open)
             del self._stack[len(names) - 1 - names[::-1].index(tag) :]
@@ -175,6 +213,8 @@ class _Collector(HTMLParser):
             self._link[1].append(data)
         if self._stack and self._stack[-1][1]:
             self.authored_text.append(data)
+        elif self._unread and self.unread_text and not self._maths:
+            self.unread_text[-1].append(data)
         if self._stack and self._stack[-1][0] in LISTS and data.strip():
             self.list_errors += 1  # text directly inside <ul>/<ol>
 
@@ -205,10 +245,27 @@ class _Collector(HTMLParser):
         if (lang := attrs.get("lang")) is not None:
             self.langs.append(lang)
         self._external(tag, attrs)
+        classes = (attrs.get("class") or "").split()
+        self._unread_text(tag, attrs, classes)
+        if tag == "math" and not void:
+            self._maths += 1
         if not void:
-            classes = (attrs.get("class") or "").split()
             inherited = bool(self._stack) and self._stack[-1][1]
             self._stack.append((tag, inherited or AUTHORED_CLASS in classes))
+
+    def _unread_text(self, tag: str, attrs: dict[str, str | None], classes: list[str]) -> None:
+        if UNREAD_PARTS_CLASS in classes:
+            self.unread_notes += 1
+            self._unread = True
+            return
+        if not self._unread:
+            return
+        if attrs.get("data-reason") == "unread_page":  # the picture: the page's text is over
+            self._unread = False
+        elif tag in _TEXT_BLOCKS:
+            self.unread_text.append([])
+        elif (tag in ("math", "img") or AUTHORED_CLASS in classes) and self.unread_text:
+            self.unread_text[-1].append(_SOMETHING)
 
     def _img(self, attrs: dict[str, str | None]) -> None:
         alt = attrs.get("alt")
@@ -234,7 +291,11 @@ class _Collector(HTMLParser):
 
 
 def _check(name: str, passed: bool, code: str, severity: Severity = "error") -> Check:
-    return Check(name=name, passed=passed, severity=severity, code=None if passed else code)
+    if passed:
+        return Check(name=name, passed=True, severity=severity)
+    return Check(
+        name=name, passed=False, severity=severity, code=code, added_on=RULE_ADDED.get(name)
+    )
 
 
 def _skips_a_level(levels: list[int]) -> bool:
@@ -269,7 +330,13 @@ def static_checks(html: str) -> list[Check]:
         ),
         _check("html.self_contained", doc.external == 0, "external_resource"),
         _check("html.wording", not _BANNED.search(authored), "banned_wording"),
+        _check(
+            "html.characters",
+            not output_chars.count(html) and output_chars.UNREADABLE not in html,
+            "unreadable_character",
+        ),
         *_text_checks(doc),
+        *_unread_page_rules(doc),
         # Only for documents with a <table>, so they come last.
         *_table_rules(html),
     ]
@@ -488,6 +555,15 @@ def _text_checks(doc: _Collector) -> list[Check]:
         ),
         _check("html.text_contrast", readable, "low_contrast"),
     ]
+
+
+def _unread_page_rules(doc: _Collector) -> list[Check]:
+    """The sentence-hole rule, only in documents with a page kept as a picture for unread
+    content whose text is written too (module docstring)."""
+    if not doc.unread_notes:
+        return []
+    holes = any(_HOLE.search(" ".join("".join(block).split())) for block in doc.unread_text)
+    return [_check("html.sentence_holes", not holes, "sentence_hole")]
 
 
 # --------------------------------------------------------------------------- axe-core

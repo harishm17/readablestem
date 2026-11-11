@@ -43,8 +43,10 @@ from datetime import UTC, datetime
 from html import escape
 from io import BytesIO
 
+from readablestem.pipeline import output_chars
 from readablestem.pipeline.export_canvas import (
     _VOID,
+    NOT_TEXT,
     CanvasExportError,
     Notes,
     _extract_images,
@@ -526,6 +528,9 @@ def export_epub(
         item_properties=properties,
         paginated=bool(pages),
     )
+    if any(output_chars.count(part) for part in (package, nav, content)):
+        # The page never holds a character that is not text, so this is the export's own.
+        raise EpubExportError("the file holds a character that is not text", NOT_TEXT)
     return EpubExport(
         title, lang, identifier, package, nav, content, images, features, len(pages), n_headings
     )

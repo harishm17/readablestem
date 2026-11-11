@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 import docx
 import pytest
 
-from fixtures.web.support import BOB, job_id_from, login, make_pdf, upload
+from fixtures.web.support import BOB, as_current, job_id_from, login, make_pdf, upload
 from readablestem.pipeline import export_docx
 from readablestem.web import events
 from readablestem.web.database import as_utc
@@ -167,7 +167,9 @@ def test_a_failed_epub_export_is_a_plain_page(web):  # noqa: F811
     set_job(
         web,
         job_id,
-        html='<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>',
+        html=as_current(
+            '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
+        ),
     )
     response = web.browser.get(f"/jobs/{job_id}/download.epub")
     assert response.status_code == 409 and "cannot be made as an EPUB" in response.text
@@ -202,7 +204,9 @@ def test_a_document_that_cannot_be_made_is_left_out_and_said(web, monkeypatch): 
     set_job(
         web,
         job_id,
-        html='<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>',
+        html=as_current(
+            '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
+        ),
     )
     response = web.browser.get("/app/download?format=epub")
     assert response.status_code == 409 and "cannot be made in that file type" in response.text

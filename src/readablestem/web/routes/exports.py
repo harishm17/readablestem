@@ -33,6 +33,7 @@ from readablestem.web.routes.jobs import (
     content_disposition,
     current_html,
     download_filename,
+    export_failed_words,
     job_access,
     require_done,
 )
@@ -154,13 +155,12 @@ def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
     html, title, still_open = _source(request, job_id, user)
     try:
         data = make_file("epub", html, title)
-    except export_epub.CanvasExportError:  # EpubExportError is one: a picture it cannot hold
-        log_event(logger, "epub_export_failed", code="image_type")
+    except export_epub.CanvasExportError as exc:  # EpubExportError is one
+        log_event(logger, "epub_export_failed", code=exc.code)
         raise PageError(
             409,
             "This document cannot be made as an EPUB",
-            "It has a picture in a form the EPUB cannot hold. The HTML file is still available "
-            "from the job page.",
+            export_failed_words("EPUB", exc.code),
             context={"job_id": job_id},
         ) from None
     _recorded(request, user, job_id, still_open, "epub")

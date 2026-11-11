@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Iterator
+from datetime import date
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from urllib.parse import urlsplit
@@ -132,6 +133,11 @@ class Check(BaseModel):
     passed: bool
     severity: Literal["error", "warning"] = "error"
     code: str | None = None  # category when it fails, e.g. "unknown_command"
+    # The day the failed rule was added to the checks, for a rule that has one: a release's
+    # new rule can reopen a document that was ready, and the job page can say since when
+    # the rule exists. None for a check stored before rules carried a date, and for rules
+    # without one. A date, never content.
+    added_on: date | None = None
 
 
 Step = Literal[

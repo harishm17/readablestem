@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import (
+    assemble,
     export_canvas,
     export_cartridge,
     export_docx,
@@ -478,6 +479,13 @@ def require_done(job: Job) -> None:
         )
 
 
+def _out_of_date(job: Job) -> bool:
+    """A review write marked the file out of date, or an older renderer made it."""
+    if job.html_stale:
+        return True
+    return job.html is not None and assemble.render_version(job.html) < assemble.RENDER_VERSION
+
+
 def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
     """`job` with its HTML file up to date.
 
@@ -486,13 +494,19 @@ def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
     the file or for the checks of it (download, view, Canvas, the job page). The row is
     locked for the rewrite, so a review write that comes meanwhile waits, then marks the
     file out of date again. The student note's date is the day of the last decision, not
-    of the render."""
-    if job.status != JobStatus.DONE or not job.html_stale:
+    of the render.
+
+    A page made by an older renderer is out of date too (`assemble.RENDER_VERSION`, written
+    in the page's head): it is made again once from the stored result, so a fix to the
+    sheet, the markup or the student words reaches documents converted before it. The
+    stored elements and decisions are not touched; the stored checks become those of the
+    new page."""
+    if job.status != JobStatus.DONE or not _out_of_date(job):
         return job
     from readablestem.web.review import rerender_job_html
 
     session.refresh(job, with_for_update=True)
-    if job.html_stale:
+    if _out_of_date(job):
         result = DocumentResult.model_validate(job.result_json or {})
         with notation.in_force(ctx.factory, ctx.settings, job.id):
             job.html = rerender_job_html(
@@ -1863,6 +1877,21 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
     )
 
 
+def export_failed_words(version: str, code: str) -> str:
+    """Why a Canvas or EPUB version cannot be made, in words: a picture it cannot hold, or
+    (`unreadable_character`) a character that is not text in the built file, which the
+    page never holds, so the version is not offered as finished."""
+    if code == export_canvas.NOT_TEXT:
+        return (
+            f"The {version} could not be made from this document. The HTML file is still "
+            "available from the job page."
+        )
+    return (
+        f"It has a picture in a form the {version} cannot hold. The HTML file is still "
+        "available from the job page."
+    )
+
+
 def _canvas_export(
     ctx: AppContext, user: CurrentUser, job_id: str, number: str | None
 ) -> tuple[export_canvas.CanvasExport, str, str, int]:
@@ -1885,13 +1914,12 @@ def _canvas_export(
             folder=export_canvas.folder_name(title, job_ref),
             course_number=number,
         )
-    except export_canvas.CanvasExportError:
-        log_event(logger, "canvas_export_failed", code="image_type")
+    except export_canvas.CanvasExportError as exc:
+        log_event(logger, "canvas_export_failed", code=exc.code)
         raise PageError(
             409,
             "This document cannot be made for Canvas",
-            "It has a picture in a form the Canvas version cannot hold. The HTML file is "
-            "still available from the job page.",
+            export_failed_words("Canvas version", exc.code),
             context={"job_id": job_ref},
         ) from None
     return export, title, job_ref, still_open

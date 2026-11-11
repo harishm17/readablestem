@@ -70,6 +70,7 @@ from readablestem.pipeline import (
     figure_images,
     inline_text,
     navigation,
+    output_chars,
     table_html,
     table_math,
 )
@@ -86,6 +87,26 @@ from readablestem.pipeline.safe_html import split_tag as _split_tag
 # Class on every element whose text this module wrote (notes, labels, the about section);
 # the table serialiser marks a maths header's reading with it too.
 AUTHORED_CLASS = table_html.AUTHORED_CLASS
+
+# The version of the student file's making: raise it with any change to the sheet, the
+# markup, the student words or the speech rules. The page carries it in its head
+# (`RENDER_META`), and the web app makes a stored page again from its stored result when
+# the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
+# documents converted before it, not only new ones and ones somebody edits again.
+RENDER_VERSION = 3
+RENDER_META = "readablestem-render"
+_RENDER_LINE = re.compile(
+    r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
+)
+
+
+def render_version(html: str) -> int:
+    """The render version written in a stored page's head; 0 for a page made before pages
+    carried one."""
+    head = html[: html.find("</head>")] if "</head>" in html else html[:4096]
+    match = _RENDER_LINE.search(head)
+    return int(match.group(1)) if match else 0
+
 
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
@@ -188,6 +209,13 @@ KEPT_IMAGE_WORDS = {
         "instructor for a text version.",
     ),
 }
+# A page kept as a picture because something painted on it was read into nothing (an
+# equation drawn with lines, F-451), when text was read from it too: its text has holes
+# ("Newton's second law of motion is ."), so a note opens that text and links to the
+# picture after it, and no reader meets a sentence with a gap unwarned (`_Renderer.lead`).
+UNREAD_PARTS_CLASS = "unread-parts-note"
+UNREAD_PARTS_NOTE = "Parts of this page could not be read and are missing from the text below."
+UNREAD_PARTS_LINK = "The page is shown as a picture after it."
 # Writing on a page converted from an image that the reading left out (`image_page_omission`).
 OMITTED_NOTE = (
     "This part of the page was not converted to text, so a screen reader cannot read it. Ask "
@@ -708,6 +736,9 @@ class _Renderer:
     # "pdf", or "latex" / "beamer" for a source (`DocumentResult.origin`): a source's
     # original is its own text, shown as written, never a missing picture.
     origin: str = "pdf"
+    # Pages kept as a picture for unread content whose text is written too: page -> the
+    # picture's element id, until the note that opens the page's text is written.
+    unread_parts: dict[int, str] = field(default_factory=dict)
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -744,6 +775,25 @@ class _Renderer:
         if not self.mark_pages or element.page == self.last_page:
             return ""
         return self.mark_for(element.page)
+
+    def lead(self, element: Element) -> str:
+        """What goes before a block that starts `element`: its page marker, and the note
+        that opens the text of a page kept as a picture for unread content."""
+        mark = self.page_mark(element)
+        picture = self.unread_parts.get(element.page)
+        if picture is None or picture == element.id:
+            return mark
+        del self.unread_parts[element.page]
+        link = (
+            f' <a href="#{_escape(picture)}">{UNREAD_PARTS_LINK}</a>'
+            if not any(c.isspace() for c in picture)
+            else f" {UNREAD_PARTS_LINK}"
+        )
+        return (
+            f'{mark}<p class="notice flag-note {UNREAD_PARTS_CLASS} {AUTHORED_CLASS}" '
+            f'role="note"><span class="flag-label">{KEPT_IMAGE_LABEL}</span> '
+            f"{UNREAD_PARTS_NOTE}{link}</p>"
+        )
 
     def marks_after(self, element: Element) -> str:
         """The markers of the pages a paragraph goes on over (`Element.last_page`), to write
@@ -823,7 +873,7 @@ class _Renderer:
         i = 0
         while i < len(ordered):
             if is_entry(ordered[i]):
-                mark = self.page_mark(ordered[i])
+                mark = self.lead(ordered[i])
                 entries: list[Element] = []
                 while i < len(ordered):
                     if is_entry(ordered[i]):
@@ -834,7 +884,7 @@ class _Renderer:
                 chunks.extend([*([mark] if mark else []), self.definitions(entries)])
                 continue
             if ordered[i].kind is Kind.LIST_ITEM:
-                mark = self.page_mark(ordered[i])
+                mark = self.lead(ordered[i])
                 items: list[Element] = []
                 inside: dict[str, list[Element]] = {}
                 while i < len(ordered):
@@ -852,7 +902,7 @@ class _Renderer:
                 continue
             chunk = self.render(ordered[i])
             if chunk:
-                if mark := self.page_mark(ordered[i]):
+                if mark := self.lead(ordered[i]):
                     chunks.append(mark)
                 chunks.append(chunk)
                 if after := self.marks_after(ordered[i]):
@@ -1513,6 +1563,24 @@ def _without_dead_links(ordered: list[Element]) -> list[Element]:
     return out
 
 
+def _unread_parts(
+    ordered: list[Element], fixes: dict[str, Fix], placed: Collection[str]
+) -> dict[int, str]:
+    """Pages kept as a picture for unread content (`unread_page`) whose text is written too:
+    page -> the picture's element id. A page with no text of its own needs no note: its
+    picture and the picture's own note are all there is."""
+    pictures = {
+        e.page: e.id
+        for e in ordered
+        if e.kind is Kind.FIGURE
+        and (fix := fixes.get(e.id)) is not None
+        and fix.reason == "unread_page"
+        and fix.status in NOT_CONVERTED
+    }
+    texts = {e.page for e in ordered if e.id not in placed and e.id not in pictures.values()}
+    return {page: picture for page, picture in pictures.items() if page in texts}
+
+
 def _kept_prose(ordered: list[Element], fixes: dict[str, Fix]) -> list[Element]:
     """Text read from an image of a page that the reviewer chose to keep as the picture: the
     element is written as a kept image of its region (a figure with the reason
@@ -1615,6 +1683,7 @@ def render_html(
     renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
     )
+    renderer.unread_parts = _unread_parts(ordered, first_fix, renderer.placed)
     body = renderer.fill_backlinks(renderer.render_all(ordered))
     kept_pages = [
         e.page
@@ -1658,7 +1727,7 @@ def render_html(
         )
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
-    return "\n".join(
+    page = "\n".join(
         [
             "<!doctype html>",
             f'<html lang="{_escape(_clean_lang(lang))}">',
@@ -1666,6 +1735,7 @@ def render_html(
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
+            f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",
@@ -1683,3 +1753,9 @@ def render_html(
             "",
         ]
     )
+    # No character that is not text reaches the student (`output_chars`): a marked gap in
+    # its place, which every output made from the page carries and Listen speaks.
+    gap = _authored_in_english(
+        f'<span class="flagged-inline {AUTHORED_CLASS}">{output_chars.UNREADABLE}</span>', lang
+    )
+    return output_chars.mark_html(page, gap)

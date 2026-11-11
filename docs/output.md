@@ -12,6 +12,7 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ReadableSTEM 0.1.0">
+<meta name="readablestem-render" content="3">   (assemble.RENDER_VERSION: an older page is made again)
 <title>Speed and Velocity</title>
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
@@ -308,7 +309,7 @@ no network, no model.
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
-| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items") |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
 | Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
@@ -1083,6 +1084,12 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 | `html.link_href` | `unsafe_link` (an `href` that is not http, https, mailto, or `#` and an id in the file) |
 | `html.lang_tags` | `invalid_lang` (a `lang` value that is not a well-formed BCP 47 tag) |
 | `html.text_contrast` | `low_contrast` (a `tc-` colour class below 4.5:1 on white) |
+| `html.characters` | `unreadable_character` (a character that is not text, or the gap that stands for one; see "Characters that are not text") |
+| `html.sentence_holes` | `sentence_hole` (a page kept for unread content only: a lone stop or a dangling "the -x" in its text) |
+
+A failed check of a rule added after launch carries `added_on`, the day the rule was
+added (`html_checks.RULE_ADDED`), so a document that was ready can be told why it is not
+now. Checks stored without the field load with `added_on=None`.
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/readablestem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
@@ -1104,6 +1111,21 @@ callers, on `run.PipelineOutput.checks`). The CLI prints them and writes them to
 it makes the file again after review decisions (once for a run of decisions: web.md,
 "Review screen"). `static_checks(result.html)` is deterministic
 and fast, so anyone holding only the HTML can recompute them.
+
+## Characters that are not text (`pipeline/output_chars.py`)
+
+No output holds a character that is not text: control characters, private-use code points
+(a symbol font that gives no letter), noncharacters and U+FFFD. A screen reader says
+nothing or "question mark" for them. `render_html` writes each one as
+`<span class="flagged-inline readablestem">[unreadable character]</span>` (with `lang="en"` on a page in another language)
+in the text, and as plain `[unreadable character]` in the title, attributes and maths, so
+the student hears where something is missing; `html.characters` then fails so the job page
+says to compare those places with the PDF. Titles from `web/titles.py` and
+`web/combine.py` are cleaned the same way, so file names and `contents.txt` are clean too.
+Every export reads the page, and each checks its own built text again: Canvas (and so the
+Cartridge) and EPUB refuse with the code `unreadable_character`, Word with the
+`DocxExportError` of that code (its list styles, `word/numbering.xml`, are left out: Word
+draws bullets with Symbol glyphs at private-use code points); the HTML file stays available.
 
 ## How `convert_pdf` fills it in
 

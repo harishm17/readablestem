@@ -2598,7 +2598,12 @@ meanwhile waits and marks it again). A run of clicks therefore costs one render,
 each, and the figure images in it are kept per crop (`pipeline.figure_images`, 15 minutes,
 64 MB); measured on a 12-page document with 52 crops, a click went from 210 ms of CPU to
 58 ms (`scripts/bench_runtime.py review`). The student note's date is the day of the last
-decision, not of the render. A failed check
+decision, not of the render. A page made by an older renderer is out of date in the same
+way: the page carries the render version in its head (`<meta name="readablestem-render">`,
+`pipeline.assemble.RENDER_VERSION`, raised with any change to the sheet, the markup, the
+student words or the speech rules), and `current_html` makes a stored page with none or an
+older one again from the stored result, once, so a fix reaches documents converted before
+it. The stored elements and decisions are not touched. A failed check
 re-shows the page (422) with the reviewer's input as typed and an error summary linked to
 the field; nothing is saved.
 

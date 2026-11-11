@@ -7,13 +7,22 @@ import re
 
 import pytest
 
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from fixtures.web.support import (
+    ALICE,
+    BOB,
+    WebEnv,
+    as_current,
+    job_id_from,
+    login,
+    make_pdf,
+    upload,
+)
 from readablestem.web import listen
 from readablestem.web.db import Job, session_scope
 
 CAROL = "carol@example.org"
 
-HTML = (
+HTML = as_current(
     '<!doctype html><html lang="en"><head><title>Kinematics notes</title></head><body><main>'
     "<h1>Kinematics</h1><p>The speed is "
     '<math id="p1-e2"><mi>v</mi><mo>=</mo><mi>d</mi><mo>/</mo><mi>t</mi></math>.</p>'
