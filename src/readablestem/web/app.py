@@ -201,6 +201,12 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
         seo.page_json_ld, site_url.rstrip("/")
     )
+    # The LaTeX classes and packages refused at upload by name (`source.support`), so the
+    # upload help and /limits name what is not taken from the same lists the check uses.
+    from readablestem.source.support import SUPPORT
+
+    env.globals["refused_classes"] = ", ".join(sorted(SUPPORT.classes.refused))  # ty: ignore[invalid-assignment]
+    env.globals["refused_packages"] = ", ".join(sorted(SUPPORT.packages.refused))  # ty: ignore[invalid-assignment]
     return Jinja2Templates(env=env)
 
 

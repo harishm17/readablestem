@@ -44,6 +44,7 @@ from readablestem.pipeline import language as languages
 from readablestem.source import envelope as source_envelope
 from readablestem.source import intake as source_intake
 from readablestem.source import latexml
+from readablestem.source.support import SUPPORT
 from readablestem.web import (
     access,
     analytics,
@@ -329,6 +330,14 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
         "convert in “Main file” and upload it again.",
         "source_beamer": f"{name} is a Beamer slide deck, which this tool cannot convert from "
         "source yet. Upload the compiled PDF.",
+        # Refused by name (`source.support`): the list is named, so the sentence stays true
+        # as it grows.
+        "source_unsupported_class": f"{name} uses a document class this tool cannot read from "
+        f"source yet ({', '.join(sorted(SUPPORT.classes.refused))}). Compile the version "
+        f"students should see to a PDF and upload that. {NOTHING_TAKEN}",
+        "source_unsupported_package": f"{name} loads a package this tool cannot read yet "
+        f"({', '.join(sorted(SUPPORT.packages.refused))}). Compile it to a PDF and upload "
+        f"that. {NOTHING_TAKEN}",
         "source_too_many_pages": f"{name} is longer than one conversion takes (about "
         f"{max_pages} pages). Split the project into parts, or {pdf}",
     }

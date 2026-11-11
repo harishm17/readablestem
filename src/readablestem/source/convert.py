@@ -4,8 +4,8 @@ conversion child, the step cache, the progress events and the spend accounting a
 PDF uses.
 
 1. The upload is unpacked into a private temporary folder (`web.archive_intake`: every limit
-   applies again here, in the process that works on the bytes), linted and its main file found
-   (`source.intake`).
+   applies again here, in the process that works on the bytes), linted, its main file found
+   and its class and packages checked against `source.support` (`source.intake`).
 2. LaTeXML runs on it inside the sandbox (`source.latexml`, `core.sandbox`): no network, a
    minimal root, the project read-only, time, memory and output caps.
 3. What LaTeXML said is read from its messages before the temporary folder goes
@@ -139,7 +139,8 @@ class _SourceRun(pipeline._Run):
 def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, bool, set[str]]:
     """Unpack the upload under `tmp/project` and return it, the main file's path, whether it
     is a Beamer deck and the packages its files load. The same checks as the web process made:
-    the zip limits, the lint, the main file."""
+    the zip limits, the lint, the main file, and a class or package refused by name
+    (`intake.check_support`), which fails with the code and the name the upload page gives."""
     try:
         kind, hint, data = intake.unwrap(blob)
     except intake.EnvelopeError:
@@ -154,6 +155,12 @@ def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, boo
             if lint.problem(text) is not None:
                 raise SourceFailed("source_refused")
         main = intake.find_main(texts, hint)
+        try:
+            intake.check_support(texts, main)
+        except intake.SourceRefused as refused:  # named, like the stop LaTeXML's errors make
+            key = "class" if refused.code == "source_unsupported_class" else "package"
+            detail: dict[str, object] = {"items": [], "more": 0, key: refused.name}
+            raise SourceFailed(refused.code, detail) from None
         beamer = intake._is_beamer(texts[main])
         if beamer and not beamer_ok:
             raise SourceFailed("source_refused")

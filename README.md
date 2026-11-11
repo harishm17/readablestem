@@ -439,6 +439,8 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   at readablestem.com since 2026-11-04, after the sandbox check passed there; Beamer source
   (`FEATURE_BEAMER_SOURCE`) and zips of several documents (`FEATURE_BATCH_ZIP`) are off by default
   and off there until real decks and course sources have been tried (a Beamer deck is taken as a PDF).
+  A source in the `exam` class, or one that loads `csquotes`, is refused at upload with "upload
+  the PDF" (docs/web.md, "LaTeX source").
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.

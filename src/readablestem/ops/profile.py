@@ -49,7 +49,15 @@ UNSET = "unset"
 # An image fact nobody measured. Every reader treats it as "not present".
 UNKNOWN = "unknown"
 ABSENT = "none"
-IMAGE_FACTS = ("tex", "install_tex_witness", "latexml", "pandoc", "libreoffice", "lxml")
+IMAGE_FACTS = (
+    "tex",
+    "install_tex_witness",
+    "latexml",
+    "pandoc",
+    "libreoffice",
+    "lxml",
+    "tex_names",  # how many TeX distribution names the build wrote (`source.support`)
+)
 # A switch that needs a program counts as on only when the image facts carry that program
 # (decision A16, points 8 and 20). The equation line check joins this when it lands.
 NEEDS_PROGRAM: dict[str, str] = {
@@ -252,6 +260,9 @@ def measure_image_facts() -> dict[str, str]:
         lxml = importlib.metadata.version("lxml")
     except importlib.metadata.PackageNotFoundError:
         lxml = ABSENT
+    from readablestem.source.support import distribution_names
+
+    names = len(distribution_names())
     return {
         "tex": tex,
         # Not a build argument on main: nothing can measure it yet.
@@ -260,6 +271,7 @@ def measure_image_facts() -> dict[str, str]:
         "pandoc": _first_line("pandoc", "--version") if shutil.which("pandoc") else ABSENT,
         "libreoffice": "present" if shutil.which("soffice") else ABSENT,
         "lxml": lxml,
+        "tex_names": str(names) if names else ABSENT,
     }
 
 

@@ -166,12 +166,35 @@ def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
             f"This source uses the document class {detail['class']}, which this tool cannot "
             "read from source yet, so nothing was converted. Upload the PDF."
         )
+    if code == "source_unsupported_package" and detail.get("package") and not first:
+        # Refused by name in the conversion child (`source.intake.check_support`).
+        return (
+            f"This source loads the package {detail['package']}, which this tool cannot read "
+            "yet, so nothing was converted. Compile it to a PDF and upload that."
+        )
     if code in ("source_undefined", "source_unsupported_package") and first:
         names = ", ".join(str(i["name"]) for i in items[:5]) + (", ..." if total > 5 else "")
         first_at = f" (first at {where})" if where else ""
         one = total == 1
         count = "1 command" if one else f"{total} commands"
         they, them = ("It", "it") if one else ("They", "them")
+        # Where the package comes from (`source.report._origin`): a TeX package this tool does
+        # not read yet, or the instructor's own, whose file in the upload is not read.
+        if code == "source_unsupported_package" and detail.get("origin") == "distribution":
+            return (
+                f"This source uses {count} from the package {detail['package']}, which this "
+                f"tool cannot read yet: {names}{first_at}. {they} would appear to students as "
+                "raw code, so nothing was converted. Upload the PDF."
+            )
+        if code == "source_unsupported_package" and detail.get("origin") == "own":
+            return (
+                f"This source uses {count} from the package {detail['package']}, which is not "
+                f"a standard TeX package: {names}{first_at}. This tool does not read package "
+                f"files from the upload, so {they.lower()} would appear to students as raw code "
+                "and "
+                f"nothing was converted. Copy the definitions you use into the source (a file "
+                "it reads with \\input counts), or upload the PDF."
+            )
         if code == "source_unsupported_package" and detail.get("package"):
             return (
                 f"This source uses {count} from the package {detail['package']}, which this "

@@ -109,11 +109,22 @@ def test_a_zip_of_pdfs_becomes_a_document_each_and_the_batch_page(web):
         assert name in text
 
 
-def test_a_bad_document_in_a_zip_is_one_refusal_beside_the_others(web):
-    data = make_zip({"good.pdf": make_pdf(1), "bad.pdf": b"not a pdf"})
+@pytest.mark.parametrize(
+    ("bad", "words"),
+    [
+        ({"bad.pdf": b"not a pdf"}, "bad.pdf is not a PDF"),
+        (  # a project folder in an exam class: refused by name, like an upload of its own
+            {"Quiz 3/main.tex": "\\documentclass{exam}\\begin{document}x\\end{document}"},
+            "Quiz 3.zip uses a document class",
+        ),
+    ],
+    ids=["not-a-pdf", "exam-project"],
+)
+def test_a_bad_document_in_a_zip_is_one_refusal_beside_the_others(web, bad, words):
+    data = make_zip({"good.pdf": make_pdf(1), **bad})
     url = batch_url(send_zip(web.alice, data))
     text = text_of(web.alice.get(url).text)
-    assert "1 of 2 files uploaded" in text and "bad.pdf is not a PDF" in text
+    assert "1 of 2 files uploaded" in text and words in text
     assert [j.filename for j in jobs(web)] == ["good.pdf"]
     assert pages_used(web) == 1  # a refusal costs nothing
 

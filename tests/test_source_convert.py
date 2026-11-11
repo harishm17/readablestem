@@ -11,6 +11,7 @@ from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.source import envelope
 from readablestem.source.convert import SourceFailed, convert_source
+from readablestem.source.support import SUPPORT
 from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
 
 pytestmark = needs_latexml
@@ -145,7 +146,7 @@ def test_the_report_names_what_latexml_said(name, tmp_path):
     (tmp_path / "main.tex").write_text(text)
     latexml.convert(tmp_path, "main.tex", tmp_path / "out")
     report = source_report.parse(
-        tmp_path / "out", project=tmp_path, loaded=source_report.loaded_packages({"m": text})
+        tmp_path / "out", project=tmp_path, loaded=source_report.loaded_packages({"main.tex": text})
     )
     found = {(p.level, p.category, p.name, p.file) for p in [*report.problems, *report.missing]}
     assert (level, category, expected, where) in found
@@ -155,6 +156,96 @@ def test_the_report_names_what_latexml_said(name, tmp_path):
     with pytest.raises(SourceFailed) as raised:
         convert_source(blob, settings=get_settings(), client=FakeVisionClient())
     assert raised.value.code == code and raised.value.detail
+
+
+# ------------------------------------------------------------ classes and packages (WS18.1)
+
+
+def test_the_support_table_lists_the_bindings_latexml_ships():
+    """`SUPPORT`'s `bound` lists are copied from LaTeXML's folder: a LaTeXML that adds or drops
+    a binding fails here until they are copied again (src/readablestem/source/support.py)."""
+    import os
+    from pathlib import Path
+
+    from readablestem.source.latexml import DEV_ROOT_VAR
+
+    root = Path(os.environ.get(DEV_ROOT_VAR) or "/")
+    folder = root / "usr/share/perl5/LaTeXML/Package"
+    shipped = {
+        kind: {p.name.removesuffix(f".{kind}.ltxml") for p in folder.glob(f"*.{kind}.ltxml")}
+        for kind in ("cls", "sty")
+    }
+    for kind, lists in (("cls", SUPPORT.classes), ("sty", SUPPORT.packages)):
+        assert shipped[kind], folder
+        assert lists.bound == shipped[kind] - lists.plain - lists.refused, kind
+
+
+PLAIN = {
+    **{c: f"\\documentclass[11pt,a4paper]{{{c}}}" for c in sorted(SUPPORT.classes.plain)},
+    **{p: f"\\documentclass{{article}}\\usepackage{{{p}}}" for p in sorted(SUPPORT.packages.plain)},
+}
+
+
+@pytest.mark.parametrize("name", list(PLAIN))
+def test_what_is_read_without_a_binding_converts_with_no_error(name):
+    """Each class read as an article, and each package read without its binding, stays on
+    `SUPPORT`'s `plain` list only while a document of it converts with nothing lost: no error,
+    no error node, and no missing file but its own binding."""
+    preamble = PLAIN[name]
+    text = (
+        f"{preamble}\n\\begin{{document}}\\title{{Notes}}\\author{{A. Teacher}}\\maketitle\n"
+        "\\section{Waves}Plain text and $a+b$.\n\\begin{itemize}\\item First.\\item Second."
+        "\\end{itemize}\n\\begin{equation}E = mc^2\\end{equation}\n\\end{document}\n"
+    )
+    blob = envelope.wrap("tex", "notes.tex", None, text.encode())
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    report = result.source_report
+    assert report is not None
+    assert not report.problems and not report.marks and not report.figures
+    assert report.log_errors == 0 and report.error_nodes == 0
+    assert {p.name for p in report.missing} <= {name}
+    assert "Waves" in result.html and "Second." in result.html
+
+
+def test_a_package_refused_by_name_still_fails_when_it_is_only_loaded(tmp_path):
+    """`csquotes` is refused at upload because loading it alone already fails here (its
+    binding reads the package's own TeX, which is hidden). When a LaTeXML reads it, this fails
+    and it comes off the list."""
+    from readablestem.source import latexml
+    from readablestem.source import report as source_report
+
+    for name in sorted(SUPPORT.packages.refused):
+        text = f"\\documentclass{{article}}\\usepackage{{{name}}}\\begin{{document}}\nHi.\n"
+        (tmp_path / "main.tex").write_text(text + "\\end{document}\n")
+        out = tmp_path / f"out-{name}"
+        latexml.convert(tmp_path, "main.tex", out)
+        assert source_report.parse(out, project=tmp_path).log_errors > 0, name
+
+
+def test_a_package_stop_says_whether_the_package_is_a_tex_package(tmp_path, monkeypatch):
+    """With the TeX distribution's names written (the image build), a stop for a package's
+    commands says whether the package is one of them or the instructor's own; without them it
+    says neither."""
+    from readablestem.source import support
+
+    monkeypatch.setattr(support, "NAMES_PATH", tmp_path / "names.txt")
+    own = LOSSES["missing_package"][0]  # \usepackage{coursemacros}, then \course
+    tex = (
+        "\\documentclass{article}\\usepackage[french,english]{babel}\\begin{document}\n"
+        "Hello \\foreignlanguage{french}{bonjour}.\n\\end{document}\n"
+    )
+
+    def origin(text: str) -> object:
+        blob = envelope.wrap("tex", "a.tex", None, text.encode())
+        with pytest.raises(SourceFailed) as raised:
+            convert_source(blob, settings=get_settings(), client=FakeVisionClient())
+        assert raised.value.code == "source_unsupported_package" and raised.value.detail
+        return raised.value.detail.get("origin")
+
+    assert origin(own) is None
+    support.write_distribution_names({"babel", "mhchem", "siunitx"}, support.NAMES_PATH)
+    assert origin(own) == "own"
+    assert origin(tex) == "distribution"
 
 
 def test_a_clean_article_with_hyperref_has_an_empty_report():

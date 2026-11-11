@@ -303,6 +303,11 @@ def _cmd_image_facts(args: argparse.Namespace) -> int:
     for key in profile.IMAGE_FACTS:
         print(f"{key}={facts[key]}")
     if args.write:
+        # The TeX distribution's names, beside `source.support` (names only), so the stop
+        # sentence can tell a TeX package from the instructor's own.
+        from readablestem.source import support
+
+        support.write_distribution_names(support.distribution_names())
         profile.write_image_facts(profile.PROFILE_PATH, facts)
         print(f"written: {profile.PROFILE_PATH} hash={profile.load().short_hash}")
     return 0

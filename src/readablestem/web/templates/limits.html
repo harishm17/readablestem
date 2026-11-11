@@ -24,8 +24,11 @@
   <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if office_on %}
     A Word or PowerPoint file is turned into a PDF first.{% endif %}{% if latex_source %} A LaTeX
     file (.tex) or a zip of a LaTeX project has its equations read from the source. The PDF is
-    still the main path, and the source of a Beamer slide deck is not taken yet: upload the deck
-    as a PDF.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
+    still the main path. Not taken yet, so upload the compiled PDF instead: the source of a
+    Beamer slide deck, a source that uses the {{ refused_classes }} class (read without its own
+    rules, its solutions and correct-answer marks could reach students), and one that loads the {{ refused_packages }}
+    package. Other classes without a LaTeXML binding (KOMA-Script, memoir, extarticle) are read
+    as an article.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
   <div><dt>Size</dt><dd>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
     {% if in_parts %}A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
     for a day so you can choose which pages to convert; each part becomes a document of its

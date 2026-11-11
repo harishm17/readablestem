@@ -184,6 +184,7 @@ MATHML_ALTTEXT = { value = false, source = "not stated; code default" }
 # reader treats unknown as not present: a switch that needs a program (`NEEDS_PROGRAM` in
 # ops/profile.py) counts as off unless its program is here. "none" means the build looked and
 # it is not installed. lxml is a development-only dependency, so the image should say "none".
+# tex_names is how many TeX distribution names the build wrote for source/support.py.
 # This table must stay the last one in the file: the build replaces it to the end.
 [image_facts]
 tex = "unknown"
@@ -192,3 +193,4 @@ latexml = "unknown"
 pandoc = "unknown"
 libreoffice = "unknown"
 lxml = "unknown"
+tex_names = "unknown"
