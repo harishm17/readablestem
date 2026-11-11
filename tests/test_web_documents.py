@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from fixtures.web.support import (
@@ -19,6 +20,7 @@ from fixtures.web.support import (
     make_pdf,
     upload,
 )
+from readablestem.core.content_budget import PAGE_CONTENT_BUDGET_BYTES
 from readablestem.core.types import Status
 from readablestem.web.db import Job, session_scope
 from readablestem.web.pdf_probe import ProbeRejected, probe
@@ -96,6 +98,33 @@ def test_a_damaged_pdf_is_not_called_empty():
     with pytest.raises(ProbeRejected) as refused:
         probe(truncated_pdf(), max_pages=50)
     assert refused.value.code == "damaged"
+
+
+def page_of_content(inflated: int) -> bytes:
+    """One page with a line of text whose content stream inflates to `inflated` bytes."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "A page with a long content stream.")
+    xref = page.get_contents()[0]
+    text = doc.xref_stream(xref)
+    doc.update_stream(xref, b" " * (inflated - len(text)) + text)  # stored compressed
+    return doc.tobytes()
+
+
+@pytest.mark.parametrize(
+    ("inflated", "refused"),
+    [(PAGE_CONTENT_BUDGET_BYTES - 4096, False), (PAGE_CONTENT_BUDGET_BYTES + 4096, True)],
+    ids=["just-under", "just-over"],
+)
+def test_a_page_whose_content_inflates_past_the_budget_is_refused(inflated, refused):
+    data = page_of_content(inflated)
+    assert len(data) < inflated // 100  # small in the file, large once inflated
+    if not refused:
+        assert probe(data, max_pages=50) == 1
+        return
+    with pytest.raises(ProbeRejected) as refusal:
+        probe(data, max_pages=50)
+    assert refusal.value.code == "content_too_large"
 
 
 # --------------------------------------------------------------------------- times

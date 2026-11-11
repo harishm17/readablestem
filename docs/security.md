@@ -569,6 +569,39 @@ once, not once per page), and the time spent decoding is summed against `DECODE_
 embedded picture is over `MAX_UPLOAD_IMAGE_PIXELS` (100 million, above a 600 dpi A3 scan)
 with the same code (422), before any quota is spent.
 
+### Content budget
+
+A page's drawing instructions are compressed in the file and inflated every time MuPDF
+reads the page, and every step that reads it (the upload probe's text pass, the layout,
+the crash probe, the tagged-structure and page-type reads) parses all of them again. A
+260 KB file can hold a page that inflates to 256 MB: before the budget it took 6.8 s of the
+upload request and 24 s of the worker, and the time grows with the inflated size.
+`core/content_budget.py` counts, before anything parses a page, how far each page's content
+inflates: its content streams (one or an array) and every stream they draw (form XObjects,
+tiling patterns, Type3 glyph procedures, annotation appearances, followed through their
+resources; a stream drawn twice on a page counts once, a stream shared by pages once for the
+document, and forms that draw each other in a loop are followed once). Each stream is read
+through MuPDF's own decoders, so every filter MuPDF applies counts (Flate, LZW, RunLength,
+ASCII85 and ASCIIHex, chains of them, and the decryption of a file with only an owner
+password), and its output is skipped in 1 MB steps and never kept: counting stops one byte
+past the budget. The object streams are counted the same way, from the cross-reference
+entries alone, before the page tree is read, since reading it loads them.
+
+The budgets are 32 MiB for a page and 128 MiB for a document, about ten times the largest
+measured in the development corpus on 2026-11-11 (3.0 MiB on a page, 9.9 MiB in a document;
+the reasoning is beside the constants). Over either, the upload probe refuses the file with
+`content_too_large` (422), before any quota is spent (the 256 MB page is refused in 0.36 s,
+most of it the child process starting). `layout.analyze` checks the pages it is given the
+same way before any step reads them, so a job, `readablestem convert` and the evals stop
+with the same code whatever the file passed before, and a PDF figure of a LaTeX project over
+the page budget is left without a picture (`source/figures.py`).
+
+Not bounded by it: how many times a page draws the same form. A form is counted once per
+page, but each `Do` runs it again: a 1.9 KB file whose page draws a 1 MB form 300 times is
+taken, and the upload probe spends 4.9 s on it (2026-11-11). Bounding it needs the drawing
+operators counted, which means scanning the page's content for them; until then the
+probe's 30 s limit and the job's time limit are what stop a larger one.
+
 ### Hostile-input set
 
 `tests/workflows/hostile_set.py` lists 36 files made to hurt the app (oversized pages and
@@ -579,10 +612,8 @@ must end, and `tests/workflows/test_wf49_hostile_input.py` runs them through the
 production's size limits, the LaTeX ones under bubblewrap and under Landlock (docs/eval.md,
 "The hostile-input set").
 
-A limit that is missing, found by the set: nothing bounds how far one page's content
-stream inflates. A 260 KB file whose page inflates to 256 MB is accepted, and reading it
-takes 7 s of the upload request and 24 s of the worker; memory stays level. The page count
-and the upload size bound the total, and the fix is a refusal at upload.
+The set found one missing limit, on how far a page's content inflates (F-559): its file is
+now refused at upload by the content budget (above).
 
 ### Output escaping
 

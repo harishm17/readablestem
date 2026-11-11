@@ -100,9 +100,9 @@ CASES: tuple[Case, ...] = (
     done("truncated.pdf"),
     done("xref-damaged.pdf"),
     done("page-tree-deep.pdf"),
-    # One page that inflates to 256 MB of content. Today it is taken: the upload request
-    # reads it for 7 s and the conversion for 24 s (F-559).
-    refused("stream-bomb.pdf", "content_too_large", open={"ends": "F-559", "bound": "F-559"}),
+    # One page that inflates to 256 MB of content: refused by the content budget before
+    # anything parses it (F-559; it took 7 s of the upload request and 24 s of a worker).
+    refused("stream-bomb.pdf", "content_too_large"),
     # ----------------------------------------------- content that is data and never a program
     done(
         "javascript.pdf",
