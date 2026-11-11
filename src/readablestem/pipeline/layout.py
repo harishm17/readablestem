@@ -11302,7 +11302,7 @@ def page_strikes(page: pymupdf.Page) -> list[Strike]:
     `_LOCK`."""
     display = _Display.of(page)
     marks: list[Strike] = []
-    for annot in page.annots(types=[pymupdf.PDF_ANNOT_STRIKE_OUT]) or ():
+    for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_STRIKE_OUT]) or ():
         points = list(annot.vertices or ())
         for i in range(0, len(points) - 3, 4):  # four points per quad, unrotated page space
             xs = [float(x) for x, _ in points[i : i + 4]]
