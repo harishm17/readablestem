@@ -132,7 +132,8 @@ hourly purge deletes it (`ops.retention.purge_upload_results`, logged as `result
 ### Usage events
 
 `events` (`web/events.py`, docs/web.md "Usage events") holds content-free, pseudonymous
-usage events: a user id, an event name, a job id, a category code and a number. They
+usage events: a user id, an event name, a job id, a category code and a number (a
+`decision_outcome` row has eight short codes from closed lists in place of the code). They
 outlive the jobs they mention on purpose (the beta's measures span weeks, and the
 deleted-document page uses them to tell an owner what happened), but not for ever:
 

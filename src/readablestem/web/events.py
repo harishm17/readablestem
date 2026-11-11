@@ -724,7 +724,7 @@ def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
             .where(Event.name == UPLOADED, Event.job_ref.in_(jobs))
             .group_by(Event.job_ref)
         )
-        pages = {job: int(n or 0) for job, n in uploads}
+        pages = {job: int(n or 0) for job, n in uploads if job}
     tallies: dict[str, _Tally] = defaultdict(_Tally)
     for user, job, kind, reason, outcome, write_mode, total in rows:
         count = int(total or 0)

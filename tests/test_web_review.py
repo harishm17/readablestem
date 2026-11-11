@@ -621,3 +621,80 @@ def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
     assert result(web).fix_for("p1-e4").reviewed  # type: ignore[union-attr]
     decided = card(review_page(web), "p1-e3")
     assert "Accepted by you" in decided
+
+
+# --------------------------------------------------------------------------- outcomes (WS8.23)
+
+
+def test_every_review_write_records_a_content_free_outcome(tmp_path):
+    """Each kind of review write records what the reviewer did (`decision_outcome`), in its
+    own transaction: kind, reason, outcome and write mode, summed net of Undo, with the
+    release of the job's output, and nothing typed or read from the document in any event."""
+    from fixtures.web.review_doc import review_output, review_pdf
+    from readablestem.web import events
+    from readablestem.web.db import Event, Job
+
+    env = WebEnv(tmp_path)
+    env.converter.output = review_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        job = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        env.browser, env.job_id = client, job
+
+        def send(path: str, **fields) -> None:
+            version = str(env.job(job).result_version or 0)
+            data = {"csrf_token": token(client, f"/jobs/{job}/review"), "version": version}
+            response = client.post(f"/jobs/{job}{path}", data=data | fields)
+            assert response.status_code == 303, (path, response.status_code)
+
+        typed = "SECRETTYPED"
+        writes = [
+            ("/review/p1-e2", {"action": "accept"}),  # one decision ...
+            ("/undo", {}),  # ... taken back ...
+            ("/review/p1-e2", {"action": "accept"}),  # ... and made again: counts once
+            ("/review/hg-p1-e3", {"action": "accept"}),  # a heading group, 3 headings
+            ("/accept/figures", {}),  # bulk accept
+            ("/review/p1-e2", {"action": "edit_anyway", "latex": typed}),  # decided, edited
+            ("/edit/p1-e4", {"action": "text", "text": f"{typed} words"}),  # page tools
+            ("/edit/p1-e4", {"action": "heading", "level": "2"}),
+            ("/pages/1/add", {"kind": "picture", "alt": f"{typed} drawn", "left": "10",
+                              "top": "55", "right": "50", "bottom": "70"}),
+            ("/pages/2/omit", {}),  # left out ...
+            ("/pages/2/restore", {}),  # ... and put back: nets to nothing
+        ]  # fmt: skip
+        for path, fields in writes:
+            send(path, **fields)
+        with session_scope(env.ctx.factory) as session:
+            sample = session.get(Job, job)
+            assert sample is not None
+            sample.is_sample = True
+        send("/review/hg-p1-e3", action="reject", scope="all")  # the sample: no row
+        with session_scope(env.ctx.factory) as session:
+            rows = list(session.scalars(select(Event)))
+            key = (Event.kind, Event.reason, Event.outcome, Event.write_mode)
+            sums = session.execute(
+                select(*key, func.sum(Event.value))
+                .where(Event.name == events.DECISION_OUTCOME)
+                .group_by(*key)
+            ).all()
+    standing = {(k, r, o, w): n for k, r, o, w, n in sums if n}
+    assert standing == {
+        ("equation", "style_mismatch", "kept", "single"): 1,
+        ("heading", "heading.repeated_label", "kept", "group"): 3,
+        ("figure", "below_accept", "kept", "group"): 1,
+        ("equation", "none", "edited", "single"): 1,  # accepted before: nobody asked
+        ("paragraph", "none", "edited", "structure"): 2,
+        ("figure", "none", "added", "structure"): 1,
+    }
+    outcomes = [e for e in rows if e.name == events.DECISION_OUTCOME]
+    assert {e.release for e in outcomes} == {"test"}  # the job output's pipeline_version
+    assert {(e.source, e.origin) for e in outcomes if e.reason == "none"} == {("browsing", "page")}
+    # Nothing typed and nothing from the document reaches any event, in any column.
+    words = [typed, "Teacher", "Vectors", "rigid", "omega", "car on a road", "Discuss"]
+    for event in rows:
+        for column in Event.__table__.columns:
+            held = getattr(event, column.name)
+            if isinstance(held, str):
+                assert not any(w.lower() in held.lower() for w in words), (column.name, held)

@@ -30,6 +30,15 @@ EVENT_COLUMNS = {
     "code": String,
     "value": Float,
     "created_at": DateTime,
+    # A decision outcome's columns: codes from closed lists (`events.make`), never text.
+    "kind": String,
+    "reason": String,
+    "outcome": String,
+    "origin": String,
+    "source": String,
+    "mode": String,
+    "write_mode": String,
+    "release": String,
 }
 
 
