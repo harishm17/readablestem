@@ -15,7 +15,10 @@ What this module does around pandoc:
   names nothing outside itself and cannot fetch anything (it has no sandbox mode on the
   distribution build, which reads its default styles from disk). The page-break markers are
   taken out (a Word document has its own pages). A long description (`<details>`) becomes
-  its heading line in bold and its paragraphs, in place after the figure. A WebP picture
+  its heading line in bold and its paragraphs, in place after the figure. `<main>` is
+  unwrapped: when a page has one, pandoc reads only what is inside it, which would leave out
+  a draft's banner and the student note "About this version" (a `<footer>` after `<main>`).
+  The skip link goes. A WebP picture
   becomes a PNG (Word cannot show WebP). The language and the title are set explicitly.
 - **The child.** A separate process in its own session with a minimal environment
   (`core.childenv`: no keys, no database URL), a private temporary directory, CPU, file-size
@@ -220,12 +223,19 @@ def _replace(node: _Node, replacement: list[_Node | str]) -> None:
 
 
 def _prepare(root: _Node) -> None:
-    """Page markers out; a long description's `<details>` as a bold line and paragraphs."""
+    """Page markers out; a long description's `<details>` as a bold line and paragraphs;
+    `<main>` unwrapped, because pandoc's HTML reader reads only what is inside `<main>` when
+    there is one (3.7.0.2), and the draft banner before it and the student note "About this
+    version" after it must be in the file; the skip link, which only a web page needs, out."""
     for node in list(root.walk()):
         if node.parent is None:
             continue
         marker = node.tag == "hr" and "doc-pagebreak" in node.attrs.get("role", "").split()
         if marker or (node.tag == "div" and "pagebreak" in node.classes()):
+            _replace(node, [])
+        elif node.tag == "main":
+            _replace(node, list(node.children))
+        elif "skip-link" in node.classes():  # a web page's link past its contents
             _replace(node, [])
         elif node.tag == "summary":
             strong = _Node("strong", {}, list(node.children))

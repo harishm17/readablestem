@@ -19,6 +19,7 @@ import stat
 import subprocess
 import threading
 import zipfile
+from html import unescape
 from pathlib import Path
 
 import docx
@@ -26,6 +27,7 @@ import pytest
 
 import readablestem.cli.main as cli
 from readablestem.pipeline import export_docx as ed
+from readablestem.pipeline.assemble import ABOUT_TITLE
 from readablestem.pipeline.export_canvas import _parse
 from test_export_canvas import DATA_URI, source_html, source_ids
 
@@ -93,6 +95,20 @@ def test_every_equation_is_a_native_equation(made):
     html, export, document = made
     equations = list(document.element.body.iter(f"{M}oMath"))
     assert len(equations) == count(html, "math") == export.equations
+
+
+def test_the_note_about_this_version_is_in_the_file():
+    """The student note is a `<footer>`, which pandoc drops with its text (F-127)."""
+    html = source_html("demo")
+    about = re.search(r'<footer id="about-conversion".*?</footer>', html, re.S)
+    assert about is not None
+    lines = [
+        " ".join(unescape(re.sub(r"<[^>]+>", "", p)).split())
+        for p in re.findall(r"<p\b[^>]*>(.*?)</p>", about.group(0), re.S)
+    ]
+    words = [" ".join(p.text.split()) for p in open_docx(ed.export_docx(html).data).paragraphs]
+    assert lines[0] == ABOUT_TITLE and len(lines) >= 3
+    assert all(line in words for line in lines)
 
 
 def test_headings_are_word_heading_styles(made):
