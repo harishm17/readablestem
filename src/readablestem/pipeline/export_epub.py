@@ -48,7 +48,7 @@ from html import escape
 from io import BytesIO
 
 from readablestem.pipeline import checked_words, output_chars
-from readablestem.pipeline.assemble import SUFFICIENT_META, SUMMARY_META
+from readablestem.pipeline.assemble import DECORATIVE_CLASS, SUFFICIENT_META, SUMMARY_META
 from readablestem.pipeline.export_canvas import (
     _VOID,
     NOT_TEXT,
@@ -267,6 +267,16 @@ def _inside(node: _Node, tag: str) -> bool:
     return False
 
 
+def _decoration(node: _Node) -> bool:
+    """Inside what the student page writes as decoration (`assemble.DECORATIVE_CLASS`)."""
+    parent = node.parent
+    while parent is not None:
+        if DECORATIVE_CLASS in parent.classes():
+            return True
+        parent = parent.parent
+    return False
+
+
 def _ensure_ids(headings: list[_Node], markers: list[_Node], taken: set[str]) -> None:
     """Give a heading or page marker without an id one, so the navigation can point at it."""
 
@@ -383,7 +393,8 @@ def _features(
         features.append("MathML")
         if maths and all(n.attrs.get("alttext", "").strip() for n in maths):
             features.append("describedMath")
-    if images and all(n.attrs.get("alt", "").strip() for n in images):
+    # Decoration with evidence has empty alt text on purpose (WS6.4): only content needs it.
+    if images and all(n.attrs.get("alt", "").strip() or _decoration(n) for n in images):
         features.append("alternativeText")
     figures = [n for n in root.walk() if n.tag == "figure"]
     if figures and all(_has_description(f) for f in figures):

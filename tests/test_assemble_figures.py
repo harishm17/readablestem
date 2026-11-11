@@ -263,6 +263,84 @@ def test_equation_images_are_left_alone():
     assert embedded(html) == [("image/png", crop)]
 
 
+# ---------------------------------------------------------------------- decoration
+
+
+def decorated_pdf() -> bytes:
+    """Three pages of text with a logo at the same place on each, a thin rule on the first
+    and a photo on the second: each a picture of its own pixels, none plain."""
+    doc = pymupdf.open()
+    logo = png(60, 60, noise=True)
+    for n in range(3):
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((72, 90), f"Section {n + 1}", fontsize=20)
+        for i in range(6):
+            line = f"Paragraph {i} of page {n + 1} says something about motion and force."
+            page.insert_text((72, 130 + 18 * i), line, fontsize=11)
+        page.insert_image(pymupdf.Rect(480, 260, 540, 320), stream=logo)
+        if n == 0:
+            page.insert_image(pymupdf.Rect(90, 400, 522, 414), stream=png(432, 14, noise=True))
+        if n == 1:
+            page.insert_image(pymupdf.Rect(150, 400, 450, 625), stream=png(200, 150, noise=True))
+        page.insert_text((72, 700), "More words below the picture for the reader.", fontsize=11)
+    return doc.tobytes()
+
+
+DECORATIVE_ANSWER = {"figure_type": "other", "decorative": True, "alt": "", "confidence": 0.99}
+
+
+@pytest.mark.parametrize(
+    "answer", [DECORATIVE_ANSWER, None], ids=["model-says-decorative", "reading-failed"]
+)
+def test_only_decoration_with_evidence_has_empty_alt_text_in_every_output(answer):
+    """WS6.4 (F-246): a logo repeated on every page and a thin rule are decoration; a photo
+    the model calls decorative, or could not read, is not: every output writes "Figure not
+    described" for it, and the job has a required decision for it, until a person decides
+    it is decoration."""
+    import zipfile
+    from io import BytesIO
+
+    from readablestem.config import Settings
+    from readablestem.core import triage
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline import export_canvas, export_docx, export_epub
+    from readablestem.pipeline.run import convert_pdf
+    from readablestem.web import listen, review
+
+    client = FakeVisionClient(defaults={"figure": answer} if answer else {})
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    output = convert_pdf(decorated_pdf(), settings=settings, client=client)
+    result, html = output.result, output.result.html
+    expected = sorted(["", "", "", "", FIGURE_NOT_DESCRIBED_ALT])  # 3 logos, the rule, the photo
+
+    def alts(page: str) -> list[str]:
+        return sorted(re.findall(r'<img\b[^>]*?\balt="([^"]*)"', page.split("<main", 1)[-1]))
+
+    assert alts(html) == expected
+    assert alts(export_epub.export_epub(html).content) == expected
+    assert alts(export_canvas.export_canvas(html, title="T", folder="t").index_html) == expected
+    heard = [i for i in listen.build_transcript(html) if i.role.startswith("Image")]
+    assert [FIGURE_NOT_DESCRIBED_ALT in i.text for i in heard] == [True]  # decoration: silent
+    if export_docx.available():
+        with zipfile.ZipFile(BytesIO(export_docx.export_docx(html, title="T").data)) as docx:
+            xml = docx.read("word/document.xml").decode()
+        described = sorted(
+            re.search(r'\bdescr="([^"]*)"', tag)[1] if "descr=" in tag else ""
+            for tag in re.findall(r"<wp:docPr\b[^>]*>", xml)
+        )
+        assert described == expected
+    # The evidenced decoration passes the output's checks; the photo is the one decision.
+    assert all(c.passed for c in static_checks(html) if c.name.startswith("html.img_alt"))
+    (photo,) = [e for e in result.elements if e.kind is Kind.FIGURE and e.bbox[3] - e.bbox[1] > 100]
+    assert result.fix_for(photo.id).review == "required"
+    assert triage.required_decisions(result.fixes) == 1
+    # A person's decision is evidence: accepting "decorative", or ticking "Decorative".
+    action, form = ("accept", {}) if answer else ("edit", {"alt": "", "decorative": "on"})
+    review.apply_review(result, photo.id, action, form)
+    assert alts(review.rerender_html(result, output.crops)) == [""] * 5
+    assert triage.open_decisions(result.fixes) == 0
+
+
 # ---------------------------------------------------------------------- browser
 
 

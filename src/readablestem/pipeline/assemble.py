@@ -69,6 +69,7 @@ from readablestem.pipeline import (
     assemble_tables,
     checked,
     checked_words,
+    decoration,
     equation_scale,
     figure_details,
     figure_images,
@@ -97,7 +98,9 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # (`RENDER_META`), and the web app makes a stored page again from its stored result when
 # the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
 # documents converted before it, not only new ones and ones somebody edits again.
-RENDER_VERSION = 4  # 4: the statement of what was reviewed and converted (SW7)
+# 4: the statement of what was reviewed and converted (SW7). 5: one H1, the title not said
+# twice (SW6c); empty alt text only for decoration with evidence (WS6.4).
+RENDER_VERSION = 5
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -128,7 +131,12 @@ EQUATION_TEXT_ALT_SUFFIXES = (EQUATION_TEXT_ALT_SUFFIX, EQUATION_FLAT_ALT_SUFFIX
 # Layout's reasons that say the text layer of an equation is not in reading order.
 _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
-FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
+# A figure with no description, never empty alt text: only decoration with evidence has that
+# (`pipeline.decoration`, WS6.4).
+FIGURE_NOT_DESCRIBED_ALT = "Figure not described"
+# The class of what is written as decoration; the page checks allow empty alt text only
+# inside it (`html_checks`, "html.img_alt_content").
+DECORATIVE_CLASS = "decorative"
 # The student note (`_about_section`). It speaks to students: what this file is and who
 # to tell about problems. What was reviewed and converted is the statement of
 # `pipeline.checked_words` (SW7): a person "reviewed", never "checked", which can read as
@@ -1259,15 +1267,19 @@ class _Renderer:
             reason = fix.reason or ""
         elif proposal is None or not (proposal.decorative or proposal.alt.strip()):
             reason = "no_output"
+        elif proposal.decorative and not decoration.is_decoration(element, fix):
+            reason = decoration.UNPROVEN  # only the model's word: not described, never silent
         else:
             alt = "" if proposal.decorative else proposal.alt.strip()
             if _is_png(self.crops.get(element.id)):
                 image = picture(alt)
             else:  # no crop to show: the description itself is the content
                 image = f"<p>{_escape(alt)}</p>" if alt else ""
+            ids = self.id_attr(element.id)
             if not alt and not caption:  # decorative: no empty "figure" for screen readers
-                return f'<div class="decorative"{self.id_attr(element.id)}>{image}</div>'
-            html = f"<figure{self.id_attr(element.id)}>{image}{caption}</figure>"
+                return f'<div class="{DECORATIVE_CLASS}"{ids}>{image}</div>'
+            marked = f' class="{DECORATIVE_CLASS}"' if not alt else ""
+            html = f"<figure{marked}{ids}>{image}{caption}</figure>"
             if not figure_details.has_details(proposal):
                 return html
             # The long description and data table follow the figure, folded (W3C WAI

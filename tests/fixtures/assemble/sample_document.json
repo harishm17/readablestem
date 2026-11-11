@@ -309,7 +309,8 @@
       "figure": {
         "figure_type": "other",
         "alt": "",
-        "decorative": true
+        "decorative": true,
+        "decoration": "repeated"
       }
     }
   ]

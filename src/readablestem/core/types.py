@@ -373,12 +373,18 @@ class TableFix(BaseModel):
 # --------------------------------------------------------------------------- figures
 
 FigureType = Literal["chart", "diagram", "photo", "illustration", "table_image", "other"]
+# Why a figure is decoration, beyond the model's word (`pipeline.decoration`, WS6.4): its
+# picture repeats on the pages, it is a rule by its shape, or a person said so.
+Decoration = Literal["repeated", "shape", "person"]
 
 
 class FigureFix(BaseModel):
     figure_type: FigureType
     alt: str  # short alt text; "" only when decorative
     decorative: bool = False
+    # The evidence that a decorative figure is decoration; only then is it written with
+    # empty alt text. Left out of the stored result when there is none.
+    decoration: Decoration | None = Field(default=None, exclude_if=lambda v: v is None)
     # Complex figures (charts, diagrams): a longer description in plain text, written
     # after the figure. None when the figure needs none or the model gave none.
     long_description: str | None = None

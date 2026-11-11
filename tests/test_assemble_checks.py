@@ -78,6 +78,7 @@ def sample_html(notice: str | None = None) -> str:
         (doc("<h1>A</h1><h2> </h2>"), "empty_heading"),
         (doc("<h1><span></span></h1>"), "empty_heading"),
         (doc('<img src="data:,">'), "img_missing_alt"),
+        (doc('<figure><img src="data:," alt=""></figure>'), "empty_alt_content"),
         (doc('<p id="a">x</p><p id="a">y</p>'), "duplicate_id"),
         (doc('<math display="inline" id="a"><mi>y</mi></math><b id="a"></b>'), "duplicate_id"),
         (doc("<li>stray item</li>"), "list_structure"),

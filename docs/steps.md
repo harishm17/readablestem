@@ -154,6 +154,14 @@ model wrote alt text anyway, the warning check `figure.decorative_consistency` f
 with code `decorative_conflict`. The fix then goes to review whatever the confidence,
 and a tiny figure escalates to the main model first.
 
+The model's word is not enough for empty alt text (WS6.4). After every step,
+`decoration.settle` keeps a decorative answer only with evidence: the picture repeats on
+the pages, it is a rule by its shape, or a person decided (docs/output.md "Decoration").
+Without evidence, an ACCEPTED decorative figure becomes NEEDS_REVIEW with review
+`required` and the warning check `figure.decoration` (`decoration_unproven`). A figure
+whose reading failed or abstained becomes ACCEPTED decoration (review `optional`, code
+`decoration_by_rule`) when the evidence says it is one, and stays a decision otherwise.
+
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
 

@@ -12,7 +12,7 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ReadableSTEM 0.1.0">
-<meta name="readablestem-render" content="3">   (assemble.RENDER_VERSION: an older page is made again)
+<meta name="readablestem-render" content="5">   (assemble.RENDER_VERSION: an older page is made again)
 <title>Speed and Velocity</title>
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
@@ -40,7 +40,8 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
   `en`, so a crafted PDF cannot inject attributes.
 - Links (`<a href>`, see "Links and cross-references") load nothing: following one is
   the reader's choice, and opening the file still sends no request.
-- `<title>` is the PDF title or the first level-1 heading, else "Converted document".
+- `<title>` is the text of the page's one `<h1>` (see "One h1"): the first top-level
+  heading when it is the title, or the title itself, else "Converted document".
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
 - If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
@@ -277,7 +278,8 @@ no network, no model.
   document has headings (a document with none gets a one-entry contents list, because the
   format needs one, and neither feature); `MathML` when there is a `<math>`; `describedMath`
   only when every `<math>` has an `alttext`; `alternativeText` only when every picture has
-  non-empty alt text; `longDescription` only when every `<figure>` has a figure description
+  non-empty alt text or is decoration (inside `class="decorative"`, written only with evidence,
+  see "Decoration"); `longDescription` only when every `<figure>` has a figure description
   (a `<details class="figure-description">` inside it or right after it); `pageNavigation`
   when there is a page list. Also `schema:accessMode` (textual, and visual when there are
   pictures). The `accessibilitySummary` is the page's statement (`readablestem-summary` in
@@ -312,10 +314,10 @@ no network, no model.
 | Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 36 characters is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
-| Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
+| Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |
 | Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
 | Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
-| Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
+| Decorative figure (with evidence, see "Decoration") | `<div class="decorative"><img alt="">` (a `<figure class="decorative">` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
 A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assembly:
@@ -526,6 +528,32 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
 - Nothing is written for a decorative figure or a proposal that is not used (rejected,
   failed, abstained). Its CSS (`DETAILS_CSS`, plus the table CSS with a table) is added
   only to documents with one.
+
+## Decoration (WS6.4)
+
+`alt=""` tells a screen reader there is nothing there, so a picture is written with it only
+as decoration with evidence (`pipeline/decoration.py`), never on the figure model's word
+alone. The evidence is one of:
+
+- `repeated`: the same picture (the same crop, pixel for pixel) on at least half of the
+  document's pages, and on two or more: a logo or a banner in the body (layout already drops
+  the ones in the header and footer bands);
+- `shape`: a rule, a band at least 8 times as long as it is thick and at most 16 pt thick;
+- `person`: a reviewer accepted that it is decoration, or ticked "Decorative" on the card.
+
+The rule is the same for a figure the model calls decorative and for one whose reading
+failed (`decoration.settle`, after every step in the PDF and LaTeX converters, and again
+before a stored result's page is made again, `review.rerender_html`). With evidence, the
+figure is decoration and the evidence is stored on its record (`FigureFix.decoration`, left
+out of the JSON when absent); a figure whose reading failed becomes decoration with an
+optional note (`figure.decoration`, `decoration_by_rule`). Without evidence, a figure the
+model calls decorative is a required decision (`figure.decoration`, `decoration_unproven`)
+and is written like any figure with no description: flagged, with alt "Figure not
+described", until a person decides. Decoration is written inside `class="decorative"`
+(`assemble.DECORATIVE_CLASS`), and the output check `html.img_alt_content` fails on any
+other empty alt text. The EPUB, Canvas and Word files keep the page's alt text (Word writes
+no description for decoration), and Listen skips decoration and says "Image, not converted:
+Figure not described" for the rest.
 
 ## Figure images in the student file (UX review MF23)
 
@@ -969,17 +997,30 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
-### One h1 (T3-13)
+### One h1 (T3-13, SW6c)
 
-A file should have one top-level heading. A slide deck has one per slide, so when the
-repaired outline would write two or more `<h1>` the assembler writes the document's title
-as the only `<h1>` (the title students hear, see "One self-contained file": the one the
-instructor typed on the job page, else the PDF's title without its section number) and
-moves every heading one level down, so the slide titles are `<h2>` (capped at `<h6>`). A
-file with at most one `<h1>` is written as before. `assemble.title_shift` decides it from the
-repaired outline, for the renderer and for tests. The move comes after the repair above,
-so the review screen's levels (`would_write`, "In the document: level N") are the levels
-before it: in a slide deck its numbers are one less than the file's. The "About this
+A file has exactly one `<h1>`, and the title is said once (`assemble.title_plan`, one rule
+for the page, the contents list, the EPUB, the Word file and Listen, which all read the
+page). The title is the one the instructor typed on the job page, else the PDF's title as
+`suggested_title` gives it. Two titles are the same when they match with case folded,
+punctuation and spaces collapsed and the section number removed ("2.3 Kinematics" and
+"KINEMATICS." are one title, `assemble.same_title`).
+
+- The title is the same as the first top-level heading of the repaired outline: that
+  heading is the `<h1>`, not moved, and nothing is added.
+- Otherwise, when the outline has exactly one top-level heading, it is the `<h1>` (a title
+  the instructor typed is never replaced by a heading: it is added as below).
+- Otherwise (no top-level heading, or several and none the title) the title is written as
+  the `<h1>` and the headings move down under it, so the shallowest is an `<h2>` (capped at
+  `<h6>`): a slide deck's slide titles are `<h2>`. When the H1 is a heading of a slide deck
+  (several top-level headings), its own section stays where it is and the rest move down.
+
+`<title>` is always the H1's text. The stored levels never change: the move comes after the
+repair above, so the review screen's levels (`would_write`, "In the document: level N") are
+the levels before it: in a slide deck its numbers are one less than the file's. Word drops
+pandoc's title paragraph when it is the same title as the first heading
+(`export_docx._drop_title_paragraph`, the same comparison), so a title that differs only in
+case is not read twice there either. The "About this
 version" title is a labeled paragraph, not a heading: the `<footer>` is named by it
 (`aria-labelledby`), so a screen reader user reaches it as a landmark, and it is not a
 section of the document's outline.
@@ -1089,6 +1130,7 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 | `html.heading_order` | `heading_skip` |
 | `html.heading_text` | `empty_heading` |
 | `html.img_alt` | `img_missing_alt` (`alt=""` is allowed) |
+| `html.img_alt_content` | `empty_alt_content` (`alt=""` outside `class="decorative"`, since 2026-11-11) |
 | `html.unique_ids` | `duplicate_id` |
 | `html.list_structure` | `list_structure` (an `<li>` outside `<ul>`/`<ol>`, or an element other than `<li>` or text directly in one; axe's `list` and `listitem` rules) |
 | `html.math_display` | `math_missing_display` (warning) |

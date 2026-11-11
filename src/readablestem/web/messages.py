@@ -223,6 +223,13 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "description), so check before hiding it from screen readers.",
     ("figure.second_check", "second_check_mismatch"): "A second automated check found a "
     "possible mismatch between the alt text and the image; worth a look.",
+    # Decoration with evidence only (pipeline.decoration, WS6.4)
+    ("figure.decoration", "decoration_unproven"): "Only the model says this figure is "
+    "decoration: it is not repeated on the pages and is not a rule, so students hear "
+    '"Figure not described" until you decide. Describe it, or accept that it is decoration.',
+    ("figure.decoration", "decoration_by_rule"): "The figure could not be read, and it is "
+    "decoration by its shape or because it repeats on the pages, so screen readers skip it; "
+    "worth a look.",
     # Tables (pipeline.table_step)
     ("table.grid", "grid_invalid"): "The rebuilt table's cells overlap, leave gaps or reach "
     "outside the table, so check its rows and columns against the image.",
@@ -313,6 +320,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "level 1 straight to level 3).",
     ("html.heading_text", "empty_heading"): "A heading in the document is empty.",
     ("html.img_alt", "img_missing_alt"): "An image in the document has no alt attribute.",
+    ("html.img_alt_content", "empty_alt_content"): "An image in the document has empty alt "
+    "text but is not marked as decoration, so screen readers skip something that may carry "
+    "content.",
     ("html.unique_ids", "duplicate_id"): "Two elements in the document share an id, which can "
     "break links and confuse screen readers.",
     ("html.list_structure", "list_structure"): "A list in the document is malformed (an empty "

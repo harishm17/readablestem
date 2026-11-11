@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: one H1, and no empty alt text on content (branch fix/one-h1-no-empty-alt)
+
+- The student page has exactly one `<h1>` and says its title once (SW6c, F-255, F-568). When
+  the title is the first top-level heading (case, punctuation, spacing and the section number
+  aside), that heading is the H1 and nothing is added; a single top-level heading is the H1;
+  otherwise the title is added as the H1 and the headings move down under it. `<title>` is the
+  H1's text, so the job page's "title students hear", the contents list, the EPUB, Listen and
+  the Word file (which drops its title paragraph on the same comparison) all agree. Stored
+  heading levels do not change.
+- A picture gets empty alt text only as decoration with evidence (WS6.4, F-246): it repeats on
+  the pages, it is a rule by its shape, or a person decided. A figure only the model calls
+  decorative is a required decision, written as "Figure not described" (the words for every
+  figure without a description, before "Figure without a description") in the page, EPUB,
+  Canvas, Word and Listen until someone decides; a figure whose reading failed is decoration
+  when the evidence says so. The evidence is stored on the figure (`FigureFix.decoration`), and
+  accepting a decorative figure or ticking "Decorative" stores the reviewer as its evidence.
+  The new output check `html.img_alt_content` fails on empty alt text outside decoration, and
+  the EPUB's `alternativeText` claim now allows decoration.
+- `assemble.RENDER_VERSION` is 5, so pages made before are made again when next opened; a
+  stored figure that was decoration without evidence becomes a decision then.
+  `PIPELINE_VERSION` stays 0.5.11 (the same unreleased wave; its comment says what moved).
+
 ## Unreleased: what is sent to a model, from one list (branch feat/sent-material)
 
 - `web.recipients.sent_material(settings)` lists each kind of material sent to a model: the
