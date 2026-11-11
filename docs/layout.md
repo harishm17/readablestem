@@ -1537,6 +1537,13 @@ The decisions in the rules, with the measured values next to each threshold in t
   groups are the same ones (`_cluster_scan` is the plain version it is tested against);
   on a page of 40,000 strokes it took 38 s and now takes under a second.
 
+**A page that raises** does not stop the document. If reading one page raises (a bug), that page
+is kept as its image with the reason `page_read_failed` (a required decision, the words "This page
+could not be read"), and every other page is read. The log has the page number and the error's
+class and place, never its message or any text of the page. A spend cap, a cancel, a configuration
+error and a refusal of the file (`LayoutError`) are not taken for a page that raised, and a
+document in which every page it tried to read raises still fails.
+
 **The safety net** (C1.1, independent of the page types): after layout, a page keeps its
 page image, with a decision (`unread_page`), when something painted on it was read into
 nothing. The elements read from it stay; the image comes after them. It fires when:
