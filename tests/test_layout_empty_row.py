@@ -17,6 +17,7 @@ import pymupdf
 import pytest
 
 from readablestem.config import Settings
+from readablestem.core import uid
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import UnknownModelError
@@ -121,15 +122,30 @@ def _make_raise(monkeypatch, stage: str, error: Exception, *, page: int | None =
     return page
 
 
+def _convert(pdf: bytes):
+    client = FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS))
+    return convert_pdf(pdf, settings=Settings(_env_file=None), client=client).result  # type: ignore[call-arg]
+
+
+def _ids(result, *, without: int) -> list[tuple[str, str]]:
+    """Each element's positional id and stable id (`core.uid`), off the page `without`."""
+    uids = uid.assign(result).by_id
+    return [(e.id, uids[e.id]) for e in result.elements if e.page != without]
+
+
+@pytest.fixture(scope="module")
+def unbroken():
+    """The same document converted with no page raising."""
+    return _convert(_document())
+
+
 @pytest.mark.parametrize("stage", STAGES)
 def test_a_page_that_raises_in_any_step_is_its_picture_and_a_notice_and_the_others_are_read(
-    stage, monkeypatch, caplog
+    stage, monkeypatch, caplog, unbroken
 ):
     bad = _make_raise(monkeypatch, stage, KeyError(SENTENCE))  # a bug that quotes the page
-    client = FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS))
     with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.layout"):
-        output = convert_pdf(_document(), settings=Settings(_env_file=None), client=client)  # type: ignore[call-arg]
-    result = output.result
+        result = _convert(_document())
     # Two pages read, one kept as its picture with a required decision, one notice.
     (fix,) = [f for f in result.fixes if f.reason == "page_read_failed"]
     assert fix.review == "required"
@@ -141,6 +157,9 @@ def test_a_page_that_raises_in_any_step_is_its_picture_and_a_notice_and_the_othe
         read = f"Page {page + 1}." in result.html
         # (the safety net only adds the picture beside a page: what was read from it stays)
         assert read == (page != bad or stage == "safety_net")
+    # The pages that were read keep the ids, positional and stable, they have when no page
+    # raises: taking the failed page's elements back renames nothing around it.
+    assert _ids(result, without=bad) == _ids(unbroken, without=bad)
     # What is logged says the page and the class of the error, never the page's words.
     assert (
         f"page {bad + 1}" in caplog.text
