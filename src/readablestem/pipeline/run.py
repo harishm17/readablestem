@@ -701,11 +701,19 @@ def _text_pass(
     options: ConversionOptions,
     tracer: Tracer,
 ) -> text_pass.TextPassResult:
-    """Links, cross-references, language and (with FEATURE_COLOUR) colour runs on the
-    elements, before any step (`text_pass.apply`; it never raises)."""
-    with _span(tracer, "text", elements=len(elements), colour=options.colour) as span:
+    """Links, cross-references, language, (with FEATURE_COLOUR) colour runs and (with
+    CONTENT_RUNS; counted either way) struck runs on the elements, before any step
+    (`text_pass.apply`; it never raises)."""
+    with _span(
+        tracer, "text", elements=len(elements), colour=options.colour, runs=options.content_runs
+    ) as span:
         text = text_pass.apply(
-            pdf_bytes, elements, pages=pages, layout_lang=layout_lang, colour=options.colour
+            pdf_bytes,
+            elements,
+            pages=pages,
+            layout_lang=layout_lang,
+            colour=options.colour,
+            runs=options.content_runs,
         )
         _annotate(span, lang_source=text.lang_source, **text.counts())
     return text

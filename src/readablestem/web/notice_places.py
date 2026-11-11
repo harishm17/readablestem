@@ -6,8 +6,9 @@ who needs to know *which* link or figure it is about and to be taken to it. This
 that out again each time from the result as it is now:
 
 - `names`: the specific things it is about. For a link whose text says nothing on its own,
-  the text of each such link in the paragraph ("click here"); for a figure, table or page,
-  its name in the review ("Figure 2", "Table 3", "Page 4");
+  the text of each such link in the paragraph ("click here"); for struck text, the struck
+  words ("October 3"); for a figure, table or page, its name in the review ("Figure 2",
+  "Table 3", "Page 4");
 - `snippet`: for a notice about a paragraph, its first words, so two notices on one page
   are told apart;
 - `query`: the Split View address of its place (the part after `/jobs/{id}/review?`): the
@@ -23,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import quote, urlencode
 
+from readablestem.core import inline
 from readablestem.core.types import DocumentResult, Element, Fix, Kind, Notice
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.text_pass import context_words, unclear_link_text, visible_text
@@ -39,6 +41,7 @@ NAMES_LEAD = {
     "colour_only": "The figure",
     "long_description_missing": "The figure",
     "table_not_rebuilt": "The table",
+    "struck_text": "The struck text",
 }
 
 
@@ -94,6 +97,17 @@ def unclear_links(element: Element) -> list[str]:
     return found
 
 
+def struck_words(element: Element) -> list[str]:
+    """The words of each struck run of the element (`Element.runs`, "deleted")."""
+    text = element.text or ""
+    found = []
+    for run in inline.spans(element).runs:
+        shown = visible_text(text, run.start, run.end) if run.kind == "deleted" else ""
+        if shown:
+            found.append(_shorten(shown, NAME_CHARS))
+    return found
+
+
 def place_of(
     notice: Notice,
     elements: dict[str, Element],
@@ -115,6 +129,8 @@ def place_of(
     names: list[str] = []
     if notice.code == "link_text_unclear":
         names = unclear_links(element)[:MAX_NAMES]
+    elif notice.code == "struck_text":
+        names = struck_words(element)[:MAX_NAMES]
     snippet = _shorten(readable(element.text or ""), SNIPPET_CHARS)
     query = urlencode({"page": shown, "note": key}) if shown is not None else f"note={quote(key)}"
     return Place(notice, names=tuple(names), snippet=snippet, query=query, key=key)

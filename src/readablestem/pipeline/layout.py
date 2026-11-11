@@ -11247,6 +11247,7 @@ class Glyph:
     c: str
     bbox: BBox  # display coordinates, the frame of `Element.bbox`
     rgb: tuple[int, int, int]  # the span's fill colour, sRGB
+    size: float = 0.0  # the span's font size in points (0: not known)
 
 
 def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
@@ -11269,8 +11270,67 @@ def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
                     continue
                 colour = int(span.get("color") or 0) & 0xFFFFFF
                 rgb = ((colour >> 16) & 0xFF, (colour >> 8) & 0xFF, colour & 0xFF)
+                size = float(span.get("size") or 0.0)
                 for ch in span["chars"]:
                     c = ch["c"].translate(_TEXT_MAP)
                     if c and not c.isspace():
-                        glyphs.append(Glyph(c[0], display.box(ch["bbox"]), rgb))
+                        glyphs.append(Glyph(c[0], display.box(ch["bbox"]), rgb, size))
     return glyphs
+
+
+# A mark that may strike text through (`page_strikes`): a horizontal line or a filled bar at
+# most this thick. The text pass decides, glyph by glyph, whether it crosses text where a
+# strikeout does (`text_pass.struck_glyphs`).
+STRIKE_MAX_PT = 3.0
+
+
+@dataclass(frozen=True, slots=True)
+class Strike:
+    """A thin horizontal mark on a page (`annotation` False: drawn; its box is the line with
+    its thickness), or the area of a StrikeOut annotation (`annotation` True: its box holds
+    the struck glyphs). Display coordinates, like `Glyph.bbox`."""
+
+    bbox: BBox
+    annotation: bool = False
+
+
+def page_strikes(page: pymupdf.Page) -> list[Strike]:
+    """The marks on `page` that may strike text through, for the text pass: every visible
+    horizontal line (its box is the stroke's width around it) or filled bar no thicker than
+    `STRIKE_MAX_PT`, and the quads of every StrikeOut annotation. A page too complex to read
+    its drawings (`page_type.too_complex`) gives its annotations only. The caller holds
+    `_LOCK`."""
+    display = _Display.of(page)
+    marks: list[Strike] = []
+    for annot in page.annots(types=[pymupdf.PDF_ANNOT_STRIKE_OUT]) or ():
+        points = list(annot.vertices or ())
+        for i in range(0, len(points) - 3, 4):  # four points per quad, unrotated page space
+            xs = [float(x) for x, _ in points[i : i + 4]]
+            ys = [float(y) for _, y in points[i : i + 4]]
+            marks.append(Strike(display.box((min(xs), min(ys), max(xs), max(ys))), True))
+    drawings = page.get_cdrawings()
+    if page_type.too_complex(drawings):
+        return marks
+    seen = page_type.paint_visibility(drawings)
+    for drawing, (filled, stroked) in zip(drawings, seen, strict=True):
+        items = drawing.get("items") or []
+        if any(item[0] == "c" for item in items):
+            continue  # a curve: not a rule
+        x0, y0, x1, y1 = (float(v) for v in drawing["rect"])
+        if filled and y1 - y0 <= STRIKE_MAX_PT and x1 - x0 >= 2 * max(y1 - y0, 0.5):
+            marks.append(Strike(display.box((x0, y0, x1, y1))))
+            continue
+        if not stroked:
+            continue
+        half = max(float(drawing.get("width") or 1.0), 0.1) / 2
+        if 2 * half > STRIKE_MAX_PT:
+            continue
+        for item in items:
+            if item[0] != "l":
+                continue
+            (px, py), (qx, qy) = item[1], item[2]
+            if abs(py - qy) <= 0.25 and abs(px - qx) >= 2.0:
+                y = (py + qy) / 2
+                box = (min(px, qx), y - half, max(px, qx), y + half)
+                marks.append(Strike(display.box(box)))
+    return marks

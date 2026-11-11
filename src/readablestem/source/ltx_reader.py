@@ -38,6 +38,7 @@ from xml.etree.ElementTree import Element as Node
 
 import defusedxml.ElementTree as SafeET
 
+from readablestem.core import inline
 from readablestem.core.types import (
     Check,
     Element,
@@ -47,6 +48,7 @@ from readablestem.core.types import (
     Kind,
     Link,
     Notice,
+    Run,
     ScriptRun,
     SourceFigure,
     SourceMark,
@@ -72,6 +74,8 @@ _SPACE = re.compile("[ \\t\\r\\n\\u00a0]+")
 _LEVEL = re.compile(r"^h([1-6])$")
 # What a step of a frame does not show (`\\pause`, `\\only`, `\\visible`).
 HIDDEN = frozenset({"ltx_covered", "ltx_invisible"})
+# Struck text (ulem's `\\sout` and `\\xout`): kept and marked as deleted (`core.types.Run`).
+STRUCK = frozenset({"ltx_ulem_sout", "ltx_ulem_xout"})
 _SECTION_TITLES = {
     "ltx_title_section",
     "ltx_title_subsection",
@@ -349,7 +353,8 @@ class _Reader:
     ) -> tuple[str, list[tuple[str, int, int, object]]]:
         """The text of `node` with an inline marker where each formula is (formulas become
         equation elements whose parent is `owner`; without an owner their TeX is written in
-        the text), and the spans (links, raised and lowered runs) as (kind, start, end, data)."""
+        the text), and the spans (links, raised and lowered runs, struck text) as (kind,
+        start, end, data)."""
         parts: list[str] = []
         spans: list[tuple[str, int, int, object]] = []
         length = [0]
@@ -408,6 +413,8 @@ class _Reader:
                         spans.append(("uri", start, length[0], href))
                 elif tag in ("sup", "sub") and length[0] > start:
                     spans.append((tag, start, length[0], None))
+                if classes & STRUCK and length[0] > start:
+                    spans.append(("deleted", start, length[0], None))
 
         if node.text:
             emit(_SPACE.sub(" ", node.text))
@@ -439,9 +446,11 @@ class _Reader:
                 continue
             try:
                 if kind == "uri":
-                    element.links.append(Link(kind="uri", start=start, end=end, href=str(extra)))
+                    inline.add(element, Link(kind="uri", start=start, end=end, href=str(extra)))
                 elif kind in ("sup", "sub"):
-                    element.script_runs.append(ScriptRun(start=start, end=end, kind=kind))
+                    inline.add(element, ScriptRun(start=start, end=end, kind=kind))
+                elif kind == "deleted":
+                    inline.add(element, Run(start=start, end=end, kind="deleted"))
             except ValueError:
                 continue
 

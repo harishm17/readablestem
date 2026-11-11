@@ -487,6 +487,20 @@ class ScriptRun(_Span):
     kind: Literal["sup", "sub"]
 
 
+# What a run of an element's text is marked as (`Run`). One kind so far: "deleted", text the
+# page shows struck through (a cancelled date), written as `<del>` with the words "deleted:"
+# and "end deleted" around it (`pipeline.inline_text`). Later kinds (strong, emphasis, blank,
+# ...) are new values here, not new fields.
+RunKind = Literal["deleted"]
+
+
+class Run(_Span):
+    """A run of an element's `text` with a meaning of its own (`RunKind`). The characters
+    stay in `text` as they were read: a struck date is kept and marked, never removed."""
+
+    kind: RunKind
+
+
 class HeadingFix(BaseModel):
     level: int = Field(ge=1, le=6)
     text: str
@@ -702,6 +716,11 @@ class Element(BaseModel):
     colour_runs: list[ColourRun] = Field(default_factory=list)
     # Raised and lowered runs of the text (`ScriptRun`), written as <sup> and <sub>.
     script_runs: list[ScriptRun] = Field(default_factory=list)
+    # Marked runs of the text (`Run`: struck text). Left out of the JSON when empty, so an
+    # element without runs is stored, cached and rendered exactly as before runs existed.
+    # Every place that moves, keeps or writes the spans of an element goes through
+    # `core.inline`, so no span is dropped by one place that forgot its field.
+    runs: list[Run] = Field(default_factory=list, exclude_if=lambda v: not v)
     # BCP 47 language of this passage, only when it differs from the document's
     # (`DocumentResult.lang`); written as a `lang` attribute on its block.
     lang: str | None = None
@@ -834,6 +853,7 @@ NOTICE_CODES = frozenset(
         "lang_assumed",  # no language in the PDF and none detected: the default is used
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
+        "struck_text",  # text the page shows struck through, kept and marked as deleted
         # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text
         # and page types"). The first four have a decision: the page's (or region's)
         # FAILED figure fix with the same reason, grouped by reason.
@@ -1263,6 +1283,8 @@ class ConversionOptions(BaseModel):
     tables: bool = False
     long_descriptions: bool = False
     colour: bool = False
+    # Write struck runs (CONTENT_RUNS); off, they are counted, not written.
+    content_runs: bool = False
     notation_memory: bool = False
     # A page math pass places each page's equations (ADR 0006).
     page_math: bool = False
@@ -1284,6 +1306,7 @@ class ConversionOptions(BaseModel):
             tables=settings.feature_tables,
             long_descriptions=settings.feature_long_descriptions,
             colour=settings.feature_colour,
+            content_runs=settings.content_runs,
             notation_memory=settings.feature_notation_memory,
             page_math=settings.feature_page_math,
             page_witness=settings.feature_page_witness,

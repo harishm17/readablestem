@@ -463,6 +463,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
     "could not be kept and is written on the line, so check it reads right.",
+    "struck_text": "Text struck through on the page is kept, shown struck through and read "
+    "out as deleted: if students no longer need it, take it out with the page tools.",
     "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
     "email address.",
     "link_text_unclear": "A link's text does not say where it goes (for example, click "
