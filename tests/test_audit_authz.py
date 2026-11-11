@@ -32,6 +32,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/"): PUBLIC,
     ("GET", "/demo"): PUBLIC,
     ("GET", "/demo/listen"): PUBLIC,  # the stored demo's listening transcript; no user data
+    ("GET", "/demo/source.pdf"): PUBLIC,  # page 3 of the demo's OpenStax source, CC BY 4.0
     ("GET", "/style"): PUBLIC,
     ("GET", "/privacy"): PUBLIC,
     ("GET", "/terms"): PUBLIC,
