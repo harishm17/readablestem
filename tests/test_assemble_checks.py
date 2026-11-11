@@ -126,6 +126,7 @@ def test_a_character_that_is_not_text_never_reaches_any_output():
     paragraph.text = "Force \ue000 mass, and \ufffd here. " + (paragraph.text or "")
     html = render_html(
         title="Forces \uf0b7",
+        title_set=True,  # written as the H1, not given way to the one top heading (SW6c)
         lang="en",
         elements=elements,
         fixes=[Fix.model_validate(f) for f in data["fixes"]],
@@ -134,7 +135,7 @@ def test_a_character_that_is_not_text_never_reaches_any_output():
     )
     assert output_chars.count(html) == 0
     body = html.split("<main", 1)[1]
-    assert body.count(output_chars.UNREADABLE) == 2
+    assert body.count(output_chars.UNREADABLE) == 3  # the paragraph's two and the H1's
     assert f"<title>Forces {output_chars.UNREADABLE}" in html
 
     (check,) = [c for c in static_checks(html) if c.name == "html.characters"]

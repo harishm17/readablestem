@@ -956,15 +956,7 @@ def suggested_title(result: DocumentResult) -> str:
     file's `<title>` is, so the field starts with what the file already says."""
     from readablestem.pipeline import assemble
 
-    first = _first_fixes(result)
-    headings = [
-        text
-        for element in sorted(result.elements, key=lambda e: e.order)
-        if element.kind is Kind.HEADING
-        for level, text in [assemble.heading_parts(element, first.get(element.id))]
-        if level is not None
-    ]
-    return assemble.suggested_title(result.title, headings)
+    return assemble.title_plan(result.elements, result.fixes, title=result.title).text
 
 
 def found_sentence(result: DocumentResult) -> str:

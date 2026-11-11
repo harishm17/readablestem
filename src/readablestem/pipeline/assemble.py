@@ -689,22 +689,82 @@ def outline_before(elements: list[Element], fixes: list[Fix], element_id: str) -
     return outline
 
 
-def title_shift(elements: list[Element], fixes: list[Fix]) -> int:
-    """How many levels `render_html` moves every heading down (T3-13): 1 when the
-    repaired outline has two or more top-level headings (a slide deck has one per slide),
-    so the document's title can be the one `<h1>` and the slide titles are `<h2>`; else 0.
-    Read from the same headings, in the same order, as the renderer writes them."""
+def title_key(text: str) -> str:
+    """A title as the one-H1 rule compares it (SW6c): the way `suggested_title` cleans a
+    title, then case folded, with punctuation and blanks collapsed, so "1 Kinematics",
+    "KINEMATICS" and "Kinematics." are one title. "" for no words."""
+    if not text.strip():
+        return ""
+    cleaned = strip_section_number(" ".join(INLINE_MARKER_RE.sub(" ", text).split()))
+    return " ".join(re.findall(r"\w+", cleaned.casefold()))
+
+
+def same_title(a: str, b: str) -> bool:
+    """Two titles that a student would hear as the same words (`title_key`)."""
+    key = title_key(a)
+    return bool(key) and key == title_key(b)
+
+
+@dataclass(frozen=True)
+class TitlePlan:
+    """How `render_html` writes the document's one `<h1>` (SW6c). `text` is the H1's text and
+    the page's `<title>`. `heading_id` is the heading written as the H1, or None when the
+    title is added above the headings. Every other heading is written `shift` levels below
+    the outline repair's level (`Outline`), except the ones in `unshifted`: the H1 heading
+    and the headings of its own section, which already sit under it. Stored levels never
+    change; this is only what is written."""
+
+    text: str
+    heading_id: str | None
+    shift: int
+    unshifted: frozenset[str] = frozenset()
+
+    def level(self, element_id: str, written: int) -> int:
+        """The `<hN>` of a heading the outline repair writes at `written`."""
+        offset = 0 if element_id in self.unshifted else self.shift
+        return max(1, min(6, written + offset))
+
+
+def title_plan(
+    elements: list[Element], fixes: list[Fix], *, title: str | None, title_set: bool = False
+) -> TitlePlan:
+    """The one-H1 rule (SW6c), read from the same headings, in the same order, as the
+    renderer writes them (the first fix for an id wins).
+
+    The title is the instructor's (`title_set`, used as typed) or `suggested_title` of the
+    PDF's. When it is the same title (`same_title`) as the first top-level heading, that
+    heading is the H1 and nothing is added. When it is not and the outline has exactly one
+    top-level heading, that heading is the H1, unless the instructor chose the title: a
+    chosen title is never replaced. Otherwise (no top-level heading, several, or a chosen
+    title) the title is added as the H1 and the headings move down under it, so the
+    shallowest one is an `<h2>`."""
     first: dict[str, Fix] = {}
     for fix in fixes:
         first.setdefault(fix.element_id, fix)
     outline = Outline()
-    tops = 0
+    written: list[tuple[str, int, str]] = []  # (element id, level written, text)
     for element in sorted(elements, key=lambda e: e.order):
         if element.kind is Kind.HEADING:
-            level, _ = heading_parts(element, first.get(element.id))
+            level, text = heading_parts(element, first.get(element.id))
             if level is not None:
-                tops += outline.write(level) == 1
-    return 1 if tops >= 2 else 0
+                written.append((element.id, outline.write(level), text))
+    tops = [entry for entry in written if entry[1] == 1]
+    chosen = _clean_title(title) if title_set else suggested_title(title, [t for *_, t in written])
+    if tops and (same_title(chosen, tops[0][2]) or (len(tops) == 1 and not title_set)):
+        h1 = tops[0]
+        section = {h1[0]}
+        for element_id, level, _ in written[written.index(h1) + 1 :]:
+            if level == 1:
+                break
+            section.add(element_id)
+        return TitlePlan(
+            text=_clean_title(h1[2]),
+            heading_id=h1[0],
+            shift=1 if len(tops) > 1 else 0,
+            unshifted=frozenset(section),
+        )
+    shift = 2 - min((level for _, level, _ in written), default=2)
+    return TitlePlan(text=chosen, heading_id=None, shift=shift)
 
 
 # --------------------------------------------------------------------------- renderer
@@ -725,9 +785,8 @@ class _Renderer:
     styles: dict[str, str] = field(default_factory=dict)
     # Write the stored speech as each <math>'s alttext (Settings.mathml_alttext).
     math_alttext: bool = False
-    # Levels added to every heading written (T3-13): 1 when the document has several
-    # top-level headings (slides), so its title can be the one h1 above them.
-    demote: int = 0
+    # Where each heading is written under the document's one H1 (SW6c, `title_plan`).
+    titles: TitlePlan = field(default_factory=lambda: TitlePlan(DEFAULT_TITLE, None, 0))
     # The scale an unconverted equation's picture is shown at (T3-15).
     scale_of: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
     # Navigation (`pipeline.navigation`): the headings as written (for the contents list),
@@ -1073,7 +1132,7 @@ class _Renderer:
                 attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
-        level = min(6, self.outline.write(level) + self.demote)
+        level = self.titles.level(element.id, self.outline.write(level))
         # Every heading has an id, so the contents list can link to it: the pipeline's own
         # (`p3-e7`, the same on every render of a result), else the next free `heading-N`.
         anchor = self.claim_id(element.id) or self.fresh_id("heading")
@@ -1690,11 +1749,11 @@ def render_html(
     answers are placeholders). `checked_on` is the day the instructor made the last
     review decision: the student note gives it once no decision is open (the review
     screen passes it when it re-renders the file; the pipeline never does).
-    `title_set`: `title` is the one the instructor chose (T1-7): used as typed, and written
-    as the top-level heading too when the body has none. Otherwise the title is
-    `suggested_title` of the PDF's. `contact`: the instructor's contact line for the note
-    after `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
-    `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
+    `title_set`: `title` is the one the instructor chose (T1-7), used as typed. Otherwise the
+    title is `suggested_title` of the PDF's. The page has exactly one `<h1>` and its
+    `<title>` is the H1's text (`title_plan`, SW6c). `contact`: the instructor's contact
+    line for the note after `<main>` (T1-17). `math_alttext`: write each equation's stored
+    speech as the `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
     here, and the student note says so. `page_labels`: the printed label of each 0-based page
     that has one (`DocumentResult.page_labels`), for the page markers. A page without one says its
@@ -1716,13 +1775,13 @@ def render_html(
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
 
-    shift = title_shift(ordered, fixes)
+    titles = title_plan(ordered, fixes, title=title, title_set=title_set)
     renderer = _Renderer(
         fixes=first_fix,
         crops=crops,
         equations=equations,
         math_alttext=math_alttext,
-        demote=shift,
+        titles=titles,
         scale_of=equation_scale.scaler(ordered),
         page_labels=page_labels or {},
         pdf_pages=pdf_pages or {},
@@ -1760,15 +1819,9 @@ def render_html(
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
     )
     top = _checked_notice(summary, renderer.used_ids)
-    heading_texts = [
-        text
-        for e in ordered
-        if e.kind is Kind.HEADING
-        for level, text in [heading_parts(e, first_fix.get(e.id))]
-        if level is not None
-    ]
-    page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
-    if (title_set or shift) and not any("<h1" in part for part in body):
+    # Exactly one H1 (SW6c): the title, added above the headings, or the heading that is it.
+    page_title = titles.text
+    if titles.heading_id is None:
         body = [f"<h1>{_escape(page_title)}</h1>", *body]
     # The PDF's own contents page is the contents list; a second one would be one too many.
     printed_contents = any(navigation.PRINTED_CONTENTS_REASON in e.reasons for e in ordered)

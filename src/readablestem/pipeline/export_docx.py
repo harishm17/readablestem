@@ -61,7 +61,7 @@ from defusedxml import ElementTree as SafeET
 
 from readablestem.core.childenv import child_env
 from readablestem.core.images import open_within_budget
-from readablestem.pipeline import output_chars
+from readablestem.pipeline import assemble, output_chars
 from readablestem.pipeline.export_canvas import _DATA_URI, _find, _Node, _parse, _write
 from readablestem.pipeline.export_epub import _HEADING, _LANGUAGE, _sanitise, _text
 
@@ -329,13 +329,15 @@ def _style(paragraph: ET.Element) -> str:
 
 def _drop_title_paragraph(body: ET.Element, title: str) -> None:
     """Pandoc writes the page title as a Title paragraph before the content. When the first
-    heading says the same thing, the line would read twice; the document's title property
+    heading is the same title (`assemble.same_title`: case, spacing, punctuation and a
+    section number aside, F-568), the line would read twice, so the Title paragraph goes and
+    the heading, the page's one H1 (SW6c), stays; the document's title property
     (`docProps/core.xml`) keeps the title either way."""
     paragraphs = [p for p in body if p.tag == f"{{{W}}}p"]
     if not paragraphs or _style(paragraphs[0]) != "Title":
         return
     first = next((p for p in paragraphs[1:] if _style(p).startswith("Heading")), None)
-    if first is not None and _paragraph_text(first) == _normal(title):
+    if first is not None and assemble.same_title(_paragraph_text(first), title):
         body.remove(paragraphs[0])
 
 
