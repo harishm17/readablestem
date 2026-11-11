@@ -23,6 +23,7 @@ from readablestem.core.types import (
     Element,
     Kind,
     Link,
+    Run,
     Status,
 )
 from readablestem.models.fake import FakeVisionClient
@@ -165,6 +166,8 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         Link(kind="uri", start=start, end=start + 5, href="https://example.org/notes"),
         Link(kind="uri", start=0, end=7, href="https://example.org/discuss"),
     ]
+    struck = paragraph.text.index("scalars")  # struck through on the page (F-509)
+    paragraph.runs = [Run(start=struck, end=struck + 7, kind="deleted")]
     env = WebEnv(tmp_path)
     env.converter.output = output
     with env.running() as client:
@@ -186,11 +189,18 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         assert [k.href for k in kept.links] == ["https://example.org/notes"]
         page = client.get(f"/jobs/{env.job_id}/review?page=1&tools=1").text
         assert "1 link was taken off" in unescape(page)
-        # The words of a link changed: that link goes.
-        done = edit_post(
-            env, PLAIN, action="text", text=(kept.text or "").replace("notes", "pages")
-        )
-        assert done.status_code == 303 and element(env, PLAIN).links == []
+        # The struck word did not change: it is still marked, where it now is.
+        text = kept.text or ""
+        assert [(r.start, r.end) for r in kept.runs] == [
+            (text.index("scalars"), text.index("scalars") + 7)
+        ]
+        # The words of a link and the struck word changed: both go, and both are counted.
+        changed = text.replace("notes", "pages").replace("scalars", "numbers")
+        done = edit_post(env, PLAIN, action="text", text=changed)
+        assert done.status_code == 303
+        assert element(env, PLAIN).links == [] and element(env, PLAIN).runs == []
+        page = client.get(f"/jobs/{env.job_id}/review?page=1&tools=1").text
+        assert "1 link and 1 struck-text mark were taken off" in unescape(page)
 
 
 def test_a_glossary_entry_loses_its_term_when_the_term_is_changed(edits):

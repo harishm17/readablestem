@@ -20,6 +20,7 @@ from readablestem.core.types import (
     Kind,
     Link,
     Notice,
+    Run,
     ScriptRun,
     Status,
     inline_marker,
@@ -63,7 +64,7 @@ def part_result(
                     heading=HeadingFix(level=1 if page == 0 else 2, text=f"{tag} heading {n}")),
             )  # fmt: skip
         marker = inline_marker(f"p{n}-e2")
-        text = f"{tag} speed {marker} then a link here and H2O end"
+        text = f"{tag} speed {marker} then a link here and H2O end, not 3 but 4"
         start = text.index("a link")
         add(
             Element(id=f"p{n}-e1", kind=Kind.PARAGRAPH, page=page, bbox=(0, 1, 1, 2), order=0,
@@ -71,7 +72,9 @@ def part_result(
                     links=[Link(start=start, end=start + 6, kind="internal",
                                 target_id=f"p{n}-e3")],
                     script_runs=[ScriptRun(start=text.index("H2O") + 1,
-                                           end=text.index("H2O") + 2, kind="sub")]),
+                                           end=text.index("H2O") + 2, kind="sub")],
+                    runs=[Run(start=text.index("3"), end=text.index("3") + 1,
+                              kind="deleted")]),
         )  # fmt: skip
         add(
             Element(id=f"p{n}-e2", kind=Kind.EQUATION, page=page, bbox=(0, 1, 1, 2), order=0,
@@ -149,6 +152,8 @@ def test_equation_markers_and_offsets_are_moved_together():
     assert text[link.start : link.end] == "a link" and link.target_id == "p3-e3"
     [script] = paragraph.script_runs
     assert text[script.start : script.end] == "2"  # the 2 of H2O
+    [struck] = paragraph.runs
+    assert (text[struck.start : struck.end], struck.kind) == ("3", "deleted")
     assert paragraph.parent_id is None
     inline = next(e for e in joined.elements if e.id == "p3-e2")
     assert inline.parent_id == "p3-e1" and inline.page == 2

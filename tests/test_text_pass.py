@@ -18,7 +18,7 @@ from readablestem.core.types import (
     Notice,
     inline_marker,
 )
-from readablestem.pipeline import language, text_pass
+from readablestem.pipeline import language, layout, text_pass
 from readablestem.pipeline.layout import Glyph
 from readablestem.pipeline.text_pass import (
     PdfLink,
@@ -423,6 +423,59 @@ def test_a_language_name_or_tag_is_accepted_and_anything_else_refused():
     for bad in ("", "Klingonese", "x-none", 'en" onload="'):
         with pytest.raises(ValueError):
             set_document_language(stored(), bad)
+
+
+# --------------------------------------------------------------------------- struck text
+
+
+def struck_page() -> bytes:
+    """A syllabus page: a date struck through by a drawn line, a word struck by a StrikeOut
+    annotation, an underlined word and a rule under a blank to fill in."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    lines = {
+        100: "The midterm is on October 3 October 10 in room 2-190.",
+        160: "Lab 3 is cancelled and moved to Friday.",
+        220: "You must not bring a phone to the exam.",
+        280: "Name:",
+    }
+    for y, words in lines.items():
+        page.insert_text((72, y), words, fontsize=12)
+
+    def under(y: float, part: str) -> pymupdf.Rect:
+        return page.search_for(part, clip=pymupdf.Rect(0, y - 14, 612, y + 4))[0]
+
+    date = under(100, "October 3")
+    page.draw_line((date.x0, 100 - 3.6), (date.x1, 100 - 3.6), width=0.6)  # through it
+    page.add_strikeout_annot(under(160, "cancelled"))
+    word = under(220, "not")
+    page.draw_line((word.x0, 220 + 1.5), (word.x1, 220 + 1.5), width=0.6)  # under it
+    name = under(280, "Name:")
+    page.draw_line((name.x1 + 6, 280 + 1), (name.x1 + 150, 280 + 1), width=0.6)  # a blank
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
+    # F-509: a cancelled date was read as live text, so a student heard both dates.
+    pdf = struck_page()
+    elements = layout.analyze(pdf).elements
+    result = text_pass.apply(pdf, elements, pages=[0], runs=True)
+    struck = [(e.text or "")[r.start : r.end] for e in result.elements for r in e.runs]
+    assert struck == ["October 3", "cancelled"]
+    assert all(r.kind == "deleted" for e in result.elements for r in e.runs)
+    assert "October 3 October 10" in " ".join(e.text or "" for e in result.elements)  # kept
+    notices = [n for n in result.notices if n.code == "struck_text"]
+    assert sum(n.count for n in notices) == 2
+    assert all(n.review == "optional" and n.page == 0 for n in notices)
+    # CONTENT_RUNS off (the shadow rollout): found and counted, not written.
+    shadow = text_pass.apply(pdf, elements, pages=[0])
+    assert shadow.counts()["deleted_runs"] == 2 and shadow.counts()["deleted_runs_written"] == 0
+    assert not any(e.runs for e in shadow.elements)
+    assert not any(n.code == "struck_text" for n in shadow.notices)
 
 
 # --------------------------------------------------------------------------- the pass as a whole
