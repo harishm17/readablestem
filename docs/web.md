@@ -978,7 +978,8 @@ upload, review, download and mean to post it?) without cookies or scripts:
 file as an earlier upload of the same person; value: hours since), `finished` (code:
 `done`, `failed:<error code>`; value: seconds since upload), `review_opened` (once per
 visit of 30 minutes), `decision_made` (code: `single`, `group` or `structure` for an edit to the words, a heading, an added region or a page left out, `bulk` in older rows; value: fixes
-changed), `review_completed` (the first time no decision is left open; value: seconds
+changed), `decision_outcome` (beside each `decision_made`: what the write did, below),
+`review_completed` (the first time no decision is left open; value: seconds
 since it finished), `html_viewed` (once per visit), `downloaded` (code `open` or `done`:
 whether decisions were still open), `download_format` (written with each `downloaded`; code `html`, `canvas`, `cartridge`, `docx` or `epub`, which the review record lists), and the two answers after a download, `will_post`
 and `minutes_saved`. Each row is a user id, a name, a job id, a code and a number
@@ -989,6 +990,24 @@ it matches that person's uploads of the same bytes and nothing else, and is neve
 plain hash. "Delete now" clears it (`events.forget_upload`): the `uploaded` row stays
 for the counts, but nothing derived from the deleted file does. A failing event is logged as `event_failed` and dropped; the action it
 records carries on. The events of a review decision are written in its transaction.
+
+`decision_outcome` (decision A15 of the accuracy round) records what each review write did
+so production can count false flags per true flag, corrections nobody was asked for per
+100 pages, and decisions per page, per release. It has no code; eight short columns, each
+checked against a closed list by `events.make`, hold the element kind, the reason code
+that put it in front of the reviewer (or `none`), the outcome (`kept`, `edited`,
+`replaced`, `rejected`, `removed`, `added`), the origin (`page` or `source`), what raised
+it (`pipeline` or `browsing`), `single` or `group`, the write mode (`single`, `group`,
+`structure`) and the release (the output's `pipeline_version`). The value is the signed
+count. `web/outcomes.py` works out the rows from a write (the rules are in its docstring)
+and keeps them in the write's `ReviewEdit`, so Undo writes them again negated and the
+sums are the decisions that stand. Every review route calls it: one decision, a heading
+or page group, bulk accept, the Symbols screen, "Accept the clean tables", a table cell
+read, the page tools and Undo. Carried decisions record nothing. Nothing typed, no element
+id and no page number is stored. `events.outcome_cells(release)` is the one reader: counts
+per lane (`events.LANES`) and for all lanes, without admin accounts, and a cell drawing on
+fewer than 5 accounts or 10 documents, or with one account giving more than half its
+decisions or pages, is withheld (with the next smallest lane when it is the only one).
 
 `/admin` counts them per UTC day (last 28 days) and per pseudonymous person (`u-` and
 the start of the random user id, never an email). Events are deleted after 400 days by

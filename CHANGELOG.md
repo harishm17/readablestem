@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
+
+- Every review write records a content-free `decision_outcome` event beside `decision_made`:
+  the element kind, the reason code that flagged it (or `none`), one of six outcomes (kept,
+  edited, replaced, rejected, removed, added), origin, what raised it, single or group, the
+  write mode and the release. Undo writes the same rows negated, so the sums are the
+  decisions that stand. `events.outcome_cells(release)` reads them per lane with the
+  small-count rules. A migration adds the eight columns and an index to `events`.
+
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 
 - Upload: one visible line beside "Upload and convert" says who receives the pictures of equations
