@@ -6,8 +6,8 @@ redirects here). The outcome of each file is stored for an hour under the person
 (`web.upload_result`); this page shows each document with its status as it is now, one row per
 file in the order they were sent:
 
-- documents waiting or converting, with their progress; finished ones with "N decisions to make"
-  or "Ready to download", and the link that is the next step;
+- each document with its state (`web.states`): its label, badge and next step, as on My
+  documents;
 - large files kept for choosing their pages, and files that were not uploaded with the reason;
 - a summary line in a polite live region (`#batch-summary`, `role="status"`), which says the
   counts again whenever they change, so a screen reader hears "3 of 5 ready to download" without
@@ -31,10 +31,11 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
-from readablestem.web import documents, upload_result
+from readablestem.web import documents, states, upload_result
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobStatus, session_scope, utcnow
+from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, conversions_closed, get_ctx, render
 from readablestem.web.job_page import elapsed_words
 from readablestem.web.routes.bundle import _zip_response
@@ -94,16 +95,28 @@ def summary(rows: list[dict[str, Any]], kept: int, refused: int) -> str:
     return text + (" " + "; ".join(extra).capitalize() + "." if extra else "")
 
 
-def _state(row: documents.DocumentRow | None) -> str:
-    if row is None:
+def _state(state: states.State) -> str:
+    """The summary's word for a row, from its state's tone."""
+    if state.key == "deleted":
         return "deleted"
-    if row.status == JobStatus.QUEUED:
-        return "waiting"
-    if row.status == JobStatus.RUNNING:
-        return "converting"
-    if row.status == JobStatus.FAILED:
-        return "stopped"
-    return "decide" if row.open_decisions else "ready"
+    return {
+        states.WAITING: "waiting",
+        states.WORKING: "converting",
+        states.FAILED: "stopped",
+        states.NEEDS_YOU: "decide",
+    }.get(state.tone, "ready")
+
+
+def _deleted(session: Session, ids: list[str]) -> dict[str, states.State]:
+    """The state of this batch's documents that are no longer listed: deleted, on the day
+    they were if the row is still there (past its time, not yet purged), else just deleted."""
+    rows = dict(session.execute(select(Job.id, Job.retain_until).where(Job.id.in_(ids))).all())
+    return {
+        job_id: states.state_of(
+            states.Facts(id=job_id, status="", deleted=True, deleted_on=rows.get(job_id))
+        )
+        for job_id in ids
+    }
 
 
 def _elapsed(minutes: int) -> str:
@@ -158,6 +171,8 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
         if seen and seen == version and request.headers.get("HX-Request") == "true":
             return None
         listing = documents.documents(session, user.id, now=now, budget_closed=closed, job_ids=ids)
+        listed = {row.id for row in listing.rows}
+        gone = _deleted(session, [i for i in ids if i not in listed])
     by_id = {row.id: row for row in listing.rows}
     titles = [r.title for r in listing.rows]
     rows: list[dict[str, Any]] = []
@@ -169,16 +184,17 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
         # Files that came out with the same title (a slide deck's every part, say) are told
         # apart by their file names: the file name leads and the title follows it.
         same = bool(row) and titles.count(name) > 1 and name != item.filename
+        state = row.state if row and row.state else gone[item.job_id]
         rows.append(
             {
                 "id": item.job_id,
                 "name": item.filename if same else name,
                 "also": name if same else (item.filename if name != item.filename else ""),
                 "pages": item.pages,
-                "label": row.label if row else "Deleted",
-                "badge": row.badge if row else "failed",
-                "state": _state(row),
-                "action": row.action if row else None,
+                "label": row.label if row else state.label,
+                "badge": state.badge,
+                "state": _state(state),
+                "action": state.primary if row else None,
             }
         )
     choose = [i for i in placed if i.pending_id]

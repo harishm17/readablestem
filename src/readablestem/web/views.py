@@ -22,19 +22,11 @@ from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Fix, Kind, Status
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import fair_queue, job_page, titles
-from readablestem.web import retry as retry_rules
+from readablestem.web import fair_queue, job_page, states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
 from readablestem.web.outcome import FAILED_MESSAGES
-
-STATUS_LABELS: dict[str, str] = {
-    JobStatus.QUEUED.value: "Waiting",
-    JobStatus.RUNNING.value: "Converting",
-    JobStatus.DONE.value: "Finished",
-    JobStatus.FAILED.value: "Stopped",
-}
 
 FIX_STATUS_LABELS = {
     Status.ACCEPTED: "Accepted automatically",
@@ -63,9 +55,21 @@ KIND_LABELS = {
     Kind.LIST_ITEM: "List item",
 }
 
+# The sentence a stop that "Try again" can help ends with. It is said only while a try is
+# left (`web.states`: the message and the offer come from one call), so a job with no tries
+# left never says "use Try again" (F-315).
+RETRY_HINTS = {
+    "budget_daily": "After 00:00 UTC, use “Try again”: what was already converted is kept.",
+    "lease_expired": "Use “Try again”: what was already converted is kept.",
+    "timeout": "You can use “Try again”: what was already converted is kept. If it stops "
+    "again, try splitting the PDF into smaller parts.",
+    "conversion_unavailable": "Use “Try again” in a little while.",
+    "store_failed": "Use “Try again”: what was already converted is kept.",
+    "internal_error": "You can use “Try again”: what was already converted is kept.",
+}
+
 JOB_ERROR_MESSAGES = {
-    "budget_daily": "Today's conversion budget ran out while this document was being "
-    "converted. After 00:00 UTC, use “Try again”: what was already converted is kept.",
+    "budget_daily": "Today's conversion budget ran out while this document was being converted.",
     "budget_job_usd": "This document needed more model work than one conversion is allowed. "
     "Try splitting it into smaller parts.",
     "budget_job_calls": "This document needed more model calls than one conversion is "
@@ -74,19 +78,16 @@ JOB_ERROR_MESSAGES = {
     "unreadable": "The PDF could not be read.",
     "too_many_pages": "The PDF has too many pages.",
     "no_pages": "The PDF has no pages.",
-    "lease_expired": "The conversion was interrupted several times and has been stopped. "
-    "Use “Try again”: what was already converted is kept.",
+    "lease_expired": "The conversion was interrupted several times and has been stopped.",
     "timeout": "The conversion took longer than a document of this size is allowed and was "
-    "stopped. You can use “Try again”: what was already converted is kept. If it stops "
-    "again, try splitting the PDF into smaller parts.",
+    "stopped.",
     "conversion_crashed": "The converter stopped while reading this PDF. Try saving the PDF "
     "again from the program that made it, or splitting it into smaller parts.",
     "conversion_unavailable": "The converter could not start. This is on our side, not a "
-    "problem with your file. Use “Try again” in a little while.",
+    "problem with your file.",
     "conversion_oom": "This PDF needed more memory than a conversion may use. Try splitting "
     "it into smaller parts.",
-    "store_failed": "The conversion finished but its results could not be saved. Use "
-    "“Try again”: what was already converted is kept.",
+    "store_failed": "The conversion finished but its results could not be saved.",
     "upload_missing": "The uploaded file was no longer available.",
     # LaTeX source (readablestem.source): nothing partial is kept.
     "source_failed": "This LaTeX source could not be converted. Upload the PDF instead.",
@@ -94,7 +95,7 @@ JOB_ERROR_MESSAGES = {
     "source_refused": "This LaTeX source uses something this tool will not run. Remove it, "
     "or upload the PDF instead.",
     "source_busy": "The server is busy right now and could not start converting this LaTeX "
-    "source. Try again in a few minutes, or upload the PDF instead.",
+    "source. Upload it again in a few minutes, or upload the PDF instead.",
     "source_unavailable": "LaTeX source is not available on this server at the moment, so "
     "this file was not converted. Compile it to a PDF and upload that.",
     # A source that would lose content outside a formula (source.report.stop). With the job's
@@ -115,7 +116,7 @@ JOB_ERROR_MESSAGES = {
     "read yet. They would appear to students as raw code, so nothing was converted. Copy the "
     "definitions you use into the source, or upload the PDF.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
-    "of your document's content. You can use “Try again”: what was already converted is kept.",
+    "of your document's content.",
     # Codes with a longer explanation of what to do next (scanned PDFs, no model key,
     # removed access, ...) share their wording with the status box.
     **FAILED_MESSAGES,
@@ -198,10 +199,15 @@ def source_stop_names(detail: dict[str, Any] | None) -> list[tuple[str, str]]:
     return rows
 
 
-def job_error_message(code: str | None) -> str:
-    return JOB_ERROR_MESSAGES.get(
+def job_error_message(code: str | None, *, with_hint: bool = True) -> str:
+    """The stop sentence of an error code; with its "Try again" hint (`RETRY_HINTS`) unless
+    `with_hint` is off. The job page asks `web.states`, which adds the hint only while a try
+    is left."""
+    plain = JOB_ERROR_MESSAGES.get(
         code or "", "The conversion stopped, and the tool has no more specific reason to show."
     )
+    hint = RETRY_HINTS.get(code or "") if with_hint else None
+    return f"{plain} {hint}" if hint else plain
 
 
 @dataclass
@@ -275,9 +281,7 @@ class JobView:
     # time itself; no percentage or finish time is made up.
     waiting_since: datetime | None = None
     slow_after_s: float = 0.0
-    # "Try again" (T3-1, `web.retry`): the offer for a stopped or partly converted job, how
-    # many tries it has had, and whether the AI service is not answering right now.
-    retry: retry_rules.Offer | None = None
+    # How many tries it has had ("Try again", T3-1, `web.retry`).
     retries: int = 0
     # While converting: the stored live progress (`jobs.progress_json`).
     progress: dict[str, Any] | None = None
@@ -309,6 +313,9 @@ class JobView:
     # gave them, and who shared it. The page shows only what that right allows.
     role: str = "owner"
     shared_by: str = ""
+    # The job's state (`web.states`): its label, tone, message, next steps and gap notes.
+    # Every word about where the job stands on the job page comes from it.
+    state: states.State | None = None
 
     @property
     def is_owner(self) -> bool:
@@ -366,18 +373,14 @@ class JobView:
         return waited is not None and waited > self.slow_after_s
 
     @property
-    def status_label(self) -> str:
-        return STATUS_LABELS.get(self.status, self.status)
+    def audience(self) -> str:
+        """Who is reading, for the state's words and steps: "owner", "review" or "view"."""
+        return "owner" if self.is_owner else ("review" if self.can_review else "view")
 
     @property
-    def status_detail(self) -> str:
-        if self.status == JobStatus.QUEUED:
-            return job_page.queue_sentence(self.queue_ahead, self.ahead_yours, self.wait_s)
-        if self.status == JobStatus.RUNNING:
-            return job_page.stage_sentence(self.progress)
-        if self.status == JobStatus.DONE:
-            return "The HTML file is ready."
-        return source_stop_message(self.error_code, self.error_detail)
+    def retry(self) -> states.Step | None:
+        """The "Try again" or "Convert the missing parts" form the state offers, if any."""
+        return self.state.retry if self.state is not None else None
 
     @property
     def stop_names(self) -> list[tuple[str, str]]:
@@ -404,6 +407,7 @@ class PartLink:
     label: str
     status: str
     current: bool
+    state: states.State | None = None  # the part's own state (`web.states`), for its words
 
 
 @dataclass
@@ -599,12 +603,14 @@ def job_view(
     with_summary: bool = False,
     with_page: bool = False,
     role: str = "owner",
+    context: states.Context | None = None,
 ) -> JobView:
     """The job's view model. `with_summary`: the counts from its result (the job page and
     the review list); `with_page`: also the job page's own data (`job_page.PageData`),
     the queue estimate and the live progress. `role` is what the person looking is to the
     document (`web.shares`); someone it was shared with sees none of the owner's other parts
-    and is told who shared it."""
+    and is told who shared it. `context` is what the state reads beyond the job (today's
+    budget, the deployment's options); with `with_page` the state is worked out."""
     owner = role == "owner"
     ahead = queue_ahead(session, job) if job.status == JobStatus.QUEUED else 0
     yours, wait_s = (
@@ -625,7 +631,8 @@ def job_view(
         result = DocumentResult.model_validate(job.result_json)
         page = job_page.page_data(result, last_decision(session, job))
         carried = carry_view(job, result)
-    return JobView(
+    summary = summarise(job.result_json) if with_summary or with_page else None
+    view = JobView(
         id=job.id,
         filename=job.filename,
         status=str(job.status),
@@ -640,16 +647,8 @@ def job_view(
         cost_usd=job.cost_usd,
         model_calls=job.model_calls,
         queue_ahead=ahead,
-        retry=retry_rules.offer(
-            status=str(job.status),
-            error_code=job.error_code,
-            result_json=job.result_json,
-            retries=job.retries or 0,
-        )
-        if with_page
-        else None,
         retries=job.retries or 0,
-        summary=summarise(job.result_json) if with_summary or with_page else None,
+        summary=summary,
         result_version=job.result_version or 0,
         ahead_yours=yours,
         wait_s=wait_s,
@@ -675,6 +674,27 @@ def job_view(
         role=role,
         shared_by=_owner_name(session, job) if not owner else "",
     )
+    if with_page:
+        # Counts are read only for a finished job: a stopped or waiting job may still hold an
+        # earlier result, and its decisions are not open while it is not finished (F-314).
+        done = job.status == JobStatus.DONE
+        counts = states.counts_of(summary.counts if summary and done else None)
+        line = (
+            job_page.queue_sentence(ahead, yours, wait_s) if job.status == JobStatus.QUEUED else ""
+        )
+        base = context or states.Context()
+        view.state = states.state_of(
+            states.Facts.of(job),
+            counts,
+            viewer=view.audience,
+            context=states.Context(
+                budget_closed=base.budget_closed,
+                waiting_line=line,
+                image_pages_offered=base.image_pages_offered,
+                now=base.now,
+            ),
+        )
+    return view
 
 
 def _owner_name(session: Session, job: Job) -> str:
@@ -727,7 +747,11 @@ def part_links(session: Session, job: Job) -> list[PartLink]:
         return int(digits[0]) if digits else 0
 
     ordered = sorted(rows, key=lambda r: (first_page(r.part_label), r.created_at))
-    return [PartLink(r.id, r.part_label or "", str(r.status), r.id == job.id) for r in ordered]
+    found = states.load(session, [r.id for r in ordered])
+    return [
+        PartLink(r.id, r.part_label or "", str(r.status), r.id == job.id, found.get(r.id))
+        for r in ordered
+    ]
 
 
 def sample_view() -> SampleView | None:

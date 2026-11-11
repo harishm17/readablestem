@@ -1,14 +1,13 @@
-{# The status box, inside the page's polite live region (job.html). `headline`
-   (web/job_page.py) says what is left to do; it changes per step, not per element, so
-   a screen reader hears each step once. Polled by htmx (204 while unchanged). #}
+{# The status box, inside the page's polite live region (job.html): the job's state
+   (web/states.py), said once. Its label, message and gap notes change per step, not per
+   element, so a screen reader hears each step once. Polled by htmx (204 while unchanged). #}
 {# Only in the htmx fragment: htmx moves a top-level <title> into the document title, so
    the tab title follows the status ("Converting: notes.pdf") as the box does. #}
 {% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
-{% set counts = job.summary.counts if job.summary else none %}
-<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ headline.state }}" data-title="{{ headline.label }}: {{ job.title }}" data-summary="{{ headline.label }}. {{ headline.message }}"{% endif %}>
-  <p><span class="status-badge status-{{ headline.badge }}">{{ headline.label }}</span>
-    {{ headline.message }}</p>
+<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ state.key }}" data-title="{{ state.label }}: {{ job.title }}" data-summary="{{ state.label }}. {{ state.message }}"{% endif %}>
+  <p><span class="status-badge status-{{ state.badge }}">{{ state.label }}</span>
+    {{ state.message }}</p>
   {# A stopped source: every file or command that stopped it, from LaTeX's own report
      (web/views.py, `source_stop_names`). Names from the source, escaped. #}
   {% if job.stop_names %}
@@ -18,9 +17,11 @@
     {% endfor %}
   </ul>
   {% endif %}
-  {% if counts and counts.decisions and headline.state != "decisions" %}
-  <p>{{ open_line }}</p>
-  {% endif %}
+  {# What of a finished job was not converted, beside its open decisions (a partly
+     converted job says it as its message). #}
+  {% if state.key != "partly_converted" %}{% for gap in state.gaps %}
+  <p class="gap-note">{{ gap.text }}</p>
+  {% endfor %}{% endif %}
   {% if provider_down|default(false) and job.status in ("queued", "running") %}
   <p id="provider-down-note">The AI service is not answering right now, so this document
     may stop early with parts not converted. If it does, “Try again” converts them once the
@@ -29,7 +30,8 @@
   {% if results_link|default(false) %}
   {# Only in the polled fragment: the full page shows the results itself. From here the
      first decision is one click away (MF17). #}
-  <p>{% if counts and counts.decisions and job.can_review %}<a href="/jobs/{{ job.id }}/review">Start the review</a> or {% endif %}<a href="/jobs/{{ job.id }}">{{ "show the results" if counts and counts.decisions else ("Show the results" if job.status == "done" else "Show why it stopped") }}</a></p>
+  {% set review = state.primary if state.primary and state.primary.kind == "review" else none %}
+  <p>{% if review %}<a href="{{ review.href }}">Start the review</a> or {% endif %}<a href="/jobs/{{ job.id }}">{{ "show the results" if review else ("Show why it stopped" if state.stopped else "Show the results") }}</a></p>
   {% endif %}
   {# Product analytics (web/analytics.py): the person has just seen the job finish. The
      loader sends it once per job in this browser. Counts and a status, nothing else. #}

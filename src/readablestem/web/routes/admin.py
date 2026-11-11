@@ -19,10 +19,10 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import case, func, select
 
 from readablestem.ops import profile
-from readablestem.web import access, events, linked_emails
+from readablestem.web import access, events, linked_emails, states
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import ErrorAggregate, Job, JobStatus, QuotaDay, User, session_scope
+from readablestem.web.db import ErrorAggregate, Job, QuotaDay, User, session_scope
 from readablestem.web.deps import (
     AdminDep,
     flash,
@@ -120,8 +120,19 @@ def admin_context(request: Request) -> dict[str, Any]:
             "page_quota": ctx.settings.open_tier_daily_page_quota,
             "rereads": ctx.settings.open_tier_daily_rereads,
         }
-        rows = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
-        counts = {str(status): int(count) for status, count in rows}
+        # The queue in the words of every other page (F-213): how many jobs are in each
+        # state of the table (`web.states`), in the table's order.
+        snapshot = ctx.guard.snapshot()
+        closed = (
+            snapshot.remaining_usd is not None and snapshot.remaining_usd <= ctx.min_headroom_usd
+        )
+        found = states.load(
+            session, session.scalars(select(Job.id)), context=states.Context(budget_closed=closed)
+        )
+        order = list(states.TABLE)
+        queue: dict[str, int] = {}
+        for state in sorted(found.values(), key=lambda s: order.index(s.key)):
+            queue[state.label] = queue.get(state.label, 0) + 1
         aggregates = session.execute(
             select(
                 ErrorAggregate.day,
@@ -155,7 +166,7 @@ def admin_context(request: Request) -> dict[str, Any]:
         "spend": ctx.guard.snapshot(),
         "spend_people": spend_people,
         "spend_people_rows": SPEND_PEOPLE_ROWS,
-        "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},
+        "queue": queue,
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,
         "ops": ops_report(ctx)[1],

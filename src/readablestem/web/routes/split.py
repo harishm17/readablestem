@@ -301,8 +301,8 @@ class OptionalLine:
 class ReadyView:
     """The review screen's finish line (no decision open): what the job page says."""
 
-    title: str  # "Ready to share", "Ready", or a stopped job's outcome label
-    sentence: str  # what is shown as an image, or why the job stopped ("" when neither)
+    title: str  # the state's label (`web.states`): "Ready to share", "Partly converted"
+    sentence: str  # what is shown as an image, or what was not converted ("" when neither)
     finish: str  # "You made 3 decisions on October 9." / "Nothing in this file needed ..."
     notes: int  # items accepted for you with a note (optional to look at)
     shareable: bool  # the file can go to students (not a job that stopped early)
@@ -673,20 +673,16 @@ class SplitBuilder:
     # ------------------------------------------------------------------ panel
 
     def ready(self) -> ReadyView:
-        """The finish line once no decision is open, as the job page says it
-        (`job_page.headline`, `job_page.Finish`): "Ready to share", or "Ready" with what
-        is shown as an image, or the outcome of a job that stopped early."""
-        from readablestem.web import job_page
-        from readablestem.web.outcome import job_outcome
+        """The finish line once no decision is open, in the job's state (`web.states`), as
+        the job page says it: "Ready to share", or "Partly converted" with what was not."""
+        from readablestem.web import job_page, states
 
         with session_scope(get_ctx(self.request).factory) as session:
             job = job_access(session, self.job_id, self.user, REVIEW)
             when = last_decision(session, job)
-            outcome = job_outcome(
-                status=str(job.status), error_code=job.error_code, result_json=job.result_json
-            )
+            facts = states.Facts.of(job)
         counts = job_page.breakdown(self.result.fixes)
-        line = job_page.headline("done", "", outcome, counts)
+        state = states.state_of(facts, states.counts_of(counts))
         finish = job_page.Finish(
             decided_units=counts.decided_units,
             last_decision=when,
@@ -694,11 +690,13 @@ class SplitBuilder:
             not_handled=len(job_page.notice_lists(self.result).not_handled),
         )
         return ReadyView(
-            title=line.label,
-            sentence=line.message if line.state in {"images", "stopped"} else "",
+            title=state.label,
+            sentence=state.message
+            if state.key in {"partly_converted", "ready"} and (state.gaps or counts.as_image)
+            else "",
             finish=finish.sentence,
             notes=finish.notes,
-            shareable=line.state in {"ready", "images"},
+            shareable=state.shareable,
         )
 
     def panel(self, decision: queue.Decision | None, fix: Fix | None) -> Panel:

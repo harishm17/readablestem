@@ -197,6 +197,10 @@ class Record:
     # The file types downloaded so far, in words; None when the app is not recording
     # downloads (EVENTS_ENABLED off), so the record does not say "none" when it cannot know.
     downloaded: list[str] | None = None
+    # The job's state (`web.states`) as every other page says it, and its gap notes (what
+    # was not converted): (title, text).
+    state: str = ""
+    gaps: list[tuple[str, str]] = field(default_factory=list)
 
 
 def long_when(value: datetime | None) -> str:
@@ -369,9 +373,11 @@ def build(
     title_chosen: bool,
     contact_set: bool,
     downloaded_formats: list[str] | None = None,
+    state: Any = None,
 ) -> Record:
     """The record from a finished job's parts. `edits` are its `ReviewEdit` rows (any
-    order); `who` maps a user id to the name shown for them."""
+    order); `who` maps a user id to the name shown for them; `state` is the job's
+    `states.State`, whose label and gap notes the record prints."""
     elements = {e.id: e for e in result.elements}
     fixes: dict[str, Fix] = {}
     for fix in result.fixes:
@@ -454,6 +460,8 @@ def build(
             if downloaded_formats is None
             else [FORMAT_WORDS.get(f, f) for f in downloaded_formats]
         ),
+        state=state.label if state is not None else "",
+        gaps=[(g.title, g.text) for g in state.gaps] if state is not None else [],
     )
 
 
@@ -501,6 +509,8 @@ def to_csv(record: Record) -> str:
     row("document", "Language", detail=record.language)
     row("document", "Record made on", when=iso_when(record.made_at))
     row("document", "Reference", detail=record.job_ref)
+    if record.state:
+        row("document", "State", detail=record.state)
     if record.downloaded is not None:
         row("document", "File types downloaded", detail=", ".join(record.downloaded) or "None")
     c = record.counts
@@ -516,6 +526,8 @@ def to_csv(record: Record) -> str:
     if record.left_out_pages:
         pages = " ".join(str(n) for n in record.left_out_pages)
         row("summary", "Pages left out of the student file", detail=pages)
+    for title, text in record.gaps:
+        row("summary", title, detail=text)
     for d in record.decisions:
         row("decision", d.item, d.page or "", d.tool_had, d.decision, d.by, iso_when(d.when))
     for item in record.open_items:

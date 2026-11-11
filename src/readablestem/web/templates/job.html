@@ -1,13 +1,11 @@
 {% extends "base.html" %}
-{# The job page (docs/web.md "The job page"). `headline` (web/job_page.py) says what is
-   left to do, from the status, the outcome (web/outcome.py: a stop, scanned pages, an
-   AI outage, tomorrow's budget) and the open decisions; it replaces the plain status
-   everywhere on this page: title, status box and the sections below. `job.page` is the
-   page's data from a finished job's result. #}
-{% set outcome = outcome|default(none) %}
+{# The job page (docs/web.md "The job page"). `state` (web/states.py) is the job's state: its
+   label, message, next steps and gap notes, from the stored facts. It is said once, in the
+   status box, and the tab title, the sections below and their headings follow it. `job.page`
+   is the page's data from a finished job's result. #}
 {% set field_errors = field_errors|default({}) %}
 {% set typed = typed|default({}) %}
-{% block title %}{% if errors|default([]) %}Error: {% endif %}{{ headline.label }}: {{ job.title }}{% endblock %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}{{ state.label }}: {{ job.title }}{% endblock %}
 {% block head %}
 {% if auto_reload and not job.finished %}
 {# Without JavaScript, and only when the user asked for it (?auto=1), reload until the
@@ -33,7 +31,7 @@
 {% if not job.finished %}
 {# How long it has been, outside the live region (ux2-lane-a, `_wait_note.html`). #}
 {% if job.waiting_since %}
-{% with wait_lead = "Waiting for" if job.status == "queued" else "Converting for", wait_tail = "", wait_text = job.waited_text, wait_since = job.waiting_since.isoformat(), wait_slow_after = job.slow_after_s, wait_slow = job.slow, wait_live = true %}
+{% with wait_lead = "Waiting for" if state.tone == "waiting" else "Converting for", wait_tail = "", wait_text = job.waited_text, wait_since = job.waiting_since.isoformat(), wait_slow_after = job.slow_after_s, wait_slow = job.slow, wait_live = true %}
 {% include "_wait_note.html" %}
 {% endwith %}
 {% endif %}
@@ -75,11 +73,12 @@
   </ul>
 </nav>
 <div id="review-and-download" class="job-group">
-{% if c.decisions %}
+{% if state.group == "needs" %}
 {# Decisions open: the review is the main action; downloading now is a draft, and the
-   draft link asks first (/jobs/{id}/draft) what students would get. #}
+   draft link asks first (/jobs/{id}/draft) what students would get. The heading names the
+   task; the state is said once, in the status box (F-415). #}
 <section aria-labelledby="decisions-heading">
-  <h2 id="decisions-heading">{{ headline.label }}</h2>
+  <h2 id="decisions-heading">{{ state.task }}</h2>
   <ul class="actions" id="next-actions">
     {% if job.can_review %}<li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>{% endif %}
     <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
@@ -109,10 +108,12 @@
 
 <section aria-labelledby="results-heading">
   <h2 id="results-heading">Results</h2>
-  {% if outcome and outcome.partial %}
+  {% if state.gaps %}
   <div class="notice notice-warning" id="partial-note">
-    <p><strong>{{ outcome.label }}:</strong> part of this document was not converted. Those parts
+    {% for gap in state.gaps %}
+    <p><strong>{{ gap.title }}:</strong> part of this document was not converted. Those parts
       stay as images marked “Not converted”.</p>
+    {% endfor %}
     {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
   </div>
   {% endif %}
@@ -132,8 +133,8 @@
     <div><dt>Decisions made</dt><dd>{{ c.decided_units }}</dd></div>
   </dl>
   </details>
-  {# Said by the status box when nothing else is: not with decisions open, or an outcome. #}
-  {% if c.as_image and (outcome or c.decisions) %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
+  {# Said by the status box when the job is ready; here in every other state. #}
+  {% if c.as_image and state.key != "ready" %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
   {% if c.notes %}
   <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. None holds up the file.</p>
   {% endif %}
@@ -197,14 +198,15 @@
 </div>
 {% endif %}
 {% include "_job_record.html" %}
-{% elif job.status == "failed" %}
-{# The reason is in the status box above, once. This section is what to do about it: try
-   again where that can help, otherwise the safe ways on (ux2-lane-a). #}
+{% elif state.stopped %}
+{# The reason is in the status box above, once. This section is what to do about it: the
+   state's next steps (web/states.py): try again while a try is left and can help, otherwise
+   the safe ways on (ux2-lane-a). #}
 <section aria-labelledby="failed-heading">
   <h2 id="failed-heading">What you can do</h2>
   {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
   <ul class="actions" id="stopped-actions">
-    {% if job.is_owner %}<li><a class="{{ 'button-secondary' if job.retry else 'button' }}" href="/app#upload-heading">Upload it again</a></li>{% endif %}
+    {% for step in state.steps if not step.form %}<li><a class="{{ 'button-secondary' if job.retry else 'button' }}" href="{{ step.href }}">{{ step.label }}</a></li>{% endfor %}
     <li><a href="/app">Back to My documents</a></li>
     <li><a href="/status">Service status</a></li>
     {% if contact_email %}<li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20stopped%20conversion">Email us about it</a></li>{% endif %}

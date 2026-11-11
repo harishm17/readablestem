@@ -1,14 +1,13 @@
 {# The finish line (BW1, MF9 of the UX review): no decision is open, so the file can go to
    students. The download is the main action; where to post it, and what to check first, follow.
-   Plain text, no check marks or scores: it assists, it does not certify. The heading is the
-   status box's label (`job_page.headline`), as on the review screen: "Ready to share" only when
-   everything was converted.
+   Plain text, no check marks or scores: it assists, it does not certify. The state is said once,
+   in the status box (web/states.py); this heading names the task (F-415).
 
    ux2-lane-a: "Where will you post it?" lists the ways the file leaves the tool, one
    recommended, each with its own link; the posting steps are said once, in the recommended
    one, and the checks before posting once, below. #}
 <section id="ready" aria-labelledby="ready-heading">
-  <h2 id="ready-heading">{{ headline.label if headline is defined else "Ready to share" }}</h2>
+  <h2 id="ready-heading">{{ state.task if state is defined else "Download" }}</h2>
   <p>{{ pg.finish.sentence }}</p>
   <ul class="actions">
     <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>

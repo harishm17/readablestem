@@ -1,18 +1,15 @@
-"""What to tell the user about a job beyond its status: why it is incomplete, or waiting.
+"""The words of a job's outcome beyond its status: why it stopped, or what of a finished job
+was not converted. `web.states` decides which state a job is in and asks here for the words.
 
-`views.JobView` covers the four statuses and the codes of failed jobs. The worker also
-records outcomes on *finished* jobs (`worker.result_outcome`): a spend cap that stopped
-model work part way ("budget_<scope>") or pages kept as images, not converted
+The worker records outcomes on *finished* jobs (`worker.result_outcome`): a spend cap that
+stopped model work part way ("budget_<scope>") or pages kept as images, not converted
 ("pages_not_converted": handwritten, scanned, or with nothing readable on them, and
-handwriting on typed pages; jobs from before page types say "scanned_pages"). Those
-jobs have results, but showing them as a plain "Finished. The
-accessible HTML is ready." would hide that part of the document was not converted. A
-queued job can also be held back because today's budget is spent (the worker claims
-nothing then). And a finished job converted during an AI service outage, with most of
-its equations and figures failed, is not "finished" either ("model_outage", read from
-the stored result). `job_outcome` turns those cases into a label and a plain-language
-message for the job page and the documents list; for everything else it returns None
-and the usual status text applies.
+handwriting on typed pages; jobs from before page types say "scanned_pages"). A finished job
+converted during an AI service outage, with most of its equations and figures failed, is read
+from the stored result (the job carries no code). Each of these is a gap note on the job's
+state (`states.gaps_of`), and a note with nothing in it is not produced. The messages of a
+stopped job's codes with a longer explanation (scanned PDFs, no model key, removed access)
+are here too (`FAILED_MESSAGES`).
 
 Messages say what happened, what the output contains and what to do next, and never
 quote the document.
@@ -20,21 +17,10 @@ quote the document.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
-
-from readablestem.web.db import JobStatus
 
 # How many page numbers to list before "and N more".
 MAX_PAGES_LISTED = 10
-
-
-@dataclass(frozen=True)
-class JobOutcome:
-    code: str  # a category code, e.g. "budget_daily", "scanned_pages", "waiting_budget"
-    label: str  # replaces the status label ("Finished", "Waiting", "Stopped")
-    message: str  # replaces the status sentence
-    partial: bool = False  # finished with results, but some of it was not converted
 
 
 def _plural(n: int, one: str, many: str) -> str:
@@ -179,65 +165,62 @@ def failed_message(code: str, *, image_pages_offered: bool = False) -> str | Non
     return FAILED_MESSAGES.get(code)
 
 
-def job_outcome(
-    *,
-    status: str,
-    error_code: str | None,
-    result_json: dict[str, Any] | None = None,
-    budget_closed: bool = False,
-    image_pages_offered: bool = False,
-) -> JobOutcome | None:
-    """The outcome to show for a job, or None when its status says it all.
-    `image_pages_offered`: see `failed_message`."""
-    if status == JobStatus.QUEUED and budget_closed:
-        return JobOutcome(
-            "waiting_budget",
-            "Waiting",
-            "Today's conversion budget has been used up, so conversions start again after "
-            "00:00 UTC. Your document stays in the queue and starts then; you can leave "
-            "this page.",
-        )
-    if status == JobStatus.FAILED and error_code in FAILED_MESSAGES:
-        message = failed_message(error_code, image_pages_offered=image_pages_offered)
-        return JobOutcome(error_code, "Stopped", message or FAILED_MESSAGES[error_code])
-    if status == JobStatus.DONE and not error_code and (outage := _outage(result_json)):
-        n, total, kinds = outage
-        message = (
-            f"The AI service did not answer for {n} of {total} {kinds}, so "
-            f"they were not converted. Nothing is wrong with your PDF. {KEPT} Use "
-            "“Convert the missing parts” below, now or later: only those parts are sent "
+# A queued job held back because today's budget is spent (the worker claims nothing then).
+WAITING_BUDGET = (
+    "Today's conversion budget has been used up, so conversions start again after 00:00 UTC. "
+    "Your document stays in the queue and starts then; you can leave this page."
+)
+
+
+def outage_message(result_json: dict[str, Any] | None, *, offered: bool = True) -> str:
+    """The gap note of a finished job converted while the AI service was down, or "".
+    `offered`: "Convert the missing parts" is offered, so the note may say to use it."""
+    outage = _outage(result_json)
+    if outage is None:
+        return ""
+    n, total, kinds = outage
+    text = (
+        f"The AI service did not answer for {n} of {total} {kinds}, so they were not "
+        f"converted. Nothing is wrong with your PDF. {KEPT}"
+    )
+    if offered:
+        text += (
+            " Use “Convert the missing parts” below, now or later: only those parts are sent "
             "again, and it does not use up your daily pages."
         )
-        return JobOutcome(MODEL_OUTAGE, "Stopped: the AI service did not answer", message,
-                          partial=True)  # fmt: skip
-    if status != JobStatus.DONE or not error_code:
-        return None
-    if error_code == "budget_daily":
-        counts = _not_converted(result_json, error_code)
-        message = (
-            _count_sentence(counts, "Today's conversion budget ran out part way through")
-            + f" {KEPT} After 00:00 UTC use “Convert the missing parts” below to convert "
-            "them: only those parts are sent again, and it does not use up your daily pages."
-        )
-        return JobOutcome(error_code, "Stopped early", message, partial=True)
-    if error_code in {"budget_job_usd", "budget_job_calls"}:
-        counts = _not_converted(result_json, error_code)
-        message = (
-            _count_sentence(
-                counts, "This document needed more model work than one conversion may use"
+    return text
+
+
+def budget_message(result_json: dict[str, Any] | None, code: str, *, offered: bool = True) -> str:
+    """The gap note of a finished job a spend cap stopped part way, or "" when nothing was
+    left unconverted by it (F-319: never "0 of N were not converted"). `offered`: as in
+    `outage_message`."""
+    counts = _not_converted(result_json, code)
+    if counts is not None and counts[0] == 0:
+        return ""
+    if code == "budget_daily":
+        text = _count_sentence(counts, "Today's conversion budget ran out part way through")
+        text += f" {KEPT}"
+        if offered:
+            text += (
+                " After 00:00 UTC use “Convert the missing parts” below to convert them: only "
+                "those parts are sent again, and it does not use up your daily pages."
             )
-            + f" {KEPT} Split the PDF into smaller parts and upload each one: every part "
-            "gets its own allowance."
-        )
-        return JobOutcome(error_code, "Stopped early", message, partial=True)
-    if error_code in PAGES_NOT_CONVERTED:
-        message = _pages_message(result_json)
-        by_reason, handwriting, _ = _kept(result_json)
-        if not (by_reason or handwriting) and (result_json or {}).get("omitted"):
-            return None  # every such page was left out of the file (T3-16)
-        what = "handwriting" if handwriting and not by_reason else "pages"
-        return JobOutcome(error_code, f"Finished, with {what} not converted", message, partial=True)
-    return None
+        return text
+    return (
+        _count_sentence(counts, "This document needed more model work than one conversion may use")
+        + f" {KEPT} Split the PDF into smaller parts and upload each one: every part gets its "
+        "own allowance."
+    )
+
+
+def pages_message(result_json: dict[str, Any] | None) -> str:
+    """The gap note of a finished job with pages kept as images, or "" when every such page
+    was left out of the file (T3-16)."""
+    by_reason, handwriting, _ = _kept(result_json)
+    if not (by_reason or handwriting) and (result_json or {}).get("omitted"):
+        return ""
+    return _pages_message(result_json)
 
 
 # Done with pages kept as images ("scanned_pages" is the code jobs had before page types).

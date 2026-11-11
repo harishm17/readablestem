@@ -575,7 +575,7 @@
     </div>
 
     {% if panel.mode == "done" %}
-    {# The finish line, as the job page says it (job_page: headline and Finish). Plain
+    {# The finish line, as the job page says it (web/states.py and job_page.Finish). Plain
        text, no check marks or scores: it assists, it does not certify. #}
     {% set ready = panel.ready %}
     <p>{{ ready.finish }}{% if ready.sentence %} {{ ready.sentence }}{% endif %}</p>
