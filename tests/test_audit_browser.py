@@ -16,7 +16,7 @@ import time
 
 import pytest
 
-from fixtures.web.support import ALICE, WebEnv, make_pdf
+from fixtures.web.support import ALICE, WebEnv, as_current, make_pdf
 from readablestem.web.db import Job, session_scope
 
 pytestmark = pytest.mark.browser
@@ -96,7 +96,7 @@ def test_a_hostile_document_runs_nothing_and_sees_no_cookie(site, browser):
     sign_in(page, site.base)
     job_id = finished_job(site, page)
     with session_scope(site.ctx.factory) as session:
-        session.get(Job, job_id).html = HOSTILE_DOCUMENT
+        session.get(Job, job_id).html = as_current(HOSTILE_DOCUMENT)
     page.goto(f"{site.base}/jobs/{job_id}/view")
     assert page.locator("h1").inner_text() == "Hostile"
     page.locator("h1").click()

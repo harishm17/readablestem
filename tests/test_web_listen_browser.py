@@ -15,7 +15,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from fixtures.web.support import ALICE, WebEnv, fake_output, make_pdf
+from fixtures.web.support import ALICE, WebEnv, as_current, fake_output, make_pdf
 from readablestem.web.db import Job, session_scope
 from test_web_browser import WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
@@ -28,7 +28,7 @@ WIDE = {"width": 1280, "height": 900}
 NARROW = {"width": 320, "height": 640}
 STRICT = {"moderate", "serious", "critical"}
 
-HTML = (
+HTML = as_current(
     '<!doctype html><html lang="en"><head><title>Kinematics notes</title></head><body><main>'
     "<h1>Kinematics</h1><p>The speed is "
     '<math id="p1-e2"><mi>v</mi><mo>=</mo><mi>d</mi><mo>/</mo><mi>t</mi></math>.</p>'

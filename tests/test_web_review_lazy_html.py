@@ -101,3 +101,32 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
         assert 'alttext="x equals 2"' in (site.job(site.job_id).html or "")
     finally:
         site.ctx.settings.mathml_alttext = False
+
+
+def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
+    """A stored page with no render version (made before pages carried one, or by an older
+    release) is made again from the stored result when it is next opened, once, and the
+    stored checks become those of the new page."""
+    import re
+
+    from readablestem.pipeline import assemble, html_checks
+
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None and not job.html_stale
+        job.html = re.sub(r'<meta name="readablestem-render"[^>]*>\n', "", job.html or "")
+        assert assemble.render_version(job.html) == 0
+        job.result_json = {**(job.result_json or {}), "html_checks": []}
+    first = site.browser.get(f"/jobs/{site.job_id}/view").text
+    assert assemble.render_version(first) == assemble.RENDER_VERSION
+    stored = site.job(site.job_id)
+    assert stored.html == first
+    checks = DocumentResult.model_validate(stored.result_json).html_checks
+    assert checks == html_checks.static_checks(first)
+
+    # A page at the current version is served as it is stored: no second render.
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None
+        job.html = first.replace("</main>", "<p>Stored as it was.</p></main>")
+    assert "Stored as it was." in site.browser.get(f"/jobs/{site.job_id}/view").text

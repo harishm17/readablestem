@@ -87,6 +87,26 @@ from readablestem.pipeline.safe_html import split_tag as _split_tag
 # the table serialiser marks a maths header's reading with it too.
 AUTHORED_CLASS = table_html.AUTHORED_CLASS
 
+# The version of the student file's making: raise it with any change to the sheet, the
+# markup, the student words or the speech rules. The page carries it in its head
+# (`RENDER_META`), and the web app makes a stored page again from its stored result when
+# the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
+# documents converted before it, not only new ones and ones somebody edits again.
+RENDER_VERSION = 1
+RENDER_META = "readablestem-render"
+_RENDER_LINE = re.compile(
+    r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
+)
+
+
+def render_version(html: str) -> int:
+    """The render version written in a stored page's head; 0 for a page made before pages
+    carried one."""
+    head = html[: html.find("</head>")] if "</head>" in html else html[:4096]
+    match = _RENDER_LINE.search(head)
+    return int(match.group(1)) if match else 0
+
+
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 # The alt text of an equation kept as an image, when its region has text in the PDF: that
@@ -1642,6 +1662,7 @@ def render_html(
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
+            f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",

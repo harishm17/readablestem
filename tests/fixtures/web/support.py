@@ -37,6 +37,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline.assemble import RENDER_META, RENDER_VERSION
 from readablestem.web.app import create_app
 from readablestem.web.auth import set_allowed
 from readablestem.web.db import Job, session_scope
@@ -186,9 +187,21 @@ def fake_result() -> DocumentResult:
             by_kind={"equation": 3, "figure": 1, "heading": 1},
             by_status={"accepted": 2, "needs_review": 2, "abstained": 1},
         ),
-        html="<!doctype html><html lang='en'><head><title>SECRET-HEADING</title></head>"
-        "<body><main><h1>SECRET-HEADING Kinematics</h1><p>SECRET-DOC-TEXT</p></main></body></html>",
+        html=as_current(
+            "<!doctype html><html lang='en'><head><title>SECRET-HEADING</title></head><body>"
+            "<main><h1>SECRET-HEADING Kinematics</h1><p>SECRET-DOC-TEXT</p></main></body></html>"
+        ),
     )
+
+
+def as_current(html: str) -> str:
+    """Hand-written HTML marked as made by the current renderer, so the app serves it as
+    stored instead of making the page again from the stored result
+    (`routes.jobs.current_html`)."""
+    line = f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">'
+    if "<head>" in html:
+        return html.replace("<head>", "<head>" + line, 1)
+    return re.sub(r"(<html\b[^>]*>)", lambda m: m.group(1) + line, html, count=1)
 
 
 def fake_output() -> ConversionOutput:

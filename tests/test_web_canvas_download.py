@@ -13,7 +13,16 @@ import pytest
 
 import canvas_sanitizer as cs
 import readablestem
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from fixtures.web.support import (
+    ALICE,
+    BOB,
+    WebEnv,
+    as_current,
+    job_id_from,
+    login,
+    make_pdf,
+    upload,
+)
 from readablestem.core.types import Status
 from readablestem.web.db import Job, session_scope
 from readablestem.web.security import VIEW_CSP
@@ -88,7 +97,7 @@ def test_with_a_course_number_the_zip_also_holds_the_page_to_paste(web):
 
 def test_the_pictures_of_a_real_document_are_files_in_the_zip(web):
     job_id = finished_job(web)
-    source = DEMO.read_text(encoding="utf-8")
+    source = as_current(DEMO.read_text(encoding="utf-8"))
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
