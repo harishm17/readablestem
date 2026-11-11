@@ -26,7 +26,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult, Element, Kind
-from readablestem.web import events, notation, page_edits, page_images
+from readablestem.web import events, notation, outcomes, page_edits, page_images
 from readablestem.web.db import Blob, Job, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -117,6 +117,15 @@ def write_structure(
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
         restart_owner_clock(job, user, ctx.settings)
+        outcomes.record_write(
+            session,
+            ctx.settings,
+            user_id=user.id,
+            job=job,
+            result=result,
+            changes=[change],
+            write_mode="structure",
+        )
         session.add(_review_edit(job.id, user, change, written))
         events.add_decision(
             session,
@@ -557,6 +566,15 @@ def write_review(
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
         restart_owner_clock(job, user, ctx.settings)
+        outcomes.record_write(
+            session,
+            ctx.settings,
+            user_id=user.id,
+            job=job,
+            result=result,
+            changes=changes,
+            write_mode=kind,
+        )
         session.add_all(_review_edit(job.id, user, c, written) for c in changes)
         events.add_decision(
             session,

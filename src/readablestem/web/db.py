@@ -29,6 +29,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -482,7 +483,11 @@ class Event(Base):
     """A content-free usage event: who (pseudonymous user id), what (`name`, a code),
     a category `code` and a number `value`, when. `job_ref` is a job id but not a
     foreign key, so a job's events outlive the job (they say nothing about its content).
-    Deleted with the user."""
+    Deleted with the user.
+
+    The eight short columns after `value` are filled only on a `decision_outcome` row (what a
+    reviewer did, `web.events.add_outcomes`): each holds a code from a closed list that
+    `web.events.make` checks, never text, an element id or a page number."""
 
     __tablename__ = "events"
 
@@ -495,6 +500,17 @@ class Event(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+    kind: Mapped[str | None] = mapped_column(String(16))
+    reason: Mapped[str | None] = mapped_column(String(64))
+    outcome: Mapped[str | None] = mapped_column(String(16))
+    origin: Mapped[str | None] = mapped_column(String(16))
+    source: Mapped[str | None] = mapped_column(String(16))
+    mode: Mapped[str | None] = mapped_column(String(16))
+    write_mode: Mapped[str | None] = mapped_column(String(16))
+    release: Mapped[str | None] = mapped_column(String(40))
+
+    # What `events.outcome_cells` groups by.
+    __table_args__ = (Index("ix_events_name_reason_release", "name", "reason", "release"),)
 
 
 class AuthIdentity(Base):

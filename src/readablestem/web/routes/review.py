@@ -74,6 +74,7 @@ from readablestem.web import (
     listen,
     notation,
     notice_places,
+    outcomes,
     page_edits,
     shares,
 )
@@ -1553,8 +1554,8 @@ def review_action(
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             restart_owner_clock(job, user, get_ctx(request).settings)
+            _decision_events(request, session, user, job, result, "single", change_made.every)
             session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
-            _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
@@ -1671,8 +1672,8 @@ def _group_action(
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
                 restart_owner_clock(job, user, get_ctx(request).settings)
+                _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
-                _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
@@ -1742,8 +1743,8 @@ def _page_group_action(
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
                 restart_owner_clock(job, user, get_ctx(request).settings)
+                _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
-                _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
@@ -1812,17 +1813,22 @@ def _decision_events(
     job: Job,
     result: DocumentResult,
     kind: str,
-    changed: int,
+    changes: list[ReviewChange],
 ) -> None:
-    """Usage events of a review write (web/events.py), in its transaction:
+    """Usage events of a review write (web/events.py), in its transaction and before its
+    ReviewEdits are made: `decision_outcome` for what it did (`web.outcomes`),
     `decision_made`, and `review_completed` when no decision is left open."""
+    settings = get_ctx(request).settings
+    outcomes.record_write(
+        session, settings, user_id=user.id, job=job, result=result, changes=changes, write_mode=kind
+    )
     events.add_decision(
         session,
-        get_ctx(request).settings,
+        settings,
         user_id=user.id,
         job=job,
         kind=kind,
-        changed=changed,
+        changed=1 if kind == "single" else len(changes),
         open_after=triage.open_decisions(result.fixes),
     )
 
@@ -1956,6 +1962,15 @@ def undo(
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             restart_owner_clock(job, user, get_ctx(request).settings)
+            # What the undone write recorded, taken back (`web.outcomes`).
+            outcomes.record_undo(
+                session,
+                get_ctx(request).settings,
+                user_id=user.id,
+                job=job,
+                result=result,
+                reversed_edits=edits,
+            )
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
