@@ -64,8 +64,8 @@ def fastest(runs: Sequence[Sequence[Converted]]) -> list[Converted]:
 
 def _spread(values: Sequence[float]) -> dict[str, float]:
     return {
-        "p50": round(percentile(values, 0.50), 4),
-        "p95": round(percentile(values, 0.95), 4),
+        "p50": round(percentile(values, 0.50), 4) if values else 0.0,
+        "p95": round(percentile(values, 0.95), 4) if values else 0.0,
     }
 
 

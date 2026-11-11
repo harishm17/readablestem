@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 
+import pytest
+
 from readablestem.cli.main import main
 from readablestem.eval.measure import Converted
 
@@ -37,6 +39,18 @@ def records(tmp_path, name: str, run: list[Converted]):
 
 def burden(*args) -> int:
     return main(["eval", "burden", *map(str, args)])
+
+
+@pytest.mark.parametrize("command", ["cost", "speed", "burden", "outputs"])
+def test_a_replay_in_which_nothing_could_be_measured_says_so(command, tmp_path, capsys):
+    failed = [Converted("w_lecture_5111", pages=PAGES, error="conversion failed")]
+    kept = tmp_path / "kept.json"
+    kept.write_text(json.dumps({"runs": [[done.as_dict() for done in failed]] * 2}))
+
+    code = main(["eval", command, "--from", str(kept), "--out", str(tmp_path / "out.json")])
+
+    assert code == 2
+    assert "no upload could be measured" in capsys.readouterr().err
 
 
 def test_a_conversion_that_asks_for_more_fails_the_bar(tmp_path, capsys):

@@ -569,6 +569,20 @@ def header(record: dict[str, Any]) -> list[str]:
         f"commit {record.get('commit')}.",
         profile.stamp_line(record.get("profile")),
     ]
+    stops = record.get("not_finished") or []
+    if stops:
+        clock = sum(stop["reason"] == "time_limit" for stop in stops)
+        places = "; ".join(
+            f"{stop['upload']} {stop['step']}"
+            + (f" page {stop['page'] + 1}" if stop["page"] is not None else "")
+            + f" ({stop['reason']})"
+            for stop in stops
+        )
+        lines.append(
+            f"Stopped early: {len(stops)} steps, {clock} of them at a time limit, where the "
+            f"result depends on how busy the machine was: {places}. A baseline is a run "
+            "with no step stopped at a time limit."
+        )
     if chosen.get("name") != split.HELD_OUT:
         lines.append(
             "Proof owed: a replay of held-out whole documents. No such recording exists, so "
@@ -579,11 +593,13 @@ def header(record: dict[str, Any]) -> list[str]:
 
 def stamps(measured: Iterable[Converted], settings: Settings) -> dict[str, Any]:
     """What a report of a measured replay says about itself (`eval.split`): the documents and
-    their side, the settings, and the code."""
+    their side, the settings, the code, and the steps that stopped before they were done
+    (a step stopped by a clock gives another result on a busier machine)."""
     from readablestem.eval import run_record, split
     from readablestem.ops import profile
     from readablestem.pipeline.run import PIPELINE_VERSION
 
+    measured = list(measured)
     manifest = corpus.load_manifest()
     names = sorted({done.upload.split("+")[0] for done in measured})
     hashes = {name: manifest[name].sha256 or manifest[name].builder for name in names}
@@ -596,6 +612,11 @@ def stamps(measured: Iterable[Converted], settings: Settings) -> dict[str, Any]:
         "pipeline_version": PIPELINE_VERSION,
         "commit": sha + ("+changes" if dirty else ""),
         "machine": machine(),
+        "not_finished": [
+            {"upload": done.upload, "step": stop.step, "page": stop.page, "reason": stop.reason}
+            for done in sorted(measured, key=lambda done: done.upload)
+            for stop in done.facts.not_finished
+        ],
     }
 
 

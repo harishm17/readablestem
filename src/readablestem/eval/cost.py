@@ -118,8 +118,8 @@ def page_dollars(done: Converted) -> list[dict[str, float]]:
 
 def _spread(values: Sequence[float]) -> dict[str, float]:
     return {
-        "p50": round(percentile(values, 0.50), 6),
-        "p95": round(percentile(values, 0.95), 6),
+        "p50": round(percentile(values, 0.50), 6) if values else 0.0,
+        "p95": round(percentile(values, 0.95), 6) if values else 0.0,
         "mean": round(sum(values) / len(values), 6) if values else 0.0,
     }
 

@@ -13,14 +13,16 @@ that stops says so with a "not finished" fact (`core.types.NotFinished`). Three 
 from __future__ import annotations
 
 import ast
+import json
 import os
 from pathlib import Path
 
 import pytest
 
+from readablestem.cli.main import main
 from readablestem.config import Settings
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
-from readablestem.core.types import NotFinished
+from readablestem.core.types import NotFinished, StepFacts
 from readablestem.eval import corpus, measure
 from readablestem.eval.measure import Converted
 from readablestem.models.fake import FakeVisionClient
@@ -151,6 +153,24 @@ def test_a_page_a_slow_machine_leaves_out_is_named_unless_the_step_says_it_stopp
         update={"not_finished": [NotFinished(step="layout", page=1, reason="time_limit", of=1)]}
     )
     assert measure.unexplained(quick, Converted(ENTRY, facts=said, parts=slow.parts)) == []
+
+
+def test_a_report_of_a_replay_names_the_step_a_clock_stopped(tmp_path, capsys) -> None:
+    # A step a clock stopped gives another result on a busier machine, so a report made from
+    # that run is no baseline: it says which step, in its record and in its text.
+    said = StepFacts(
+        not_finished=[NotFinished(step="page_type", page=3, reason="time_limit", of=1)]
+    )
+    run = [Converted(ENTRY, pages=4, kinds=["typical"] * 4, decisions=[], facts=said)]
+    records, out = tmp_path / "records.json", tmp_path / "burden.json"
+    records.write_text(json.dumps({"runs": [[done.as_dict() for done in run]]}))
+
+    assert main(["eval", "burden", "--from", str(records), "--out", str(out)]) == 0
+
+    assert json.loads(out.read_text())["not_finished"] == [
+        {"upload": ENTRY, "step": "page_type", "page": 3, "reason": "time_limit"}
+    ]
+    assert f"{ENTRY} page_type page 4 (time_limit)" in capsys.readouterr().out
 
 
 def test_a_page_typed_without_its_ink_because_the_time_ran_out_says_so(
