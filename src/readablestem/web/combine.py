@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import combine, output_chars
-from readablestem.web import output, ranges
+from readablestem.web import ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
@@ -48,6 +48,11 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
     draft and is held back by the same rule as a download (`web.output.export_state`). When two
     parts name a page in common (the same pages converted twice) the newest is kept and the
     older one left out, so the file never holds a page twice."""
+    # Imported here: `output` imports the app's dependencies, which import the worker, and the
+    # worker imports this module. At the top it made `import readablestem.web.worker` fail on
+    # its own (the proof report's limits table, tests/test_ops_limits.py run alone).
+    from readablestem.web import output
+
     if not job.part_group:
         return []
     rows = session.scalars(
