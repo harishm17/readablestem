@@ -8,8 +8,9 @@ expired document is a 404, a document that has not finished is a 409), the file 
 up to date first (`jobs.current_html`), the deletion clock restarts, the download is
 recorded for the usage events (with the decisions that were open, and its file type, which the
 review record lists), and the response carries the view CSP. The job page offers them only when
-no decision is open, as it offers the HTML file; a direct request for a draft works as the HTML
-download of a draft does.
+no decision is open, as it offers the HTML file; a direct request for a draft goes through the
+same gate as the HTML download (`web.output.check`): the draft page first, then a file named
+`-draft` that opens with the draft banner.
 
 The Word export runs pandoc as a child process (`export_docx`). At most `MAX_RUNNING` run at
 once; a request that cannot get a turn within `WAIT_S` seconds is told to try again. If pandoc
@@ -25,7 +26,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from readablestem.pipeline import export_docx, export_epub
-from readablestem.web import bundle, documents, events, retention
+from readablestem.web import bundle, documents, events, output, retention
 from readablestem.web.db import session_scope
 from readablestem.web.deps import PageError, UserDep, get_ctx
 from readablestem.web.logsafe import log_event
@@ -35,7 +36,7 @@ from readablestem.web.routes.jobs import (
     download_filename,
     export_failed_words,
     job_access,
-    require_done,
+    role_of,
 )
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.shares import VIEW
@@ -50,25 +51,29 @@ _turns = threading.BoundedSemaphore(MAX_RUNNING)
 EPUB_MEDIA_TYPE = "application/epub+zip"
 
 
-def _filename(title: str, job_id: str, ending: str) -> str:
-    """The HTML download's file name, with this file type's ending."""
-    return download_filename(title, job_id).removesuffix(".html") + ending
+def _filename(title: str, job_id: str, ending: str, state: output.ExportState) -> str:
+    """The HTML download's file name, with this file type's ending (`-draft` before it for a
+    draft)."""
+    name = download_filename(title, job_id).removesuffix(".html") + ending
+    return output.file_name(name, state)
 
 
-def _source(request: Request, job_id: str, user) -> tuple[str, str, int]:
-    """(html, title, decisions still open) of the owner's finished document, up to date; the
-    deletion clock restarts, as for the HTML download."""
+def _source(
+    request: Request, job_id: str, user, file_type: str
+) -> tuple[str, str, output.ExportState]:
+    """(html, title, export state) of the finished document, up to date and through the draft
+    gate (`output.check`; a draft's HTML carries its banner, so the file made from it does
+    too); the deletion clock restarts, as for the HTML download."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
-        require_done(job)
+        state = output.check(request, job, role_of(session, job, user), file_type)
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
-        still_open = documents.open_decisions(result.get("fixes"))
         if job.user_id == user.id:  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
-        return job.html or "", title, still_open
+        return output.marked(job.html or "", state), title, state
 
 
 def _recorded(request: Request, user, job_id: str, still_open: int, file_type: str) -> None:
@@ -118,7 +123,7 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             "job page.",
             context={"job_id": job_id},
         )
-    html, title, still_open = _source(request, job_id, user)
+    html, title, state = _source(request, job_id, user, "docx")
     try:
         data = make_file("docx", html, title)
     except Busy:
@@ -138,12 +143,12 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             "available from the job page.",
             context={"job_id": job_id},
         ) from None
-    _recorded(request, user, job_id, still_open, "docx")
+    _recorded(request, user, job_id, state.open_decisions, "docx")
     return Response(
         data,
         media_type=export_docx.DOCX_MEDIA_TYPE,
         headers={
-            "Content-Disposition": content_disposition(_filename(title, job_id, ".docx")),
+            "Content-Disposition": content_disposition(_filename(title, job_id, ".docx", state)),
             "Content-Security-Policy": VIEW_CSP,
         },
     )
@@ -152,7 +157,7 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
 @router.get("/jobs/{job_id}/download.epub")
 def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
     """The document as an EPUB 3 publication with MathML (pipeline/export_epub.py)."""
-    html, title, still_open = _source(request, job_id, user)
+    html, title, state = _source(request, job_id, user, "epub")
     try:
         data = make_file("epub", html, title)
     except export_epub.CanvasExportError as exc:  # EpubExportError is one
@@ -163,12 +168,12 @@ def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
             export_failed_words("EPUB", exc.code),
             context={"job_id": job_id},
         ) from None
-    _recorded(request, user, job_id, still_open, "epub")
+    _recorded(request, user, job_id, state.open_decisions, "epub")
     return Response(
         data,
         media_type=EPUB_MEDIA_TYPE,
         headers={
-            "Content-Disposition": content_disposition(_filename(title, job_id, ".epub")),
+            "Content-Disposition": content_disposition(_filename(title, job_id, ".epub", state)),
             "Content-Security-Policy": VIEW_CSP,
         },
     )

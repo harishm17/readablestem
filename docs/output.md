@@ -433,7 +433,8 @@ and each part's equations, figures and tables as in the part.
   (`user_id`: another person's part is never in it, whatever the group), finished, not past
   `retain_until` (an expired part counts as deleted before the purge, as `job_access` does),
   and whose `part_label` names as many pages as the part has; a part with a decision still
-  open is a draft and is held back, as "Download all" holds it back. When two parts name a
+  open is a draft and is held back by the same rule as a download (`web/output.py`
+  `export_state`), as "Download all" holds it back. When two parts name a
   page in common (the same pages converted twice) the newest is kept and the older left out.
   In page order. The "Combine parts" link counts exactly these (`JobView.combinable`), so it is
   never offered when the file would be a 409 page; with fewer than two (reached by an old link)

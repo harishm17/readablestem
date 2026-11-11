@@ -15,6 +15,7 @@ from fixtures.web.support import (
     WebEnv,
     csrf_from,
     encrypted_pdf,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -304,10 +305,10 @@ def test_status_poll_for_a_deleted_job_reloads_the_page(web):
 
 def test_download_view_and_crops_of_a_finished_job(web):
     job_id = finished_job(web)
-    download = web.browser.get(f"/jobs/{job_id}/download")
+    download = fetch(web.browser, f"/jobs/{job_id}/download")
     assert download.status_code == 200
     assert download.headers["content-disposition"].startswith(
-        f'attachment; filename="secret-heading-kinematics-{job_id[:6]}.html"'
+        f'attachment; filename="secret-heading-kinematics-{job_id[:6]}-draft.html"'
     )
     assert download.headers["content-security-policy"] == VIEW_CSP
     assert "SECRET-DOC-TEXT" in download.text

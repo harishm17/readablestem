@@ -355,6 +355,22 @@ def upload(
     return client.post("/jobs", data=fields, files={"pdf": (filename, data, "application/pdf")})
 
 
+def fetch(client: TestClient, path: str):
+    """GET a download as a person does: a draft is sent to its draft page first, and
+    "Download the draft anyway" (a POST with the CSRF token) leads on to the file."""
+    response = client.get(path)
+    location = response.headers.get("location", "")
+    if response.status_code != 303 or "/draft" not in location:
+        return response
+    page = client.get(location)
+    if page.status_code != 200:
+        return page
+    fields = dict(re.findall(r'<input type="hidden" name="([^"]+)" value="([^"]*)"', page.text))
+    confirmed = client.post(location.split("?")[0], data=fields)
+    assert confirmed.status_code == 303, confirmed.text
+    return client.get(confirmed.headers["location"])
+
+
 def job_id_from(response) -> str:
     location = response.headers["location"]
     assert location.startswith("/jobs/"), location

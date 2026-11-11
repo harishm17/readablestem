@@ -13,6 +13,7 @@ from fixtures.web.support import (
     ALICE,
     WebEnv,
     csrf_from,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -102,7 +103,7 @@ def test_the_converted_document_is_sandboxed_whichever_way_it_is_opened(web):
     job = job_id_from(upload_pdf(web.browser, make_pdf(1)))
     web.run_worker()
     for path in (f"/jobs/{job}/view", f"/jobs/{job}/download"):
-        response = web.browser.get(path)
+        response = fetch(web.browser, path)
         assert response.status_code == 200, path
         check_headers(response, csp=VIEW_CSP, where=path)
     assert VIEW_CSP.startswith("sandbox;")

@@ -52,6 +52,7 @@ from readablestem.web import (
     events,
     notation,
     office_convert,
+    output,
     pending,
     retention,
     sample,
@@ -434,6 +435,11 @@ _TOO_LITTLE = {
 
 def is_owner(job: Job, user: CurrentUser) -> bool:
     return job.user_id == user.id
+
+
+def role_of(session: Session, job: Job, user: CurrentUser) -> str:
+    """This person's right to a job `job_access` already let them see (`shares.role_of`)."""
+    return shares.role_of(session, job, user) or VIEW
 
 
 def restart_owner_clock(job: Job, user: CurrentUser, settings) -> None:
@@ -1512,10 +1518,22 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
 # --------------------------------------------------------------------------- draft
 
 
+def _draft_target(format: str, course: str) -> tuple[str, str]:
+    """The file type and Canvas course number a draft confirm leads on to; anything else is
+    the HTML file, without a course."""
+    file_type = format if format in output.FORMATS else "html"
+    number = course.strip() if file_type == "canvas" else ""
+    return file_type, number if number and export_canvas.valid_course_number(number) else ""
+
+
 @router.get("/jobs/{job_id}/draft")
-def draft(request: Request, job_id: str, user: UserDep) -> Response:
-    """Asked before a download while decisions are open: what students would get, with
-    the review as the main way on (MF9). With none open, the job page's finish line."""
+def draft(
+    request: Request, job_id: str, user: UserDep, format: str = "html", course: str = ""
+) -> Response:
+    """Asked before a draft leaves (MF9, SW21): what students would get, with the review as
+    the main way on. Every download of a draft without this page's confirm is sent here
+    (`output.check`), with the file type it asked for. With no decision open, the job page's
+    finish line. A person who can only view is never offered a draft."""
     job, _ = load_job_status(request, job_id, user)
     if job.status != JobStatus.DONE or job.page is None:
         raise PageError(409, "Not ready yet", "This document has not finished converting.",
@@ -1523,14 +1541,47 @@ def draft(request: Request, job_id: str, user: UserDep) -> Response:
     decisions = job.page.counts.decisions
     if not decisions:
         return RedirectResponse(f"/jobs/{job.id}#ready", status_code=303)
+    if not job.can_review:
+        raise PageError(403, *output.DRAFT_NOT_FOR_VIEWERS, context={"job_id": job_id})
+    file_type, number = _draft_target(format, course)
     item = f"?item={job.page.first_open}" if job.page.first_open else ""
     context = {
         "job": job,
         "decisions": decisions,
         "draft": job.page.draft,
+        "banner": assemble.draft_banner(decisions),
         "review_url": f"/jobs/{job_id}/review{item}",
+        "file_type": file_type,
+        "course": number,
     }
     return render(request, "job_draft.html", context)
+
+
+@router.post("/jobs/{job_id}/draft", dependencies=[Depends(require_csrf)])
+def confirm_draft(
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    format: Annotated[str, Form()] = "html",
+    course: Annotated[str, Form()] = "",
+) -> Response:
+    """ "Download the draft anyway": the one place a confirm token is made (`output`). The
+    browser is sent on to the download with it; the token holds for this session, this
+    job and its current version, for `output.TOKEN_S` seconds."""
+    file_type, number = _draft_target(format, course)
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, VIEW)
+        state = output.export_state(job)
+        if state.key == output.NOT_AVAILABLE:
+            raise PageError(409, *output.NOT_FINISHED, context={"job_id": job_id})
+        token = ""
+        if state.draft:
+            if not output.may_take_draft(role_of(session, job, user)):
+                raise PageError(403, *output.DRAFT_NOT_FOR_VIEWERS, context={"job_id": job_id})
+            token = output.mint_token(request, job)
+    target = output.download_url(job_id, file_type, token, course=number)
+    return RedirectResponse(target, status_code=303)
 
 
 # --------------------------------------------------------------------------- language
@@ -1701,12 +1752,13 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
-        require_done(job)
+        state = output.check(request, job, role_of(session, job, user), "html")
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
-        html, name = job.html or "", download_filename(title, job.id)
-        still_open = documents.open_decisions(result.get("fixes"))
+        html = output.marked(job.html or "", state)
+        name = output.file_name(download_filename(title, job.id), state)
+        still_open = state.open_decisions
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
     events.record_download(
@@ -1742,20 +1794,21 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             context={"job_id": job_id},
         )
     ctx = get_ctx(request)
-    export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, number)
+    export, title, job_ref, state = _canvas_export(request, user, job_id, "canvas", number)
+    name = canvas_filename(title, job_ref)
     events.record_download(
         ctx.factory,
         ctx.settings,
         user_id=user.id,
         job_id=job_id,
-        open_decisions=still_open,
+        open_decisions=state.open_decisions,
         file_type="canvas",
     )
     return Response(
         export_canvas.build_zip(export),
         media_type="application/zip",
         headers={
-            "Content-Disposition": content_disposition(canvas_filename(title, job_ref)),
+            "Content-Disposition": content_disposition(output.file_name(name, state)),
             "Content-Security-Policy": VIEW_CSP,
         },
     )
@@ -1772,20 +1825,21 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     which Canvas, Blackboard, Moodle and D2L import. A GET like the other downloads, for the
     owner only."""
     ctx = get_ctx(request)
-    export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, None)
+    export, title, job_ref, state = _canvas_export(request, user, job_id, "cartridge", None)
+    name = cartridge_filename(title, job_ref)
     events.record_download(
         ctx.factory,
         ctx.settings,
         user_id=user.id,
         job_id=job_id,
-        open_decisions=still_open,
+        open_decisions=state.open_decisions,
         file_type="cartridge",
     )
     return Response(
         export_cartridge.build_cartridge(export),
         media_type="application/zip",
         headers={
-            "Content-Disposition": content_disposition(cartridge_filename(title, job_ref)),
+            "Content-Disposition": content_disposition(output.file_name(name, state)),
             "Content-Security-Policy": VIEW_CSP,
         },
     )
@@ -1893,18 +1947,20 @@ def export_failed_words(version: str, code: str) -> str:
 
 
 def _canvas_export(
-    ctx: AppContext, user: CurrentUser, job_id: str, number: str | None
-) -> tuple[export_canvas.CanvasExport, str, str, int]:
-    """The finished document, exported for Canvas (the owner's, done, up to date). A
-    picture the export cannot hold is a 409 page, and the HTML file stays available."""
+    request: Request, user: CurrentUser, job_id: str, file_type: str, number: str | None
+) -> tuple[export_canvas.CanvasExport, str, str, output.ExportState]:
+    """The finished document, exported for Canvas (done, up to date, through the draft gate
+    `output.check`; a draft carries its banner). A picture the export cannot hold is a 409
+    page, and the HTML file stays available."""
+    ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
-        require_done(job)
+        role = role_of(session, job, user)
+        state = output.check(request, job, role, file_type, course=number or "")
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename)
-        html, job_ref = job.html or "", job.id
-        still_open = documents.open_decisions(result.get("fixes"))
+        html, job_ref = output.marked(job.html or "", state), job.id
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
     try:
@@ -1922,7 +1978,7 @@ def _canvas_export(
             export_failed_words("Canvas version", exc.code),
             context={"job_id": job_ref},
         ) from None
-    return export, title, job_ref, still_open
+    return export, title, job_ref, state
 
 
 @router.get("/jobs/{job_id}/view")
@@ -1931,7 +1987,9 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         require_done(job)
-        html = current_html(ctx, session, job).html or ""
+        # The preview can be saved as it is, so a draft says so here as in its download.
+        state = output.export_state(job)
+        html = output.marked(current_html(ctx, session, job).html or "", state)
     events.record(
         ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True
     )

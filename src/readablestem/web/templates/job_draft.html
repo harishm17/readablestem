@@ -1,14 +1,27 @@
 {% extends "base.html" %}
-{# Asked before a download while decisions are open (MF9): what students would get, and
-   the review as the main way on. Works without JavaScript: two links. #}
+{# Asked before a draft leaves (MF9, SW21): what students would get, and the review as the
+   main way on. Every download of a draft without this page's confirm comes here, so the
+   question cannot be skipped by typing the address. "Download the draft anyway" is a form:
+   its POST makes the confirm (web/output.py) and sends the browser on to the file. Works
+   without JavaScript. #}
+{% set kinds = {"html": "the HTML file", "canvas": "the Canvas zip", "cartridge": "the Common Cartridge", "docx": "the Word file", "epub": "the EPUB"} %}
 {% block title %}Download a draft of {{ job.filename }}?{% endblock %}
 {% block content %}
 <h1>Download a draft of {{ job.filename }}?</h1>
 <p>{{ decisions }} {{ "decision is" if decisions == 1 else "decisions are" }} still open.
-  {{ draft }} The file also tells them that some parts have not been checked by you yet.</p>
+  {{ draft }} The file's name ends in &ldquo;-draft&rdquo;, and it opens with this line:</p>
+<p class="draft-mark" role="note">{{ banner }}</p>
+<p>Make the decisions first, then download it again, before you give it to students.</p>
 <ul class="actions">
   <li><a class="button" href="{{ review_url }}">Review {{ decisions }} {{ "decision" if decisions == 1 else "decisions" }} first</a></li>
-  <li><a href="/jobs/{{ job.id }}/download">Download the draft anyway</a></li>
+  <li>
+    <form method="post" action="/jobs/{{ job.id }}/draft" class="inline-form">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <input type="hidden" name="format" value="{{ file_type }}">
+      {% if course %}<input type="hidden" name="course" value="{{ course }}">{% endif %}
+      <button type="submit" class="button-secondary">Download the draft anyway ({{ kinds[file_type] }})</button>
+    </form>
+  </li>
 </ul>
 <p><a href="/jobs/{{ job.id }}">Back to {{ job.filename }}</a></p>
 {% endblock %}

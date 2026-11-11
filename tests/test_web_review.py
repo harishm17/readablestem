@@ -21,6 +21,7 @@ from fixtures.web.support import (
     ALICE,
     PNG,
     WebEnv,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -404,7 +405,7 @@ def test_a_failed_render_loses_no_decision_and_shows_no_content(web):
     with session_scope(web.ctx.factory) as session:
         assert session.scalar(select(func.count()).select_from(ReviewEdit)) == 1
     assert web.job(web.job_id).html_stale
-    failed = web.browser.get(f"/jobs/{web.job_id}/download")
+    failed = fetch(web.browser, f"/jobs/{web.job_id}/download")
     assert failed.status_code == 500 and "SECRET" not in failed.text
     assert web.job(web.job_id).html_stale  # nothing was half-written
     web.pipeline.render_raises = None

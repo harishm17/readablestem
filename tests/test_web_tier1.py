@@ -16,7 +16,7 @@ from html import unescape
 import pytest
 
 from fixtures.web.review_doc import GROUP, review_output, review_pdf
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token, upload
+from fixtures.web.support import ALICE, BOB, WebEnv, fetch, job_id_from, login, token, upload
 from fixtures.web.table_doc import table_output, table_pdf
 from readablestem.core.types import (
     Check,
@@ -131,12 +131,12 @@ def test_each_choice_sets_the_mode_and_the_time_kept(ux, fields, mode, opt_in, d
 
 def test_a_download_restarts_the_clock_of_a_day_and_a_week_job(ux):
     set_retain_until(ux, utcnow() + timedelta(hours=2))
-    assert ux.browser.get(f"/jobs/{ux.job_id}/download").status_code == 200
+    assert fetch(ux.browser, f"/jobs/{ux.job_id}/download").status_code == 200
     assert timedelta(hours=23, minutes=55) < retain_in(ux) <= timedelta(hours=24)
 
     post(ux, "/keep")
     set_retain_until(ux, utcnow() + timedelta(days=1))
-    assert ux.browser.get(f"/jobs/{ux.job_id}/download").status_code == 200
+    assert fetch(ux.browser, f"/jobs/{ux.job_id}/download").status_code == 200
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
 
 
@@ -225,7 +225,7 @@ def test_setting_a_title_remakes_the_file_and_names_everything(titled):
     assert title_field(html) == "Calculus week 3"
     assert "The title students hear is now “Calculus week 3”" in text_of(html)
     assert ">Calculus week 3</a>" in titled.browser.get("/app").text
-    response = titled.browser.get(f"/jobs/{titled.job_id}/download")
+    response = fetch(titled.browser, f"/jobs/{titled.job_id}/download")
     assert 'filename="calculus-week-3-' in response.headers["content-disposition"]
     assert "<title>Calculus week 3</title>" in response.text
 
@@ -279,11 +279,11 @@ def test_the_contact_line_goes_in_the_student_footer(ux):
         'tell your instructor: <a href="mailto:prof.lee@example.edu">prof.lee@example.edu</a>.'
         in footer
     )
-    downloaded = ux.browser.get(f"/jobs/{ux.job_id}/download").text
-    assert 'href="mailto:prof.lee@example.edu"' in downloaded
     html = page(ux)
     assert 'id="contact"' in html and 'value="prof.lee@example.edu"' in html
     assert "added to the student file" in text_of(html)
+    downloaded = fetch(ux.browser, f"/jobs/{ux.job_id}/download").text
+    assert 'href="mailto:prof.lee@example.edu"' in downloaded
 
 
 def test_a_web_address_is_accepted_and_clearing_it_removes_the_line(ux):

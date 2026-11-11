@@ -15,7 +15,17 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import func, select
 
-from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, job_id_from, login, make_pdf, upload
+from fixtures.web.support import (
+    ALICE,
+    BOB,
+    WebEnv,
+    csrf_from,
+    fetch,
+    job_id_from,
+    login,
+    make_pdf,
+    upload,
+)
 from readablestem.ops import retention as purge
 from readablestem.web import shares
 from readablestem.web.database import as_utc
@@ -34,16 +44,19 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}"): "view",
     ("GET", "/jobs/{job_id}/status"): "view",
     ("GET", "/jobs/{job_id}/progress"): "view",
-    ("GET", "/jobs/{job_id}/draft"): "view",
     ("GET", "/jobs/{job_id}/view"): "view",
     ("GET", "/jobs/{job_id}/listen"): "view",
     ("GET", "/jobs/{job_id}/record"): "view",
     ("GET", "/jobs/{job_id}/record.csv"): "view",
-    ("GET", "/jobs/{job_id}/download"): "view",
-    ("GET", "/jobs/{job_id}/download/canvas"): "view",
-    ("GET", "/jobs/{job_id}/download/cartridge"): "view",
-    ("GET", "/jobs/{job_id}/download.docx"): "view",
-    ("GET", "/jobs/{job_id}/download.epub"): "view",
+    # The site's document has decisions open, so it is a draft: a person who can only view is
+    # never given one (`web.output`); a ready document's downloads need only "view".
+    ("GET", "/jobs/{job_id}/draft"): "review",
+    ("POST", "/jobs/{job_id}/draft"): "review",
+    ("GET", "/jobs/{job_id}/download"): "review",
+    ("GET", "/jobs/{job_id}/download/canvas"): "review",
+    ("GET", "/jobs/{job_id}/download/cartridge"): "review",
+    ("GET", "/jobs/{job_id}/download.docx"): "review",
+    ("GET", "/jobs/{job_id}/download.epub"): "review",
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): "view",
     ("GET", "/jobs/{job_id}/feedback"): "view",
     ("POST", "/jobs/{job_id}/feedback"): "view",
@@ -384,9 +397,9 @@ def test_only_the_owner_s_use_keeps_a_document_longer(site):
     soon = utcnow() + timedelta(hours=2)
     with session_scope(site.ctx.factory) as session:
         session.get(Job, site.job_id).retain_until = soon
-    assert site.who[VIEWER].get(f"/jobs/{site.job_id}/download.epub").status_code == 200
+    assert fetch(site.who[REVIEWER], f"/jobs/{site.job_id}/download.epub").status_code == 200
     assert as_utc(site.job(site.job_id).retain_until) == as_utc(soon)
-    assert site.who[OWNER].get(f"/jobs/{site.job_id}/download.epub").status_code == 200
+    assert fetch(site.who[OWNER], f"/jobs/{site.job_id}/download.epub").status_code == 200
     assert as_utc(site.job(site.job_id).retain_until) > as_utc(soon)
 
 
