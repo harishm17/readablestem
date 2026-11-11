@@ -45,7 +45,9 @@ Untrusted input: MuPDF is C code parsing bytes from the internet, and some damag
 make it abort the whole process (a glibc double free while rendering). Before a page is
 extracted or rendered in this process, `analyze` and `crop` have a child process do the
 same once (`_probe_pages`); a child that dies or hangs makes the file
-`LayoutError("unreadable")`.
+`LayoutError("unreadable")`. Before that, `analyze` counts how far the selected pages'
+drawing instructions inflate and refuses them over the content budget
+(`core.content_budget`, `LayoutError("content_too_large")`), since every step parses them.
 MuPDF's own error and warning printing is switched off: it quotes content-stream tokens
 and resource names from the PDF, which must not reach the logs.
 
@@ -79,6 +81,7 @@ from typing import Any, Literal, cast
 import pymupdf
 
 from readablestem.config import ConfigError
+from readablestem.core import content_budget
 from readablestem.core import images as pixel_budget
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.childenv import child_env
@@ -430,6 +433,8 @@ class LayoutError(ValueError):
         # "unreadable" | "encrypted" | "too_many_pages" | "no_pages" | "page_out_of_range"
         # | "too_complex" (a page needs more time or memory to read than a conversion has)
         # | "image_too_large" (decoding its pictures took longer than a job may spend)
+        # | "content_too_large" (a page's drawing instructions inflate past the content
+        # budget, `core.content_budget`: the upload probe refuses these first)
         self.code = code
 
 
@@ -542,7 +547,9 @@ def analyze(
         try:
             doc = _open(pdf_bytes)
             try:
+                _check_content(lambda: content_budget.check_objects(doc))  # before the page tree
                 selected = _select_pages(doc.page_count, pages, max_pages)
+                _check_content(lambda: content_budget.check(doc, selected))
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
                 return _analyze_document(doc, selected, page_math, display_grouping)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
@@ -1221,6 +1228,18 @@ def _open(pdf_bytes: bytes) -> pymupdf.Document:
         doc.close()
         raise LayoutError("encrypted", "the PDF needs a password to open")
     return doc
+
+
+def _check_content(check: Callable[[], None]) -> None:
+    """Run a check of the content budget (`core.content_budget`) and refuse the document
+    when it is over: the object streams before the page tree is read, the selected pages
+    before any step parses them (each step parses all of their content again). Every PDF
+    converted comes here (the worker, `readablestem convert`, the evals), whether or not it
+    passed the upload probe."""
+    try:
+        check()
+    except content_budget.ContentTooLarge as exc:
+        raise LayoutError("content_too_large", str(exc)) from None
 
 
 def _select_pages(page_count: int, pages: list[int] | None, max_pages: int | None) -> list[int]:
