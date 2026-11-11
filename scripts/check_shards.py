@@ -1,10 +1,14 @@
-"""Check that CI's test shards together ran every collected test exactly once.
+"""Check that CI's test shards together ran every collected test exactly once, and with
+`--routes` that together they requested every route of the app.
 
-Usage: python scripts/check_shards.py REPORT_DIR EXPECTED_SHARDS
+Usage: python scripts/check_shards.py REPORT_DIR EXPECTED_SHARDS [--routes]
 
 Each shard writes a JSON report with `pytest --shard-report` (tests/conftest.py). A shard
 that did not run, a test that no shard ran, and a test that two shards ran all fail the job.
-Standard library only, so the CI job needs no install.
+With `--routes`, so does a route of the app that gave no shard's tests its own answer:
+either no test requests it, or every test of it is refused (tests/_routes.py says what
+counts and holds the list of routes let off, which is empty). Standard library only, so the
+CI job needs no install.
 """
 
 from __future__ import annotations
@@ -39,16 +43,48 @@ def check(reports: list[dict], expected: int) -> list[str]:
     return problems
 
 
+def routes(reports: list[dict]) -> tuple[int, list[str]]:
+    """How many routes the shards' apps had, and one problem for each that gave no shard's
+    tests its own answer. A report with no route list is a problem itself: nothing was
+    measured."""
+    known: set[str] = set()
+    requested: set[str] = set()
+    covered: set[str] = set()
+    problems = []
+    for report in reports:
+        seen = report.get("routes")
+        if seen is None:
+            problems.append(f"shard {report['shard']} wrote no list of routes")
+            continue
+        known.update(seen["known"])
+        requested.update(seen["requested"])
+        covered.update(seen["answered"], seen["allowed"])
+    if not known and not problems:
+        problems.append("no shard built the app: no route was seen")
+    for route in sorted(known - covered):
+        if route in requested:
+            problems.append(f"tests of this route only get refusals, never its own answer: {route}")
+        else:
+            problems.append(f"no test requests the route: {route}")
+    return len(known), problems
+
+
 def main(argv: list[str]) -> int:
     folder, expected = Path(argv[1]), int(argv[2])
     reports = [json.loads(p.read_text()) for p in sorted(folder.glob("**/shard-*.json"))]
     problems = check(reports, expected)
+    count = 0
+    if "--routes" in argv[3:] and reports:
+        count, missing = routes(reports)
+        problems += missing
     for line in problems[:50]:
         print(f"::error::{line}")
     if problems:
         return 1
     total = len(reports[0]["collected"])
     print(f"ok: {total} tests, each ran in exactly one of {expected} shards")
+    if count:
+        print(f"ok: {count} routes, each gave a test its own answer")
     return 0
 
 

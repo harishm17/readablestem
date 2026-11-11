@@ -38,6 +38,12 @@ measured and replayed against.
   child cannot read what the worker sent it, it says so: the job fails as
   `conversion_unavailable` (our side, "Try again" offered) with `conversion_child_link_failed`
   in the log, where before it looked like a crash on the person's PDF.
+- **Every route has a test of what it does.** The test run notes each request that
+  reaches the app, and CI fails for a route no test requests or whose tests only get
+  refusals (`scripts/check_shards.py --routes`, `pytest --route-coverage`). The first run
+  found one: the region preview picture, now checked.
+- **"Download all" needs two.** The documents list and a course page offered "Download all
+  1 ready document"; the line now appears from two ready documents up.
 - **The quality ledger** (`readablestem eval ledger`): one table over the evals' kept
   records, led by the whole-document rows (silent errors per 100 pages, documents with no
   silent error, required decisions a page, false flags per true flag). Every figure is

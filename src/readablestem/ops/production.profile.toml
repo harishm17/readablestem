@@ -147,6 +147,9 @@ CLAUDE_SECOND_CHECK = { value = "off", source = ".railway/railway.ts:136-138 and
 CLAUDE_CHECK_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }
 CLAUDE_CHECK_EFFORT = { value = "low", source = "not stated; code default" }
 CLAUDE_CHECK_SCOPE = { value = "accepted", source = "not stated; code default" }
+# Word and PowerPoint uploads work only where the image has the converter. Before an image
+# that has it goes to production: equations typed as plain text are lost and the pages say
+# "Your PDF" for a Word source (audit findings F-030, F-060).
 OFFICE_INPUT_ENABLED = { value = true, source = "not stated; code default" }
 MATH_READER_CLAUDE_ENABLED = { value = false, source = "not stated; code default" }
 MATH_READER_CLAUDE_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }
@@ -171,6 +174,9 @@ PAGE_AUDIT_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code def
 PAGE_AUDIT_MAX_OUTPUT_TOKENS = { value = 1500, source = "not stated; code default (the page audit runs in no job yet)" }
 FEATURE_IMAGE_PAGES = { value = true, source = "docs/web.md:83 and docs/deploy-railway.md:201 at 693cca24, stated 2026-11-04" }
 FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-railway.md:166 at 693cca24, on since 2026-11-04 13:53 UTC" }
+# Before this is turned on: a zip with one unsupported file is refused whole, a .txt is
+# dropped without a word, a Mac zip brings extra entries, and the batch page offers
+# "Download all" for one file (audit findings F-029, F-100).
 FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04" }
 FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04" }
 IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default" }

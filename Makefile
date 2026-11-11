@@ -67,7 +67,7 @@ ci-local:
 	uv run ruff format --check .
 	uv run ty check src
 	uv run python scripts/dead_code.py
-	uv run pytest -q
+	uv run pytest -q --route-coverage
 	$(CI_314) uv sync --locked --all-extras --group browser --python 3.14
 	$(CI_314) uv run --python 3.14 ty check src
 	$(CI_314) uv run --python 3.14 pytest -q

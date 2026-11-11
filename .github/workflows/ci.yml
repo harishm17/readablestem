@@ -205,7 +205,7 @@ jobs:
       - name: Python 3.12
         run: |
           mkdir r312 && cp reports/*/shard-3.12-*.json r312/
-          python3 scripts/check_shards.py r312 "$SHARDS"
+          python3 scripts/check_shards.py r312 "$SHARDS" --routes
       - name: Browser tests
         run: |
           mkdir rbrowser && cp reports/*/shard-browser-*.json rbrowser/

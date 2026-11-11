@@ -818,7 +818,7 @@ Nothing it prints is document content.
 |---|---|
 | `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `scripts/dead_code.py` (no function, class, method or property of the package without a caller), and an import of every module |
 | `pytest` (shards) | `pytest -n auto --shard i/4` (offline, parallel; Postgres tests use the embedded server on 3.12). 3.12 always; 3.14 in full on main, nightly and dependency or workflow changes, otherwise one smoke shard. Rules and sharding: [development.md](development.md), "CI" |
-| `shard-coverage` | Every collected test ran in exactly one shard |
+| `shard-coverage` | Every collected test ran in exactly one shard, and every route of the app gave some test its own answer (not only a refusal) |
 | `ci-passed` | Fails if any other job failed or was cancelled; the one check to require in branch protection |
 | `postgres` | `alembic upgrade head` and `alembic check` (models match migrations), then `pytest -m postgres`, against a Postgres 18 service container (the major the backup image uses). Zero collected tests fails the job |
 | `browser` | `pytest -m browser -n 3 --dist loadfile --shard i/2` (two jobs) with Playwright Chromium (axe-core checks); the browsers and axe-core are cached; zero collected tests fails the job |
