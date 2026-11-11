@@ -13,7 +13,7 @@ arrived at; read them by question, not front to back.
 | Why does the app ask a person about some conversions and not others? | [steps.md](steps.md); [eval.md](eval.md), "Review load" |
 | How are equations and figures checked after the model has answered? | [steps.md](steps.md) |
 | How are headings, lists, equations and figures found in a PDF? | [layout.md](layout.md): "How a page is read" and "Known failure modes" |
-| How do tables work (off by default in the code, on in production)? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
+| How do tables work (off by default in the code)? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
 | Which equation scores are secondary, and what do they say about the held-out run? | [eval-secondary-metrics.md](eval-secondary-metrics.md) |
 | What does the current system score on the held-out sections (a re-measurement, not blind)? | [remeasurement-2026-10-21.md](remeasurement-2026-10-21.md) |
 | Does the page math pass help, and what did it cost? | [eval-page-math.md](eval-page-math.md); [decisions/0006-page-math-pass.md](decisions/0006-page-math-pass.md) |

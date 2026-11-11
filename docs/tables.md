@@ -288,7 +288,7 @@ falls in the table's box); now each is one TABLE element.
 **These numbers are optimistic.** The arbitration was developed on these same pages, so
 expect lower precision and recall on new documents. Before `FEATURE_TABLES` is turned on,
 check it on a private set of 3-5 real course PDFs kept out of git (the challenge's
-recommendation); that was the rule when this was written. `FEATURE_TABLES` has been on in production since the 2026-10-21 decision; the measurement of what turning
+recommendation); that was the rule when this was written. `FEATURE_TABLES` was turned on in production by the 2026-10-21 decision (its value now: `src/readablestem/ops/production.profile.toml`); the measurement of what turning
 it on does, and how the blockers were closed, is at the end of this page ("Tables on, on the development
 sets").
 
@@ -402,7 +402,7 @@ exception's class name), never text. MuPDF's own messages are counted and droppe
 
 `pipeline.run` sends every TABLE element to `table_step.rebuild` with its crop, like an
 equation or a figure. Rebuilding is behind `FEATURE_TABLES` (`ConversionOptions.tables`,
-off by default in code, on in production). Off, the table is kept as an image of the table with a required decision
+off by default in code; production's value is in `src/readablestem/ops/production.profile.toml`). Off, the table is kept as an image of the table with a required decision
 (FAILED, reason `table_not_rebuilt`) before any model work.
 
 ### What the model is asked
