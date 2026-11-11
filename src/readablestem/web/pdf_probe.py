@@ -171,10 +171,11 @@ def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> N
     from readablestem.pipeline.page_type import document_refusal
 
     try:
-        for page in doc:
+        for number in range(doc.page_count):
+            page = doc[number]
             if max(page.rect.width, page.rect.height) > MAX_PAGE_SIDE_PT:
                 raise ProbeRejected("page_too_large")
-            if _largest_image_pixels(doc, page.number) > MAX_UPLOAD_IMAGE_PIXELS:
+            if _largest_image_pixels(doc, number) > MAX_UPLOAD_IMAGE_PIXELS:
                 raise ProbeRejected("image_too_large")
         reason = document_refusal(doc)
     except ProbeRejected:

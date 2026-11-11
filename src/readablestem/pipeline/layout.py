@@ -72,7 +72,7 @@ from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import combinations, count, pairwise
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import pymupdf
 
@@ -6480,10 +6480,11 @@ def _raster_figures(
 def _images_in_budget(page: pymupdf.Page) -> bool:
     """Whether every image the page lists is within the pixel budget (`core.images`), by
     the sizes their PDF objects state: only then may anything hash or decode them."""
+    doc, number = _where(page)
     try:
         return all(
             pixel_budget.within_budget(width, height)
-            for _, _, width, height, *_ in page.parent.get_page_images(page.number, full=True)
+            for _, _, width, height, *_ in doc.get_page_images(number, full=True)
         )
     except (RuntimeError, ValueError):
         return False
@@ -6496,7 +6497,7 @@ def _image_infos(page: pymupdf.Page, *, hashes: bool = False) -> list[dict[str, 
     infos come without digests."""
     if not hashes or not _images_in_budget(page):
         return page.get_image_info()
-    memo = _decode_memo(page.parent)
+    memo = _decode_memo(_where(page)[0])
     started = time.perf_counter()
     try:
         return page.get_image_info(hashes=True)
@@ -6510,7 +6511,7 @@ def _image_xrefs(page: pymupdf.Page, count: int) -> list[int]:
     (kept per image for the document, not made again for every page) when the page's images
     are all within the pixel budget; else by their stated size, an image whose size another
     listed image shares being 0."""
-    doc, number = page.parent, page.number
+    doc, number = _where(page)
     infos = page.get_image_info()
     if len(infos) != count:
         return [0] * count
@@ -6573,8 +6574,14 @@ def _charge(memo: _DecodeMemo, started: float) -> None:
 def _decode_memo(doc: pymupdf.Document) -> _DecodeMemo:
     memo = getattr(doc, "_rs_decode_memo", None)
     if memo is None:
-        memo = doc._rs_decode_memo = _DecodeMemo()  # type: ignore[attr-defined]
+        memo = doc._rs_decode_memo = _DecodeMemo()  # ty: ignore[unresolved-attribute]
     return memo
+
+
+def _where(page: pymupdf.Page) -> tuple[pymupdf.Document, int]:
+    """The document `page` was read from and its number there. PyMuPDF types
+    `Page.parent` and `Page.number` as optional; a page of an open document has both."""
+    return cast(pymupdf.Document, page.parent), cast(int, page.number)
 
 
 def _image_size(doc: pymupdf.Document, xref: int) -> tuple[int, int]:
