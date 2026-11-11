@@ -129,6 +129,17 @@ def _where(item: dict[str, Any]) -> str:
     return str(file)
 
 
+# What to write instead of a special character LaTeX cannot read in running text.
+CHARACTER_ADVICE = {
+    "^": "If it starts an exponent, put the formula inside $ signs; for the character itself, "
+    "write \\^{}. ",
+    "_": "If it starts a subscript, put the formula inside $ signs; for the character itself, "
+    "write \\_. ",
+    "&": "For the character itself, write \\&. ",
+    "#": "For the character itself, write \\#. ",
+}
+
+
 def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
     """The stop sentence of a source job, naming the file or commands from its
     `error_detail` (`source.report.stop`); the plain sentence when there is no detail."""
@@ -151,6 +162,24 @@ def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
             f"This source asks for {total} files that are not in the upload, listed below. "
             "Nothing was converted. Zip the whole project folder with those files in it and "
             "upload the zip, or upload the PDF."
+        )
+    if code == "source_syntax_error" and detail.get("character") and first:
+        # ^ _ & # in running text (`source.report.CHARACTERS`): LaTeX reads them only in a
+        # formula, a table or a definition
+        if total == 1:
+            character = str(first["name"])
+            advice = CHARACTER_ADVICE.get(character, "")
+            return (
+                f"This source has the character {character} in its text{at}, where LaTeX "
+                "cannot read it, so the words around it would be wrong and nothing was "
+                f"converted. {advice}Then upload it again, or upload the PDF."
+            )
+        return (
+            f"This source has {total} special characters in its text where LaTeX cannot read "
+            f"them, listed below. The words around them would be wrong, so nothing was "
+            "converted. Put each exponent or subscript inside $ signs, and write each "
+            "character you mean as itself with a backslash: \\&, \\#, \\_ or \\^{}. Then upload "
+            "it again, or upload the PDF."
         )
     if code == "source_syntax_error" and where:
         return (

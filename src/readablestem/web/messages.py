@@ -32,6 +32,19 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
         "unknown_command",
     ): "The LaTeX source uses a command this tool does not know, so this equation could "
     "not be read from it: correct the LaTeX or reject it.",
+    # LaTeX source (readablestem.source.ltx_reader): what a table, heading or figure shows
+    # that LaTeX could not read, or a picture that left its table cell
+    (
+        "source.read",
+        "source_formula_unread",
+    ): "A formula here uses a command LaTeX does not know, so it is shown as LaTeX code: "
+    "correct it, or accept it as it is.",
+    (
+        "source.read",
+        "source_table_picture",
+    ): "A cell of this table holds a picture, which follows the table as a figure of its own "
+    "and leaves the cell empty: say in the cell what the picture is, or accept the table as "
+    "it is.",
     # LaTeX (pipeline.validate.check_latex)
     ("latex.not_empty", "empty"): "The transcription is empty: type the LaTeX for this "
     "equation, or reject it to keep the image.",
@@ -485,6 +498,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "file says that it is not there.",
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
+    "source_unread": "This tool could not read part of the LaTeX source, so it is not in the file.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
@@ -561,12 +575,18 @@ def source_item_notes(result: DocumentResult) -> dict[str, str]:
             names = commands.setdefault(mark.element_id, [])
             if mark.name not in names:
                 names.append(mark.name)
+    kinds = {e.id: e.kind.value for e in result.elements}
+    holders = {"table": "this table", "heading": "this heading", "figure": "this caption"}
     for element_id, names in commands.items():
         listed = ", ".join(names[:5])
         verb = "is" if len(names) == 1 else "are"
-        notes[element_id] = (
-            f"This formula uses {listed}, which {verb} not defined. It is shown as it was written."
+        where = holders.get(kinds.get(element_id, ""))
+        subject = f"A formula in {where}" if where else "This formula"
+        sentence = (
+            f"{subject} uses {listed}, which {verb} not defined. It is shown as it was written."
         )
+        before = notes.get(element_id)
+        notes[element_id] = f"{before} {sentence}" if before else sentence
     return notes
 
 

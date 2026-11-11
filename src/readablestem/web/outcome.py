@@ -123,6 +123,40 @@ def _outage(result_json: dict[str, Any] | None) -> tuple[int, int, str] | None:
     return None
 
 
+# A LaTeX source job whose reader left words or pictures out (`source.ltx_reader`, the
+# `source_unread` notice): the file is finished but not whole. Read from the stored result's
+# `source_report`; counts only, never its words.
+SOURCE_UNREAD = "source_unread"
+
+
+def unread_phrase(words: int, pictures: int) -> str:
+    """ "12 words and 1 picture", "1 word", "2 pictures"."""
+    parts = []
+    if words:
+        parts.append(f"{words} {_plural(words, 'word', 'words')}")
+    if pictures:
+        parts.append(f"{pictures} {_plural(pictures, 'picture', 'pictures')}")
+    return " and ".join(parts)
+
+
+def _unread(result_json: dict[str, Any] | None) -> str | None:
+    report = (result_json or {}).get("source_report")
+    if not isinstance(report, dict):
+        return None
+    words, pictures = report.get("unread_words"), report.get("unread_pictures")
+    words = words if isinstance(words, int) and words > 0 else 0
+    pictures = pictures if isinstance(pictures, int) and pictures > 0 else 0
+    if not (words or pictures):
+        return None
+    one = words + pictures == 1
+    return (
+        f"This tool could not read part of the LaTeX source: {unread_phrase(words, pictures)} "
+        f"from it {'is' if one else 'are'} not in the file, as listed under “Not handled in "
+        f"this file” below. Check that the file reads well without {'it' if one else 'them'} "
+        "before you share it, or upload the PDF instead."
+    )
+
+
 FAILED_MESSAGES = {
     # Every page handwritten or scanned (pipeline.page_type.refusal_code): the upload
     # probe refuses these first; a job sees them only when the probe could not tell.
@@ -210,6 +244,8 @@ def job_outcome(
         )
         return JobOutcome(MODEL_OUTAGE, "Stopped: the AI service did not answer", message,
                           partial=True)  # fmt: skip
+    if status == JobStatus.DONE and not error_code and (unread := _unread(result_json)):
+        return JobOutcome(SOURCE_UNREAD, "Finished, with parts not converted", unread)
     if status != JobStatus.DONE or not error_code:
         return None
     if error_code == "budget_daily":

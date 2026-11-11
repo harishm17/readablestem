@@ -853,6 +853,9 @@ NOTICE_CODES = frozenset(
         "second_reader_budget",
         # LaTeX source: text LaTeXML could not read (an unknown command), kept as written.
         "source_error",
+        # LaTeX source: words or pictures no rule of the reader took (`source.report`
+        # `SourceReport.unread_words`, `unread_pictures`): `count` of them.
+        "source_unread",
     }
 )
 
@@ -1095,11 +1098,14 @@ class SourceProblem(BaseModel):
 class SourceMark(BaseModel):
     """A place in the converted document where LaTeXML left an error node (`ltx_ERROR`): the
     element that holds it (None when the reader did not place it) and whether it sits in a
-    formula. `name` is the node's text (a command, as written), trimmed like `SourceProblem`."""
+    formula. `name` is the node's text (a command, as written), trimmed like `SourceProblem`.
+    `decided`: a formula's error whose element holds a required decision about it (its own
+    equation, or the table, heading or figure that shows the formula as written)."""
 
     name: str = ""
     element_id: str | None = None
     in_formula: bool = False
+    decided: bool = Field(default=False, exclude_if=lambda v: not v)
 
 
 class SourceFigure(BaseModel):
@@ -1117,7 +1123,11 @@ class SourceReport(BaseModel):
     number of error nodes the reader could not tie to an element. `counts` holds every error
     by category, content-free; `problems` keeps at most 20 named lines per category and
     `omitted` the number left out. Harmless warnings (a helper package LaTeXML's own
-    bindings ask for) are counted in `warnings` and never named."""
+    bindings ask for) are counted in `warnings` and never named.
+
+    `unread_words` and `unread_pictures` count what LaTeXML wrote that the reader neither
+    read nor left out by a named rule (`source.ltx_reader.SKIP`); `unread_start` is the
+    first of those words, as written."""
 
     problems: list[SourceProblem] = Field(default_factory=list)
     missing: list[SourceProblem] = Field(default_factory=list)
@@ -1129,12 +1139,16 @@ class SourceReport(BaseModel):
     log_errors: int = 0
     error_nodes: int = 0
     unplaced_errors: int = 0
+    unread_words: int = Field(default=0, ge=0, exclude_if=lambda v: not v)
+    unread_pictures: int = Field(default=0, ge=0, exclude_if=lambda v: not v)
+    unread_start: str = Field(default="", exclude_if=lambda v: not v)
 
     @property
     def empty(self) -> bool:
-        """Nothing to tell the instructor: no error, no missing file, no error node."""
+        """Nothing to tell the instructor: no error, no missing file, no error node, nothing
+        left unread."""
         return not (self.problems or self.missing or self.marks or self.figures) and not (
-            self.log_errors or self.error_nodes
+            self.log_errors or self.error_nodes or self.unread_words or self.unread_pictures
         )
 
 
