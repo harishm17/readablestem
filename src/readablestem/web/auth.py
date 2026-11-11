@@ -40,7 +40,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import access, analytics, events, linked_emails, microsoft, tombstones
+from readablestem.web import (
+    access,
+    analytics,
+    events,
+    forms,
+    linked_emails,
+    microsoft,
+    tombstones,
+)
 from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
@@ -147,6 +155,7 @@ def set_allowed(
         user.is_admin = False
         # Signed-in sessions end now and stay ended if they are allowed back later.
         user.session_version += 1
+        forms.forget_user(session, user.id)
         stop_jobs_of(session, user.id, "access_removed")
     elif admin is not None:
         user.is_admin = admin
@@ -258,6 +267,7 @@ def end_sessions(factory: sessionmaker[Session], user_id: str) -> None:
             .values(session_version=User.session_version + 1)
             .execution_options(synchronize_session=False)
         )
+        forms.forget_user(session, user_id)  # the sessions' request tokens end with them
 
 
 def finish_login(

@@ -45,6 +45,8 @@ USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 # of accounts: the page lists the newest and says so, and the "Block by email" form reaches
 # any account, listed or not.
 PEOPLE_ROWS = 300
+# A second Link for a link already made (SW43).
+LINK_EXISTS = "That address was already linked to this instructor. Nothing was changed."
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
 
 
@@ -296,6 +298,11 @@ def link_email(
                 linked_emails.link(session, owner, linked)
         except linked_emails.LinkRefused as refused:
             message = refused.message
+            if refused.code == "already_linked" and _linked_to(request, linked, owner):
+                # This very link is there already (often a second click): nothing to fix
+                # (SW43, "identical repeat").
+                flash(request, LINK_EXISTS, undo=False)
+                return RedirectResponse("/admin", status_code=303)
     if message:
         context = admin_context(request) | {
             "errors": [{"field_id": "link-other", "message": message}],
@@ -307,6 +314,13 @@ def link_email(
     log_event(logger, "linked_email_add", by=user.id)
     flash(request, "The other Google account was linked.")
     return RedirectResponse("/admin", status_code=303)
+
+
+def _linked_to(request: Request, linked: str, owner: str) -> bool:
+    """`linked` is linked to the instructor `owner` already."""
+    with session_scope(get_ctx(request).factory) as session:
+        user = session.scalar(select(User).where(User.email == owner))
+        return user is not None and linked in linked_emails.linked_to(session, user.id)
 
 
 @router.post("/admin/linked-emails/remove", dependencies=[Depends(require_csrf)])

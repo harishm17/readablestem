@@ -1487,6 +1487,58 @@ def _stale_page(
     )
 
 
+ALREADY_SAVED = "Already saved: this item has that decision. Nothing was saved twice."
+
+
+def _already_saved(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    element_id: str,
+    action: str,
+    form: dict[str, str],
+    anyway: bool,
+    keep_open: bool,
+) -> tuple[str, str, DocumentResult] | None:
+    """A decision refused as made from an out-of-date page, which the item has already: the
+    decision would change nothing, and the item's last decision is this reviewer's, with
+    the same action. Then (the owned job's id, the element's id, the review as it is);
+    otherwise None, and the refusal stands. Nothing is written."""
+    ctx = get_ctx(request)
+    try:
+        with (
+            session_scope(ctx.factory) as session,
+            notation.in_force(ctx.factory, ctx.settings, job_id),
+        ):
+            job = job_access(session, job_id, user, REVIEW)
+            require_done(job)
+            result = DocumentResult.model_validate(job.result_json or {})
+            decided = element_ref(result, element_id)
+            trial = result.model_copy(deep=True)
+            change = apply_review(
+                trial,
+                decided,
+                action,
+                form,
+                anyway=anyway,
+                witness=ctx.settings.feature_page_witness,
+                keep_open=keep_open,
+            )
+            if any(c.before != c.after for c in change.every):
+                return None
+            last = session.scalar(
+                select(ReviewEdit)
+                .where(ReviewEdit.job_id == job.id, ReviewEdit.element_id == decided)
+                .order_by(ReviewEdit.created_at.desc(), ReviewEdit.id.desc())
+                .limit(1)
+            )
+            if last is None or last.user_id != user.id or last.action != change.action:
+                return None
+            return job.id, decided, result
+    except (LookupError, ReviewInvalid, PageError):
+        return None
+
+
 def _refuse_stale(job: Job, version: str) -> None:
     """Raise ReviewStale when the form was drawn before the job's last review write."""
     if is_stale(job.result_version, version):
@@ -1611,7 +1663,17 @@ def review_action(
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
-        return _stale_page(request, job_id, user, view, element_id, _typed(form))
+        same = _already_saved(request, job_id, user, element_id, action, form, anyway, keep_open)
+        if same is None:
+            return _stale_page(request, job_id, user, view, element_id, _typed(form))
+        # The item already has this decision, by this reviewer (often a second click
+        # whose page was drawn before the first one saved): nothing to save twice, and
+        # the answer the first click got (SW43, "identical repeat").
+        owned_id, decided, now = same
+        flash(request, ALREADY_SAVED, element_id=decided, undo=False)
+        if view != LIST_VIEW:
+            return _split_redirect(owned_id, now, decided)
+        return keep_filter(RedirectResponse(_landing(owned_id, now, decided), status_code=303), flt)
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
         known = action in STATUS_FOR_ACTION or action in {ADD_DATA_TABLE, DESCRIBE}

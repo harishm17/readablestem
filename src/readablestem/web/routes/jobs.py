@@ -1659,12 +1659,12 @@ def set_language(
 
 # --------------------------------------------------------------------------- try again
 
+RETRY_ALREADY = "This document is already waiting or being converted. Nothing was changed."
 RETRY_REFUSED = {
     "not_stopped": (
         409,
         "Nothing to try again",
-        "This document is not stopped: it is still waiting or being converted, or it has "
-        "finished completely. Nothing was changed.",
+        "This document is not stopped: it has finished completely. Nothing was changed.",
     ),
     "too_many_active": (
         429,
@@ -1707,6 +1707,8 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             )
         except retry_rules.RetryRefused as exc:
             refused, tries = exc.code, job.retries or 0
+            if refused == "not_stopped" and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                refused = "already_queued"
         else:
             retention.restart_clock(job, ctx.settings)
             tries = job.retries or 0
@@ -1718,6 +1720,11 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             "new document. Nothing was changed.",
             context={"job_id": job_id},
         )
+    if refused == "already_queued":
+        # Waiting or converting is what Try again asks for (often a second click): the
+        # job page, as the first click got (SW43, "already in that state").
+        flash(request, RETRY_ALREADY, undo=False)
+        return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
     if refused:
         status, title, message = RETRY_REFUSED[refused]
         raise PageError(status, title, message, context={"job_id": job_id})

@@ -1,6 +1,7 @@
-"""Migrations of the jobs work (T3-1, T3-2, T3-3, T3-4, T3-9): each follows the one before
-it, keeps existing jobs, lets an older release insert rows without the new columns (a
-traffic rollback), downgrades and upgrades again, and matches web/db.py.
+"""Migrations of the jobs work (T3-1, T3-2, T3-3, T3-4, T3-9) and of the request tokens
+(SW43): each follows the one before it, keeps existing jobs, lets an older release insert
+rows without the new columns (a traffic rollback), downgrades and upgrades again, and
+matches web/db.py.
 
 (The Postgres variant is in test_web_postgres.py.)
 """
@@ -24,6 +25,8 @@ PARTS = "a8c4e0b61d97"
 PARTS_COLUMNS = {"part_group", "part_label"}
 SAMPLE = "b1d5f7a29c46"
 SAMPLE_COLUMNS = {"is_sample"}
+OUTCOMES = "c2f4a8d61e57"
+REQUEST_TOKENS = "8b3d5f0e2a71"  # SW43: one row per submitted form
 
 # (revision, the one before it, columns it adds to jobs, tables it adds)
 CHAIN = [
@@ -31,6 +34,7 @@ CHAIN = [
     (RETRY, REVISED, RETRY_COLUMNS, {"step_records"}),
     (PARTS, RETRY, PARTS_COLUMNS, {"pending_uploads"}),
     (SAMPLE, PARTS, SAMPLE_COLUMNS, set()),
+    (REQUEST_TOKENS, OUTCOMES, set(), {"request_tokens"}),
 ]
 
 

@@ -356,9 +356,11 @@ def test_a_job_that_is_not_stopped_cannot_be_tried_again(site):
     assert site.job(clean_id).status == "done"
     response = site.post_retry(site.browser, clean_id)
     assert response.status_code == 409 and "Nothing to try again" in response.text
-    # Waiting is not stopped either.
+    # Waiting is what Try again asks for (often a second click, SW43): the job page, as the
+    # first click got, and nothing changed.
     waiting = job_id_from(upload(site.browser, PDF.read_bytes(), filename="b.pdf"))
-    assert site.post_retry(site.browser, waiting).status_code == 409
+    again = site.post_retry(site.browser, waiting)
+    assert again.status_code == 303 and again.headers["location"] == f"/jobs/{waiting}"
     assert site.job(waiting).retries == 0
 
 

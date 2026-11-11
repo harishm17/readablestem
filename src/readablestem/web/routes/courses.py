@@ -49,6 +49,10 @@ router = APIRouter()
 
 Field = Annotated[str, Form()]
 
+# A second Add for something already there (SW43): the page it would have led to, and this.
+COURSE_EXISTS = "You already have a course with this name, so nothing new was added. Here it is."
+ENTRY_EXISTS = "This course already has {what} with that meaning, so nothing new was added."
+
 
 def _require_feature(request: Request) -> None:
     if not notation.enabled(get_ctx(request).settings):
@@ -109,6 +113,13 @@ def create_course(request: Request, user: UserDep, name: Field = "") -> Response
             course = notation.create_course(session, user.id, name)
             course_id = course.id
     except notation.NotationInvalid as exc:
+        with session_scope(get_ctx(request).factory) as session:
+            existing = notation.course_named(session, user.id, name)
+        if existing is not None:
+            # The course is there already (often a second click): open it, as the first
+            # click did, and say nothing new was added (SW43, "identical repeat").
+            flash(request, COURSE_EXISTS, undo=False)
+            return RedirectResponse(f"/courses/{existing}", status_code=303)
         extra = _errors(exc) | {"values": exc.values or {"name": name}}
         return _courses_page(request, user, extra, status=422)
     log_event(logger, "course_created", course_id=course_id)
@@ -249,6 +260,11 @@ def add_entry(
         with session_scope(get_ctx(request).factory) as session:
             course = _course(session, course_id, user)
             owned_id = course.id  # redirects are built from the owned row, not the request
+            if notation.same_entry(course, entry) is not None:
+                # The same symbol with the same meaning and note (often a second click):
+                # nothing to add, and no error to fix (SW43, "identical repeat").
+                flash(request, ENTRY_EXISTS.format(what=describe(entry.canonical)), undo=False)
+                return RedirectResponse(f"/courses/{owned_id}", status_code=303)
             notation.add_entry(session, course, entry)
     except notation.NotationInvalid as exc:
         extra = _errors(exc) | {"values": exc.values}

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
+import time
 from html import unescape
 
 import pytest
@@ -125,6 +127,74 @@ def test_names_and_symbols_are_escaped(web):
     page = web.browser.get(f"/courses/{course_id}").text
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;" in page and "&lt;b&gt;displacement" in page
+
+
+def request_token(html: str) -> str:
+    """The request token of the page's first form that has one (SW43, `web.forms`)."""
+    found = re.search(r'name="request_token" value="([^"]+)"', html)
+    assert found, "no request token in the page"
+    return found.group(1)
+
+
+def test_one_click_makes_one_course_however_often_it_is_sent(web, monkeypatch):
+    """The one submit rule (SW43): a form sent again with its request token gets the first
+    answer and runs nothing, also when the two arrive together; another person's token
+    replays nothing; a repeat with a new token finds the course; signing out forgets."""
+    from readablestem.web import notation
+    from readablestem.web.db import RequestToken
+
+    sent = request_token(web.browser.get("/courses").text)
+    first = post(web.browser, "/courses", name="Physics 1", request_token=sent)
+    again = post(web.browser, "/courses", name="Physics 1", request_token=sent)
+    assert first.status_code == again.status_code == 303
+    assert again.headers["location"] == first.headers["location"]
+    assert len(rows(web, Course)) == 1
+    # A second form drawn before the first click saved (a new token): the course is there.
+    fresh = post(web.browser, "/courses", name="Physics 1")
+    assert fresh.headers["location"] == first.headers["location"]
+    assert len(rows(web, Course)) == 1
+
+    # Two requests with one token at the same moment: one course, the same two answers.
+    slow = notation.create_course
+
+    def create_slowly(*args, **kwargs):
+        time.sleep(0.4)
+        return slow(*args, **kwargs)
+
+    monkeypatch.setattr(notation, "create_course", create_slowly)
+    sent = request_token(web.browser.get("/courses").text)
+    csrf = token(web.browser, "/courses")
+    tabs = [web.client() for _ in range(2)]
+    for tab in tabs:
+        tab.cookies.update(dict(web.browser.cookies))
+    answers: list = [None, None]
+
+    def send(n: int) -> None:
+        data = {"csrf_token": csrf, "name": "Physics 2", "request_token": sent}
+        answers[n] = tabs[n].post("/courses", data=data)
+
+    threads = [threading.Thread(target=send, args=(n,)) for n in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert [a.status_code for a in answers] == [303, 303]
+    assert answers[0].headers["location"] == answers[1].headers["location"]
+    assert sorted(c.name for c in rows(web, Course)) == ["Physics 1", "Physics 2"]
+
+    # Bob sends Alice's token: his own course is made, nothing of hers comes back.
+    bob = web.client()
+    login(bob, BOB)
+    theirs = post(bob, "/courses", name="Chemistry", request_token=sent)
+    assert theirs.status_code == 303
+    assert theirs.headers["location"] not in {a.headers["location"] for a in answers}
+    assert sorted(c.name for c in rows(web, Course)) == ["Chemistry", "Physics 1", "Physics 2"]
+
+    # Signing out ends the session's tokens.
+    alice = next(u.id for u in rows(web, User) if u.email == ALICE)
+    assert any(r.user_id == alice for r in rows(web, RequestToken))
+    post(web.browser, "/logout", "/courses")
+    assert all(r.user_id != alice for r in rows(web, RequestToken))
 
 
 # --------------------------------------------------------------------------- owner only

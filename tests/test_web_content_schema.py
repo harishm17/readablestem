@@ -98,6 +98,7 @@ def seed_user(factory, email: str) -> dict[str, str]:
                     expires_at=now + timedelta(minutes=15),
                 ),
                 db.QuotaDay(user_id=user.id, day=date(2026, 10, 9), pages=3),
+                db.RequestToken(user_id=user.id, token=f"{email:x<24}"[:24], route="course.create"),
                 db.UploadResult(
                     user_id=user.id,
                     items=[{"filename": "secret.pdf", "code": "not_pdf"}],
@@ -162,6 +163,7 @@ def test_every_table_that_holds_a_user_id_is_known():
         ("login_links", "user_id"),
         ("pending_uploads", "user_id"),
         ("quota_days", "user_id"),
+        ("request_tokens", "user_id"),
         ("review_edits", "user_id"),
         ("upload_results", "user_id"),
     ]
