@@ -281,6 +281,9 @@ def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, 
         )
         if origin := _origin(p.name for p in packages):
             detail["origin"] = origin
+        if origin == "own":  # name the instructor's own: those are the ones to copy from
+            own = [p.name for p in packages if distributed(p.name) is False]
+            detail["package"] = ", ".join(own[:5])
         return "source_unsupported_package", detail
     if items:
         return "source_undefined", _detail(list(items.values()), total=total)
