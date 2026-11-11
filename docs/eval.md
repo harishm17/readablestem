@@ -2681,7 +2681,46 @@ the tests say so instead of running.
 **Marking an open finding.** A workflow test that a known, unfixed finding makes false is
 marked `@harness.finding("F-nnn")`. The mark is a strict expected failure: when the fix
 lands the test passes, the run fails, and the same change removes the mark. A finding
-cannot be fixed by accident and stay marked open.
+cannot be fixed by accident and stay marked open. The audit's register ends at F-558; a
+finding met while the plan is built takes the next number.
+
+### The hostile-input set (`tests/workflows/hostile_set.py`)
+
+Files made to hurt the app, each from a builder (`tests/workflows/builders/hostile.py` and
+`hostile_sources.py`), and for each the one way it must end: refused at upload with a named
+code, kept for choosing its pages, or queued and ended `done` or `failed` with a named code.
+`tests/workflows/test_wf49_hostile_input.py` uploads each file under production's size
+limits while a second person uploads a two-page syllabus behind it, and checks four things:
+
+| Check | What must hold |
+|---|---|
+| ends | the file ends as its case states |
+| bound | the upload request and the job together take no more than the case's time (30 s for a job, 10 s for a refusal), and no process holds more than 600 MB |
+| next | the second person's file is converted, from the recording alone, no later than the hostile job's bound plus 15 s |
+| planted | a string the builder planted where it could run (a script, a link that runs its target, an open action) is in no page or download and no log line; planted markup is only ever text; no page or download has a handler attribute or a link that runs its target |
+
+The queue is run by a worker in a process of its own, stopped after twice the bound, so a
+file that hangs the worker or ends it fails its case and not the run. A LaTeX source runs
+once under bubblewrap and once under Landlock, where the machine can start each.
+
+As of 2026-11-11 the set has 36 files: 6 on the size of pages and pictures, 3 on page
+count, 8 on the structure of the PDF, 5 on content that must stay data, 8 zips and 6 LaTeX
+sources. 35 end as stated. One does not: a page whose content inflates to 256 MB from a
+260 KB file is taken, read for 7 s in the upload request and for 24 s by the worker
+(F-559); its case states the refusal the fix must give.
+
+Owed:
+
+- **That a model was not steered.** Three files carry text that tells a model what to
+  write. The check reads the model's answers, and none is recorded for them (two a file).
+  One recording under a cap of $0.25 pays for them; until then the set shows only that
+  their output is safe.
+- **Cases for readers the app does not have yet.** A second PDF text extractor, readers
+  for Word, PowerPoint and notebook files, a structure checker and a TeX compile step each
+  add their cases in the change that adds the reader (docs/dependencies.md names the test
+  for each).
+- **One slice of waiting.** With one worker the second person waits for the whole hostile
+  job. When the queue has slots the `next` check becomes one page slice.
 
 ## Reading order (`eval/order.py`)
 

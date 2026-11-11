@@ -569,6 +569,21 @@ once, not once per page), and the time spent decoding is summed against `DECODE_
 embedded picture is over `MAX_UPLOAD_IMAGE_PIXELS` (100 million, above a 600 dpi A3 scan)
 with the same code (422), before any quota is spent.
 
+### Hostile-input set
+
+`tests/workflows/hostile_set.py` lists 36 files made to hurt the app (oversized pages and
+pictures, page counts, broken and encrypted PDFs, scripts and markup planted in text,
+properties and links, text that instructs a model, zips that leave their folder or lie
+about their size, LaTeX that loops or reaches for a file of the host) with the one way each
+must end, and `tests/workflows/test_wf49_hostile_input.py` runs them through the app under
+production's size limits, the LaTeX ones under bubblewrap and under Landlock (docs/eval.md,
+"The hostile-input set").
+
+A limit that is missing, found by the set: nothing bounds how far one page's content
+stream inflates. A 260 KB file whose page inflates to 256 MB is accepted, and reading it
+takes 7 s of the upload request and 24 s of the worker; memory stays level. The page count
+and the upload size bound the total, and the fix is a refusal at upload.
+
 ### Output escaping
 
 Jinja autoescape is on for every template. Everything a model or a PDF controls and that

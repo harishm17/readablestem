@@ -55,6 +55,74 @@
   "sha256": "b3537d017ef99f947b418bad9378553f55aa08b4d6bbfa9dd02a2965763836bc",
   "bytes": 864918
  },
+ "stream-bomb.pdf": {
+  "sha256": "58ca095048de44a1579d3d33460e6816ad61878fedf38cbd1e52ae943be8af4d",
+  "bytes": 261558
+ },
+ "page-tree-deep.pdf": {
+  "sha256": "8e452721fa324a44a3e2d522b1c4fd7fa318f4b9bb06c28f040decec0113504d",
+  "bytes": 497241
+ },
+ "markup.pdf": {
+  "sha256": "bfba92c6cc71d058c00ea56432bf4cf78fbb926c677377665d269342f4a97b44",
+  "bytes": 3043
+ },
+ "shared-image-under-limit-100-pages.pdf": {
+  "sha256": "f2de49d0547a568eb11352b65ec9fdceac2ce17895da0309aaa2e868428d156c",
+  "bytes": 137734
+ },
+ "zip-traversal.zip": {
+  "sha256": "4016419497644a3986dd7261cc10742c71ef656acc19ab6c764f596ed3d7b8dc",
+  "bytes": 321
+ },
+ "zip-absolute.zip": {
+  "sha256": "1941a573dda953d7118b53f67e1469779e5e9f4f12e87666a827b9dab0331339",
+  "bytes": 325
+ },
+ "zip-backslash.zip": {
+  "sha256": "f1a594fbabdda5ee6ab5cb2894a54572e78dde72ff33c520a4a1a5d5cc7548ec",
+  "bytes": 321
+ },
+ "zip-symlink.zip": {
+  "sha256": "94e920f95307903b838a0f8d34ed62acadd5219182d65ee039eef6334f062e6f",
+  "bytes": 313
+ },
+ "zip-duplicate.zip": {
+  "sha256": "8ee32938d3a2381d1fcb889eceb0c626b7aa2b02083307716cedc5a8425959eb",
+  "bytes": 346
+ },
+ "zip-bomb.zip": {
+  "sha256": "88fe5ae5a1f98a9baade36a717b58f4d9c066f736c56e3b0540179b73ecca93a",
+  "bytes": 30886
+ },
+ "zip-lying-header.zip": {
+  "sha256": "b0b46ca5ee52fc3879b08c7c34a0368daa422d3f3153205d0cf648fd012912ed",
+  "bytes": 3366
+ },
+ "hostile-loop.tex": {
+  "sha256": "9802c20d3287a07f91801affbf83bb36174ab62724bce1e74311bd48e61ccc92",
+  "bytes": 90
+ },
+ "hostile-grows.tex": {
+  "sha256": "1c9ae569ff6ba63bc26944d1915124e54aefdcd590ef9f822bd7bd38405969b6",
+  "bytes": 100
+ },
+ "hostile-input-host-file.tex": {
+  "sha256": "d533a0e7905a991e126ebe5b65263ad9e007ee528c05a1a32dd3a6c2a3c12e4a",
+  "bytes": 76
+ },
+ "hostile-input-built-name.tex": {
+  "sha256": "758ddff580e6121c8ca849cbea16da7dd3e9d9ed36337650e440446df25cbf39",
+  "bytes": 188
+ },
+ "hostile-read-built-name.tex": {
+  "sha256": "84e114fcc7b2bc07141f40c764c0c3c81aa12b9df912c2043da18aa2e271e94b",
+  "bytes": 264
+ },
+ "hostile-shell.tex": {
+  "sha256": "fcb9e61fc7495d9898a2007fc91360d53fbb8bf4fd26f94654d932b7968d9719",
+  "bytes": 90
+ },
  "kinetics-pset.docx": {
   "sha256": "7f6653be5136aa4038ccad9a8508d7bb967c4b6b72183b089f3c560ccc220869",
   "bytes": 37006

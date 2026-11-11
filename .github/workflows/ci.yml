@@ -298,8 +298,18 @@ jobs:
           key: corpus-${{ hashFiles('tests/workflows/corpus/corpus.json') }}
       - name: Fetch the corpus's public files (each checked against its hash)
         run: uv run python -m readablestem.eval.corpus check --fetch
+      # The hostile-input workflow runs LaTeX sources in the real sandbox (as the `latex
+      # source` job does): with the variable below a missing LaTeXML or bubblewrap fails it.
+      - name: Install LaTeXML and bubblewrap, allow user namespaces
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends latexml bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          latexml --VERSION | head -n 1
       - name: Pytest (workflow-marked tests only)
         # Exit code 5 (no tests collected) fails the job.
+        env:
+          READABLESTEM_REQUIRE_SANDBOX_TESTS: "1"
         run: uv run pytest -m workflow -n auto --dist loadfile --durations=15 -rs
 
   ci-passed:

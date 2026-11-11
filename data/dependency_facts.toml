@@ -140,7 +140,7 @@ use = "settings from the environment"
 use = "reads PDFs: text, pictures, structure; renders pages"
 reads = "every uploaded PDF"
 runs_in = "the conversion child: a separate process with memory, time and file-size limits, so a file that crashes, hangs or balloons the parser costs that child and nothing else"
-hostile = ["tests/test_audit_uploads.py"]
+hostile = ["tests/test_audit_uploads.py", "tests/workflows/test_wf49_hostile_input.py"]
 
 [python.pymupdf-layout]
 use = "table proposals only (pipeline/tables.py); ruled out for reading order and as a witness"
@@ -212,7 +212,7 @@ license = "public domain (a work of NIST); TeX Live's base is LPPL-1.3c and othe
 run_only = true
 reads = "every uploaded LaTeX project"
 runs_in = "bubblewrap with no network, a read-only system and prlimit limits (core/sandbox.py); ImageMagick's policy allows PNG, JPEG and GIF only"
-hostile = ["tests/test_source_escapes.py", "tests/test_sandbox.py", "tests/test_archive_intake.py"]
+hostile = ["tests/test_source_escapes.py", "tests/test_sandbox.py", "tests/test_archive_intake.py", "tests/workflows/test_wf49_hostile_input.py"]
 
 [system.bubblewrap]
 use = "the sandbox LaTeXML and TeX run in"

@@ -3,6 +3,8 @@ tell the model what to write. First made in the security round of November 10, 2
 
 from __future__ import annotations
 
+import zlib
+
 import pymupdf
 
 from . import fixture
@@ -112,11 +114,14 @@ def page_4999_points_image_20000_pixels() -> bytes:
     shows="100 pages that all draw the same 20,000-pixel image",
 )
 def shared_image_on_100_pages() -> bytes:
-    pages = 100
+    return _shared_image(20000)
+
+
+def _shared_image(side: int, pages: int = 100) -> bytes:
     objects: list[bytes] = [b""] * (4 + 2 * pages)
     objects[0] = b"<< /Type /Catalog /Pages 2 0 R >>"
     objects[2] = HELVETICA
-    objects[3] = image_object(20000, gray_image(20000))
+    objects[3] = image_object(side, gray_image(side))
     kids = []
     for number in range(pages):
         content = (
@@ -329,3 +334,116 @@ def injection_on_an_exam_question() -> bytes:
         fontsize=9,
     )
     return save(doc, clean=False)
+
+
+# ------------------------------------------------- added with the hostile-input set (A28)
+
+A28 = "hostile-input set A28, 2026-11-11"
+
+
+@fixture(
+    "stream-bomb.pdf",
+    origin=A28,
+    shows="one page whose content stream is 260 KB in the file and 256 MB when inflated",
+)
+def content_stream_bomb() -> bytes:
+    packer = zlib.compressobj(9)
+    chunk = b" " * (1 << 20)
+    packed = b"".join(packer.compress(chunk) for _ in range(256))
+    packed += packer.compress(b"BT /F1 14 Tf 72 720 Td (A page with a very long stream.) Tj ET")
+    packed += packer.flush()
+    stream = (
+        b"<< /Filter /FlateDecode /Length %d >>\nstream\n" % len(packed) + packed + b"\nendstream"
+    )
+    page = (
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]"
+        b" /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>"
+    )
+    return write_pdf(
+        [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [4 0 R] /Count 1 >>",
+            HELVETICA,
+            page,
+            stream,
+        ]
+    )
+
+
+@fixture(
+    "page-tree-deep.pdf",
+    origin=A28,
+    shows="one page under 5,000 page-tree nodes, each the only child of the one above",
+)
+def deep_page_tree() -> bytes:
+    depth = 5000
+    # Objects: 1 catalog, 2 font, 3 content, 4 .. 3 + depth the nodes, 4 + depth the page.
+    objects = [
+        b"<< /Type /Catalog /Pages 4 0 R >>",
+        HELVETICA,
+        stream_object(b"BT /F1 14 Tf 72 720 Td (A page at the bottom of a deep tree.) Tj ET"),
+    ]
+    for level in range(depth):
+        number = 4 + level
+        parent = b" /Parent %d 0 R" % (number - 1) if level else b""
+        objects.append(b"<< /Type /Pages%s /Kids [%d 0 R] /Count 1 >>" % (parent, number + 1))
+    objects.append(
+        b"<< /Type /Page /Parent %d 0 R /MediaBox [0 0 612 792]"
+        b" /Resources << /Font << /F1 2 0 R >> >> /Contents 3 0 R >>" % (3 + depth)
+    )
+    return write_pdf(objects)
+
+
+# Each marker says where it was planted. One that sits in a place a viewer would run or
+# follow (`MARKUP_NEVER`) may appear nowhere in what the app writes; one that is text of the
+# page or its description may appear only as text.
+MARKUP_NEVER = ("A28-LINK-SCRIPT", "A28-LINK-DATA")
+MARKUP_AS_TEXT = ("A28-PAGE-TEXT", "A28-PAGE-IMG", "A28-META-TITLE", "A28-META-AUTHOR", "A28-NOTE")
+
+
+@fixture(
+    "markup.pdf",
+    origin=A28,
+    shows="HTML and script in the page text, the document properties, two links and a note",
+)
+def markup_everywhere() -> bytes:
+    doc = notes(1)
+    page = doc[0]
+    page.insert_text((72, 430), "<script>alert('A28-PAGE-TEXT')</script>", fontsize=11)
+    page.insert_text((72, 450), '"><img src=x onerror="alert(\'A28-PAGE-IMG\')">', fontsize=11)
+    page.insert_text((72, 480), "Course site", fontsize=11)
+    page.insert_text((72, 500), "Syllabus", fontsize=11)
+    page.insert_link(
+        {
+            "kind": pymupdf.LINK_URI,
+            "from": pymupdf.Rect(72, 468, 140, 484),
+            "uri": "javascript:alert('A28-LINK-SCRIPT')",
+        }
+    )
+    page.insert_link(
+        {
+            "kind": pymupdf.LINK_URI,
+            "from": pymupdf.Rect(72, 488, 140, 504),
+            "uri": "data:text/html,<script>alert('A28-LINK-DATA')</script>",
+        }
+    )
+    page.add_text_annot((300, 200), "<script>alert('A28-NOTE')</script>")
+    doc.set_metadata(
+        {
+            "title": "</title><script>alert('A28-META-TITLE')</script>",
+            "author": "<img src=x onerror=alert('A28-META-AUTHOR')>",
+            "creationDate": "D:20260101000000Z",
+            "modDate": "D:20260101000000Z",
+        }
+    )
+    return save(doc, clean=False)
+
+
+@fixture(
+    "shared-image-under-limit-100-pages.pdf",
+    origin=A28,
+    shows="100 pages that all draw one image of 9,990 by 9,990 pixels, just under the 100 "
+    "million an upload may hold and over the 40 million any one decode may be asked for",
+)
+def shared_image_under_the_upload_limit() -> bytes:
+    return _shared_image(9990)
