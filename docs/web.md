@@ -624,7 +624,33 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
 - **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
   per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
   `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their
-  switch (`source.intake.BEAMER_ENABLED`) is on.
+  switch (`FEATURE_BEAMER_SOURCE`) is on.
+- **Classes and packages** (`source/support.py`, `SUPPORT`). Each class and package is on one of
+  three lists. `bound`: LaTeXML 0.8.8 ships a binding for it (43 classes, 356 packages; a test
+  where LaTeXML is installed compares the lists with `LaTeXML/Package/`, so an upgrade fails it
+  until they are copied again). `plain`: read without a binding; for a class, its commands
+  carry layout, so it is read as an article (`scrartcl`, `scrreprt`, `scrbook`, `memoir`,
+  `extarticle`, each kept only while a small document of it converts with no error); for a
+  package, its binding loads nothing with the TeX tree hidden and the document is read without
+  it (`babel`: a command of it that the document uses stops the job). `refused`: refused at
+  upload by name, before anything is queued or counted (`source.intake.check_support`, run
+  again in the conversion child): the `exam` class (`source_unsupported_class`; read without
+  its rules, its solutions and correct-answer marks would reach students) and the `csquotes`
+  package (`source_unsupported_package`; loading it alone gives 24 errors here). The answer
+  says to compile the version students should see and upload the PDF. The main file's literal
+  `\documentclass` and the `.tex` files' literal `\usepackage` lines are read, comments
+  removed, names compared in lower case. A class on no list goes on to LaTeXML, which falls
+  back to its "OmniBus" guess, and the report stops the job if errors follow (below). Which
+  other bindings only load a package's own TeX and so fail here is found by the package sweep
+  (WS18.0), which moves each to `plain` or `refused`.
+- **TeX package names** (`source/tex_distribution_names.txt`). The image build
+  (`readablestem ops image-facts --write`) writes the names of TeX Live's packages and of the
+  files they install, from texdoc's data that `texlive-base` brings, and records their number
+  as the image fact `tex_names`. When the job stops because a package's commands are not
+  read, a package on that list is "a package this tool cannot read yet: upload the PDF", and
+  one not on it is the instructor's own: "this tool does not read package files from the
+  upload: copy the definitions you use into the source". Without the file (the repository, an
+  image built without LaTeXML) the sentence says both.
 - **The job.** The upload is stored as an envelope (`source/envelope.py`, media type
   `application/x-readablestem-tex` or `-zip`); the worker hands it to the converter like a PDF and
   `pipeline.run.convert_pdf` passes it to `source.convert`, in the same conversion child
@@ -680,7 +706,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   outside a formula stops the job (`source.report.stop`): `source_missing_file` (an `\input` or
   `\include` that is not in the upload), `source_syntax_error` (an unclosed brace or environment,
   with its file and line), `source_unsupported_class` / `source_unsupported_package` (no binding,
-  and the document used what it defines; a `.sty` in the upload is not read either) or
+  and the document used what it defines; a `.sty` in the upload is not read either; a class read
+  as an article is never named as the cause) or
   `source_undefined`. The job page names the files and commands from `Job.error_detail` (at most
   20, nullable JSON, migration `3c9a4e7d1b62`): document content, so never logged, cleared on
   "Try again" and deleted with the job. A command LaTeX did not know inside a formula, and a

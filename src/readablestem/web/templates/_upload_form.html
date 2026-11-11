@@ -91,7 +91,8 @@
           {% endif %}
           {% if latex_source and not revising %}
           <li>A LaTeX file (.tex) or project zip (up to 100 MB unpacked, 500 files) also works; every
-            3,000 characters or figure count as one page. Upload Beamer decks as PDF.</li>
+            3,000 characters or figure count as one page. Upload Beamer decks, and sources that
+            use the {{ refused_classes }} class or the {{ refused_packages }} package, as PDF.</li>
           {% endif %}
         </ul>
       </details>

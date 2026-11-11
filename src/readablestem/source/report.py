@@ -19,9 +19,11 @@ logged (`summary` gives the counts that may be).
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 from readablestem.core.types import SourceMark, SourceProblem, SourceReport
+from readablestem.source.support import SUPPORT, distributed
 
 MAX_LOG_BYTES = 2 * 1024 * 1024
 MAX_NAME = 120
@@ -37,7 +39,6 @@ _LINE = re.compile(
 _COMPLETE = re.compile(r"(?:Conversion|Postprocessing) complete:?.*?(\d+) errors?\b")
 _BINDING = re.compile(r"Can't find binding for (class|package) (\S+)")
 _RAW = re.compile(r"Can't find package (\S+)")
-_PACKAGES = re.compile(r"\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\]\s*)?\{([^}]*)\}")
 
 
 def clean(text: str) -> str:
@@ -47,13 +48,12 @@ def clean(text: str) -> str:
 
 
 def loaded_packages(texts: dict[str, str]) -> set[str]:
-    """The packages the project's own files load by a literal `\\usepackage` (or
-    `\\RequirePackage`)."""
-    found: set[str] = set()
-    for text in texts.values():
-        for match in _PACKAGES.finditer(text):
-            found.update(p.strip() for p in match.group(1).split(",") if p.strip())
-    return found
+    """The packages the project's `.tex` files load by a literal `\\usepackage` (or
+    `\\RequirePackage`), comments removed: the same reading the upload check makes
+    (`source.intake.loaded_packages`)."""
+    from readablestem.source.intake import loaded_packages as literal
+
+    return set(literal(texts))
 
 
 def _relative(name: str, prefixes: tuple[str, ...]) -> str:
@@ -235,6 +235,18 @@ def _beamer_binding(problem: SourceProblem) -> bool:
     return "beamer@" in problem.name
 
 
+def _origin(names: Iterable[str]) -> str | None:
+    """Where the missing packages come from, for the stop sentence: "own" when one of them is
+    not a TeX distribution package (the instructor's own), "distribution" when all are, None
+    when the image wrote no list of names (`source.support.distributed`)."""
+    found = [distributed(name) for name in names]
+    if False in found:
+        return "own"
+    if found and all(found):
+        return "distribution"
+    return None
+
+
 def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, object]] | None:
     """The stop code for a report and its details (names from the source, for the job page
     only), or None when the source converts. Only errors of the `latexml` step stop a job:
@@ -256,14 +268,20 @@ def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, 
         if not m.in_formula and m.name:
             items.setdefault(m.name, {"name": m.name, "file": "", "line": None})
     total = len(items) + (report.omitted.get("undefined", 0) if items else 0)
-    classes = [p for p in report.missing if p.what == "class"]
+    # A class read as an article (`source.support`) is not the cause of what follows it.
+    classes = [
+        p for p in report.missing if p.what == "class" and SUPPORT.classes.kind(p.name) != "plain"
+    ]
     if classes and (errors or report.marks):
         return "source_unsupported_class", _detail([], total=0, **{"class": classes[0].name})
     packages = [p for p in report.missing if p.what in ("package", "package_source")]
     if items and packages:
-        return "source_unsupported_package", _detail(
+        detail = _detail(
             list(items.values()), total=total, package=", ".join(p.name for p in packages[:5])
         )
+        if origin := _origin(p.name for p in packages):
+            detail["origin"] = origin
+        return "source_unsupported_package", detail
     if items:
         return "source_undefined", _detail(list(items.values()), total=total)
     other = [p for p in errors if p.category != "undefined"]
