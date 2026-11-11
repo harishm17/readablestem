@@ -99,6 +99,8 @@ class Settings(BaseSettings):
     anthropic_effort_page_math: Effort | None = None
     # Effort of the page witness pass (`pipeline/page_witness.py`). Unset: medium.
     anthropic_effort_page_witness: Effort | None = None
+    # Effort of the page audit (`pipeline/page_audit.py`). Unset: low.
+    anthropic_effort_page_audit: Effort | None = None
     # Effort of the image page pass (ADR 0007). Unset: `pipeline.image_page.DEFAULT_EFFORT`.
     anthropic_effort_image_pages: Effort | None = None
     # The fixed untrusted-text notice rides in the cached system block instead of in every
@@ -484,6 +486,16 @@ class Settings(BaseSettings):
     # Output limit of one witness call (thinking is allowed on top of it): a dense page lists
     # a hundred formulas or more, and a call that ends at the limit is split in two.
     page_witness_max_output_tokens: int = Field(default=12288, ge=1024, le=32000)
+    # The page audit (`pipeline/page_audit.py`): one request a page that compares the page
+    # with its output and answers with codes and places. It runs only from `readablestem
+    # eval page-audit` in this release; no conversion reads these settings.
+    page_audit_model: str = "claude-sonnet-5-5"
+    page_audit_max_output_tokens: int = Field(default=1500, ge=256, le=8000)
+    # The most one page's audit may cost at worst (`pricing.estimate_max_cost_usd`). A page
+    # whose request could cost more is not sent and is stored as "not audited". The worst
+    # case counts every token the reply may use, thinking included: $0.05 to $0.09 for a page
+    # that costs about one cent (2026-11-11).
+    page_audit_max_usd_per_page: float = Field(default=0.10, gt=0, le=1.0)
     # Seconds one witness call may take. A dense page with thinking takes a minute or more (the
     # E1 dev run saw 58 s answers and timeouts at `model_timeout_s`), and a timeout is charged
     # its whole worst-case reservation.

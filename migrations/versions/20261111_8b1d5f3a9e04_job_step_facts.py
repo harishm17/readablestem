@@ -1,15 +1,18 @@
-"""step facts: what model work and how much time each job took
+"""step facts: what model work and how much time each job took, and what stopped early
 
 - `job_calls`: one row for each request a job sent to a model, with its step, page, model,
   tokens, seconds, dollars and how it ended (`core.types.CallFact`).
 - `job_stages`: the wall time of each stage of a job's last conversion, and the time it
   waited before a worker took it (`core.types.StageFact`).
+- `job_not_finished`: each step of a job's last conversion that stopped before it had done
+  all of its work, with the page, the reason code and how much was done
+  (`core.types.NotFinished`).
 
-Both hold codes, counts, seconds and dollars only, are written by the worker when a job is
-stored (`web.step_facts`) and read by `readablestem ops step-report` and the admin page.
+All three hold codes, counts, seconds and dollars only, are written by the worker when a job
+is stored (`web.step_facts`) and read by `readablestem ops step-report` and the admin page.
 Document-derived: deleted with the job (`ondelete=CASCADE`, and `ops.retention`).
 
-Additive: an older release neither reads nor writes them. The downgrade drops both.
+Additive: an older release neither reads nor writes them. The downgrade drops all three.
 
 Revision ID: 8b1d5f3a9e04
 Revises: c2f4a8d61e57
@@ -66,9 +69,27 @@ def upgrade() -> None:
     )
     with op.batch_alter_table("job_stages", schema=None) as batch_op:
         batch_op.create_index(batch_op.f("ix_job_stages_job_id"), ["job_id"], unique=False)
+    op.create_table(
+        "job_not_finished",
+        sa.Column("id", sa.String(length=32), nullable=False),
+        sa.Column("job_id", sa.String(length=32), nullable=False),
+        sa.Column("seq", sa.Integer(), nullable=False),
+        sa.Column("step", sa.String(length=32), nullable=False),
+        sa.Column("page", sa.Integer(), nullable=True),
+        sa.Column("reason", sa.String(length=16), nullable=False),
+        sa.Column("done", sa.Integer(), nullable=False),
+        sa.Column("total", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(["job_id"], ["jobs.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    with op.batch_alter_table("job_not_finished", schema=None) as batch_op:
+        batch_op.create_index(batch_op.f("ix_job_not_finished_job_id"), ["job_id"], unique=False)
 
 
 def downgrade() -> None:
+    with op.batch_alter_table("job_not_finished", schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f("ix_job_not_finished_job_id"))
+    op.drop_table("job_not_finished")
     with op.batch_alter_table("job_stages", schema=None) as batch_op:
         batch_op.drop_index(batch_op.f("ix_job_stages_job_id"))
     op.drop_table("job_stages")

@@ -3006,6 +3006,100 @@ What neither report has yet:
   recorded, so the `source` kind has no row.
 - How long a background (batch) check takes to come back: no batch answer is recorded.
 
+## The page audit in shadow (`eval page-audit`)
+
+The page audit (steps.md, "Page audit") compares one page of the output with the page it
+came from. This command runs it over a set and writes its verdicts. "In shadow" means that
+nothing reads them: no output, stored result or decision changes. It is how the audit's
+flags are measured before any of them is acted on.
+
+```bash
+uv run readablestem eval page-audit --corpus --fake            # no model: every page "not audited"
+uv run readablestem eval page-audit --corpus --provider anthropic --max-usd 3.00 --batch
+uv run readablestem eval page-audit --corpus --answers kept.jsonl --answers-offline   # replay, $0
+uv run readablestem eval page-audit --gold-dir <a layout gold set's folder> --provider anthropic --max-usd 1.00
+uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendered
+```
+
+- **`--corpus`**: each corpus upload converted under the production profile from its
+  recorded answers, as `eval cost` converts it. An upload this machine cannot replay is
+  listed under `skipped` with its reason.
+- **`--gold-dir DIR`**: the files of a layout gold set (`DIR/files/<id>.pdf`), each
+  converted with no model, so what is audited is the layout and the reading order. The
+  report goes in that folder (`DIR/page-audit.json`), so a held-out set's rows stay with
+  the set and outside the repository.
+- **`--rendered`** also sends the picture of the page's output (needs the browser group).
+- **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
+  nothing is sent and a page whose answer is not in the file is not audited. `--batch`
+  sends what the file cannot answer as Message Batches at half price.
+- A live run needs `--provider anthropic` and a `--max-usd` cap, and keeps its recording
+  like every other live run ("Runs keep their recordings").
+
+Exit code 0: every page has a verdict. 1: the spend cap ended the run, and the pages after
+it are `not_audited` with `cap_reached`. 2: the run could not start.
+
+The report (default `data/eval/latest-page-audit.json`) holds codes, ids, boxes, counts and
+dollars, and no text of any document: the model, effort and prompt version; `verdicts`
+(pass, flagged, not audited); `answered_by` (the model, or a test by code);
+`not_audited_by_reason`; `findings` by code and severity; `requests`, `cost_usd` and
+`usd_per_asked_page`; `stopped`; `skipped`; and one row a page with its verdict, findings,
+reason and the key of the question asked.
+
+One run's verdicts are not a measurement of the audit. Its bars (how many marked faults it
+flags, how many clean pages it flags, and the share of verdicts that differ between two
+runs of one input) are judged on pages whose faults a person marked. No live run is
+recorded yet: the first shadow recording of the corpus waits for the owner's approval of
+its cap.
+
+## The same file gives the same document on any machine
+
+A score or a replay means something only if a result does not depend on the machine that
+made it. The rule (`core.types.NotFinished`, tests/test_determinism.py):
+
+- A budget counts work: candidates tried, cells tested, pixels read. That is the same on
+  every machine.
+- A limit on time, memory or money may only stop a step. It never quietly changes what a
+  page contains.
+- A step that stops says so with a "not finished" fact: `{step, page, reason, done, of}`,
+  with no document text (operations.md, "Step facts and the step report").
+
+Three tests hold the rule:
+
+1. **Every clock is named.** The test finds each read of a clock in `pipeline/` and
+   `source/` and compares the list with a table in the test file that says what each is for:
+   a timing field, a cache's expiry, a limit that ends the conversion with a code, a limit
+   whose step writes the fact. A new read fails the test until it is added to the table,
+   which is when to ask whether it can change a document.
+2. **A planted step.** A conversion with a step planted in it that leaves a page out once
+   its clock has passed a second is compared with the same conversion at full speed. The
+   comparison names the earliest part of the result that differs, and passes only when the
+   step wrote the fact.
+3. **The corpus, twice** (`-m workflow`). Every corpus upload is replayed as it is and
+   again held back to a quarter of the time (`eval.measure.run(..., share=0.25)`: the
+   conversion and everything it started are stopped and continued ten times a second, so
+   every clock they read runs four times as fast against their work). The two results are
+   hashed part by part with the fields of seconds left out (`measure.parts`: page types,
+   elements, the fixes of each kind, the HTML, the rest). An upload may differ only if a
+   step of the slower run wrote a "not finished" fact the quicker one lacks, or if it is
+   in the test's `KNOWN` list with the plan item that ends its difference.
+
+What the corpus run found (2026-11-11, 73 uploads). The first run failed on one upload, a
+handwritten lecture converted with its image pages read. The ink analysis has 10 seconds
+of wall-clock time for a document (`page_type.INK_BUDGET_S`) and takes 5.4 of them on that
+file at full speed. At a quarter of the speed the time ran out, one page was typed without
+its ink and so was not seen as handwriting, and its page type, elements, fixes and HTML all
+changed with nothing saying why. The stop now writes the fact (`page_type` with
+`time_limit` for each such page, and `ink_strokes` when the strokes were not read), and the
+test passes with an empty `KNOWN` list. The budget is still a clock: a slower machine can
+still give that file a different document, and now says so. Making it a count of work is
+the next step for it. The table search's time limit was not reached by any corpus upload at
+a quarter of the speed; it is listed in the clock table and gets its own fact with the
+table work.
+
+Not covered: a document long enough to reach the limits by its size. The corpus's longest
+upload is short of that, so a 100-page math-heavy document converted under several CPU
+limits is still owed.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -3059,6 +3153,7 @@ What neither report has yet:
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
 | `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
 | `src/readablestem/eval/cost.py`, `eval/speed.py` | `eval cost` and `eval speed`: the reports made from a measured replay, and the speed bar |
+| `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |
 | `scripts/dev_chem_classes.py` | the outcome classes of a chemistry run, what harms a listener, `--speech` |

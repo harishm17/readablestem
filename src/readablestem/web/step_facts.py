@@ -1,5 +1,6 @@
-"""A job's step facts in the database: every request it sent to a model and how long each
-of its stages took (`job_calls`, `job_stages`; the facts are `pipeline.step_facts`).
+"""A job's step facts in the database: every request it sent to a model, how long each of
+its stages took, and each step that stopped before it had done all of its work (`job_calls`,
+`job_stages`, `job_not_finished`; the facts are `pipeline.step_facts`).
 
 The worker keeps them in the transaction that stores the job's result. They are replaced
 when the job is converted again and deleted with it. What they hold is codes, counts,
@@ -7,6 +8,7 @@ seconds and dollars, so they may be logged and shown to an administrator; they n
 document text or a person's id.
 
 `measured` gives the jobs the step report is made from (`ops.step_report`).
+`not_finished` is the one place a page or a count reads which steps of a job stopped early.
 """
 
 from __future__ import annotations
@@ -19,10 +21,10 @@ from datetime import datetime
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from readablestem.core.types import CallFact, StageFact, StepFacts
+from readablestem.core.types import CallFact, NotFinished, StageFact, StepFacts
 from readablestem.ops import step_report
 from readablestem.ops.step_report import Measured
-from readablestem.web.db import Job, JobCall, JobStage, JobStatus
+from readablestem.web.db import Job, JobCall, JobNotFinished, JobStage, JobStatus
 from readablestem.web.logsafe import log_event
 
 logger = logging.getLogger(__name__)
@@ -40,11 +42,24 @@ def keep(session: Session, job_id: str, facts: StepFacts) -> None:
         JobStage(job_id=job_id, seq=seq, stage=fact.stage, seconds=fact.seconds)
         for seq, fact in enumerate(facts.stages)
     )
+    session.add_all(
+        JobNotFinished(
+            job_id=job_id,
+            seq=seq,
+            step=fact.step,
+            page=fact.page,
+            reason=fact.reason,
+            done=fact.done,
+            total=fact.of,
+        )
+        for seq, fact in enumerate(facts.not_finished)
+    )
 
 
 def forget(session: Session, job_ids: Sequence[str]) -> None:
     session.execute(delete(JobCall).where(JobCall.job_id.in_(job_ids)))
     session.execute(delete(JobStage).where(JobStage.job_id.in_(job_ids)))
+    session.execute(delete(JobNotFinished).where(JobNotFinished.job_id.in_(job_ids)))
 
 
 def kept(session: Session, job_ids: Sequence[str]) -> dict[str, StepFacts]:
@@ -62,7 +77,29 @@ def kept(session: Session, job_ids: Sequence[str]) -> dict[str, StepFacts]:
         select(JobStage).where(JobStage.job_id.in_(job_ids)).order_by(JobStage.job_id, JobStage.seq)
     ):
         found[stage.job_id].stages.append(StageFact(stage=stage.stage, seconds=stage.seconds))
+    for row in session.scalars(
+        select(JobNotFinished)
+        .where(JobNotFinished.job_id.in_(job_ids))
+        .order_by(JobNotFinished.job_id, JobNotFinished.seq)
+    ):
+        found[row.job_id].not_finished.append(
+            NotFinished.model_validate(
+                {
+                    "step": row.step,
+                    "page": row.page,
+                    "reason": row.reason,
+                    "done": row.done,
+                    "of": row.total,
+                }
+            )
+        )
     return dict(found)
+
+
+def not_finished(session: Session, job_id: str) -> list[NotFinished]:
+    """The steps of the job's last conversion that stopped before they had done all of
+    their work, in a fixed order; none for a job that kept no facts."""
+    return kept(session, [job_id]).get(job_id, StepFacts()).not_finished
 
 
 def measured(
@@ -119,6 +156,17 @@ def log_job(job_id: str, pages: int, facts: StepFacts) -> None:
             call_s_p50=round(row.call_s_p50, 2),
             call_s_p95=round(row.call_s_p95, 2),
             cost_usd=round(row.usd, 6),
+        )
+    for stop in facts.not_finished:
+        log_event(
+            logger,
+            "job_not_finished",
+            job_id=job_id,
+            step=stop.step,
+            page=stop.page,
+            reason=stop.reason,
+            done=stop.done,
+            of=stop.of,
         )
     log_event(
         logger,

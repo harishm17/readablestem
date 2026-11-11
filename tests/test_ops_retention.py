@@ -17,7 +17,7 @@ from fixtures.ops.seed import (
     review,
     sentinel_result,
 )
-from readablestem.core.types import CallFact, StageFact, StepFacts
+from readablestem.core.types import CallFact, NotFinished, StageFact, StepFacts
 from readablestem.ops import aggregate, retention
 from readablestem.ops.aggregate import aggregate_finished
 from readablestem.ops.retention import PurgeStats, delete_jobs, purge_expired
@@ -55,7 +55,9 @@ def test_purge_deletes_expired_jobs_with_everything_derived(factory):
         add_job(s, user, retain_until=EXPIRED, status=db.JobStatus.QUEUED, finished_at=None)
         keep = add_job(s, user, retain_until=KEPT, blobs=1, edits=[("p1-e1", "accept")])
         facts = StepFacts(
-            calls=[CallFact(step="describe", page=1)], stages=[StageFact(stage="steps", seconds=1)]
+            calls=[CallFact(step="describe", page=1)],
+            stages=[StageFact(stage="steps", seconds=1)],
+            not_finished=[NotFinished(step="figure", reason="cap_reached", done=1, of=3)],
         )
         step_facts.keep(s, gone, facts)
         step_facts.keep(s, keep, facts)

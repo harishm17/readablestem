@@ -18,6 +18,7 @@ from readablestem.core.types import (
     EquationFix,
     Fix,
     Kind,
+    NotFinished,
     Status,
 )
 from readablestem.models.fake import FakeVisionClient
@@ -152,6 +153,22 @@ def test_a_run_with_a_fake_reader_adds_notes_and_choices_and_asks_about_every_eq
     assert [e.alternatives for e in again.elements] == [e.alternatives for e in result.elements]
 
 
+def test_second_readings_that_ran_out_of_time_are_said_to_be_unfinished():
+    """A clock may stop the reader; it may not quietly change the document. The conversion
+    says which step stopped and how far it got (`StepFacts.not_finished`)."""
+    reader = FakeReader(r"u = \frac{d}{t}", r"v = \frac{d}{t}")
+    output, _ = convert(
+        {"local": reader},
+        math_reader_local_enabled=True,
+        image_pages_second_reader="local",
+        image_pages_second_reader_time_s=0.001,  # less than one read's worst case
+    )
+    assert reader.reads == 0
+    assert output.facts.not_finished == [
+        NotFinished(step="second_reader", reason="time_limit", done=0, of=2)
+    ]
+
+
 def test_the_readers_own_sub_cap_stop_is_a_notice_and_never_stops_the_job():
     """`run._budget_scope` stops the whole job on a failed fix whose reason starts `budget_`:
     a reader's own spend limit must only ever be a note on a fix that stands."""
@@ -165,13 +182,16 @@ def test_the_readers_own_sub_cap_stop_is_a_notice_and_never_stops_the_job():
     job = JobBudget(guard=InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100)
     transport = FakeTransport([])  # nothing may be sent
     readers = build_readers(s, job, transport=transport)
-    result, _ = convert(
+    output, _ = convert(
         readers,
         math_reader_claude_enabled=True,
         math_reader_max_usd_per_job=0.00001,
         image_pages_second_reader="claude",
     )
-    result = result.result
+    assert output.facts.not_finished == [
+        NotFinished(step="second_reader", reason="cap_reached", done=0, of=2)
+    ]
+    result = output.result
     assert transport.sent == []
     equations = [e for e in result.elements if e.kind is Kind.EQUATION]
     assert len(equations) == 2

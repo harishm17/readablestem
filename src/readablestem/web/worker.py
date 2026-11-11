@@ -1137,7 +1137,7 @@ class Worker:
             )
             stored = time.monotonic() - attempt.converted
             after.append(StageFact(stage="store", seconds=round(stored, 4)))
-        return StepFacts(calls=output.facts.calls, stages=[*before, *output.facts.stages, *after])
+        return output.facts.model_copy(update={"stages": [*before, *output.facts.stages, *after]})
 
     def _write_result_retrying(self, attempt: _Attempt, output: ConversionOutput) -> bool:
         try:

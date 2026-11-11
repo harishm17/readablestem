@@ -9,6 +9,13 @@ The facts travel on `ConversionOutput.facts`, not in the stored result. The web 
 them for the job (`web.step_facts`), and `ops.step_report` turns the facts of many jobs
 into the numbers budgets and public figures are sized from.
 
+A third kind of fact says that a step stopped before it had done all of its work
+(`NotFinished`). The rule it serves: a budget counts work (candidates tried, cells tested,
+pixels read), which is the same on every machine; a limit on time or on money may only stop
+a step, and a step that stops says so with one of these. `capped`, `pages_capped` and `stopped` make
+the ones the conversion can see for itself; a step that has a budget of its own writes its
+own.
+
 Two kinds of time:
 
 - a stage's seconds are wall time, and the stages of one conversion do not overlap, so they
@@ -23,12 +30,25 @@ import time
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from readablestem.core.types import CallFact, Fix, ModelCall, StageFact, StepFacts
+from readablestem.core.types import (
+    CallFact,
+    Fix,
+    ModelCall,
+    NotFinished,
+    NotFinishedReason,
+    StageFact,
+    Status,
+    StepFacts,
+)
 
 # Steps whose requests are not in a job's call count: they are asked about an answer the
 # job already has, and only their dollars count toward its limits (`core.budget.JobBudget`).
 SECOND_CHECK = "second_check"
 SECOND_READER = "second_reader"
+# The two steps the ink analysis's clock can stop: typing a page, and reading the strokes
+# of a handwritten page for its pictures.
+PAGE_TYPE = "page_type"
+INK_STROKES = "ink_strokes"
 # The stage a caller adds for what its call of the conversion took outside the conversion's
 # own stages (`start_up`).
 START_UP = "start_up"
@@ -124,8 +144,50 @@ def of_reader_call(call: Any, page: int | None) -> CallFact:
     )
 
 
-def gathered(calls: Iterable[CallFact], watch: Stopwatch) -> StepFacts:
+def capped(fixes: Iterable[Fix]) -> list[NotFinished]:
+    """The steps the job's limit on dollars or on calls stopped: for each kind of element,
+    how many were done when the limit was reached (a fix that failed with a `budget_` reason
+    is one that was not)."""
+    done: dict[str, int] = {}
+    stopped: dict[str, int] = {}
+    for fix in fixes:
+        step = fix.kind.value
+        if fix.status is Status.FAILED and (fix.reason or "").startswith("budget_"):
+            stopped[step] = stopped.get(step, 0) + 1
+        else:
+            done[step] = done.get(step, 0) + 1
+    return [
+        NotFinished(
+            step=step,
+            reason="cap_reached",
+            done=done.get(step, 0),
+            of=done.get(step, 0) + count,
+        )
+        for step, count in sorted(stopped.items())
+    ]
+
+
+def pages_capped(
+    step: str, pages: Iterable[int], reason: NotFinishedReason = "cap_reached"
+) -> list[NotFinished]:
+    """The facts of a step that reads whole pages, for the pages it did not read: the ones
+    the job's limit kept it from, or with another `reason` the ones its clock did."""
+    return [NotFinished(step=step, page=page, reason=reason, of=1) for page in pages]
+
+
+def stopped(step: str, reason: NotFinishedReason, *, done: int, of: int) -> list[NotFinished]:
+    """The fact of a step over the whole document that stopped with `of - done` units of
+    its work left; nothing when it did them all."""
+    if done >= of:
+        return []
+    return [NotFinished(step=step, reason=reason, done=done, of=of)]
+
+
+def gathered(
+    calls: Iterable[CallFact], watch: Stopwatch, not_finished: Iterable[NotFinished] = ()
+) -> StepFacts:
     """The facts of one conversion, its calls ordered by page and step so that two runs of
     one document give the same list whatever order their threads finished in."""
     ordered = sorted(calls, key=lambda c: (c.page is None, c.page or 0, c.step, c.attempt))
-    return StepFacts(calls=ordered, stages=watch.stop())
+    stops = sorted(not_finished, key=lambda n: (n.step, n.page is None, n.page or 0, n.reason))
+    return StepFacts(calls=ordered, stages=watch.stop(), not_finished=stops)

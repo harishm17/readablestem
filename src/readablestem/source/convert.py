@@ -381,7 +381,9 @@ def _finish(
     checks = html_checks.static_checks(html)
     # A source has no pages: every request is about the document.
     facts = step_facts.gathered(
-        (fact for fix in ordered for fact in step_facts.of_fix(fix, None)), watch
+        (fact for fix in ordered for fact in step_facts.of_fix(fix, None)),
+        watch,
+        step_facts.capped(ordered),
     )
     wall_ms = round((time.perf_counter() - started) * 1000)
     stats = pipeline._stats(page_list, elements, ordered, run.page_ms, wall_ms)

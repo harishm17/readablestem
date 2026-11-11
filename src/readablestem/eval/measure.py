@@ -17,7 +17,13 @@ one at a time unless asked otherwise, so that
 - one upload's caches cannot make the next one look faster.
 
 What is measured is content-free: page kinds, step facts (`pipeline.step_facts`), seconds,
-megabytes and dollars.
+megabytes and dollars, and a hash of each part of the result with its timing left out
+(`parts`).
+
+The same replay answers a second question: does a slower machine give the same document?
+`run(..., share=0.25)` holds every conversion back to a quarter of the time, and
+`unexplained` names what then came out different without a step saying it stopped early
+(tests/test_determinism.py).
 
 A page has one kind, the first of these that fits, so that the dollars and the seconds of
 the kinds add up to the document's:
@@ -34,9 +40,12 @@ the kinds add up to the document's:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import hashlib
 import json
 import os
 import resource
+import signal
 import subprocess
 import sys
 import tempfile
@@ -54,6 +63,7 @@ from readablestem.pipeline import step_facts
 
 if TYPE_CHECKING:
     from readablestem.config import Settings
+    from readablestem.core.types import ConversionOptions
 
 KINDS = ("scan", "source", "slide", "dense_math", "table", "figure", "typical")
 # A page with this many equations is a page of a derivation or of a worked solution. On the
@@ -71,6 +81,9 @@ ROOM = {
 }
 # How long one upload's process may run before it is stopped and counted as failed.
 LIMIT_S = 1800.0
+# The fields of a result that say how long something took. Two conversions of one file
+# agree on everything else (`parts`).
+_TIMING = frozenset({"latency_ms", "seconds"})
 
 
 @dataclass(frozen=True)
@@ -104,6 +117,8 @@ class Converted:
     peak_mb: float = 0.0  # the most memory the conversion process held
     own_peak_mb: float = 0.0  # the most the calling process held
     error: str = ""
+    # A hash of each part of the result with its timing left out (`parts`).
+    parts: dict[str, str] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
@@ -155,6 +170,53 @@ def page_kinds(result: DocumentResult, facts: StepFacts) -> list[str]:
     return kinds
 
 
+def _timeless(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _timeless(item) for key, item in value.items() if key not in _TIMING}
+    if isinstance(value, list):
+        return [_timeless(item) for item in value]
+    return value
+
+
+def parts(result: DocumentResult) -> dict[str, str]:
+    """A hash of each part of a result, in the order a conversion makes them, with the
+    fields that hold seconds left out: what two conversions of one file must agree on,
+    whatever machine each ran on."""
+    raw = _timeless(result.model_dump(mode="json"))
+    fixes = raw.pop("fixes")
+    split = {
+        "page types": [raw.pop(name, None) for name in ("page_types", "image_only_pages")],
+        "elements": raw.pop("elements"),
+        **{
+            f"{kind} fixes": [fix for fix in fixes if fix["kind"] == kind]
+            for kind in sorted({fix["kind"] for fix in fixes})
+        },
+        "html": raw.pop("html"),
+        "the rest": raw,
+    }
+    return {
+        name: hashlib.sha256(json.dumps(part, sort_keys=True).encode()).hexdigest()[:16]
+        for name, part in split.items()
+    }
+
+
+def differing(one: Converted, other: Converted) -> list[str]:
+    """The parts of the result two conversions of one upload disagree on, the earliest
+    made first; "error" when one of them ended differently."""
+    if one.error != other.error:
+        return ["error"]
+    names = [*one.parts, *(name for name in other.parts if name not in one.parts)]
+    return [name for name in names if one.parts.get(name) != other.parts.get(name)]
+
+
+def unexplained(quick: Converted, slow: Converted) -> list[str]:
+    """What the slower of two conversions of one upload changed without saying so: the
+    parts that differ (`differing`), unless a step of the slower one says it stopped early
+    with a "not finished" fact the quicker one does not have."""
+    said = [stop for stop in slow.facts.not_finished if stop not in quick.facts.not_finished]
+    return [] if said else differing(quick, slow)
+
+
 def replay_settings(answers: Path) -> Settings:
     """Production's behaviour settings, with the recorded answers in place of the provider."""
     from readablestem.config import Settings
@@ -199,30 +261,71 @@ def _not_fetched(url: str, size: int) -> bytes:
     raise corpus.CorpusError("not fetched")
 
 
-def convert(upload: Upload, settings: Settings) -> Converted:
-    """Convert one upload in a conversion process, as a job is converted, and measure it."""
+@dataclass(frozen=True)
+class _Job:
+    """One upload as a job gets it: the file, its page count, the job's client (under the
+    job's caps) and its options."""
+
+    pdf: bytes
+    pages: int
+    client: Any
+    options: ConversionOptions
+
+
+def _job(upload: Upload, settings: Settings) -> _Job | str:
+    """The job of one upload, or the code of why this machine cannot replay it."""
     import pymupdf
 
     from readablestem.core.budget import InMemorySpendGuard, JobBudget
     from readablestem.core.types import ConversionOptions
-    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
     from readablestem.web.worker import default_client_factory, job_caps
 
     if reason := cannot_replay(upload.entry):
-        return Converted(upload.name, error=reason)
+        return reason
     try:
         pdf = corpus.document(corpus.load_manifest()[upload.entry], get=_not_fetched)
     except corpus.CorpusError:
-        return Converted(upload.name, error="not_fetched")
+        return "not_fetched"
     with pymupdf.open(stream=pdf, filetype="pdf") as opened:
         page_count = opened.page_count
     image_pages = upload.image_pages and settings.feature_image_pages
     max_usd, max_calls = job_caps(settings, page_count, image_pages)
     budget = JobBudget(InMemorySpendGuard(cap_usd=1000.0), max_usd=max_usd, max_calls=max_calls)
-    client: Any = default_client_factory(settings, budget)
     options = ConversionOptions.from_settings(settings).model_copy(
         update={"exam_mode": upload.exam, "image_pages": image_pages}
     )
+    return _Job(pdf, page_count, default_client_factory(settings, budget), options)
+
+
+def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult] | str:
+    """One upload's file and the document a job makes of it (converted as `convert`
+    converts it, without the measuring), or the code of why there is none."""
+    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+
+    job = _job(upload, settings)
+    if isinstance(job, str):
+        return job
+    try:
+        output = convert_isolated(
+            job.pdf,
+            settings=settings,
+            client=job.client,
+            options=job.options,
+            concurrency=settings.model_concurrency,
+        )
+    except ConversionFailed as exc:
+        return str(exc.code)
+    return job.pdf, output.result
+
+
+def convert(upload: Upload, settings: Settings) -> Converted:
+    """Convert one upload in a conversion process, as a job is converted, and measure it."""
+    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+
+    job = _job(upload, settings)
+    if isinstance(job, str):
+        return Converted(upload.name, error=job)
+    pdf, page_count, client, options = job.pdf, job.pages, job.client, job.options
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     own_before = time.process_time()
     started = time.monotonic()
@@ -240,7 +343,7 @@ def convert(upload: Upload, settings: Settings) -> Converted:
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
     readers = [client, getattr(client, "second_check", None)]
     facts = output.facts or StepFacts()
-    facts = StepFacts(calls=facts.calls, stages=[step_facts.start_up(facts, wall_s), *facts.stages])
+    facts = facts.model_copy(update={"stages": [step_facts.start_up(facts, wall_s), *facts.stages]})
     result = output.result
     return Converted(
         upload.name,
@@ -259,10 +362,97 @@ def convert(upload: Upload, settings: Settings) -> Converted:
         # Linux counts both in KB.
         peak_mb=round(after.ru_maxrss / 1024, 1),
         own_peak_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
+        parts=parts(result),
     )
 
 
-def _in_a_process(upload: Upload, answers: Path, folder: Path, cores: str | None) -> Converted:
+def _children(pid: int) -> list[int] | None:
+    """The processes `pid` started, from the kernel's own list (one file for each of its
+    threads). None where the kernel keeps no such list."""
+    found: list[int] = []
+    try:
+        threads = os.listdir(f"/proc/{pid}/task")
+    except OSError:
+        return found  # it has ended
+    for thread in threads:
+        try:
+            listed = Path(f"/proc/{pid}/task/{thread}/children").read_text(encoding="ascii")
+        except FileNotFoundError:
+            if Path(f"/proc/{pid}/task/{thread}").is_dir():
+                return None  # the thread is there and the list is not: no such list here
+            continue
+        except OSError:
+            continue
+        found.extend(int(one) for one in listed.split())
+    return found
+
+
+def _started_under(pid: int) -> list[int]:
+    """`pid` and every process started under it, read from /proc."""
+    found = [pid]
+    for one in found:
+        below = _children(one)
+        if below is None:
+            return _started_under_by_parent(pid)
+        found.extend(below)
+    return found
+
+
+def _started_under_by_parent(pid: int) -> list[int]:
+    """The same from every process's parent: slow (it reads all of /proc), for a kernel
+    without the lists of children."""
+    children: dict[int, list[int]] = {}
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            # "pid (name) state parent ...": the name may hold spaces and brackets.
+            text = stat.read_text(encoding="utf-8", errors="replace")
+            parent = int(text.rsplit(")", 1)[1].split()[1])
+        except (OSError, IndexError, ValueError):
+            continue  # it ended while it was being read
+        children.setdefault(parent, []).append(int(stat.parent.name))
+    found = [pid]
+    for one in found:
+        found.extend(children.get(one, []))
+    return found
+
+
+def _tell(pids: Iterable[int], what: signal.Signals) -> None:
+    for pid in pids:
+        with contextlib.suppress(OSError):  # it has ended
+            os.kill(pid, what)
+
+
+def _held_back(process: subprocess.Popen[bytes], share: float) -> int | None:
+    """Wait for `process` while it and everything it started run for only `share` of the
+    time: they are stopped and continued ten times a second. To every clock the conversion
+    reads, that is a machine with that share of this one to give. Returns the exit status,
+    or None when `LIMIT_S` passed (everything is then ended)."""
+    period = 0.1
+    deadline = time.monotonic() + LIMIT_S
+    stopped: list[int] = []
+    try:
+        while process.poll() is None:
+            if time.monotonic() > deadline:
+                _tell(_started_under(process.pid), signal.SIGKILL)
+                return None
+            began = time.monotonic()
+            time.sleep(period * share)
+            stopped = _started_under(process.pid)
+            _tell(stopped, signal.SIGSTOP)
+            # Finding and stopping them took time in which they ran: the pause is sized
+            # from the time they really had, so the share holds whatever that cost.
+            ran = time.monotonic() - began
+            time.sleep(ran * (1 - share) / share)
+            _tell(stopped, signal.SIGCONT)
+            stopped = []
+    finally:
+        _tell(stopped, signal.SIGCONT)  # never leave anything stopped behind
+    return process.returncode
+
+
+def _in_a_process(
+    upload: Upload, answers: Path, folder: Path, cores: str | None, share: float | None
+) -> Converted:
     out = folder / f"{upload.name}.json"
     command = [sys.executable, "-m", "readablestem.eval.measure", upload.entry]
     command += ["--answers", str(answers), "--out", str(out)]
@@ -270,11 +460,17 @@ def _in_a_process(upload: Upload, answers: Path, folder: Path, cores: str | None
     command += ["--exam"] if upload.exam else []
     if cores:
         command = ["taskset", "--cpu-list", cores, *command]
-    try:
-        ended = subprocess.run(
-            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=LIMIT_S
-        ).returncode
-    except subprocess.TimeoutExpired:
+    quiet: Any = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    ended: int | None
+    if share is None:
+        try:
+            ended = subprocess.run(command, timeout=LIMIT_S, **quiet).returncode
+        except subprocess.TimeoutExpired:
+            ended = None
+    else:
+        with subprocess.Popen(command, **quiet) as process:
+            ended = _held_back(process, share)
+    if ended is None:
         return Converted(upload.name, error="timeout")
     if ended != 0 or not out.is_file():
         return Converted(upload.name, error="process_failed")
@@ -286,17 +482,22 @@ def run(
     *,
     at_once: int = 1,
     cores: str | None = None,
+    share: float | None = None,
     said: Callable[[Converted], None] | None = None,
 ) -> list[Converted]:
     """Measure each upload in a process of its own, `at_once` of them at a time (1 for
     seconds that mean anything), pinned to the CPU list `cores` when given. `said` is
-    called as each one ends."""
+    called as each one ends.
+
+    `share` (0.25 for a quarter) holds each conversion back to that share of the time, as
+    a much slower machine would: its seconds then mean nothing, and its result must be the
+    one a quick machine gives (`unexplained`)."""
     with tempfile.TemporaryDirectory(prefix="readablestem-measure-") as name:
         folder = Path(name)
         answers = answers_file(folder)
 
         def one(upload: Upload) -> Converted:
-            done = _in_a_process(upload, answers, folder, cores)
+            done = _in_a_process(upload, answers, folder, cores, share)
             if said is not None:
                 said(done)
             return done

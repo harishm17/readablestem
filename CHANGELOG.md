@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased: the measuring ground (branch feat/stage0-ground)
+
+Nothing here changes what a converted document contains. It is what later changes are
+measured and replayed against.
+
+- **Test corpus and recorded answers.** A manifest of files made for the tests or fetched by
+  hash, each converted through the app from recorded model answers, keyed by the question as
+  sent. A replay sends nothing and costs nothing. The workflow suite (`-m workflow`) runs the
+  audit's workflows on it, and a hostile-input set states for each of 36 files how its
+  conversion must end.
+- **Gold and evals.** Reading-order gold built from a document's source; a layout gold set
+  drawn by seeded rules, and a held-out set of 51 documents no page of which was opened.
+  Evals split by document, and only a held-out score can meet a bar.
+- **Step facts.** Every model request and every stage of a job is kept as a content-free
+  fact (`job_calls`, `job_stages`), with `readablestem ops step-report` and totals on the
+  admin page.
+- **"Not finished" facts.** A step that stops before it has done all of its work says so:
+  `{step, page, reason, done, of}` in the table `job_not_finished`, a log line, and one
+  reader (`web.step_facts.not_finished`). Written by the steps the job's limit stops, the
+  image pages it keeps from being read, the second reader's time and dollar share, and the
+  ink analysis when its time runs out.
+- **The same file gives the same document on any machine** (tests/test_determinism.py).
+  Every read of a clock in `pipeline/` and `source/` is named in a table; the corpus is
+  replayed at full speed and held back to a quarter of the time, and an upload may differ
+  only if a step said it stopped. The first run found one: a handwritten upload lost a
+  page's handwriting when the ink analysis's 10 seconds ran out with nothing recorded. The
+  stop is now recorded. The clock itself is not yet replaced by a count of work.
+- **Cost and speed of a page** (`readablestem eval cost`, `eval speed`): dollars a page by
+  kind and by step and seconds a page by kind and stage, from a measured replay of the
+  corpus under the production profile. The Sonnet cache-read price was double the published
+  rate and is corrected.
+- **The page audit, in shadow** (`pipeline/page_audit.py`, `readablestem eval page-audit`):
+  one request a page that sets the page's picture beside its converted text and answers
+  with fault codes, element ids and boxes, never text. A page is a pass, flagged, or not
+  audited with a reason; an answer that cannot be used is never a pass. It has a per-page
+  ceiling and runs under the run's spend cap. Nothing reads its verdicts yet, no job runs
+  it, and no live run has been recorded.
+- **Dependency record** (docs/dependencies.md): versions, licenses and rules, checked by the
+  suite.
+- The production profile lists the page audit's three behavior settings at their code
+  defaults, so its hash changes with no change to what production runs.
+
 ## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
 
 - Every review write records a content-free `decision_outcome` event beside `decision_made`:

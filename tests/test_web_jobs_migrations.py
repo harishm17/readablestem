@@ -32,7 +32,7 @@ CHAIN = [
     (RETRY, REVISED, RETRY_COLUMNS, {"step_records"}),
     (PARTS, RETRY, PARTS_COLUMNS, {"pending_uploads"}),
     (SAMPLE, PARTS, SAMPLE_COLUMNS, set()),
-    (STEP_FACTS, "c2f4a8d61e57", set(), {"job_calls", "job_stages"}),
+    (STEP_FACTS, "c2f4a8d61e57", set(), {"job_calls", "job_stages", "job_not_finished"}),
 ]
 
 

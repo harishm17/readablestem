@@ -141,7 +141,15 @@ class Check(BaseModel):
 
 
 Step = Literal[
-    "equation", "figure", "judge", "table", "check", "page_math", "page_witness", "image_page"
+    "equation",
+    "figure",
+    "judge",
+    "table",
+    "check",
+    "page_math",
+    "page_witness",
+    "image_page",
+    "page_audit",
 ]
 
 Outcome = Literal[
@@ -1242,11 +1250,35 @@ class StageFact(BaseModel):
     seconds: float
 
 
+# Why a step stopped before it had done all of its work (`NotFinished.reason`):
+# - "work_budget": it had done the count of work it is allowed (the same on every machine);
+# - "time_limit": a clock stopped it, so another machine may have got further;
+# - "memory_limit": it would have held more memory than it may;
+# - "cap_reached": the job's own limit on dollars or on model calls was reached.
+NotFinishedReason = Literal["work_budget", "time_limit", "memory_limit", "cap_reached"]
+
+
+class NotFinished(BaseModel):
+    """A step that stopped before it had done all of its work. Content-free: the step's name,
+    a page number, a code and two counts.
+
+    A limit may stop a step; it may not quietly change what a document contains. So every
+    step that stops early says so here, and a difference between two conversions of one file
+    is allowed only where the slower one holds such a fact (tests/test_determinism.py)."""
+
+    step: str
+    page: int | None = None  # 0-based; None for a step over the whole document
+    reason: NotFinishedReason
+    done: int = 0  # units of the step's work that were done (elements, pages, reads)
+    of: int = 0  # units there were to do
+
+
 class StepFacts(BaseModel):
     """What a conversion measured of itself (`pipeline.step_facts`). Content-free."""
 
     calls: list[CallFact] = Field(default_factory=list)
     stages: list[StageFact] = Field(default_factory=list)
+    not_finished: list[NotFinished] = Field(default_factory=list)
 
 
 class ConversionOutput(BaseModel):

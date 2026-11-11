@@ -991,6 +991,98 @@ def _cmd_speed(args: argparse.Namespace) -> int:
     return 1 if verdict.judged else 2
 
 
+def _cmd_page_audit(args: argparse.Namespace) -> int:
+    """`eval page-audit`: the page audit in shadow on the corpus or on a layout gold set's
+    folder (`eval.page_audit_eval`). It writes verdicts and changes no output. Exit code 0:
+    every page has a verdict; 1: the spend cap ended the run early (the report says where);
+    2: the run could not start."""
+    import tempfile
+
+    from readablestem.eval import page_audit_eval as audit_eval
+    from readablestem.eval import pipeline_eval as pe
+    from readablestem.eval import run_record, staged
+    from readablestem.eval.render import ChromiumRenderer, RenderError
+
+    live = not (args.fake or args.answers_offline)
+    if args.answers_offline and not args.answers:
+        return _error("--answers-offline needs --answers FILE")
+    if args.batch and not live:
+        return _error("--batch needs real model calls: no --fake and no --answers-offline")
+    settings = _settings_for(args)
+    if isinstance(settings, str):
+        return _error(settings)
+    if live and settings.model_provider != "anthropic":
+        return _error("the page audit asks an Anthropic model: pass --provider anthropic")
+    root: Path | None = args.gold_dir
+    if root is not None and not (root / "files").is_dir():
+        return _error(f"{root} is not a layout gold set's folder (no files/ in it)")
+    name = "corpus" if root is None else root.name
+    keep = (run_record.set_root("corpus"), "corpus") if root is None else (root, name)
+    default_out = (
+        _default(Path("data/eval/latest-page-audit.json"))
+        if root is None
+        else root / "page-audit.json"  # a held-out set's rows stay with the set
+    )
+    out: Path = args.out or default_out
+    with _recording(args, keep) as rec:
+        if args.answers_offline:
+            from readablestem.eval.answers import CachedClient
+
+            client: Any = CachedClient(None, args.answers, settings)
+            label = "replay"
+        else:
+            made = _make_client(args, settings)
+            if isinstance(made, str):
+                return _error(made)
+            client, _budget, label = made
+        with tempfile.TemporaryDirectory() as scratch:
+            documents = list(
+                audit_eval.corpus_documents(Path(scratch), args.only)
+                if root is None
+                else audit_eval.gold_documents(root, settings, args.only)
+            )[: args.limit]
+        if not documents:
+            return _error("no document to audit: the set is empty, or --only names none of it")
+        renderer = ChromiumRenderer() if args.rendered else None
+
+        def one_pass() -> Any:
+            if hasattr(client, "reset"):
+                client.reset()
+            quiet = (lambda _line: None) if args.batch else print
+            return audit_eval.audit_documents(
+                documents, client, settings, renderer=renderer, say=quiet
+            )
+
+        try:
+            if args.batch:
+                run = staged.drive(one_pass, args.staged_pool, args.staged_runner)
+            else:
+                run = one_pass()
+        except RenderError as exc:
+            return _error(f"could not draw a page's output: {exc}")
+        except staged_error() as exc:
+            return _error(str(exc))
+        finally:
+            if renderer is not None:
+                renderer.close()
+        found = audit_eval.report(
+            run,
+            set_name=name,
+            settings=settings,
+            date=args.date,
+            client_label=label,
+            with_output_picture=args.rendered,
+        )
+        if hasattr(client, "summary"):
+            found["answers_file"] = dict(client.summary())
+        _finish_recording(rec, args, found)
+        pe.write_report(found, out)
+        print(audit_eval.format_markdown(found), end="")
+        print(f"wrote {_shown(out)}")
+        _copy_report(rec, found)
+    return 1 if run.stopped else 0
+
+
 def _cmd_promote(args: argparse.Namespace) -> int:
     """Copy a reviewed report to data/eval/<baseline|latest>-<task>.json for the CI gate.
 
@@ -1757,6 +1849,60 @@ def register(
         help="how much slower a page kind may be (0.10; 1.0 on a shared runner)",
     )
     speed.set_defaults(func=_cmd_speed)
+
+    page_audit = group.add_parser(
+        "page-audit",
+        help="the page audit in shadow: one request a page that compares the page with its "
+        "output; writes verdicts, changes no output",
+    )
+    which = page_audit.add_mutually_exclusive_group(required=True)
+    which.add_argument(
+        "--corpus",
+        action="store_true",
+        help="the corpus, each upload converted from its recorded answers (as `eval cost`)",
+    )
+    which.add_argument(
+        "--gold-dir",
+        type=Path,
+        metavar="DIR",
+        help="a layout gold set's folder (files/<id>.pdf), each file converted with no model",
+    )
+    page_audit.add_argument(
+        "--only", action="append", default=[], metavar="ID", help="only this document (repeat)"
+    )
+    page_audit.add_argument("--limit", type=_positive_int, help="the first N documents")
+    page_audit.add_argument(
+        "--rendered",
+        action="store_true",
+        help="also send a picture of the page's output as a browser draws it (needs the "
+        "browser group: uv sync --group browser)",
+    )
+    _add_spend_args(page_audit)
+    page_audit.add_argument(
+        "--answers",
+        type=Path,
+        help="a file of recorded answers (eval/answers.py): a request in it costs nothing, "
+        "any other goes to the model and is appended (default: the run's own folder)",
+    )
+    page_audit.add_argument(
+        "--answers-offline",
+        action="store_true",
+        help="with --answers: replay only; a request not in the file is not audited",
+    )
+    page_audit.add_argument(
+        "--batch",
+        action="store_true",
+        help="send what the answers file cannot answer as Message Batches (half price); a "
+        "request that keeps failing is stored as not audited",
+    )
+    page_audit.add_argument("--date", type=_iso_date, default=today, help="run date to record")
+    page_audit.add_argument(
+        "--out",
+        type=Path,
+        help="report JSON (default: data/eval/latest-page-audit.json; with --gold-dir, "
+        "page-audit.json in that folder)",
+    )
+    page_audit.set_defaults(func=_cmd_page_audit)
 
     promote = group.add_parser(
         "promote", help="copy a reviewed report to data/eval as the baseline or latest"

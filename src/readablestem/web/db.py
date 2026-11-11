@@ -283,6 +283,23 @@ class JobStage(Base):
     seconds: Mapped[float] = mapped_column(Float)
 
 
+class JobNotFinished(Base):
+    """A step of a job's last conversion that stopped before it had done all of its work
+    (`core.types.NotFinished`): the step, the page, why, and how much was done. Codes and
+    counts only. Replaced and deleted like `JobCall`."""
+
+    __tablename__ = "job_not_finished"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    step: Mapped[str] = mapped_column(String(32))
+    page: Mapped[int | None] = mapped_column(Integer)  # 0-based; NULL: the whole document
+    reason: Mapped[str] = mapped_column(String(16))  # a `core.types.NotFinishedReason`
+    done: Mapped[int] = mapped_column(Integer)
+    total: Mapped[int] = mapped_column(Integer)  # `NotFinished.of`
+
+
 class ReviewEdit(Base):
     """A reviewer's decision on one fix. Kept only as long as its job."""
 

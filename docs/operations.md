@@ -168,9 +168,25 @@ When a job ends `done`, the worker keeps what it took of the models and of the c
   `start_up`, the stages of the conversion (`layout`, `page_math`, `page_witness`,
   `image_pages`, `steps`, `second_readings`, `assemble`, `checks`; a LaTeX source has
   `source` in place of the first four) and `store`.
+- `job_not_finished` has one row for each step that stopped before it had done all of its
+  work: the step, the page (empty for a step over the whole document), a reason code and
+  how many units of its work were done out of how many there were. The reasons are
+  `work_budget` (it did the count of work it is allowed, the same on every machine),
+  `time_limit` (a clock stopped it, so another machine may have got further),
+  `memory_limit` and `cap_reached` (the job's limit on dollars or on model calls). Written
+  today: `equation`, `table` and `figure` when the job's limit stopped the steps (elements
+  done of elements); `image_page`, one row for each page the limit kept from being read;
+  `second_reader`, when its time ran out (`time_limit`) or its own dollar share was spent
+  (`cap_reached`), with the equations read of those it could have read; `page_type`, one
+  row for each page that was typed without its ink because the document's time for the ink
+  analysis had run out (`time_limit`; such a page may be handwriting that was not seen as
+  handwriting); `ink_strokes`, when the same time ran out while the strokes of handwritten
+  pages were read for their pictures (pages read of pages).
+  `web.step_facts.not_finished(session, job_id)` is the one place a page or a count reads
+  them, and each is also a `job_not_finished` log line.
 
-Both hold codes, counts, seconds and dollars only: no text of the document, no file name
-and no user id. They are replaced when the job is converted again and deleted with the
+All three hold codes, counts, seconds and dollars only: no text of the document, no file
+name and no user id. They are replaced when the job is converted again and deleted with the
 job. A job that failed keeps none.
 
 There are two kinds of seconds, and they do not add up to each other:
@@ -211,8 +227,9 @@ recent documents".
 
 The same facts go to the log when the job is stored: one `job_steps` line for each step
 and model (`calls`, `failed`, `input_tokens`, `cached_input_tokens`, `output_tokens`,
-`cache_read`, `call_s_p50`, `call_s_p95`, `cost_usd`) and one `job_stages` line with
-`pages` and a `<stage>_s` field for each stage.
+`cache_read`, `call_s_p50`, `call_s_p95`, `cost_usd`), one `job_stages` line with
+`pages` and a `<stage>_s` field for each stage, and one `job_not_finished` line for each
+step that stopped early (`step`, `page`, `reason`, `done`, `of`).
 
 ## Error aggregates
 
@@ -333,7 +350,7 @@ Useful filters for the service's **Logs** panel or `railway logs --service web -
 | Anything wrong? | `@severity:WARNING OR @severity:ERROR` |
 | Server errors | `@message:request AND @status:>=500` |
 | Slow pages | `@message:request AND @latency_ms:>5000` |
-| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages` (add `AND @job_id:...` for one job) |
+| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished` (add `AND @job_id:...` for one job) |
 | Hourly cleanup (cron service) | `@message:aggregate_done OR @message:purge_done OR @message:aggregate_failed OR @message:aggregate_on_delete_failed` |
 | Tracing problems | `@message:tracing_disabled OR @message:trace_failed` |
 | Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `@message:upload_rejected AND (@code:handwritten OR @code:handwritten_no_text OR @code:scanned OR @code:scanned_ocr)` |

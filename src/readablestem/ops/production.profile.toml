@@ -103,6 +103,7 @@ operations = [
   "IMAGE_PAGES_TIMEOUT_S",
   "IMAGE_PAGES_USD_PER_PAGE",
   "IMAGE_PAGES_MAX_USD_PER_JOB",
+  "PAGE_AUDIT_MAX_USD_PER_PAGE",
   "TRACING_ENABLED",
   "LANGFUSE_PUBLIC_KEY",
   "LANGFUSE_SECRET_KEY",
@@ -122,6 +123,7 @@ ANTHROPIC_EFFORT_EQUATION = { value = "unset", source = "not stated; code defaul
 ANTHROPIC_EFFORT_FIGURE = { value = "unset", source = "not stated; code default" }
 ANTHROPIC_EFFORT_PAGE_MATH = { value = "unset", source = "not stated; code default" }
 ANTHROPIC_EFFORT_PAGE_WITNESS = { value = "unset", source = "not stated; code default" }
+ANTHROPIC_EFFORT_PAGE_AUDIT = { value = "unset", source = "not stated; code default (the page audit runs in no job yet)" }
 ANTHROPIC_EFFORT_IMAGE_PAGES = { value = "unset", source = "not stated; code default" }
 ANTHROPIC_NOTICE_IN_SYSTEM = { value = true, source = "not stated; code default" }
 EQUATION_CONTEXT_ON_ESCALATION = { value = false, source = "not stated; code default" }
@@ -165,6 +167,8 @@ PAGE_MATH_UNCONFIRMED_FACTOR = { value = 1.0, source = "not stated; code default
 FEATURE_PAGE_WITNESS = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
 PAGE_WITNESS_MODEL = { value = "claude-opus-5-5", source = "not stated; code default" }
 PAGE_WITNESS_MAX_OUTPUT_TOKENS = { value = 12288, source = "not stated; code default" }
+PAGE_AUDIT_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default (the page audit runs in no job yet)" }
+PAGE_AUDIT_MAX_OUTPUT_TOKENS = { value = 1500, source = "not stated; code default (the page audit runs in no job yet)" }
 FEATURE_IMAGE_PAGES = { value = true, source = "docs/web.md:83 and docs/deploy-railway.md:201 at 693cca24, stated 2026-11-04" }
 FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-railway.md:166 at 693cca24, on since 2026-11-04 13:53 UTC" }
 FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04" }
