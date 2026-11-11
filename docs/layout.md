@@ -44,8 +44,8 @@ Element conventions:
   content: render mode 3, 5 % opacity or less, or painted over by an image or a filled
   shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
   look-alikes `〚` `〛` (U+301A/U+301B) in every piece of document text, so a PDF cannot
-  fake a marker: every marker in an element's `text` is a real inline child of it. Word's
-  private-use Symbol bullet (U+F0B7) becomes `•`.
+  fake a marker: every marker in an element's `text` is a real inline child of it. Private-use
+  codes of symbol fonts (Word's Symbol bullet U+F0B7 is `•`) are mapped by `font_codes`, by font name.
 - Figures carry the nearby `"Figure N ..."` text in `caption` and any labels drawn inside
   or right next to them (axis titles, tick labels) in `text`.
 - **Tables** (since pipeline 0.4.0) are `Kind.TABLE`: `table` is the grid built from the
@@ -73,7 +73,8 @@ Element conventions:
    is off.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
-   line and cannot be told apart. Ligatures are expanded.
+   line and cannot be told apart. Ligatures are expanded. Codes of symbol and TeX fonts are
+   read as what the font draws (`pipeline/font_codes.py`, "Font code tables" below).
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
@@ -455,7 +456,8 @@ A row starts a list item when it begins with a marker followed by the item's tex
 within 3 x font size:
 
 - a bullet glyph (`•` `◦` `▪` `▫` `■` `□` `●` `○` `‣` `⁃` `➢` `✓` `►` `▸` `▶` `▹` `◆`,
-  Word's private-use Symbol bullet, beamer's AMS triangle `▶`);
+  Word's Symbol and Wingdings bullets (private-use codes, mapped by `font_codes` before this
+  step), beamer's AMS triangle `▶`);
 - a bullet drawn as a small shape (at most 0.6 x font size) just left of the row at its
   height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
   filled squares "▪";
@@ -650,8 +652,8 @@ other. A minus sign alone is not math evidence: groff prints command-line option
   open and close in order. A lone italic word, `[3]`, `10-12` and `2019` are not math.
   TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run; math
   function names (`sin`, `lim`, `proj`, `rank`, `diag` ...) are not English words. List
-  bullets (`•`, `▪`, Word's private-use Symbol bullet U+F0B7, and a `·` or `∙` that
-  starts a line) are never math, even in the Symbol font Word draws them in.
+  bullets (`•`, `▪`, Word's Symbol bullet (U+F0B7, mapped to `•` by `font_codes`), and a
+  `·` or `∙` that starts a line) are never math, even in the Symbol font Word draws them in.
 - When `,` `.` `;` `:` or `?` follows an inline equation, its box's right edge moves left by
   up to `CROP_PAD` (crop's default padding, 2 pt) so the padded crop ends where the
   punctuation starts and still holds every glyph. The mark stays in the paragraph after
@@ -738,6 +740,26 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   among its characters (`_spread_ligatures`) wherever layout reads characters from the PDF: the
   rows (so tables, whose cells come from them), `line_glyphs` and `page_glyphs`. Text running down
   the page is shared along y; other angles are left as MuPDF has them.
+- **Font code tables** (`pipeline/font_codes.py`, `FONT_CODE_TABLES`, on; every file). A font with
+  no usable ToUnicode gives its codes as control characters, private-use code points or plain
+  letters that are not what is printed. `_text_blocks` rewrites them, before rows, markers, math
+  detection or any output read the page, so this module is the one place a code is mapped. Tables,
+  keyed on the font's base name (subset prefix removed): the Symbol family (Symbol, SymbolMT,
+  SymbolPS, Standard Symbols; OpenSymbol for its private-use codes), for private-use codes
+  (U+F061 is alpha) and Latin letters (SymbolMT's "h" is eta); Wingdings (not 2 or 3), the five
+  codes Word uses for bullets and an arrow (U+F0A7 `▪`, U+F0D8 `➢`, U+F0FC `✓`, U+F076 `❖`,
+  U+F0E0 `→`, or the Latin-1 letters a font with no ToUnicode gives); MT-Extra (U+F06C `ℓ`); the
+  APS math font AdvP4C4E74 (thorn is "+",
+  one-quarter "=", eth and capital thorn the parentheses). The same code is another glyph in
+  another font (U+F0A7 is a club in Symbol), so a code is never mapped without its font. Also, for
+  fonts with no table: TeX's ligatures, dashes and quotes at control codes (OT1 or T1, told by the
+  font's own codes), a spacing accent printed over a letter becomes the accented letter ("Ren´e"),
+  and an unreadable glyph that starts two or more lines of a page, set off from the text by a gap
+  and nowhere inside a line, is a bullet. A code with no row stays as it was. Left out: the
+  big-bracket pieces U+F8EB to U+F8F8 (`_OPENING_BRACES`, `signs._NO_SIGN` read them by code
+  point), Wingdings 2 and 3, Webdings, ZapfDingbats, MSAM, the MathTime families, and MSBM, whose
+  double-struck letters `_Char.styled` already gives equation text (`_LETTER_STYLE_FONTS`). With the setting
+  off, only U+F0B7 and U+F0A7 are mapped (to `•` and `▪`), whatever the font.
 
 Known gaps: Beamer's ball and circle bullets (Warsaw, Madrid and the other infolines themes) are
 small pictures, not drawn shapes, so a list in those themes is one paragraph (the default theme's

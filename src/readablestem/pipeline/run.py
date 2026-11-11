@@ -135,6 +135,7 @@ from readablestem.pipeline import (
     equation_scale,
     equation_step,
     figure_step,
+    font_codes,
     heading_step,
     html_checks,
     image_page,
@@ -1696,6 +1697,7 @@ def _convert(
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    font_codes.configure(settings.font_code_tables)
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
         cached = _CachedDocument(pdf_bytes)
         try:

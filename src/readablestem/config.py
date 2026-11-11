@@ -136,6 +136,13 @@ class Settings(BaseSettings):
     # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped (0.5.10 or
     # later) in the change that enables it.
     layout_display_grouping: bool = False
+    # The codes of symbol and TeX fonts read as what the font draws, by the font's name
+    # (`pipeline/font_codes.py`, docs/layout.md): Symbol, Wingdings, MT-Extra and the APS
+    # math font, TeX's ligatures and accents at control codes, and a glyph that starts several
+    # lines as a bullet. Element text changes on the documents with these fonts, so the step keys
+    # of their elements change and answers stored for them are asked again. Off: only the two
+    # private-use bullets the code used to map by code point are mapped, as before.
+    font_code_tables: bool = True
     # A calibrated rule on top of the checks (`pipeline/flag_policy.py`): an accepted equation
     # that looks like the readings that turned out wrong (a small logistic model over content-free
     # features, fitted on the development splits) becomes a required decision. It only adds

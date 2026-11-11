@@ -211,6 +211,11 @@ profile's hash to an admin (the public `/healthz/ops` gives the status word only
 writes the image facts (`readablestem ops image-facts --write`, Dockerfile), which changes that
 hash with what the image carries.
 
+`FONT_CODE_TABLES` is new: on by default in code, with no value set in Railway (the profile says
+so). Set it to `false` on `web`, and in the profile, to go back to the old private-use bullet rules
+without a deploy; element text changes on documents with symbol fonts, so their stored step answers
+are asked again.
+
 Limits in production (each equals the code default in `config.py`, except the per-user page quota and the daily
 spend cap, which are set on `web`): 100 pages and 50 MB per upload (`MAX_PAGES_PER_JOB`, `MAX_UPLOAD_MB`); a file of up
 to 500 pages and 100 MB is kept for choosing pages (`MAX_SOURCE_PAGES`, `MAX_LARGE_UPLOAD_MB`);
