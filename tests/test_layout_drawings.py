@@ -251,8 +251,36 @@ def _box_plot(page, top: float) -> tuple[float, float, float, float]:
     return 140, ym - 22, 500, ym + 22
 
 
+def _labelled_bars(page, top: float) -> tuple[float, float, float, float]:
+    """Filled bars on axes with their labels where a plotting library sets them: tick
+    marks 3.5 pt long and the labels 3.5 pt beyond them, the category names one row of
+    words far apart, a rotated axis title and a centred one a line beyond the labels.
+    The box returned reaches the middle of every label: the picture cut for the figure
+    step must show them."""
+    x0, y0, x1, y1 = 170, top + 10, 470, top + 170
+    _path(page, [[(x0, y0), (x0, y1), (x1, y1)]])
+    names = ["Forest", "Grassland", "Cropland", "Wetland", "Urban"]
+    for i, (name, h) in enumerate(zip(names, [120, 90, 150, 60, 40], strict=True)):
+        x = x0 + 14 + i * 58
+        _rect(page, (x, y1 - h, x + 34, y1), colour=None, width=0, fill=BLUE)
+        _path(page, [[(x + 17, y1), (x + 17, y1 + 3.5)]], width=0.8)
+        _label(page, (x + 17 - pymupdf.get_text_length(name, fontsize=9) / 2, y1 + 14), name)
+    for k in range(4):
+        value = str(50 * k)
+        width = pymupdf.get_text_length(value, fontsize=9)
+        _path(page, [[(x0 - 3.5, y1 - 50 * k), (x0, y1 - 50 * k)]], width=0.8)
+        _label(page, (x0 - 7 - width, y1 - 50 * k + 3), value)
+    page.insert_text((x0 - 29, (y0 + y1) / 2 + 22), "Area (km2)", fontsize=9, rotate=90)
+    _label(page, (x0 + 128, y1 + 30), "Land cover")
+    box = pymupdf.Rect(x0, y0, x1, y1)
+    for word in page.get_text("words", clip=(x0 - 60, y0 - 5, x1 + 5, y1 + 45)):
+        box.include_point(((word[0] + word[2]) / 2, (word[1] + word[3]) / 2))
+    return box.x0, box.y0, box.x1, box.y1
+
+
 DIAGRAMS = {
     "scatter plot with a legend": _scatter,
+    "bar chart with its tick and category labels outside its axes": _labelled_bars,
     "outlined bars on a baseline": _outline_bars,
     "circuit with labels inside its loop": _circuit,
     "flowchart of filled boxes and open arrows": lambda page, top: _flowchart(
@@ -389,8 +417,18 @@ def _lewis_water(page, ym: float) -> tuple[float, float, float, float]:
     return 281, ym - 19, 313, ym + 10
 
 
+def _skeletal(page, ym: float) -> tuple[float, float, float, float]:
+    """But-1-ene as a skeletal formula: a zigzag of single straight lines meeting at their
+    ends, the double bond's second line parallel to its first, no atom letters."""
+    corners = [(240, ym + 7), (252, ym), (264, ym + 7), (276, ym)]
+    _lines(page, list(itertools.pairwise(corners)), width=1.0)
+    _path(page, [[(243, ym + 8.75), (252, ym + 3.5)]], width=1.0)
+    return 240, ym, 276, ym + 8.75
+
+
 FORMULAS = {
     "Fischer projections": lambda page, y: _fischer(page, 220, y + 40),
+    "a skeletal formula's bond lines": lambda page, y: _skeletal(page, y + 30),
     "ethane's bond lines": lambda page, y: _ethane(page, y + 70),
     "a one-line circuit of boxes and wires": lambda page, y: _flat_circuit(page, y + 20),
     "a Lewis structure's electron dots": lambda page, y: _lewis_water(page, y + 50),

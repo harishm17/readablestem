@@ -1198,11 +1198,31 @@ math by the document's evidence; the equation step's own tiers then decide it.
   sweep: a warning icon, a benzene ring, a number line, math drawn as glyph outlines, a
   hand check mark). On a page with a line of text or more, they are grouped (within 24 pt) and
   each group is kept when it is at least 6 pt on its longer side or has 3 marks in
-  different places. Pen marks (most of their paths are the page type's pen strokes, or
-  every path is an open stroked line or curve, or a hand mark over typed text, below: a
-  check mark, a cross, a signature; never a ruler's straight lines) become a handwriting
-  region (below, never sent to the figure model); any other drawing a figure for the
-  figure model. On a `mixed_ink` page all of them are cut out with the handwriting; on a
+  different places. Pen marks become a handwriting region (below, never sent to the
+  figure model); any other drawing a figure for the figure model. A group is a pen mark
+  when every path is a hand mark over typed text (below), or when half its paths or more
+  carry pen evidence in the stroke itself:
+  - a page-type pen stroke (`page_type._candidate`: enough points, bends more than half a
+    circle, not jagged, not a blob; since 2026-11-11 not a circle's arc either, a turn
+    rate within 25% of its mean all along, all one way (`ARC_SPREAD`): a printed seal's
+    open ring);
+  - an open stroke the same tests take for a pen stroke at any length
+    (`page_type.pen_line`: a signature or a wavy line longer than the 90 pt stroke limit,
+    which the page's own ink count keeps);
+  - a short open stroke of straight lines, too few points for those tests (a tick, a
+    cross, a slash: `_short_lines`, `_hand_strokes`), when every line runs more than
+    about 5 degrees off both axes, its lines are not all one length within 2% (a printed
+    chevron), no end comes within 0.75 pt of another stroke's end or lies in a filled
+    shape of the group (an arrowhead), no line lies alongside another stroke's line,
+    parallel within 1 degree (a double bond), and no line has the length of another
+    stroke's line to rounding precision (0.1%, the page type's size-twin test: machine
+    drawings repeat sizes, hands do not; a printed cross of two equal lines).
+
+  Being an open stroke is no evidence by itself (2026-11-11, WS6.10): a skeletal
+  structure's single straight bonds, meeting at their ends or running parallel, were cut
+  out as "handwriting, not converted" on typeset exams (F-400); they now go to the
+  figure step as drawings, while a grader's tick, cross or signature stays handwriting.
+  On a `mixed_ink` page all of them are cut out with the handwriting; on a
   page with ink the checks rejected or did not analyze, the safety net keeps the page
   image instead. Not counted: a drawn list bullet, a mark repeated in the header or
   footer band (a logo), horizontal and vertical lines and boxes alone (an empty answer
@@ -1270,6 +1290,28 @@ math by the document's evidence; the equation step's own tiers then decide it.
   photo and a report's screenshots under their captions were dropped as backgrounds,
   with no decision). Only a plain picture (a colored panel or a wash drawn as an image,
   `_plain_image`) under running text is a background and is dropped.
+- **A drawing's outer labels** (`_absorb_outer_labels`, 2026-11-11, WS6.12, F-399): once
+  every figure has the labels at its edges, a vector drawing takes the ones beyond them,
+  looked for from its growing box up to 3 times: a row of spread-out short words (the
+  tick or category labels along an axis: the typical gap between its words at least 0.8
+  x its font size, none under 0.4) within 0.6 x font size of the box; a short row (25
+  characters or fewer) within one font size that is vertical (a rotated axis title) or
+  centered on the drawing (its middle within 15 % of the drawing's side of the drawing's
+  middle) and is no line of the page's running text; and a short quantity (12 glyphs of
+  math at most) set partly over the drawing ("N = 49 N" beside a force arrow). A
+  caption, a line of code, a row larger than body text and display math clear of the
+  drawing never join. The figure's box, and so the picture cut for the figure step,
+  grows to them. Before, a chart's category names stayed in the body as a stray
+  paragraph and its crop had no axis values, so the model estimated them. On the 12
+  sealed generated figure documents of accuracy round 2 (no model): label kinds inside a
+  figure's box 206 of 282 (122 before), printed labels 255 of 420 (149), body markers
+  lost 0 of 480, captions kept 48 of 48, figures found 54 of 60 (both). Still outside:
+  values printed above bars, timelines (0 of 48 label kinds) and circuits (0 of 18).
+- **Glyphs drawn as outlines in a line of text** (`_glyph_outlines`, 2026-11-11, WS6.10,
+  F-364): a page-type pen stroke inside a typed line (within its height, a tenth of it
+  over at most, with typed glyphs on both sides) whose drawing is a fill with no stroke
+  that lies in the line too is outline math (an italic variable, the digits of a
+  quantity), not handwriting: it becomes a small figure for the figure step.
 - **Captions**: a run starting `Figure N` / `Fig. N` followed by punctuation or a capital
   letter ("Figure 2 shows ..." is prose) attaches to the nearest figure that overlaps it
   horizontally, below or above within 36 pt (below wins ties). An unattached caption stays
@@ -1434,7 +1476,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
-| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple for the stroke test (a tick, a cross, a one-stroke signature) are cut out too ("Small drawings on a typed page") |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analyzed in time; its visible text is read, its drawings are not sent to the figure model |

@@ -84,6 +84,27 @@
 - New setting `FONT_CODE_TABLES` (on). `false` keeps only the two old private-use bullet rules.
   Declared on `web` in `railway.ts`.
 
+## Unreleased: a figure keeps its labels; drawings are named for what they are (branch feat/figure-label-crop)
+
+- Layout: a vector chart takes the labels beyond its edge labels (`_absorb_outer_labels`): rows of
+  spread-out tick or category labels, a rotated or centered axis title, a short quantity half over
+  the drawing, up to three passes from the growing box. They no longer stay in the body as stray
+  paragraphs, and the figure's crop now shows them (F-399, WS6.12 fixes 1 and 2). On the 12
+  sealed generated figure documents: label kinds inside a figure 206 of 282 (122 before), printed
+  labels 255 of 420 (149), no body text or caption lost, the same 54 of 60 figures found.
+- Layout: a small drawing on a typed page is called handwriting only with pen evidence in the
+  strokes themselves, on half its paths or more: a page-type pen stroke; a stroke that passes the
+  same tests at any length (a signature); or a short straight stroke (a tick, a cross) whose lines
+  all run off the axes, are not all one length, and neither meet another stroke's ends, lie
+  alongside its lines nor repeat their length exactly. A hand mark over typed text still counts too. Being an open stroke no longer
+  counts: a skeletal structure's bond lines now go to the figure step as a drawing instead of
+  "handwriting, not converted" (F-400, WS6.10), while a grader's tick, cross or signature stays
+  handwriting. The page type's pen test no longer takes a circle's arc for a pen stroke (a printed
+  seal's open ring). A page-type pen stroke that is a filled glyph outline inside a typed line is a
+  small drawing too (F-364).
+- Figure step: labels newly in a figure change its text, so its step key changes and a re-run
+  reads such figures again.
+
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 
 - Upload: one visible line beside "Upload and convert" says who receives the pictures of equations
