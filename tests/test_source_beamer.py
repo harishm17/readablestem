@@ -275,6 +275,8 @@ def test_the_spike_decks_convert_with_no_unknown_command(name, beamer_on):
     ).result
     assert result.origin == "beamer"
     assert not [n for n in result.notices if n.code == "source_error"]  # no frame hit an error
+    report = result.source_report  # and the reader read every frame whole
+    assert report is not None and (report.unread_words, report.unread_pictures) == (0, 0)
     headings = [e for e in result.elements if e.kind is Kind.HEADING]
     assert len(headings) >= 3
     assert "web version of a slide deck" in result.html

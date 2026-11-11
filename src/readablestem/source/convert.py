@@ -294,6 +294,9 @@ def _convert(
             raise SourceFailed("source_unreadable") from None
     report = source_report.with_marks(report, reading.marks, reading.error_nodes)
     report.figures = list(reading.figures)
+    report.unread_words = reading.unread_words
+    report.unread_pictures = reading.unread_pictures
+    report.unread_start = reading.unread_start
     _stop_if_lost(report, beamer=beamer)
     return _finish(
         reading,
@@ -364,6 +367,11 @@ def _finish(
         run.collect(block=True)
     finally:
         run.pool.shutdown(wait=True, cancel_futures=True)
+    for element_id in reading.unread_formulas:  # a figure step's fix holds the decision too
+        if element_id in run.fixes:
+            run.fixes[element_id] = ltx_reader.needs_decision(
+                run.fixes[element_id], ltx_reader.FORMULA_UNREAD
+            )
     ordered = pipeline._ordered_fixes(elements, run.fixes)
     pipeline._send(stage_progress, "assemble")
     html = assemble.render_html(

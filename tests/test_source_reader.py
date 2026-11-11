@@ -192,7 +192,7 @@ def test_a_figure_gets_the_projects_picture_and_its_caption(tmp_path):
 def test_a_figure_without_a_usable_picture_is_a_required_decision(tmp_path):
     body = '<div class="ltx_figure"><span class="ltx_ERROR undefined">{tikzpicture}</span></div>'
     result = read(body, tmp_path)
-    [figure] = result.elements
+    figure = result.elements[0]  # the error's text follows it, as written (SW42.4)
     fix = result.fixes[figure.id]
     assert fix.status is Status.FAILED and fix.reason == "source_figure_missing"
     assert fix.review == "required" and figure.id not in result.images

@@ -60,6 +60,7 @@ from readablestem.pipeline.source_facts import flattened_parts
 from readablestem.pipeline.speech import GREEK, SYMBOLS
 from readablestem.web import notice_places
 from readablestem.web.messages import explain_notice
+from readablestem.web.outcome import unread_phrase
 
 # --------------------------------------------------------------------------- words
 
@@ -786,6 +787,16 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
         line = _line(notice, fixes, labels, elements)
         if notice.code == "source_error" and (names := _unknown_commands(result)):
             line = replace(line, names=names, lead="The commands LaTeX did not know", place="")
+        if notice.code == "source_unread" and (report := result.source_report) is not None:
+            # how much was left out, and its first words (document content: the owner's page)
+            what = unread_phrase(report.unread_words, report.unread_pictures)
+            one = report.unread_words + report.unread_pictures == 1
+            text = (
+                f"This tool could not read {what} of the LaTeX source, so "
+                f"{'it is' if one else 'they are'} not in the file."
+            )
+            first = (report.unread_start,) if report.unread_start else ()
+            line = replace(line, text=text, count=1, names=first, lead="The first words not read")
         if notice_rules.section(notice) == "worth_checking":
             lists.worth_checking.append(line)
         else:

@@ -6,7 +6,8 @@ stopped model work part way ("budget_<scope>") or pages kept as images, not conv
 ("pages_not_converted": handwritten, scanned, or with nothing readable on them, and
 handwriting on typed pages; jobs from before page types say "scanned_pages"). A finished job
 converted during an AI service outage, with most of its equations and figures failed, is read
-from the stored result (the job carries no code). Each of these is a gap note on the job's
+from the stored result (the job carries no code), and so is a LaTeX source job whose reader
+left words or pictures unread (`SOURCE_UNREAD`). Each of these is a gap note on the job's
 state (`states.gaps_of`), and a note with nothing in it is not produced. The messages of a
 stopped job's codes with a longer explanation (scanned PDFs, no model key, removed access)
 are here too (`FAILED_MESSAGES`).
@@ -101,6 +102,43 @@ def _outage(result_json: dict[str, Any] | None) -> tuple[int, int, str] | None:
     if failed and 2 * len(failed) > len(model):
         return len(failed), len(model), _kinds_phrase(model)
     return None
+
+
+# A LaTeX source job whose reader left words or pictures out (`source.ltx_reader`, the
+# `source_unread` notice): the file is finished but not whole. Read from the stored result's
+# `source_report`; counts only, never its words.
+SOURCE_UNREAD = "source_unread"
+
+
+def unread_phrase(words: int, pictures: int) -> str:
+    """ "12 words and 1 picture", "1 word", "2 pictures"."""
+    parts = []
+    if words:
+        parts.append(f"{words} {_plural(words, 'word', 'words')}")
+    if pictures:
+        parts.append(f"{pictures} {_plural(pictures, 'picture', 'pictures')}")
+    return " and ".join(parts)
+
+
+def unread_message(result_json: dict[str, Any] | None) -> str:
+    """The gap note of a finished LaTeX source job whose reader left words or pictures
+    unread, or "" when it read everything. Converting again reads the same way, so the note
+    offers no retry."""
+    report = (result_json or {}).get("source_report")
+    if not isinstance(report, dict):
+        return ""
+    words, pictures = report.get("unread_words"), report.get("unread_pictures")
+    words = words if isinstance(words, int) and words > 0 else 0
+    pictures = pictures if isinstance(pictures, int) and pictures > 0 else 0
+    if not (words or pictures):
+        return ""
+    one = words + pictures == 1
+    return (
+        f"This tool could not read part of the LaTeX source: {unread_phrase(words, pictures)} "
+        f"from it {'is' if one else 'are'} not in the file, as listed under “Not handled in "
+        f"this file” below. Check that the file reads well without {'it' if one else 'them'} "
+        "before you share it, or upload the PDF instead."
+    )
 
 
 FAILED_MESSAGES = {

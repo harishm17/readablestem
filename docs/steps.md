@@ -157,6 +157,15 @@ and a tiny figure escalates to the main model first.
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
 
+From a LaTeX source (`source/ltx_reader.py`) every picture the reader meets is a figure for
+this step, outside a float too: a picture centered on its own, in a sentence, in a list item or
+in a table cell is a figure straight after the block that holds it, so a source job spends on
+those descriptions where it spent nothing before (the upload's reservation already counted every
+`\includegraphics`). A picture inside a sentence follows the sentence; its place inside the text
+waits for Element v2 (WS16). A figure whose caption shows a formula LaTeX could not read keeps
+this step's status and also becomes a required decision (`source.read` /
+`source_formula_unread`, docs/web.md "LaTeX source").
+
 ### Long descriptions, data tables and color (FEATURE_LONG_DESCRIPTIONS)
 
 Off by default in code (`ConversionOptions.long_descriptions`, read with `options.current()`); production's value is in the production profile, `src/readablestem/ops/production.profile.toml`.

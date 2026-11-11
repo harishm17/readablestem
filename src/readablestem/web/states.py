@@ -109,6 +109,8 @@ KEEPS = frozenset({"needs_decisions", "partly_converted", "ready", "ready_remain
 # The finished states with no decision open and no gap note: their message is the
 # summary's (`pipeline.checked`), never a template's.
 READY_KEYS = frozenset({"ready", "ready_remains"})
+# Gap notes that converting again cannot close, so the job can still be shared.
+FINAL_GAPS = frozenset({"pages_as_pictures", "source_unread"})
 
 # --------------------------------------------------------------------------- stop codes
 
@@ -201,7 +203,8 @@ class Gap:
     """A note on a finished job: part of it was not converted. `title` is its short name,
     `text` says what and why, `action` is what can be done about it."""
 
-    code: str  # "stopped_early", "too_large", "service_outage", "pages_as_pictures"
+    # "stopped_early", "too_large", "service_outage", "pages_as_pictures", "source_unread"
+    code: str
     title: str
     text: str
     action: Step | None = None
@@ -237,13 +240,12 @@ class State:
     def shareable(self) -> bool:
         """Whole enough to give to students: ready (the student page says what is a picture
         or left out, `pipeline.checked`), or partly converted only because pages are kept as
-        pictures (converting again cannot read them); not a job a cap or an outage stopped
-        part way, whose missing parts can still be converted."""
+        pictures or a LaTeX source had parts its reader could not read (converting again
+        cannot read either); not a job a cap or an outage stopped part way, whose missing
+        parts can still be converted."""
         if self.key in READY_KEYS:
             return True
-        return self.key == "partly_converted" and all(
-            g.code == "pages_as_pictures" for g in self.gaps
-        )
+        return self.key == "partly_converted" and all(g.code in FINAL_GAPS for g in self.gaps)
 
     @property
     def stopped(self) -> bool:
@@ -516,6 +518,8 @@ def gaps_of(job: Facts, left: int, viewer: str = "owner") -> list[Gap]:
         out.append(Gap("too_large", "Stopped early", text))
     if code in words.PAGES_NOT_CONVERTED and (text := words.pages_message(data)):
         out.append(Gap("pages_as_pictures", "Pages kept as pictures", text))
+    if not code and (text := words.unread_message(data)):
+        out.append(Gap(words.SOURCE_UNREAD, "Parts not read", text))
     return out
 
 
