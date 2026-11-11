@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from base64 import b64encode
 
 import pytest
@@ -76,7 +77,14 @@ def test_production_refuses_analytics_while_the_notice_says_there_is_none(tmp_pa
 
 
 def test_production_accepts_analytics_once_the_notice_describes_it(tmp_path, monkeypatch):
-    notice_dir(tmp_path, monkeypatch, "<p>Page views go to PostHog.</p>")
+    # The real page (it describes PostHog when analytics is on), with the words "no
+    # analytics" taken out of it.
+    real = (launch.TEMPLATES_DIR / "privacy.html").read_text(encoding="utf-8")
+    edited = real.replace("There are no analytics, advertising", "There are no advertising")
+    edited = edited.replace("carry no analytics", "carry none")
+    assert launch.NO_ANALYTICS_CLAIM not in edited.lower()
+    shutil.copytree(launch.TEMPLATES_DIR, tmp_path / "templates")
+    notice_dir(tmp_path, monkeypatch, edited)
     prod(tmp_path, analytics_enabled=True).check_production()
     notice_dir(tmp_path, monkeypatch, "<p>PostHog. There are no analytics.</p>")
     with pytest.raises(ConfigError, match="no analytics"):

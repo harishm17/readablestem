@@ -819,6 +819,18 @@ class Settings(BaseSettings):
                     "Update the notice (web/templates/privacy.html) and the vendor sheet "
                     "(docs/vendor-information.md) first"
                 )
+        # What the settings send to a model, and what the notice says is stored and deleted:
+        # every kind of material that is on must be stated on the rendered privacy notice
+        # and the vendor line, with the day it was first stated, and every statement about
+        # storage must match its setting (`ops.launch`).
+        from readablestem.ops.launch import privacy_claim_problems, sent_material_problems
+
+        if problems := sent_material_problems(self) + privacy_claim_problems(self):
+            raise ConfigError(
+                "production start refused: "
+                + "; ".join(problems)
+                + ". State it on the page (web/templates/privacy.html, web/recipients.py) first"
+            )
         if self.image_pages_second_reader != "off":
             from readablestem.ops.launch import second_reader_problem
 

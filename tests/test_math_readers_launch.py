@@ -92,7 +92,7 @@ def test_production_refuses_a_page_that_does_not_name_the_reader_company(
     stand_in(tmp_path, monkeypatch, "<p>Nothing here.</p>")
     with pytest.raises(ConfigError, match=f"refused in production.*does not name .*{word}"):
         prod(tmp_path, model_provider="openai", **reader_flags((flag,))).check_production()
-    stand_in(tmp_path, monkeypatch, "<p>Pictures go to OpenAI and Anthropic.</p>")
+    monkeypatch.undo()  # the real page names the reader's company and what it receives
     prod(tmp_path, model_provider="openai", **reader_flags((flag,))).check_production()
 
 

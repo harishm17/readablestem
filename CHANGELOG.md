@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased: what is sent to a model, from one list (branch feat/sent-material)
+
+- `web.recipients.sent_material(settings)` lists each kind of material sent to a model: the
+  setting that turns it on, who receives it, what is kept from the answer and the day the privacy
+  notice first named it. The upload and landing vendor line, the privacy notice, the offices page,
+  its summary and drawing, the scanned-pages box and the account deletion notes render from it,
+  so a setting that sends something new changes all of them at once. With tables and scans on
+  (production), the vendor line keeps its old sentence; notation adds a clause.
+- A production start is refused (and `readablestem ops launch-check` lists it) while a sending
+  setting is on whose row the privacy notice does not state, whose row has no date, or whose date
+  is still to come. Pictures of whole math pages (`FEATURE_PAGE_WITNESS`, `FEATURE_PAGE_MATH`)
+  have no date yet, so they cannot start in production until one is set.
+- The privacy notice's storage statements (the RETENTION_HOURS and one-week deletion, opt-in days, backup
+  days, event retention and the small-count rule, courses, LaTeX problem names) are checked
+  against the code at a production start. The notice now names the review-outcome notes and the
+  rule under which their totals are read, and lists the day each kind of material was first named.
+- `docs/vendor-information.md`, `docs/security.md` and the README name each sending setting.
+
 ## Unreleased: LaTeX classes and packages, read or refused (branch feat/latex-class-support)
 
 - A LaTeX source in the `exam` class is refused at upload (`source_unsupported_class`): LaTeXML
@@ -69,7 +87,6 @@
 - My documents groups "Needs you" (decisions, then stopped documents with "Try again"),
   "Working" and "Ready". The heading over the job page's actions names the task ("Review",
   "Download") instead of repeating the state.
-
 ## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
 
 - Every review write records a content-free `decision_outcome` event beside `decision_made`:

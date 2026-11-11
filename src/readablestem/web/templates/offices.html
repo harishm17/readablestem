@@ -67,12 +67,16 @@
       equations and figures{% if tables_on %} and tables{% endif %}, with a little of the nearby text.{% if latex_source %}
       A LaTeX file or project is read on the server instead, with LaTeXML in a sandbox: its
       equations come from the source, and its figures are described as a PDF's are.{% endif %}</li>
-    <li>Those images and that text are sent to the API of {{ model_names }}, which returns
-      proposed LaTeX and descriptions.{% if notation_on %} For a document uploaded for one of
-      the instructor's courses, that course's notation (its symbols and what they mean) is sent
-      with the equations.{% endif %}{% if image_pages_on %} If the instructor checks “Convert
-      scanned or handwritten pages”, a picture of each such page is sent as well.{% endif %}
-      The PDF file itself, its file name and the instructor's email address are not sent.</li>
+    {# What is sent: the list in web/recipients.py (`sent_material`), as on the privacy page. #}
+    <li>What is sent to the API of {{ model_names }}, which returns proposed LaTeX and
+      descriptions:
+      <ul>
+        {% for m in sent_material %}
+        <li>{{ m.what }}</li>
+        {% endfor %}
+      </ul>
+      The PDF file itself, its file name and the instructor's email address are not
+      sent{% if whole_pages_sent %}; pictures of whole pages are, as listed{% endif %}.</li>
     <li>Automatic checks compare each proposal with the PDF's own text. The instructor decides
       what the tool is unsure about and can edit anything. A document can be shared with named
       colleagues, who must sign in with the exact email address entered.</li>

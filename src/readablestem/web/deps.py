@@ -334,6 +334,9 @@ def render(
         "accepted": ctx.accepted_types(),
         "accepted_revision": ctx.accepted_types(revision=True),
         "model_vendor": ctx.model_vendor,
+        # What is sent to the model, from one list (web/recipients.py `sent_material`): the
+        # vendor line, the upload form's scanned-pages box and the deletion notes read it.
+        **recipients.material_context(ctx.settings),
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,
         "retention_hours": ctx.settings.retention_hours,
