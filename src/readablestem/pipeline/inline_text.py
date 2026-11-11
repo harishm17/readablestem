@@ -18,8 +18,9 @@ cross-references", "Language", "Coloured text"):
   lowered runs (`Element.script_runs`: Na+, H2O, cm3) are written as `<sup>` and `<sub>`,
   innermost; a lowered and a raised run side by side (SO4 2-, the two numbers before a
   nuclide's symbol) are written as one stacked pair (`STACK_CSS`). Struck text
-  (`Element.runs`, kind "deleted": a cancelled date) sits inside colour and outside
-  `<sup>`/`<sub>`, and is written as `<del>` with the tool's own words "deleted:" before
+  (`Element.runs`, kind "deleted": a cancelled date) sits inside links and outside colour
+  and `<sup>`/`<sub>` (a colour span cut in two is not heard; a struck run cut in two would
+  be said twice), and is written as `<del>` with the tool's own words "deleted:" before
   it and "end deleted" after it, visually hidden, so a listener hears that the words are
   struck whether or not the screen reader announces `<del>` (most do not by default), and
   a format that keeps text but not the tag (Word keeps both) still says so.
@@ -293,7 +294,7 @@ def _struck(text: str, segments: Sequence[_Segment]) -> str:
         j = i
         while j < len(segments) and segments[j].deleted == segments[i].deleted:
             j += 1
-        inner = _inner(text, segments[i:j])
+        inner = _coloured(text, segments[i:j])
         if segments[i].deleted:
             inner = f"{_hidden(DELETED_BEFORE)}<del>{inner}</del>{_hidden(DELETED_AFTER)}"
         out.append(inner)
@@ -308,7 +309,7 @@ def _coloured(text: str, segments: Sequence[_Segment]) -> str:
         j = i
         while j < len(segments) and segments[j].colour == segments[i].colour:
             j += 1
-        inner = _struck(text, segments[i:j])
+        inner = _inner(text, segments[i:j])
         rgb = segments[i].colour
         out.append(f'<span class="{colour_class(rgb)}">{inner}</span>' if rgb else inner)
         i = j
@@ -328,7 +329,7 @@ def _write(
         j = i
         while j < len(segments) and segments[j].link == segments[i].link:
             j += 1
-        inner = _coloured(text, segments[i:j])
+        inner = _struck(text, segments[i:j])
         link = segments[i].link
         shown = "".join(text[s.start : s.end] for s in segments[i:j])
         if link is not None and shown.strip():

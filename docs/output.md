@@ -934,8 +934,10 @@ del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;
 ```
 
 A text decoration is drawn in the text's own color, so it stays in forced-colors mode and
-on the dark page. Nesting, outermost first: link, color, struck, raised or lowered; a struck
-run may cover an inline equation (the hidden words go around the math).
+on the dark page. Nesting, outermost first: link, struck, color, raised or lowered. A struck
+run is outside color so that a color change inside it never cuts it in two (a cut run would
+be said twice); a link stays outermost so it is never cut. A struck run may cover an inline
+equation (the hidden words go around the math).
 
 What each output holds for the struck date above:
 

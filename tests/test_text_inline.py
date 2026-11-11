@@ -188,11 +188,11 @@ def test_struck_text_is_written_as_del_and_said_as_deleted():
     said = '<span class="visually-hidden readablestem">deleted: </span><del>{}</del>' + (
         '<span class="visually-hidden readablestem"> end deleted</span>'
     )
-    # Colour outside the struck run, the struck run inside it; the words stay as they were.
+    # The struck run is said once, the colour inside it; the words stay as they were.
     assert out.startswith('<a href="https://example.org/a">Midterm</a> on ')
-    assert '<span class="tc-ff0000">' + said.format("October") + "</span>" + said.format(
-        " 3"
-    ) + " October 10, see " + said.format(MATHS) + " and the notes." in out
+    coloured = '<span class="tc-ff0000">October</span> 3'
+    assert said.format(coloured) + " October 10, see " + said.format(MATHS) in out
+    assert out.count("deleted: ") == 2 and out.endswith(" and the notes.")
     assert inline_text.DELETED_CLASS in styles.added
     # Without struck runs the text is written exactly as before, with no rule added.
     unmarked = Styles()
