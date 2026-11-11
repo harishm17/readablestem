@@ -73,6 +73,7 @@ import hashlib
 import logging
 import re
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from functools import cache
@@ -253,7 +254,7 @@ class _Collector(HTMLParser):
             inherited = bool(self._stack) and self._stack[-1][1]
             self._stack.append((tag, inherited or AUTHORED_CLASS in classes))
 
-    def _unread_text(self, tag: str, attrs: dict[str, str | None], classes: list[str]) -> None:
+    def _unread_text(self, tag: str, attrs: dict[str, str | None], classes: Sequence[str]) -> None:
         if UNREAD_PARTS_CLASS in classes:
             self.unread_notes += 1
             self._unread = True
