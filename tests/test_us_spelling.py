@@ -9,6 +9,9 @@ placeholder), script and style bodies dropped. Python strings are read with `ast
 comments and docstrings are ignored, and a string with no space in it (an identifier, a
 setting name, a CSS class, a URL) is ignored.
 
+The README, DESIGN.md, the other top-level notes and `docs/` are read the same way, with code
+fences, code spans and link targets blanked, so the badge and the docs keep the US forms too.
+
 A hit fails with `file:line`. Add to ALLOWED only for a case that cannot change, with the
 reason: a quoted proper name, or a word that is correct as spelled.
 """
@@ -67,7 +70,7 @@ PYTHON_ROOTS = [
 PYTHON_SKIP_PARTS = {"vendor", "prompts", "__pycache__"}
 
 TEMPLATE_ROOTS = [SRC / "web" / "templates", ROOT / "site" / "templates"]
-STATIC_PAGES = [SRC / "web" / "static" / "demo" / "index.html"]
+STATIC_PAGES = [SRC / "web" / "demo" / "index.html"]
 STATIC_SCRIPTS = [SRC / "web" / "static" / "app.js", SRC / "web" / "static" / "parts.js"]
 
 _JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.S)
@@ -98,7 +101,8 @@ def _expression_text(match: re.Match[str]) -> str:
 def _tag_text(match: re.Match[str]) -> str:
     """A tag shows nothing, except the attribute values a person reads."""
     kept = [(a or b).replace("\n", " ") for a, b in _VISIBLE_ATTR.findall(match.group(0))]
-    return " ".join(kept) + "\n" * match.group(0).count("\n")
+    # A space, not nothing: `<th>Book</th><th>Licence</th>` must not fuse into one word.
+    return " " + " ".join(kept) + " " + "\n" * match.group(0).count("\n")
 
 
 def visible_text(source: str) -> str:
@@ -121,10 +125,10 @@ def _blank_attr_exprs(match: re.Match[str]) -> str:
     return _JINJA_EXPR.sub(_blank, match.group(0))
 
 
-def hits_in_text(text: str) -> list[tuple[int, str]]:
+def hits_in_text(text: str, pattern: re.Pattern[str] = BRITISH) -> list[tuple[int, str]]:
     found = []
     for number, line in enumerate(text.split("\n"), start=1):
-        for match in BRITISH.finditer(line):
+        for match in pattern.finditer(line):
             found.append((number, match.group(0)))
     return found
 
@@ -180,6 +184,26 @@ def _page_files() -> list[Path]:
     return files + STATIC_PAGES
 
 
+# The repository's own writing: the README, DESIGN.md, the other top-level notes and docs/.
+# CHANGELOG.md is history and quotes the old words on purpose.
+DOC_FILES = [p for p in sorted(ROOT.glob("*.md")) if p.name != "CHANGELOG.md"] + sorted(
+    (ROOT / "docs").rglob("*.md")
+)
+# In prose a bare "tick" or "ticks" is also an axis tick or a pen stroke, which US English
+# keeps; the checkbox forms (ticked, ticking, unticked) are still caught.
+_BRITISH_DOCS = re.compile(BRITISH.pattern.replace("tick|ticks|", ""), re.IGNORECASE)
+_FENCE = re.compile(r"^([ \t]*)(```+|~~~+).*?^\1\2[ \t]*$", re.S | re.M)
+_CODE_SPAN = re.compile(r"`[^`\n]*`")
+_LINK_TARGET = re.compile(r"\]\([^)\n]*\)|https?://\S+|<[^>\n]+>")
+
+
+def doc_prose(source: str) -> str:
+    """Markdown with code fences, code spans, link targets, URLs and HTML tags blanked."""
+    for pattern in (_FENCE, _CODE_SPAN, _LINK_TARGET):
+        source = pattern.sub(_blank, source)
+    return source
+
+
 def _scan() -> list[str]:
     problems: list[str] = []
 
@@ -200,6 +224,9 @@ def _scan() -> list[str]:
         add(script, hits_in_text(quoted))
     for module in _python_files():
         add(module, python_string_hits(module))
+    for doc in DOC_FILES:
+        text = doc_prose(doc.read_text(encoding="utf-8"))
+        add(doc, hits_in_text(text, _BRITISH_DOCS))
     return problems
 
 

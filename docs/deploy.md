@@ -60,7 +60,7 @@ Console: create a workspace "ReadableSTEM prod", create an API key inside it, th
 **Settings > Limits** for that workspace: a monthly spend limit of **$100** (the app's own
 daily cap of $10 makes $300 the most a month could ever cost; a real month of 3-5
 instructors is under $15, see "Spend limits") and a usage alert at $25. Keep the key; you
-type it into the script's hidden prompt. If the key is an organisation-level key instead,
+type it into the script's hidden prompt. If the key is an organization-level key instead,
 note the workspace id (`wrkspc_...`).
 
 **4. HARISH: Google sign-in** (step 3). In the project's **Google Auth Platform**: Branding
@@ -193,11 +193,11 @@ processor for the app, so the privacy page changes with the setting and
 
 1. In the Anthropic Console, create a workspace for the app (for example "ReadableSTEM prod")
    and an API key inside it. **Use a workspace-scoped key.** A key that is not scoped to a
-   workspace (an organisation-level key) is refused with HTTP 400 "This API key is not
+   workspace (an organization-level key) is refused with HTTP 400 "This API key is not
    scoped to a workspace" unless every request carries the workspace id. The id is
    `ANTHROPIC_WORKSPACE_ID` (`wrkspc_...`; the client sends it as the `anthropic-workspace-id`
    header). Set it only for such a key; the settings cannot tell the two kinds of key apart
-   (the key text does not say), so a deployment with an organisation-level key and no id
+   (the key text does not say), so a deployment with an organization-level key and no id
    starts, and then fails each model call with that 400 (`call:<model>:outcome:api_error`
    in the aggregates, HTTP status 400 in the log lines). The proof's one-request API check
    (`readablestem proof --live --provider anthropic`) names the missing id.
@@ -492,8 +492,8 @@ from the Microsoft Entra admin center as documented on learn.microsoft.com (chec
    for local development `http://localhost:8000/auth/microsoft/callback` (Microsoft
    allows http only for localhost). The app sends `BASE_URL + /auth/microsoft/callback`;
    as for Google, sign-in only works on the `BASE_URL` host.
-5. **ID tokens: nothing to tick.** Leave both boxes under **Implicit grant and hybrid
-   flows** unticked. The app uses the authorisation code flow with PKCE, and the ID token
+5. **ID tokens: nothing to check.** Leave both boxes under **Implicit grant and hybrid
+   flows** unchecked. The app uses the authorisation code flow with PKCE, and the ID token
    comes back from the token request, not through the browser.
 6. **Certificates & secrets > Client secrets > New client secret.** Pick an expiry (at
    most 24 months; Microsoft recommends under 12) and write the date in your calendar:
@@ -505,14 +505,14 @@ from the Microsoft Entra admin center as documented on learn.microsoft.com (chec
    email address) and calls no Microsoft API. Under **Microsoft Graph (delegated)** keep
    `openid`, `profile` and `email`, and remove the `User.Read` permission added by
    default, so the approval page asks for as little as possible.
-8. **Token configuration > Add optional claim > ID**, tick `email` and `xms_edov`, and
+8. **Token configuration > Add optional claim > ID**, check `email` and `xms_edov`, and
    accept the offer to turn on the Graph `email` permission. `xms_edov` says whether the
    directory has verified the owner of the email's domain; the app ignores an email
    claim it marks false and uses the sign-in name instead.
 9. Find each university's **directory (tenant) id**: ask its IT team, or read it from
    `https://login.microsoftonline.com/UNIVERSITY_DOMAIN/v2.0/.well-known/openid-configuration`
    (the id in `issuer`). Someone from a university that is not listed sees "Your
-   organisation is not set up for this beta" with their directory id to send you. List
+   organization is not set up for this beta" with their directory id to send you. List
    the ids, comma-separated, in `MS_ALLOWED_TENANTS` (step 4). People still have to be
    on the allowlist (`readablestem users allow EMAIL`), with the address their university
    account has.
@@ -740,7 +740,7 @@ Railway (deploy-railway.md). It applies if you deploy on Cloud Run. In order:
 6. If you offer Microsoft sign-in: register the app (step 3b), get admin consent from
    each university's IT team, sign in once with a university account at the run.app
    URL, and add Microsoft sign-in to the privacy notice ("Your account": what Microsoft
-   sends, the directory id, and that the account's id is kept to recognise it).
+   sends, the directory id, and that the account's id is kept to recognize it).
    `readablestem ops launch-check` run with the production settings lists the privacy
    notice until it mentions Microsoft. The notice should also say that the Google
    account's id is now kept with the account.

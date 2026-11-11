@@ -271,7 +271,7 @@ eval-handwriting.md, "The omission check".
 ## Real pages (no answer key; qualitative)
 
 Eight pages, found for this purpose, public domain or CC BY-SA, in
-`.local/image-pages/real` (not committed; sources and licences in its `SOURCES.tsv`): four handwritten
+`.local/image-pages/real` (not committed; sources and licenses in its `SOURCES.tsv`): four handwritten
 (van 't Hoff's laboratory notes, a Ramanujan notebook page, an 1904 student's algebra, Bredig's pencil
 notes with a graph) and four scanned prints (Poynting's *Physics* 1914, Edwards's *Differential
 Calculus* 1896, a curved-page photograph of Beeton's *Chemistry*, Hedrick's logarithm tables 1920).
@@ -345,7 +345,7 @@ no cost (`--answers-offline`).
   measure against the PDF's own text layer. Its typed comparison is the other branch's recorded run on
   the same nine papers.
 - The score of equations in prose (inline) is the key's, with its glued brackets and its text
-  written maths; the flag numbers for inline formulas follow it.
+  written math; the flag numbers for inline formulas follow it.
 - Cost is the provider's list price as recorded, with the refusal fallback's occasional dearer
   rerun in it; `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` apply as they do to every call.
 - Nothing here tests a reviewer: the review load is the pipeline's count of decisions, not a measure
@@ -373,7 +373,7 @@ open-tier pool. Why this and not the alternatives:
   so $0.15 would have stopped a dense document half way; $0.25 leaves room and is still a
   tenth of what the daily open-tier pool ($4) allows per day.
 
-**Open for the author** (ADR 0007, "Consequences"; decided afterwards, see "Update: maths always required": every inline formula is asked about): whether inline formulas stay part of their
+**Open for the author** (ADR 0007, "Consequences"; decided afterwards, see "Update: math always required": every inline formula is asked about): whether inline formulas stay part of their
 paragraph's item (on the papers this leaves 5 wrong per 100 gold equations unasked, fewer than
 the typed pipeline's 10, and asks 1.7 things a page instead of 6.4); whether a display equation the
 two readers agree on may become an optional note (agreement is no evidence when the same model reads
@@ -426,12 +426,12 @@ page is unchanged. The silent wrong equations are the same count, 15 inline form
 before: a typed page's inline formula is not a decision, and about 6 in 100 gold equations are inline
 formulas wrong by the symbols score and not asked about.
 
-## Update: maths always required (2026-10-22)
+## Update: math always required (2026-10-22)
 
 The handwriting measurement found the reader's `high` untrustworthy (the fresh set's two silent wrong
 equations were `high` blocks) and the owner decided ([ADR 0007](decisions/0007-image-pages.md), point 12;
-[eval-handwriting.md](eval-handwriting.md), "Maths always required"): on a page read from an image, every
-block that holds maths is a required decision whatever the model's confidence
+[eval-handwriting.md](eval-handwriting.md), "Math always required"): on a page read from an image, every
+block that holds math is a required decision whatever the model's confidence
 (`IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, on). Typed born-digital pages and the typed equation step are not
 touched, and plain prose blocks keep their tiers. This is where the cost lands. Replayed at $0 from the
 recorded answers (`--answers-offline`, nothing sent), off and on:

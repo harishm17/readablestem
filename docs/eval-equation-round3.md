@@ -26,7 +26,7 @@ beat Opus yet. Spend this round: $12.00 (exploratory $0.97, development $1.60, f
 - **17% of the gold is out of every arm's reach.** 257 equations in `sidewaystable` were found by no arm: the same
   loss for all four, so it narrows every difference.
 - **What was left, by mechanism** (reading B, ReadableSTEM wrong and Opus right, minus the reverse): span edges +1.6
-  points (34 against 6), upright text +0.5, table cells +0.4, longer inline or display +0.3, captions +0.3. Recognising
+  points (34 against 6), upright text +0.5, table cells +0.4, longer inline or display +0.3, captions +0.3. Recognizing
   symbols inside a correct span was not where it lost.
 - **Span edges, case by case.** `T = 2\pi` for `T = 2\pi\sqrt{m/k}` (the radical is a line object of its own);
   `0.077` for `Ca^*=0.077`; `f\,d\mu = 0` for `\int f\,d\mu = 0`; `j!` for `\dfrac{n!}{i!\,j!}`; and junk kept at
@@ -48,7 +48,7 @@ below gives the model the context it lacked and lets it decide the boundary, whi
 `layout.crop_line` renders the line an inline equation sits in (the paragraph's width, 0.8 span heights above and
 below, so a raised radical or a stacked fraction is in it) with a two-pixel red box round the span. The equation step
 sends it after the usual crop, with `prompts/equation_line.md` appended to the equation prompt: transcribe the whole
-formula the box is part of, extend past the box while the maths goes on, leave out words of the sentence, footnote
+formula the box is part of, extend past the box while the math goes on, leave out words of the sentence, footnote
 and citation marks, item numbers and the sentence's punctuation. Display equations, figures and tables are unchanged.
 Setting `EQUATION_LINE_CONTEXT` (default off in the code; on in production after this test).
 
@@ -86,7 +86,7 @@ wrong equations go through unasked; the flags that remain are less often on a wr
 
 ## 5. Where it still loses to Opus (fresh4, reading B)
 
-ReadableSTEM wrong and Opus right, minus the reverse, of 1,600 gold: maths in table cells not found +1.1 points (23
+ReadableSTEM wrong and Opus right, minus the reverse, of 1,600 gold: math in table cells not found +1.1 points (23
 against 5); **bold italic letters (`\bm`, `\boldsymbol`) +1.0 (20 against 4)**; span edges +0.7 (23 against 12, was 34
 against 6 on fresh3); captions +0.3. The bold-italic loss is self-inflicted: the equation prompt says "bold symbols
 (vectors) use `\mathbf{...}`", so an author's bold italic `\bm{x}` is written upright bold. That is the next change to
@@ -102,7 +102,7 @@ Commands: `scripts/realworld_report.py --part fresh4 --tag after --extra-arm bef
   paper). It was +2.0 on the development papers and +2.6 on fresh4: no shrinkage from tuned to untuned papers.
 - **Course material.** On the 14 OpenStax algebra and trigonometry sections of dev-v2 (1,114 gold, production flags) it
   changed 46 transcriptions and the score not at all: 3 equations right that were wrong, 3 wrong that were right
-  (0.5395 either way). Textbook maths is mostly display equations, which line context does not touch. The chemistry
+  (0.5395 either way). Textbook math is mostly display equations, which line context does not touch. The chemistry
   sections were not compared: the API account ran out of credit during the run, and the calls after that failed.
 - **What a student hears.** `scripts/rw_spoken.py` (`--spoken` on `realworld_report.py` and `rw_gap_table.py`;
   exploratory, not registered) also counts an equation right when ReadableSTEM's speech reads prediction and gold

@@ -41,7 +41,7 @@ from readablestem.core import sandbox
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
-from readablestem.web import analytics, output, seo
+from readablestem.web import analytics, dev_only, output, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -67,6 +67,7 @@ from readablestem.web.routes import (
     bundle,
     courses,
     cron,
+    dev,
     discovery,
     edits,
     email_login,
@@ -534,6 +535,8 @@ def create_app(
     ):
         app.include_router(module.router)
     app.include_router(auth_router)
+    if dev_only.available(settings):  # builder pages (web.dev_only): 404 in production
+        app.include_router(dev.router)
     if settings.analytics_enabled:  # the /m/ proxy to PostHog (web.analytics); absent when off
         app.include_router(analytics.router)
     return app

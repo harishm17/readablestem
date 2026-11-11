@@ -3,7 +3,7 @@
     uv run python site/build.py [--out site/_build]
 
 Everything on the site comes from files committed in this repository: the stored results
-of past conversions (site/examples/*, and the demo under src/readablestem/web/static/demo),
+of past conversions (site/examples/*, and the demo under src/readablestem/web/demo),
 the committed PROOF.md, the text and the stylesheet in site/. The build calls no model,
 fetches nothing, reads no clock and reads no environment variable, so the same inputs give
 the same bytes. docs/site.md describes the pages, the inputs and how to add an example.

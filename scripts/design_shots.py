@@ -164,7 +164,7 @@ def main() -> None:
         # real converted document (headings, equations, figures, links) in its place.
         from readablestem.web.db import Job, session_scope
 
-        demo = Path(__file__).resolve().parents[1] / "src/readablestem/web/static/demo/index.html"
+        demo = Path(__file__).resolve().parents[1] / "src/readablestem/web/demo/index.html"
         with session_scope(env.ctx.factory) as session:
             row = session.get(Job, job)
             if row is not None:

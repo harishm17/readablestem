@@ -10,7 +10,7 @@ from pathlib import Path
 import readablestem
 from readablestem.cli.eval_cli import rerender_demo
 
-DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo"
+DEMO = Path(readablestem.__file__).parent / "web" / "demo"
 SITE = Path(__file__).resolve().parent.parent / "site" / "examples"
 
 

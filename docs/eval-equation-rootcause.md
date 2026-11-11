@@ -2,7 +2,7 @@
 
 [docs/eval-realworld.md](eval-realworld.md) found that ReadableSTEM writes about as many equations exactly right on
 arXiv PDFs as a free chatbot (held-out 0.583 against 0.641 for both Haiku and Opus; development 0.562 against Haiku's
-0.687) and named symptoms: maths in tables and figures, the edges of inline spans, short inline expressions not
+0.687) and named symptoms: math in tables and figures, the edges of inline spans, short inline expressions not
 found. This page is the root-cause work on those symptoms, done as debugging: evidence from the recorded outputs first,
 at no cost; then fixes for the mechanisms that carry the gap; then a test on a fresh set of papers registered before any
 system ran on it.
@@ -12,7 +12,7 @@ the edges of inline spans (3.6) and `\bm` read as `\mathbf` (0.6). Reading the e
 could see 1 of its 282 silent errors, so it was not built. The fixes are deterministic, from the text layer and the glyph boxes, with no prompt change. On development they take ReadableSTEM from 0.553 to 0.680 (+0.129 [+0.079, +0.181]),
 level with Haiku (0.677) and behind Opus on its 6 papers, and the silent errors fall from 12.0 to 8.8 per 100 gold. **On 15 fresh papers, registered before any system ran, the fixes are worth +0.068 [+0.031, +0.116] (0.558 to 0.626),
 the silent errors do not rise (9.76 to 8.42 per 100; the limit was +0.5), and ReadableSTEM is level with Haiku (0.626 against 0.622, +0.004, nothing detectable) and 5.6 points below Opus (0.682; the 97.5% interval -0.109 to +0.007).
-The registered claim "clearly beats the chatbot recipe" is not met.** It leaves clearly fewer silent errors than either chatbot (8.4 against 16.3 and 13.7 per 100 gold). What stays: maths in table cells, formulas that wrap or are typed
+The registered claim "clearly beats the chatbot recipe" is not met.** It leaves clearly fewer silent errors than either chatbot (8.4 against 16.3 and 13.7 per 100 gold). What stays: math in table cells, formulas that wrap or are typed
 apart, and a notation convention (`\text` against the authors' `\mathrm`) the scorer counts as 4 points for the chatbots and 1.5 for ReadableSTEM on this set. Spend $13.55 of $18.
 
 
@@ -76,14 +76,14 @@ Reading it:
 
 ## 3. The mechanisms, with their evidence
 
-**M1. A variable set in an italic text font is not seen as maths (3.9 points; the largest).** `mathptmx`, `mathpazo`, Charter and `newtx` set the
-Latin letters of a formula in the text family's italic and only Greek letters and symbols in a maths font. The layout (`pipeline/layout.py`,
-`_inline_evidence`) kept a run only with a maths-font glyph, an operator, a script or a relation, so a lone `S`, `m`, `K(t)` or `N_i` in a sentence was text.
+**M1. A variable set in an italic text font is not seen as math (3.9 points; the largest).** `mathptmx`, `mathpazo`, Charter and `newtx` set the
+Latin letters of a formula in the text family's italic and only Greek letters and symbols in a math font. The layout (`pipeline/layout.py`,
+`_inline_evidence`) kept a run only with a math-font glyph, an operator, a script or a relation, so a lone `S`, `m`, `K(t)` or `N_i` in a sentence was text.
 Example (2503.02792 p1, "Let us consider *S* species"): gold `S`; ReadableSTEM nothing; Haiku `S`; the PDF's font for the letter is
 `CharterBT-Italic`. The same on 2408.09889 p2 (Palatino: `m`, `a`), 2404.15495 p1 to 3 (Times: `K(t)`, `t`) and 2501.09629 (MathDesign). Of the
 ReadableSTEM misses in running text with one to three tokens, Haiku found 112; what it did not find and ReadableSTEM did not either is gold convention (below).
 
-**M2. Mathematics typed in a table cell (2.9 points).** 196 of the 223 table equations are not found: a cell's maths is the table step's text, not an
+**M2. Mathematics typed in a table cell (2.9 points).** 196 of the 223 table equations are not found: a cell's math is the table step's text, not an
 equation element, and a table the detector does not propose is not read at all (docs/tables.md measured 65 of 223 found, 49 exact, with `FEATURE_TABLES`
 on: the rest is detection, the work of the table branch). Not changed here; the arms of the fresh test run with `FEATURE_TABLES` on (the deployed setting).
 
@@ -91,10 +91,10 @@ on: the rest is detection, the work of the table branch). Not changed here; the 
 the gold has none), and 19 more are in table captions. The layout kept a caption as one plain string, `Element.caption`, and never cut it into text and
 formulas. Example (2404.15495 p2, Figure 5's caption): gold `K(t)` and `\langle N_{\Delta t=1h}\rangle`; before nothing, Haiku right; after exact.
 
-**M4. Where an inline formula starts and ends (3.6 points over four kinds).** The author's maths stops at the dollar sign, and ReadableSTEM's span ran on.
+**M4. Where an inline formula starts and ends (3.6 points over four kinds).** The author's math stops at the dollar sign, and ReadableSTEM's span ran on.
 - *Things around the formula that are the sentence's* (parentheses, a unit, a citation, 69 of the 204 span failures; gold stops before them in 27 of 31 formulas
   cut inside a pair of parentheses; 37 failures on an upright unit against 2 exact): `(\gamma = -0.9)` for `\gamma=-0.9`, `t = 915\ \text{s}` for `t=915` (2505.11658 p2).
-- *The crop shows the neighbour.* The padded crop (2 pt) takes in half of the parenthesis beside a formula and the model writes it: 2401.11209 p2, run `βr` (the text layer
+- *The crop shows the neighbor.* The padded crop (2 pt) takes in half of the parenthesis beside a formula and the model writes it: 2401.11209 p2, run `βr` (the text layer
   has no bracket), reading `(\beta_r)`; 2405.03801, `(k-1)-regular` read as `(k-1)\text{-}`.
 - *Words and operands taken in.* A theorem set in italics with `log(n)` upright read "for all" and "and" as variables (2305.06353 p3: `n_k \succsim n_l \text{ for all } 1\le k,l\le K`
   for gold `1 \le k,l \le K`); two formulas with a word space between them read as one (`\varepsilon^{(i)}(k)\ (i=1,...,I)`, 2404.15495 p3); a `:=` and a map
@@ -122,12 +122,12 @@ the text layer and the glyph boxes; a recorded model answer replays to the same 
 
 | Fix | Mechanism | Where |
 |---|---|---|
-| An italic variable in upright prose is maths: a short italic group (not an English word, not an italic phrase, not a label, not a quantity's unit) whose neighbours are not italic letters | M1 | `layout._italic_variables`, `_word_lengths` |
+| An italic variable in upright prose is math: a short italic group (not an English word, not an italic phrase, not a label, not a quantity's unit) whose neighbors are not italic letters | M1 | `layout._italic_variables`, `_word_lengths` |
 | A bold letter with an index is a vector, not the count of `H2O` | M1 | `layout._bold_variable` |
 | A figure's caption is cut like a paragraph; its formulas are inline equations of the figure (`Element.caption_marked`, written into the `<figcaption>`) | M3 | `layout._attach_captions`, `_to_elements`, `assemble.figure`, `run.context_texts` |
 | The parentheses of the sentence around a whole formula (a tuple keeps its pair), an upright unit after a number, a citation after a space and a trailing opening bracket leave the formula | M4 | `layout._trim_run`, `_sentence_parentheses`, `_tail_outside_maths` |
 | A visible word space between two operands ends the formula; an ellipsis list, `:=` and a map `H : A -> B` are one | M4 | `layout._word_space_between_operands`, `_ellipsis_comma`, `_join_signatures` |
-| A parenthesis, hyphen or dot at an edge of the reading that the run's own text layer lacks is the neighbour's | M4 | `equation_step.drop_neighbour_brackets`, `drop_neighbour_marks` |
+| A parenthesis, hyphen or dot at an edge of the reading that the run's own text layer lacks is the neighbor's | M4 | `equation_step.drop_neighbour_brackets`, `drop_neighbour_marks` |
 | `\mathbf` becomes `\boldsymbol` for a letter drawn in a bold italic font | M5 | `layout._Char.styled`, `equation_step.restyle_bold_italic` |
 
 Layout changes the OpenStax pages too; the layout of the 121 PDFs of `scripts/layout_identity.py` is compared before and after in section 7.
@@ -220,8 +220,8 @@ ReadableSTEM leaves clearly fewer wrong equations nobody is asked about than eit
 algorithms +0.49, bold italic +0.24, against short inline expressions in running text **-3.17**, captions -1.34, upright text -1.04, other readings -1.34. On this set the mechanisms of the
 analysis hold in sign and, for short variables and captions, in size: ReadableSTEM finds 74 short inline equations that Haiku does not and Haiku finds 22 that ReadableSTEM does not.
 
-**What the scorer hides, and it is not in ReadableSTEM's favour here.** Undoing the two notation artefacts of section 3 (`rw_scorer_sensitivity.py`) adds +1.46 points to ReadableSTEM but **+4.64 to Haiku and +4.03 to Opus**:
-the authors of this set write upright words in maths as `\mathrm{...}` and the chatbots follow them, while ReadableSTEM writes `\text{...}` (the equation prompt's rule), and the scorer reads the two as different trees. The registered primary is unchanged and is what the verdict uses;
+**What the scorer hides, and it is not in ReadableSTEM's favor here.** Undoing the two notation artefacts of section 3 (`rw_scorer_sensitivity.py`) adds +1.46 points to ReadableSTEM but **+4.64 to Haiku and +4.03 to Opus**:
+the authors of this set write upright words in math as `\mathrm{...}` and the chatbots follow them, while ReadableSTEM writes `\text{...}` (the equation prompt's rule), and the scorer reads the two as different trees. The registered primary is unchanged and is what the verdict uses;
 under the variant, ReadableSTEM (0.641) would be below Haiku (0.668) and Opus (0.722). That is a measured disadvantage of the one convention ReadableSTEM writes upright words in, not an error in what a reader sees; it is not fixed here because it needs a choice the evidence does not make (the authors split: in subscripts `\text` 55 against `\mathrm` 36 on the development set, and for words outside subscripts `\mathrm` 111 against `\text` 31 on the held-out set), and a prompt change would invalidate every recorded answer.
 
 **Unresolved** (not tuned on the fresh set, which is now used): the 30 longer inline expressions Haiku found and ReadableSTEM did not (`v : \mathcal{S} \to \mathbb{R}`, `(1-\gamma)`, `0_k 0_l`, a display with `aligned`), concentrated in 3 papers; table cells; upright words.

@@ -236,7 +236,7 @@ university's.
   accounts. Copy the **Application (client) ID**.
 - Authentication, **Add Redirect URI**, platform **Web**: `https://readablestem.com/auth/microsoft/callback`
   (the app sends `BASE_URL` + `/auth/microsoft/callback`, and the match is exact), plus
-  `http://localhost:8000/auth/microsoft/callback` for local work. Leave both implicit-grant boxes unticked.
+  `http://localhost:8000/auth/microsoft/callback` for local work. Leave both implicit-grant boxes unchecked.
 - API permissions: keep `openid`, `profile` and `email` and remove `User.Read`.
 - Token configuration, **Add optional claim**, type **ID**: `email` and `xms_edov`.
 
@@ -247,7 +247,7 @@ secret, run the `MS_CLIENT_SECRET` command below with the new Value, redeploy, t
 
 **3. Allowed directories.** `MS_ALLOWED_TENANTS` lists the directory (tenant) ids that may sign in,
 comma-separated, lower-case GUIDs (the app refuses to start on anything else, such as a domain name or
-`common`). People from any other directory see "Your organisation is not set up for this beta" with their
+`common`). People from any other directory see "Your organization is not set up for this beta" with their
 directory id. The ids read on 2026-11-03 (re-check one with
 `https://login.microsoftonline.com/DOMAIN/v2.0/.well-known/openid-configuration`, the id in `issuer`):
 

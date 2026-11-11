@@ -33,7 +33,7 @@ result is good enough to switch on. It does not assume it is.
 For the pages `page_type` classifies as scanned or handwritten (reasons `scanned_page` and
 `handwritten_page`, nothing else: not `unread_page`, not handwriting on a typed page), and
 only when the conversion asked for it (in the web app the upload option "Convert scanned or
-handwritten pages", offered by `FEATURE_IMAGE_PAGES`, ticked by the document's owner; for the CLI
+handwritten pages", offered by `FEATURE_IMAGE_PAGES`, checked by the document's owner; for the CLI
 and the eval the flag), read the page with **one vision call**, validate what
 comes back, and put it into the document as ordinary elements with review flags that say it has
 no text layer behind it. Without the request, or when anything below fails, the page is kept as
@@ -49,7 +49,7 @@ its image exactly as before.
    (`heading` with a level, `paragraph`, `list_item` with its marker and level, display
    `equation` with LaTeX and its printed number, `figure` with a short description, `table`
    as a grid of cells with header flags and spans), a bounding box on a 0 to 1000 scale, and a
-   confidence (`high`, `medium`, `low`). Prose is a list of runs, text or inline-maths
+   confidence (`high`, `medium`, `low`). Prose is a list of runs, text or inline-math
    (LaTeX), so an inline formula is a span and not a guess made later. A word the model
    cannot read is written as the literal marker `[illegible]` in its place; the prompt forbids
    guessing, completing, solving and correcting, and omits running headers, footers and page
@@ -57,7 +57,7 @@ its image exactly as before.
 2. **Nothing is trusted as it comes** (`image_page.build`). Every LaTeX, display or inline, goes
    through the existing validators (`check_latex`, `safe_latex_to_mathml`, `check_mathml`) and
    the equation step's cleaning. A table's grid goes through the table step's own constructor
-   and structure checks (`grid_problems`, header sanity, maths cells); a grid that is not a
+   and structure checks (`grid_problems`, header sanity, math cells); a grid that is not a
    grid is kept as the table's image. A bounding box is checked, clamped to the page, padded
    a little and trimmed to the ink it holds (so a loose box cannot take in the line above); a
    box that is unusable removes the second reading for that block and nothing else. Headings
@@ -77,10 +77,10 @@ its image exactly as before.
    Inline formulas are part of their paragraph's item, not decisions of their own: a
    paragraph with six variables would otherwise be six decisions. The measurement reports how
    many wrong inline formulas that leaves nobody asked about; if it is too many, inline
-   maths on these pages becomes required too (it is one constant).
+   math on these pages becomes required too (it is one constant).
 4. **The page keeps its original** (`assemble`). Each converted page starts with a notice
    (**"Converted from an image of the page. Check it against the original."**, a visible text
-   label, not colour) and the original page image in a `<details>` the reader opens ("Show the
+   label, not color) and the original page image in a `<details>` the reader opens ("Show the
    original page N"), with alt text that says what it is. No script. The notice is also a
    content-free job notice (`image_page_converted`), and the about section for students says
    which pages were converted from images. The wording follows architecture rule 7: it
@@ -104,7 +104,7 @@ its image exactly as before.
    per page (`DocumentResult.image_pages.per_page`: model, calls, dollars, blocks, review load,
    outcome), is in `DocumentStats.cost_usd` and counts against the job's dollar and call caps
    like every call. The upload probe, which refuses a PDF whose every page is a certain scan
-   or handwriting (`page_type.document_refusal`), lets such a PDF through when the owner ticked
+   or handwriting (`page_type.document_refusal`), lets such a PDF through when the owner checked
    the upload option, and counts its scanned and handwritten pages (a file with none is not affected).
 
 8. **Omission check** (added 2026-10-21, `pipeline/image_page_omission.py`; numbers in
@@ -131,7 +131,7 @@ its image exactly as before.
 9. **A line that holds only a formula is a display equation** (added 2026-10-22,
    `image_page.lone_formula`; [eval-handwriting.md](../eval-handwriting.md), "Root causes and fixes").
    On handwriting the reader set 35 of 56 display equations as list items or paragraphs with one
-   formula run in them ("3." and an equation), so they were read and set as inline maths. A
+   formula run in them ("3." and an equation), so they were read and set as inline math. A
    paragraph or list item with one valid formula and no words is now an equation block, the
    marker its number, its box without the marker (and the prompt says so). Display equations keep
    their tier (required, with a read of the crop and a comparison with the page reading). It adds no
@@ -141,7 +141,7 @@ its image exactly as before.
     out of the page picture and read with the same prompt; the blocks that come back join the page in
     reading order, so the stretch is converted (with its own confidence and decision) and no longer
     flagged. A stretch that gives nothing stays flagged. A request only for a page the check flags.
-11. **Second reading of lines with maths, off by default** (2026-10-22,
+11. **Second reading of lines with math, off by default** (2026-10-22,
     `pipeline/image_page_check.py`, `IMAGE_PAGES_SECOND_READING`, `IMAGE_PAGES_ACCEPT_AGREED`). Each
     `medium` paragraph or list item that holds a formula is cut out and read alone, several lines to a
     request (`image_page_crops` prompt); the verdict (formulas the same by their symbols, words the
@@ -152,21 +152,21 @@ its image exactly as before.
     removes about one decision in 140 and no silent wrong equation, and is off. This does not change the
     consequence in point 5: agreement of two readings by one model lowers no tier.
 
-12. **Maths always required** (decided by the owner 2026-10-22,
+12. **Math always required** (decided by the owner 2026-10-22,
     `Settings.image_pages_maths_always_required` / `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, on). On a page read
-    from an image, every block that holds maths is a required decision whatever the page reader's
+    from an image, every block that holds math is a required decision whatever the page reader's
     confidence: a display equation (always, point 3), and a paragraph, list item or heading with any
     formula in it. The option's promise is "you check every item", and the reader's `high` is not
     trustworthy on handwriting (two silent wrong equations of the fresh held-out set were `high` blocks;
     [eval-handwriting.md](../eval-handwriting.md)). The reason a person sees is
-    `image_page.maths_always_checked` ("This was read from an image and holds maths, and every such block
+    `image_page.maths_always_checked` ("This was read from an image and holds math, and every such block
     is checked, however sure the reader was ..."). Prose-only blocks keep the tiers of point 3; typed
     pages, which this pass never reads, and the typed equation step are untouched; a second reading's
     agreement (point 11) cannot lift such a block out. Measured by replay at $0: silent wrong equations 0
     by construction and verified on every set (the typed scans had 15 and the scanned papers 46 by the
     symbols score); required decisions a page 5.79 to 5.96 on the fresh handwriting set, 3.58 to 6.44 on
     the typed development scans and 2.00 to 5.69 on the scanned papers
-    ([eval-image-pages.md](../eval-image-pages.md), "Update: maths always required"). It settles the open
+    ([eval-image-pages.md](../eval-image-pages.md), "Update: math always required"). It settles the open
     question of the "Consequences" about inline formulas riding with their paragraph.
 
 13. **A text layer that does not cover the page does not make it typed** (2026-11-03,
@@ -175,10 +175,10 @@ its image exactly as before.
     called typed and never reached the pass. A page-sized picture that a
     text layer of only furniture (a watermark, a header, a stamp, a page number) does not lie over is
     read by the pass (when asked) as a scan (`page_type.reads_image`; the page's kept reason stays
-    `unread_page`, so what it says on the review screen is unchanged; calibrated on the labelled
+    `unread_page`, so what it says on the review screen is unchanged; calibrated on the labeled
     corpus with no page worse, layout.md). A page of vector handwriting under furniture-only text is read the same way (`handwritten_page`). The page reader's reading replaces the text layer's
     words, which it reads again from the image. A scan with a *hidden* OCR layer was
-    already read from its image, because nothing can check that layer and for maths it is poor; a
+    already read from its image, because nothing can check that layer and for math it is poor; a
     *visible* layer that covers the picture is the page's text. The image pass cannot read a region of
     a page: a typed page with a photograph of handwriting that covers less than 75 % of it stays typed,
     with the photograph as a figure. A page that stays an image says why on the review screen
@@ -198,7 +198,7 @@ decision to offer the option (see "Result"), registered before that run.
   pass), and rebuilt as image-only PDFs (`eval/scan.py`, deterministic from a seed so recorded
   answers replay). The existing gold and scorers apply unchanged: equations (primary
   `exact_lenient` and the symbols score), headings, review load, cost; plus a prose word error
-  rate against the page's own source text with maths removed (`eval/prose_wer.py`).
+  rate against the page's own source text with math removed (`eval/prose_wer.py`).
 - **Real pages.** A small set of openly licensed scans and handwritten notes, run for a
   qualitative look (and gold by hand for a few pages where it is feasible).
 - **Models.** Claude Opus, Sonnet and Haiku (5.5) as the page reader, same pages, same

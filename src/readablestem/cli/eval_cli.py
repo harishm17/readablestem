@@ -28,7 +28,7 @@ GOLD_DIR = Path("data/gold")
 EVAL_DIR = Path("data/eval")
 EVAL_CACHE = Path(".cache/eval")
 OPENSTAX_CACHE = Path(".cache/openstax")
-DEMO_DIR = Path("src/readablestem/web/static/demo")
+DEMO_DIR = Path("src/readablestem/web/demo")
 WEEKLY_DIR = Path(".local") / "eval" / "weekly"  # git-ignored; commit a report on purpose
 # Known-correct LaTeX for every sample equation (`make eval-latex-check`): an equation it
 # still fails is a scorer gap, left out of the "excluding scorer gaps" review flags.
@@ -1674,9 +1674,7 @@ def register(
     build.add_argument("--page", required=True, help="OpenStax page slug")
     build.add_argument("--book", default="physics")
     _add_spend_args(build)
-    build.add_argument(
-        "--out", type=Path, help="output dir (default: src/readablestem/web/static/demo/)"
-    )
+    build.add_argument("--out", type=Path, help="output dir (default: src/readablestem/web/demo/)")
     build.add_argument("--gold", type=Path, help="gold dir (gold pages render from cache)")
     build.add_argument("--date", type=_iso_date, default=today)
     build.add_argument("--paper", choices=["Letter", "A4"], default="Letter")

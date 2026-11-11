@@ -27,8 +27,8 @@ points behind (0.671 against 0.695 and 0.709). It is cheaper than Opus ($0.030 a
 
 ## What the set is
 
-**Papers and pages.** 40 arXiv papers, under CC BY 4.0 (the licence is read from the arXiv record;
-CC BY 3.0 and CC0 would also be accepted, every other licence is skipped), in math-heavy
+**Papers and pages.** 40 arXiv papers, under CC BY 4.0 (the license is read from the arXiv record;
+CC BY 3.0 and CC0 would also be accepted, every other license is skipped), in math-heavy
 categories (math.PR, math.NA, math.HO, stat.TH, stat.ME, stat.ML, cs.LG, cs.DS, econ.EM, q-bio.QM,
 physics.class-ph, ed-ph, flu-dyn, data-an, cond-mat.stat-mech), half of them lecture-note or tutorial
 style by title (a heuristic: some "tutorials" are research papers). The document is the PDF arXiv
@@ -52,8 +52,8 @@ the score by display and inline.
 **How the papers were chosen** (`src/readablestem/gold/arxiv_corpus.py`, `scripts/realworld_select.py`,
 `scripts/realworld_build.py`; deterministic given the cached OAI records):
 
-1. The arXiv OAI-PMH `ListRecords` of 15 sets over a window of months each (the record carries the licence, so
-   no paper is fetched before its licence is known): 10,527 records with an accepted licence after de-duplicating
+1. The arXiv OAI-PMH `ListRecords` of 15 sets over a window of months each (the record carries the license, so
+   no paper is fetched before its license is known): 10,527 records with an accepted license after de-duplicating
    cross-lists (about 35% to 45% of the records; recent arXiv papers are often CC BY), 10,165 inside the page range.
 2. A seeded order (seed `realworld-2026-10-21`, SHA-256 of seed, set and id; sets in turn; tutorial and
    research alternating). The first 40 candidates that pass the gates are the set, and a candidate that fails a
@@ -66,7 +66,7 @@ the score by display and inline.
    part, and an addendum (sizing of the Opus arm) before any held-out run.
 
 The corpus, the PDFs and the gold are kept outside the repository (`~/.cache/readablestem/realworld`), as
-the held-out cache is; the repository has the scripts, the manifests (ids, titles, licences, chosen pages, SHA-256 of the PDF,
+the held-out cache is; the repository has the scripts, the manifests (ids, titles, licenses, chosen pages, SHA-256 of the PDF,
 the source archive, the cut PDF and each gold file), the registration and the results.
 `uv run python scripts/realworld_build.py verify` rebuilds the gold of every paper from the cached downloads and
 checks it against the manifests.
@@ -90,7 +90,7 @@ No model is called and no TeX engine is needed (`src/readablestem/gold/arxiv_tex
    `gather` is one equation per row and `multline` one equation. This follows the layout stage's own rule (a derivation is one
    equation, two numbered rows stay apart; docs/layout.md). It is a convention, and the pipeline and the chatbot may
    write an alignment the other way (see "Limits").
-4. **Place.** Prose words (four letters or more, maths removed) of the source are aligned to the words of the PDF
+4. **Place.** Prose words (four letters or more, math removed) of the source are aligned to the words of the PDF
    with word 3-grams that occur once in both and a longest increasing subsequence. An equation lies between the nearest anchors
    before and after it; it is *placed* when both are on the same page and has an interval of pages otherwise. A float or a
    picture is placed by its own words, and when it has none it blocks the pages it may be on.
@@ -206,7 +206,7 @@ ReadableSTEM** (development; gold LaTeX is what the author typed; "text layer" i
 | 4 | 2505.11658 p2 | `6.371 \times 10^{6}` | `R = 6.371 \times 10^{6}\ \text{m}` | the author typed `R =` and `m` outside the dollars; the page shows one formula (a boundary convention; Haiku wrote the same) |
 | 5 | 2503.07628 p6 | `\boldsymbol{g}: \Gamma_N \to \mathbb{R}^2` | `\Gamma_N \rightarrow \mathbb{R}^2` | the span starts after the bold g (text layer `ΓN →ℝ2`) |
 | 6 | 2408.09889 p6 | `\mathcal{O}(n_\text{live}^{-\frac{1}{2}})` | `\mathcal{O}(n_{\text{live}}^{-\frac{1}{2}})\ \text{([26])}` | the citation after the formula is absorbed (flagged as a required decision) |
-| 7 | 2404.15495 p7 | `k=1,...,T` | `\lambda_1\ (k=1,\ldots,T)` | the span takes in the neighbouring symbol |
+| 7 | 2404.15495 p7 | `k=1,...,T` | `\lambda_1\ (k=1,\ldots,T)` | the span takes in the neighboring symbol |
 | 8 | 2412.08797 p13, display | `\widetilde{\mathcal{P}}^{**}\equiv\max_{...}\widetilde{\mathcal{P}}(\nu,\chi)=...` | nothing (a required decision) | the accent glyph has no Unicode value: text layer `�𝒫∗∗≡maxν∈(0,1)...` |
 | 9 | 2504.03499 p21, two-line display | `\begin{aligned} &\bm z_{t+1}=\arg\max ... \\ & r_t(\bm z)=... \end{aligned}` | nothing (a required decision); Haiku wrote only the second line | a display with an unmapped glyph; a derivation cut by line |
 | 10 | 2505.08251 p2 | `p_{\text{out}} = p_{ij}` | `p_{out} = p_{ij}` | the reading is right to a reader; the primary scorer says no (the symbols scorer says yes: bucket "scorer") |
@@ -300,7 +300,7 @@ Review screen (ReadableSTEM only): of the aligned equations that are wrong in th
    equations and 62% (16%) of the figure ones; its exact rate in a table is 0.07 (0.06). Math in a table cell is not an equation element
    of the pipeline (it is the table step's text), and text inside a figure is not read as math. The chatbots lose here too (Opus 0.22, Haiku 0.16 exact in tables) but much less.
 2. **The edges of inline spans.** 8.7% (8.6%) of the gold, 4 to 5 times the chatbots' (1.8% to 3.5%): the formula is cut at the end of its glyph run, so a
-   neighbouring symbol, a unit or a citation comes in (`([26])`, `R =`, a leading `\lambda_1`), or a leading symbol or a closing bracket stays out
+   neighboring symbol, a unit or a citation comes in (`([26])`, `R =`, a leading `\lambda_1`), or a leading symbol or a closing bracket stays out
    (`\boldsymbol{g}:`, `(\mathbb{R}^d)`). Part of this is the author's math boundary (`R =` and `m` outside the dollars), which the scorer cannot tell from a
    pipeline error; the rest is real.
 3. **Short inline expressions in running text are not found.** 109 (126) single symbols, 32 (86) of two or three symbols, 23 (34) longer inline
@@ -311,7 +311,7 @@ Review screen (ReadableSTEM only): of the aligned equations that are wrong in th
 
 **Update (2026-10-21, later the same day).** The root causes of the gap above, the fixes and a fresh registered test against both chatbot arms are in
 [eval-equation-rootcause.md](eval-equation-rootcause.md): on 15 new papers the fixes are worth +6.8 points (0.558 to 0.626), ReadableSTEM is level with Haiku and 5.6 points below Opus, and its silent errors are 8.4 per 100 gold against 16.3 and 13.7.
-Two corrections to how this page's numbers compare: the chatbot item files above were scored by the converter that made the gold and ReadableSTEM runs made after the chemistry work are scored by a newer one (the page's chatbot numbers are untouched; the other page re-scores them), and a table cell's maths was
+Two corrections to how this page's numbers compare: the chatbot item files above were scored by the converter that made the gold and ReadableSTEM runs made after the chemistry work are scored by a newer one (the page's chatbot numbers are untouched; the other page re-scores them), and a table cell's math was
 never an equation to the scorer for ReadableSTEM while it was for the chatbots.
 
 ## The page math pass on the real-world development set
@@ -362,7 +362,7 @@ By stratum (exact_lenient): display 0.503 to 0.558, align-like 0.385 to 0.462, r
 Of the aligned pairs, 961 sit on a page-pass span (77% exact) and 725 on a layout run the pass did not confirm (79%).
 
 **Ten that it helped** (gold; flag off; page pass): `a`, nothing, `a` (a lone variable in a figure label); `N_i > 0`, `\text{(i) } N_i > 0` (the item number taken in), `N_{i} > 0`;
-`K(t)`, `K(t+\Delta t)` (a neighbour taken in), `K(t)`; `m`, nothing, `m`; `S, M \rightarrow \infty`, `M \rightarrow \infty` (the left half lost), whole;
+`K(t)`, `K(t+\Delta t)` (a neighbor taken in), `K(t)`; `m`, nothing, `m`; `S, M \rightarrow \infty`, `M \rightarrow \infty` (the left half lost), whole;
 `P(f)/P_{\phi=0\%}(f)`, `P_{\phi=0^\circ}` (the `%` read as a degree sign from the glyphs), right; `\mathbf{A}`, nothing, found; `0\sim 20\%`, `0 \sim 20` (percent sign left out), whole;
 `\bm g_{t+1}`, `\mathbf{g}_{t+1}`, `\boldsymbol{g}_{t+1}`; `\theta_{\max} )`, `\theta_\text{max})`, `\theta_{\max})`.
 **Five that it hurt:** `t=1, 2, 3` in a table cell, right, now `t = 1, 2, 3, \underline{w}_{t}` (the span runs on into the next cell: twice); `z_i = z_j`, found,
@@ -453,8 +453,8 @@ No command reads a gold file's content. The registration is `data/realworld/PRER
 |---|---|---|---|
 | A, arXiv LaTeX | 12 papers | the fresh4 order continued after its last visited candidate, same gates as above | `arxiv-order`, `arxiv-build` |
 | B, OpenStax | 6 sections | CC BY books (archive and CMS), sections no earlier set used, a title no earlier set used, sibling editions folded, at most 2 per book family, seeded by SHA-256 | `openstax`, `openstax-render` |
-| C, course-style LaTeX | 8 documents, at least 3 Beamer decks | GitHub repositories from a fixed query set, licence gate (CC BY, CC BY-SA, MIT), seeded order, compiled with TeX Live (Tectonic as fallback), gold by the arXiv path | `course-harvest`, `course-draw` |
-| D, OpenStax chemistry (not pooled) | 3 sections, 115 chemistry gold equations (the rule filled 3 of 4 places) | the live licence is read for every book with "chemistry" in its slug; the CC BY first editions are walked first, then Chemistry 2e and Atoms First 2e (CC BY-NC-SA, a private measurement), Organic Chemistry last and only if needed; sections no earlier set used and no title an earlier set or dev-v2's possibly sealed part has, off the topics earlier chemistry sets cover, at least 25 gold equations of which 40% chemistry, 8-gram overlap with every used section at most 20%, at most 15 printed pages, ranked by tier then SHA-256 of `fresh5-D\|book\|section`, stopping at 4 sections with at least 100 chemistry equations | `chemistry` |
+| C, course-style LaTeX | 8 documents, at least 3 Beamer decks | GitHub repositories from a fixed query set, license gate (CC BY, CC BY-SA, MIT), seeded order, compiled with TeX Live (Tectonic as fallback), gold by the arXiv path | `course-harvest`, `course-draw` |
+| D, OpenStax chemistry (not pooled) | 3 sections, 115 chemistry gold equations (the rule filled 3 of 4 places) | the live license is read for every book with "chemistry" in its slug; the CC BY first editions are walked first, then Chemistry 2e and Atoms First 2e (CC BY-NC-SA, a private measurement), Organic Chemistry last and only if needed; sections no earlier set used and no title an earlier set or dev-v2's possibly sealed part has, off the topics earlier chemistry sets cover, at least 25 gold equations of which 40% chemistry, 8-gram overlap with every used section at most 20%, at most 15 printed pages, ranked by tier then SHA-256 of `fresh5-D\|book\|section`, stopping at 4 sections with at least 100 chemistry equations | `chemistry` |
 
 Stratum D (`chemistry` command, `selection-fresh5-D.json`). It is read apart from the others: chemistry gold is scored by what the
 chemistry says (`eval/equations_chem.py`), the primary number is "chemically right" with the lone `×` left out and the number with
@@ -464,12 +464,12 @@ used or possibly sealed section, and it is printed to Letter with the renderer o
 fails is logged with the gate and skipped. The two CC BY editions are close to one text and earlier sets used most of it
 (1 section passes), so the CC BY-NC-SA 2e editions fill the rest as a private measurement: their PDFs and answer keys are written
 only to `gold/fresh5d-private` in the cache, the repository gets section ids, counts and hashes, and only aggregate numbers are published,
-with OpenStax and the licence named. `licence_tier` in `selection-fresh5-D.json` says which tier a section is in; a test checks that
+with OpenStax and the license named. `licence_tier` in `selection-fresh5-D.json` says which tier a section is in; a test checks that
 nothing of a private section is in the repository. The rule filled 3 of its 4 places. The scan for used sections skips the selection files of B and D so that a rerun of either gives
 the same draw; the command writes byte-identical output when run again.
 
-Stratum C (`src/readablestem/gold/course_corpus.py`). The licence is GitHub's SPDX id for the repository and is read again
-when the repository is fetched; forks, archived repositories and anything else (NC, ND, GPL, no licence) are refused. Documents
+Stratum C (`src/readablestem/gold/course_corpus.py`). The license is GitHub's SPDX id for the repository and is read again
+when the repository is fetched; forks, archived repositories and anything else (NC, ND, GPL, no license) are refused. Documents
 are the files with `\documentclass` and `\begin{document}`; Beamer is the class or the package. A document is compiled with
 pdflatex or xelatex from a user-level TeX Live (latexmk), then Tectonic (`--untrusted`, cached packages only); the first
 that compiles it wins, and its engine and version are in the manifest. Every compile and every unpacking goes through
@@ -481,7 +481,7 @@ local files is the mount namespace; `openin_any=p` and `openout_any=p` are set a
 never replaced by choice. The gates are those of the arXiv path (at most 10% unconvertible equations, at least 4 usable
 pages, 4 to 6 pages drawn by hash), with a lower text and equation floor for slides (100 characters and 3 equations,
 against 300 and 5); the draft registration records why. At most 2 documents per repository are taken and at most 6 tried.
-The licence of a repository does not cover
+The license of a repository does not cover
 third-party material inside a document (figures, quotations); the gold holds equations only.
 
 ## The spoken-equal scorer, fixed so that one print is one speech

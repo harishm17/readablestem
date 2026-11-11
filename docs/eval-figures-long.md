@@ -8,7 +8,7 @@ written at the bottom, as the other pre-registrations do).
 
 The v1 figure gold ([eval.md](eval.md), "figures") is 13 OpenStax Physics figures. The
 long-description feature (long descriptions and chart data tables,
-[steps.md](steps.md#long-descriptions-data-tables-and-colour-feature_long_descriptions)) was
+[steps.md](steps.md#long-descriptions-data-tables-and-color-feature_long_descriptions)) was
 judged on them once (2026-10-09): 9 figures got a judged long description, all 9 passed, and the
 Wilson 95% interval for 9 of 9 runs from 0.70 to 1.00. The long judge is not calibrated against
 human labels. Three data tables were judged. That cannot support a bar, and 4 charts in 13 is too
@@ -22,14 +22,14 @@ and its manifest are untouched.
 
 ### The rule (code: `gold/figures_v2.py`; the draw is a pure function, tested)
 
-1. **Licence gate.** OpenStax: the book's licence is plain CC BY in both the archive and the CMS
+1. **License gate.** OpenStax: the book's license is plain CC BY in both the archive and the CMS
    (`gold licenses`, `data/openstax-licenses.csv`). arXiv: CC BY 3.0 or 4.0 in the OAI record.
-   NC, SA, ND, CC0 and "arXiv non-exclusive" are out; a missing licence is out.
+   NC, SA, ND, CC0 and "arXiv non-exclusive" are out; a missing license is out.
 2. **Exclusion gate.** No figure from a page whose slug is a registered held-out section (any
    book, so a later edition of a held-out section is out too), or that another gold, development
    or held-out set under `data/` already uses (54 slugs). 47 pages were dropped this way.
 3. **Credit gate.** The book's CC BY does not override a figure's own credit line. A caption
-   credit that names another licence, permission, copyright, Wikimedia Commons or Flickr takes
+   credit that names another license, permission, copyright, Wikimedia Commons or Flickr takes
    the figure out, and so does a credit to a person or a body not on a short free list (US
    government bodies, whose works are public domain, and ESO, CC BY): its terms are not stated.
    Every credit of a kept figure is recorded in `ATTRIBUTION.md` as the caption prints it
@@ -37,7 +37,7 @@ and its manifest are untouched.
    order after this gate.
 4. **Reference gate.** One image; the OpenStax alt text (the reference long description) at least
    120 characters; for charts at least four numbers of two digits or with a decimal point in it
-   (readable values: a proxy, not a check); no maths in the caption.
+   (readable values: a proxy, not a check); no math in the caption.
 5. **Stratum** from the first 90-200 characters of the alt text, by a fixed keyword list
    (`classify_openstax`): chart (graph, plot, histogram, pie chart, ...), chemistry (structures,
    Lewis symbols, ball-and-stick and space-filling models, structural formulas), photo or
@@ -72,8 +72,8 @@ chemistry structures. 49 images are JPEG, one PNG.
 `id`, `stratum`, `split`, `source`, `book`, `book_state`, `page_key`, `source_url`,
 `licence_name`, `licence_url`, `attribution`, `image` (`url`, `sha256`, `bytes`, `media_type`,
 size), `caption`, `reference_alt`, `reference_long_description`, `reference_long_source`,
-`reference_table` (or null). `ATTRIBUTION.md` lists every figure with its licence and source.
-`scripts/figures_v2_build.py check` and `tests/test_gold_figures_v2.py` re-run the licence gate on
+`reference_table` (or null). `ATTRIBUTION.md` lists every figure with its license and source.
+`scripts/figures_v2_build.py check` and `tests/test_gold_figures_v2.py` re-run the license gate on
 the committed file.
 
 - **OpenStax images are not committed.** A run downloads each one and checks its sha256 (as the v1
@@ -197,7 +197,7 @@ The long judge has never been compared with a person. Before a bar is claimed:
    is still under 0.6, the numbers are published as "judge not agreed with a person" and no bar is
    claimed.
 5. The judge is the run's main model unless the registration names another; the report records
-   it. A judge from the same model family as the writer can favour its own wording; the human
+   it. A judge from the same model family as the writer can favor its own wording; the human
    labels are the check on that.
 
 After the confirmatory run C, a short spot check reads what the judge decided on that run:

@@ -14,7 +14,7 @@ proposed scope; the questions further down are still open.
 | Fact | Basis |
 |---|---|
 | ADA Title II web and course-material deadline for public entities serving over 50,000 people: **April 26, 2027** (smaller ones: April 2028) | EDUCAUSE and university accessibility-office guidance, as read on 2026-10-06. Not yet checked against the rule text (28 CFR part 35); the landing page does not state it until it is |
-| Target output is accessible HTML with MathML (accessibility guides advise against tagged PDF for maths) | Accessibility-office guidance; not reproduced here |
+| Target output is accessible HTML with MathML (accessibility guides advise against tagged PDF for math) | Accessibility-office guidance; not reproduced here |
 | The tool "assists"; it never claims conformance with WCAG, the ADA or any other standard | Project rule |
 | Free and open source; no paid tiers, ads or donations | Project decision |
 | Course PDFs from the author's university are test inputs only: private, local, in `private-inputs/`, never in the repository, the gold set, screenshots or write-ups | Project rule |
@@ -47,7 +47,7 @@ proposed scope; the questions further down are still open.
 - Out of the beta: university SSO
 
 **Since this record was written.** Tables, long figure descriptions, links and language,
-colour and course-notation memory were built behind flags that are off by default;
+color and course-notation memory were built behind flags that are off by default;
 tables have their own amendment in ADR 0003. They are
 not part of the beta scope above until their flags are turned on.
 
@@ -68,7 +68,7 @@ in ADR 0002). The Cloud Run guide ([deploy.md](../deploy.md)) stays as an altern
 | Model routing (cheap cases to a cheap model)? | Yes: ADR 0002 |
 | Fallback model per step? | Yes, each model is the other's fallback: ADR 0002 |
 | Hosting | Cloud Run, one service: ADR 0004 (moved to Railway, see its update) |
-| Code licence | **MIT**, decided 2026-10-06. The shortest widely recognised permissive licence; Apache-2.0's patent grant was judged unnecessary for a small project. Data under `data/gold/` stays CC BY 4.0 |
+| Code license | **MIT**, decided 2026-10-06. The shortest widely recognized permissive license; Apache-2.0's patent grant was judged unnecessary for a small project. Data under `data/gold/` stays CC BY 4.0 |
 
 ## New facts from building the skeleton (2026-10-06, checked against live OpenStax APIs)
 
@@ -86,7 +86,7 @@ Open questions this raises (not legal advice; unverified until checked against O
 terms):
 
 1. Keep the public gold set CC BY only (current code rule), or also use CC BY-NC-SA books? ShareAlike may affect how a derived dataset can be licensed.
-2. Is a retired edition acceptable as ground truth, given its alt text and MathML may be older than the current edition? **Answered for the held-out evaluation on 2026-10-13, before any system ran on it: yes** (`proof/DECISION-retired-editions-2026-10-13.md`; the licence of each retired book was read from OpenStax's CMS and archive and is in `data/openstax-licenses.csv` and `proof/selection/licenses-2026-10-13.csv`, which is not legal advice). The rest of this ADR stays Proposed. Before that decision, `gold fetch` refuses non-live books unless `--allow-retired` is passed, and every record carries `book_state`.
+2. Is a retired edition acceptable as ground truth, given its alt text and MathML may be older than the current edition? **Answered for the held-out evaluation on 2026-10-13, before any system ran on it: yes** (`proof/DECISION-retired-editions-2026-10-13.md`; the license of each retired book was read from OpenStax's CMS and archive and is in `data/openstax-licenses.csv` and `proof/selection/licenses-2026-10-13.csv`, which is not legal advice). The rest of this ADR stays Proposed. Before that decision, `gold fetch` refuses non-live books unless `--allow-retired` is passed, and every record carries `book_state`.
 3. Equation scoring defaults: report strict exact match, lenient exact match (mi/mn/mtext treated alike, trailing period ignored) and TEDS (1 - TED / max nodes), or a subset? Also: should lenient mode split operators out of OpenStax text (`<mtext>time =</mtext>` vs `\text{time} =`)? That affects 5 of the 30 sample equations.
 
 ## Consequences
@@ -104,4 +104,4 @@ Drafted from what the repository shows; the author confirms or edits.
   retired first editions (question 2).
 - **When to revisit.** If measured results on documents outside the OpenStax sample show
   the scope is too wide or too narrow; if the 26 October equation checkpoint fails; or if
-  the licence answers in questions 1 and 2 change what the public gold set can contain.
+  the license answers in questions 1 and 2 change what the public gold set can contain.

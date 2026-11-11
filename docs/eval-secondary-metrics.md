@@ -9,7 +9,7 @@ headline (PROOF.md, `proof/PREREGISTRATION.md`; neither is edited).
 ## The metrics
 
 `eval pipeline` (equations and document tasks) reports three equation scores. The first is the
-primary one; the other two are secondary, labelled as such in the report, and never replace it.
+primary one; the other two are secondary, labeled as such in the report, and never replace it.
 
 | Scorer | Where | What it forgives (beyond the primary scorer) |
 |---|---|---|

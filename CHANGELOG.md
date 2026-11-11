@@ -23,6 +23,19 @@
   program the image facts do not name (unknown counts as absent) is printed as counted off.
 - `.railway/railway.ts` names every behaviour setting on `web` (`preserve()`), and the docs and
   comments that repeated production values now point at the profile.
+## Unreleased: copy leftovers and dev-only pages (branch fix/copy-leftovers)
+
+- Copy: the maintainer credit (both footers, the landing page, sign-in, privacy and terms) links
+  to "Support and continuity" on the offices page. The README, DESIGN.md and `docs/` use US
+  spelling and US date order, the attribution table head and the stemcheck summary line too, and
+  `tests/test_us_spelling.py` now reads those files and no longer lets two table cells run
+  together into one word. The README and the public site say the hosted service takes PDF and
+  LaTeX.
+- Dev-only addresses: `/style` is mounted only where `ENV` is `dev` or `test` (`web/dev_only.py`)
+  and answers 404 in production, as `/dev-login` already did. The stored demo moved from
+  `web/static/demo/` to `web/demo/`, so `/static/demo/*` no longer serves it unsandboxed;
+  `/demo` is its one address, and the landing page's PDF link is now `/demo/source.pdf`.
+  `docs/` and `scripts/` stay out of the Docker image.
 
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 

@@ -28,6 +28,11 @@ proof/
 !proof/sets/
 deploy/
 .railway/
+# Developer notes and tools: nothing the running app or the showcase build reads (the
+# proof facts the app shows are in web/proof_facts.json, made from docs/ by
+# `python -m readablestem.web.proof_facts`).
+docs/
+scripts/
 node_modules/
 Dockerfile
 .dockerignore

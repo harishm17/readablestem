@@ -20,7 +20,7 @@ score). Registered rule: advertise if the primary is at least 0.50 and silent wr
 before advertising: 43% of the equations are wrong, and the reason none is silent is that the
 model calls 85% of handwritten blocks `medium` or `low` confidence, so 5.7 decisions per page are
 required (typed pages: 1.4); it silently dropped four whole display equations of one page (nothing
-flags them); and 35 of the 56 expressions set as display equations came out as inline maths in a
+flags them); and 35 of the 56 expressions set as display equations came out as inline math in a
 paragraph or list item, not as display equations. The cost is $0.066 a page. Total spend $2.09 of
 the $8.00 cap.
 
@@ -29,7 +29,7 @@ page picture with the regions the blocks account for and makes a stretch of writ
 required decision ("The omission check" below). Replayed at no cost, it flags the known page, adds
 no decision on the 10 development pages and 0.04 a page on the clean held-out pages (one false
 flag in 23), and changes neither the primary score nor the silent wrong equations (0 and 0). It
-does not touch the 35 display expressions read as inline maths.
+does not touch the 35 display expressions read as inline math.
 
 **The ceiling, stated plainly.** Most of the "wrong" equations on this answer key are not the
 reader's mistakes: two thirds are ink (or a label) that one reading cannot settle, about a quarter are a
@@ -44,7 +44,7 @@ and fixes" below). Two thirds of the wrong equations are ink a reader cannot set
 about a quarter are a notation the label did not use, and the model reading each expression alone from
 clean ink gets the same share right as the page reading; so nothing tried raised the share of
 equations right beyond noise (fresh set, paired: +0.031, interval -0.024 to +0.083) or cut the 5.8
-required decisions a page. What was fixed: display lines set as inline maths (16 of 49 on the fresh
+required decisions a page. What was fixed: display lines set as inline math (16 of 49 on the fresh
 set, now 56 of 57) and writing a reader left out (now read, not only flagged). **What did not hold up:
 the zero silent wrong equations above: 2 of 192 on the fresh set, 2 of 161 for the unchanged pipeline,
 both in blocks the model called `high`.** The numbers in this part, up to here, are the first
@@ -54,13 +54,13 @@ measurement's and stay as they were.
 
 Real human ink from Google's MathWriting dataset: people copying a rendered LaTeX expression on a
 touchscreen or with a digital pen, so that the label is what the writer was asked to write.
-**Licence CC BY-NC-SA 4.0 (Google LLC), so none of it is committed**: the repository holds the
+**License CC BY-NC-SA 4.0 (Google LLC), so none of it is committed**: the repository holds the
 builder and `data/handwriting/manifest.json` (identifiers and SHA-256 hashes of every ink file,
 page picture and gold file); `scripts/handwriting_eval.py fetch`, `build` and `verify` rebuild the
 set from the 2.9 GB archive (verified byte for byte on the author's machine, with the DejaVu Serif
 font hashed in the manifest). Attribution: [data/handwriting/ATTRIBUTION.md](../data/handwriting/ATTRIBUTION.md)
 (Gervais, Fadeeva and Maksai, arXiv:2404.10690). Only human ink is used; MathWriting's synthetic
-ink is not. Other sources: CROHME 2019 (research use only, no licence file found) and openly
+ink is not. Other sources: CROHME 2019 (research use only, no license file found) and openly
 licensed scanned lecture notes with a typed transcript (none found) were not used, so there is one
 source; its breakdown is by the dataset's own splits and by strata.
 
@@ -80,7 +80,7 @@ converts by the pipeline's own LaTeX path with no unknown command, has 3 to 40 t
 150 characters, and has no text mode and no run of plain letters spelling a word. Pages are US
 Letter at 300 dpi, two to a document, up to seven blocks each: a short typed sentence with one or
 two handwritten expressions inside it ("Since [ink] we obtain [ink] directly."), or a handwritten
-display expression on a line of its own, centred or after a typed label ("3."). The ink is drawn at
+display expression on a line of its own, centerd or after a typed label ("3."). The ink is drawn at
 pen width in black, blue or graphite, a third of the documents on ruled paper, and each page is
 degraded by `eval/scan.py` (150 to 200 dpi, small rotation, shading, grain, blur, JPEG 55 to 75) and
 set in an image-only PDF with no text layer. The gold is one record per expression in the document
@@ -147,8 +147,8 @@ are not worse.
 - **Display equations are not display equations.** Of the 56 expressions set on a line of their
   own, 17 came out as display equation blocks (each a required decision with a second reading of
   the crop: the crop and page readings agreed on 14, 3 of the 14 wrong, and disagreed on 3, all
-  3 wrong), 35 as inline maths inside a paragraph or list item (the model made 35 list items on
-  these pages, every one with a marker such as "1." or "(b)", about the number of labelled display
+  3 wrong), 35 as inline math inside a paragraph or list item (the model made 35 list items on
+  these pages, every one with a marker such as "1." or "(b)", about the number of labeled display
   lines; I did not check them one by one), and 4 were not found. So "every display equation is required by construction" held
   for a third of them; the rest were covered by their paragraph's confidence.
 - **One page lost four equations without a flag.** In `hw-heldout-08` the reader returned only
@@ -248,7 +248,7 @@ through the real pipeline on its recorded answers, with the check off and on; no
   check sees, not a rate of what it finds.
 - **It also found real omissions in the typed scans** (docs/eval-image-pages.md, "The omission
   check").
-- **It does not catch the display equations read as inline maths** (35 of the 56 in held-out): the ink
+- **It does not catch the display equations read as inline math** (35 of the 56 in held-out): the ink
   is inside a paragraph's or a list item's box, so it is accounted for. Reported as asked; changing how
   those pages are laid out is a different change and is not attempted here.
 - **Primary and silent wrong equations do not change**: an omission item is a figure item with no
@@ -276,7 +276,7 @@ faithful), 8% are real misreads of clear ink, 4% were left out. A model reading 
 alone, from the clean ink, gets 61 to 64%, about what the page reading gets: the rate has a ceiling
 near 60 to 65% for this ink and this model, and none of the fixes tried moved it beyond noise (fresh
 set, paired with the control on the units both finished: +0.031, interval -0.024 to +0.083).
-The pass did have two real defects, and both are fixed: display equations were set as inline maths
+The pass did have two real defects, and both are fixed: display equations were set as inline math
 (control 16 of 49 on the fresh set, fixed 56 of 57) and a reader that stopped early left writing out
 (it is now read from a picture of just that part). Required decisions a page did not move (5.79
 and 5.79): the review load is the confidence labels' doing, and the labels say almost nothing. And the
@@ -316,7 +316,7 @@ and in the model's reading of it, not in the pixels.
 ### Layout
 
 First held-out: of 56 gold display expressions, 17 came out as display equation blocks, 35 as inline
-maths in a list item or paragraph and 4 were not found; **all 35 are a list item or paragraph that
+math in a list item or paragraph and 4 were not found; **all 35 are a list item or paragraph that
 holds one formula and no words** ("3." and a formula beside it): the prompt called a list item a marker
 and runs and a display equation "on lines of its own", and a numbered display line is both. Nothing
 was merged or split (201 output equations for 205 gold equations, the 4 missing are one page).
@@ -458,18 +458,18 @@ or `low` 0.85 and 0.85, decisions 5.71 and 5.79, display set as display 30% and 
 wrong equations does not (0 and 2). The fixed pipeline's 2 silent equations are 1.0 per 100 gold
 equations.
 
-### Maths always required (2026-10-22, decided by the owner; ADR 0007, point 12)
+### Math always required (2026-10-22, decided by the owner; ADR 0007, point 12)
 
-The confidence labels cannot be trusted to leave a block with maths unasked (above), and the option's
-promise is "you check every item", so on a page read from an image **every block that holds maths is a
+The confidence labels cannot be trusted to leave a block with math unasked (above), and the option's
+promise is "you check every item", so on a page read from an image **every block that holds math is a
 required decision whatever the reader's confidence**: a display equation (already always required), and a
 paragraph, list item or heading with any formula in it (`IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, on). Prose-only
 blocks keep their tiers; typed born-digital pages are never read by this pass and the typed equation step
 is untouched. A second reading's agreement cannot lift such a block out (acceptance, off anyway, is a no-op
-while this is on). The review card says why: "This was read from an image and holds maths, and every such
+while this is on). The review card says why: "This was read from an image and holds math, and every such
 block is checked, however sure the reader was ...". Measured by replay of the recorded answers, at $0
 (`handwriting_accuracy.py run --offline --env IMAGE_PAGES_MATHS_ALWAYS_REQUIRED=...`; the typed and paper
-sets: docs/eval-image-pages.md, "Update: maths always required"):
+sets: docs/eval-image-pages.md, "Update: math always required"):
 
 | Set (pages) | Silent wrong equations, symbols / strict, off to on | Required decisions / page, off to on | Optional notes / page, off to on |
 |---|---|---|---|
@@ -481,7 +481,7 @@ Silent wrong equations are 0 by construction, and the replay verifies it on ever
 equations whose item is not a required decision is 0 in every "on" arm). On handwriting the price is small,
 0.17 decisions a page on both held-out parts (the `high` blocks: 4 text blocks of 142 on the fresh set),
 because the reader already calls 85% of handwritten blocks `medium` or `low`; the development part has no
-`high` block with maths. The primary and every reading are unchanged (a decision is not a reading). The
+`high` block with math. The primary and every reading are unchanged (a decision is not a reading). The
 first held-out row is a replay with today's code on the first run's recorded answers (its display lines
 promoted and their crops not recorded, recovery not asked), so its "off" figure is 5.92, not the 5.71 of
 the first measurement. The cost lands on pages where the reader is confident, the typed scans: 3.58 to
@@ -503,7 +503,7 @@ the first measurement. The cost lands on pages where the reader is confident, th
 - **For the owner:** advertising "handwriting" on this evidence is the earlier caveat made sharper:
   about 59% of messy touchscreen expressions read right, about 40% need correcting, 5.8 decisions a page
   are required, and the claim that none can go unnoticed does not hold (1% of equations were wrong and
-  not asked about). The policy that makes every block holding maths a required decision (the section above,
+  not asked about). The policy that makes every block holding math a required decision (the section above,
   decided by the owner after this measurement) makes the count of silent wrong equations 0 by
   construction at the cost of the `high` blocks: 0.17 decisions a page on handwriting, and a large one
   on typed scans, where the reader calls 99% of blocks `high`.
@@ -527,7 +527,7 @@ findings above (the silent omission of a whole block of display equations, displ
 folded into paragraphs, a zero that depends on the model's own low confidence) are the reasons not
 to read the rule's pass as more than it says. Nothing here changes the rule, which was fixed first.
 The "what a different design would change" the registration allows, not measured and not part of
-the decision: required inline maths would add nothing here (177 of 184 matched inline equations were
+the decision: required inline math would add nothing here (177 of 184 matched inline equations were
 already in asked items); a check that a page's reading ends where the page's ink ends would have
 caught the dropped half page (built afterwards: the section above).
 
@@ -541,7 +541,7 @@ caught the dropped half page (built afterwards: the section above).
 - The label is what the writer was shown, not a reading of the ink. A faithful reader scores below
   100% on ink that does not show its label, and the notation conventions of LaTeX (`\bar` or
   `\overline`) are a source of "wrong" the scorer cannot tell from a misread. The by-eye split is my
-  judgement on 30 of the 85 wrong equations and no more.
+  judgment on 30 of the 85 wrong equations and no more.
 - One run per part, 12 held-out units, 205 equations: the interval is 10 points wide, and no stratum
   is tested. The rule's threshold sits 6.6 points below the point estimate and 1.5 points below the
   interval's lower end; a rerun with the same model would move it by an unknown amount (the earlier
@@ -554,7 +554,7 @@ caught the dropped half page (built afterwards: the section above).
   be higher, as on the dense papers ($0.136 a page).
 - MathWriting may be in the model's training data; contamination cannot be checked, and would push
   the numbers up.
-- Licence: CC BY-NC-SA 4.0. This is an evaluation of a free accessibility tool and no model is trained
+- License: CC BY-NC-SA 4.0. This is an evaluation of a free accessibility tool and no model is trained
   on the data, but the owner should confirm that a product decision counts as non-commercial use
   before the set is used again; nothing of it is committed.
 - The equation step's prompt hash on `origin/main` (`equation-68ebbbf9`) differs from the one
@@ -607,7 +607,7 @@ per arm, the scanned PDF and the vector-ink PDF, with the pipeline of that date)
   formula has no decision of its own and rides with its paragraph, list item or heading
   (`eval/image_pages._asked_about`, ADR 0007 point 12). Counted the way this report counts, by the
   decision that governs the equation, every wrong reading was asked about: 25 of 25 and 30 of 30
-  (and every right one: 49 of 49 and 44 of 44, since the rule asks about all maths). A replay of the
+  (and every right one: 49 of 49 and 44 of 44, since the rule asks about all math). A replay of the
   recorded answers on the current code, at $0 (`eval pipeline --task document --answers-offline`, 38 answers
   replayed, 0 missing), gave the same counts. So the "zero silent" property held on this set; it was
   not a regression. The set is small and the writers are MathWriting's, so it is a check of the rule
@@ -635,7 +635,7 @@ physical or mathematical" (which was always), and a letter was Greek when it had
 (3) `medium` meant one or two doubts the reader can name, `low` three or more, `high` none, and a
 `high` block that listed a doubt counted as `medium`; (4) chemistry was written `\ce{...}` with the
 subset `pipeline/chem.py` accepts, and the course notation reached the reader as fenced context.
-Handwritten maths stayed a required decision.
+Handwritten math stayed a required decision.
 
 **One live run on the practice set** (74 expressions on 10 pages composed from MathWriting test ink,
 CC BY-NC-SA and not in this repository; `claude-opus-5-5`; $0.64, the page pass $0.52; one run per
@@ -704,7 +704,7 @@ Most wrong handwritten equations are one symbol off, and a writer's notation is 
 same misreading tends to repeat in a document. The Symbols screen (docs/web.md, "Symbols in
 handwritten equations") lists every symbol read in the handwritten equations of one document,
 grouped with the symbols that look alike, with counts and the place of each; the instructor changes
-one symbol to another of its family everywhere in one step and ticks the places where it was right.
+one symbol to another of its family everywhere in one step and checks the places where it was right.
 It edits the proposal of each equation still waiting and never accepts, so every handwritten
 equation stays a required decision; one Undo takes the change back.
 
@@ -842,7 +842,7 @@ How to read it:
   only as good as the hand: a writer who makes a small x as tall as a capital is a false alarm. It
   says nothing about 6 of the 34 controls that have a letter in doubt (no letter on the line to
   measure against and no page heights) and about every expression whose symbols and glyphs do not
-  pair one to one (a letter written touching its neighbour, a symbol written in two pieces that do
+  pair one to one (a letter written touching its neighbor, a symbol written in two pieces that do
   not overlap). Of the 318 held-out expressions, 28 gave a case verdict. k, p and y are not measured:
   with p and y measured from the baseline, over both sets, 58 of 105 put-in errors were named and 16
   of 56 controls (0.55 and 0.29); without them 51 of 105 and 10 of 56 (0.49 and 0.18). The tail
@@ -890,7 +890,7 @@ Every page measured above is MathWriting ink drawn onto a page and degraded like
 exported from an iPad are vector, and this set has none. The kit in
 [data/handwriting-copy](../data/handwriting-copy/README.md) (`scripts/handwriting_copy_set.py`) has a
 few volunteers copy CC BY OpenStax worked examples by hand in their own notes apps. It picks the
-passages with a written, seeded rule behind a licence gate, writes each writer a brief, matches the
+passages with a written, seeded rule behind a license gate, writes each writer a brief, matches the
 PDFs they send back to passages, and builds the answer key from the textbook's published MathML. A
 writer's pages are published, under CC BY 4.0 and a pseudonymous id, only if that writer said yes and a person has looked at the page; the
 manifest keeps counts for the rest. No page has been collected and no number comes from it yet.

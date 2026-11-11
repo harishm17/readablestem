@@ -25,7 +25,7 @@ is.
   the repository. A test that calls a real model is marked `live_model` and is opt-in; use
   your own key with a spend cap, and never commit a key. OpenAI requests are sent with
   `store=False`; do not change that.
-- **Test behaviour, not code.** CLAUDE.md, "What tests to write here", says which tests
+- **Test behavior, not code.** CLAUDE.md, "What tests to write here", says which tests
   earn a place. In short: a bug fix gets one regression test, and copy, markup, constants,
   private helpers and permutations of the same path do not get tests.
 - **Only inputs that can be published.** Test and example documents must be your own work
@@ -48,18 +48,18 @@ is.
   `MODEL_CONCURRENCY` low for small runs, and record answers once with `--answers` so
   reruns replay for free.
 - **Style.** ruff with line length 100, type hints that pass `ty check src`, and docstrings
-  that say why. A new runtime dependency needs a note in the pull request, and its licence
+  that say why. A new runtime dependency needs a note in the pull request, and its license
   has to fit `THIRD_PARTY_NOTICES.md`.
 
 ## Commits and pull requests
 
 Small commits with plain messages that say what changed and why. Run `make check` first.
-Describe how you tested the change and, for behaviour that touches accessibility, what you
+Describe how you tested the change and, for behavior that touches accessibility, what you
 checked by hand.
 
-## Licence
+## License
 
-Contributions are under the MIT licence of the project. The hosted service also links
+Contributions are under the MIT license of the project. The hosted service also links
 PyMuPDF (AGPL-3.0); see `THIRD_PARTY_NOTICES.md` for what that means for redistribution.
 
 ## Security

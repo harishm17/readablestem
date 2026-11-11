@@ -94,13 +94,13 @@ components:
 
 ## Overview
 
-A reader-first, technical interface for instructors, accessibility staff and procurement reviewers. It is plain on purpose: one blue accent, humanist text, a serif for headings where people read, generous line length control, and the real converted output shown beside its PDF. References (approved 2026-11-03): Observable Framework docs (prose column, serif display, dark mode from tokens), Stripe Docs (restraint, 4px grid, 4 and 8px radii) and arXiv HTML (the converted page as a paper). GOV.UK is not a visual reference; its focus ring, error summary and forced-colours care are the accessibility floor.
+A reader-first, technical interface for instructors, accessibility staff and procurement reviewers. It is plain on purpose: one blue accent, humanist text, a serif for headings where people read, generous line length control, and the real converted output shown beside its PDF. References (approved 2026-11-03): Observable Framework docs (prose column, serif display, dark mode from tokens), Stripe Docs (restraint, 4px grid, 4 and 8px radii) and arXiv HTML (the converted page as a paper). GOV.UK is not a visual reference; its focus ring, error summary and forced-colors care are the accessibility floor.
 
 Two modes. Read and Persuade surfaces (landing, compare, help, guides, offices, privacy, terms, limits) use Source Serif 4 600 for h1 and h2 and 18px prose in a 68ch column. Operate surfaces (upload, documents, job page, review split and list, Symbols, account) use Source Sans 3 700 headings, 16px text and scan-first density. The converted student HTML is a separate artefact and is not styled by this system.
 
 ## Colors
 
-One accent (`accent`, 8.30:1 on white, 7.68:1 on `surface`). Neutrals are cool slate. Status colours (`ok`, `warn`, `err`) are semantic only, always written out in words, and sit on their tints at 7:1 or more. All text is at least 7:1 in light and dark. `border-control` (4.25:1) is the border for inputs and checkboxes (3:1 non-text rule); `border-subtle` is decorative only. Dark mode follows `prefers-color-scheme` with its own tokens (accent `#8ab4ff`); there is no toggle. Pictures of documents stay on white "paper" (`--paper`) in dark mode and use the light tokens inside.
+One accent (`accent`, 8.30:1 on white, 7.68:1 on `surface`). Neutrals are cool slate. Status colors (`ok`, `warn`, `err`) are semantic only, always written out in words, and sit on their tints at 7:1 or more. All text is at least 7:1 in light and dark. `border-control` (4.25:1) is the border for inputs and checkboxes (3:1 non-text rule); `border-subtle` is decorative only. Dark mode follows `prefers-color-scheme` with its own tokens (accent `#8ab4ff`); there is no toggle. Pictures of documents stay on white "paper" (`--paper`) in dark mode and use the light tokens inside.
 
 Links in text are always underlined. Yellow is reserved for focus.
 
@@ -122,26 +122,26 @@ Flat. Depth comes from 1px borders and surface tints, not shadows. The only shad
 
 ## Components
 
-Header (brand, nav, Sign in as a secondary button, Menu disclosure; signed in, the workspace links come first: My documents, Courses, Account, then Guides and For accessibility offices), column footer (Product, Trust, Guides, Source) on public pages, a one-line footer of at most six links on signed-in pages and a five-link one on sign-in pages (footer and cancel links are 44px targets), buttons (primary filled, secondary outlined, danger, small), tags (status in words), notices, form fields with hint and error, card, stat tile (number, label, set and date, a "how measured" link), two-pane before/after (the job and review screens), "Hear the difference" (the landing page's one equation read two ways: a label, the equation on a small sheet of paper, what a screen reader says in plain text, a 44px Play button; side by side from 48rem), compact comparison chart (two charts and one line of words), comparison table (a collapsed disclosure per topic under 52rem), role rows (a native radio inside a whole-row label, with its description), "On this page" contents, FAQ in native details, data matrix (a table from 40rem, a list on a phone) and retention table for the offices and privacy pages, term and description list for limits, focusable scroll box for any table that can be wider than a phone (`_table_scroll.html`). Buttons live in `controls.css`, shared with the listening player and the showcase. A decision's row of choices sticks to the bottom of the window on wide screens; the listening transport sticks to the top. The focus ring is a 3px dark outline with a 5px yellow halo (yellow outline with a dark gap in dark mode, `Highlight` outline in forced colours) and is not to be changed. All are shown on `/style`, each demonstration in a dashed box labelled as an inert example, with the light, dark and forced-colour states side by side.
+Header (brand, nav, Sign in as a secondary button, Menu disclosure; signed in, the workspace links come first: My documents, Courses, Account, then Guides and For accessibility offices), column footer (Product, Trust, Guides, Source) on public pages, a one-line footer of at most six links on signed-in pages and a five-link one on sign-in pages (footer and cancel links are 44px targets), buttons (primary filled, secondary outlined, danger, small), tags (status in words), notices, form fields with hint and error, card, stat tile (number, label, set and date, a "how measured" link), two-pane before/after (the job and review screens), "Hear the difference" (the landing page's one equation read two ways: a label, the equation on a small sheet of paper, what a screen reader says in plain text, a 44px Play button; side by side from 48rem), compact comparison chart (two charts and one line of words), comparison table (a collapsed disclosure per topic under 52rem), role rows (a native radio inside a whole-row label, with its description), "On this page" contents, FAQ in native details, data matrix (a table from 40rem, a list on a phone) and retention table for the offices and privacy pages, term and description list for limits, focusable scroll box for any table that can be wider than a phone (`_table_scroll.html`). Buttons live in `controls.css`, shared with the listening player and the showcase. A decision's row of choices sticks to the bottom of the window on wide screens; the listening transport sticks to the top. The focus ring is a 3px dark outline with a 5px yellow halo (yellow outline with a dark gap in dark mode, `Highlight` outline in forced colors) and is not to be changed. All are shown on `/style`, each demonstration in a dashed box labeled as an inert example, with the light, dark and forced-color states side by side.
 
-Motion: none by default; 120ms colour transitions only under `prefers-reduced-motion: no-preference`.
+Motion: none by default; 120ms color transitions only under `prefers-reduced-motion: no-preference`.
 
 ## Stylesheets
 
 Plain CSS in `src/readablestem/web/static/`, loaded in this order (specificity stays modest; there
 are no cascade layers, so what comes later wins between rules of the same weight):
 
-- `tokens.css`: fonts, colour (light, dark), type, space, radius, widths, and the shared constants
+- `tokens.css`: fonts, color (light, dark), type, space, radius, widths, and the shared constants
   below. The showcase site loads it too.
 - `controls.css`: the one button component (primary, secondary, danger, the danger outline that opens
-  a delete confirmation, small, disabled, link) with its forced-colour rules. Shared with the listening
-  player and the showcase; no other file styles a button's colours or forced colours.
+  a delete confirmation, small, disabled, link) with its forced-color rules. Shared with the listening
+  player and the showcase; no other file styles a button's colors or forced colors.
 - `app.css`: the web app. Base (reset, headings, links, focus), then "Components" in the order
   header, footer, actions, tags, card, stat, FAQ, panes, forms, errors, notices, tables, status badges;
   then the review screens, My documents, the job page, page tools, the Symbols screen, the upload
   form, sharing, the comparison guide, the /style page, the landing page, the offices page, limits,
   sign-in, status, confirmations, account, courses, choosing pages, the review list, the comparison
-  chart and print. Every component keeps its base, responsive (`@media`) and forced-colour rules
+  chart and print. Every component keeps its base, responsive (`@media`) and forced-color rules
   together, in that order; a new rule goes into its component's place, not at the end of the file.
 - `listen.css`: the listening player and its transcript (loaded by that page and the showcase).
 
@@ -169,8 +169,8 @@ Shared constants (`tokens.css`):
 
 - Do show the real PDF and the real converted page, with the numbers' sample sizes.
 - Do keep any text at 7:1 or better, 14px or larger.
-- Do add a forced-colours rule for anything that relies on a background or a shadow.
+- Do add a forced-colors rule for anything that relies on a background or a shadow.
 - Don't add a second accent, gradients, glass, eyebrows, section numbers or identical icon-card grids.
-- Don't put a coloured stripe on one side of a card or notice; use a full border or a top rule.
+- Don't put a colored stripe on one side of a card or notice; use a full border or a top rule.
 - Don't use a pill shape, or a radius other than 4 and 8.
 - Don't style the converted student HTML from this stylesheet.

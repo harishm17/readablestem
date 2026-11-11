@@ -50,7 +50,7 @@ tell the model that text between `<document_text>` tags is data, not instruction
 | `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only, except `\ce{...}` for chemical species ("Chemistry" in the prompt); calibrated confidence bands; a best partial reading with low confidence when unreadable. |
 | `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
-| `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
+| `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labeled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by color alone. |
 | `figure_exam.md` (`ConversionOptions.exam_mode`) | `FigureOutput`, as `figure.md` | The same output fields, and alt text rules for an exam or graded assessment: describe what is shown, never the result. Charts: type, the quantity and unit on each axis, the scale range, what is drawn; no trend, extreme, slope, intercept, total, comparison or value read off the graph unless the figure prints it. Diagrams: parts, printed labels and values, arrangement; no resultant, sum, net quantity or consequence. Never calculate a number; never answer a question in the caption or the nearby text. Long descriptions and data tables are not asked for in exam mode, even with long descriptions on (a trend or a table of values is a result). The default `figure.md` is unchanged, so the recorded runs and every job without the flag are as before. |
 
 Why `array{rcl}`: latex2mathml 3.81.1 renders `aligned` as one flat row with literal `&`
@@ -80,7 +80,7 @@ usual "fairly sure", so without the acceptance every such answer would wait for 
 Measured on the development set (3 OpenStax sections, 13-16 pages each, Claude, recorded
 2026-10-14 with the skip off and replayed with it on, same recorded answers): 8 of the 19
 second readings were band-only, and in all 8 the main model's answer was the same LaTeX
-(6) or the same maths in other braces (2); the document task made 81 model calls instead
+(6) or the same math in other braces (2); the document task made 81 model calls instead
 of 89 and cost $0.2028 instead of $0.2183 (-7.1 %); the equation scores did not move (end
 to end 0.7667, unflagged wrong 3.33 per 100, detection 1.0 / 0.5455); required decisions
 went from 8 to 7, optional notes per page from 0.60 to 0.79. Limits: the 30 gold equations
@@ -157,7 +157,7 @@ and a tiny figure escalates to the main model first.
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
 
-### Long descriptions, data tables and colour (FEATURE_LONG_DESCRIPTIONS)
+### Long descriptions, data tables and color (FEATURE_LONG_DESCRIPTIONS)
 
 Off by default in code (`ConversionOptions.long_descriptions`, read with `options.current()`); production's value is in the production profile, `src/readablestem/ops/production.profile.toml`.
 Off, the step sends `figure.md` and `FigureOutput` exactly as before, and the fix has
@@ -172,7 +172,7 @@ the status rules above are unchanged; the answer adds (`pipeline/figure_details.
 | `long_description` | the answer is usable after cleaning (one paragraph per line, invisible characters removed): 40-2,000 characters, at most 12 lines, no URL, markup, file name or placeholder (the alt-text rules of those codes). Anything else is dropped, never shown | `figure.long_description` passes; `long_description_unsure` (warning, a note in `NOTE_CODES`) when the model said part of the figure was hard to read: review "optional". A chart or diagram left without one gets the notice `long_description_missing` (optional; `figure_step.long_description_missing(fix)` says when) |
 | `data_table` | charts only, when the rows are rectangular, at most 60 rows and 12 columns, no cell over 120 characters, and the body has at least one number: a `TableGrid` (source "model", the header row as column headers, the first column as row headers) | `figure.data_values` passes when `data_values_from_text` |
 | `data_values_from_text` | with a data table | True only when the model says every value is printed in the figure **and** every number in the table appears in the PDF's own text in the figure region (`Element.text`). Numbers are read the same way on both sides: minus signs (U+2212, en dash, figure dash) become "-", but only where they cannot be a dash between two numbers or words; thousands separators (",", thin and no-break spaces before a group of three) are removed; "0.50" equals "0.5" and ".5"; subscripts are not numbers, and a run of superscripts is a number of its own (10²⁴ is 10 and 24, as "10^24" is), so an exponent is compared too. Otherwise False: the warning `values_from_image` fails, a note (`NOTE_CODES`): the figure keeps the tier its alt text earns (ACCEPTED, review "optional", when that clears the bar), and the table is an optional extra kept on the fix, offered on the review screen ("Add the data table") and written only once a reviewer adds it (`FigureFix.data_table_added`, `figure_details.data_table_shown`). Additive extras never add a required decision (decided 2026-10-09). A raster chart has no PDF text, so its table is always offered, never written as it is |
-| `colour_only` | the model says the figure tells things apart by colour alone | none: the status and tier do not change; the job page lists the notice `colour_only` |
+| `colour_only` | the model says the figure tells things apart by color alone | none: the status and tier do not change; the job page lists the notice `colour_only` |
 
 Decorative answers carry none of these. Both conditions on `data_values_from_text` are
 needed: a table whose numbers are all tick labels can still have been placed by eye. Known limit: each number need only appear somewhere in the figure text, so values rounded to the axis ticks pass this half of the check (only the model's own claim then guards them), and an exponent is not paired with its own mantissa.
@@ -231,7 +231,7 @@ it never repeats a symbol difference:
 - `equation.text_layer_case`, code `case_mismatch`: letters are counted as (letter, capital)
   on both sides, so W for w, S for s, A for a, a Greek capital for its small letter differ.
   Modifier letters (accents) are not letters; pdfTeX's U+2206 is the capital Delta. Small
-  caps are not recognised: their text layer has the capital, so nothing is flagged.
+  caps are not recognized: their text layer has the capital, so nothing is flagged.
 
 Both are failed warnings with a meaning-level code: the fix needs a decision, the confidence
 is scaled by 0.6 once (with the other meaning-level checks), and a cheap-model answer
@@ -263,7 +263,7 @@ denominator come out of the text layer in an order of their own), the sides in o
 
 What it finds: another element or a moved count; a subscript read as a coefficient (and the
 reverse); a charge's sign flipped, dropped or added; a state changed, dropped or added; an
-arrow read as another (`→` for `⇌`), missing or extra; a neighbour word taken into a formula
+arrow read as another (`→` for `⇌`), missing or extra; a neighbor word taken into a formula
 (a species the text layer lacks, or letters stuck to a formula so it is no longer one); and a
 reaction cut mid-way (species or an arrow at either end that the reading lacks).
 
@@ -303,7 +303,7 @@ answers (`round4/on.jsonl`, 1,519 aligned pairs of 28 documents):
 - errors written into the right readings it applies to (`--mutate`): a subscript read as
   a coefficient 77 of 77 (the other text-layer checks: 0), an arrow changed 89 of 91 (0), a
   charge dropped 78 of 78 (77), and the same-bag errors the symbol and signs checks already
-  catch (a neighbour formula 134 of 134, a flipped sign 78 of 78, a cut reaction 85 of 85,
+  catch (a neighbor formula 134 of 134, a flipped sign 78 of 78, a cut reaction 85 of 85,
   a state 91 of 91, an element 73 of 73).
 
 What it cannot see: a reading that is wrong where the text layer is as wrong (`H2O(g) → H2O(l)`
@@ -316,7 +316,7 @@ not be replayed on them.
 ## Letter-style check (equations)
 
 The text layer also says how letters are styled: layout writes a bold letter as a
-Unicode maths bold one (`𝐝`), and Chromium and Word print maths letters as styled code
+Unicode math bold one (`𝐝`), and Chromium and Word print math letters as styled code
 points (italic `𝑣`, bold `𝐯`). `text_layer_style(text_layer, mathml, regular_letters=...)`
 compares the styles of the letters both sides contain, occurrence by occurrence, and
 returns `None` (the text layer says nothing about style), `"match"`, `"meaning"` or
@@ -370,13 +370,13 @@ handout's `\mathbb{R}^n` is now a match, not a cosmetic note, and `\mathbb{R}` r
 The checks above read `Element.text`, the text layer of the equation's box. Two things that text
 cannot say are read from the glyphs themselves (`layout.line_glyphs`, kept on the element as
 `Element.glyphs`, `core.types.GlyphContext`: each glyph as its character and a one-letter style
-code). With the setting on, `run.py` reads them for every equation that has text (the neighbours
+code). With the setting on, `run.py` reads them for every equation that has text (the neighbors
 of an inline equation only with `EQUATION_LINE_CONTEXT`), and every check of one reading goes
 through `equation_step.reading_layer`: the step's `_evaluate`, a reviewer's edit
 (`web.edit_check.evaluate`), the review screen's table (`web.compare`) and the eval's
 "supported" test (`pipeline_eval._text_layer_supported`), so they agree about what the PDF says.
 
-**The extent.** A reading of the line (`EQUATION_LINE_CONTEXT`) goes on past the box when the maths
+**The extent.** A reading of the line (`EQUATION_LINE_CONTEXT`) goes on past the box when the math
 does: `T = 2\pi` boxed, `\sqrt{m/k}` right after it. The box's text then has fewer letters than
 the reading, and every text-layer check (symbols, numbers, case, style, signs, species) compared
 the reading with the wrong glyphs. `text_layer_compare.extend_text_layer` finds the glyphs the
@@ -447,7 +447,7 @@ not the PDF's is still flagged.
   `Element.equation_label` when that is empty. `f(1)` at the end of a formula has neither the
   separator nor the gap.
 - **Styles** (no note, like `restyle_bold_italic`). A capital the glyphs draw in an RSFS or EUSM face
-  (`GlyphContext.scr`) is written `\mathscr`, CMSY's stay `\mathcal`; and a table's maths cell
+  (`GlyphContext.scr`) is written `\mathscr`, CMSY's stay `\mathcal`; and a table's math cell
   gets `restyle_bold_italic` against the PDF cell it stands on (`table_step.restyle_cells`), as the
   crop path always had: `\bm g` in a cell was `\mathbf{g}`.
 
@@ -458,7 +458,7 @@ Measured in docs/eval-dev-baseline-2026-11-03.md, "Reading push".
 Two corrections of the model's LaTeX, applied after `clean_latex`, deterministic, so a recorded answer
 replays to the same result (docs/eval-equation-rootcause.md):
 
-- **A bracket or mark that is the neighbour's** (`drop_neighbour_brackets`, `drop_neighbour_marks`; inline equations
+- **A bracket or mark that is the neighbor's** (`drop_neighbour_brackets`, `drop_neighbour_marks`; inline equations
   only). The crop of an inline formula is padded by 2 pt and takes in half of the parenthesis or hyphen
   beside it ("(x = 0.9)", "(k-1)-regular"), which the model then writes. The run's own text layer says what the
   run holds: a pair of parentheses around the whole reading goes when the text layer has none (a tuple keeps its
@@ -515,7 +515,7 @@ widens an interval, so it can never make a flag on its own.
   (`time-dependent`, `1–3`, TeX's `1--3`, `C-14`) may be a word hyphen or a range, so it
   is uncertain; anywhere else it is a minus (`a = -9.8` typed as plain text, Word's
   ` – ` with spaces). Except a single hyphen with a digit after it and a digit or a
-  single lowercase letter before it: typed maths without an equation editor flattens
+  single lowercase letter before it: typed math without an equation editor flattens
   `10<sup>-19</sup>` to `10-19` and `m s<sup>-2</sup>` to `m s-2`, so that is a minus.
   Figure dash, em dash and horizontal bar are uncertain (Chromium prints `\overline` as
   U+2015). A run of minus or `=` glyphs glued to an arrow head is one uncertain minus
@@ -531,7 +531,7 @@ widens an interval, so it can never make a flag on its own.
   directly beside a private-use glyph may have a negation slash over it (KaTeX prints
   `\neq` as `=` under its `\not` glyph, U+E020), so it counts as that relation or its
   negation.
-- MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain, including a
+- MathML: `<mo>`, `<mi>` and `<mn>` are math, so their signs are certain, including a
   minus inside `<mn>` and an ASCII hyphen in `<mo>` (latex2mathml writes `±`, `⩽`,
   `⟹` and, for `\sim`, an ASCII `~` as `<mi>`). An accent (the `<mo>` script of `<mover>`/`<munder>`:
   `\vec`'s arrow, `\tilde`'s `~`) is uncertain: Chromium prints it as a standalone `→`,
@@ -610,7 +610,7 @@ symbol by symbol, `+/-` as `\pm`) and wrong answers accepted (a minus before a C
 vector arrow, a dropped minus hidden by `\overline`'s bar, `10-19` read as `10^{19}`, an
 added sign hidden by brace pieces, a dot product of arrow vectors read as a cross
 product). On the review's 429 right answers the check now flags 6 (57 before); none of
-the 6 is a sign the check reads wrongly (three are inline maths inside a hyphenated word,
+the 6 is a sign the check reads wrongly (three are inline math inside a hyphenated word,
 `non-𝑥`, where layout puts the word hyphen in the equation; two are typed lines layout
 cuts short, which `symbol_mismatch` flags too; one is `\not\approx`, which validation
 refuses). Wrong answers caught: 51/52 (43 before). Arrow-vector products (25 equations,
@@ -639,7 +639,7 @@ with a vector product a × that became a · anywhere counts as the swap. Signs i
 - KaTeX's `\neq` is `=` under a slash glyph, so `=` and `≠` cannot be told apart there.
 - Vector products the text layer does not show as one: newtx's arrow (U+FFFD), the arrow
   of a vector that starts a TeX equation (lost from the text layer), a vector with a
-  subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline maths
+  subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline math
   that layout cuts at the dot.
 
 ## Page math pass and the second reading (equations; `FEATURE_PAGE_MATH`, off)
@@ -664,13 +664,13 @@ layout's. Measurements: [eval-page-math.md](eval-page-math.md).
 
 ## Page witness and the glyph-checked second reading (equations; `FEATURE_PAGE_WITNESS`, off)
 
-With the flag on, one call per maths page (`pipeline/page_witness.py`, prompt `page_witness`, model
+With the flag on, one call per math page (`pipeline/page_witness.py`, prompt `page_witness`, model
 `PAGE_WITNESS_MODEL`, default `claude-opus-5-5`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS` 12,288, timeout `PAGE_WITNESS_TIMEOUT_S` 240 s (a timeout is charged its whole worst-case reservation), effort
 `ANTHROPIC_EFFORT_PAGE_WITNESS`, default medium) reads every formula on the page from the page image and the
 numbered text-layer rows, table cells, captions and figure labels included. Each formula is anchored by a quote
 of its text-layer row(s); `page_math.locate` and `page_math.verify` decide whether the quote holds, so a formula
-with an anchor that holds nowhere, or that overlaps one kept before it, is dropped. A maths page is one on which
-layout found an equation or the text layer has at least three maths glyphs (maths fonts, Greek letters,
+with an anchor that holds nowhere, or that overlaps one kept before it, is dropped. A math page is one on which
+layout found an equation or the text layer has at least three math glyphs (math fonts, Greek letters,
 operators); pages of prose are not asked. The call is reserved against the job budget like any other step
 (worst case about $0.3 on Opus: the 12,288-token limit plus the thinking allowance, priced at the output rate).
 
@@ -684,9 +684,9 @@ operators); pages of prose are not asked. The call is reserved against the job b
 formula is the box of the characters it quotes. An equation element gets `Element.witness_latex` and
 `witness_status`: `match` (every edge within one glyph of the witness's extent) or `extent` (overlapping, edges
 further apart). A formula no element took becomes a new equation element (`added`, reason `witness_added`) only
-with glyph evidence (at least 40% of its characters are maths glyphs) and only when it lies clear of every other
+with glyph evidence (at least 40% of its characters are math glyphs) and only when it lies clear of every other
 element: a formula inside a paragraph, a table, a caption or a figure is left to that element (counted as
-`inside_text`; table cells are the table step's), and one with no maths glyphs (a page number, a year) is left
+`inside_text`; table cells are the table step's), and one with no math glyphs (a page number, a year) is left
 out. The equation step then compares its crop reading with the witness's:
 
 - **agree** (equal after `math_canonical` notation folding, extents a `match`): a passed note
@@ -822,7 +822,7 @@ applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md)
 2. Rewrites `aligned`, `align`, `align*`, `split` and `gathered` to
    `\begin{array}{...}`: right/left alternating columns (`rl`, `rlrl`, ...) sized to the
    widest row's top-level `&` count (ampersands inside nested matrices or braces are not
-   counted); `gathered` becomes centred columns. Optional `[t]` positions are dropped.
+   counted); `gathered` becomes centerd columns. Optional `[t]` positions are dropped.
 3. XML-escapes `<`, `>` and `&` in the spans latex2mathml copies verbatim (text-command
    arguments and `\verb`, located with latex2mathml's own tokenizer pattern). Its
    serialiser unescapes `&lt;`, `&gt;` and `&amp;` across the whole output, so without
@@ -832,7 +832,7 @@ applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md)
    `\$` in `<mtext>` (latex2mathml leaves the backslash in text mode).
    Then, on the tree, the repairs a reader needs: bold letters (`bake_bold_variants`), a charge
    or a count on its element symbol, arrows as operators, and the screen-reader shape
-   (`mathml_shape.shape_general`: the degree sign, overline and underline, labelled arrows;
+   (`mathml_shape.shape_general`: the degree sign, overline and underline, labeled arrows;
    `chem_mathml.shape_chemistry`: one `mi` per element symbol, states, nuclides, and
    `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape").
 6. Re-serialises with `serialize_mathml`, which writes one MathML `xmlns` on the root and
@@ -928,7 +928,7 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Cases | a table after an opening brace with no closing one: "cases: case 1: x squared, if x greater than 0; case 2: 0, otherwise; end cases". The second cell is the condition; "if" is added unless it starts with if, for, when, otherwise, ... |
 | Nuclides | scripts on an empty base before an element or particle: "carbon 14, atomic number 6", "uranium 235, atomic number 92", "neutron, mass number 1, atomic number 0", "electron, ... atomic number minus 1". Unknown letters read as written (`speech_nuclides.py`) |
 | Units | upright letters or text right after a number: "5 m/s" reads "5 meters per second", "9.8 m/s^2" "9.8 meters per second squared", "3 kg·m/s" "3 kilogram meters per second", "2.9 m/s" "2.9 meters per second", "25 °C" "25 degrees Celsius"; singular after 1. Italic letters (a variable `m`), ambiguous divisions (`J/kg K`) and unknown symbols read as before (`speech_units.py`) |
-| Text | verbatim, except words that are a single maths symbol ("time =" reads "time equals") |
+| Text | verbatim, except words that are a single math symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
 
 Sentence punctuation at the very end of the equation is not read. Unreadable input
@@ -945,15 +945,15 @@ full description is in [tables.md](tables.md). In short:
   errors), gpt-6.1-sol is asked once when a check fails or the answer says the crop is
   not a data table, and the better answer is kept. Spend goes through the same
   `JobBudget` reservations; `BudgetExceeded` propagates.
-- The answer is rows of cells (text, LaTeX for maths cells, header flags, spans), placed
+- The answer is rows of cells (text, LaTeX for math cells, header flags, spans), placed
   as HTML places them. The PDF's own words for the table are not sent to the model: they
   are the input of the checks, as an equation's text layer is.
 - Checks: the grid and its headers (`grid_problems`, no header at all); agreement with
   the local grid from detection (rows x columns, merged cells); the cell-text bijection
   (the words, numbers and meaningful symbols of the text cells equal the PDF's words,
-  row by row when the grids agree); maths cells through the LaTeX and MathML validators
+  row by row when the grids agree); math cells through the LaTeX and MathML validators
   and this page's symbol, sign and style rules against the PDF glyphs in their place.
-- Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic maths style ->
+- Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic math style ->
   ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
   not a data table -> the grid read from the PDF written as its text in reading order,
   ACCEPTED with the note `written_as_text` (optional; ABSTAINED `not_data_table`,
@@ -1010,7 +1010,7 @@ never reaches the instructions, and that the equation's text layer is never sent
 | `tests/test_layout_bold_letters.py` | bold letters in prose: evidence, labels, bold words, sentence capitals, the flag off, the course; no misses and no false positives on the LaTeX fixtures |
 | `tests/test_eval_notation_flags.py` | the false-flag count and `eval pipeline --notation` |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
-| `tests/test_steps_figure_long.py` | long descriptions on and off: the request off is what it was, the long prompt and fenced labels on, cleaning and dropping long descriptions, the unsure note, values from the text or the image, tables that are dropped, colour only, number normalisation and the data grid |
+| `tests/test_steps_figure_long.py` | long descriptions on and off: the request off is what it was, the long prompt and fenced labels on, cleaning and dropping long descriptions, the unsure note, values from the text or the image, tables that are dropped, color only, number normalisation and the data grid |
 | `tests/test_steps_figure_exam.py` | exam mode off: the default prompt and its version; on: the exam prompt and version on every call (a tiny figure's cheap and main calls too), exam wins over long descriptions, the prompt's rules, none of the default examples, the shared output fields and the unchanged recorded identity |
 | `tests/test_steps_live.py` | `live_model`: a gold equation rendered from MathML in Chromium and a generated bar chart, through the real API |
 | `tests/test_steps_support.py` | helpers, including `fallback_router`, a stand-in for WP1's router used until it merges |
@@ -1095,7 +1095,7 @@ the worker and the eval need no extra argument; steps find it with
 | Setting (default) | `DECISIONS_FIGURE_VERIFY` (true) | `DECISIONS_EQUATION_SHADOW` (true) |
 | Asked about | an ACCEPTED, non-decorative figure with alt text (anything else already needs a decision or has nothing to compare) | the final proposal, and the cheap model's answer before escalation when it was valid and different (the same LaTeX reuses the final answer: answers are deterministic) |
 | Input | the figure image (detail high), then the caption and the alt text fenced as data | "Equation image from the PDF:", the original crop (detail high), then the proposal's LaTeX fenced as data (no renderer) |
-| Questions | predicates `ok` (conveys the key information with no factual error) and `fe` (states something the image contradicts), worded as in the research (`FIGURE_OK`, `FIGURE_FACTUAL_ERROR`) | one choice `verdict`: `match`, `cosmetic`, `meaning_changing`, in that order, always (choice answers favour the first value listed, +0.11 on average, so `match` goes first and the order never changes without re-measuring) |
+| Questions | predicates `ok` (conveys the key information with no factual error) and `fe` (states something the image contradicts), worded as in the research (`FIGURE_OK`, `FIGURE_FACTUAL_ERROR`) | one choice `verdict`: `match`, `cosmetic`, `meaning_changing`, in that order, always (choice answers favor the first value listed, +0.11 on average, so `match` goes first and the order never changes without re-measuring) |
 | Score | min(P(ok), 1 - P(factual error)); low = possible mismatch | P(meaning_changing); high = possible mismatch |
 | Threshold | `DECISIONS_FIGURE_FLAG_BELOW` = 0.5 (pre-registered) | `DECISIONS_EQUATION_FLAG_AT` = 0.2 ("would flag" in the aggregates and the eval only) |
 | When it flags | warning check `figure.second_check` fails with code `second_check_mismatch`, a note (`NOTE_CODES`): the figure stays ACCEPTED, review "optional", confidence unchanged; the review screen lists it under "Optional checks": "A second automated check found a possible mismatch between the alt text and the image; worth a look.", and never calls it something small or "nothing to do" (docs/web.md "Order") | nothing changes: not the status, the confidence, the tier, the checks or escalation |

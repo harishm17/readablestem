@@ -21,7 +21,7 @@ from parsers_bench.arms import ARMS, NOT_RUN, Arm
 from parsers_bench.equations import VARIANTS
 
 REPO_ROOT = arms_mod.HARNESS_DIR.parents[1]
-DEMO_PDF = REPO_ROOT / "src" / "readablestem" / "web" / "static" / "demo" / "source.pdf"
+DEMO_PDF = REPO_ROOT / "src" / "readablestem" / "web" / "demo" / "source.pdf"
 GOLD_DIR = REPO_ROOT / "data" / "gold"
 DEV_BOOK = "physics"
 DEV_PAGE = "2-3-position-vs-time-graphs"

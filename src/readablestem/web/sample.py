@@ -2,7 +2,7 @@
 
 An instructor deciding whether to upload a course PDF wants to see the review screen first:
 what the tool proposes, what it asks, what a decision looks like. The sample is a real
-conversion made once, ahead of time (`static/demo/`: OpenStax *Physics* 2.3 "Position vs.
+conversion made once, ahead of time (`web/demo/`: OpenStax *Physics* 2.3 "Position vs.
 Time Graphs", CC BY 4.0, its source PDF and its stored result, 13 pages, converted with
 the real models), put in the person's list as a finished document of their own.
 
@@ -43,7 +43,7 @@ from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 
 logger = logging.getLogger(__name__)
 
-DEMO_DIR = Path(__file__).resolve().parent / "static" / "demo"
+DEMO_DIR = Path(__file__).resolve().parent / "demo"
 SAMPLE_FILENAME = "sample-openstax-physics-2-3.pdf"
 
 

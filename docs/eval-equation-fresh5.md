@@ -160,7 +160,7 @@ ReadableSTEM arms to one cap (`--group-cap`), and runs the chatbots over the spl
 
 This is one run per arm on 26 units (and 3 in D), so it shows no run-to-run variation. A difference under about
 3 points of the primary is not claimed either way. The speech is ReadableSTEM's own (`pipeline.speech`), not a
-particular screen reader's. The result says nothing about scans, handwriting, Word files or maths inside figures.
+particular screen reader's. The result says nothing about scans, handwriting, Word files or math inside figures.
 The arXiv gold follows the authors' `$` boundaries. Two of the three Beamer decks come from one repository.
 
 ## Correction (2026-11-04)

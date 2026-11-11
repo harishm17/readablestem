@@ -87,7 +87,7 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/style` (the design tokens and components; `noindex`, no data), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
 | Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` (CSRF-checked; sets the caller's own "keep 7 days by default" only), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages, including the owner-only `GET /uploads/{id}/preview`), everything under `/courses/...` (including `/courses/{id}/download`, and the CSRF-checked `POST /courses/{id}/starter` and `POST /courses/{id}/documents`, which touch only the caller's own course and documents) |
 | Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
@@ -601,7 +601,7 @@ a wrong alt text or equation, which the instructor reviews.
   download, failure and deletion and finds the markers in no log record, stdout line, cookie,
   response header, event, aggregate or quota row. `test_web_ops.py` does the same for logs
   alone.
-- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person ticks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
+- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person checks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
   answers 404 immediately, and the hourly purge (cron, with the worker as a backstop) deletes
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
@@ -671,7 +671,7 @@ have regression tests; 7 to 9 are wording.
 Checked and found sound (tests added as regression guards, no code change): headers on
 every response kind; CSRF on every state-changing route; owner checks and IDOR on all 29
 routes that take an id; admin routes; session fixation and cross-copy sign-out; dev login in
-production; Microsoft tenant and Google allowlist behaviour; size, page and probe limits
+production; Microsoft tenant and Google allowlist behavior; size, page and probe limits
 including a 1 GiB decompression bomb; hostile PDFs; file name handling; escaping of every
 model and PDF field; no document content in logs, events, aggregates, cookies or headers;
 the retention clock and erasure; no 500 for junk in any parameter of any route.
@@ -699,7 +699,7 @@ Triage of what the scanners reported:
 | B105 / S105 hardcoded password (13) | `pipeline/vendor/rapid_table.py`, `core/notation.py`, `web/compare.py`, others | False positives: variables named `token` that hold text tokens, and the OAuth `code_challenge_method` constant |
 | B311 / S311 `random` (6) | evaluation sampling, retry back-off in `models/openai_client.py` | False positives: no token, id or secret is made with `random` (ids use `uuid4`, tokens use `secrets`) |
 | B101 / S101 `assert` (5) | exception-handler type narrowing | False positives: not used for authorisation or validation |
-| semgrep `plaintext-http-link` (2) | `static/demo/index.html` | False positive: the Creative Commons licence link inside the OpenStax attribution the licence requires; a link, not a resource |
+| semgrep `plaintext-http-link` (2) | `web/demo/index.html` | False positive: the Creative Commons license link inside the OpenStax attribution the license requires; a link, not a resource |
 
 ## Residual risks, accepted for the beta
 
