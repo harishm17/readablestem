@@ -41,6 +41,7 @@ CACHE_SIZE = 32
 
 # What an unreadable equation is called, so the transcript never goes quiet about one.
 NO_READING = "no spoken reading available"
+NO_DESCRIPTION = "no description"  # said for a picture with no alt text
 
 
 def speakable(text: str | None) -> str:
@@ -579,12 +580,12 @@ class _Transcript:
         alt = _words(node.get("alt"))
         if self._flagged:
             return self.add(
-                "Image, not converted", alt or "no description", "not-converted",
-                say=f"Image, not converted: {alt or 'no description'}",
+                "Image, not converted", alt or NO_DESCRIPTION, "not-converted",
+                say=f"Image, not converted: {alt or NO_DESCRIPTION}",
             )  # fmt: skip
         if "alt" in node.attrs and not alt:
             return  # decorative: a screen reader skips it
-        self.add(role, alt or "no description", "figure", say=f"{role}: {alt or 'no description'}")
+        self.add(role, alt or NO_DESCRIPTION, "figure", say=f"{role}: {alt or NO_DESCRIPTION}")
 
     def figure(self, node: Node, depth: int) -> None:
         for child in node.children:

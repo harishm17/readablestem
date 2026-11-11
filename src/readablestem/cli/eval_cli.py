@@ -869,9 +869,12 @@ def _cmd_bar(args: argparse.Namespace) -> int:
     return verdict.exit_code
 
 
-def _measured(args: argparse.Namespace, runs: int) -> tuple[list[list[Any]], Any] | int:
+def _measured(
+    args: argparse.Namespace, runs: int, *, outputs: bool = False
+) -> tuple[list[list[Any]], Any] | int:
     """The measured replays `eval cost` and `eval speed` report on: read from `--from`, or
-    made now (`eval.measure`) and written to `--records`."""
+    made now (`eval.measure`) and written to `--records`. `outputs`: each conversion also
+    builds and audits the files a student is given."""
     from readablestem.eval import corpus, measure
 
     settings = measure.replay_settings(corpus.ANSWERS)
@@ -908,6 +911,7 @@ def _measured(args: argparse.Namespace, runs: int) -> tuple[list[list[Any]], Any
                 at_once=args.at_once,
                 cores=cores[number % len(cores)] if cores else None,
                 said=said,
+                outputs=outputs,
             )
         )
     if args.records is not None:
@@ -1019,6 +1023,26 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     if verdict is None or verdict.met:
         return 0
     return 1 if verdict.judged else 2
+
+
+def _cmd_outputs(args: argparse.Namespace) -> int:
+    """`eval outputs`: every file a student is given (the page, Word, EPUB, the two Canvas
+    files, the Cartridge and the Listen transcript), built from a replay of the corpus under
+    the production profile, read and counted (`eval.outputs`). Spends nothing and gates
+    nothing. Exit code 0: measured; 2: nothing could be measured."""
+    from readablestem.eval import measure, outputs
+
+    measured = _measured(args, runs=1, outputs=True)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = outputs.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(outputs.render(record))
+    if not metrics["whole"]["uploads"] and not metrics["answers_missing"]["uploads"]:
+        return _error("no upload could be measured")
+    return 0
 
 
 def _cmd_page_audit(args: argparse.Namespace) -> int:
@@ -1895,6 +1919,14 @@ def register(
         help="how many more decisions a page a page kind may ask for than before (0)",
     )
     burden.set_defaults(func=_cmd_burden)
+
+    outputs = group.add_parser(
+        "outputs",
+        help="the files a student is given, built from a replay of the corpus, read and "
+        "counted: what is wrong in each, by kind (spends nothing, gates nothing)",
+    )
+    _add_measure_args(outputs, at_once=4)
+    outputs.set_defaults(func=_cmd_outputs)
 
     page_audit = group.add_parser(
         "page-audit",

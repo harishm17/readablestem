@@ -117,6 +117,13 @@ _TEXT_BLOCKS = frozenset(
 _SOMETHING = "\ufffc"  # stands for maths, a picture or the tool's words inside a sentence
 _DARK_BLOCK = re.compile(r"@media[^{}]*prefers-color-scheme\s*:\s*dark[^{}]*\{")
 
+
+def has_hole(text: str) -> bool:
+    """Whether a block of text has a gap in a sentence. Maths, a picture or the tool's own
+    words inside it stand as U+FFFC, so the words on either side of one are not a gap."""
+    return bool(_HOLE.search(" ".join(text.split())))
+
+
 # The day each rule added after the first set came in. A failed check stores it, so a
 # document that was ready and fails a new rule can say since when the rule exists.
 RULE_ADDED: dict[str, date] = {
@@ -563,7 +570,7 @@ def _unread_page_rules(doc: _Collector) -> list[Check]:
     content whose text is written too (module docstring)."""
     if not doc.unread_notes:
         return []
-    holes = any(_HOLE.search(" ".join("".join(block).split())) for block in doc.unread_text)
+    holes = any(has_hole("".join(block)) for block in doc.unread_text)
     return [_check("html.sentence_holes", not holes, "sentence_hole")]
 
 

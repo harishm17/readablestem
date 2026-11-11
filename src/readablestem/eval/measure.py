@@ -124,6 +124,10 @@ class Converted:
     # (0-based, None when no element holds it), kind, reasons and members. None in a record
     # made before this was kept, which is not the same as a document that asks nothing.
     decisions: list[dict[str, Any]] | None = None
+    # The audit of the files built from the result (`eval.outputs.audit_document`): each
+    # wrong place, what each output held and the outputs that could not be built. None
+    # when the replay was not asked to build them.
+    outputs: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
@@ -323,8 +327,10 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
     return job.pdf, output.result
 
 
-def convert(upload: Upload, settings: Settings) -> Converted:
-    """Convert one upload in a conversion process, as a job is converted, and measure it."""
+def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Converted:
+    """Convert one upload in a conversion process, as a job is converted, and measure it.
+    `outputs`: also build every file a student is given and audit it (`eval.outputs`),
+    after the measuring, so the seconds and the memory are the conversion's alone."""
     from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
 
     job = _job(upload, settings)
@@ -350,6 +356,14 @@ def convert(upload: Upload, settings: Settings) -> Converted:
     facts = output.facts or StepFacts()
     facts = facts.model_copy(update={"stages": [step_facts.start_up(facts, wall_s), *facts.stages]})
     result = output.result
+    peak_mb = round(after.ru_maxrss / 1024, 1)
+    own_cpu_s = round(time.process_time() - own_before, 4)
+    own_peak_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
+    audit = None
+    if outputs:
+        from readablestem.eval.outputs import audit_document
+
+        audit = audit_document(result)
     return Converted(
         upload.name,
         pages=result.stats.pages,
@@ -363,12 +377,13 @@ def convert(upload: Upload, settings: Settings) -> Converted:
             after.ru_utime + after.ru_stime - before.ru_utime - before.ru_stime,
             4,
         ),
-        own_cpu_s=round(time.process_time() - own_before, 4),
+        own_cpu_s=own_cpu_s,
         # Linux counts both in KB.
-        peak_mb=round(after.ru_maxrss / 1024, 1),
-        own_peak_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
+        peak_mb=peak_mb,
+        own_peak_mb=own_peak_mb,
         parts=parts(result),
         decisions=[asdict(decision) for decision in triage.decisions(result)],
+        outputs=audit,
     )
 
 
@@ -457,13 +472,19 @@ def _held_back(process: subprocess.Popen[bytes], share: float) -> int | None:
 
 
 def _in_a_process(
-    upload: Upload, answers: Path, folder: Path, cores: str | None, share: float | None
+    upload: Upload,
+    answers: Path,
+    folder: Path,
+    cores: str | None,
+    share: float | None,
+    outputs: bool = False,
 ) -> Converted:
     out = folder / f"{upload.name}.json"
     command = [sys.executable, "-m", "readablestem.eval.measure", upload.entry]
     command += ["--answers", str(answers), "--out", str(out)]
     command += ["--image-pages"] if upload.image_pages else []
     command += ["--exam"] if upload.exam else []
+    command += ["--outputs"] if outputs else []
     if cores:
         command = ["taskset", "--cpu-list", cores, *command]
     quiet: Any = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
@@ -490,10 +511,12 @@ def run(
     cores: str | None = None,
     share: float | None = None,
     said: Callable[[Converted], None] | None = None,
+    outputs: bool = False,
 ) -> list[Converted]:
     """Measure each upload in a process of its own, `at_once` of them at a time (1 for
     seconds that mean anything), pinned to the CPU list `cores` when given. `said` is
-    called as each one ends.
+    called as each one ends. `outputs`: each process also builds and audits the files a
+    student is given (`convert`).
 
     `share` (0.25 for a quarter) holds each conversion back to that share of the time, as
     a much slower machine would: its seconds then mean nothing, and its result must be the
@@ -503,7 +526,7 @@ def run(
         answers = answers_file(folder)
 
         def one(upload: Upload) -> Converted:
-            done = _in_a_process(upload, answers, folder, cores, share)
+            done = _in_a_process(upload, answers, folder, cores, share, outputs)
             if said is not None:
                 said(done)
             return done
@@ -584,9 +607,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--exam", action="store_true")
     parser.add_argument("--answers", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--outputs", action="store_true")
     args = parser.parse_args(argv)
     upload = Upload(args.entry, image_pages=args.image_pages, exam=args.exam)
-    done = convert(upload, replay_settings(args.answers))
+    done = convert(upload, replay_settings(args.answers), outputs=args.outputs)
     args.out.write_text(json.dumps(done.as_dict()), encoding="utf-8")
     return 0
 
