@@ -439,7 +439,10 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   at readablestem.com since 2026-11-04, after the sandbox check passed there; Beamer source
   (`FEATURE_BEAMER_SOURCE`) and zips of several documents (`FEATURE_BATCH_ZIP`) are off by default
   and off there until real decks and course sources have been tried (a Beamer deck is taken as a PDF).
-- **A model is in the loop.** Document images and the text around them are sent to Anthropic's
+- **A model is in the loop.** Pictures cut from a document and the text around them, and, with
+  the settings that send them, pictures of whole pages (scanned pages the instructor asks to
+  have converted, or pages that hold math; the list is `sent_material` in
+  `src/readablestem/web/recipients.py`, and the privacy page prints it), are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.
 - **Equations are the hard part.** On the newest registered test (fresh5: 26 documents, 1,715
