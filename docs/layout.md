@@ -1560,7 +1560,7 @@ paragraph that goes on from the failed page onto the next is written there as a 
 own, not lost to the join. The
 steps that look at several pages together stay unguarded, since one page cannot be blamed for
 them: the margin statistic's thresholds, the body size and line pitch, the document's
-spellings, the list-marker judgement, glossary entries, bold letters, numbered lines, run-in
+spellings, the list-marker judgment, glossary entries, bold letters, numbered lines, run-in
 labels, joins over a page break, the outline, notices, footnote and contents links, and the
 slide-deck finish. The safety net is different: when its look at a page raises, the page keeps
 the elements read from it and gets its picture beside them, as when something painted was left
