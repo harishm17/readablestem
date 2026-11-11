@@ -212,12 +212,27 @@ def _detail(
     return {"items": kept, "more": max(0, total - len(kept)), **names}
 
 
+# The elements LaTeXML's Beamer binding names in a `malformed` error on an ordinary deck,
+# with nothing lost (the decks in tests/fixtures/source/beamer convert whole with them):
+# `\titlepage` inside a frame ("<ltx:titlepage> isn't allowed in <ltx:g>", or in
+# <ltx:slide>), a list with `\pause` in it (`ltx:item` in an `ltx:inline-block`, then the
+# `ltx:itemize` and `ltx:inline-block` it cannot close) and a frame's slides nested in one
+# another (`ltx:slidesequence` in `ltx:slidesequence`).
+_BEAMER_MALFORMED = frozenset(
+    {"ltx:titlepage", "ltx:item", "ltx:itemize", "ltx:inline-block", "ltx:slidesequence"}
+)
+
+
 def _beamer_binding(problem: SourceProblem) -> bool:
-    """A complaint LaTeXML's Beamer binding makes about its own output on an ordinary deck,
-    with nothing lost: the document shape (`malformed`: a title page, or a list with
-    `\\pause`, inside a frame) and its internal frame macro (`\\end{beamer@frame}`, a name
-    no deck writes). The decks in tests/fixtures/source/beamer convert whole with them."""
-    return problem.category == "malformed" or "beamer@" in problem.name
+    """A complaint LaTeXML's Beamer binding makes about its own output on an ordinary deck:
+    a `malformed` error about one of `_BEAMER_MALFORMED`, or its internal frame macro
+    (`\\end{beamer@frame}`, a name no deck writes). A `malformed` error about any other
+    element still stops a deck. `SourceProblem` keeps the element, not the one it was put
+    in, so a list element that is malformed for another reason on a deck is let through as
+    well."""
+    if problem.category == "malformed":
+        return problem.name in _BEAMER_MALFORMED
+    return "beamer@" in problem.name
 
 
 def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, object]] | None:
