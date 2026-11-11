@@ -89,6 +89,11 @@
   --radius-control: 4px;
   --radius-frame: 8px;
 
+  /* Targets: every small control is at least 24 by 24 CSS px (WCAG 2.5.8); with a coarse
+     pointer (a finger) the small ones grow to 44 by 44 (2.5.5). In rem, so they grow with text. */
+  --target-min: 1.5rem;
+  --target-touch: 2.75rem;
+
   --page-max: 75rem;
   --review-max: 90rem;
   --prose-max: 68ch;

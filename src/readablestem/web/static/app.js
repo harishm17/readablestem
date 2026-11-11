@@ -126,9 +126,9 @@
  * is empty or is larger than the limit, instead of after sending all of it (35 s at
  * 5 Mbit/s for a refusal the browser can make instantly). The form takes several files
  * (T3-4): too many, or more than the request may carry together, is said the same way.
- * While good files are sent, says so ("Uploading notes.pdf. Keep this tab open.") and keeps
- * a second click from sending them twice. The server checks everything again; without this
- * file the form works the same, only slower to say no.
+ * While good files are sent, says so ("Uploading notes.pdf. Keep this tab open."); the one
+ * submit rule below keeps a second click from sending them twice. The server checks
+ * everything again; without this file the form works the same, only slower to say no.
  */
 (function () {
   "use strict";
@@ -138,7 +138,6 @@
   var form = input.form;
   var box = document.getElementById("pdf-check");
   var status = document.getElementById("upload-status");
-  var button = form.querySelector('button[type="submit"]');
   var field = input.closest(".field");
   var maxBytes = Number(input.getAttribute("data-max-bytes"));
   var limitBytes = Number(input.getAttribute("data-limit-bytes") || maxBytes);
@@ -146,7 +145,7 @@
   var maxFiles = Number(input.getAttribute("data-max-files") || 1);
   var describedBy = input.getAttribute("aria-describedby") || "";
   var serverError = input.getAttribute("aria-invalid") === "true";
-  if (!box || !status || !button || !field) return;
+  if (!box || !status || !field) return;
 
   // A file between the two sizes is allowed: the server keeps it so its pages can be chosen.
   // "docx pptx": the Word and PowerPoint kinds this server converts (data-office, T3-30).
@@ -239,21 +238,106 @@
       return;
     }
     if (!files || !files.length) return; // the server answers "Choose ... to upload."
-    if (button.getAttribute("aria-disabled") === "true") {
-      event.preventDefault(); // already sending
-      return;
-    }
+    if (form.hasAttribute("data-submitting")) return; // already sending: the rule below
+    // Said here, with the file's name; the one submit rule below then says nothing more.
     status.textContent =
       files.length === 1
         ? "Uploading " + files[0].name + ". Keep this tab open."
         : "Uploading " + files.length + " files. Keep this tab open.";
-    button.setAttribute("aria-disabled", "true");
   });
 
   // Back to this page from the next one (the browser's page cache): ready again.
   window.addEventListener("pageshow", function () {
     status.textContent = "";
+  });
+})();
+
+/* The one submit rule, in the browser (SW43; the server's half is web/forms.py). A form
+ * drawn by the form(key) macro (components/forms.html, data-submit-once) is sent once:
+ * the pressed button says what is happening ("Saving…", its data-busy-label or the
+ * form's), is marked aria-busy and aria-disabled (not disabled: a disabled button leaves
+ * the focus order and its name and value would not be sent), a polite live region says
+ * the same words, and a second click or Enter sends nothing. Ready again when the page
+ * comes back from the browser's page cache, and at the end of an htmx request the form
+ * itself made. Another submit handler that stops the send (the upload's file checks)
+ * runs first and wins. Without this file a second click is still answered once, by the
+ * server: the form's request token.
+ */
+(function () {
+  "use strict";
+
+  var region = null;
+
+  // One polite live region for the page, made when first needed.
+  function say(words) {
+    if (!region) {
+      region = document.createElement("p");
+      region.className = "visually-hidden";
+      region.setAttribute("aria-live", "polite");
+      document.body.appendChild(region);
+    }
+    region.textContent = "";
+    // A moment later, so the same words twice in a row are still announced.
+    window.setTimeout(function () { region.textContent = words; }, 50);
+  }
+
+  function pressedButton(form, event) {
+    var button = event.submitter;
+    if (button && button.form === form && button.tagName === "BUTTON") return button;
+    return form.querySelector('button[type="submit"], button:not([type])');
+  }
+
+  function busy(form, button) {
+    form.setAttribute("data-submitting", "");
+    if (!button) return "";
+    var words =
+      button.getAttribute("data-busy-label") || form.getAttribute("data-busy-label") || "";
+    button.setAttribute("aria-disabled", "true");
+    button.setAttribute("aria-busy", "true");
+    button.setAttribute("data-submit-pressed", "");
+    // Only a button whose label is plain text takes the busy words in its place.
+    if (words && !button.children.length) {
+      button.setAttribute("data-label", button.textContent);
+      button.textContent = words;
+    }
+    return words;
+  }
+
+  function ready(form) {
+    form.removeAttribute("data-submitting");
+    var button = form.querySelector("[data-submit-pressed]");
+    if (!button) return;
     button.removeAttribute("aria-disabled");
+    button.removeAttribute("aria-busy");
+    button.removeAttribute("data-submit-pressed");
+    if (button.hasAttribute("data-label")) {
+      button.textContent = button.getAttribute("data-label");
+      button.removeAttribute("data-label");
+    }
+  }
+
+  // Bubbling to the document: the form's own submit handlers have run by now.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-submit-once")) return;
+    if (form.hasAttribute("data-submitting")) {
+      event.preventDefault(); // already on its way: the first click's answer will come
+      return;
+    }
+    if (event.defaultPrevented) return; // another handler stopped it (a file check)
+    var words = busy(form, pressedButton(form, event));
+    var own = form.querySelector('[role="status"]');
+    if (words && !(own && own.textContent)) say(words);
+  });
+
+  window.addEventListener("pageshow", function () {
+    var forms = document.querySelectorAll("form[data-submitting]");
+    for (var i = 0; i < forms.length; i++) ready(forms[i]);
+  });
+
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var form = event.detail && event.detail.elt;
+    if (form instanceof HTMLFormElement && form.hasAttribute("data-submit-once")) ready(form);
   });
 })();
 
