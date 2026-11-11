@@ -289,6 +289,9 @@ def test_a_layout_gold_set_is_scored_with_no_model_and_a_held_out_one_only_for_a
     (root / "files" / "news.pdf").write_bytes(corpus.document(entry))
     gold = corpus.load_gold(entry) | {"id": "news", "kind": "made here", "source": "a test"}
     (root / "gold" / "news.json").write_text(json.dumps(gold))
+    # A file the reader refuses is named as not measured, and the others are still scored.
+    (root / "files" / "torn.pdf").write_bytes(b"%PDF-1.4 torn")
+    (root / "gold" / "torn.json").write_text(json.dumps(gold | {"id": "torn"}))
 
     def eval_order(side: str, *args: str) -> tuple[int, dict]:
         registry, out = tmp_path / f"{side}.json", tmp_path / f"{side}-record.json"
@@ -302,6 +305,7 @@ def test_a_layout_gold_set_is_scored_with_no_model_and_a_held_out_one_only_for_a
     student = record["metrics"]["sources"]["html"]
     assert student["all"]["pages"] == 1 and set(student["groups"]) == {"made here"}
     assert [page["page"] for page in record["metrics"]["pages"]] == [1]
+    assert record["metrics"]["uploads"]["not_measured"] == ["torn"]
 
     # A held-out set is not scored while the reader is worked on, and its record names no page.
     assert eval_order("held-out") == (2, {})

@@ -99,11 +99,12 @@ def set_stamp(registry: Mapping[str, Any], names: Iterable[str]) -> dict[str, An
 
 
 def set_settings() -> Any:
-    """Production's behavior settings for a conversion that asks no model."""
+    """Production's behavior settings for a conversion that asks no model, with a job's
+    own limits: a document longer than a job may be is not measured, and is named."""
     from readablestem.config import Settings
     from readablestem.ops import profile
 
-    base = Settings(_env_file=None, env="test", **measure.ROOM)  # type: ignore[call-arg]
+    base = Settings(_env_file=None, env="test")  # type: ignore[call-arg]
     return profile.load().apply(base)
 
 
@@ -111,7 +112,7 @@ def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
     """One document of a set, converted with no model and scored (a process of `set_run`)."""
     from readablestem.core.types import ConversionOptions, StepFacts
     from readablestem.models.fake import FakeVisionClient
-    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+    from readablestem.web.isolated_convert import convert_isolated
 
     gold = json.loads(Path(gold_path).read_text(encoding="utf-8"))
     pdf = Path(pdf_path).read_bytes()
@@ -124,8 +125,11 @@ def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
             options=ConversionOptions.from_settings(settings),
             concurrency=settings.model_concurrency,
         )
-    except ConversionFailed as exc:
-        return Converted(gold["id"], error=str(exc.code)).as_dict()
+    except Exception as exc:
+        from readablestem.web.worker import error_code_for
+
+        # A file the reader refuses or cannot finish ends as a job's does: with its code.
+        return Converted(gold["id"], error=error_code_for(exc)).as_dict()
     done = Converted(
         gold["id"],
         pages=output.result.stats.pages,

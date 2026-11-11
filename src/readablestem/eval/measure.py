@@ -316,7 +316,7 @@ def _job(upload: Upload, settings: Settings) -> _Job | str:
 def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult] | str:
     """One upload's file and the document a job makes of it (converted as `convert`
     converts it, without the measuring), or the code of why there is none."""
-    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+    from readablestem.web.isolated_convert import convert_isolated
 
     job = _job(upload, settings)
     if isinstance(job, str):
@@ -329,8 +329,11 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
             options=job.options,
             concurrency=settings.model_concurrency,
         )
-    except ConversionFailed as exc:
-        return str(exc.code)
+    except Exception as exc:
+        from readablestem.web.worker import error_code_for
+
+        # A file the reader refuses or cannot finish ends as a job's does: with its code.
+        return error_code_for(exc)
     return job.pdf, output.result
 
 
@@ -378,7 +381,7 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
     `outputs`: also build every file a student is given and audit it (`eval.outputs`).
     That, and the reading-order counts of a file with gold (`order_rows`), come after the
     measuring, so the seconds and the memory are the conversion's alone."""
-    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+    from readablestem.web.isolated_convert import convert_isolated
 
     job = _job(upload, settings)
     if isinstance(job, str):
@@ -395,8 +398,10 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
             options=options,
             concurrency=settings.model_concurrency,
         )
-    except ConversionFailed as exc:
-        return Converted(upload.name, pages=page_count, error=str(exc.code))
+    except Exception as exc:
+        from readablestem.web.worker import error_code_for
+
+        return Converted(upload.name, pages=page_count, error=error_code_for(exc))
     wall_s = time.monotonic() - started
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
     readers = [client, getattr(client, "second_check", None)]
