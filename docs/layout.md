@@ -162,6 +162,18 @@ Element conventions:
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
    counted, so a break never vouches for itself.
+   A break that falls inside one token leaves it whole (`hyphens.joins_inside_token`, for
+   paragraph text, headings, captions, list items and the cells of a table): a digit, a
+   hyphen and a digit keep the hyphen with no space (`(2012-08-` / `17)`); a line that ends
+   in `/`, `.`, `_`, `-` or `=` inside an address (a scheme or `www.` start, or a `/` or `@`
+   in the word) goes on from it (`project/` / `memspectrum/`), with the hyphen of an address
+   never dropped; a full stop joins only a host that still lacks its suffix (`www.example.` /
+   `org`, with a lowercase start), so a sentence that ends with an address keeps its space
+   and so does an address with a path that ends in a full stop; a non-breaking hyphen
+   (U+2011, also U+FE63 and U+FF0D) after a letter or digit is a compound that must not
+   break (`easy-` / `to-use`), kept as written. The address test reads the word before the
+   break; the page's link annotations, which would settle the ambiguous cases, are not read
+   yet.
    Inline math that wraps from one line to the next is one equation (`_wrapped_inline`): a
    relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
    minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),

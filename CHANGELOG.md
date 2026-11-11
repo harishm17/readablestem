@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: lines broken inside a token (branch fix/line-end-joins)
+
+- Text: a number or an address broken at a line end is joined without a space. A digit, a hyphen
+  and a digit keep the hyphen (`(2012-08-` / `17)` is one date); a line that ends in `/`, `.`, `_`,
+  `-` or `=` inside an address goes on from it (`project/` / `memspectrum/`; a full stop joins
+  only a host still short of its suffix, so a sentence that ends in an address keeps its space);
+  a non-breaking hyphen (U+2011) after a letter or digit is a compound that must not break
+  (`easy-` / `to-use` came out with a space). One function (`hyphens.joins_inside_token`) for
+  paragraph, heading, caption, list-item and table-cell text, and for a table row split by a page
+  break. Element text changes on the affected paragraphs, so their step keys change and stored
+  answers for them are asked again. The page's link annotations are not read for addresses yet.
+- Wingdings bullets (WS2.2a) were already built by the font code tables below; this branch adds
+  the arrow and the remaining bullets to the test of them.
+
 ## Unreleased: what is sent to a model, from one list (branch feat/sent-material)
 
 - `web.recipients.sent_material(settings)` lists each kind of material sent to a model: the

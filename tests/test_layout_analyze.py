@@ -528,6 +528,8 @@ def font_page(font: str, rows: list[str], differences: str = "") -> bytes:
         # Word's Wingdings bullets, as the private-use code or as the Latin-1 letter
         ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF0A7", ["▪"]),
         ("Wingdings-Regular", ["\\374 first point", "\\374 second point"], "", ["✓"]),
+        ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF0D8", ["➢"]),
+        ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF076", ["❖"]),
         # the same private-use code in Symbol is a club, not a bullet
         ("SymbolMT", ["\\001 first point", "\\001 second point"], "1 /uniF0A7", []),
         # unreadable glyphs of an icon font that start several lines are bullets
@@ -547,6 +549,7 @@ def test_bullets_of_symbol_fonts_are_list_items_by_font_name(font, rows, differe
         ("Symbol", "The angle \\001 is small.", "1 /uniF071", "θ"),
         ("MT-Extra", "The length \\001 is small.", "1 /uniF06C", "\u2113"),
         ("AdvP4C4E74", "The sum a\\376b\\274c is small.", "", "a+b=c"),
+        ("Wingdings", "The step \\001 follows it.", "1 /uniF0E0", "→"),  # maths, so an equation
         ("CMR10", "The e\\013ects are small.", "11 /uni000B", "effects"),
     ],
 )

@@ -14,7 +14,8 @@ from readablestem.pipeline.layout import _line_break
 def test_a_soft_hyphen_always_goes_and_other_line_ends_are_joined_with_a_space():
     assert _line_break("a soft­", "hyphen") == ("a soft", "")
     assert _line_break("ends here", "and goes on") == ("ends here", " ")
-    assert _line_break("a range 5-", "7 m") == ("a range 5-", " ")  # no letter before the hyphen
+    assert _line_break("a range 5-", "7 m") == ("a range 5-", "")  # one number, one token
+    assert _line_break("a range 5-", "x m") == ("a range 5-", " ")  # no letter before the hyphen
     assert _line_break("a dash \u2013", "like this") == ("a dash \u2013", " ")
 
 

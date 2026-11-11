@@ -233,7 +233,9 @@ log = logging.getLogger(__name__)
 # source's outcome changes too (`source.support`, the same unreleased wave): a source in a class
 # read as an article converts instead of stopping on that class, one in a refused class or
 # package stops in the conversion child with its code and name, and a package stop records
-# whether the package is the instructor's own. Results from 0.5.10 load unchanged.
+# whether the package is the instructor's own. A date, an address or a compound broken at a line
+# end keeps its token whole (`hyphens.joins_inside_token`): no space inside "(2012-08-17)" or
+# "project/memspectrum/". Results from 0.5.10 load unchanged.
 PIPELINE_VERSION = "0.5.11"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
