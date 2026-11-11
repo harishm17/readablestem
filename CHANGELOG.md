@@ -8,6 +8,21 @@
   write mode and the release. Undo writes the same rows negated, so the sums are the
   decisions that stand. `events.outcome_cells(release)` reads them per lane with the
   small-count rules. A migration adds the eight columns and an index to `events`.
+## Unreleased: the production profile (branch feat/production-profile)
+
+- `src/readablestem/ops/production.profile.toml` says what production runs: every behaviour setting
+  of `config.py` with its production value and the line of the repository it was taken from, the
+  other settings named as operations settings (never valued), and the image facts the build writes
+  (`readablestem ops image-facts --write` in the Dockerfile). Nobody has read the hosting dashboard
+  for it yet, so it says `confirmed = false`: a production start whose settings differ from it logs
+  `profile_mismatch` by setting name and starts; once confirmed, a difference refuses the start.
+- `/healthz/ops` returns the profile's hash; /admin shows its name, hash and the names of the
+  settings that differ; `readablestem ops profile-check` prints the same comparison.
+- Eval reports record the profile (`profile` in the JSON, one line in the header): "development
+  settings" unless the run's settings are the profile's (`--profile production`). A switch whose
+  program the image facts do not name (unknown counts as absent) is printed as counted off.
+- `.railway/railway.ts` names every behaviour setting on `web` (`preserve()`), and the docs and
+  comments that repeated production values now point at the profile.
 
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 

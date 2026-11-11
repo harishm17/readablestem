@@ -272,7 +272,7 @@ cannot see the live header; the log line is the only live check.
 
 ### Running uploaded TeX (sandbox)
 
-A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`, on in production since 2026-11-04)
+A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`; production's value is in `src/readablestem/ops/production.profile.toml`)
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
 application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
 folder writable, a new network namespace (no network), a new pid namespace that dies with the
@@ -634,7 +634,7 @@ a wrong alt text or equation, which the instructor reviews.
 | Recipient | What | How long |
 |---|---|---|
 | Railway (the web service, Railway Postgres and the `backup` volume) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups up to about a week more |
-| The model provider (`MODEL_PROVIDER`; production runs Anthropic) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
+| The model provider (`MODEL_PROVIDER`; production's is in `src/readablestem/ops/production.profile.toml`) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
 | A handwriting reader (`MATH_READER_CLAUDE_ENABLED`, `MATH_READER_OPENAI_ENABLED`; off; the pipeline calls one only when `IMAGE_PAGES_SECOND_READER` names it, and in the hosted conversion child only the local reader can run) | One tight crop of an expression, no text | Anthropic: deleted within 30 days (longer if flagged). OpenAI: sent with `store=False`. Turning one on can add a recipient to this table and to the privacy page (`docs/math-readers.md`). The local reader (`MATH_READER_LOCAL_ENABLED`) runs in the conversion child, sends nothing and adds no recipient |
 | Langfuse (only if tracing is on) | Timings, model names, token counts, costs, error categories, random ids; payloads are masked | Set in the Langfuse project |
 

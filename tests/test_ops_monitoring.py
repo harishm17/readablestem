@@ -78,6 +78,25 @@ def test_healthz_ops_is_503_with_the_status_word_and_the_admin_sees_the_database
     assert "secret" not in public.text + detail.text
 
 
+def test_health_and_admin_show_the_production_profile_by_hash_and_setting_names(tmp_path):
+    from readablestem.ops import profile
+
+    shipped = profile.load()
+    env = WebEnv(tmp_path)
+    with env.running() as web:
+        public = web.get("/healthz/ops").json()
+        login(web, ADMIN)
+        health = web.get("/admin/health").json()
+        page = web.get("/admin").text
+    assert set(public) == {"status"}  # the public route gives the status word only
+    assert health["profile"] == shipped.short_hash
+    assert "FEATURE_TABLES" not in str(health)  # the hash names no setting
+    section = page.split('id="profile-heading"')[1]
+    assert shipped.short_hash in section
+    # The test environment runs the code defaults, so the profile's switches differ: by name.
+    assert "<code>FEATURE_TABLES</code>" in section
+
+
 # --------------------------------------------------------------------------- cron CLI
 
 

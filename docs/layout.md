@@ -1369,7 +1369,7 @@ into the same hole, and the app's own advice for scans ("run OCR and upload agai
 produced exactly those files. There is **no handwriting or scan conversion by default**
 (decided 2026-10-09): such pages are kept as page images, marked "Not converted", with a
 decision. On request, per upload (the box "Convert scanned or handwritten pages", offered by
-`FEATURE_IMAGE_PAGES`, default off in code, on in production; [ADR 0007](decisions/0007-image-pages.md), measured in
+`FEATURE_IMAGE_PAGES`, default off in code, production's value in `src/readablestem/ops/production.profile.toml`; [ADR 0007](decisions/0007-image-pages.md), measured in
 [eval-image-pages.md](eval-image-pages.md)) a page the types below call
 `scan_no_text`, `scan_ocr`, `handwritten` or `handwritten_ocr` (kept reasons `scanned_page` and
 `handwritten_page`, and a picture under a text layer that does not cover it, `unread_page`

@@ -1,5 +1,6 @@
 """CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
-report|export-opted-in|decisions-canary|claude-canary|replay-erasures|sandbox-probe.
+report|export-opted-in|decisions-canary|claude-canary|replay-erasures|sandbox-probe|
+profile-check|image-facts.
 
 The same tasks the web app runs on its hourly cron call, for running by hand or as the
 Railway `cron` service (`readablestem ops cron`). Output is counts only, as `key=value` pairs on
@@ -12,6 +13,9 @@ day (ops/canary.py; `ops cron` does not); by hand it needs no database, only a k
 `--max-usd`.
 `claude-canary` is the same for the Claude second check (ops/claude_canary.py). Nothing in
 production calls either, because production runs `ops cron`: run them by hand.
+`profile-check` compares the settings of this environment with the production profile
+(ops/profile.py) and prints the names that differ, never a value; `image-facts --write` is run
+by the image build to record what the image carries in the profile's `[image_facts]` table.
 """
 
 from __future__ import annotations
@@ -69,6 +73,20 @@ def register(
         help="fail when LaTeXML is not installed (the default only reports it)",
     )
     probe.set_defaults(func=_cmd_sandbox_probe)
+    sub.add_parser(
+        "profile-check",
+        help="compare this environment's settings with the production profile; print the "
+        "profile's hash and the names of the settings that differ (exit 1 if any)",
+    ).set_defaults(func=_cmd_profile_check)
+    facts = sub.add_parser(
+        "image-facts",
+        help="print what this machine carries (TeX, LaTeXML, pandoc, LibreOffice, lxml); "
+        "with --write, record it in the shipped profile (the image build does this)",
+    )
+    facts.add_argument(
+        "--write", action="store_true", help="write the facts into the profile's [image_facts]"
+    )
+    facts.set_defaults(func=_cmd_image_facts)
     sub.add_parser(
         "backup-check",
         help="read DATABASE_URL (a restored copy) and say whether the app could run on it: "
@@ -256,6 +274,38 @@ def _cmd_sandbox_probe(args: argparse.Namespace) -> int:
     for line in report.lines():
         print(line)
     return 0 if report.passed else 1
+
+
+def _cmd_profile_check(args: argparse.Namespace) -> int:
+    """Exit 1 when a behaviour setting differs from the production profile (names only)."""
+    from readablestem.config import get_settings
+    from readablestem.ops import profile
+
+    shipped = profile.load()
+    settings = get_settings()
+    differing = shipped.differences(settings)
+    print(
+        f"profile={shipped.name} hash={shipped.short_hash} "
+        f"confirmed={str(shipped.confirmed).lower()} differs={len(differing)}"
+    )
+    for name in differing:
+        print(f"differs: {name}")
+    for name in shipped.counted_off(settings):
+        print(f"counted_off: {name} (the image facts lack its program)")
+    return 1 if differing else 0
+
+
+def _cmd_image_facts(args: argparse.Namespace) -> int:
+    """Print what this machine carries; with --write, record it in the shipped profile."""
+    from readablestem.ops import profile
+
+    facts = profile.measure_image_facts()
+    for key in profile.IMAGE_FACTS:
+        print(f"{key}={facts[key]}")
+    if args.write:
+        profile.write_image_facts(profile.PROFILE_PATH, facts)
+        print(f"written: {profile.PROFILE_PATH} hash={profile.load().short_hash}")
+    return 0
 
 
 def _cmd_launch_check(args: argparse.Namespace) -> int:

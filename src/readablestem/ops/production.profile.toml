@@ -1,0 +1,193 @@
+# The production profile (WS0.9): what production runs, in the repository.
+#
+# Every setting of src/readablestem/config.py is either a behaviour setting under [settings],
+# with its production value and where that value came from, or named in `operations` (secrets,
+# addresses, accounts, spend and size limits, timeouts), never valued. tests/test_profile.py
+# fails for a setting that is in neither, and for a [settings] name that config.py or
+# .railway/railway.ts does not have. Read by src/readablestem/ops/profile.py.
+#
+# How the values were found: nobody has read the hosting dashboard for this file yet. Each value
+# was taken from what the repository itself states, with the file, line and commit in `source`.
+# Where the repository states no production value the code default is written and the source
+# says "not stated; code default". Until the owner has read the dashboard and corrected this
+# file, `confirmed` stays false: a production start whose settings differ from it names each
+# differing setting (log line `profile_mismatch`, /admin) and still starts. With `confirmed =
+# true` a difference refuses the start.
+#
+# A setting whose value is None in config.py is written "unset". MAIN_MODEL and CHEAP_MODEL are
+# the values config.py resolves them to under MODEL_PROVIDER=anthropic.
+#
+# Changing a value here changes the profile's hash (shown on /healthz/ops and /admin, and
+# stamped on every eval report); reordering lines or editing comments does not.
+
+name = "production"
+confirmed = false
+
+operations = [
+  "ENV",
+  "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_WORKSPACE_ID",
+  "MODEL_TIMEOUT_S",
+  "MODEL_MAX_RETRIES",
+  "MODEL_CONCURRENCY",
+  "FAKE_MODELS",
+  "MODEL_ANSWERS_FILE",
+  "MODEL_ANSWERS_OFFLINE",
+  "DECISIONS_TIMEOUT_S",
+  "DECISIONS_CANARY",
+  "CLAUDE_CHECK_TIMEOUT_S",
+  "CLAUDE_CANARY",
+  "CLAUDE_CANARY_MAX_MISSES",
+  "DAILY_SPEND_CAP_USD",
+  "PER_USER_DAILY_PAGE_QUOTA",
+  "OPEN_TIER_DAILY_PAGE_QUOTA",
+  "OPEN_TIER_DAILY_REREADS",
+  "MAX_NEW_ACCOUNTS_PER_DAY",
+  "OPEN_TIER_DAILY_SPEND_CAP_USD",
+  "MAX_USD_PER_JOB",
+  "MAX_MODEL_CALLS_PER_JOB",
+  "MAX_USD_PER_PAGE",
+  "MAX_MODEL_CALLS_PER_PAGE",
+  "MAX_PAGES_PER_JOB",
+  "MAX_UPLOAD_MB",
+  "MAX_LARGE_UPLOAD_MB",
+  "MAX_SOURCE_PAGES",
+  "SOFFICE_PATH",
+  "OFFICE_TIMEOUT_S",
+  "SOURCE_SANDBOX_MAX_TOTAL_MB",
+  "SANDBOX_PROBE_AT_STARTUP",
+  "SANDBOX_PROBE_TIMEOUT_S",
+  "MAX_CONCURRENT_UPLOADS",
+  "STORAGE_PER_USER_MB",
+  "STORAGE_OPEN_TIER_MB",
+  "STORAGE_GLOBAL_MAX_MB",
+  "DATABASE_URL",
+  "RETENTION_HOURS",
+  "OPT_IN_RETENTION_DAYS",
+  "BASE_URL",
+  "SESSION_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "SIGNUP_MODE",
+  "ADMIN_EMAILS",
+  "DEV_LOGIN_ENABLED",
+  "MS_CLIENT_ID",
+  "MS_CLIENT_SECRET",
+  "MS_ALLOWED_TENANTS",
+  "EMAIL_LOGIN_ENABLED",
+  "EMAIL_SENDER",
+  "EMAIL_LINK_MINUTES",
+  "CRON_TOKEN",
+  "SESSION_SECRET_PREVIOUS",
+  "RUN_WORKER",
+  "WORKER_POLL_S",
+  "PRELOAD_TABLE_MODELS",
+  "CONVERSION_MEMORY_MB",
+  "TRUSTED_PROXY_HOPS",
+  "RATE_LIMITS_ENABLED",
+  "SOURCE_URL",
+  "CONTACT_EMAIL",
+  "FEEDBACK_URL",
+  "FEEDBACK_QUESTIONS_ENABLED",
+  "EVENTS_ENABLED",
+  "ANALYTICS_ENABLED",
+  "MATH_READER_LOCAL_DIR",
+  "MATH_READER_LOCAL_THREADS",
+  "MATH_READER_LOCAL_TIME_S",
+  "MATH_READER_MAX_USD_PER_JOB",
+  "IMAGE_PAGES_SECOND_READER_TIME_S",
+  "PAGE_WITNESS_TIMEOUT_S",
+  "IMAGE_PAGES_TIMEOUT_S",
+  "IMAGE_PAGES_USD_PER_PAGE",
+  "IMAGE_PAGES_MAX_USD_PER_JOB",
+  "TRACING_ENABLED",
+  "LANGFUSE_PUBLIC_KEY",
+  "LANGFUSE_SECRET_KEY",
+  "LANGFUSE_HOST",
+  "LOG_LEVEL",
+]
+
+[settings]
+MODEL_PROVIDER = { value = "anthropic", source = "docs/deploy-railway.md:133-134 at 693cca24, set by hand (written 2026-10-14); docs/web.md:85, 2026-11-04" }
+MAIN_MODEL = { value = "claude-opus-5-5", source = "config.py _resolve_models: ANTHROPIC_MAIN_MODEL under MODEL_PROVIDER=anthropic; data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+CHEAP_MODEL = { value = "claude-haiku-5-5", source = "config.py _resolve_models: ANTHROPIC_CHEAP_MODEL under MODEL_PROVIDER=anthropic; data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+ANTHROPIC_MAIN_MODEL = { value = "claude-opus-5-5", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+ANTHROPIC_CHEAP_MODEL = { value = "claude-haiku-5-5", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+ANTHROPIC_EFFORT_MAIN = { value = "medium", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+ANTHROPIC_EFFORT_CHEAP = { value = "low", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+ANTHROPIC_EFFORT_EQUATION = { value = "unset", source = "not stated; code default" }
+ANTHROPIC_EFFORT_FIGURE = { value = "unset", source = "not stated; code default" }
+ANTHROPIC_EFFORT_PAGE_MATH = { value = "unset", source = "not stated; code default" }
+ANTHROPIC_EFFORT_PAGE_WITNESS = { value = "unset", source = "not stated; code default" }
+ANTHROPIC_EFFORT_IMAGE_PAGES = { value = "unset", source = "not stated; code default" }
+ANTHROPIC_NOTICE_IN_SYSTEM = { value = true, source = "not stated; code default" }
+EQUATION_CONTEXT_ON_ESCALATION = { value = false, source = "not stated; code default" }
+EQUATION_LINE_CONTEXT = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:111, on since 2026-11-03" }
+EQUATION_GLYPH_CHECKS = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:117, on since 2026-11-03" }
+EQUATION_GLYPH_RECONCILE = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:125, on since 2026-11-04" }
+LAYOUT_DISPLAY_GROUPING = { value = false, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:130" }
+FLAG_POLICY = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:139, on since 2026-11-03" }
+FIGURE_MODEL_MAX_EDGE_PX = { value = "unset", source = "not stated; code default" }
+EQUATION_DISPLAY_FIRST_CHEAP = { value = false, source = "not stated; code default" }
+ACCEPT_CONFIDENCE_BY_MODEL = { value = {}, source = "not stated; code default" }
+ANTHROPIC_REFUSAL_FALLBACK = { value = true, source = "not stated; code default" }
+AUTO_ACCEPT_CONFIDENCE = { value = 0.85, source = "not stated; code default" }
+ABSTAIN_CONFIDENCE = { value = 0.4, source = "not stated; code default" }
+DECISIONS_MODEL = { value = "gpt-6-luna", source = "not stated; code default" }
+DECISIONS_FIGURE_VERIFY = { value = true, source = "not stated; code default" }
+DECISIONS_FIGURE_FLAG_BELOW = { value = 0.5, source = "not stated; code default" }
+DECISIONS_EQUATION_SHADOW = { value = true, source = "not stated; code default" }
+DECISIONS_EQUATION_FLAG_AT = { value = 0.2, source = "not stated; code default" }
+CLAUDE_SECOND_CHECK = { value = "off", source = ".railway/railway.ts:136-138 and docs/deploy-railway.md:163 at 693cca24, off since 2026-11-09" }
+CLAUDE_CHECK_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }
+CLAUDE_CHECK_EFFORT = { value = "low", source = "not stated; code default" }
+CLAUDE_CHECK_SCOPE = { value = "accepted", source = "not stated; code default" }
+OFFICE_INPUT_ENABLED = { value = true, source = "not stated; code default" }
+MATH_READER_CLAUDE_ENABLED = { value = false, source = "not stated; code default" }
+MATH_READER_CLAUDE_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }
+MATH_READER_CLAUDE_EFFORT = { value = "medium", source = "not stated; code default" }
+MATH_READER_OPENAI_ENABLED = { value = false, source = "not stated; code default" }
+MATH_READER_OPENAI_MODEL = { value = "gpt-6-luna", source = "not stated; code default" }
+MATH_READER_LOCAL_ENABLED = { value = false, source = "docs/deploy-railway.md:170 at 693cca24, written 2026-11-03" }
+IMAGE_PAGES_SECOND_READER = { value = "off", source = "docs/deploy-railway.md:170 at 693cca24, written 2026-11-03" }
+FEATURE_TABLES = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
+FEATURE_LONG_DESCRIPTIONS = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
+FEATURE_COLOUR = { value = false, source = "docs/web.md:59 at 693cca24, stated 2026-11-04 (not among the flags turned on)" }
+FEATURE_NOTATION_MEMORY = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
+FEATURE_PAGE_MATH = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+PAGE_MATH_MODEL = { value = "unset", source = "not stated; code default" }
+PAGE_MATH_AGREEMENT_LIFT = { value = true, source = "not stated; code default" }
+PAGE_MATH_MAX_OUTPUT_TOKENS = { value = 4096, source = "not stated; code default" }
+PAGE_MATH_UNCONFIRMED_FACTOR = { value = 1.0, source = "not stated; code default" }
+FEATURE_PAGE_WITNESS = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+PAGE_WITNESS_MODEL = { value = "claude-opus-5-5", source = "not stated; code default" }
+PAGE_WITNESS_MAX_OUTPUT_TOKENS = { value = 12288, source = "not stated; code default" }
+FEATURE_IMAGE_PAGES = { value = true, source = "docs/web.md:83 and docs/deploy-railway.md:201 at 693cca24, stated 2026-11-04" }
+FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-railway.md:166 at 693cca24, on since 2026-11-04 13:53 UTC" }
+FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04" }
+FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04" }
+IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default" }
+IMAGE_PAGES_DPI = { value = 200, source = "not stated; code default" }
+IMAGE_PAGES_OMISSION_CHECK = { value = true, source = "not stated; code default" }
+IMAGE_PAGES_MATHS_ALWAYS_REQUIRED = { value = true, source = "not stated; code default" }
+IMAGE_PAGES_RECOVER_OMISSIONS = { value = true, source = "not stated; code default" }
+IMAGE_PAGES_VECTOR_CROPS = { value = false, source = "not stated; code default" }
+IMAGE_PAGES_VECTOR_CHECKS = { value = true, source = "not stated; code default" }
+IMAGE_PAGES_SECOND_READING = { value = false, source = "not stated; code default" }
+IMAGE_PAGES_ACCEPT_AGREED = { value = false, source = "not stated; code default" }
+MATHML_ALTTEXT = { value = false, source = "not stated; code default" }
+
+# What the production image carries, written by the image build (`readablestem ops image-facts
+# --write`, Dockerfile), never typed. In the repository every fact is "unknown", and every
+# reader treats unknown as not present: a switch that needs a program (`NEEDS_PROGRAM` in
+# ops/profile.py) counts as off unless its program is here. "none" means the build looked and
+# it is not installed. lxml is a development-only dependency, so the image should say "none".
+# This table must stay the last one in the file: the build replaces it to the end.
+[image_facts]
+tex = "unknown"
+install_tex_witness = "unknown"
+latexml = "unknown"
+pandoc = "unknown"
+libreoffice = "unknown"
+lxml = "unknown"

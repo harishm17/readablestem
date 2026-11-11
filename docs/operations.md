@@ -339,8 +339,8 @@ is the event name alone and the fields become top-level keys, so
 
 ## Decisions canary
 
-This applies to the OpenAI provider only (the Decisions API is OpenAI's); production runs
-Anthropic, so nothing here runs there. The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
+This applies to the OpenAI provider only (the Decisions API is OpenAI's); with production's
+provider (`MODEL_PROVIDER` in `src/readablestem/ops/production.profile.toml`) set to Anthropic, nothing here runs there. The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
 probabilities with fixed thresholds. Those thresholds mean nothing once the answers
 under them move, and the API is in beta: one model, no version pinning. Its answers are
 deterministic, so a fixed set of requests answered differently on one day is a change

@@ -79,6 +79,7 @@ from readablestem.eval import ted
 from readablestem.eval.equations import MathMLError, canonical, normalize
 from readablestem.models.base import VisionClient
 from readablestem.models.fake import FakeVisionClient
+from readablestem.ops import profile as run_profile
 from readablestem.pipeline import layout, run, table_step
 from readablestem.pipeline import options as run_options
 
@@ -1687,6 +1688,7 @@ def build_report(
         "mode": cfg.mode,
         "date": cfg.date,
         "pipeline_version": run.PIPELINE_VERSION,
+        "profile": run_profile.stamp(cfg.settings),
         "prompt_versions": _prompt_versions(items),
         "models": {"main": cfg.settings.main_model, "cheap": cfg.settings.cheap_model},
         "models_used": sorted({m for i in items for m in i.get("models", [])}),
@@ -1854,6 +1856,7 @@ def format_markdown(report: dict) -> str:
         "",
         f"n = {report['n']} of {report['n_planned']} documents, {status}. Pipeline "
         f"{report['pipeline_version']}; gold manifest {report['dataset']['manifest_sha256'][:12]}.",
+        run_profile.stamp_line(report.get("profile")),
         "",
     ]
     lines += pe._table(["metric", "value"], ((k, m.get(k)) for k in HEADLINE))
