@@ -216,10 +216,12 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
     client = make_vision_client(settings, budget, fake=settings.fake_models)
     if settings.model_answers_file is None or settings.fake_models:
         return client
-    from readablestem.eval.answers import CachedClient
+    from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
-    inner = None if settings.model_answers_offline else client
-    return CachedClient(inner, settings.model_answers_file, settings)
+    offline = settings.model_answers_offline
+    cached = CachedClient(None if offline else client, settings.model_answers_file, settings)
+    keep_second_check_answers(client, cached, offline=offline)
+    return cached
 
 
 def error_code_for(exc: BaseException) -> str:

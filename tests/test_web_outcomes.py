@@ -516,6 +516,44 @@ def test_recorded_answers_wrap_the_real_client_and_offline_refuses_a_miss(tmp_pa
     assert isinstance(fake, FakeVisionClient)
 
 
+def test_offline_replay_answers_the_second_check_from_the_same_file(tmp_path):
+    from readablestem.core.types import ModelCall
+    from readablestem.eval.answers import answer_key
+    from readablestem.models.claude_verifier import FigureAudit, figure_request
+    from readablestem.models.openai_client import PNG_SIGNATURE
+
+    budget = JobBudget(guard=InMemorySpendGuard(1.0), max_usd=1, max_calls=10)
+    path = tmp_path / "answers.jsonl"
+    common = {
+        "model_provider": "anthropic",
+        "anthropic_api_key": "sk-ant-test",
+        "claude_second_check": "shadow",
+        "model_answers_file": path,
+    }
+    live_settings = Settings(_env_file=None, **common)
+    live = default_client_factory(live_settings, budget)
+    png = PNG_SIGNATURE + b"crop"
+    request = figure_request(live_settings.claude_check_model, png, alt="A ramp.", caption=None)
+    audit = FigureAudit(conveys_key_information=True, contradicts_image=False, problem="none")
+    call = ModelCall(step="check", model=request.model, prompt_version=request.prompt_version)
+    check = live.second_check  # the check keeps its own settings (its prompt notice differs)
+    check.record(answer_key(check._settings, request), "check", audit, call)
+
+    offline = default_client_factory(
+        Settings(_env_file=None, model_answers_offline=True, **common), budget
+    )
+    assert offline.verifier is not None
+    recorded = offline.verifier.figure_alt(png, alt="A ramp.", caption=None)
+    assert recorded.reason_code == "ok" and recorded.probabilities == {
+        "ok": 1.0,
+        "factual_error": 0.0,
+    }
+    size = path.stat().st_size
+    missing = offline.verifier.figure_alt(png, alt="Another picture.", caption=None)
+    assert missing.reason_code != "ok" and not missing.probabilities
+    assert path.stat().st_size == size  # nothing was asked, nothing recorded
+
+
 def test_a_missing_model_key_fails_with_its_own_code_and_message(env, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert error_code_for(ConfigError("no key")) == "model_not_configured"

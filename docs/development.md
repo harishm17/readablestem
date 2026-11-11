@@ -53,7 +53,7 @@ works on the machine.
 
 Running the web app on recorded answers (`MODEL_ANSWERS_FILE` with `MODEL_ANSWERS_OFFLINE=true`, docs/web.md)
 needs no spend headroom: uploads and the worker ignore the room one live model call would need under
-`DAILY_SPEND_CAP_USD`, so a server with a $0.01 cap converts what the file can answer. Serve it on a fresh database; there is no need to copy a recorder's.
+`DAILY_SPEND_CAP_USD`, so a server with a $0.01 cap converts what the file can answer, and the Claude second check replays from the same file. Serve it on a fresh database; there is no need to copy a recorder's.
 
 CLI:
 

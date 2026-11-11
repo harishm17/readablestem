@@ -178,7 +178,7 @@ def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
     path = getattr(args, "answers", None)
     if path is None:
         return client
-    from readablestem.eval.answers import CachedClient
+    from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
     if getattr(args, "batch", False):
         # A staged run: what the file cannot answer is collected, not sent (eval/staged.py).
@@ -188,32 +188,10 @@ def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
         cached = CachedClient(staging, path, settings)
         staging.owner = cached
         return cached
-    cached = CachedClient(
-        None if getattr(args, "answers_offline", False) else client, path, settings
-    )
-    _keep_second_check_answers(args, client, cached)
+    offline = bool(getattr(args, "answers_offline", False))
+    cached = CachedClient(None if offline else client, path, settings)
+    keep_second_check_answers(client, cached, offline=offline)
     return cached
-
-
-def _keep_second_check_answers(args: argparse.Namespace, client: Any, cached: Any) -> None:
-    """The Claude second check asks the model too: its answers go into the same file, so a
-    replay (and `--answers-offline`) spends nothing on it either. A staged `--batch` run
-    leaves it live (its few small requests are not staged)."""
-    from readablestem.eval.answers import CachedClient
-    from readablestem.models.claude_verifier import ClaudeVerifier
-
-    verifier = getattr(client, "verifier", None)
-    if not isinstance(verifier, ClaudeVerifier) or getattr(args, "batch", False):
-        return
-
-    def wrap(inner: Any) -> Any:
-        check = CachedClient(
-            None if getattr(args, "answers_offline", False) else inner, args.answers, inner.settings
-        )
-        cached.second_check = check
-        return check
-
-    verifier.wrap_client(wrap)
 
 
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
