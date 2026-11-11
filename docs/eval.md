@@ -2912,9 +2912,9 @@ no step stopped early). A count is given as its pages and, in brackets, its plac
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
-| real, student page | 41 | 29 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 12 | 4 |
+| real, student page | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
 | self-made, student page | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
-| real and self-made, student page | 78 | 57 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 44 | 17 |
+| real and self-made, student page | 78 | 58 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 43 | 17 |
 | edge, student page | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
 | real, element list | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
 | self-made, element list | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
@@ -2923,15 +2923,19 @@ no step stopped early). A count is given as its pages and, in brackets, its plac
 
 Read with care:
 
-- 57 of 78 pages are right in the student page, and 33 are
+- 58 of 78 pages are right in the student page and in the element list, and 33 are
   faultless. 12 of the 78 read a running head, a page number
   or a stamp aloud, 16 cut a block and
   13 run blocks together.
-- The element list reads 58 of 78. The page it differs on is a lab manual's
-  first page: the answer written for an inline formula ends with the word that follows the
-  formula in the sentence, so the page says that word twice. Said once, the page is right.
-  (The gold of that block also reads a Greek letter as the file's text layer has it, a
-  Latin one; that alone does not break the block, and the two together do.)
+- Two labels were corrected on November 11, and the figures above are scored with them. A
+  lab manual's first page had a block whose label read a Greek letter as the file's text
+  layer has it, a Latin one; with the printed letter the student page is right there (57
+  before, 58 now). On that page the answer written for an inline formula still ends with
+  the word that follows the formula in the sentence, so the page says that word twice: one
+  fault alone does not break the block, and the two together did. The glossary's second
+  page had a heading and two continued pieces on the wrong side of the page break in its
+  labels; with them in place, what is left wrong on that page is the reader's: a short
+  two-column page is read across the gutter.
 - The layout dumps of November 10 gave 59 of 78 for the same reader. The one page more was
   a matching exercise that is written as a table and read row by row: a dump holds the words
   of the table's region, in the order of the two lists, and the page a student gets does not.
@@ -3501,9 +3505,9 @@ figure and no release bar is registered: every line below is a development score
 | Row | Set | Figure | Counts | 95% bound | Label | Goal bar |
 |---|---|---|---|---|---|---|
 | Required decisions a page, the median document | corpus | 0.29 | 63 documents | 0.60 | development score | at most 1.00 |
-| Pages not read right in the student page, by the scorer | corpus | 28.4 per 100 | 25 of 88 pages | 37.4 per 100 | development score | - |
+| Pages not read right in the student page, by the scorer | corpus | 27.3 per 100 | 24 of 88 pages | 36.2 per 100 | development score | - |
 | Pages not read right in the student page, by the scorer | layout-dev-1 | 44.2 per 100 | 118 of 267 pages | 49.4 per 100 | development score | - |
-| Documents with every gold page right | corpus | 54.5% | 24 of 44 documents | 41.1% | development score | - |
+| Documents with every gold page right | corpus | 56.8% | 25 of 44 documents | 43.3% | development score | - |
 | Documents with every gold page right | layout-dev-1 | 13.3% | 8 of 60 documents | 6.8% | development score | - |
 | Pages that read a running head, a page number or a stamp aloud | corpus | 17.0 per 100 | 15 of 88 pages | 25.0 per 100 | development score | at most 2.0 per 100 |
 | Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 54.3 per 100 | 145 of 267 pages | 59.5 per 100 | development score | at most 2.0 per 100 |
@@ -3525,7 +3529,7 @@ Read with care:
 - The corpus line of the page rows counts every gold page measured whole
   (88, the edge pages with the others); `eval order`'s
   "of 78" leaves the edge pages out.
-- Every gold page is right in 24 of 44 corpus documents and in
+- Every gold page is right in 25 of 44 corpus documents and in
   8 of 60 documents of `layout-dev-1`. A document's gold pages are
   the ones labeled, which in a layout set is a sample of its pages.
 - The output rows count places, and one fault can be many places: most of the HTML file's

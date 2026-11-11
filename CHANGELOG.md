@@ -55,7 +55,7 @@ measured and replayed against.
   the page a student is given and in the element list, from the measured replay, with a bar
   that no page that was right is made wrong. The scorer (version 5) counts what a right page
   can still have wrong: furniture read aloud, a block cut, blocks run together, a caption on
-  the wrong picture. Baseline: 57 of 78 pages right in the student page and
+  the wrong picture. Baseline: 58 of 78 pages right in the student page and
   33 faultless. `--set` scores a layout gold set with no model
   (149 of 267 on `layout-dev-1`); a held-out set is scored
   only with `--for-release` and its record names no page.
