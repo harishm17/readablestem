@@ -39,7 +39,8 @@ for the day, like any other daily stop).
 
 `largest_reservation_usd(settings)` is the threshold below which the day counts as spent:
 uploads are refused and the worker stops claiming jobs once less than that is left,
-because no element could be converted with it.
+because no element could be converted with it. `conversion_headroom_usd(settings)` is that
+threshold, except that offline replay (nothing is billed) needs none.
 """
 
 from __future__ import annotations
@@ -456,3 +457,13 @@ def largest_reservation_usd(settings: Settings) -> float:
     from readablestem.ops.limits import largest_reservation_usd as largest
 
     return largest(settings, optional_steps=False)
+
+
+def conversion_headroom_usd(settings: Settings) -> float:
+    """What must be left under the daily cap for a conversion to start: one largest
+    reservation, except when no call can be billed. Offline replay (`MODEL_ANSWERS_FILE`
+    with `MODEL_ANSWERS_OFFLINE`) answers from a file and never reserves, and the offline
+    fake client is not billed, so a small cap must not turn their uploads away."""
+    if settings.fake_models or (settings.model_answers_file and settings.model_answers_offline):
+        return 0.0
+    return largest_reservation_usd(settings)

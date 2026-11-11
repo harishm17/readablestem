@@ -257,6 +257,28 @@ def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
     assert count(web, Job) == 0
 
 
+@pytest.mark.parametrize("offline", [False, True])
+def test_a_tiny_spend_cap_refuses_live_uploads_but_not_offline_replay(tmp_path, offline):
+    """Offline replay bills nothing, so it needs no headroom under the cap (a live upload
+    needs room for one model call)."""
+    env = WebEnv(
+        tmp_path,
+        daily_spend_cap_usd=0.01,
+        model_answers_file=tmp_path / "answers.jsonl" if offline else None,
+        model_answers_offline=offline,
+    )
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        response = upload(client, make_pdf(1))
+        if not offline:
+            assert response.status_code == 503
+            return
+        job_id = job_id_from(response)
+        assert env.run_worker() == job_id
+        assert env.job(job_id).status == "done"
+
+
 # --------------------------------------------------------------------------- status
 
 

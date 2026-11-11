@@ -51,6 +51,10 @@ distribution (`apt install latexml bubblewrap`), or, without root, unpack the pa
 Perl is pointed at it; production never sets it). `uv run readablestem ops sandbox-probe` (`READABLESTEM_SANDBOX_BACKEND=landlock` to force the Landlock backend) says whether the sandbox
 works on the machine.
 
+Running the web app on recorded answers (`MODEL_ANSWERS_FILE` with `MODEL_ANSWERS_OFFLINE=true`, docs/web.md)
+needs no spend headroom: uploads and the worker ignore the room one live model call would need under
+`DAILY_SPEND_CAP_USD`, so a server with a $0.01 cap converts what the file can answer. Serve it on a fresh database; there is no need to copy a recorder's.
+
 CLI:
 
 ```

@@ -12,11 +12,11 @@ queue is safe with several workers or instances:
   ahead of everyone else's work after each restart. Jobs of someone removed from the
   allowlist are never claimed (removal also stops the ones already queued or running;
   see `web.auth.set_allowed`).
-- While less than one model call's worth (`spend.largest_reservation_usd`) is left under
-  the daily cap, nothing is claimed: queued jobs wait for the next UTC day instead of
-  running into a document with every element "not converted". The same for the open-tier
-  pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`, `web.spend`) and the jobs of open-tier accounts
-  (`web.access`): they wait for the next day while the pool is spent, and the jobs of
+- While less than one model call's worth (`spend.conversion_headroom_usd`; none in offline
+  replay) is left under the daily cap, nothing is claimed: queued jobs wait for the next UTC
+  day instead of running into a document with every element "not converted". The same for
+  the open-tier pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`, `web.spend`) and the jobs of open-tier
+  accounts (`web.access`): they wait for the next day while the pool is spent, and the jobs of
   invited people are claimed as before. A job of an open-tier account reserves in the
   pool as well as under the daily cap (`_start_attempt`).
 - The conversion runs on its own thread. The worker thread waits for it and extends the
@@ -108,7 +108,7 @@ from readablestem.web.fair_queue import claim_order_by
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
-from readablestem.web.spend import DbSpendGuard, largest_reservation_usd
+from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
 from readablestem.web.step_cache import DbStepCache
 from readablestem.web.step_cache import forget as forget_steps
 
@@ -454,7 +454,7 @@ class Worker:
         self.timeout_grace_s = timeout_grace_s
         # Less than this left under the daily cap: claim nothing (see the module docstring).
         self.headroom_usd = (
-            largest_reservation_usd(settings) if headroom_usd is None else headroom_usd
+            conversion_headroom_usd(settings) if headroom_usd is None else headroom_usd
         )
         self.tracer = tracer  # None: the converter's own default (no tracing)
         # The dearest reservation any enabled step can hold (steps' own sizes, the optional
