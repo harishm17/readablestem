@@ -147,7 +147,9 @@ def test_a_character_that_is_not_text_never_reaches_any_output():
     canvas = export_canvas.export_canvas(html, title="Forces", folder="forces")
     assert output_chars.count_in_zip(export_canvas.build_zip(canvas)) == 0
     if export_docx.available():
-        assert output_chars.count_in_zip(export_docx.export_docx(html, title="Forces").data) == 0
+        docx = export_docx.export_docx(html, title="Forces").data
+        # Word's own bullet glyphs (Wingdings) live in its list styles, which hold no text.
+        assert output_chars.count_in_zip(docx, skip=frozenset({"word/numbering.xml"})) == 0
 
 
 # --------------------------------------------------------------------------- axe (no browser)

@@ -139,7 +139,7 @@ ALWAYS_NOT_CHECKED = (
     "How the file looks in your course site (for example Canvas). It has not been tried "
     "in a live course.",
     "The Word and EPUB files. They are made from the HTML file, and the structure checks "
-    "above are of the HTML file. Nobody has opened them in Word or a reading app.",
+    "above are of the HTML file. Nobody has checked how they open in Word or a reading app.",
     "The PDF itself. This record is about the HTML file made from it.",
 )
 

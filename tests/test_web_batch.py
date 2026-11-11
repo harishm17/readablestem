@@ -367,8 +367,12 @@ def _set_state(job: Job, key: str) -> None:
             "stopped_unknown": "a_code_this_version_does_not_know",
         }[key]
         job.retries = 3 if key == "stopped_no_tries" else 0
-    elif key in {"partly_converted", "ready", "sample"}:
+    elif key in {"partly_converted", "ready", "ready_remains", "sample"}:
         job.result_json = _decide_all(job.result_json or {})
+        if key == "ready":  # and every part converted: nothing a picture, no check failing
+            result = job.result_json
+            result["elements"] = [e for e in result["elements"] if e["kind"] == "heading"]
+            result["fixes"], result["html_checks"] = [], []
         job.error_code = "pages_not_converted" if key == "partly_converted" else None
         job.is_sample = key == "sample"
     elif key == "deleted":
