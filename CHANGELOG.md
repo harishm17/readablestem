@@ -31,6 +31,14 @@ measured and replayed against.
   kind and by step and seconds a page by kind and stage, from a measured replay of the
   corpus under the production profile. The Sonnet cache-read price was double the published
   rate and is corrected.
+- **Reading order** (`readablestem eval order`): the gold pages of the corpus are scored in
+  the page a student is given and in the element list, from the measured replay, with a bar
+  that no page that was right is made wrong. The scorer (version 5) counts what a right page
+  can still have wrong: furniture read aloud, a block cut, blocks run together, a caption on
+  the wrong picture. Baseline: 57 of 78 pages right in the student page and
+  33 faultless. `--set` scores a layout gold set with no model
+  (149 of 267 on `layout-dev-1`); a held-out set is scored
+  only with `--for-release` and its record names no page.
 - **What a page asks of a reviewer** (`readablestem eval burden`): required decisions a
   page by page kind, by what is decided and by why it was asked, from the same measured
   replay, with a bar against an earlier record (no page kind asks for more). The count is

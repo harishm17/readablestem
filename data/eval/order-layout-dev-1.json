@@ -1,0 +1,8279 @@
+{
+ "set": "layout-dev-1",
+ "split": {
+  "name": "development",
+  "seed": "layout-dev-1",
+  "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
+  "documents": 60
+ },
+ "client": "none",
+ "profile": {
+  "name": "production",
+  "sha256": "62b4f1678d3695f82a93261d2178a8ec75af489c017418686a77000de360e5e8",
+  "confirmed": false,
+  "differs": [],
+  "counted_off": [
+   "FEATURE_LATEX_SOURCE",
+   "OFFICE_INPUT_ENABLED"
+  ]
+ },
+ "pipeline_version": "0.5.10",
+ "commit": "63e90e8efc6ec3082048af6067202d4018f3268f",
+ "machine": {
+  "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+  "cores": 16
+ },
+ "not_finished": [],
+ "metrics": {
+  "scorer": 5,
+  "listed": true,
+  "uploads": {
+   "measured": 60,
+   "answers_missing": {},
+   "not_measured": [],
+   "without_gold": 0
+  },
+  "sources": {
+   "html": {
+    "all": {
+     "found": 4340,
+     "lost": 120,
+     "split": 561,
+     "pairs": 4073,
+     "pairs_ok": 3893,
+     "stitched": 409,
+     "dropped": 0,
+     "leaked": 0,
+     "blocks": 4460,
+     "elements": 5745,
+     "stray": 1178,
+     "cut": 207,
+     "merged": 172,
+     "heading_merged": 31,
+     "caption_judged": 5,
+     "caption_wrong": 0,
+     "furniture": 190,
+     "tau_tot": 108211,
+     "tau_ok": 78937,
+     "flow_tot": 92964,
+     "flow_ok": 91072,
+     "broken": 98,
+     "opairs": 4009,
+     "opairs_ok": 3926,
+     "xjoin": 35,
+     "ejoin": 245,
+     "entries": 1831,
+     "clean": 184,
+     "stamp_pages": 32,
+     "stamp_read": 30,
+     "stamp_in_text": 29,
+     "numrun_pages": 2,
+     "numrun_bad": 2,
+     "right": 149,
+     "faultless": 45,
+     "pages": 267,
+     "pages_with": {
+      "furniture": 145,
+      "stray": 221,
+      "cut": 92,
+      "merged": 68,
+      "heading_merged": 22,
+      "caption_wrong": 0
+     }
+    },
+    "groups": {
+     "paper": {
+      "found": 1187,
+      "lost": 32,
+      "split": 174,
+      "pairs": 1068,
+      "pairs_ok": 995,
+      "stitched": 76,
+      "dropped": 0,
+      "leaked": 0,
+      "blocks": 1219,
+      "elements": 2055,
+      "stray": 588,
+      "cut": 52,
+      "merged": 102,
+      "heading_merged": 26,
+      "caption_judged": 0,
+      "caption_wrong": 0,
+      "furniture": 39,
+      "tau_tot": 6357,
+      "tau_ok": 6230,
+      "flow_tot": 51528,
+      "flow_ok": 50705,
+      "broken": 32,
+      "opairs": 999,
+      "opairs_ok": 981,
+      "xjoin": 17,
+      "ejoin": 0,
+      "entries": 0,
+      "clean": 93,
+      "stamp_pages": 30,
+      "stamp_read": 28,
+      "stamp_in_text": 27,
+      "numrun_pages": 0,
+      "numrun_bad": 0,
+      "right": 73,
+      "faultless": 34,
+      "pages": 119,
+      "pages_with": {
+       "furniture": 38,
+       "stray": 97,
+       "cut": 42,
+       "merged": 46,
+       "heading_merged": 19,
+       "caption_wrong": 0
+      }
+     },
+     "selfmade": {
+      "found": 748,
+      "lost": 30,
+      "split": 25,
+      "pairs": 708,
+      "pairs_ok": 693,
+      "stitched": 64,
+      "dropped": 0,
+      "leaked": 0,
+      "blocks": 778,
+      "elements": 550,
+      "stray": 61,
+      "cut": 32,
+      "merged": 39,
+      "heading_merged": 4,
+      "caption_judged": 5,
+      "caption_wrong": 0,
+      "furniture": 8,
+      "tau_tot": 22572,
+      "tau_ok": 16473,
+      "flow_tot": 8908,
+      "flow_ok": 8509,
+      "broken": 17,
+      "opairs": 703,
+      "opairs_ok": 689,
+      "xjoin": 12,
+      "ejoin": 35,
+      "entries": 482,
+      "clean": 24,
+      "stamp_pages": 2,
+      "stamp_read": 2,
+      "stamp_in_text": 2,
+      "numrun_pages": 2,
+      "numrun_bad": 2,
+      "right": 18,
+      "faultless": 9,
+      "pages": 40,
+      "pages_with": {
+       "furniture": 4,
+       "stray": 16,
+       "cut": 6,
+       "merged": 14,
+       "heading_merged": 2,
+       "caption_wrong": 0
+      }
+     },
+     "textbook": {
+      "found": 2405,
+      "lost": 58,
+      "split": 362,
+      "pairs": 2297,
+      "pairs_ok": 2205,
+      "stitched": 269,
+      "dropped": 0,
+      "leaked": 0,
+      "blocks": 2463,
+      "elements": 3140,
+      "stray": 529,
+      "cut": 123,
+      "merged": 31,
+      "heading_merged": 1,
+      "caption_judged": 0,
+      "caption_wrong": 0,
+      "furniture": 143,
+      "tau_tot": 79282,
+      "tau_ok": 56234,
+      "flow_tot": 32528,
+      "flow_ok": 31858,
+      "broken": 49,
+      "opairs": 2307,
+      "opairs_ok": 2256,
+      "xjoin": 6,
+      "ejoin": 210,
+      "entries": 1349,
+      "clean": 67,
+      "stamp_pages": 0,
+      "stamp_read": 0,
+      "stamp_in_text": 0,
+      "numrun_pages": 0,
+      "numrun_bad": 0,
+      "right": 58,
+      "faultless": 2,
+      "pages": 108,
+      "pages_with": {
+       "furniture": 103,
+       "stray": 108,
+       "cut": 44,
+       "merged": 8,
+       "heading_merged": 1,
+       "caption_wrong": 0
+      }
+     }
+    },
+    "main": {
+     "pages": 0,
+     "pages_with": {
+      "furniture": 0,
+      "stray": 0,
+      "cut": 0,
+      "merged": 0,
+      "heading_merged": 0,
+      "caption_wrong": 0
+     }
+    },
+    "apart": {
+     "pages": 0,
+     "pages_with": {
+      "furniture": 0,
+      "stray": 0,
+      "cut": 0,
+      "merged": 0,
+      "heading_merged": 0,
+      "caption_wrong": 0
+     }
+    }
+   },
+   "elements": {
+    "all": {
+     "found": 4402,
+     "lost": 58,
+     "split": 584,
+     "pairs": 4135,
+     "pairs_ok": 3936,
+     "stitched": 427,
+     "dropped": 0,
+     "leaked": 0,
+     "blocks": 4460,
+     "elements": 5672,
+     "stray": 980,
+     "cut": 148,
+     "merged": 199,
+     "heading_merged": 42,
+     "caption_judged": 5,
+     "caption_wrong": 0,
+     "furniture": 186,
+     "tau_tot": 108993,
+     "tau_ok": 79655,
+     "flow_tot": 92964,
+     "flow_ok": 91589,
+     "broken": 91,
+     "opairs": 4060,
+     "opairs_ok": 3973,
+     "xjoin": 40,
+     "ejoin": 246,
+     "entries": 1831,
+     "clean": 185,
+     "stamp_pages": 32,
+     "stamp_read": 32,
+     "stamp_in_text": 31,
+     "numrun_pages": 2,
+     "numrun_bad": 2,
+     "right": 150,
+     "faultless": 45,
+     "pages": 267,
+     "pages_with": {
+      "furniture": 141,
+      "stray": 217,
+      "cut": 81,
+      "merged": 78,
+      "heading_merged": 32,
+      "caption_wrong": 0
+     }
+    },
+    "groups": {
+     "paper": {
+      "found": 1190,
+      "lost": 29,
+      "split": 175,
+      "pairs": 1071,
+      "pairs_ok": 997,
+      "stitched": 77,
+      "dropped": 0,
+      "leaked": 0,
+      "blocks": 1219,
+      "elements": 2069,
+      "stray": 431,
+      "cut": 49,
+      "merged": 103,
+      "heading_merged": 26,
+      "caption_judged": 0,
+      "caption_wrong": 0,
+      "furniture": 35,
+      "tau_tot": 6368,
+      "tau_ok": 6235,
+      "flow_tot": 51528,
+      "flow_ok": 50721,
+      "broken": 33,
+      "opairs": 1000,
+      "opairs_ok": 981,
+      "xjoin": 18,
+      "ejoin": 0,
+      "entries": 0,
+      "clean": 92,
+      "stamp_pages": 30,
+      "stamp_read": 30,
+      "stamp_in_text": 29,
+      "numrun_pages": 0,
+      "numrun_bad": 0,
+      "right": 71,
+      "faultless": 34,
+      "pages": 119,
+      "pages_with": {
+       "furniture": 34,
+       "stray": 95,
+       "cut": 40,
+       "merged": 46,
+       "heading_merged": 19,
+       "caption_wrong": 0
+      }
+     },
+     "selfmade": {
+      "found": 751,
+      "lost": 27,
+      "split": 27,
+      "pairs": 711,
+      "pairs_ok": 697,
+      "stitched": 65,
+      "dropped": 0,
+      "leaked": 0,
+      "blocks": 778,
+      "elements": 507,
+      "stray": 28,
+      "cut": 2,
+      "merged": 38,
+      "heading_merged": 4,
+      "caption_judged": 5,
+      "caption_wrong": 0,
+      "furniture": 7,
+      "tau_tot": 22595,
+      "tau_ok": 16497,
+      "flow_tot": 8908,
+      "flow_ok": 8583,
+      "broken": 19,
+      "opairs": 706,
+      "opairs_ok": 693,
+      "xjoin": 12,
+      "ejoin": 35,
+      "entries": 482,
+      "clean": 24,
+      "stamp_pages": 2,
+      "stamp_read": 2,
+      "stamp_in_text": 2,
+      "numrun_pages": 2,
+      "numrun_bad": 2,
+      "right": 18,
+      "faultless": 10,
+      "pages": 40,
+      "pages_with": {
+       "furniture": 3,
+       "stray": 15,
+       "cut": 2,
+       "merged": 13,
+       "heading_merged": 2,
+       "caption_wrong": 0
+      }
+     },
+     "textbook": {
+      "found": 2461,
+      "lost": 2,
+      "split": 382,
+      "pairs": 2353,
+      "pairs_ok": 2242,
+      "stitched": 285,
+      "dropped": 0,
+      "leaked": 0,
+      "blocks": 2463,
+      "elements": 3096,
+      "stray": 521,
+      "cut": 97,
+      "merged": 58,
+      "heading_merged": 12,
+      "caption_judged": 0,
+      "caption_wrong": 0,
+      "furniture": 144,
+      "tau_tot": 80030,
+      "tau_ok": 56923,
+      "flow_tot": 32528,
+      "flow_ok": 32285,
+      "broken": 39,
+      "opairs": 2354,
+      "opairs_ok": 2299,
+      "xjoin": 10,
+      "ejoin": 211,
+      "entries": 1349,
+      "clean": 69,
+      "stamp_pages": 0,
+      "stamp_read": 0,
+      "stamp_in_text": 0,
+      "numrun_pages": 0,
+      "numrun_bad": 0,
+      "right": 61,
+      "faultless": 1,
+      "pages": 108,
+      "pages_with": {
+       "furniture": 104,
+       "stray": 107,
+       "cut": 39,
+       "merged": 19,
+       "heading_merged": 11,
+       "caption_wrong": 0
+      }
+     }
+    },
+    "main": {
+     "pages": 0,
+     "pages_with": {
+      "furniture": 0,
+      "stray": 0,
+      "cut": 0,
+      "merged": 0,
+      "heading_merged": 0,
+      "caption_wrong": 0
+     }
+    },
+    "apart": {
+     "pages": 0,
+     "pages_with": {
+      "furniture": 0,
+      "stray": 0,
+      "cut": 0,
+      "merged": 0,
+      "heading_merged": 0,
+      "caption_wrong": 0
+     }
+    }
+   }
+  },
+  "pages": [
+   {
+    "upload": "ax_astrophga_240306369",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 3",
+      "neighbours out of order: 1",
+      "joins across columns: 5",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 3",
+      "neighbours out of order: 1",
+      "joins across columns: 5",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306369",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306369",
+    "page": 7,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306369",
+    "page": 8,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 6,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 4",
+      "neighbours out of order: 1",
+      "joins across columns: 3"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 6,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 4",
+      "neighbours out of order: 1",
+      "joins across columns: 3"
+     ]
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306409",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306409",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306409",
+    "page": 11,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_astrophga_240306409",
+    "page": 12,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306379",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306379",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306379",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306379",
+    "page": 5,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306379",
+    "page": 6,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306389",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306389",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306389",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 11,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_condmatmtrlsci_240306389",
+    "page": 7,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 13,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 13,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscl_240306350",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cscl_240306350",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscl_240306350",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscl_240306350",
+    "page": 30,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 10,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 10,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscl_240306355",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cscl_240306355",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 10,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscl_240306355",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 3,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 7",
+      "neighbours out of order: 1",
+      "joins across columns: 4"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 3,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 7",
+      "neighbours out of order: 1",
+      "joins across columns: 4"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cscl_240306355",
+    "page": 6,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cscl_240306355",
+    "page": 7,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscv_240306351",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cscv_240306351",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscv_240306351",
+    "page": 12,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscv_240306351",
+    "page": 13,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscv_240306361",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 7,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 7,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cscv_240306361",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscv_240306361",
+    "page": 15,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cscv_240306361",
+    "page": 16,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cslg_240306366",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cslg_240306366",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 7,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cslg_240306366",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 9,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cslg_240306366",
+    "page": 10,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 27,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 27,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cslg_240306367",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 13,
+     "cut": 1,
+     "merged": 3,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "joins across columns: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 13,
+     "cut": 1,
+     "merged": 3,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "joins across columns: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cslg_240306367",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cslg_240306367",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "blocks broken: 2",
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "blocks broken: 2",
+      "neighbours out of order: 1",
+      "joins across columns: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_cslg_240306367",
+    "page": 9,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_cslg_240306367",
+    "page": 10,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_csro_240306420",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 2,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 2,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_csro_240306420",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_csro_240306420",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 2,
+     "merged": 7,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 2,
+     "merged": 7,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_csro_240306533",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_csro_240306533",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_csro_240306533",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_csro_240306533",
+    "page": 4,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 2,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 2,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1",
+      "joins across columns: 2"
+     ]
+    }
+   },
+   {
+    "upload": "ax_csro_240306533",
+    "page": 5,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_econem_240306657",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_econem_240306657",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_econem_240306657",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_econem_240306657",
+    "page": 47,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 7,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 7,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306423",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306423",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306423",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 11,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306423",
+    "page": 5,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 22,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 13,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306423",
+    "page": 6,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 20,
+     "cut": 1,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 7",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 19,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 8",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306460",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "joins across columns: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "joins across columns: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306460",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306460",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 18,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306460",
+    "page": 7,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 19,
+     "cut": 2,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 2,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_eesssp_240306460",
+    "page": 8,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 12,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_hepth_240306509",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_hepth_240306509",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 6,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 6,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_hepth_240306509",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 2,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 2,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_hepth_240306509",
+    "page": 19,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 7,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_hepth_240306652",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_hepth_240306652",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_hepth_240306652",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_hepth_240306652",
+    "page": 17,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 11,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_hepth_240306652",
+    "page": 18,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306449",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_mathap_240306449",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306449",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306449",
+    "page": 12,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306464",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_mathap_240306464",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306464",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306464",
+    "page": 19,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 9,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathap_240306464",
+    "page": 20,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 10,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 9,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_mathco_240306383",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_mathco_240306383",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathco_240306383",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathco_240306383",
+    "page": 6,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathco_240306383",
+    "page": 7,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_mathco_240306468",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_mathco_240306468",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathco_240306468",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_mathco_240306468",
+    "page": 10,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_physicsoptics_240306439",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_physicsoptics_240306439",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_physicsoptics_240306439",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240306496",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240306496",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240306496",
+    "page": 16,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240306496",
+    "page": 17,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240307089",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_qbionc_240307089",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 4,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 1,
+     "merged": 4,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240307089",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240307089",
+    "page": 8,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 25,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 25,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_qbionc_240307089",
+    "page": 9,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 6,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_quantph_240306377",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_quantph_240306377",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 12,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_quantph_240306377",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 9,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_quantph_240306377",
+    "page": 10,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_quantph_240306377",
+    "page": 11,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 43,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 41,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_quantph_240306391",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_quantph_240306391",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_quantph_240306391",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_statme_240307124",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_statme_240307124",
+    "page": 21,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_statme_240307158",
+    "page": 1,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "ax_statme_240307158",
+    "page": 2,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_statme_240307158",
+    "page": 3,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 13,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 13,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_statme_240307158",
+    "page": 16,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "ax_statme_240307158",
+    "page": 17,
+    "group": "paper",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 4,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 4,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 5,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 3",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 6,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 10,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 4"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 6,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 4"
+     ]
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 11,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 12,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 16,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 17,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 6,
+     "cut": 2,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 3"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 7,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_algebra_and_trigonometry_2e",
+    "page": 20,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 9,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "neighbours out of order: 7"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 9,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 8",
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 5,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 6,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 11,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 12,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 16,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 17,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 5",
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_astronomy_2e",
+    "page": 20,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 23,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 3",
+      "entries joined: 23"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 23,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 3",
+      "entries joined: 23"
+     ]
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 3,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "blocks broken: 3",
+      "neighbours out of order: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 5,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3",
+      "neighbours out of order: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 3,
+     "stray": 6,
+     "cut": 15,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "entries joined: 7"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 3,
+     "stray": 5,
+     "cut": 6,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "entries joined: 7"
+     ]
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 12,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 13,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3"
+     ]
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 21,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 17,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 13,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 5,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_calculus_volume_1",
+    "page": 18,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 16,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 24"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 16,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 24"
+     ]
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 3,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 12,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 10"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 11,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 10"
+     ]
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 19,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 19,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 18,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 7",
+      "neighbours out of order: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 18,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 7",
+      "neighbours out of order: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 12,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 13,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_concepts_biology",
+    "page": 17,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 5,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 10,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 10,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 11,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 4,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 16,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 4",
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_contemporary_mathematics",
+    "page": 19,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 15,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 36"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 15,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 36"
+     ]
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 3,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "joins across columns: 1",
+      "entries joined: 4"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "joins across columns: 1",
+      "entries joined: 4"
+     ]
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 18,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 18,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 13,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introduction_computer_science",
+    "page": 18,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 17,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "entries joined: 29"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 17,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "entries joined: 29"
+     ]
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 3,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 3",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 3,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 6,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 9,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 2",
+      "neighbours out of order: 2",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 11,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 11,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 12,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 7,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 7,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 5,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 16,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 9",
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 2,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "joins across columns: 3"
+     ]
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 17,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "blocks broken: 1",
+      "neighbours out of order: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_introductory_statistics_2e",
+    "page": 20,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 12,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "entries joined: 10"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 12,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "entries joined: 10"
+     ]
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 7,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 11,
+     "heading_merged": 1,
+     "caption_wrong": 0,
+     "why": [
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 5,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 6,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 11,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 11,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 25,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 25,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 11,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 16,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 5,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 17,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_organic_chemistry",
+    "page": 20,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 17,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "neighbours out of order: 2",
+      "entries joined: 23"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 16,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "neighbours out of order: 2",
+      "entries joined: 23"
+     ]
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3"
+     ]
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 3,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 5,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "entries joined: 6"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "entries joined: 6"
+     ]
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 5,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 6"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 5,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 6"
+     ]
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 8,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 8,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 11,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 16,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 9,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3",
+      "neighbours out of order: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 9,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 3",
+      "neighbours out of order: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_principles_data_science",
+    "page": 19,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 14,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "entries joined: 7"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 14,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 3",
+      "entries joined: 7"
+     ]
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 2,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 8,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 3,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 4,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 7,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 10,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "entries joined: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 10,
+     "cut": 3,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 8,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 9,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 10",
+      "neighbours out of order: 1",
+      "joins across columns: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 4,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 10",
+      "neighbours out of order: 1",
+      "joins across columns: 2"
+     ]
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 10,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 5,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 5,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 13,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 14,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 15,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 4,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "os_university_physics_volume_2",
+    "page": 18,
+    "group": "textbook",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 12,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 11"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 2,
+     "stray": 12,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "entries joined: 11"
+     ]
+    }
+   },
+   {
+    "upload": "sm_answers_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 31,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "numbered runs out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "numbered runs out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_answers_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "numbered runs out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "numbered runs out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_exam_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 3,
+     "stray": 4,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 3,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2"
+     ]
+    }
+   },
+   {
+    "upload": "sm_exam_a",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_exam_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 3,
+     "stray": 3,
+     "cut": 0,
+     "merged": 10,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 3,
+     "stray": 3,
+     "cut": 0,
+     "merged": 10,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_figlabel_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_figlabel_a",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_figlabel_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_figlabel_b",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_figlabel_b",
+    "page": 3,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 1",
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_glossary_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 2,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    }
+   },
+   {
+    "upload": "sm_glossary_a",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 7,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 2"
+     ]
+    }
+   },
+   {
+    "upload": "sm_glossary_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 15,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 2,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_glossary_b",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 6,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_handout_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_handout_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 2",
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 1",
+      "blocks broken: 3",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_handout_b",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1",
+      "neighbours out of order: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_index_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "entries joined: 17"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "entries joined: 17"
+     ]
+    }
+   },
+   {
+    "upload": "sm_index_a",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "entries joined: 11"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "entries joined: 11"
+     ]
+    }
+   },
+   {
+    "upload": "sm_index_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 26",
+      "neighbours out of order: 2",
+      "joins across columns: 1",
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks not found: 26",
+      "neighbours out of order: 2",
+      "joins across columns: 1",
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_index_b",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "joins across columns: 1",
+      "entries joined: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 2",
+      "joins across columns: 1",
+      "entries joined: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_lineno_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 5,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 5,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_lineno_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_newsletter_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 9",
+      "neighbours out of order: 1",
+      "joins across columns: 4"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 3,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "blocks broken: 9",
+      "neighbours out of order: 1",
+      "joins across columns: 4"
+     ]
+    }
+   },
+   {
+    "upload": "sm_newsletter_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 4,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "joins across columns: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_slides_a",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_a",
+    "page": 3,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 1,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_a",
+    "page": 4,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_a",
+    "page": 5,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_a",
+    "page": 6,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_b",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_b",
+    "page": 3,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 3,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_b",
+    "page": 4,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 4,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 4,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_b",
+    "page": 5,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 2,
+     "heading_merged": 2,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_slides_b",
+    "page": 6,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_stamp_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 1,
+     "stray": 2,
+     "cut": 1,
+     "merged": 2,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "neighbours out of order: 1",
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_stamp_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    },
+    "elements": {
+     "right": 0,
+     "faultless": 0,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 1,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0,
+     "why": [
+      "stamps read in the text: 1"
+     ]
+    }
+   },
+   {
+    "upload": "sm_tablecap_a",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_tablecap_b",
+    "page": 1,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 1,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   },
+   {
+    "upload": "sm_tablecap_b",
+    "page": 2,
+    "group": "selfmade",
+    "apart": false,
+    "html": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    },
+    "elements": {
+     "right": 1,
+     "faultless": 1,
+     "furniture": 0,
+     "stray": 0,
+     "cut": 0,
+     "merged": 0,
+     "heading_merged": 0,
+     "caption_wrong": 0
+    }
+   }
+  ]
+ }
+}

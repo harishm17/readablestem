@@ -2726,8 +2726,9 @@ Owed:
 
 `src/readablestem/eval/order.py` scores what a listener hears on a page against the gold
 blocks of "The test corpus". It takes the output as a list of elements in reading order,
-made from a layout dump or from the student HTML, and never looks at boxes, so the layout
-step, the finished HTML and any other reader are scored the same way. Its counts per page:
+made from a layout dump, from a conversion's element list or from the student HTML, and
+never looks at boxes, so the layout step, the finished HTML and any other reader are scored
+the same way. Its counts per page:
 
 | Count | Meaning |
 |---|---|
@@ -2739,9 +2740,37 @@ step, the finished HTML and any other reader are scored the same way. Its counts
 | leaked | text that must not be read (a running header, a page number) that is in the output |
 | clean page | no broken block, every neighboring pair in order, no cross-join, half the blocks found |
 | right page | clean, and no margin stamp read inside text, no index entries joined, numbered blanks in order |
+| stray | a text element none of whose words any gold block accounts for |
+| furniture | a stray element that is the page's furniture: the words of a block that must not be read, or of a line printed in the page's margins (a running head, a page number, a stamp) |
+| cut | an unbroken block of 6 or more words heard in two or more elements |
+| merged | neighboring gold blocks heard in one element; `heading merged` is the part where one of the two is a heading |
+| caption wrong | a caption heard with, or nearest to, another picture or table than its own |
+| faultless page | a right page with none of the five |
 
 The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
-swapped pair fails the page.
+swapped pair fails the page. A right page can still read a running head aloud, cut a
+paragraph in two, run two list items together or put a caption on the wrong picture, which
+is what the last six rows count, so pages right is never reported alone. Two kinds of gold
+are judged differently where they must be. Gold built from a source does not hold every
+word of the page (a table's cells, a formula's line), so there a faultless page is one with
+no furniture read, in place of no stray text. Gold labeled by hand may hold two paragraphs
+in one block, so there only a cut inside a sentence is counted, and a block that ends inside
+a sentence is not merged with the one after it.
+
+None of the counts sees a formula missing from a sentence or from a line of its own. The
+gold marks the tokens of a block that are not source words, but such a token is also a
+drawing's label or another column's word on the same line, so it does not say where a
+formula stands. The equations eval and the page audit count that.
+
+**How the student page is heard.** `elements_from_html` reads the page as a screen reader
+does, cut at the page markers: a block element is one element, a formula's letters and
+digits stand side by side as the page prints them ("CH3", not "C H 3"), and the picture of
+an equation that was not converted is heard as the PDF's own text of it, which is its alt
+text. Text hidden from a voice is not heard. The writer's own words (a note that an equation
+was not converted, a label, the title it puts above a document that has no first-level
+heading) are not counted as text of any page. In a conversion's element list
+(`elements_from_result`) a table is heard as the grid that is written, row by row, and not
+as the words the file has in its region.
 
 The scorer is the research scorer (version 4) moved into the package. Before it was
 committed it was run next to the research script on every stored output of the layout
@@ -2749,9 +2778,11 @@ studies: 26 runs, 2,133 page rows, every count and every listed fault identical.
 layout output of the main branch as stored on 2026-11-10, both give 59 clean pages of 78
 (30 of 41 on public files, 29 of 37 on files made here) and 6 of 13 on the edge files.
 Those numbers describe that stored output, read from a layout dump; they were not measured
-under the production profile and are not the registered baseline, which the order eval
-records when it lands. The first scorer (version 2) was not moved: its element-level counts
-are still reported by this one (`pairs`, `stitched`, `split`, `lost`).
+under the production profile and are not the registered baseline, which `eval order`
+records (below). Version 5 added the five further counts and `faultless`; for the same
+elements its other counts are those of version 4. The first scorer (version 2) was not
+moved: its element-level counts are still reported by this one (`pairs`, `stitched`,
+`split`, `lost`).
 
 ### Gold built from sources (`gold/layout_gold.py`)
 
@@ -2838,6 +2869,100 @@ lacks, and what a reading-order bar met on it therefore does not cover yet:
 - Three of the eight books are not science or mathematics (government, psychology,
   economics): the walk takes books in seeded order and does not choose by subject. Their
   pages count as textbook layout, not as mathematics.
+
+### `eval order`
+
+Whether each gold page is read in the order it was written, and what else is wrong on a page
+that is.
+
+```bash
+uv run readablestem eval order --out data/eval/order-corpus.json
+uv run readablestem eval order --out order.json --against data/eval/order-corpus.json
+uv run readablestem eval order --set layout-dev-1 --out data/eval/order-layout-dev-1.json
+```
+
+**On the corpus** the command is made from the measured replay of the next section: every
+corpus file with gold is converted as the worker converts a job, under the production
+profile, with the recorded answers in place of the provider. It spends nothing. Two things
+are scored against the same gold:
+
+- the **student page**: the HTML a student is given, read as a listener hears it. This is
+  the product, and the headline is of it;
+- the **element list**: what the pipeline holds before any file is written. Where the two
+  differ, writing the page changed what is heard.
+
+The groups are the manifest's (`labels.group`): `real` pages of published documents,
+labeled by hand; `self-made` pages built from a source that carries each block's role;
+`edge` pages generated to hold one hard case each. A figure "of 78" is of the real and the
+self-made pages together. A file whose recording does not hold every answer its conversion
+asks for is reported apart and left out of every total: an element whose answer is missing
+fails, which is the recording's doing and not the reader's.
+
+**The bar.** With `--against`, no page that was right in the earlier record is not right
+now; a page that became right is named too. Two records are compared only when they are of
+the same documents and were scored by the same version of the scorer, and every page scored
+then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a page was made
+wrong; 2: the two records cannot be compared, or nothing could be measured. The record
+keeps counts per page and no word of any document.
+
+**The baseline** (`data/eval/order-corpus.json`, 44 files measured
+whole, 88 gold pages, pipeline 0.5.10,
+production profile `62b4f1678d36`,
+no step stopped early). A count is given as its pages and, in brackets, its places.
+
+| | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|
+| real, student page | 41 | 29 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 12 | 4 |
+| self-made, student page | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
+| real and self-made, student page | 78 | 57 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 44 | 17 |
+| edge, student page | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
+| real, element list | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
+| self-made, element list | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
+| real and self-made, element list | 78 | 58 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 43 | 17 |
+| edge, element list | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
+
+Read with care:
+
+- 57 of 78 pages are right in the student page, and 33 are
+  faultless. 12 of the 78 read a running head, a page number
+  or a stamp aloud, 16 cut a block and
+  13 run blocks together.
+- The element list reads 58 of 78. The page it differs on is a lab manual's
+  first page: the answer written for an inline formula ends with the word that follows the
+  formula in the sentence, so the page says that word twice. Said once, the page is right.
+  (The gold of that block also reads a Greek letter as the file's text layer has it, a
+  Latin one; that alone does not break the block, and the two together do.)
+- The layout dumps of November 10 gave 59 of 78 for the same reader. The one page more was
+  a matching exercise that is written as a table and read row by row: a dump holds the words
+  of the table's region, in the order of the two lists, and the page a student gets does not.
+- 3 files (`ar3_sideways90`, `ar4_sideways270`, `e1_mc_columns`; 10
+  answers missing, 3 gold pages, none right) are
+  apart until they are recorded again, so the edge group is
+  10 pages and not 13.
+- This is a development set: every page of it has been read while the reader was built.
+  These figures guard against going backward and meet no release bar.
+
+**On a layout gold set** (`--set NAME`, the registry `data/gold/layout/NAME.json` and the
+set's folder) each file is converted as a job converts it, under production's behavior
+settings, with no model: an equation, a picture and a table keep what the file gives, which
+is what the reading order is made of. The folder must be the registered one
+(`gold layout verify`), and the groups are the registry's kinds of document. A held-out set
+is scored only with `--for-release`: once, for a release, and never while the reader is
+being changed. Its record keeps totals and names no page, `--records`, `--from` and
+`--against` are refused for it, and a failing page is not looked at.
+
+`layout-dev-1` (60 documents, 267 pages;
+`data/eval/order-layout-dev-1.json`), the student page:
+
+| | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|
+| paper | 119 | 73 | 34 | 38 (39) | 42 (52) | 46 (102) | 0 of 0 | 32 | 17 |
+| selfmade | 40 | 18 | 9 | 4 (8) | 6 (32) | 14 (39) | 0 of 5 | 17 | 12 |
+| textbook | 108 | 58 | 2 | 103 (143) | 44 (123) | 8 (31) | 0 of 0 | 49 | 6 |
+| all | 267 | 149 | 45 | 145 (190) | 92 (207) | 68 (172) | 0 of 5 | 98 | 35 |
+
+The element list reads 150 of 267 of these pages right.
+`layout-heldout-1` has not been scored.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -3411,6 +3536,8 @@ limits is still owed.
 | `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
 | `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
 | `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
+| `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
+| `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
 | `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |
