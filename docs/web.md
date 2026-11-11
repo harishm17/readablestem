@@ -2773,7 +2773,7 @@ it. The stored elements and decisions are not touched, with one exception: a fig
 as decoration without evidence (a result from before WS6.4) becomes the required decision
 it would be today (`decoration.settle`, docs/output.md "Decoration"), since its page now
 says "Figure not described". Accepting a decorative figure, or saving one with
-"Decorative" ticked, stores the reviewer as its evidence (`FigureFix.decoration` `person`).
+"Decorative" checked, stores the reviewer as its evidence (`FigureFix.decoration` `person`).
 A failed check
 re-shows the page (422) with the reviewer's input as typed and an error summary linked to
 the field; nothing is saved.

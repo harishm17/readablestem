@@ -334,7 +334,7 @@ def test_only_decoration_with_evidence_has_empty_alt_text_in_every_output(answer
     (photo,) = [e for e in result.elements if e.kind is Kind.FIGURE and e.bbox[3] - e.bbox[1] > 100]
     assert result.fix_for(photo.id).review == "required"
     assert triage.required_decisions(result.fixes) == 1
-    # A person's decision is evidence: accepting "decorative", or ticking "Decorative".
+    # A person's decision is evidence: accepting "decorative", or checking "Decorative".
     action, form = ("accept", {}) if answer else ("edit", {"alt": "", "decorative": "on"})
     review.apply_review(result, photo.id, action, form)
     assert alts(review.rerender_html(result, output.crops)) == [""] * 5

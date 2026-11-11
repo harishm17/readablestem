@@ -539,7 +539,7 @@ alone. The evidence is one of:
   document's pages, and on two or more: a logo or a banner in the body (layout already drops
   the ones in the header and footer bands);
 - `shape`: a rule, a band at least 8 times as long as it is thick and at most 16 pt thick;
-- `person`: a reviewer accepted that it is decoration, or ticked "Decorative" on the card.
+- `person`: a reviewer accepted that it is decoration, or checked "Decorative" on the card.
 
 The rule is the same for a figure the model calls decorative and for one whose reading
 failed (`decoration.settle`, after every step in the PDF and LaTeX converters, and again

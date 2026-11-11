@@ -15,7 +15,7 @@
   figure without a description, before "Figure without a description") in the page, EPUB,
   Canvas, Word and Listen until someone decides; a figure whose reading failed is decoration
   when the evidence says so. The evidence is stored on the figure (`FigureFix.decoration`), and
-  accepting a decorative figure or ticking "Decorative" stores the reviewer as its evidence.
+  accepting a decorative figure or checking "Decorative" stores the reviewer as its evidence.
   The new output check `html.img_alt_content` fails on empty alt text outside decoration, and
   the EPUB's `alternativeText` claim now allows decoration.
 - `assemble.RENDER_VERSION` is 5, so pages made before are made again when next opened; a
