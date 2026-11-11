@@ -613,7 +613,9 @@ class GlyphContext(BaseModel):
 class Element(BaseModel):
     """Something on a page, in document reading order."""
 
-    id: str  # stable within a document: "p{page+1}-e{index}"
+    # "p{page+1}-e{index}": its place on its page, fixed within one result but not between
+    # two conversions (an element added above renames it). `core.uid` gives the stable one.
+    id: str
     kind: Kind
     page: int  # 0-based
     bbox: BBox

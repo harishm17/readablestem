@@ -1139,7 +1139,8 @@ still the owner's, finished and not past its deletion time, and carries the deci
   equation, figure or table the SHA-256 of its crop, plus an equation's display mode and a
   figure's caption (the alt text is written for it); for a heading its words (case and
   spacing ignored), size and weight. One pixel of difference is a different item, and a
-  changed item never inherits a decision.
+  changed item never inherits a decision. The fingerprint is the one stable ids are made
+  from (`core.uid.fingerprint`, "Stable ids" below), given the crop.
 - **Position** chooses among items with one fingerprint (a small figure repeated on every
   page): the nearest pairs (page first, then place on the page) are matched first, one earlier
   item to one new item. It also finds the items that **changed**: a decided earlier item with
@@ -1173,8 +1174,10 @@ made before a page was left out is found.
 - **Words and headings** are found by what the item said before the edits: the earlier
   version's `ReviewEdit` rows (`edit_text`, `make_heading`) are walked back from the result as it
   stands, so an edit that was undone is not carried and two edits in a row are one. The new
-  file's item must say the same words (case and spacing aside), be of the same kind, size and
-  weight, and be told from a twin by place only when both files have the same number of them.
+  file's item must say the same words (case and spacing aside, the content fingerprint of
+  `core/uid.py`, where an inline equation counts by place and not by its id), be of the same
+  kind, size and weight, and be told from a twin by place only when both files have the same
+  number of them.
   The inline equations in the text must be the same pictures in the same order, or the words
   are left alone. The edit is made by the review's own functions (`page_edits.edit_text`,
   `make_heading`), so a level the outline would now change is refused and nothing is left half
@@ -1196,6 +1199,31 @@ more"); what was is a `carried` `ReviewEdit` with the kind in its `after`
 comparison needs no drawing; a picture added by hand on a page the tool could not read before
 is not added a second time once the tool reads it. Any failure leaves the result as the
 pipeline made it (a copy of it is put back).
+
+## Stable ids (`core/uid.py`)
+
+An element's id (`p3-e12`) is its place on its page, so a paragraph added above it renames
+it and everything after it on the page. Its **uid** (`u1-` and 16 hex digits) is made from
+what it is: a SHA-256 of the version, the page (the whole document for a LaTeX source, which
+has no pages of its own), the element's content fingerprint (its kind and words with case and
+spacing folded, and per kind a heading's size and weight, an equation's display mode and
+printed number, a figure's caption and own alt text, a table's caption and cells; never its
+box, its order or the ids of the equations inside it) and its place among the elements of
+that page with the same fingerprint. Two elements of one document never share a uid, and a
+uid holds no text of the document, so it is safe in an address or a log line. Two identical
+items on a page (the same formula twice) are told apart by order; removing the later one
+leaves the earlier its uid.
+
+Uids are computed from the result whenever they are needed (`uid.assign`): nothing stored
+changes, so a result stored before they existed has them, and decisions, crops and review
+rows stay keyed by the positional id, which is also the label people see. The routes that
+take an element id in their address (`crops`, `regions`, `review/{element_id}` and its
+`check`, `edit`, `read-cell`, and `?item=` on the review screen) take a uid too; one that
+names no element is a 404 (on the review screen, the first open decision), never the element
+nearest to it. The version is in the prefix: when the fingerprint changes, the next version
+is added beside the old one, and a uid of any earlier version still resolves to its element
+(`Uids.aliases`). A reviewer's edit to an element's words or kind gives it the uid of what it
+now says; its positional id still names it.
 
 ## The review record (`web/record.py`, `web/routes/record.py`, T3-6)
 
