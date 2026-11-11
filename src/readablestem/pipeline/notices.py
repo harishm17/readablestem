@@ -20,6 +20,11 @@ written by the steps (the figure and table work only set their fix fields):
 - `long_description_missing` (optional): a chart or diagram without a long
   description, when long descriptions are on.
 
+and one follows from the text itself (`from_runs`): `struck_text` (optional), a paragraph,
+list item or heading with words the page strikes through, kept and marked as deleted
+(`Element.runs`). A reviewer's text edit that changes the struck words takes the mark off,
+and the notice goes with it.
+
 Other notices (the text pass's links, colour and language codes, layout facts) come
 with the result and are merged in unchanged. `current(result)` derives the fix-based
 ones again from the fixes as they are now, so the job page stays true after review
@@ -50,6 +55,7 @@ PAGE_READ_FAILED = "page_read_failed"
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 COLOUR_ONLY = "colour_only"
 LONG_DESCRIPTION_MISSING = "long_description_missing"
+STRUCK_TEXT = "struck_text"
 # The reasons of figures kept as images before any model work; each is its own notice
 # code (`pipeline.page_type`).
 KEPT_IMAGE_CODES = frozenset(
@@ -57,9 +63,9 @@ KEPT_IMAGE_CODES = frozenset(
 )
 # Codes this module derives from the fixes; any stored notice with one of them is
 # replaced by `current`.
-DERIVED_CODES = frozenset({TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING}) | (
-    KEPT_IMAGE_CODES
-)
+DERIVED_CODES = frozenset(
+    {TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING, STRUCK_TEXT}
+) | (KEPT_IMAGE_CODES)
 # Figures that need more than short alt text (W3C "complex images").
 # Where a notice is listed on the job page.
 Section = Literal["not_handled", "worth_checking"]
@@ -159,6 +165,20 @@ def current(result: DocumentResult) -> list[Notice]:
     Whether a figure was described with long descriptions on is in its own model calls
     (the long prompt's version), so the notice follows the fix as it is now.
     """
-    derived = from_fixes(result.elements, result.fixes, long_descriptions=True)
+    derived = [
+        *from_fixes(result.elements, result.fixes, long_descriptions=True),
+        *from_runs(result.elements),
+    ]
     kept = [n for n in result.notices if n.code not in DERIVED_CODES]
     return ordered(merge(derived, kept), result.elements)
+
+
+def from_runs(elements: Iterable[Element]) -> list[Notice]:
+    """`struck_text` for each element with struck runs, counting them ("Worth checking",
+    never a decision: the words are kept and marked, and whether students need them at all
+    is the instructor's call)."""
+    return [
+        Notice(code=STRUCK_TEXT, page=e.page, element_id=e.id, count=n)
+        for e in elements
+        if (n := sum(1 for r in e.runs if r.kind == "deleted"))
+    ]

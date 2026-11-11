@@ -339,6 +339,12 @@ def _finish(
     elements = sorted(reading.elements, key=lambda e: e.order)
     for element in elements:  # a source has no pages to number (the reading's are estimates)
         element.page = 0
+    # Struck text (`\\sout`) is written only with CONTENT_RUNS; off, it is counted, as the
+    # PDF text pass counts it (`text_pass.apply`).
+    struck = sum(len(e.runs) for e in elements)
+    with pipeline._span(tracer, "runs", deleted_runs=struck, written=options.content_runs):
+        if not options.content_runs:
+            elements = [e.model_copy(update={"runs": []}) if e.runs else e for e in elements]
     page_list = [0]
     counts = Counter(e.kind.value for e in elements)
     pipeline._send(stage_progress, "layout", 1, 1, dict(counts))
@@ -389,9 +395,10 @@ def _finish(
     checks = html_checks.static_checks(html)
     wall_ms = round((time.perf_counter() - started) * 1000)
     stats = pipeline._stats(page_list, elements, ordered, run.page_ms, wall_ms)
-    derived = notice_rules.from_fixes(
-        elements, ordered, long_descriptions=options.long_descriptions
-    )
+    derived = [
+        *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),
+        *notice_rules.from_runs(elements),
+    ]
     notices: list[Notice] = notice_rules.ordered(
         notice_rules.merge(derived, reading.notices), elements
     )

@@ -13,7 +13,9 @@ from readablestem.core.types import (
     Element,
     Kind,
     Link,
+    Run,
     ScriptRun,
+    inline_marker,
 )
 from readablestem.pipeline import inline_text
 from readablestem.pipeline.inline_text import colour_css, passage_attrs, render_inline_text
@@ -163,3 +165,39 @@ def test_a_lowered_run_beside_a_raised_one_is_one_stacked_pair():
     # A nuclide: the mass number comes first, and is drawn on top.
     nuclide = paragraph("226Ra", script_runs=[script(0, 2, "sup"), script(2, 3, "sub")])
     assert html(nuclide).startswith('<span class="script-stack"><sup>22</sup><sub>6</sub>')
+
+
+# --------------------------------------------------------------------------- struck text
+
+
+def test_struck_text_is_written_as_del_and_said_as_deleted():
+    # F-509: the meaning must not depend on a screen reader announcing <del>.
+    text = f"Midterm on October 3 October 10, see {inline_marker('p1-e1')} and the notes."
+    start, marker = text.index("October 3"), text.index(inline_marker("p1-e1"))
+    element = paragraph(
+        text,
+        links=[uri(0, 7)],
+        colour_runs=[ColourRun(start=start, end=start + 7, rgb=RED)],
+        runs=[
+            Run(start=start, end=start + 9, kind="deleted"),
+            Run(start=marker, end=text.index(" and"), kind="deleted"),  # an equation
+        ],
+    )
+    styles = Styles()
+    out = html(element, styles)
+    said = '<span class="visually-hidden readablestem">deleted: </span><del>{}</del>' + (
+        '<span class="visually-hidden readablestem"> end deleted</span>'
+    )
+    # The struck run is said once, the colour inside it; the words stay as they were.
+    assert out.startswith('<a href="https://example.org/a">Midterm</a> on ')
+    coloured = '<span class="tc-ff0000">October</span> 3'
+    assert said.format(coloured) + " October 10, see " + said.format(MATHS) in out
+    assert out.count("deleted: ") == 2 and out.endswith(" and the notes.")
+    assert inline_text.DELETED_CLASS in styles.added
+    # Without struck runs the text is written exactly as before, with no rule added.
+    unmarked = Styles()
+    assert html(paragraph(text, links=[uri(0, 7)]), unmarked) == (
+        f'<a href="https://example.org/a">Midterm</a> on October 3 October 10, see {MATHS}'
+        " and the notes."
+    )
+    assert unmarked.added == {}

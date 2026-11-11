@@ -6,7 +6,8 @@ cross-references", "Language", "Coloured text"):
 
 - `render_inline_text`: the one place inline text becomes HTML (paragraphs, list items,
   headings, captions). It escapes the text, puts each inline equation at its marker,
-  and writes the element's links (`<a href>`) and colour runs (`<span class>`).
+  and writes the element's spans (`core.inline`): links (`<a href>`), colour runs
+  (`<span class>`) and struck text (`<del>`).
   Offsets are into `Element.text` as stored, markers included. A span that starts or
   ends inside a marker, reaches past the text or overlaps an earlier span of its own
   kind is skipped; a web link is written only while `core.types.is_safe_href` still
@@ -16,7 +17,13 @@ cross-references", "Language", "Coloured text"):
   spans sit inside links and may wrap maths, which takes the colour too. Raised and
   lowered runs (`Element.script_runs`: Na+, H2O, cm3) are written as `<sup>` and `<sub>`,
   innermost; a lowered and a raised run side by side (SO4 2-, the two numbers before a
-  nuclide's symbol) are written as one stacked pair (`STACK_CSS`).
+  nuclide's symbol) are written as one stacked pair (`STACK_CSS`). Struck text
+  (`Element.runs`, kind "deleted": a cancelled date) sits inside links and outside colour
+  and `<sup>`/`<sub>` (a colour span cut in two is not heard; a struck run cut in two would
+  be said twice), and is written as `<del>` with the tool's own words "deleted:" before
+  it and "end deleted" after it, visually hidden, so a listener hears that the words are
+  struck whether or not the screen reader announces `<del>` (most do not by default), and
+  a format that keeps text but not the tag (Word keeps both) still says so.
 - `passage_attrs`: ` lang="..."` on the element's own block (`<p>`, `<li>`, `<h2>`...)
   when `Element.lang` is set.
 
@@ -25,7 +32,8 @@ one CSS rule (`add_style`) with the colour made dark enough for 4.5:1 contrast o
 output's white background, its hue kept (`pipeline.contrast`), and a second rule inside
 the dark-scheme `@media` block with the printed colour lightened as far as the dark page
 needs (no colour reaches 4.5:1 on both pages). Text without links or colour runs is written
-exactly as before these features existed.
+exactly as before these features existed, and so is text without struck runs: the `<del>`
+rule (`DELETED_CSS`) is added to the stylesheet only for a document that has one.
 
 Rendering reads the stored element only (no options), so the review screen's re-render
 of a stored result writes the same file.
@@ -38,17 +46,20 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 
+from readablestem.core import inline
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     ColourRun,
     Element,
     Link,
+    Run,
     ScriptRun,
     is_safe_href,
 )
 from readablestem.pipeline import contrast
 from readablestem.pipeline.language import is_language_tag
 from readablestem.pipeline.safe_html import escape_text
+from readablestem.pipeline.table_html import AUTHORED_CLASS
 
 # HTML for the inline equation with this element id, or None when the id is not an
 # equation of this document (the marker then stays as text: a layout bug made visible).
@@ -71,6 +82,18 @@ STACK_CSS = (
     f".{STACK_CLASS}.{STACK_LOW_FIRST} {{ flex-direction: column-reverse; }}\n"
     f".{STACK_CLASS} sup, .{STACK_CLASS} sub {{ font-size: inherit; vertical-align: baseline;"
     f" line-height: inherit; }}\n"
+)
+# Struck text: the words said around it (the tool's own words, so they carry its class and
+# are marked English like every other word of the tool's), and its look. The line through is
+# a text decoration, which forced colors keep, in the text's own colour, so it shows on a
+# dark page too; it is drawn thicker than a browser's default so it is not lost at small
+# sizes. Added to the stylesheet only for a document that has struck text.
+DELETED_BEFORE = "deleted: "
+DELETED_AFTER = " end deleted"
+DELETED_CLASS = "deleted-run"
+DELETED_CSS = (
+    "del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;"
+    " text-decoration-skip-ink: none; }\n"
 )
 # An element id a link may point at ("p3-e12"), as the assembler writes ids.
 LINK_TARGET = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
@@ -102,7 +125,7 @@ def _href(link: Link) -> str | None:
     return None
 
 
-def _usable[S: (Link, ColourRun, ScriptRun)](
+def _usable[S: (Link, ColourRun, ScriptRun, Run)](
     spans: Sequence[S], text: str, markers: Sequence[tuple[int, int]]
 ) -> list[S]:
     """Spans inside the text, not starting or ending inside a marker, without overlaps
@@ -129,6 +152,7 @@ class _Segment:
     link: int | None  # index into the usable links
     colour: tuple[int, int, int] | None
     script: str | None = None  # "sup" or "sub" when this piece is a raised or lowered run
+    deleted: bool = False  # inside struck text
 
 
 def render_inline_text(
@@ -158,22 +182,27 @@ def render_inline_text(
     links: list[tuple[Link, str]] = []
     runs: list[ColourRun] = []
     scripts: list[ScriptRun] = []
+    struck: list[Run] = []
     if element is not None:
-        scripts = _usable(element.script_runs, text, markers)
-        for link in _usable(element.links, text, markers):
+        found = inline.spans(element)
+        scripts = _usable(found.scripts, text, markers)
+        for link in _usable(found.links, text, markers):
             href = _href(link)
             if href is not None:
                 links.append((link, href))
         if add_style is not None:
-            runs = _usable(element.colour_runs, text, markers)
-    if not links and not runs and not scripts:
+            runs = _usable(found.colours, text, markers)
+        struck = _usable([r for r in found.runs if r.kind == "deleted"], text, markers)
+    if not links and not runs and not scripts and not struck:
         return _plain(text, placed)
-    segments = _segments(text, placed, [k for k, _ in links], runs, scripts)
+    segments = _segments(text, placed, [k for k, _ in links], runs, scripts, struck)
     for rgb in sorted({s.colour for s in segments if s.colour is not None}):
         if add_style is not None:
             add_style(f"colour-{colour_class(rgb)}", colour_css(rgb))
     if add_style is not None and _stacked(segments):
         add_style(STACK_CLASS, STACK_CSS)
+    if add_style is not None and struck:
+        add_style(DELETED_CLASS, DELETED_CSS)
     return _write(text, segments, [href for _, href in links], [k for k, _ in links], link_attrs)
 
 
@@ -195,12 +224,13 @@ def _segments(
     links: list[Link],
     runs: list[ColourRun],
     scripts: Sequence[ScriptRun] = (),
+    struck: Sequence[Run] = (),
 ) -> list[_Segment]:
     """The text cut at every marker, link and run edge, each piece with what covers it."""
     cuts = {0, len(text)}
     for start, (end, _) in placed.items():
         cuts |= {start, end}
-    for span in (*links, *runs, *scripts):
+    for span in (*links, *runs, *scripts, *struck):
         cuts |= {span.start, span.end}
     edges = sorted(cuts)
     segments = []
@@ -214,7 +244,8 @@ def _segments(
         script = next(
             (r.kind for r in scripts if r.start <= start and end <= r.end and maths is None), None
         )
-        segments.append(_Segment(start, end, maths, link, colour, script))
+        deleted = any(r.start <= start and end <= r.end for r in struck)
+        segments.append(_Segment(start, end, maths, link, colour, script, deleted))
     return segments
 
 
@@ -251,6 +282,26 @@ def _inner(text: str, segments: Sequence[_Segment]) -> str:
     return "".join(out)
 
 
+def _hidden(words: str) -> str:
+    return f'<span class="visually-hidden {AUTHORED_CLASS}">{words}</span>'
+
+
+def _struck(text: str, segments: Sequence[_Segment]) -> str:
+    """The pieces with each stretch of struck text as `<del>`, said as struck (`DELETED_*`)."""
+    out: list[str] = []
+    i = 0
+    while i < len(segments):
+        j = i
+        while j < len(segments) and segments[j].deleted == segments[i].deleted:
+            j += 1
+        inner = _coloured(text, segments[i:j])
+        if segments[i].deleted:
+            inner = f"{_hidden(DELETED_BEFORE)}<del>{inner}</del>{_hidden(DELETED_AFTER)}"
+        out.append(inner)
+        i = j
+    return "".join(out)
+
+
 def _coloured(text: str, segments: Sequence[_Segment]) -> str:
     out: list[str] = []
     i = 0
@@ -278,7 +329,7 @@ def _write(
         j = i
         while j < len(segments) and segments[j].link == segments[i].link:
             j += 1
-        inner = _coloured(text, segments[i:j])
+        inner = _struck(text, segments[i:j])
         link = segments[i].link
         shown = "".join(text[s.start : s.end] for s in segments[i:j])
         if link is not None and shown.strip():

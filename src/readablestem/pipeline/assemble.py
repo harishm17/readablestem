@@ -52,6 +52,7 @@ from defusedxml import DefusedXmlException
 
 from readablestem import __version__
 from readablestem.config import get_settings
+from readablestem.core import inline
 from readablestem.core.types import (
     HEADING_REPEATS_ABOVE,
     IMAGE_PAGE_OMISSION_REASON,
@@ -1650,7 +1651,7 @@ def _kept_prose(ordered: list[Element], fixes: dict[str, Fix]) -> list[Element]:
             fix = fixes[element.id]
             fixes[element.id] = fix.model_copy(update={"reason": "image_page_text"})
             element = element.model_copy(
-                update={"kind": Kind.FIGURE, "text": None, "links": [], "list_marker": None}
+                update={"kind": Kind.FIGURE, "text": None, "list_marker": None, **inline.cleared()}
             )
         elif element.parent_id in kept:
             continue

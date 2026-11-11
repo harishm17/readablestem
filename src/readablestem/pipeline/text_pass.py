@@ -1,4 +1,4 @@
-"""The text pass: links, cross-references, language and coloured text (pipeline 0.4.0).
+"""The text pass: links, cross-references, language, coloured and struck text (pipeline 0.4.0).
 
 It runs once per conversion, right after layout (`run._convert`, after
 `_with_page_images`, before any step), reads the PDF once more for what layout does not
@@ -24,6 +24,13 @@ keep, and adds to the elements without changing their text or anything a model s
   4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`).
 - the notice `link_text_unclear` for a link whose text says nothing on its own ("click
   here", a long bare URL with next to no text around it).
+- `Element.runs`, "deleted" (written only with CONTENT_RUNS; without it they are found and
+  counted in the trace, not written): text the page strikes through, a cancelled date on a
+  syllabus, with the notice `struck_text`. A thin horizontal line or bar crosses glyphs
+  of one row where a strikeout does (`struck_glyphs`), or a StrikeOut annotation covers
+  them. A line under the baseline is an underline and a line under blanks is a blank to
+  fill in: neither crosses a glyph's middle, so neither is struck text. The words stay in
+  the text; the run only marks them (`pipeline.inline_text` writes `<del>`).
 
 Every notice is optional ("Worth checking"); nothing here adds a decision.
 
@@ -64,10 +71,12 @@ from readablestem.core.types import (
     LangSource,
     Link,
     Notice,
+    Run,
     is_safe_href,
 )
 from readablestem.pipeline import contrast, language, layout
-from readablestem.pipeline.layout import Glyph
+from readablestem.pipeline import notices as notice_rules
+from readablestem.pipeline.layout import Glyph, Strike
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +90,16 @@ BOX_SLACK = 1.5  # pt: a glyph belongs to an element when its centre is this clo
 TARGET_SLACK = 2.0  # pt: a destination point this close to an element's box is on it
 TARGET_X_SLACK = 6.0  # pt: ... and this close in x is in its column
 MAX_ALIGN_CHARS = 20_000  # longer texts are not aligned (cost; no real paragraph is this long)
+
+# Struck text (`struck_glyphs`): a line crosses a glyph where a strikeout does, between these
+# shares of the glyph's height measured up from its foot (an underline is under the foot,
+# an overline over the top), and it is no thicker than this share of the text's size (a
+# filled bar behind text, a highlight, is not a line through it). Most glyphs the line spans
+# in its row must be crossed so: a line that only touches one tall glyph is not a strike.
+STRIKE_LOW, STRIKE_HIGH = 0.25, 0.65
+STRIKE_MAX_SIZE_SHARE = 0.12
+STRIKE_MIN_CROSSED = 0.5
+STRIKE_X_SLACK = 0.5  # pt: a glyph whose middle is this close to a line's end is under it
 
 # Link text that says nothing on its own (WCAG 2.4.4), compared case-folded with the
 # punctuation around it removed; and a bare URL longer than `LONG_URL_CHARS` as the whole
@@ -163,6 +182,8 @@ class PdfText:
     links: dict[int, list[PdfLink]] = field(default_factory=dict)
     glyphs: dict[int, list[Glyph]] = field(default_factory=dict)
     annotations: int = 0  # link annotations of any kind on the analysed pages
+    # Per page, the marks that may strike text through (`layout.page_strikes`).
+    strikes: dict[int, list[Strike]] = field(default_factory=dict)
 
 
 def _catalog_lang(doc: pymupdf.Document) -> str | None:
@@ -214,10 +235,11 @@ def _pdf_links(
 def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText:
     """/Lang, links and glyphs of the analysed pages (0-based).
 
-    Glyphs are read only where they are needed: pages with links, and every page when
-    colour runs are on. `layout.analyze` has already rendered these pages in its crash
-    probe, so reading them in this process is safe; PyMuPDF is not thread-safe, so this
-    holds layout's lock like every other PyMuPDF call. Raises whatever PyMuPDF raises.
+    Glyphs are read only where they are needed: pages with links, pages with a mark that may
+    strike text through, and every page when colour runs are on. `layout.analyze` has
+    already rendered these pages in its crash probe, so reading them in this process is
+    safe; PyMuPDF is not thread-safe, so this holds layout's lock like every other PyMuPDF
+    call. Raises whatever PyMuPDF raises.
     """
     wanted = sorted(set(pages))
     found = PdfText()
@@ -236,7 +258,10 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
                     links = _pdf_links(doc, number, annotations, in_doc)
                     if links:
                         found.links[number] = links
-                    if colour or links:
+                    strikes = layout.page_strikes(doc[number])
+                    if strikes:
+                        found.strikes[number] = strikes
+                    if colour or links or strikes:
                         found.glyphs[number] = layout.page_glyphs(doc[number])
             finally:
                 doc.close()
@@ -748,6 +773,79 @@ def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> li
     return notices
 
 
+# ============================================================================ struck text
+
+
+def _middle_y(glyph: Glyph) -> float:
+    return (glyph.bbox[1] + glyph.bbox[3]) / 2
+
+
+def _size(glyph: Glyph) -> float:
+    """The glyph's text size: its span's font size, else the height of its box."""
+    return glyph.size or (glyph.bbox[3] - glyph.bbox[1])
+
+
+def struck_glyphs(glyphs: Sequence[Glyph], strikes: Iterable[Strike]) -> set[int]:
+    """Indexes into `glyphs` of the glyphs struck through.
+
+    A StrikeOut annotation strikes every glyph whose middle is inside it. A drawn line
+    strikes the glyphs of one row when it crosses most of the glyphs it spans there
+    (`STRIKE_MIN_CROSSED`) between `STRIKE_LOW` and `STRIKE_HIGH` of their height, and is no
+    thicker than `STRIKE_MAX_SIZE_SHARE` of their size; then every glyph of that row under
+    it is struck, a comma or a full stop as much as a letter. An underline, a rule under
+    blanks, an overline, a table rule between rows and a highlight behind text cross no
+    glyph so, and strike nothing."""
+    struck: set[int] = set()
+    for strike in strikes:
+        x0, y0, x1, y1 = strike.bbox
+        under = [
+            i
+            for i, g in enumerate(glyphs)
+            if x0 - STRIKE_X_SLACK <= (g.bbox[0] + g.bbox[2]) / 2 <= x1 + STRIKE_X_SLACK
+        ]
+        if strike.annotation:
+            struck.update(i for i in under if _centre_in(glyphs[i].bbox, strike.bbox, 0.0))
+            continue
+        y, thickness = (y0 + y1) / 2, y1 - y0
+        touched = [i for i in under if glyphs[i].bbox[1] <= y <= glyphs[i].bbox[3]]
+        crossed = []
+        for i in touched:
+            top, foot = glyphs[i].bbox[1], glyphs[i].bbox[3]
+            if foot - top <= 0 or thickness > STRIKE_MAX_SIZE_SHARE * _size(glyphs[i]):
+                continue
+            if STRIKE_LOW <= (foot - y) / (foot - top) <= STRIKE_HIGH:
+                crossed.append(i)
+        if not crossed or len(crossed) < STRIKE_MIN_CROSSED * len(touched):
+            continue
+        top = min(glyphs[i].bbox[1] for i in crossed)
+        foot = max(glyphs[i].bbox[3] for i in crossed)
+        struck.update(i for i in under if top <= _middle_y(glyphs[i]) <= foot)
+    return struck
+
+
+def deleted_runs(element: Element, aligner: _Aligner, strikes: Sequence[Strike]) -> list[Run]:
+    """The element's struck runs (offsets into its text): its struck glyphs mapped onto the
+    text, each run trimmed of spaces and kept only when it has a letter, a digit or an
+    inline equation."""
+    box = element.bbox
+    near = [s for s in strikes if _overlaps(s.bbox, box, BOX_SLACK)]
+    if not near:
+        return []
+    glyphs, alignment = aligner.of(element)
+    struck = struck_glyphs(glyphs, near)
+    if not struck:
+        return []
+    text = element.text or ""
+    runs = labelled_runs(
+        text, alignment, lambda i: True if i in struck else None, across_markers=True
+    )
+    return [
+        Run(start=start, end=end, kind="deleted")
+        for start, end, _ in runs
+        if INLINE_MARKER_RE.search(text[start:end]) or any(c.isalnum() for c in text[start:end])
+    ]
+
+
 # ============================================================================ language
 
 
@@ -798,6 +896,8 @@ class TextPassResult:
     lang_source: LangSource
     notices: list[Notice]
     annotations: int = 0
+    # Struck runs found, whether or not they were written (CONTENT_RUNS off: shadow).
+    deleted_runs: int = 0
 
     def counts(self) -> dict[str, int]:
         """Content-free numbers for the trace."""
@@ -806,13 +906,20 @@ class TextPassResult:
             "links": sum(1 for k in links if k.kind != "crossref"),
             "crossrefs": sum(1 for k in links if k.kind == "crossref"),
             "colour_runs": sum(len(e.colour_runs) for e in self.elements),
+            "deleted_runs": self.deleted_runs,
+            "deleted_runs_written": sum(len(e.runs) for e in self.elements),
             "passages": sum(1 for e in self.elements if e.lang),
             "notices": len(self.notices),
         }
 
 
 def annotate(
-    elements: list[Element], pdf: PdfText, *, layout_lang: str = "en", colour: bool = False
+    elements: list[Element],
+    pdf: PdfText,
+    *,
+    layout_lang: str = "en",
+    colour: bool = False,
+    runs: bool = False,
 ) -> TextPassResult:
     """The pass on elements and what was read from the PDF (pure; see `apply`)."""
     aligner = _Aligner(pdf.glyphs)
@@ -837,14 +944,21 @@ def annotate(
             own = sorted([*own, *crossrefs(element.text, targets, own)], key=lambda k: k.start)
         if own:
             links[element.id] = own
-    runs: dict[str, list[ColourRun]] = {}
+    coloured: dict[str, list[ColourRun]] = {}
     if colour:
         body = body_colour(g for glyphs in pdf.glyphs.values() for g in glyphs)
         for element in elements:
             if element.kind in RUNNING_KINDS and element.text:
                 found_runs = colour_runs(element, aligner, body, links.get(element.id, []))
                 if found_runs:
-                    runs[element.id] = found_runs
+                    coloured[element.id] = found_runs
+    struck: dict[str, list[Run]] = {}
+    for element in elements:
+        strikes = pdf.strikes.get(element.page)
+        if not strikes or element.kind not in LINK_KINDS or not element.text:
+            continue
+        if found_struck := deleted_runs(element, aligner, strikes):
+            struck[element.id] = found_struck
     lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang)
     langs = passages(elements, lang)
     updated = []
@@ -852,8 +966,10 @@ def annotate(
         update: dict[str, object] = {}
         if element.id in links:
             update["links"] = links[element.id]
-        if element.id in runs:
-            update["colour_runs"] = runs[element.id]
+        if element.id in coloured:
+            update["colour_runs"] = coloured[element.id]
+        if runs and element.id in struck:
+            update["runs"] = [*element.runs, *struck[element.id]]
         if langs.get(element.id):
             update["lang"] = langs[element.id]
         updated.append(element.model_copy(update=update) if update else element)
@@ -862,9 +978,13 @@ def annotate(
     for (page, owner), count in sorted(unclear.items()):
         notices.append(Notice(code="link_text_unclear", page=page, element_id=owner, count=count))
     if colour:
-        notices.extend(_colour_reference_notices(updated, set(runs)))
+        notices.extend(_colour_reference_notices(updated, set(coloured)))
+    notices.extend(notice_rules.from_runs(updated))
     notices.extend(lang_notices)
-    return TextPassResult(updated, lang, source, notices, annotations=pdf.annotations)
+    found = sum(len(r) for r in struck.values())
+    return TextPassResult(
+        updated, lang, source, notices, annotations=pdf.annotations, deleted_runs=found
+    )
 
 
 def apply(
@@ -874,12 +994,14 @@ def apply(
     pages: Iterable[int],
     layout_lang: str = "en",
     colour: bool = False,
+    runs: bool = False,
 ) -> TextPassResult:
     """The text pass for one conversion (the module docstring says what it adds).
 
     `pages` are the analysed pages (0-based), `layout_lang` the language layout reported
     (`Layout.lang`: the PDF's /Lang, else "en"), `colour` the FEATURE_COLOUR flag in
-    force. Never raises: a PDF that cannot be read again gives no links or colours (the
+    force, `runs` the CONTENT_RUNS flag (off: struck runs are counted, not written). Never
+    raises: a PDF that cannot be read again gives no links or colours (the
     cross-references and the language still come from the text), and a failure of the
     pass itself leaves the elements as they were, with the language layout reported.
     """
@@ -889,7 +1011,7 @@ def apply(
         log.warning("text pass could not read the PDF: %s", type(exc).__name__)
         pdf = PdfText()
     try:
-        return annotate(elements, pdf, layout_lang=layout_lang, colour=colour)
+        return annotate(elements, pdf, layout_lang=layout_lang, colour=colour, runs=runs)
     except Exception as exc:
         log.warning("text pass failed: %s", type(exc).__name__)
         if pdf.lang or layout_lang != language.DEFAULT_LANG:

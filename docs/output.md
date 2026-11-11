@@ -911,6 +911,61 @@ text ("shown in red") gets the optional notice `colour_reference`: the instructo
 to add a cue that does not depend on seeing it. With the flag off, colored text is
 written in the body color, as in pipeline 0.3.0.
 
+## Struck, bold and other marked text
+
+Text whose look changes its meaning is kept as a run of the element's text
+(`Element.runs`, `core/types.Run`), offsets into the stored text like links and color
+runs. One kind exists so far: `deleted`, text struck through on the page ("The midterm is
+on ~~October 3~~ October 10"). Bold, italic and highlighted text are not runs yet; they are
+written as plain text.
+
+A struck run is kept, never removed, and written as `<del>` with the words said around it:
+
+```html
+<p id="p1-e1">The midterm is on <span class="visually-hidden readablestem">deleted: </span><del>October 3</del><span
+  class="visually-hidden readablestem"> end deleted</span> October 10 in room 2-190.</p>
+```
+
+Most screen readers say nothing for `<del>`, so the meaning would depend on the reader's
+settings; the two hidden phrases ("deleted: " before, "end deleted" after) say it in every
+reader and in Listen. They sit outside `<del>`, so the strike covers only the page's words,
+and they carry the `readablestem` class (the tool's own words, `lang="en"` in a document in
+another language). A document with struck text gets one rule, added only then:
+
+```css
+del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;
+  text-decoration-skip-ink: none; }
+```
+
+A text decoration is drawn in the text's own color, so it stays in forced-colors mode and
+on the dark page. Nesting, outermost first: link, struck, color, raised or lowered. A struck
+run is outside color so that a color change inside it never cuts it in two (a cut run would
+be said twice); a link stays outermost so it is never cut. A struck run may cover an inline
+equation (the hidden words go around the math).
+
+What each output holds for the struck date above:
+
+- **HTML and EPUB:** as above (the EPUB sanitizer keeps `del` and the spans).
+- **Canvas page and index, Common Cartridge:** as above, the hidden spans also given
+  Canvas's `screenreader-only` class and its inline hiding style.
+- **Word:** "deleted:" and "end deleted" as ordinary words, and "October 3" struck through
+  (pandoc writes `<del>` as strike; Word has no hidden text that a screen reader reads).
+- **Listen:** "The midterm is on deleted: October 3 end deleted October 10 in room 2-190."
+
+Where runs come from: the text pass marks struck PDF text (docs/layout.md "Struck text"),
+and the LaTeX reader turns `\sout` and `\xout` (ulem) into deleted runs. Each element with
+struck text gets the optional notice `struck_text` ("Worth checking", with its page; it adds
+no required decision): the instructor may want to take out words students no longer need.
+A text edit that changes struck words takes the run off, and the edit's message counts it
+("1 struck-text mark was taken off because its words changed"); the notice goes with the
+last run.
+
+`CONTENT_RUNS` (off by default) is the rollout switch. Off, struck runs are found and
+counted in the trace (`deleted_runs`, `deleted_runs_written: 0`) but not stored or written,
+and no notice is raised: the output is as before. A result without runs is stored and
+written byte for byte as before (the field is left out of the JSON when empty), and a
+result with runs loads in a release that does not know them, which writes the words plain.
+
 ## MathML is rebuilt, never pasted
 
 MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also importable as

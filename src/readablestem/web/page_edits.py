@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
+from readablestem.core import inline
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     PENDING_STATUSES,
@@ -366,28 +367,35 @@ def _moved(mapping: list[int | None], start: int, end: int) -> tuple[int, int] |
     return first, last + 1
 
 
-def remap_spans(old: str, new: str, element: Element) -> tuple[dict[str, Any], int]:
-    """The element's links, colour runs, script runs and glossary term, moved to where their
-    words are in the new text. A span whose words were changed is dropped (it would point
-    at other words). Returns (fields to update, how many links were dropped)."""
+def remap_spans(old: str, new: str, element: Element) -> tuple[dict[str, Any], Counter[str]]:
+    """The element's spans (links, colour, raised and lowered runs, struck text:
+    `core.inline`) and glossary term, moved to where their words are in the new text. A
+    span whose words were changed is dropped (it would cover other words). Returns (fields
+    to update, how many spans were dropped, by kind: "link", "deleted", ...)."""
     mapping = _char_map(old, new)
-    update: dict[str, Any] = {}
-    dropped = 0
-    for name in ("links", "colour_runs", "script_runs"):
-        kept = []
-        for span in getattr(element, name):
-            moved = _moved(mapping, span.start, span.end)
-            if moved is None:
-                dropped += 1 if name == "links" else 0
-                continue
-            kept.append(span.model_copy(update={"start": moved[0], "end": moved[1]}))
-        update[name] = kept
+    update, dropped = inline.moved(element, lambda start, end: _moved(mapping, start, end))
     if element.term_end is not None:
         # The glossary term stays a term only while its own words are unchanged; then the
         # definition may change freely.
         end = element.term_end
         update["term_end"] = end if new[:end] == old[:end] else None
     return update, dropped
+
+
+def _taken_off(dropped: Counter[str]) -> str:
+    """The sentence that says what an edit took off (" 1 link was taken off because its
+    words changed."): links and struck-text marks, which a reader would miss. A colour or a
+    raised run is only the look of the words that changed, and is not counted."""
+    named = [
+        (dropped["link"], "link", "links"),
+        (dropped["deleted"], "struck-text mark", "struck-text marks"),
+    ]
+    parts = [f"{n} {one if n == 1 else many}" for n, one, many in named if n]
+    if not parts:
+        return ""
+    total = sum(n for n, _, _ in named)
+    were, their = ("was", "its") if total == 1 else ("were", "their")
+    return f" {' and '.join(parts)} {were} taken off because {their} words changed."
 
 
 def text_element(result: DocumentResult, element_id: str) -> Element:
@@ -449,12 +457,7 @@ def edit_text(result: DocumentResult, element_id: str, typed: str) -> StructureC
     if heading and fix is not None and fix.heading is not None:
         fix.heading = HeadingFix(level=fix.heading.level, text=stored)
     _recount(result)
-    note = ""
-    if dropped:
-        note = (
-            f" {dropped} link{' was' if dropped == 1 else 's were'} taken off because "
-            f"{'its' if dropped == 1 else 'their'} words changed."
-        )
+    note = _taken_off(dropped)
     return StructureChange(
         element_id=element_id,
         action="edit_text",

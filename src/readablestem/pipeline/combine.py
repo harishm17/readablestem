@@ -15,8 +15,8 @@ each part. What changes between a part and the whole is only addresses:
   (`p31-e0`), which no other part can have; an id of another shape gets the part's number
   in front. The same rewrite is applied everywhere an id is named: the element and its
   fix, its container, links and cross-references, the equation markers inside text (their
-  length changes, so the offsets of links, colour runs, raised and lowered runs and a term's
-  end are moved with them) and the pictures.
+  length changes, so the offsets of every span of the text (`core.inline`: links, colour,
+  raised and lowered runs, struck text) and a term's end are moved with them) and the pictures.
 - **Gaps.** Source pages between the first and last part that no part here holds (a part
   deleted, or not finished) are named in the student note as left out of this file, so the
   file never reads as complete when it is not.
@@ -31,15 +31,13 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+from readablestem.core import inline
 from readablestem.core.types import (
     INLINE_MARKER_RE,
-    ColourRun,
     DocumentResult,
     Element,
     Fix,
     HeadingFix,
-    Link,
-    ScriptRun,
     inline_marker,
 )
 from readablestem.pipeline import assemble
@@ -129,22 +127,8 @@ def _element(element: Element, map_id: Callable[[str], str], pages: Sequence[int
         update["caption_marked"] = _text_map(element.caption_marked, map_id)[0]
     if element.term_end is not None:
         update["term_end"] = move(element.term_end)
-    update["links"] = [
-        Link(
-            start=move(k.start),
-            end=move(k.end),
-            kind=k.kind,
-            href=k.href,
-            target_id=map_id(k.target_id) if k.target_id else None,
-        )
-        for k in element.links
-    ]
-    update["colour_runs"] = [
-        ColourRun(start=move(r.start), end=move(r.end), rgb=r.rgb) for r in element.colour_runs
-    ]
-    update["script_runs"] = [
-        ScriptRun(start=move(r.start), end=move(r.end), kind=r.kind) for r in element.script_runs
-    ]
+    spans, _ = inline.moved(element, lambda start, end: (move(start), move(end)), target=map_id)
+    update.update(spans)
     return element.model_copy(update=update)
 
 

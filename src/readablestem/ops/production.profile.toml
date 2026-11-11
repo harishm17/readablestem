@@ -155,6 +155,7 @@ IMAGE_PAGES_SECOND_READER = { value = "off", source = "docs/deploy-railway.md:17
 FEATURE_TABLES = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
 FEATURE_LONG_DESCRIPTIONS = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
 FEATURE_COLOUR = { value = false, source = "docs/web.md:59 at 693cca24, stated 2026-11-04 (not among the flags turned on)" }
+CONTENT_RUNS = { value = false, source = "new 2026-11-11 (content model WS16.1); off is the shadow rollout: struck runs counted in the trace, not written; code default" }
 FEATURE_NOTATION_MEMORY = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
 FEATURE_PAGE_MATH = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
 PAGE_MATH_MODEL = { value = "unset", source = "not stated; code default" }

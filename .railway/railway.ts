@@ -140,6 +140,7 @@ const appVariables = [
 // behaviour setting named here is in src/readablestem/ops/production.profile.toml, not here.
 const webOnlyVariables = [
   "CLAUDE_SECOND_CHECK",
+  "CONTENT_RUNS",
   "EQUATION_GLYPH_CHECKS",
   "EQUATION_GLYPH_RECONCILE",
   "EQUATION_LINE_CONTEXT",

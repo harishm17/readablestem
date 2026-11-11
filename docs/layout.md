@@ -14,9 +14,10 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048, tag_dpi=False) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped; `tag_dpi` writes the resolution into the PNG header (equation crops for the student file, `pipeline/equation_scale.py`) |
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
-| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span color, for the text pass |
+| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span color and size, for the text pass |
+| `page_strikes(page) -> list[Strike]` | thin horizontal rules and bars, and StrikeOut annotation quads, of an open page (display space), for the text pass |
 | `heading_step.heading_fixes(elements) -> list[Fix]` | one `HeadingFix` per heading, outline repaired, with checks and confidence |
-| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour) -> TextPassResult` | the elements with links, color runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
+| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour, runs) -> TextPassResult` | the elements with links, color runs, struck runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
 
 Element conventions:
 
@@ -2189,6 +2190,32 @@ color. Headings get no color runs. Running text that names a color ("in red", "s
 in blue", "highlighted in yellow", "the green curve", "red arrows") on or within two
 paragraphs of colored text on the same page gets the optional notice
 `colour_reference`. With the flag off there are no runs and no such notices.
+
+### Struck text (F-509, `CONTENT_RUNS`)
+
+Text struck through on the page is kept and marked as a `deleted` run (`Element.runs`), so
+"October 3 October 10" with the first date struck is not read as two live dates. The marks
+come from `layout.page_strikes`: every visible horizontal stroked line and every filled bar
+no thicker than 3 pt (curves are skipped; a page too complex to read its drawings gives its
+annotations only), and the quads of each StrikeOut annotation. A glyph is struck
+(`text_pass.struck_glyphs`) when:
+
+- a StrikeOut quad holds its center; or
+- a rule crosses it between 25% and 65% of the glyph's height from its bottom, no thicker
+  than 0.12 of its font size, and the rule crosses at least half of the glyphs of that row
+  it touches. The glyphs whose vertical middle lies in the band of those it crosses are
+  struck with them, so a rule drawn at x-height also covers the capitals and digits beside.
+
+A rule under the text (an underline) or under a blank ("Name: ____") crosses no glyph in
+that band and strikes nothing. Struck glyphs become runs the same way as color
+(`labelled_runs`, across inline markers), kept only with a letter, a digit or math in them,
+on paragraphs, list items and headings. Each element with runs gets the optional notice
+`struck_text` (with its page; no required decision). Glyphs are now read on any page with a
+strike mark, not only on pages with links or color.
+
+With `CONTENT_RUNS` off (the default, shadow rollout) the runs are found and counted
+(`TextPassResult.deleted_runs`, trace `deleted_runs` and `deleted_runs_written: 0`) but not
+stored, and no notice is raised. The LaTeX path follows the same switch for its `\sout` runs.
 
 ### Source facts
 
