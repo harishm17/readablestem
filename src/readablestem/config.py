@@ -11,10 +11,13 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from readablestem.ops.profile import Profile
 
 # The OpenAI pair Harish chose on 2026-10-07 (ADR 0002), used when MODEL_PROVIDER=openai,
 # which is the default in code. Production runs MODEL_PROVIDER=anthropic (the pair below).
@@ -746,11 +749,22 @@ class Settings(BaseSettings):
             if on
         ]
 
-    def check_production(self) -> None:
+    def production_profile(self) -> Settings:
+        """These settings with every behaviour setting at its production value (the production
+        profile, `ops/production.profile.toml`); secrets, addresses and limits are kept. Evals
+        run under it with `--profile production`; unit tests keep the code defaults."""
+        from readablestem.ops.profile import load
+
+        return load().apply(self)
+
+    def check_production(self, profile: Profile | None = None) -> None:
         """Fail fast on a production start that would run without its safety limits.
 
         The Microsoft sign-in settings are checked in every environment: half of them set
         is always a mistake (`_check_microsoft`); so is the email sign-in without a sender.
+        Last, the behaviour settings are compared with the production profile (`profile`, the
+        shipped one when None; `ops.profile.check_start`): each one that differs is logged by
+        name, and the start is refused only when the profile is confirmed.
         """
         self._check_microsoft()
         self._check_email_login()
@@ -829,6 +843,9 @@ class Settings(BaseSettings):
         errors = [f.text for f in spend_findings(self) if f.severity == "error"]
         if errors:
             raise ConfigError("production start refused; spend limits: " + "; ".join(errors))
+        from readablestem.ops.profile import check_start
+
+        check_start(self, profile)
 
     def provider_key(self) -> SecretStr | None:
         return self.anthropic_api_key if self.model_provider == "anthropic" else self.openai_api_key

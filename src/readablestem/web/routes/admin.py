@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import case, func, select
 
+from readablestem.ops import profile
 from readablestem.web import access, events, linked_emails
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
@@ -133,7 +134,15 @@ def admin_context(request: Request) -> dict[str, Any]:
         ).all()
         # Usage events (web/events.py): counts per day and per pseudonymous person.
         usage = events.usage(session, days=USAGE_DAYS)
+    shipped = profile.load()
     return {
+        # The production profile (ops/profile.py): names only, never a value.
+        "profile": {
+            "name": shipped.name,
+            "hash": shipped.short_hash,
+            "confirmed": shipped.confirmed,
+            "differs": shipped.differences(ctx.settings),
+        },
         "usage": usage,
         "usage_columns": {"day": events.DAY_COLUMNS, "person": events.PERSON_COLUMNS},
         "events_on": ctx.settings.events_enabled,

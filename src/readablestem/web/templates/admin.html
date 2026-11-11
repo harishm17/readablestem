@@ -276,4 +276,22 @@
   <p>No usage events yet.</p>
   {% endif %}
 </section>
+
+<section aria-labelledby="profile-heading">
+  <h2 id="profile-heading">Production profile</h2>
+  <p>The settings production should run, from <code>ops/production.profile.toml</code>:
+    profile <code>{{ profile.name }}</code>, hash <code>{{ profile.hash }}</code>.
+    {% if profile.confirmed %}Its values were confirmed against the hosting dashboard, so a
+    start whose settings differ is refused.{% else %}Its values are not yet confirmed against
+    the hosting dashboard, so a start whose settings differ is logged
+    (<code>profile_mismatch</code>) and goes ahead.{% endif %}</p>
+  {% if profile.differs %}
+  <p>Settings that differ from the profile now:</p>
+  <ul>
+    {% for name in profile.differs %}<li><code>{{ name }}</code></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>Every behaviour setting matches the profile.</p>
+  {% endif %}
+</section>
 {% endblock %}

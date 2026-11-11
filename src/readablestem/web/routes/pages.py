@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
+from readablestem.ops import profile
 from readablestem.pipeline import export_docx
 from readablestem.web import analytics, office_convert, offices, proof_facts, seo, storage
 from readablestem.web.assets import cached_html, static_url
@@ -363,7 +364,8 @@ def readyz(request: Request) -> Response:
 @router.get("/healthz/ops")
 def healthz_ops(request: Request) -> Response:
     """Did the daily backup and the hourly cron finish well lately (ops.heartbeat)? 200, or
-    503 listing only the names that are stale. Content-free, like /readyz."""
+    503 listing only the names that are stale. Content-free, like /readyz. `profile` is the
+    production profile's hash (ops/profile.py), which names no setting and no value."""
     ctx = get_ctx(request)
     ok, stale = ops_freshness(ctx)
     try:
@@ -374,6 +376,7 @@ def healthz_ops(request: Request) -> Response:
     return JSONResponse(
         {
             "status": "ok" if ok else "stale",
+            "profile": profile.load().short_hash,
             "stale": stale,
             "storage": stored,
             "sandbox": ctx.sandbox.public(),

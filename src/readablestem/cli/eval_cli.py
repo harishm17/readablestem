@@ -127,6 +127,13 @@ def _add_spend_args(parser: argparse.ArgumentParser) -> None:
         metavar="ID",
         help="cheap model of the chosen provider (default: the setting, e.g. claude-haiku-5-5)",
     )
+    parser.add_argument(
+        "--profile",
+        choices=["production"],
+        help="run under the production profile (ops/production.profile.toml) instead of this "
+        "environment's settings; the report then names the profile and its hash, and without "
+        "it says 'development settings' unless the settings are the profile's",
+    )
 
 
 def _add_judge_args(parser: argparse.ArgumentParser) -> None:
@@ -260,9 +267,12 @@ def _settings_for(args: argparse.Namespace) -> Any:
 
     from readablestem.config import with_provider
 
+    base = _settings()
+    if getattr(args, "profile", None) == "production":
+        base = base.production_profile()
     try:
         return with_provider(
-            _settings(),
+            base,
             getattr(args, "provider", None),
             main_model=getattr(args, "main_model", None),
             cheap_model=getattr(args, "cheap_model", None),

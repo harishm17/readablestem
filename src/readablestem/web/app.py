@@ -394,9 +394,11 @@ def create_app(
 ) -> FastAPI:
     """Build the web app. Tests pass a fake converter and client factory."""
     settings = settings or get_settings()
+    # Logging first, so the production profile's `profile_mismatch` lines (written by
+    # `check_production`) come out in the service's own format.
+    configure_logging(settings)
     settings.check_production()
     check_web_secrets(settings)
-    configure_logging(settings)
     engine = make_engine(settings.database_url)
     factory = make_sessionmaker(engine)
     ctx = AppContext(

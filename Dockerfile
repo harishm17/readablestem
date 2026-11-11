@@ -142,6 +142,12 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     TABLE_MODEL_DIR=/app/models \
     MATH_READER_LOCAL_DIR=/app/math-reader
 
+# The production profile's image facts (src/readablestem/ops/production.profile.toml,
+# "[image_facts]"): what this image carries (TeX Live packages, LaTeXML, pandoc, LibreOffice,
+# lxml), measured here and written into the installed copy of the profile, so they are filled by
+# the build and never typed. A check that needs a program counts as on only when these name it.
+RUN readablestem ops image-facts --write
+
 USER 10001:10001
 EXPOSE 8080
 

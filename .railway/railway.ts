@@ -167,6 +167,62 @@ const webOnlyVariables = [
   "PORT",
 ];
 
+// The rest of the behaviour settings of the production profile
+// (src/readablestem/ops/production.profile.toml, which holds their production values and where
+// each came from; this file holds names only). Declared on web, where conversions run, so that a
+// value set in the dashboard is kept by the next apply and not deleted. Naming a variable that
+// has no value in Railway changes nothing in the plan. tests/test_profile.py fails when a
+// profile setting is named in none of the lists here.
+const profileVariables = [
+  "ABSTAIN_CONFIDENCE",
+  "ACCEPT_CONFIDENCE_BY_MODEL",
+  "ANTHROPIC_CHEAP_MODEL",
+  "ANTHROPIC_EFFORT_CHEAP",
+  "ANTHROPIC_EFFORT_EQUATION",
+  "ANTHROPIC_EFFORT_FIGURE",
+  "ANTHROPIC_EFFORT_IMAGE_PAGES",
+  "ANTHROPIC_EFFORT_MAIN",
+  "ANTHROPIC_EFFORT_PAGE_MATH",
+  "ANTHROPIC_EFFORT_PAGE_WITNESS",
+  "ANTHROPIC_MAIN_MODEL",
+  "ANTHROPIC_NOTICE_IN_SYSTEM",
+  "ANTHROPIC_REFUSAL_FALLBACK",
+  "AUTO_ACCEPT_CONFIDENCE",
+  "CHEAP_MODEL",
+  "CLAUDE_CHECK_EFFORT",
+  "CLAUDE_CHECK_MODEL",
+  "CLAUDE_CHECK_SCOPE",
+  "DECISIONS_EQUATION_FLAG_AT",
+  "DECISIONS_FIGURE_FLAG_BELOW",
+  "DECISIONS_MODEL",
+  "EQUATION_CONTEXT_ON_ESCALATION",
+  "EQUATION_DISPLAY_FIRST_CHEAP",
+  "FEATURE_PAGE_MATH",
+  "FIGURE_MODEL_MAX_EDGE_PX",
+  "IMAGE_PAGES_ACCEPT_AGREED",
+  "IMAGE_PAGES_DPI",
+  "IMAGE_PAGES_MATHS_ALWAYS_REQUIRED",
+  "IMAGE_PAGES_MODEL",
+  "IMAGE_PAGES_OMISSION_CHECK",
+  "IMAGE_PAGES_RECOVER_OMISSIONS",
+  "IMAGE_PAGES_SECOND_READING",
+  "LAYOUT_DISPLAY_GROUPING",
+  "MAIN_MODEL",
+  "MATHML_ALTTEXT",
+  "MATH_READER_CLAUDE_EFFORT",
+  "MATH_READER_CLAUDE_ENABLED",
+  "MATH_READER_CLAUDE_MODEL",
+  "MATH_READER_LOCAL_ENABLED",
+  "MATH_READER_OPENAI_ENABLED",
+  "MATH_READER_OPENAI_MODEL",
+  "OFFICE_INPUT_ENABLED",
+  "PAGE_MATH_AGREEMENT_LIFT",
+  "PAGE_MATH_MAX_OUTPUT_TOKENS",
+  "PAGE_MATH_MODEL",
+  "PAGE_MATH_UNCONFIRMED_FACTOR",
+  "PAGE_WITNESS_MAX_OUTPUT_TOKENS",
+];
+
 export default defineRailway(() => {
   const Postgres = postgres("Postgres", { region: "iad" });
   Postgres.networking = { privateNetworkEndpoint: "postgres" };
@@ -196,7 +252,7 @@ export default defineRailway(() => {
     preDeploy: "readablestem db upgrade",
     replicas: { iad: 1 },
     domains: ["readablestem.com", "www.readablestem.com"],
-    env: preserved(...appVariables, ...webOnlyVariables),
+    env: preserved(...appVariables, ...webOnlyVariables, ...profileVariables),
   });
 
   // Hourly at minute 7: aggregate finished jobs, then purge past retention. No pre-deploy
