@@ -131,3 +131,70 @@ def test_a_second_conversion_waits_for_the_first_and_gives_up_as_a_timeout(monke
 def test_conversions_one_after_another_each_get_the_gate():
     for _ in range(2):
         assert convert("bib").stats.required_decisions == 0
+
+
+# ------------------------------------------------------------------ what LaTeXML reported
+
+LOSSES = {  # a source that loses content, and the line its report must hold
+    "missing_input": (
+        "\\documentclass{article}\\begin{document}\nIntro.\n\\input{problems/set3}\n"
+        "\\end{document}\n",
+        ("error", "missing_file", "problems/set3", "main.tex"),
+    ),
+    "unclosed_brace": (
+        "\\documentclass{article}\\usepackage{amsmath}\\begin{document}\n"
+        "\\begin{align}a &= \\frac{1}{2\n\\end{align}\n\\section{Harmonic series}Gone.\n"
+        "\\end{document}\n",
+        ("error", "expected", "}", "main.tex"),
+    ),
+    "undefined_text": (
+        "\\documentclass{article}\\begin{document}\nA \\term{word} and \\hw.\n\\end{document}\n",
+        ("error", "undefined", "\\term", "main.tex"),
+    ),
+    "missing_package": (
+        "\\documentclass{article}\\usepackage{coursemacros}\\begin{document}\nHi \\course.\n"
+        "\\end{document}\n",
+        ("missing", "missing_file", "coursemacros", "main.tex"),
+    ),
+    "unknown_class": (
+        "\\documentclass{exam}\\begin{document}\\begin{questions}\\question[5] Two?\n"
+        "\\begin{solution}Four.\\end{solution}\\end{questions}\\end{document}\n",
+        ("missing", "missing_file", "exam", "main.tex"),
+    ),
+}
+
+
+@pytest.mark.parametrize("name", list(LOSSES))
+def test_the_report_names_what_latexml_said(name, tmp_path):
+    from readablestem.source import latexml
+    from readablestem.source import report as source_report
+
+    text, (level, category, expected, where) = LOSSES[name]
+    (tmp_path / "main.tex").write_text(text)
+    latexml.convert(tmp_path, "main.tex", tmp_path / "out")
+    report = source_report.parse(tmp_path / "out", project=tmp_path)
+    found = {(p.level, p.category, p.name, p.file) for p in [*report.problems, *report.missing]}
+    assert (level, category, expected, where) in found
+    assert report.log_errors >= 1
+
+
+def test_a_clean_article_with_hyperref_has_an_empty_report():
+    blob = envelope.wrap(
+        "tex",
+        "clean.tex",
+        None,
+        b"\\documentclass{article}\\usepackage{hyperref}\\usepackage{amsmath}\n"
+        b"\\begin{document}\\section{One}Clean $a+b$ and \\url{https://example.org}.\n"
+        b"\\end{document}\n",
+    )
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    assert result.source_report is not None and result.source_report.empty
+    assert result.source_report.warnings == 8  # the helpers hyperref's binding asks for
+
+
+def test_every_error_node_is_counted_and_placed():
+    result = convert("broken_macro")
+    report = result.source_report
+    assert report is not None and report.error_nodes == 2 and report.unplaced_errors == 0
+    assert {m.name for m in report.marks} == {r"\mysterycommand", r"\anotherunknown"}
+    assert all(m.in_formula and m.element_id for m in report.marks)

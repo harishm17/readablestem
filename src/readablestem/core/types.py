@@ -1062,6 +1062,73 @@ class ImagePagesSummary(BaseModel):
     second_reader: SecondReaderSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
+class SourceProblem(BaseModel):
+    """One line LaTeXML wrote about a source (`source.report`): an error, a fatal error, or a
+    file, package or class it could not find.
+
+    Unlike `Notice` and `Check`, this holds the instructor's own names (a command, a file
+    name, a package): it is kept with the document, removed with it, and never logged; logs
+    get the counts per category only. `name` and `file` are trimmed to printable characters
+    and 120 of them; `file` is relative to the project ("" when LaTeXML named no file of the
+    project). `what` says what a missing name is: a class or package with no binding
+    ("class", "package"), a package whose binding needs the package's own file
+    ("package_source"), or a file."""
+
+    level: Literal["error", "fatal", "missing"]
+    category: str
+    name: str = ""
+    file: str = ""
+    line: int | None = None
+    step: Literal["latexml", "post"] = "latexml"
+    what: Literal["class", "package", "package_source", "file"] | None = None
+
+
+class SourceMark(BaseModel):
+    """A place in the converted document where LaTeXML left an error node (`ltx_ERROR`): the
+    element that holds it (None when the reader did not place it) and whether it sits in a
+    formula. `name` is the node's text (a command, as written), trimmed like `SourceProblem`."""
+
+    name: str = ""
+    element_id: str | None = None
+    in_formula: bool = False
+
+
+class SourceFigure(BaseModel):
+    """A figure whose picture could not be read: the file name the source asked for."""
+
+    element_id: str
+    name: str
+
+
+class SourceReport(BaseModel):
+    """What LaTeXML said about a source, and where its error nodes ended up (`source.report`).
+
+    Three totals that should agree: `log_errors` (errors LaTeXML counted), `error_nodes`
+    (error nodes in its XHTML) and the marks the reader placed; `unplaced_errors` is the
+    number of error nodes the reader could not tie to an element. `counts` holds every error
+    by category, content-free; `problems` keeps at most 20 named lines per category and
+    `omitted` the number left out. Harmless warnings (a helper package LaTeXML's own
+    bindings ask for) are counted in `warnings` and never named."""
+
+    problems: list[SourceProblem] = Field(default_factory=list)
+    missing: list[SourceProblem] = Field(default_factory=list)
+    marks: list[SourceMark] = Field(default_factory=list)
+    figures: list[SourceFigure] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+    omitted: dict[str, int] = Field(default_factory=dict)
+    warnings: int = 0
+    log_errors: int = 0
+    error_nodes: int = 0
+    unplaced_errors: int = 0
+
+    @property
+    def empty(self) -> bool:
+        """Nothing to tell the instructor: no error, no missing file, no error node."""
+        return not (self.problems or self.missing or self.marks or self.figures) and not (
+            self.log_errors or self.error_nodes
+        )
+
+
 class DocumentResult(BaseModel):
     """Everything the pipeline produced for one PDF. Crop images are kept separately."""
 
@@ -1122,6 +1189,10 @@ class DocumentResult(BaseModel):
     origin: Literal["pdf", "latex", "beamer"] = Field(
         default="pdf", exclude_if=lambda v: v == "pdf"
     )
+    # A source only: what LaTeXML reported and where its error nodes are (`SourceReport`).
+    # It holds names from the source, so it lives and dies with the document. None for a PDF
+    # and for a source converted before it existed, and left out of the JSON then.
+    source_report: SourceReport | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @property
     def omitted_pages(self) -> list[int]:

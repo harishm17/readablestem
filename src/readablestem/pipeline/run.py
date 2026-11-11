@@ -219,7 +219,11 @@ log = logging.getLogger(__name__)
 # TeX-made PDF, a unit past the box, a printed slash, a display's equation number, `\mathscr` for
 # an RSFS face, and `\boldsymbol` for a table cell's bold italic letter. Results from 0.5.8 load
 # unchanged.
-PIPELINE_VERSION = "0.5.9"
+# 0.5.10 (2026-11-11): a LaTeX source's result carries what LaTeXML reported
+# (`DocumentResult.source_report`, `source.report`), and a source that loses content outside a
+# formula stops with a code that names the cause. PDFs are unchanged. Results from 0.5.9 load
+# unchanged and are not judged again.
+PIPELINE_VERSION = "0.5.10"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

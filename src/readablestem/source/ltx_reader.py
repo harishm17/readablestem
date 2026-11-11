@@ -19,6 +19,10 @@ What each part becomes:
   no usable picture the figure is a required decision (`source_figure_missing`);
 - text-level errors stay in the text as written and add the notice `source_error`.
 
+Every error node (`ltx_ERROR`) is counted once, wherever it is, and each is tied to the element
+that holds it where the reader can (`Reading.marks`, for `source.report`): inline, inside a
+formula, or in a block the reader took whole (a figure, a table, loose text).
+
 Nothing here runs TeX or opens a file outside the project folder.
 """
 
@@ -42,6 +46,8 @@ from readablestem.core.types import (
     Link,
     Notice,
     ScriptRun,
+    SourceFigure,
+    SourceMark,
     Status,
     TableCell,
     TableFix,
@@ -49,6 +55,7 @@ from readablestem.core.types import (
     inline_marker,
 )
 from readablestem.source import figures
+from readablestem.source.report import clean
 
 CHARS_PER_PAGE = 3000
 MAX_XHTML_BYTES = 60 * 1024 * 1024
@@ -99,6 +106,11 @@ class Reading:
     images: dict[str, bytes] = field(default_factory=dict)  # figure element id -> PNG
     notices: list[Notice] = field(default_factory=list)
     errors: int = 0
+    # Every error node in the document (`error_nodes`) and, in document order, where each
+    # one went (`marks`); the pictures a figure asked for that could not be read (`figures`).
+    error_nodes: int = 0
+    marks: list[SourceMark] = field(default_factory=list)
+    figures: list[SourceFigure] = field(default_factory=list)
 
 
 class _Reader:
@@ -114,6 +126,17 @@ class _Reader:
         self.chars = 0
         self.counter = 0
         self.errors = 0
+        self.marked: dict[int, str | None] = {}  # id of an error node -> its element's id
+        self.pending: list[Node] = []  # error nodes met before their element was made
+
+    def _mark(self, node: Node, element: Element | None = None) -> None:
+        """Tie an error node to `element`, or to the next element made (a heading's text is
+        read before its element exists)."""
+        if id(node) in self.marked:
+            return
+        self.marked[id(node)] = element.id if element is not None else None
+        if element is None:
+            self.pending.append(node)
 
     # ------------------------------------------------------------------ elements
 
@@ -131,6 +154,9 @@ class _Reader:
             **fields,
         )
         self.out.elements.append(element)
+        for node in self.pending:
+            self.marked[id(node)] = element.id
+        self.pending = []
         return element
 
     def _heading_fix(self, element: Element, level: int, text: str) -> None:
@@ -146,63 +172,74 @@ class _Reader:
     # ------------------------------------------------------------------ walking
 
     def walk(self, node: Node, depth: int = 0) -> None:
+        before = self.counter
+        if self._walk(node, depth) and self.counter > before:
+            # a block taken whole: an error node in it that no rule placed is in its last element
+            holder = self.out.elements[-1]
+            for inner in node.iter():
+                if "ltx_ERROR" in _classes(inner):
+                    self._mark(inner, holder)
+
+    def _walk(self, node: Node, depth: int) -> bool:
+        """Read `node`; True when one rule took it whole (not its children one by one)."""
         if depth > MAX_DEPTH:
             raise ReadError("too deep")
         tag = _local(node.tag)
         classes = _classes(node)
         if tag in ("head", "script", "style", "nav") or classes & {"ltx_page_footer", "ltx_dates"}:
-            return
+            return False
         if classes & HIDDEN:  # not shown on this step of a frame (beamer)
-            return
+            return False
         if tag == "p" and any(_local(n.tag) == "foreignObject" for n in node.iter()):
             # beamer draws a title page inside an svg: the blocks in it are the content
             for box in (n for n in node.iter() if _local(n.tag) == "foreignObject"):
                 self._walk_children(box, depth + 1)
-            return
+            return True
         if tag == "math":  # display maths outside any equation table
             self._display_math([node], None)
-            return
+            return True
         if m := _LEVEL.match(tag):
             self._section_heading(node, int(m.group(1)), classes)
-            return
+            return True
         if tag == "p":
             self._paragraph(node)
-            return
+            return True
         if tag in ("ul", "ol") or classes & {"ltx_itemize", "ltx_enumerate", "ltx_biblist"}:
             self._list(node, 1)
-            return
+            return True
         if tag == "dl" or "ltx_description" in classes:
             self._description(node)
-            return
+            return True
         if tag == "table" and classes & {"ltx_equation", "ltx_equationgroup"}:
             self._equation_table(node)
-            return
+            return True
         if tag == "table" and "ltx_tabular" in classes:
             self._table(node, caption=None)
-            return
+            return True
         if _is_figure(node):
             self._figure(node, depth)
-            return
+            return True
         if classes & {"ltx_listing", "ltx_verbatim"} or tag == "pre":
             self._listing(node)
-            return
+            return True
         if "ltx_theorem" in classes or "ltx_proof" in classes:
             self._theorem(node, depth)
-            return
+            return True
         if "ltx_authors" in classes:
             text = _squash(self._plain(node))
             if text:
                 self._new(Kind.PARAGRAPH, text=text)
                 self.chars += len(text)
-            return
+            return True
         if tag in ("span", "a", "em", "strong", "b", "i") and not _children_blocks(node):
             # loose inline text directly inside a container: a paragraph of its own
             text, _ = self._inline_text(node)
             if text:
                 self._new(Kind.PARAGRAPH, text=text)
                 self.chars += len(text)
-            return
+            return True
         self._walk_children(node, depth)
+        return False
 
     # ------------------------------------------------------------------ slides (beamer)
 
@@ -343,6 +380,7 @@ class _Reader:
                 emit(" ")
             elif "ltx_ERROR" in classes:
                 self.errors += 1
+                self._mark(item, owner)
                 emit(_squash(self._plain(item)))
             elif classes & {"ltx_note"}:
                 note = _squash(
@@ -518,6 +556,9 @@ class _Reader:
         """(latex, mathml, has_error) of one `<math>`."""
         latex = (math.get("alttext") or "").strip()
         failed = any(_local(n.tag) == "merror" or "ltx_ERROR" in _classes(n) for n in math.iter())
+        for node in math.iter():
+            if "ltx_ERROR" in _classes(node):
+                self._mark(node)  # the equation element made next holds it
         math.set("display", display)
         return latex, _serialise_math(math), failed
 
@@ -678,6 +719,8 @@ class _Reader:
             element = self._new(Kind.FIGURE, caption=caption if first and caption else None)
             first = False
             png = self._picture(picture) if picture is not None else None
+            if png is None and picture is not None and (name := self._picture_name(picture)):
+                self.out.figures.append(SourceFigure(element_id=element.id, name=name))
             if png is None:
                 self.out.fixes[element.id] = Fix(
                     element_id=element.id,
@@ -692,6 +735,15 @@ class _Reader:
         for sub in nested:
             if id(sub) not in below:
                 self._figure(sub, depth + 1)
+
+    def _picture_name(self, node: Node) -> str:
+        """The file a picture asked for, as written in the source ("" for a drawing)."""
+        if _local(node.tag) != "img":
+            return ""
+        src = (node.get("src") or "").split("?", 1)[0].split("#", 1)[0]
+        if not src or src.startswith("data:"):
+            src = self.graphics.get(node.get("id") or "", "")
+        return clean(src)
 
     def _picture(self, node: Node) -> bytes | None:
         tag = _local(node.tag)
@@ -1063,9 +1115,20 @@ def read(
     body = next((c for c in root if _local(c.tag) == "body"), None)
     if body is None:
         raise ReadError("no body")
+    in_formula = {id(n) for m in body.iter() if _local(m.tag) == "math" for n in m.iter()}
+    error_nodes = [n for n in body.iter() if "ltx_ERROR" in _classes(n)]
     reader.walk(body)
     out = reader.out
     out.errors = reader.errors
+    out.error_nodes = len(error_nodes)
+    out.marks = [
+        SourceMark(
+            name=clean(_squash(reader._plain(n))),
+            element_id=reader.marked.get(id(n)),
+            in_formula=id(n) in in_formula,
+        )
+        for n in error_nodes
+    ]
     if not out.elements:
         raise ReadError("no content")
     if reader.errors:
