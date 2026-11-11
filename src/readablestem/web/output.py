@@ -17,10 +17,9 @@ preview) asks `export_state` before it builds anything. The answer is one of:
   The zips and "Combine parts" never take a draft: they hold it back and say how many.
 - `not available`: not finished (or nothing written yet). Nothing leaves.
 
-"Decisions still open" is read in one place, `open_required`, which today counts the open
-item fixes of the stored result as the job page does (a group of repeated headings is one).
-The state table (SW1) and the review counter of part 5 replace that one function; nothing
-else here changes when they do.
+"Decisions still open" is read in one place, `open_required`: the count of the summary of
+what was checked (`pipeline.checked.open_required`, which is `core.triage.review_load`), so
+the draft gate, the job's state and the student note never disagree (SW7).
 """
 
 from __future__ import annotations
@@ -88,8 +87,8 @@ class DraftConfirm(Exception):
 
 
 def open_required(job: Job) -> int:
-    """The decisions still open that make a file a draft. The one place the later counter
-    (SW1's state, part 5's `review_load()`) replaces."""
+    """The decisions still open that make a file a draft: the summary's own count
+    (`pipeline.checked.open_required`), read through `documents.open_decisions`."""
     return documents.open_decisions((job.result_json or {}).get("fixes"))
 
 

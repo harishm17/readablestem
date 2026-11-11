@@ -3,7 +3,7 @@
 A page to print and a CSV, made from what the app has stored about one finished job: the
 stored result, the review decisions (`ReviewEdit`: who, when, what the tool had and what the
 decision made of it) and the settings the instructor made. It says what the tool did, what a
-person decided and when, which parts were not converted, which automatic checks ran, and,
+person decided and when, which parts were not converted, which structure checks ran, and,
 in plain words, what was not checked.
 
 It is a record, not a verdict. It never says the document meets a standard or a law, and
@@ -38,6 +38,8 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
+from readablestem.pipeline import checked, checked_words
+from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import job_page
 from readablestem.web.database import as_utc
 from readablestem.web.messages import explain_check, explain_reason, severity_label
@@ -55,7 +57,7 @@ from readablestem.web.views import KIND_LABELS
 
 STATEMENT = (
     "This record lists what the tool did to this document, what a person decided and when, "
-    "which parts were not converted, and which automatic checks ran. It does not say that "
+    "which parts were not converted, and which structure checks ran. It does not say that "
     "the document meets any standard or law, and nobody at the tool has looked at the "
     "document. The accessibility office makes that judgment."
 )
@@ -130,18 +132,14 @@ TOOL_STATUS_WORDS = {
     "edited": "Already edited",
     "rejected": "Already rejected",
 }
-# What the tool does not know, whatever the document. Plain facts about the method.
+# What the tool does not know, whatever the document. Plain facts about the method: the
+# summary's (`pipeline.checked_words.NEVER_CHECKED`), then what only the record says.
 ALWAYS_NOT_CHECKED = (
-    "Whether the file reads well with a screen reader. Nobody has listened to it with NVDA, "
-    "JAWS or VoiceOver.",
-    "The axe accessibility test. It runs on the tool's own test documents, not on yours.",
-    "Whether each part says what the PDF meant. The automatic checks look at the structure "
-    "of the file (language, title, headings, lists, tables, image descriptions), not at "
-    "the meaning.",
+    *checked_words.NEVER_CHECKED,
     "How the file looks in your course site (for example Canvas). It has not been tried "
     "in a live course.",
-    "The Word and EPUB files. They are made from the HTML file, and the checks above are "
-    "of the HTML file. Nobody has checked how they open in Word or a reading app.",
+    "The Word and EPUB files. They are made from the HTML file, and the structure checks "
+    "above are of the HTML file. Nobody has checked how they open in Word or a reading app.",
     "The PDF itself. This record is about the HTML file made from it.",
 )
 
@@ -184,6 +182,7 @@ class Record:
     title_chosen: bool
     contact_set: bool
     counts: job_page.Breakdown
+    checked: CheckedSummary  # what was converted, checked and reviewed (`pipeline.checked`)
     by_kind: dict[str, int]
     decisions: list[DecisionRow] = field(default_factory=list)
     kept_as_images: list[ImageRow] = field(default_factory=list)
@@ -286,8 +285,9 @@ def _page_number(element_id: str) -> int | None:
     return int(tail) if head == "page" and tail.isdecimal() else None
 
 
-def not_checked_list(result: DocumentResult, counts: job_page.Breakdown) -> list[str]:
-    """What was not checked: the fixed facts plus the parts a person did not look at."""
+def not_checked_list(result: DocumentResult, summary: CheckedSummary) -> list[str]:
+    """What was not checked: the fixed facts plus the parts a person did not look at (the
+    summary's open decisions, pictures, notes never opened and "Accept anyway")."""
     out = list(ALWAYS_NOT_CHECKED)
     by_tool = Counter(
         f.kind for f in result.fixes if f.status is Status.ACCEPTED and not f.decided_by_reviewer
@@ -303,16 +303,14 @@ def not_checked_list(result: DocumentResult, counts: job_page.Breakdown) -> list
                 f"{by_tool[kind]} {words} were accepted by the tool after its own automatic "
                 "checks, with no decision from a person."
             )
-    if counts.waiting:
+    if summary.open_required:
         out.append(
-            f"{counts.decisions} decisions were still open when this record was made. "
+            f"{summary.open_required} decisions were still open when this record was made. "
             "The file has the tool's proposals for them."
         )
-    if counts.as_image:
-        out.append(
-            f"{counts.as_image} parts are shown as pictures of the original. Screen "
-            "readers cannot read them."
-        )
+    if summary.pictures:
+        out.append(checked_words.as_image_sentence(summary))
+    out.extend(checked_words.record_not_reviewed(summary))
     for line in by_hand_not_checked(result):
         out.append(line)
     return out
@@ -391,6 +389,7 @@ def build(
             fixes.setdefault(f.element_id, f)
     labels = item_labels(result)
     counts = job_page.breakdown(result.fixes)
+    summary = checked.of_result(result)
     decisions = []
     ordered = sorted(edits, key=lambda e: (as_utc(e.created_at) or e.created_at, e.id))
     relabeled = [e for e in ordered if _relabel_mark(e) is not None]
@@ -415,14 +414,17 @@ def build(
         )
     decisions.extend(_relabel_rows(relabeled, labels, who, owner))
     decisions.sort(key=lambda d: d.when)
+    # The parts shown as pictures, as the summary counts them (an element with no fix too).
     images = [
         ImageRow(
-            item=labels.get(f.element_id, KIND_LABELS.get(f.kind, f.kind.value.title())),
-            page=_page_of(elements, f.element_id),
-            why=explain_reason(f.reason).text if f.reason else "",
+            item=labels.get(p.element_id)
+            or KIND_LABELS.get(elements[p.element_id].kind, p.kind.title()),
+            page=p.page,
+            why=explain_reason(fix.reason).text
+            if (fix := fixes.get(p.element_id)) is not None and fix.reason
+            else "",
         )
-        for f in result.fixes
-        if job_page.shown_as_image(f)
+        for p in summary.converted.pictures
     ]
     failed = [
         CheckRow(severity_label(c), explain_check(c).text, explain_check(c).code)
@@ -446,13 +448,14 @@ def build(
         title_chosen=title_chosen,
         contact_set=contact_set,
         counts=counts,
+        checked=summary,
         by_kind=dict(Counter(job_page.word_kind(f) for f in result.fixes)),
         decisions=decisions,
         kept_as_images=images,
         checks_run=len(result.html_checks),
         failed_checks=failed,
         open_items=open_items,
-        not_checked=not_checked_list(result, counts),
+        not_checked=not_checked_list(result, summary),
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
         downloaded=(
@@ -519,8 +522,12 @@ def to_csv(record: Record) -> str:
         row("summary", f"Found: {kind}", detail=n)
     row("summary", "Accepted by the tool, no decision from a person", detail=c.accepted)
     row("summary", "Decided by a person", detail=c.decided)
-    row("summary", "Decisions still open", detail=c.decisions)
-    row("summary", "Shown as pictures of the original", detail=c.as_image)
+    s = record.checked
+    # What people did, per decision (`core.triage.review_load`), the open ones first.
+    for action, label in checked_words.ACTION_ROWS.items():
+        row("summary", label, detail=s.load.actions[action])
+    row("summary", "Shown as pictures of the original", detail=s.pictures)
+    row("summary", checked_words.READY_ALL, detail="Yes" if s.all_found_converted else "No")
     for name, n in record.by_hand.items():
         row("summary", name, detail=n)
     if record.left_out_pages:
@@ -534,7 +541,7 @@ def to_csv(record: Record) -> str:
         row("open", item, decision="Waiting for a decision")
     for i in record.kept_as_images:
         row("not_converted", i.item, i.page or "", detail=i.why)
-    row("check", "Automatic checks of the HTML file that ran", detail=record.checks_run)
+    row("check", "Structure checks of the HTML file that ran", detail=record.checks_run)
     for ch in record.failed_checks:
         row("check", ch.code, tool_had=ch.severity, decision="Did not pass", detail=ch.text)
     for line in record.not_checked:

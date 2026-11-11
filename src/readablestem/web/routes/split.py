@@ -301,11 +301,12 @@ class OptionalLine:
 class ReadyView:
     """The review screen's finish line (no decision open): what the job page says."""
 
-    title: str  # the state's label (`web.states`): "Ready to share", "Partly converted"
-    sentence: str  # what is shown as an image, or what was not converted ("" when neither)
-    finish: str  # "You made 3 decisions on October 9." / "Nothing in this file needed ..."
-    notes: int  # items accepted for you with a note (optional to look at)
+    title: str  # the state's label (`web.states`): "Ready to share", "Ready", "Partly ..."
+    sentence: str  # what remains, or what was not converted ("" when nothing does)
+    finish: str  # what people reviewed (`pipeline.checked_words.finish_sentence`)
+    notes: str  # the optional notes nobody opened, never counted as reviewed ("" when none)
     shareable: bool  # the file can go to students (not a job that stopped early)
+    checks_scope: str = ""  # what the structure checks look at, and what not
 
 
 @dataclass
@@ -678,28 +679,24 @@ class SplitBuilder:
     def ready(self) -> ReadyView:
         """The finish line once no decision is open, in the job's state (`web.states`), as
         the job page says it: "Ready to share", or "Partly converted" with what was not."""
-        from readablestem.web import job_page, states
+        from readablestem.pipeline import checked, checked_words
+        from readablestem.web import states
 
         with session_scope(get_ctx(self.request).factory) as session:
             job = job_access(session, self.job_id, self.user, REVIEW)
             when = last_decision(session, job)
             facts = states.Facts.of(job)
-        counts = job_page.breakdown(self.result.fixes)
-        state = states.state_of(facts, states.counts_of(counts))
-        finish = job_page.Finish(
-            decided_units=counts.decided_units,
-            last_decision=when,
-            notes=counts.notes,
-            not_handled=len(job_page.notice_lists(self.result).not_handled),
-        )
+        summary = checked.of_result(self.result, reviewed_on=when)
+        state = states.state_of(facts, states.counts_of(summary))
+        # "Ready to share" says it all; "Ready" and "Partly converted" say what remains.
+        said = state.key in {"partly_converted", "ready_remains"}
         return ReadyView(
             title=state.label,
-            sentence=state.message
-            if state.key in {"partly_converted", "ready"} and (state.gaps or counts.as_image)
-            else "",
-            finish=finish.sentence,
-            notes=finish.notes,
+            sentence=state.message if said else "",
+            finish=checked_words.finish_sentence(summary),
+            notes=checked_words.notes_line(summary),
             shareable=state.shareable,
+            checks_scope=checked_words.CHECKS_NOT_MEANING,
         )
 
     def panel(self, decision: queue.Decision | None, fix: Fix | None) -> Panel:

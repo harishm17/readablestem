@@ -6,6 +6,11 @@ accepted automatically and listed as notes; `none` items need nothing. Repeated 
 with weak evidence share a `group_key` and make one decision together, so counting is in
 *decisions* (units), not fixes.
 
+`review_load` also says what people have done since, per decision (`ReviewLoad.actions`):
+the one count of open, decided and never-opened items that the job page, the student
+note, the record and the draft gate all read (SW7, accuracy decision A16.3). Nothing else
+counts them.
+
 Everything here is content-free: the reason codes are check codes, `Fix.reason` codes or
 the fixed words below, so the web app, the ops aggregates and the eval can all use them.
 """
@@ -16,7 +21,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
-from readablestem.core.types import Fix, Kind
+from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Fix, Kind, Status
 
 # Reason for a required fix with no failed check and no Fix.reason: the model's own
 # confidence stayed below the auto-accept bar (after escalation, for equations).
@@ -53,8 +58,9 @@ def required_decisions(fixes: Iterable[Fix]) -> int:
 
 
 def open_decisions(fixes: Iterable[Fix]) -> int:
-    """Decisions still waiting now: a group counts while any member is waiting."""
-    return len(units(f for f in fixes if f.pending))
+    """Decisions still waiting now: a group counts while any member is waiting. The count
+    `review_load` gives (`ReviewLoad.open_decisions`), so no two callers can differ."""
+    return review_load(list(fixes)).open_decisions
 
 
 def second_check_note(fix: Fix) -> bool:
@@ -85,6 +91,39 @@ def tier_reasons(fix: Fix) -> list[str]:
     return sorted(codes)
 
 
+# What people did, per decision (`action_of`). A heading group is one decision.
+OPEN = "open"  # still waiting for a person
+ACCEPTED = "accepted"  # a person accepted the proposal, every check of it passing
+ACCEPTED_FAILING = "accepted_failing_check"  # "Accept anyway": kept with a check failing
+EDITED = "edited"  # a person changed the proposal
+KEPT_IMAGE = "kept_as_image"  # a person kept the original picture
+DECORATIVE = "marked_decorative"  # a person marked a figure as decoration
+UNOPENED = "optional_unopened"  # accepted by the tool with a note nobody has opened
+DECIDED_ACTIONS = (ACCEPTED, ACCEPTED_FAILING, EDITED, KEPT_IMAGE, DECORATIVE)
+ACTIONS = (OPEN, *DECIDED_ACTIONS, UNOPENED)
+
+
+def action_of(unit: Sequence[Fix]) -> str | None:
+    """What happened to one decision: still `OPEN`, one of `DECIDED_ACTIONS` when a person
+    decided it, `UNOPENED` for an optional note nobody acted on, or None for an item the
+    tool accepted with nothing to note (nobody was asked, nobody looked)."""
+    if any(f.pending for f in unit):
+        return OPEN
+    decided = [f for f in unit if f.decided_by_reviewer]
+    if decided:
+        fix = decided[0]
+        if fix.kind is not Kind.HEADING and fix.status in KEPT_ORIGINAL_STATUSES:
+            return KEPT_IMAGE
+        if fix.figure is not None and fix.figure.decorative and fix.kind is Kind.FIGURE:
+            return DECORATIVE
+        if fix.status in (Status.EDITED, Status.REJECTED):  # a heading made bold text
+            return EDITED
+        return ACCEPTED_FAILING if any(f.failed_checks for f in decided) else ACCEPTED
+    if any(f.optional_note for f in unit):
+        return UNOPENED
+    return None
+
+
 @dataclass
 class ReviewLoad:
     """Counts for one document (or many): what the pipeline asked a person to look at."""
@@ -98,6 +137,30 @@ class ReviewLoad:
     optional_by_kind: Counter[str] = field(default_factory=Counter)
     required_by_reason: Counter[str] = field(default_factory=Counter)  # fixes
     optional_by_reason: Counter[str] = field(default_factory=Counter)
+    # What people did since, per decision (`ACTIONS`), over every fix that can wait for a
+    # person, of any kind (the text of a page read from its image too, which the tier counts
+    # above leave out). Not in `as_dict`: the eval reports what the pipeline asked for.
+    actions: Counter[str] = field(default_factory=Counter)
+
+    @property
+    def open_decisions(self) -> int:
+        """Decisions still waiting for a person: what makes a file a draft."""
+        return self.actions[OPEN]
+
+    @property
+    def decided(self) -> int:
+        """Decisions a person made."""
+        return sum(self.actions[a] for a in DECIDED_ACTIONS)
+
+    @property
+    def unopened(self) -> int:
+        """Optional notes nobody opened: never counted as reviewed."""
+        return self.actions[UNOPENED]
+
+    @property
+    def flagged(self) -> int:
+        """Decisions the tool flagged (asked for, or noted) or a person made."""
+        return sum(self.actions.values())
 
     def add(self, other: ReviewLoad) -> None:
         self.required_decisions += other.required_decisions
@@ -108,6 +171,7 @@ class ReviewLoad:
         self.optional_by_kind.update(other.optional_by_kind)
         self.required_by_reason.update(other.required_by_reason)
         self.optional_by_reason.update(other.optional_by_reason)
+        self.actions.update(other.actions)
 
     def as_dict(self) -> dict:
         return {
@@ -126,7 +190,8 @@ REVIEWABLE_KINDS = frozenset({Kind.EQUATION, Kind.FIGURE, Kind.HEADING, Kind.TAB
 
 
 def review_load(fixes: Sequence[Fix]) -> ReviewLoad:
-    """The pipeline's tiers for these fixes (equations, figures, headings and tables)."""
+    """The pipeline's tiers for these fixes (equations, figures, headings and tables), and
+    what people did since (`ReviewLoad.actions`, every kind)."""
     load = ReviewLoad()
     reviewable = [f for f in fixes if f.kind in REVIEWABLE_KINDS]
     required = [f for f in reviewable if f.review == "required"]
@@ -143,4 +208,7 @@ def review_load(fixes: Sequence[Fix]) -> ReviewLoad:
             load.optional_by_reason.update(tier_reasons(fix))
         else:
             load.none += 1
+    for unit in units(fixes):
+        if (action := action_of(unit)) is not None:
+            load.actions[action] += 1
     return load

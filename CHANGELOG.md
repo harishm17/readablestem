@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: one statement of what was checked (branch feat/checked-summary)
+
+- `pipeline/checked.py` (`CheckedSummary`) holds what was converted by kind, the structure
+  checks that ran and failed, what people did per decision (`core.triage.review_load`) and
+  what is never checked; `pipeline/checked_words.py` makes every sentence about it. The
+  student note, a new notice that opens an unreviewed page or one with pictures or pages
+  left out, the job state, the job page, the before/after card, the review screen's finish,
+  the record and its CSV, the EPUB's accessibility metadata and the Canvas README all print
+  those sentences (SW7: F-034, F-110).
+- The student note counts what a person reviewed ("Your instructor reviewed 3 of 5 parts the
+  tool flagged"), never counts an optional note nobody opened, says parts kept with a check
+  failing apart, and says how many parts are pictures and which pages were left out ("7 of
+  8" when the page count is known). A re-render with no recorded decision (decisions
+  carried from an earlier conversion) writes no date; it used to write today's.
+- "Ready to share" only when nothing is a picture, nothing is left out, no structure check
+  failed and nothing is open; otherwise the new state "Ready" says what remains. "Everything
+  was converted" is now "Every part the tool found was converted."
+- The EPUB's `accessibilitySummary` is the page's own statement, `accessModeSufficient` needs
+  the page to say the text alone is enough, and a page made before the statement existed gets
+  `accessibilityHazard` `unknown`. `RENDER_VERSION` is 4, so stored pages are made again when
+  next opened.
+
 ## Unreleased: pipeline 0.5.11 (integration/wave-1a)
 
 - `PIPELINE_VERSION` 0.5.11: the font code tables and the figure label crop (both below) change

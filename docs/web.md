@@ -965,17 +965,61 @@ offer and the admin queue (F-213).
 | `stopped_unknown` | Stopped | a missing or unknown code; names the step it stopped in | Needs you | Try again (N left) |
 | `needs_decisions` | Needs your decisions | finished, decisions open | Needs you | Review |
 | `partly_converted` | Partly converted | finished, none open, a gap note | Ready | Convert the missing parts, or Download |
-| `ready` | Ready to share | finished, nothing left | Ready | Download, Share |
+| `ready` | Ready to share | finished, none open, no gap note, and the summary says ready (below) | Ready | Download, Share |
+| `ready_remains` | Ready | finished, none open, no gap note, but a part is a picture, a page is left out or a structure check failed: the message says which | Ready | Download, Share |
 | `sample` | Sample | the recorded sample | its state's | Open |
 | `deleted` | Deleted on Nov 11, 2026 | past its deletion time (the batch page) | Needs you | Upload it again |
 
 A finished job's gaps (an outage, a budget stop, pages kept as pictures) are notes under
 the state ("Outcome codes on finished jobs", below); a note with nothing in it is not
 shown (F-319). A stopped job says nothing about decisions in its old result (F-314) and is
-not offered "Keep for 7 days": only `needs_decisions`, `partly_converted` and `ready` have
-something to keep (F-316). Steps are the owner's; a reviewer gets Review, a viewer none.
+not offered "Keep for 7 days": only `needs_decisions`, `partly_converted`, `ready` and
+`ready_remains` have something to keep (F-316). Steps are the owner's; a reviewer gets Review, a viewer none.
 The badge color (`status-*` in app.css) comes from the tone and only repeats the words.
 `tests/test_web_batch.py` walks every key and checks each surface prints its label.
+
+### What was checked (SW7)
+
+Every sentence about what was converted, checked or reviewed is made from one model,
+`pipeline.checked.CheckedSummary`, by one module, `pipeline/checked_words.py`; no template
+writes such a sentence. The summary is computed from the stored result (`checked.of_result`:
+its elements, fixes, pages left out and the page's structure checks) and is never stored. It
+holds what was converted by kind (equations in MathML, figures described or marked as
+decoration, tables rebuilt or written as text, the parts shown as pictures with their kind and
+page, the pages left out), the structure checks (how many ran, which failed), what people did
+per decision (`core.triage.review_load`: open, accepted, accepted with a check failing,
+edited, kept as a picture, marked as decoration, optional notes never opened), what is never
+checked, the day of the last decision and the version.
+
+- The open count is `review_load`'s: `checked.open_required`, which `documents.open_decisions`
+  (the stored `jobs.open_decisions`), `output.open_required` (the draft gate) and the state
+  read, so the three never disagree.
+- The state table reads it: with no gap note and nothing open, `ready` only when nothing is a
+  picture, nothing is left out and no structure check failed; otherwise `ready_remains`,
+  "Ready", whose message says what remains ("2 equations are shown as images that screen
+  readers cannot read. 7 of 8 pages were left out."). With no summary (a caller that passes
+  none) the job is never "Ready to share". The documents list reads the result of every
+  finished job with no decision open to get this label; a job with decisions open needs only
+  its stored count.
+- "Every part the tool found was converted." is the sentence for a whole job, never
+  "Everything was converted": ink the tool did not find is not counted until page facts exist.
+- The job page's pictures line, notes line, structure-checks line and "What was checked, and
+  what was not", the before/after card's equation row and its "Yes" ("In the converted
+  parts" when a part is a picture or a page is left out), the finish line ("You reviewed 3 of
+  5 flagged parts, the last on October 9. 1 part kept with a check failing. 2 optional notes
+  not opened."), the review screen's finish, the record and its CSV (one row per action), the
+  student note and the notice that opens the student page (docs/output.md), the EPUB's
+  accessibility metadata and the Canvas README's first lines all print `checked_words`.
+- Old jobs: nothing new is stored. A page made before the summary existed is made again when
+  it is next opened (`RENDER_VERSION` 4, `routes.jobs.current_html`), which also rewrites its
+  structure checks; until then a download of an older stored page has the old footer. Its
+  EPUB says "This file does not record what was converted or reviewed" and an
+  `accessibilityHazard` of `unknown`.
+
+Not in the summary yet, because nothing on this branch holds them: the page facts of each
+page (type, unread ink: WS14.1, WS14.7, WS14.11), the language found (P2), page cards
+(WS21.8), where a source-read document's content came from (A11, S4), `format_when` (SW9),
+the record link (SW25) and the audience helper (SW16).
 
 Not in the table yet, because nothing stored says so: the final checks of a conversion,
 a canceled job (no cancel code, column or route), and "checking", "paused for an update"
@@ -1329,7 +1373,7 @@ reference); what the tool did (parts found by kind, accepted by the tool with no
 from a person, decided by a person, still open, shown as pictures); every review decision
 (`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom
 - the document's owner, the only person who can review it); the decisions still open; the
-parts shown as pictures and why; the automatic checks (how many ran, which did not pass);
+parts shown as pictures and why; the structure checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
 lines for the office to sign. Every kind of change a person can make is a row with who and
 when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a
@@ -1773,8 +1817,9 @@ From top to bottom:
    ("For 1 equation and 1 figure, students will get the tool's suggestion as it is. 1
    equation is an image marked "Not converted"."). The polled status links to the first
    decision as soon as the job finishes ("Start the review"), so it is one click from
-   finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
-   decisions on October 9." (or "Nothing in this file needed your decision."), the
+   finished to deciding. With none open, the state's label (BW1, MF9) and the finish line
+   from the summary ("You reviewed 3 of 5 flagged parts, the last on October 9." or "The
+   tool flagged nothing in this file for review, and nobody has reviewed it."), the
    download as the main button, the student version, then **"Where will you post it?"**
    (ux2-lane-a): one flat list of the ways the file leaves the tool, each with its own
    link and the recommended one first. "A course site or any web page (Recommended)" is
@@ -1819,8 +1864,8 @@ From top to bottom:
    handwritten pages and the scanned page", never "groups of repeated figures"), and the
    waiting items say why they make fewer decisions ("pages kept as images for the same
    reason are decided together"). The finish line's heading is the status box's label:
-   **Ready to share** only when everything was converted, else "Ready" or "Finished,
-   with pages not converted", as on the review screen.
+   **Ready to share** only when the summary says so ("What was checked" above), else
+   "Ready" with what remains, or "Partly converted", as on the review screen.
 5. **What changed for a screen-reader user** (Beta 1 of the feature review), shown for
    results with `source_facts` (older ones have no card): up to 7 rows "Can a
    screen-reader user ... | In your PDF | In the HTML" (equations with their structure,
@@ -1846,10 +1891,11 @@ From top to bottom:
    T1-11): "Decisions to make" and "Decisions made" ("Decisions still open" for a person who can only view it), counted as on the review
    screen and in My documents (a group of repeated headings is one decision). A heading
    made bold text is a decision, never "shown as an image" (`job_page.shown_as_image`),
-   so a job whose decisions are done is "Ready to share". Items are not counted, and
+   so it does not keep a job from "Ready to share". Items are not counted, and
    there is no model cost, internal code or confidence here (cost is on `/admin`). One
-   line says how many parts were accepted for you with a note, with a link to them. Then
-   the links per kind to their first decision, and the automatic checks of the file with
+   line says how many parts were accepted by the tool with an optional note nobody has
+   opened (not reviewed), with a link to them. Then
+   the links per kind to their first decision, and the structure checks of the file with
    their plain sentences and a disclosure, "What was checked, and what was not": the
    structure checks ran; the axe test and screen-reader testing did not.
 7. **Language**, one line with a "Change" control folded behind a details element:
@@ -2144,9 +2190,9 @@ sentence and code. Previous and next decision links close the card. After Accept
 edit or the "Reject" button the form redirects (303) to the next decision still open
 after this one (`queue.next_open`, wrapping round), or to the done state, the finish
 line as the job page says it (`SplitBuilder.ready`, from the job's state and
-`job_page.Finish`): **Ready to share** ("You made 3 decisions on October 9." or "Nothing
-in this file needed your decision."), or **Ready** with what is shown as an image ("2
-tables are shown as an image that screen readers cannot read."), then **Download the
+the summary): **Ready to share** or **Ready** with what remains ("2 tables are shown as
+images that screen readers cannot read."), after the finish line ("You reviewed 3 of 5
+flagged parts, the last on October 9."), then **Download the
 HTML file**, "Preview the student version", a line on reading it through before sharing
 (and the notes, optional), "How to post it in your course" and "Back to the results". A
 job that stopped early shows its outcome instead, with no download button. There the
@@ -2819,7 +2865,7 @@ worth a look)". The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
 HTML file that did not pass, each as a sentence from `web/messages.py` with its code
-("All 11 checks passed" otherwise). An incomplete or failed job's state ("Job states":
+("All 11 structure checks passed" otherwise). An incomplete or failed job's state ("Job states":
 a stop with its reason, or a finished job's gap notes, "Stopped early" or "Pages kept as
 pictures") is the page title and the status box (once; the section under it, "What you can
 do", has the retry or the safe ways on), and a finished but incomplete job gets a note at

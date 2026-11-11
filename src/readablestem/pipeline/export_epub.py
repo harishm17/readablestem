@@ -25,11 +25,15 @@ What is kept and what changes:
 
 Accessibility metadata is written from what is in the document, not from a fixed list:
 `schema:accessMode`, `accessibilityFeature` (structural navigation, tableOfContents, MathML,
-alternativeText, longDescription, describedMath, pageNavigation), `accessibilityHazard` and
-`accessibilitySummary`. `accessModeSufficient` is left out when the document still has items
-flagged for a person to fix. The package never carries `dcterms:conformsTo`: the tool
-assists and does not claim conformance with any standard (CONTRIBUTING.md). The tests run the
-package through EPUBCheck and DAISY Ace when they are installed.
+alternativeText, longDescription, describedMath, pageNavigation). `accessibilitySummary`,
+`accessModeSufficient` and `accessibilityHazard` are the page's statement of what was converted
+and reviewed (`pipeline.checked`, read from the page's head): the summary says how many
+equations are MathML, how much a person reviewed and what is a picture or left out;
+`accessModeSufficient` "textual" only when nothing is a picture, left out or flagged; the
+hazard "none" only for a page this tool made with that statement, else "unknown". The
+package never carries `dcterms:conformsTo`: the tool assists and does not claim conformance
+with any standard (CONTRIBUTING.md). The tests run the package through EPUBCheck and DAISY
+Ace when they are installed.
 """
 
 from __future__ import annotations
@@ -43,7 +47,8 @@ from datetime import UTC, datetime
 from html import escape
 from io import BytesIO
 
-from readablestem.pipeline import output_chars
+from readablestem.pipeline import checked_words, output_chars
+from readablestem.pipeline.assemble import SUFFICIENT_META, SUMMARY_META
 from readablestem.pipeline.export_canvas import (
     _VOID,
     NOT_TEXT,
@@ -53,6 +58,7 @@ from readablestem.pipeline.export_canvas import (
     _find,
     _Node,
     _parse,
+    page_meta,
 )
 
 NS_XHTML = "http://www.w3.org/1999/xhtml"
@@ -66,11 +72,11 @@ CONTENT = "EPUB/content.xhtml"
 NAV = "EPUB/nav.xhtml"
 PACKAGE = "EPUB/package.opf"
 
-ACCESSIBILITY_SUMMARY = (
-    "Made from a PDF by ReadableSTEM, which assists with accessibility and does not certify "
-    "it. Equations are MathML, pictures have text descriptions, and the headings make the "
-    "contents list. Check it before students use it."
-)
+# The accessibility summary, `accessModeSufficient` and hazard are the page's statement of
+# what was converted and reviewed (`pipeline.checked`), which the renderer writes into the
+# page's head (`assemble.SUMMARY_META`): the export reads the page, not the result. A page
+# without it (made before it existed, or not by this tool) says so and claims nothing.
+ACCESSIBILITY_SUMMARY = checked_words.SUMMARY_UNKNOWN
 
 _LANGUAGE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*\Z")
 _HEADING = re.compile(r"h[1-6]\Z")
@@ -361,6 +367,7 @@ def _features(
     has_math: bool,
     n_headings: int,
     n_pages: int,
+    text_sufficient: bool = False,
 ) -> tuple[list[str], list[str], list[str]]:
     """(accessMode values, accessModeSufficient values, accessibilityFeature values)."""
     images = [n for n in root.walk() if n.tag == "img"]
@@ -383,8 +390,10 @@ def _features(
         features.append("longDescription")
     if n_pages:
         features.append("pageNavigation")
+    # Text alone is enough only when the page's statement says so (nothing is a picture,
+    # nothing is left out, nothing is open) and no part is flagged.
     flagged = any("flag-note" in n.classes() or "data-status" in n.attrs for n in root.walk())
-    sufficient = [] if flagged else ["textual"]
+    sufficient = ["textual"] if text_sufficient and not flagged else []
     return modes, sufficient, sorted(features)
 
 
@@ -400,6 +409,8 @@ def _package_document(
     images: dict[str, bytes],
     item_properties: list[str],
     paginated: bool,
+    summary: str = ACCESSIBILITY_SUMMARY,
+    hazard: str = "unknown",
 ) -> str:
     meta = [
         f'<dc:identifier id="pub-id">{escape(identifier)}</dc:identifier>',
@@ -410,8 +421,8 @@ def _package_document(
         *(f'<meta property="schema:accessMode">{m}</meta>' for m in modes),
         *(f'<meta property="schema:accessModeSufficient">{m}</meta>' for m in sufficient),
         *(f'<meta property="schema:accessibilityFeature">{f}</meta>' for f in features),
-        '<meta property="schema:accessibilityHazard">none</meta>',
-        f'<meta property="schema:accessibilitySummary">{escape(ACCESSIBILITY_SUMMARY)}</meta>',
+        f'<meta property="schema:accessibilityHazard">{hazard}</meta>',
+        f'<meta property="schema:accessibilitySummary">{escape(summary)}</meta>',
     ]
     props = f' properties="{" ".join(item_properties)}"' if item_properties else ""
     manifest = [
@@ -463,6 +474,8 @@ def export_epub(
     publication's id (default a UUID made from the document, so the same document keeps the
     same one)."""
     root = _parse(html)
+    statement = page_meta(root, SUMMARY_META)  # read before `_prepare` drops the head
+    text_sufficient = page_meta(root, SUFFICIENT_META) == "textual"
     html_tag = _find(root, "html")
     body = _find(root, "body")
     if html_tag is None or body is None:
@@ -496,7 +509,11 @@ def export_epub(
         body.children.insert(0, _Node("span", {"id": "start"}, [], body))
 
     modes, sufficient, features = _features(
-        root=body, has_math=has_math, n_headings=n_headings, n_pages=len(pages)
+        root=body,
+        has_math=has_math,
+        n_headings=n_headings,
+        n_pages=len(pages),
+        text_sufficient=text_sufficient,
     )
     lang_attr = escape(lang, quote=True)
     head = f'<meta charset="utf-8"/><title>{escape(_clean(title))}</title>' + "".join(
@@ -527,6 +544,10 @@ def export_epub(
         images=images,
         item_properties=properties,
         paginated=bool(pages),
+        summary=statement or ACCESSIBILITY_SUMMARY,
+        # This tool's pages hold no sound, motion or flashing; a page it did not make, or
+        # made before the statement existed, is not known.
+        hazard="none" if statement else "unknown",
     )
     if any(output_chars.count(part) for part in (package, nav, content)):
         # The page never holds a character that is not text, so this is the export's own.

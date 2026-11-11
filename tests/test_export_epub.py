@@ -12,6 +12,7 @@ import io
 import re
 import zipfile
 from datetime import UTC, datetime
+from html import unescape
 
 import pytest
 from defusedxml import ElementTree
@@ -153,11 +154,19 @@ def _flat(node):
 
 
 def test_metadata_makes_no_conformance_claim(made):
-    _, export, parts = made
+    html, export, parts = made
     meta = metadata(parts)
     assert meta["schema:accessMode"][0] == "textual"
-    assert meta["schema:accessibilityHazard"] == ["none"]
-    assert meta["schema:accessibilitySummary"] == [ee.ACCESSIBILITY_SUMMARY]
+    # The summary and hazard are the page's own statement (SW7); a page without one (made
+    # before it existed) claims nothing about either.
+    said = re.search(r'<meta name="readablestem-summary" content="([^"]*)"', html)
+    if said:
+        assert meta["schema:accessibilityHazard"] == ["none"]
+        assert meta["schema:accessibilitySummary"] == [unescape(said.group(1))]
+    else:
+        assert meta["schema:accessibilityHazard"] == ["unknown"]
+        assert meta["schema:accessibilitySummary"] == [ee.ACCESSIBILITY_SUMMARY]
+    assert "a tool that assists with accessibility" in meta["schema:accessibilitySummary"][0]
     assert ("tableOfContents" in meta["schema:accessibilityFeature"]) == (export.headings > 0)
     assert "dcterms:conformsTo" not in meta
     for name in (ee.PACKAGE, ee.NAV, ee.CONTENT):

@@ -66,7 +66,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from readablestem.core import triage
@@ -1826,9 +1826,9 @@ def rerender_html(
 
     The static checks of the new HTML replace `result.html_checks`, so the job page lists
     the checks of the file the user downloads, not of the one before the review.
-    `checked_on` is the day of the last decision for the student note ("checked by your
-    instructor on ..." once no decision is open); by default today (UTC), since a
-    re-render follows a decision. The assembler ignores it while a decision is open.
+    `checked_on` is the day of the last decision for the student note ("Your instructor
+    reviewed ... on ..."); None writes no date, because a day nobody recorded is not one
+    to claim (decisions carried from an earlier conversion have none).
     `math_alttext` is the app's `Settings.mathml_alttext`, the setting the first render used
     (T2-24): the file made again must read like the first one (None: the process settings).
     """
@@ -1850,7 +1850,8 @@ def rerender_html(
         fixes=result.fixes,
         crops=crops,
         source_note=None,
-        checked_on=checked_on or datetime.now(UTC).date(),
+        checked_on=checked_on,
+        pages=result.stats.pages or None,
         math_alttext=math_alttext,
         page_labels=result.page_labels,
         pdf_pages=dict(enumerate(result.source_pages)),

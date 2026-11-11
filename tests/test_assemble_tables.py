@@ -20,7 +20,7 @@ from readablestem.core.types import (
     TableGrid,
 )
 from readablestem.pipeline import html_checks
-from readablestem.pipeline.assemble import FLAGGED_NOTE, render_html
+from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
 from readablestem.pipeline.html_checks import static_checks
 
@@ -85,7 +85,7 @@ def test_a_rebuilt_table_is_a_table_in_a_scroll_box():
     ) in html
     assert '<th scope="col">Time (s)</th>' in html
     assert all(c.passed for c in static_checks(html)), static_checks(html)
-    assert FLAGGED_NOTE not in html  # the student note: nothing shown as an image
+    assert "could not be converted" not in html  # the student note: nothing is a picture
 
 
 def test_a_table_waiting_for_review_is_shown_as_rebuilt():
@@ -110,7 +110,8 @@ def test_a_table_not_rebuilt_keeps_its_image_flagged():
     assert f'<span class="flag-label">Not converted.</span> {TABLE_NOTE}' in html
     assert "<table>" not in html and TABLE_CSS not in html
     assert all(c.passed for c in static_checks(html))
-    assert FLAGGED_NOTE in html  # the student note says some parts are pictures
+    # The student note says how many parts are pictures.
+    assert "1 part could not be converted and is shown as a picture of the original" in html
 
 
 @pytest.mark.parametrize(

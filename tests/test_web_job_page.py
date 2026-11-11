@@ -147,7 +147,7 @@ def test_failed_checks_of_the_html_file_are_listed(web):
     job_id = convert(web, html_checks=checks)
     results = section(web.browser.get(f"/jobs/{job_id}").text, "results-heading")
     text = page_text(results)
-    assert "2 of 3 checks did not pass" in text
+    assert "2 of 3 structure checks did not pass" in text
     assert "Must be fixed: The headings skip a level" in text
     assert "heading_skip" not in text and "html.heading_order" not in text  # no codes (T1-11)
     assert "Worth checking: An equation does not say" in text

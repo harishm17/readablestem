@@ -12,7 +12,8 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from readablestem.core.types import DocumentResult
-from readablestem.web import documents, events, job_page, record, shares, states
+from readablestem.pipeline import checked
+from readablestem.web import documents, events, record, shares, states
 from readablestem.web.database import as_utc
 from readablestem.web.db import ReviewEdit, User, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, get_ctx, render
@@ -60,7 +61,7 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
         viewer = "owner" if role == "owner" else ("review" if role == shares.REVIEW else "view")
         state = states.state_of(
             states.Facts.of(job),
-            states.counts_of(job_page.breakdown(result.fixes)),
+            states.counts_of(checked.of_result(result)),
             viewer=viewer,
         )
         made = record.build(

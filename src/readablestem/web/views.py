@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 
 from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Fix, Kind, Status
+from readablestem.pipeline import checked
+from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
 from readablestem.web import fair_queue, job_page, states, titles
@@ -249,6 +251,9 @@ class ResultSummary:
     failed_checks: list[CheckLine] = field(default_factory=list)
     # One breakdown of every item, the same on every screen (`job_page.breakdown`).
     counts: job_page.Breakdown = field(default_factory=job_page.Breakdown)
+    # What was converted, checked and reviewed (`pipeline.checked`): the state, the checks
+    # line and every claim on the job page read it.
+    checked: CheckedSummary | None = None
 
 
 @dataclass
@@ -496,6 +501,7 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
         checks_run=len(result.html_checks),
         failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],
         counts=job_page.breakdown(result.fixes),
+        checked=checked.of_result(result),
     )
 
 
@@ -679,7 +685,7 @@ def job_view(
         # Counts are read only for a finished job: a stopped or waiting job may still hold an
         # earlier result, and its decisions are not open while it is not finished (F-314).
         done = job.status == JobStatus.DONE
-        counts = states.counts_of(summary.counts if summary and done else None)
+        counts = states.counts_of(summary.checked if summary and done else None)
         line = (
             job_page.queue_sentence(ahead, yours, wait_s) if job.status == JobStatus.QUEUED else ""
         )

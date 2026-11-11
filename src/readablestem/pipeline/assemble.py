@@ -13,10 +13,12 @@ What the output looks like and why is in docs/output.md. In short:
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
 - A short note for students after `<main>` ("About this version", a `<footer>`): what
-  the file is, that some parts have not been checked by the instructor yet or the date
-  the instructor made the last decision (`checked_on`), and to tell the instructor about
-  anything hard to read. No counts: those are for the instructor, on the job page. An
-  optional `notice` at the top (e.g. "offline test run": placeholders, not conversions).
+  the file is, the statement of what was reviewed and converted (`pipeline.checked`: who
+  reviewed how many of the parts the tool flagged and on which day, how many parts are
+  pictures, which pages were left out), and to tell the instructor about anything hard to
+  read. When nobody reviewed it, or a part is a picture or left out, the same statement
+  opens `<main>` too, with a link to each place (`_checked_notice`). An optional `notice`
+  at the top (e.g. "offline test run": placeholders, not conversions).
 
 Security: all document and model text is
 escaped with `html.escape`. MathML is never pasted as a string: `sanitize_mathml` parses
@@ -65,6 +67,8 @@ from readablestem.core.types import (
 from readablestem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from readablestem.pipeline import (
     assemble_tables,
+    checked,
+    checked_words,
     equation_scale,
     figure_details,
     figure_images,
@@ -93,7 +97,7 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # (`RENDER_META`), and the web app makes a stored page again from its stored result when
 # the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
 # documents converted before it, not only new ones and ones somebody edits again.
-RENDER_VERSION = 3
+RENDER_VERSION = 4  # 4: the statement of what was reviewed and converted (SW7)
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -126,10 +130,9 @@ _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merg
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
 FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
 # The student note (`_about_section`). It speaks to students: what this file is and who
-# to tell about problems. Final for the beta: it does not name screen readers, and
-# "checked" appears only once an instructor has made a decision. The
-# feature review's challenge (10.3, row 4) warns that "checked" can read as a
-# certificate; its alternative, "N parts were decided by your instructor", was not taken.
+# to tell about problems. What was reviewed and converted is the statement of
+# `pipeline.checked_words` (SW7): a person "reviewed", never "checked", which can read as
+# a certificate.
 ABOUT_TITLE = "About this version"
 ABOUT_WORDING = (
     "This is a web version of a PDF from your course, made with ReadableSTEM, a tool that "
@@ -143,22 +146,6 @@ ABOUT_WORDING_SOURCE = (
 ABOUT_WORDING_BEAMER = (
     "This is a web version of a slide deck from your course, made with ReadableSTEM, "
     "a tool that assists with accessibility."
-)
-MATHS_NOTE = "Its equations are written so that screen readers can read them aloud."
-NOT_CHECKED_YET = (
-    "Some parts were made by the tool and have not been checked by your instructor yet."
-)
-CHECKED = "Your instructor checked the parts the tool was unsure about"
-FLAGGED_NOTE = (
-    "Some parts could not be converted. They are shown as pictures of the original, "
-    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
-    "instructor for a version you can read."
-)
-# The same for a LaTeX source, whose parts are shown as written, never as pictures.
-FLAGGED_NOTE_SOURCE = (
-    "Some parts could not be converted. They are shown as they were written in LaTeX, "
-    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
-    "instructor for a version you can read."
 )
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
@@ -263,6 +250,14 @@ _BACKLINK_RE = re.compile(_BACKLINK_SLOT + "([^\x00]*)" + _BACKLINK_SLOT)
 
 ABOUT_ID = "about-conversion"
 ABOUT_TITLE_ID = "about-conversion-title"
+# The statement at the top of the page (`_checked_notice`), and the sentence of the note at
+# the end that names the pages left out, which it links to.
+NOTICE_ID = "checked-notice"
+NOTICE_TITLE_ID = "checked-notice-title"
+LEFT_OUT_ID = "about-left-out"
+# The statement in the head, for the files made from the page (`_summary_meta`).
+SUMMARY_META = "readablestem-summary"
+SUFFICIENT_META = "readablestem-access-sufficient"
 
 
 # BCP 47-ish: "en", "en-US", "zh-Hant-TW". Anything else falls back to "en".
@@ -720,7 +715,9 @@ class _Renderer:
     fixes: dict[str, Fix]
     crops: dict[str, bytes]
     equations: dict[str, Element]
-    used_ids: set[str] = field(default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID})
+    used_ids: set[str] = field(
+        default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID, NOTICE_ID, NOTICE_TITLE_ID, LEFT_OUT_ID}
+    )
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
     outline: Outline = field(default_factory=Outline)
@@ -1318,24 +1315,6 @@ def _notice(text: str | None) -> str | None:
     )
 
 
-def long_date(day: date) -> str:
-    """The date as "October 9, 2026" (US order, as the rest of the site)."""
-    return f"{day:%B} {day.day}, {day.year}"
-
-
-def _review_line(fixes: list[Fix], checked_on: date | None) -> str:
-    """Whether the instructor has checked what the tool asked about. Nothing when the
-    tool asked nothing and nobody changed anything; "not checked yet" while a decision
-    is open; once every decision is made, "checked", with the date when it is known."""
-    asked = any(f.review == "required" or f.decided_by_reviewer for f in fixes)
-    if not asked:
-        return ""
-    if any(f.pending for f in fixes):
-        return f"<p>{NOT_CHECKED_YET}</p>\n"
-    when = f" on {long_date(checked_on)}" if checked_on is not None else ""
-    return f"<p>{CHECKED}{when}.</p>\n"
-
-
 def kept_pages_note(kept_pages: list[int]) -> str:
     """ "Pages 2 and 5 are shown only as pictures of the page and were not converted."
     (1-based), or "" when no page is kept whole as an image. Whatever the reason (a
@@ -1366,56 +1345,82 @@ def image_pages_note(pages: list[int]) -> str:
     )
 
 
-def omitted_pages_note(omitted_pages: list[int]) -> str:
-    """ "Page 1 of the original PDF was left out of this file." (1-based), or "" when no
-    page was left out. The instructor chose it (a blank page, a cover: T3-16), so the
-    note says the page is not here and does not say why."""
-    numbers = [str(p + 1) for p in sorted(set(omitted_pages))]
-    if not numbers:
-        return ""
-    if len(numbers) == 1:
-        return f"Page {numbers[0]} of the original PDF was left out of this file."
-    listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
-    return f"Pages {listed} of the original PDF were left out of this file."
-
-
 def _about_section(
-    fixes: list[Fix],
-    flagged: int,
+    summary: checked.CheckedSummary,
     source_note: str | None,
-    checked_on: date | None = None,
     kept_pages: list[int] | None = None,
     contact: str | None = None,
-    omitted_pages: list[int] | None = None,
     image_pages: list[int] | None = None,
-    origin: str = "pdf",
 ) -> str:
     """The note for students at the end of the file (MF7 of the UX review): what this
-    is, whether the instructor has checked it, which pages are only pictures, who to tell
-    about problems. It is written for the people who read the file, so it has no counts
-    and no review vocabulary ("needs review", "rejected"): the instructor's numbers are
-    on the job page. `kept_pages`: 0-based pages kept whole as an image."""
-    maths = any(f.kind is Kind.EQUATION and f.status not in NOT_CONVERTED for f in fixes)
+    is, the statement of what was reviewed and converted (`checked_words.statement`), which
+    pages are only pictures, who to tell about problems. It speaks to the people who read
+    the file, with no review vocabulary ("needs review", "rejected"). `kept_pages`: 0-based
+    pages kept whole as an image. The sentence about pages left out carries an id, so the
+    notice at the top can link to it."""
     opening = {"latex": ABOUT_WORDING_SOURCE, "beamer": ABOUT_WORDING_BEAMER}.get(
-        origin, ABOUT_WORDING
+        summary.origin, ABOUT_WORDING
     )
-    what = f"{opening} {MATHS_NOTE}" if maths else opening
-    flagged_words = FLAGGED_NOTE if origin == "pdf" else FLAGGED_NOTE_SOURCE
-    flagged_note = f"<p>{flagged_words}</p>\n" if flagged else ""
+    maths = checked_words.maths_sentence(summary)
+    lines = [f"<p>{opening} {maths}</p>" if maths else f"<p>{opening}</p>"]
+    left_out = checked_words.left_out_sentence(summary)
+    for sentence in checked_words.statement(summary):
+        where = f' id="{LEFT_OUT_ID}"' if sentence == left_out else ""
+        lines.append(f"<p{where}>{_escape(sentence)}</p>")
     if pages_line := kept_pages_note(kept_pages or []):
-        flagged_note += f"<p>{pages_line}</p>\n"
+        lines.append(f"<p>{pages_line}</p>")
     if converted := image_pages_note(image_pages or []):
-        flagged_note += f"<p>{converted}</p>\n"
-    if left_out := omitted_pages_note(omitted_pages or []):
-        flagged_note += f"<p>{left_out}</p>\n"
-    source = f"<p>{_escape(source_note)}</p>\n" if source_note and source_note.strip() else ""
+        lines.append(f"<p>{converted}</p>")
+    lines.append(f"<p>{_contact_sentence(contact)}</p>")
+    if source_note and source_note.strip():
+        lines.append(f"<p>{_escape(source_note)}</p>")
     return (
         f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
         f'<p id="{ABOUT_TITLE_ID}" class="about-title">{ABOUT_TITLE}</p>\n'
-        f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
-        f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
+        + "\n".join(lines)
+        + "\n</footer>"
     )
+
+
+def _checked_notice(summary: checked.CheckedSummary, places: Collection[str]) -> str:
+    """The statement again, first in `<main>`, when nobody reviewed the page or a part is a
+    picture or left out (SW7), so the note at the end is not the only notice. A region named
+    by its own title (not the footer's, so a list of landmarks tells the two apart), with no
+    live role, so it is read once, where it stands. Its links go to the note at the end, to
+    each picture (numbered, up to `NOTICE_MAX_LINKS`) and to the pages left out. `places` are
+    the ids the page holds, so no link points nowhere."""
+    if not summary.needs_notice:
+        return ""
+    words = checked_words
+    links = [f'<li><a href="#{ABOUT_ID}">{words.NOTICE_ABOUT_LINK}</a></li>']
+    shown = [p for p in summary.converted.pictures if p.element_id in places]
+    for number, picture in enumerate(shown[: words.NOTICE_MAX_LINKS], 1):
+        name = _escape(words.picture_link(number, picture.kind, picture.page))
+        links.append(f'<li><a href="#{_escape(picture.element_id)}">{name}</a></li>')
+    if len(shown) > words.NOTICE_MAX_LINKS:
+        rest = words.more_pictures(len(shown) - words.NOTICE_MAX_LINKS)
+        links.append(f"<li>{_escape(rest)}</li>")
+    if summary.left_out:
+        links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.NOTICE_LEFT_OUT_LINK}</a></li>')
+    return (
+        f'<section id="{NOTICE_ID}" class="notice checked-notice {AUTHORED_CLASS}" '
+        f'aria-labelledby="{NOTICE_TITLE_ID}">\n'
+        f'<p id="{NOTICE_TITLE_ID}" class="flag-label">{words.NOTICE_TITLE}</p>\n'
+        f"<p>{_escape(' '.join(words.statement(summary)))}</p>\n"
+        f"<ul>{''.join(links)}</ul>\n</section>"
+    )
+
+
+def _summary_meta(summary: checked.CheckedSummary) -> list[str]:
+    """The statement in the page's head, for the files made from the page (the EPUB's
+    accessibility summary and `accessModeSufficient`, the Canvas README's first lines),
+    which read the page and not the result."""
+    text = _escape(checked_words.export_summary(summary))
+    lines = [f'<meta name="{SUMMARY_META}" content="{text}">']
+    if summary.text_sufficient:
+        lines.append(f'<meta name="{SUFFICIENT_META}" content="textual">')
+    return lines
 
 
 def draft_banner(open_decisions: int) -> str:
@@ -1671,6 +1676,7 @@ def render_html(
     pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
     origin: str = "pdf",
+    pages: int | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1697,7 +1703,8 @@ def render_html(
     its page in the PDF it was cut from (a part of a longer file). `footnote_ids`: the element
     ids of footnotes (`Notice` code "footnote"), whose marks and notes are linked both ways.
     `origin`: "pdf" or, for a document made from a LaTeX source, "latex" or "beamer"
-    (`DocumentResult.origin`): the student note's first sentence says so.
+    (`DocumentResult.origin`): the student note's first sentence says so. `pages`: how many
+    pages the document has, when known, so the note can say "7 of 8" pages were left out.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -1735,17 +1742,24 @@ def render_html(
         and fix.reason in KEPT_PAGE_REASONS
         and fix.status in NOT_CONVERTED
     ]
+    # The statement of what was reviewed and converted, from the same parts the web app reads
+    # from the stored result (`checked.of_result`), so the page and the job page agree.
+    summary = checked.summarize(
+        elements=elements,
+        fixes=fixes,
+        left_out_pages=omitted_pages or (),
+        pages=pages,
+        reviewed_on=checked_on,
+        origin=origin,
+    )
     about = _about_section(
-        list(first_fix.values()),
-        len(renderer.flagged),
+        summary,
         source_note,
-        checked_on,
         kept_pages,
         contact,
-        omitted_pages,
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
-        origin,
     )
+    top = _checked_notice(summary, renderer.used_ids)
     heading_texts = [
         text
         for e in ordered
@@ -1779,6 +1793,7 @@ def render_html(
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
             f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
+            *_summary_meta(summary),
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",
@@ -1788,6 +1803,7 @@ def render_html(
             f'<span id="{navigation.MAIN_ID}" tabindex="-1"></span>',
             "<main>",
             *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
+            *([_authored_in_english(top, lang)] if top else []),
             *(_authored_in_english(part, lang) for part in body),
             "</main>",
             _authored_in_english(about, lang),

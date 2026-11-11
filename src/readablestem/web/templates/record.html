@@ -39,7 +39,8 @@
     <li>{{ c.accepted }} accepted by the tool after its own automatic checks, with no decision from a person.</li>
     <li>{{ c.decided }} decided by a person ({{ record.decisions|length }} {{ "step" if record.decisions|length == 1 else "steps" }} listed below).</li>
     <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
-    <li>{{ c.as_image }} {{ "part" if c.as_image == 1 else "parts" }} shown as pictures of the original.</li>
+    {% if record.checked.pictures %}<li>{{ checked_words.as_image_sentence(record.checked) }}</li>
+    {% elif record.checked.all_found_converted %}<li>{{ checked_words.READY_ALL }}</li>{% endif %}
     {% for name, n in record.by_hand.items() %}<li>{{ name }}: {{ n }}.</li>{% endfor %}
     {% for title, text in record.gaps %}<li>{{ title }}: {{ text }}</li>{% endfor %}
     {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
@@ -88,23 +89,17 @@
     {% for i in record.kept_as_images %}<li>{{ i.item }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
   </ul>
   {% else %}
-  <p>Every part was converted.</p>
+  <p>{{ checked_words.record_pictures(record.checked) }}</p>
   {% endif %}
 </section>
 
 <section aria-labelledby="record-checks">
-  <h2 id="record-checks">Automatic checks</h2>
-  {% if record.checks_run %}
-  <p>{{ record.checks_run }} checks of the structure of the HTML file ran
-    (language, title, order of headings, lists, links, tables and the alt attribute of every image).
-    {% if record.failed_checks %}{{ record.failed_checks|length }} did not pass:{% else %}All passed.{% endif %}</p>
+  <h2 id="record-checks">Structure checks</h2>
+  <p>{{ checked_words.record_checks(record.checked) }}</p>
   {% if record.failed_checks %}
   <ul>
     {% for ch in record.failed_checks %}<li><strong>{{ ch.severity }}:</strong> {{ ch.text }}</li>{% endfor %}
   </ul>
-  {% endif %}
-  {% else %}
-  <p>No structure checks are stored for this file.</p>
   {% endif %}
 </section>
 

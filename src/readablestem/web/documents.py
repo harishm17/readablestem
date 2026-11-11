@@ -17,15 +17,17 @@ recorded sample, which has no file of the person's, and a title the person chose
 (T1-7) lead with the title. Titles and file names are document-derived: shown to their owner
 only, never logged.
 
-The list reads no stored result. The two facts it needs from one, the title and how many
-decisions are open, are columns of the job (`jobs.result_title`, `jobs.open_decisions`),
+A job with decisions open needs no stored result: the title and how many decisions are open
+are columns of the job (`jobs.result_title`, `jobs.open_decisions`),
 set whenever a result is stored (`list_facts`, called from the `Job.result_json` set
 event in `web.db`): while anything is waiting or converting, htmx polls
 `GET /app/documents` and every change of a page count rebuilds the list, which used to
 load and validate the fixes of every finished document each time. `list_version` says
 whether anything changed from the jobs' own columns alone, so an unchanged list costs one
 small query and a 204. A finished job from before the columns existed (both NULL) is read
-once from its result and the two facts are stored.
+once from its result and the two facts are stored. A finished job with no decision open, or
+with an outcome code, has its result read for its label (`states.load`): "Ready to share"
+or "Ready" is the summary's (`pipeline.checked`), which is not stored (SW7).
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core import triage
 from readablestem.core.types import Fix
+from readablestem.pipeline import checked
 from readablestem.web import states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus
@@ -203,8 +206,10 @@ def _fixes(fixes: object) -> list[Fix]:
 
 
 def open_decisions(fixes: object) -> int:
-    """Decisions still open in a stored result's fixes (a heading group is one)."""
-    return triage.open_decisions(_fixes(fixes))
+    """Decisions still open in a stored result's fixes (a heading group is one): the
+    summary's count (`pipeline.checked.open_required`), which the stored
+    `jobs.open_decisions`, the draft gate and the job's state all read."""
+    return checked.open_required(_fixes(fixes))
 
 
 def list_facts(result: object) -> tuple[int, str]:

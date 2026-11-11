@@ -202,7 +202,8 @@ def test_a_list_that_runs_over_a_page_gets_the_marker_inside_the_item_that_start
         ]
     )
     html = render(items)
-    assert html.count("<ul>") == 1  # one list, not cut in two
+    content = re.sub(r'<section id="checked-notice".*?</section>', "", html, flags=re.S)
+    assert content.count("<ul>") == 1  # one list, not cut in two (the notice's links aside)
     assert '<li id="p2-e1"><div class="pagebreak' in html
     assert "<ul><div" not in html  # a div is not a child of a ul
 
