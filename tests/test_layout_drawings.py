@@ -310,9 +310,28 @@ def test_a_worked_example_box_with_a_grid_of_cell_borders_is_still_not_a_figure(
     _path(page, [[(56, 65), (557, 65)]])
     _path(page, [[(56, 335), (557, 335)]])
     _running_text(page, 80, 3)
+    # A shaded contents box: a frame of four filled strips and one tinted rectangle behind
+    # each entry. The strips and the shading are not the bars of a chart, and the entries
+    # stay text.
+    page = _page(doc)
+    top = _running_text(page, 60, 1)
+    box = (72, top + 10, 330, top + 190)
+    for side in (
+        (box[0], box[1], box[0] + 4, box[3]),
+        (box[2] - 4, box[1], box[2], box[3]),
+        (box[0], box[1], box[2], box[1] + 4),
+        (box[0], box[3] - 4, box[2], box[3]),
+    ):
+        _rect(page, side, colour=None, width=0, fill=BLUE)
+    for i, entry in enumerate(["In this issue", "New faculty", "Student awards", "Alumni news"]):
+        y = box[1] + 14 + 26 * i
+        _rect(page, (box[0] + 10, y, box[0] + 120, y + 18), colour=None, width=0, fill=GREY)
+        _label(page, (box[0] + 16, y + 13), entry, 10)
+    _running_text(page, box[3] + 20, 1, start=1)
     out = layout.analyze(doc.tobytes())
     assert out.kept_pages == {}
-    assert _figures(out, 0) == [] and _figures(out, 1) == []
+    assert _figures(out, 0) == [] and _figures(out, 1) == [] and _figures(out, 2) == []
+    assert "Student awards" in _text_of(out)
 
 
 # --------------------------------------------------------------------------- formulas, circuits
