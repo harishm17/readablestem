@@ -159,6 +159,19 @@ def test_a_plain_escape_is_refused_with_the_pdf_advice(web, snippet, words):
         assert "root:" not in text and snippet not in text  # the source is never echoed
 
 
+@pytest.mark.parametrize(
+    ("preamble", "name"),
+    [("\\documentclass[addpoints]{exam}", "exam"), ("\\usepackage{csquotes}", "csquotes")],
+    ids=["exam", "csquotes"],
+)
+def test_a_class_or_package_not_read_yet_is_refused_at_upload(web, preamble, name):
+    if "documentclass" not in preamble:
+        preamble = "\\documentclass{article}" + preamble
+    source = f"{preamble}\\begin{{document}}\\question Two?\\end{{document}}"
+    text = html.unescape(refused(web, source.encode(), "quiz.tex"))  # no job, no pages
+    assert "quiz.tex" in text and f"({name})" in text and "PDF" in text  # what, and what to do
+
+
 def zip_with_attr(name: str, data: bytes, attr: int) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:

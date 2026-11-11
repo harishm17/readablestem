@@ -33,7 +33,6 @@ absent, and nothing is said either way.
 
 from __future__ import annotations
 
-import functools
 import re
 import subprocess
 from dataclasses import dataclass
@@ -208,11 +207,10 @@ def write_distribution_names(names: set[str], path: Path = NAMES_PATH) -> None:
     if not names:
         return
     path.write_text("\n".join(sorted(names)) + "\n", encoding="utf-8")
-    _names.cache_clear()
 
 
-@functools.cache
 def _names() -> frozenset[str] | None:
+    """The names the image build wrote; read each time (only a stopped job asks)."""
     try:
         text = NAMES_PATH.read_text(encoding="utf-8")
     except OSError:

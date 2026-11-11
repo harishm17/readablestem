@@ -59,12 +59,14 @@ LOSSES: dict[str, tuple[str, str, str, tuple[str, str, str, str]]] = {
         "coursemacros",
         ("missing", "missing_file", "coursemacros", "main.tex"),
     ),
+    # A class on none of `source.support`'s lists goes to LaTeXML (`exam`, refused by name,
+    # never gets there: tests/test_source_intake.py).
     "unknown_class": (
-        "\\documentclass{exam}\\begin{document}\\begin{questions}\\question[5] Two?\n"
-        "\\begin{solution}Four.\\end{solution}\\end{questions}\\end{document}\n",
+        "\\documentclass{tufte-handout}\\begin{document}\\newthought{In the beginning} there "
+        "was text.\n\\end{document}\n",
         "source_unsupported_class",
-        "exam",
-        ("missing", "missing_file", "exam", "main.tex"),
+        "tufte-handout",
+        ("missing", "missing_file", "tufte-handout", "main.tex"),
     ),
     "tikz_figure": (
         "\\documentclass{article}\\usepackage{tikz}\\usetikzlibrary{arrows.meta}\n"

@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: LaTeX classes and packages, read or refused (branch feat/latex-class-support)
+
+- A LaTeX source in the `exam` class is refused at upload (`source_unsupported_class`): LaTeXML
+  has no binding for it and its fallback printed the solutions and named the correct choice. A
+  source that loads `csquotes` is refused the same way (`source_unsupported_package`): its
+  binding reads the package's own TeX, which is hidden, and loading it alone gave 24 errors.
+  The answer says to compile the version students should see and upload the PDF; nothing is
+  queued or counted. The conversion child refuses the same sources, and a project folder in a
+  batch zip gets the same answer. The upload help, /limits and the comparison guide name both.
+- `source/support.py` lists every class and package as bound (LaTeXML 0.8.8's 43 class and
+  356 package bindings, compared with the installed folder by a test), read without a binding
+  (`scrartcl`, `scrreprt`, `scrbook`, `memoir`, `extarticle` as an article, each held by a test
+  that converts it with no error; `babel`, whose commands stop the job when used) or refused.
+  A class read as an article is no longer named as the cause when a job stops.
+- The image build writes TeX Live's package names (from texdoc's data in `texlive-base`) beside
+  the table and records their number as the image fact `tex_names`. A job stopped for a
+  package's commands then says whether the package is one this tool does not read yet (upload
+  the PDF) or the instructor's own, whose file in the upload is not read (copy the definitions
+  into the source). Without the list the sentence is the one it was.
 ## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
 
 - Every review write records a content-free `decision_outcome` event beside `decision_made`:
