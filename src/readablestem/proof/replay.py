@@ -42,9 +42,15 @@ from unittest import mock
 
 from PIL import Image, PngImagePlugin
 
-from readablestem.core.images import open_within_budget
 from readablestem.core.types import Check, ModelCall
 from readablestem.models.base import T, VisionClient, VisionRequest
+from readablestem.models.question import (
+    IDENTITY_KEYWORD,
+    PNG_SIGNATURE,
+    difference,
+    image_identity,
+    request_key,
+)
 from readablestem.models.verifier import (
     EQUATION_CHECK,
     EQUATION_VERSION,
@@ -58,8 +64,6 @@ from readablestem.pipeline import html_checks
 from readablestem.proof.bundle import Bundle, dump_line
 from readablestem.proof.errors import BundleError
 
-PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-IDENTITY_KEYWORD = "a11y-proof-identity"
 MAX_STANDIN_SIDE = 8192
 
 
@@ -68,41 +72,6 @@ def _sha(text: str) -> str:
 
 
 # --------------------------------------------------------------------------- images
-
-
-def declared_identity(png: bytes) -> str | None:
-    """The identity a stand-in PNG declares in its text chunk, if it has one."""
-    if png[:8] != PNG_SIGNATURE:
-        return None
-    pos = 8
-    while pos + 8 <= len(png):
-        (length,) = struct.unpack(">I", png[pos : pos + 4])
-        kind = png[pos + 4 : pos + 8]
-        if kind == b"tEXt":
-            key, _, value = png[pos + 8 : pos + 8 + length].partition(b"\x00")
-            if key == IDENTITY_KEYWORD.encode("ascii"):
-                return value.decode("ascii", "replace")
-        if kind in (b"IDAT", b"IEND"):
-            return None
-        pos += 12 + length
-    return None
-
-
-def pixel_identity(png: bytes) -> str:
-    """SHA-256 of the decoded pixels ("px:..."), or of the bytes ("raw:...") when the
-    data is not an image PIL can read."""
-    try:
-        with open_within_budget(png) as image:
-            rgba = image.convert("RGBA")
-    except (OSError, ValueError, SyntaxError):
-        return "raw:" + hashlib.sha256(png).hexdigest()
-    digest = hashlib.sha256(f"{rgba.width}x{rgba.height}".encode())
-    digest.update(rgba.tobytes())
-    return "px:" + digest.hexdigest()
-
-
-def image_identity(png: bytes) -> str:
-    return declared_identity(png) or pixel_identity(png)
 
 
 def png_size(png: bytes) -> tuple[int, int] | None:
@@ -124,20 +93,6 @@ def standin_png(identity: str, width: int, height: int) -> bytes:
 
 
 # ---------------------------------------------------------------------------- keys
-
-
-def request_key(request: VisionRequest) -> str:
-    parts = [
-        request.step,
-        request.model,
-        request.prompt_version,
-        _sha(request.instructions),
-        [image_identity(png) for png in request.images],
-        request.context_text,
-        request.max_output_tokens,
-        request.image_detail,
-    ]
-    return _sha(json.dumps(parts, ensure_ascii=False, separators=(",", ":")))
 
 
 def verify_key(check: str, version: str, png: bytes, *texts: str | None) -> str:
@@ -196,10 +151,15 @@ class AnswerSet:
         self._verify: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._axe: dict[str, list[dict[str, Any]]] = {}
         self._cursor: dict[tuple[str, str], int] = defaultdict(int)
+        # What each recorded request asked (`models.question.asked`), by step: a miss is
+        # named from them. Rows recorded before the lists were kept have none.
+        self._asked: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.stats = ReplayStats()
         for row in rows:
             if row["t"] == "model":
                 self._model[row["k"]].append(row)
+                if isinstance(row.get("q"), dict):
+                    self._asked[row["step"]].append(row["q"])
             elif row["t"] == "verify":
                 self._verify[row["k"]].append(row)
             elif row["t"] == "axe":
@@ -211,6 +171,19 @@ class AnswerSet:
         """Make one more model row answerable (a live run that records as it goes)."""
         with self._lock:
             self._model[row["k"]].append(row)
+            if isinstance(row.get("q"), dict):
+                self._asked[row["step"]].append(row["q"])
+
+    def why_missing(self, asked: dict[str, Any]) -> str:
+        """Why the question `asked` has no answer here (`models.question.difference`)."""
+        with self._lock:
+            recorded = list(self._asked.get(asked["step"], ()))
+        return difference(asked, recorded)
+
+    def taken(self, key: str) -> dict[str, Any] | None:
+        """The next recorded model answer under `key`, or None, with nothing counted (a
+        second place to look for a request that `model` did not find)."""
+        return self._take(self._model, "model", key)
 
     @classmethod
     def load(cls, bundle: Bundle, task: str, repeat: int) -> AnswerSet:
@@ -227,13 +200,18 @@ class AnswerSet:
                 self.stats.reused += 1
             return rows[index % len(rows)]
 
-    def model(self, key: str, step: str) -> dict[str, Any] | None:
+    def model(
+        self, key: str, step: str, asked: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
+        """The next recorded answer under `key`. A miss is listed with its reason when the
+        caller says what was `asked`."""
         with self._lock:
             self.stats.requests += 1
         row = self._take(self._model, "model", key)
         if row is None:
+            reason = f": {self.why_missing(asked)}" if asked is not None else ""
             with self._lock:
-                self.stats.misses.append(f"model {step} {key[:12]}")
+                self.stats.misses.append(f"model {step} {key[:12]}{reason}")
         return row
 
     def verdict(self, key: str, check: str) -> dict[str, Any] | None:

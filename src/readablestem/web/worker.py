@@ -219,7 +219,12 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
     from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
     offline = settings.model_answers_offline
-    cached = CachedClient(None if offline else client, settings.model_answers_file, settings)
+    cached = CachedClient(
+        None if offline else client,
+        settings.model_answers_file,
+        settings,
+        rekey=settings.model_answers_rekey,
+    )
     keep_second_check_answers(client, cached, offline=offline)
     return cached
 

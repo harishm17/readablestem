@@ -19,7 +19,8 @@ Child to parent, part 0 is JSON and the rest are raw bytes (images, crops): the 
 the process that reads the hostile file, so the parent never unpickles anything it sends.
 
 Child to parent `op`s: "model" (a `VisionRequest`'s fields; the images are the blobs),
-"verify", "progress", "stage", "cache_lookup", "cache_store" (each answered, by `id`),
+"verify", "progress", "stage", "cache_lookup", "cache_store", "cache_answer", "cache_keep"
+(each answered, by `id`),
 "observe" (a finished model call; not answered), and the last frame: "done" (the result as
 JSON, the crops as blobs) or "error" (a category, never an exception message: MuPDF's
 messages quote the PDF).
@@ -340,6 +341,16 @@ class ProxyStepCache:
                     "fix": fix.model_dump(mode="json"),
                 }
             )
+
+    def answer(self, key: str) -> dict[str, Any] | None:
+        try:
+            return self._link.call({"op": "cache_answer", "key": key})
+        except Exception:  # a miss, as the cache's own contract says
+            return None
+
+    def keep(self, key: str, row: dict[str, Any]) -> None:
+        with contextlib.suppress(Exception):
+            self._link.call({"op": "cache_keep", "key": key, "row": row})
 
 
 # --------------------------------------------------------------------------- the child

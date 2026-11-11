@@ -7,25 +7,33 @@ its answer is appended to the file at once (so a run that stops keeps what it pa
 `--answers-offline` turns a miss into a refusal instead of a call, which makes a replay
 spend nothing whatever the run asks for; the misses are counted and printed.
 
-The key is `proof.replay.request_key` (step, model, prompt version, instructions, the
-images by what they show, the fenced text, token limit, image detail) plus what else
-changes the answer without being part of the request: the thinking effort the client will
-ask for, and whether the untrusted-text notice rides in the system block. So an arm that
-changes nothing a model can see (a different routing rule, say) shares every answer with the
-baseline, and an arm that does change it (a lower effort, a smaller picture, other context)
-asks again and is recorded beside it. Answers and costs are the recording's: a cost read
-from the file is the one the recording call paid at list price.
+The key is `models.question.question_key`: everything the model is sent (step, model,
+prompt version, the system text, the images by what they show, the fenced text, token limit,
+image detail, the thinking effort, the answer format). Nothing about the release is in it.
+So an arm that changes nothing a model can see (a different routing rule, a new pipeline
+version) shares every answer with the baseline, and an arm that does change it (a lower
+effort, a smaller picture, an edited prompt or schema) asks again and is recorded beside it.
+Answers and costs are the recording's: a cost read from the file is the one the recording
+call paid at list price.
 
-The file is JSON lines, one `{"t": "model", "k": key, ...}` row per answer, the format of
-`proof.replay`. It holds model outputs for development-set items only (public OpenStax and
-project-authored text); keep it outside the repository.
+The file is JSON lines, one `{"t": "model", "k": key, "q": what was asked, ...}` row per
+answer, the format of `proof.replay`. "q" is the content-free list the key is the hash of
+(`models.question.asked`); with it a request the file cannot answer is counted by reason
+("prompt equation-1a2b3c4d recorded, equation-9f8e7d6c asked"). It holds model outputs for
+development-set items only (public OpenStax and project-authored text); keep it outside the
+repository.
+
+A file recorded under the older key (before the answer format and the fence were part of
+it) is read with `rekey`: a request found only under its old key is answered from that row,
+and the row is appended again under the new key, so one replay of the runs a file was made
+for moves it to the new keys without a call. Rows no run asks for stay as they were.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import threading
+from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -33,8 +41,18 @@ from typing import Any
 from readablestem.config import Settings
 from readablestem.core.types import ModelCall
 from readablestem.models.base import T, VisionRequest
+from readablestem.models.question import asked, effective_effort, key_of, legacy_key
+from readablestem.models.question import question_key as answer_key
 from readablestem.proof.bundle import dump_line
-from readablestem.proof.replay import AnswerSet, request_key
+from readablestem.proof.replay import AnswerSet
+
+__all__ = [
+    "CachedClient",
+    "answer_key",
+    "effective_effort",
+    "keep_second_check_answers",
+    "load_rows",
+]
 
 _FILE_LOCKS: dict[Path, threading.Lock] = {}
 _FILE_LOCKS_GUARD = threading.Lock()
@@ -45,23 +63,6 @@ def _file_lock(path: Path) -> threading.Lock:
     key = path.resolve()
     with _FILE_LOCKS_GUARD:
         return _FILE_LOCKS.setdefault(key, threading.Lock())
-
-
-def effective_effort(settings: Settings, request: VisionRequest) -> str | None:
-    """The thinking effort a Claude client will send for `request` (None: not Claude)."""
-    if settings.model_provider != "anthropic":
-        return None
-    return request.effort or settings.anthropic_effort_for(request.model)
-
-
-def answer_key(settings: Settings, request: VisionRequest) -> str:
-    """Everything that decides the answer, as one hash."""
-    extra = [
-        effective_effort(settings, request),
-        bool(getattr(settings, "anthropic_notice_in_system", False)),
-    ]
-    text = request_key(request) + json.dumps(extra, separators=(",", ":"))
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def load_rows(path: Path) -> list[dict[str, Any]]:
@@ -77,12 +78,15 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
 class CachedClient:
     """A `VisionClient` that answers from a file and asks `inner` only for what is missing.
 
-    `inner` None (offline): a miss comes back refused, with no call and no cost."""
+    `inner` None (offline): a miss comes back refused, with no call and no cost.
+    `rekey`: a request the file holds only under its older key is answered from that row and
+    the row is written again under the new key (module docstring)."""
 
-    def __init__(self, inner: Any, path: Path, settings: Settings) -> None:
+    def __init__(self, inner: Any, path: Path, settings: Settings, *, rekey: bool = False) -> None:
         self._inner = inner
         self._path = path
         self._settings = settings
+        self._rekey = rekey
         self._lock = threading.Lock()
         self._answers = AnswerSet(load_rows(path))
         self._local = threading.local()  # per thread: did the last first attempt only stage?
@@ -91,6 +95,8 @@ class CachedClient:
         self.second_check: CachedClient | None = None
         self.hits = 0
         self.misses = 0
+        self.rekeyed = 0
+        self.missed_because: Counter[str] = Counter()
         self.live_cost_usd = 0.0
         self.replayed_cost_usd = 0.0
         self._steps: dict[str, dict[str, float]] = {}
@@ -98,7 +104,8 @@ class CachedClient:
     def run(
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
     ) -> tuple[T | None, ModelCall]:
-        key = answer_key(self._settings, request)
+        parts = asked(self._settings, request, schema)
+        key = key_of(parts)
         if not is_fallback:
             self._local.staged = False
         elif getattr(self._local, "staged", False):
@@ -111,14 +118,22 @@ class CachedClient:
                 is_fallback=True,
                 outcome="api_error",
             )
+        moved = None
         with self._lock:
             row = self._answers.model(key, request.step)
-            if row is not None:
-                self.hits += 1
-            else:
-                self.misses += 1
+            if row is None:
                 # AnswerSet counted the miss as a replay miss; a live call is not one.
                 self._answers.stats.misses.pop()
+                if self._rekey:
+                    row = moved = self._answers.taken(legacy_key(self._settings, request))
+            if row is not None:
+                self.hits += 1
+                self.rekeyed += moved is not None
+            else:
+                self.misses += 1
+                self.missed_because[self._answers.why_missing(parts)] += 1
+        if moved is not None:
+            self._write({**moved, "k": key, "q": parts})
         if row is not None:
             call = ModelCall.model_validate(row["call"])
             self.replayed_cost_usd += call.cost_usd
@@ -147,10 +162,18 @@ class CachedClient:
         self._tally(call)
         # An answer lost to an outage or a budget stop is not worth keeping: ask again later.
         if call.outcome in ("ok", "invalid_output", "refused"):
-            self.record(key, request.step, parsed, call)
+            self.record(key, request.step, parsed, call, parts)
         return parsed, call
 
-    def record(self, key: str, step: str, parsed: Any, call: ModelCall) -> None:
+    def record(
+        self,
+        key: str,
+        step: str,
+        parsed: Any,
+        call: ModelCall,
+        asked: dict[str, Any] | None = None,
+    ) -> None:
+        """Keep one answer under `key`; `asked` is the list the key is the hash of."""
         row = {
             "t": "model",
             "k": key,
@@ -158,6 +181,11 @@ class CachedClient:
             "payload": parsed.model_dump(mode="json") if parsed is not None else None,
             "call": call.model_dump(mode="json"),
         }
+        if asked is not None:
+            row["q"] = asked
+        self._write(row)
+
+    def _write(self, row: dict[str, Any]) -> None:
         self._answers.add(row)
         # One lock per file for the process: the web app builds a client per job and per
         # re-read, and two of them may append to the same file at once.
@@ -168,7 +196,8 @@ class CachedClient:
 
     def reset(self) -> None:
         """Zero the counters (a staged run counts its last pass only)."""
-        self.hits = self.misses = 0
+        self.hits = self.misses = self.rekeyed = 0
+        self.missed_because = Counter()
         self.live_cost_usd = self.replayed_cost_usd = 0.0
         self._steps = {}
 
@@ -207,6 +236,11 @@ class CachedClient:
         return out
 
     def _summary(self) -> dict[str, Any]:
+        extra: dict[str, Any] = {}
+        if self.rekeyed:
+            extra["answers_file_rekeyed"] = self.rekeyed
+        if self.missed_because:
+            extra["answers_file_missed_because"] = dict(self.missed_because.most_common())
         return {
             "by_step": {
                 k: {n: round(v, 6) for n, v in row.items()} for k, row in self._steps.items()
@@ -216,6 +250,7 @@ class CachedClient:
             "answers_file_misses": self.misses,
             "live_cost_usd": round(self.live_cost_usd, 6),
             "replayed_cost_usd": round(self.replayed_cost_usd, 6),
+            **extra,
         }
 
 
@@ -233,7 +268,9 @@ def keep_second_check_answers(client: Any, cached: CachedClient, *, offline: boo
         return
 
     def wrap(inner: Any) -> Any:
-        check = CachedClient(None if offline else inner, cached._path, inner.settings)
+        check = CachedClient(
+            None if offline else inner, cached._path, inner.settings, rekey=cached._rekey
+        )
         cached.second_check = check
         return check
 

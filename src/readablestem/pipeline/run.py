@@ -73,8 +73,11 @@ Design notes:
 - Finished steps can be kept and reused (`StepCache`, T3-1): with a cache, every model
   step's answer that is worth keeping (`reusable`: not a failure that a new try could
   change) is stored under a key made from the element, its crop, its nearby text, the
-  options and the models (`step_key`), and a later run of the same document finds it
-  there instead of calling the model again. The web app keeps them per job so that
+  options, the behaviour settings and the conversion code (`step_key`), and a later run of
+  the same document finds it there instead of calling the model again. The passes that ask
+  about a whole page (page math, the page witness, pages read from a picture) keep each
+  answer under the key of its question (`models.question.question_key`) and ask only for
+  what a previous run did not get (`_PageAnswers`). The web app keeps both per job so that
   "Try again" on a stopped conversion pays only for what was not finished.
 - After the steps, `pipeline.notices` derives the notices that follow from the fixes
   (a table kept as an image, a scanned page, a colour-only figure, a chart without a
@@ -87,6 +90,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import hashlib
+import json
 import logging
 import threading
 import time
@@ -96,7 +100,8 @@ from collections.abc import Callable, Generator, Iterable, Mapping
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cache, partial
+from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import Field
@@ -126,6 +131,7 @@ from readablestem.core.types import (
     Status,
     inline_marker,
 )
+from readablestem.models import question
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.math_readers.base import MathReader
 from readablestem.models.pricing import UnknownModelError
@@ -369,12 +375,57 @@ class StepCache(Protocol):
     """Where finished steps are kept between runs of one document (module docstring).
 
     `lookup` returns the stored fix for this element when `key` is what it was stored
-    under, else None; `store` keeps one. Both are called on the calling thread, and a
-    cache must not raise: a failure to read or write is a miss, never a failed run."""
+    under, else None; `store` keeps one. Both are called on the calling thread.
+
+    `answer` returns what an earlier run kept for a page-level question (`{"payload": the
+    model's answer, "call": its `ModelCall`}`), else None; `keep` keeps one. Both may be
+    called from several threads at once. `answer` gives back only what was kept before this
+    run began: a request this run sends twice is asked twice, as without a cache.
+
+    A cache must not raise: a failure to read or write is a miss, never a failed run."""
 
     def lookup(self, element: Element, key: str) -> Fix | None: ...
 
     def store(self, element: Element, key: str, fix: Fix) -> None: ...
+
+    def answer(self, key: str) -> dict[str, Any] | None: ...
+
+    def keep(self, key: str, row: dict[str, Any]) -> None: ...
+
+
+class _PageAnswers:
+    """The client of a page-level pass when finished steps are kept (`StepCache`): a
+    question an earlier run of this document already has the answer to is not asked again,
+    and each new answer is kept. Only an answer the model gave and the step could read is
+    kept; a refusal, an outage or an unreadable reply is asked again next time."""
+
+    def __init__(self, inner: VisionClient, cache: StepCache, settings: Settings) -> None:
+        self._inner = inner
+        self._cache = cache
+        self._settings = settings
+
+    def run(
+        self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
+    ) -> tuple[T | None, ModelCall]:
+        key = question.question_key(self._settings, request, schema)
+        kept = self._cache.answer(key)
+        if kept is not None:
+            try:
+                return schema.model_validate(kept["payload"]), ModelCall.model_validate(
+                    kept["call"]
+                )
+            except (KeyError, TypeError, ValueError):
+                pass  # not readable by this release: ask
+        parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+        if parsed is not None and call.outcome == "ok":
+            self._cache.keep(
+                key,
+                {"payload": parsed.model_dump(mode="json"), "call": call.model_dump(mode="json")},
+            )
+        return parsed, call
+
+    def __getattr__(self, name: str) -> Any:  # anything else a pass may read
+        return getattr(self._inner, name)
 
 
 # `Fix.reason` codes of a failure that trying again could change: the model did not answer
@@ -392,6 +443,59 @@ def reusable(fix: Fix) -> bool:
     return reason not in _TRANSIENT_REASONS and not reason.startswith(_TRANSIENT_PREFIXES)
 
 
+# The settings a stored fix depends on whatever the profile lists (`_behaviour`).
+_KEY_SETTINGS = (
+    "model_provider",
+    "main_model",
+    "cheap_model",
+    "decisions_model",
+    "decisions_figure_verify",
+    "decisions_equation_shadow",
+    "claude_check_model",
+    "claude_check_scope",
+)
+# The packages whose code and prompts make a fix out of a model's answer.
+_CONVERSION_PACKAGES = ("core", "models", "pipeline", "source")
+
+
+@cache
+def code_identity() -> str:
+    """A digest of the conversion code this process runs: every file of the packages that
+    turn a model's answer into a fix, prompts and data files included. A stored fix is the
+    model's answer after this code has checked and shaped it, so it is good for this code
+    and no other; hashing the files asks nobody to remember a version bump. Where the
+    files cannot be read it is the pipeline version."""
+    root = Path(__file__).resolve().parent.parent
+    digest = hashlib.sha256()
+    count = 0
+    try:
+        for package in _CONVERSION_PACKAGES:
+            for path in sorted((root / package).rglob("*")):
+                if path.is_file() and "__pycache__" not in path.parts:
+                    digest.update(path.relative_to(root).as_posix().encode())
+                    digest.update(b"\x00")
+                    digest.update(path.read_bytes())
+                    count += 1
+    except OSError:
+        count = 0
+    return digest.hexdigest() if count else PIPELINE_VERSION
+
+
+def _behaviour(settings: Settings) -> str:
+    """The run's value of every setting that decides what a conversion gives: the ones the
+    production profile lists as behaviour (`ops.profile`), and the models and checks named
+    here in case the profile cannot be read."""
+    names: set[str] = set(_KEY_SETTINGS)
+    try:
+        from readablestem.ops import profile
+
+        names |= set(profile.load().settings)
+    except Exception as exc:  # the key is then built from the named settings alone
+        log.warning("step key: the profile was not read: %s", type(exc).__name__)
+    values = {name: str(getattr(settings, name, "")) for name in sorted(names)}
+    return json.dumps(values, separators=(",", ":"))
+
+
 def step_key(
     element: Element,
     png: bytes,
@@ -399,29 +503,19 @@ def step_key(
     options: ConversionOptions,
     settings: Settings,
 ) -> str:
-    """What a step's answer depends on, as a digest: the pipeline version, the element
-    (its text layer is checked against the answer), the picture, the nearby text sent with
-    it, the conversion options (notation, exam mode, feature flags) and the models and
-    checks in use. Equal keys mean the same question asked the same way."""
+    """What a step's stored fix depends on, as a digest: the element (its text layer is
+    checked against the answer), the picture, the nearby text sent with it, the conversion
+    options (notation, exam mode, feature flags), every behaviour setting (models, efforts,
+    switches) and the conversion code with its prompts (`code_identity`). Equal keys mean
+    the same question, asked and handled the same way. A recorded model answer is keyed by
+    its question alone (`models.question`); this key is for a finished fix."""
     parts = [
-        PIPELINE_VERSION,
+        code_identity(),
         element.model_dump_json(exclude={"id", "order"}),
         hashlib.sha256(png).hexdigest(),
         context_text or "",
         options.model_dump_json(),
-        "|".join(
-            str(getattr(settings, name, ""))
-            for name in (
-                "model_provider",
-                "main_model",
-                "cheap_model",
-                "decisions_model",
-                "decisions_figure_verify",
-                "decisions_equation_shadow",
-                "claude_check_model",
-                "claude_check_scope",
-            )
-        ),
+        _behaviour(settings),
     ]
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
@@ -1609,6 +1703,7 @@ def _image_pages_pass(
     concurrency: int,
     tracer: Tracer,
     observer: Callable[[ModelCall], None] | None,
+    step_cache: StepCache | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept scanned and handwritten pages from a picture of each (ADR 0007).
 
@@ -1620,7 +1715,10 @@ def _image_pages_pass(
     pages = image_page.kept_reads(kept)
     if not pages:
         return {}, None
-    recording = _RecordingClient(client, tracer, observer)
+    # (An answer kept by an earlier run is given back in front of the recording client: it
+    # is not a request, so it gets no span and the observer does not hear of it.)
+    sending = _RecordingClient(client, tracer, observer)
+    recording: Any = sending if step_cache is None else _PageAnswers(sending, step_cache, settings)
     renders = {
         number: partial(
             layout.render_page,
@@ -1696,6 +1794,10 @@ def _convert(
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    # The page-level passes ask through the job's kept answers when it has any.
+    page_client: VisionClient = (
+        client if step_cache is None else _PageAnswers(client, step_cache, settings)
+    )
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
         cached = _CachedDocument(pdf_bytes)
         try:
@@ -1723,7 +1825,7 @@ def _convert(
                     pdf_bytes,
                     doc,
                     collector,
-                    client=client,
+                    client=page_client,
                     settings=settings,
                     pages=pages,
                     concurrency=concurrency,
@@ -1734,7 +1836,7 @@ def _convert(
                     pdf_bytes,
                     doc,
                     collector,
-                    client=client,
+                    client=page_client,
                     settings=settings,
                     concurrency=concurrency,
                     tracer=tracer,
@@ -1777,6 +1879,7 @@ def _convert(
                     concurrency=concurrency,
                     tracer=tracer,
                     observer=call_observer,
+                    step_cache=step_cache,
                 )
                 for number in image_built:
                     kept.pop(number)  # read: no longer an image kept whole

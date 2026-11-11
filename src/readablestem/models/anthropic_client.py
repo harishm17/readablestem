@@ -69,7 +69,7 @@ from pydantic import ValidationError
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import ModelCall, Outcome
-from readablestem.models.base import UNTRUSTED_NOTICE, T, VisionRequest, fence_untrusted, rate_gate
+from readablestem.models.base import T, VisionRequest, rate_gate, sent_context, sent_system
 from readablestem.models.openai_client import (
     _NOT_SENT_ERRORS,
     IMAGE_DETAILS,
@@ -80,8 +80,6 @@ from readablestem.models.openai_client import (
     _retry_delay_s,
     _safe_code,
     _status_is_retryable,
-    defang_context,
-    fenced_context,
 )
 from readablestem.models.pricing import (
     BATCH_DISCOUNT,
@@ -407,22 +405,15 @@ class AnthropicVisionClient:
         """The fenced document text for the user message. With
         `Settings.anthropic_notice_in_system` the fixed notice is not repeated here: it is
         in the cached system block (`_system_text`)."""
-        if not self._settings.anthropic_notice_in_system:
-            return fenced_context(text, limit)
-        if not text:
-            return None
-        cleaned = defang_context(text)
-        if limit is None:
-            return fence_untrusted(cleaned, notice=False)
-        return fence_untrusted(cleaned, limit, notice=False)
+        return sent_context(text, limit, notice_in_system=self._settings.anthropic_notice_in_system)
 
     def _system_text(self, request: VisionRequest) -> str:
         """The instructions, and with `anthropic_notice_in_system` the untrusted-text notice
         after them. It is added to every request, with document text or without, so the
         cached prefix is the same for both."""
-        if not self._settings.anthropic_notice_in_system:
-            return request.instructions
-        return f"{request.instructions}\n\n{UNTRUSTED_NOTICE}"
+        return sent_system(
+            request.instructions, notice_in_system=self._settings.anthropic_notice_in_system
+        )
 
     def _uses_fallback(self, model: str) -> bool:
         return self._settings.anthropic_refusal_fallback and model in FALLBACK_MODELS

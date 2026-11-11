@@ -750,15 +750,28 @@ describe them, not the committed files. The OpenAI path has no committed baselin
 
 Recorded answers, replays and batches (`--answers`, `--batch`; development sets only). A live
 run is paid for once. `--answers FILE` keeps every model answer in a JSON-lines file keyed by
-everything the model is given (step, model, prompt version, instructions, the images by what
-they show, the text, the token limit, the thinking effort the client will send, and whether
-the untrusted-text notice rides in the system block). A request already in the file is
+the question as it is sent (`models/question.py`): step, model, prompt version, the
+instructions as sent, the images by what they show, the nearby text as sent (so the fence
+around it and the number of characters kept are part of it), the token limit, the image
+detail, the thinking effort the client will send, whether a refusal may go to the fallback
+model, and the format the answer is read in. Nothing about the release is in the key: a new
+pipeline version that sends the same question finds the same answer, and an edited prompt,
+answer format or context limit asks again. A request already in the file is
 answered from it, with the recorded tokens and cost, at no charge; any other goes to the model
 and is appended. So one baseline recording serves every experiment that asks the same
 thing, and an experiment pays only for requests that differ from the baseline's.
 `--answers-offline` turns a miss into a refusal instead of a call (a replay that cannot spend),
 and `--every N` takes every Nth equation or figure instead of the first few. `--answers` is
 refused for the held-out set and the sealed check part.
+Each row also holds the parts of its question (`"q"`), so a miss is reported with its reason:
+the report's `answers_file.answers_file_missed_because` counts misses by what differs from the nearest
+recorded question ("prompt equation-5 recorded, equation-6 asked", "nearby text changed",
+"no answer recorded for this picture"). A file recorded before 2026-11-11 is keyed by an
+older list (no answer format, no context limit). `--answers-rekey` moves it: a request found
+only under the older key is answered from that row, and the row is appended under the new key
+with its parts (`answers_file.answers_file_rekeyed` counts them). Run it once, with the code and settings
+the file was recorded with, then drop the flag; a request that changed since the recording is
+a miss either way.
 The Claude second check (shadow by default) asks the model as well; from 2026-10-14 its
 answers are kept in the same file (the report's `answers_file.second_check`), so a replay and
 `--answers-offline` spend nothing on it. The baselines of "Baselines and the gate" were

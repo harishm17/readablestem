@@ -224,8 +224,11 @@ class Blob(Base):
 
 class StepRecord(Base):
     """A finished model step of a job, kept so "Try again" does not pay for it twice (T3-1,
-    `web.step_cache`). `input_key` is `pipeline.run.step_key`: what the answer depends on.
-    The answer is a `Fix` as JSON. Document-derived: deleted with the job."""
+    `web.step_cache`). For an element's step, `element_id` is the element, `input_key` is
+    `pipeline.run.step_key` (what the fix depends on) and `fix_json` is the `Fix`. For an
+    answer about a whole page, `element_id` is "q:" and the start of `input_key`, which is
+    `models.question.question_key` (the question), and `fix_json` is the model's answer with
+    its call record. Document-derived: deleted with the job."""
 
     __tablename__ = "step_records"
 

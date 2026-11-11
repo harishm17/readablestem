@@ -555,7 +555,7 @@ def test_offline_replay_answers_the_second_check_from_the_same_file(tmp_path):
     audit = FigureAudit(conveys_key_information=True, contradicts_image=False, problem="none")
     call = ModelCall(step="check", model=request.model, prompt_version=request.prompt_version)
     check = live.second_check  # the check keeps its own settings (its prompt notice differs)
-    check.record(answer_key(check._settings, request), "check", audit, call)
+    check.record(answer_key(check._settings, request, FigureAudit), "check", audit, call)
 
     offline = default_client_factory(
         Settings(_env_file=None, model_answers_offline=True, **common), budget

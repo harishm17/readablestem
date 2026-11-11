@@ -187,16 +187,17 @@ def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
         return client
     from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
+    rekey = bool(getattr(args, "answers_rekey", False))
     if getattr(args, "batch", False):
         # A staged run: what the file cannot answer is collected, not sent (eval/staged.py).
         from readablestem.models.anthropic_batch import StagingClient
 
         staging = StagingClient(client, args.staged_pool)
-        cached = CachedClient(staging, path, settings)
+        cached = CachedClient(staging, path, settings, rekey=rekey)
         staging.owner = cached
         return cached
     offline = bool(getattr(args, "answers_offline", False))
-    cached = CachedClient(None if offline else client, path, settings)
+    cached = CachedClient(None if offline else client, path, settings, rekey=rekey)
     keep_second_check_answers(client, cached, offline=offline)
     return cached
 
@@ -330,6 +331,8 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
         return _error("--answers is for development sets: not for the held-out or check parts")
     if args.answers_offline and not args.answers:
         return _error("--answers-offline needs --answers FILE")
+    if args.answers_rekey and not args.answers:
+        return _error("--answers-rekey needs --answers FILE")
     if args.scanned and args.task != "document":
         return _error("--scanned applies to the document task")
     if args.scanned and (
@@ -1497,6 +1500,13 @@ def register(
         "--answers-offline",
         action="store_true",
         help="with --answers: a request not in the file is refused, not sent (spends nothing)",
+    )
+    pipeline.add_argument(
+        "--answers-rekey",
+        action="store_true",
+        help="with --answers: a request the file holds only under the key used before the "
+        "answer format was part of it is answered from that row, and the row is written "
+        "again under the new key. One such run moves a recorded file to the new keys",
     )
     pipeline.add_argument(
         "--speech",

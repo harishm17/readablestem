@@ -87,7 +87,7 @@ value and where that value came from. This page does not repeat those values.
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai` is the default in code; production's provider is in the production profile) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organization-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
-| `MODEL_ANSWERS_FILE`, `MODEL_ANSWERS_OFFLINE` | Dev and test only: the real client sits behind a JSON-lines file of recorded answers (`eval/answers.py`, the format `eval pipeline --answers` uses). A recorded request is answered from the file at no cost; any other is asked and appended, so a walkthrough or browser test pays for each answer once. With `MODEL_ANSWERS_OFFLINE=true` a missing answer is refused instead of asked, so a replay spends nothing. A replay also needs no room under `DAILY_SPEND_CAP_USD`: uploads and the worker are not held back by the headroom a live call needs (`web.spend.conversion_headroom_usd`), so a copy of the server with a $0.01 cap still converts. Conversions and review-screen re-reads are both recorded. With the Claude second check on (`CLAUDE_SECOND_CHECK`), its answers go into the same file (step `check`) and replay from it, offline as well; a verdict the file lacks comes back as an unanswered check, with no call. Ignored with `FAKE_MODELS`; refused in production. Keep the file outside the repository |
+| `MODEL_ANSWERS_FILE`, `MODEL_ANSWERS_OFFLINE`, `MODEL_ANSWERS_REKEY` | Dev and test only: the real client sits behind a JSON-lines file of recorded answers (`eval/answers.py`, the format `eval pipeline --answers` uses). `MODEL_ANSWERS_REKEY=true` reads a file recorded before 2026-11-11 through its older keys and writes each row found that way again under the new one (docs/eval.md, "Recorded answers"). A recorded request is answered from the file at no cost; any other is asked and appended, so a walkthrough or browser test pays for each answer once. With `MODEL_ANSWERS_OFFLINE=true` a missing answer is refused instead of asked, so a replay spends nothing. A replay also needs no room under `DAILY_SPEND_CAP_USD`: uploads and the worker are not held back by the headroom a live call needs (`web.spend.conversion_headroom_usd`), so a copy of the server with a $0.01 cap still converts. Conversions and review-screen re-reads are both recorded. With the Claude second check on (`CLAUDE_SECOND_CHECK`), its answers go into the same file (step `check`) and replay from it, offline as well; a verdict the file lacks comes back as an unanswered check, with no call. Ignored with `FAKE_MODELS`; refused in production. Keep the file outside the repository |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
@@ -1585,13 +1585,22 @@ there). What it does not do:
 - **Pay for finished steps again.** While a job converts, each model step whose answer is
   worth keeping (`pipeline.run.reusable`: not `model_*`, `budget_*`, `internal_error` or
   `crop_error` failures, which a new try could change) is stored in `step_records` under a
-  key made from the element, its picture, its nearby text, the conversion options and the
-  models in use (`pipeline.run.step_key`). A later conversion of the same job takes those
-  answers instead of calling the model, so a retry spends only on what was missing; the
-  cost and calls of the steps given back are taken off the new result's totals
+  key made from the element, its picture, its nearby text, the conversion options, every
+  behaviour setting of the production profile and a digest of the conversion code and its
+  prompts (`pipeline.run.step_key`, `code_identity`). A later conversion of the same job
+  takes those answers instead of calling the model, so a retry spends only on what was
+  missing; the cost and calls of the steps given back are taken off the new result's totals
   (`DbStepCache.reused_usd`), so `jobs.cost_usd` counts every step once. A changed key (a
-  new course notation, exam mode, another model) asks again. When a job finishes with
-  nothing a retry could improve, its records are deleted at once; the rest go with the job.
+  new course notation, exam mode, another model, a changed setting, a deploy that changed
+  the conversion code) asks again: a stored fix is the model's answer after the code has
+  judged it, so it is good for that code only, and nobody has to remember a version bump.
+  The passes that ask about a whole page (page math, the page witness, a page read from
+  its picture) have no element to store a fix under. Each of their answers is stored as the
+  model gave it, under the key of its question (`models.question.question_key`, the key of
+  the answers file), and a retry gets it back for the same question and reads it with
+  whatever code it runs; only answers stored before the retry began are given back. When a
+  job finishes with nothing a retry could improve, its records are deleted at once; the
+  rest go with the job.
 - **Lose decisions.** A partly converted result keeps what the person decided: the new
   result inherits the job's own earlier decisions item by item (`web/carry.py`, the same
   rules as for a revised upload), no `ReviewEdit` is added (they already are the job's) and

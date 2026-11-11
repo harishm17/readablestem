@@ -253,6 +253,13 @@ def _valid[M: BaseModel](model: type[M], data: Any) -> M:
         raise _Protocol(model.__name__) from None
 
 
+def _question_key(value: Any) -> str:
+    """A page-level question's key as the child names it: a SHA-256 in hex, nothing else."""
+    if not isinstance(value, str) or len(value) != 64 or set(value) - set("0123456789abcdef"):
+        raise _Protocol("key")
+    return value
+
+
 def resolve_schema(name: str) -> type[BaseModel]:
     """The pydantic model a request names ("module:Qualname"): one the steps define
     (`_SCHEMA_MODULES`), nothing else."""
@@ -626,6 +633,20 @@ class _Conversion:
             element, fix = _valid(Element, header["element"]), _valid(Fix, header["fix"])
             key, ident = str(header["key"]), header["id"]
             return lambda: self._store(element, key, fix, ident)
+        if op == "cache_answer":
+            key, ident = _question_key(header["key"]), header["id"]
+            return lambda: self._answer(key, ident)
+        if op == "cache_keep":
+            key, ident = _question_key(header["key"]), header["id"]
+            row = header["row"]
+            if not isinstance(row, dict) or not isinstance(row.get("payload"), dict):
+                raise _Protocol("cache_keep")
+            # (the answer itself is read back by the schema of the step that asks for it)
+            kept = {
+                "payload": row["payload"],
+                "call": _valid(ModelCall, row.get("call")).model_dump(mode="json"),
+            }
+            return lambda: self._keep(key, kept, ident)
         if op == "observe":
             call = _valid(ModelCall, header["call"])
             return lambda: self._observed(call)
@@ -678,6 +699,20 @@ class _Conversion:
         assert self.step_cache is not None
         with suppress(Exception):
             self.step_cache.store(element, key, fix)
+        self._reply(ident)
+
+    def _answer(self, key: str, ident: int) -> None:
+        assert self.step_cache is not None
+        try:
+            row = self.step_cache.answer(key)
+        except Exception:  # a cache never fails a run (`StepCache`)
+            row = None
+        self._reply(ident, value=row)
+
+    def _keep(self, key: str, row: dict[str, Any], ident: int) -> None:
+        assert self.step_cache is not None
+        with suppress(Exception):
+            self.step_cache.keep(key, row)
         self._reply(ident)
 
     def _observed(self, call: ModelCall) -> None:
