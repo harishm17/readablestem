@@ -7,7 +7,7 @@ Existing rows keep NULL in all of them. Additive; the downgrade drops the index 
 columns.
 
 Revision ID: c2f4a8d61e57
-Revises: 5d8e1f2a7c39
+Revises: 3c9a4e7d1b62
 Create Date: 2026-11-11 12:00:00.000000+00:00
 """
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c2f4a8d61e57"
-down_revision: str | Sequence[str] | None = "5d8e1f2a7c39"
+down_revision: str | Sequence[str] | None = "3c9a4e7d1b62"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
