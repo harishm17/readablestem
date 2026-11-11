@@ -231,6 +231,12 @@ and model (`calls`, `failed`, `input_tokens`, `cached_input_tokens`, `output_tok
 `pages` and a `<stage>_s` field for each stage, and one `job_not_finished` line for each
 step that stopped early (`step`, `page`, `reason`, `done`, `of`).
 
+A step that runs in shadow (docs/steps.md, "Running a new step in shadow") adds one
+`job_shadow` line a job: its `step`, and how often it said the `same` as the answer the
+conversion kept, how often it `differs`, and how often it `failed`. These counts are in
+the log only, not in a table: they are read over many jobs. A step with many `failed` is
+broken or out of money; it has changed no document.
+
 ## Error aggregates
 
 `error_aggregates` has one row per (UTC day, step, category) with a count. The day is the
@@ -350,7 +356,7 @@ Useful filters for the service's **Logs** panel or `railway logs --service web -
 | Anything wrong? | `@severity:WARNING OR @severity:ERROR` |
 | Server errors | `@message:request AND @status:>=500` |
 | Slow pages | `@message:request AND @latency_ms:>5000` |
-| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished` (add `AND @job_id:...` for one job) |
+| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished OR @message:job_shadow` (add `AND @job_id:...` for one job) |
 | Hourly cleanup (cron service) | `@message:aggregate_done OR @message:purge_done OR @message:aggregate_failed OR @message:aggregate_on_delete_failed` |
 | Tracing problems | `@message:tracing_disabled OR @message:trace_failed` |
 | Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `@message:upload_rejected AND (@code:handwritten OR @code:handwritten_no_text OR @code:scanned OR @code:scanned_ocr)` |

@@ -155,6 +155,7 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    shadow,
     step_facts,
     table_math,
     table_step,
@@ -1807,6 +1808,9 @@ def _convert(
     # time, and every request to a model with its page.
     watch = step_facts.Stopwatch()
     measured: list[CallFact] = []
+    # The steps run in shadow (`pipeline.shadow`): a step that is given this runs beside
+    # the conversion and can change nothing of it.
+    shadowed = shadow.Shadow()
     # Pages a layout run typed without their ink, and handwritten pages whose strokes were
     # not read, because the time for the ink analysis ran out (`page_type.InkBudget`).
     ink_late: set[int] = set()
@@ -2057,7 +2061,9 @@ def _convert(
         stops += strokes_late + step_facts.pages_capped(
             step_facts.PAGE_TYPE, sorted(ink_late), "time_limit"
         )
-        facts = step_facts.gathered(measured, watch, stops + step_facts.capped(ordered))
+        facts = step_facts.gathered(
+            measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
+        )
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
         if page_math_summary is not None:

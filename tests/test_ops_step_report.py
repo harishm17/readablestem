@@ -1,11 +1,18 @@
-"""ops.step_report: the report made from the step facts of a set of jobs."""
+"""ops.step_report: the report made from the step facts of a set of jobs, and the facts of
+the steps run in shadow (`pipeline.shadow`)."""
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
+from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import CallFact, StageFact, StepFacts
+from readablestem.observability.logging import FIELDS_ATTR
 from readablestem.ops.step_report import Measured, report
+from readablestem.pipeline.shadow import Shadow
+from readablestem.web import step_facts
 
 
 def call(step: str, seconds: float, usd: float, cached: int = 0, **more) -> CallFact:
@@ -82,3 +89,37 @@ def test_a_report_of_no_jobs_is_empty_and_divides_by_nothing():
     made = report([])
     assert (made.jobs, made.pages, made.usd_per_page, made.calls_per_page) == (0, 0, 0.0, 0.0)
     assert (made.cache_read, made.settled_usd, made.s_per_page_p50, made.wall_s) == (None,) * 4
+
+
+def test_a_step_in_shadow_is_counted_by_what_it_said_and_its_failure_goes_no_further(caplog):
+    """Three pages: the new step says the same, says something else, and runs out of money
+    with a message that quotes the page. The conversion gets nothing back from it."""
+    kept = {0: "x = 1", 1: "x = 2", 2: "x = 3"}
+
+    def new_step(page: int) -> str:
+        if page == 2:
+            raise BudgetExceeded("job_usd", "over the cap while reading 'x = 3'")
+        return {0: "x = 1", 1: "x = -2"}[page]
+
+    shadowed = Shadow()
+    for page, answer in kept.items():
+        got = shadowed.beside("line_check", answer, lambda page=page: new_step(page), page=page)
+        assert got is None
+    facts = StepFacts(shadow=shadowed.facts())
+
+    assert [(fact.page, fact.outcome, fact.error) for fact in facts.shadow] == [
+        (0, "same", ""),
+        (1, "differs", ""),
+        (2, "failed", "BudgetExceeded"),
+    ]
+    caplog.set_level(logging.INFO)
+    step_facts.log_job("job-1", 3, facts)
+    [line] = [record for record in caplog.records if record.getMessage() == "job_shadow"]
+    assert getattr(line, FIELDS_ATTR) == {
+        "job_id": "job-1",
+        "step": "line_check",
+        "same": 1,
+        "differs": 1,
+        "failed": 1,
+    }
+    assert "x = " not in facts.model_dump_json()

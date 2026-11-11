@@ -16,6 +16,10 @@ measured and replayed against.
 - **Step facts.** Every model request and every stage of a job is kept as a content-free
   fact (`job_calls`, `job_stages`), with `readablestem ops step-report` and totals on the
   admin page.
+- **Shadow steps** (`pipeline/shadow.py`). One way to run a new check or reader beside the
+  conversion: it returns nothing, any failure of it is counted and goes no further, and
+  what is kept is `same`, `differs` or `failed` by step and page (the `job_shadow` log
+  line). No step uses it yet.
 - **"Not finished" facts.** A step that stops before it has done all of its work says so:
   `{step, page, reason, done, of}` in the table `job_not_finished`, a log line, and one
   reader (`web.step_facts.not_finished`). Written by the steps the job's limit stops, the

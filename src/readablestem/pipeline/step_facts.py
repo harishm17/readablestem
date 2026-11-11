@@ -16,6 +16,9 @@ a step, and a step that stops says so with one of these. `capped`, `pages_capped
 the ones the conversion can see for itself; a step that has a budget of its own writes its
 own.
 
+A fourth kind says what a step run in shadow said next to the answer the conversion kept
+(`ShadowFact`, made by `pipeline.shadow`).
+
 Two kinds of time:
 
 - a stage's seconds are wall time, and the stages of one conversion do not overlap, so they
@@ -36,6 +39,7 @@ from readablestem.core.types import (
     ModelCall,
     NotFinished,
     NotFinishedReason,
+    ShadowFact,
     StageFact,
     Status,
     StepFacts,
@@ -184,10 +188,14 @@ def stopped(step: str, reason: NotFinishedReason, *, done: int, of: int) -> list
 
 
 def gathered(
-    calls: Iterable[CallFact], watch: Stopwatch, not_finished: Iterable[NotFinished] = ()
+    calls: Iterable[CallFact],
+    watch: Stopwatch,
+    not_finished: Iterable[NotFinished] = (),
+    shadow: Iterable[ShadowFact] = (),
 ) -> StepFacts:
     """The facts of one conversion, its calls ordered by page and step so that two runs of
-    one document give the same list whatever order their threads finished in."""
+    one document give the same list whatever order their threads finished in. `shadow` is
+    what the steps run in shadow said (`pipeline.shadow.Shadow.facts`, already in order)."""
     ordered = sorted(calls, key=lambda c: (c.page is None, c.page or 0, c.step, c.attempt))
     stops = sorted(not_finished, key=lambda n: (n.step, n.page is None, n.page or 0, n.reason))
-    return StepFacts(calls=ordered, stages=watch.stop(), not_finished=stops)
+    return StepFacts(calls=ordered, stages=watch.stop(), not_finished=stops, shadow=list(shadow))

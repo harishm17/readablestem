@@ -1050,6 +1050,36 @@ a cent) because the worst case of one request is $0.05 to $0.09: the output limi
 thinking can fill, dominates it. Every request goes through the run's spend guard; when
 the guard refuses, the run stops and the pages left are `cap_reached`.
 
+## Running a new step in shadow (`pipeline/shadow.py`)
+
+A new check or reader is not trusted on the day it is written. It first runs in shadow:
+beside the conversion, on the same input, with nothing depending on what it says. One
+helper does this, so that every such step is harmless in the same way:
+
+```python
+shadowed.beside("line_check", kept_answer, lambda: new_step(crop), page=number)
+```
+
+- `beside` returns nothing, so the new step's answer cannot be used by mistake.
+- Whatever the new step raises is caught there and counted as `failed` with the
+  exception's type: an error, a refused request, the job's spend limit. A job never
+  fails or changes because of a step nobody reads. This is the one place in the pipeline
+  that catches every exception, and the reason is that rule.
+- What is kept is one fact a call: the step, the page and `same`, `differs` or `failed`
+  (`ShadowFact`, in the conversion's step facts). Neither answer is kept, so the fact is
+  content-free. `same` is equality unless the step passes its own test (`same=`).
+- A shadow step that asks a model sends its requests as the second checks do
+  (`count_call=False`: dollars against the job's limit, no place in its call count), and
+  gives its calls to the step facts as rows that are not counted.
+
+The conversion makes one collector (`shadowed` in `pipeline/run.py`) and hands it to a
+step that needs it. The worker logs the counts by step (`job_shadow`,
+[operations.md](operations.md)), and `shadow.agreement` gives the same counts to an eval.
+
+A step leaves shadow when an eval on held-out documents meets its bar
+([eval.md](eval.md)), never because its agreement in production looks good: agreement
+says how often two answers are the same, not which one is right.
+
 ## Privacy
 
 `Check.code`, `Fix.reason` and `ModelCall.outcome` are category codes. Exception
