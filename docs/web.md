@@ -188,7 +188,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the checked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
-| GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
+| GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, the queue (how many stored documents are in each state, in the table's labels, F-213), aggregate counts, usage counts per day and per pseudonymous person |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (adding makes them `invited`; removing blocks them) |
 | POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
@@ -770,8 +770,9 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
 
 **The batch page** (`GET /app/batch/{id}`, `batch.html`, `_batch_rows.html`): the answer to an upload of
 several files or a zip of documents (a zip of documents is answered by it even when it held one). One row per
-document in the order sent, with its status as it is now (`documents.DocumentRow`: "Waiting", "Converting: 2 of 5 pages done",
-"3 decisions to make" with a Review link, "Ready to download" with a Download link, "Stopped", "Deleted"), then
+document in the order sent, with its state as it is now (`documents.DocumentRow`, from "Job states" below: "Waiting",
+"Converting: 2 of 5 pages done", "Needs your decisions: 3 decisions to make" with a Review link, "Ready to share" with a
+Download link, a stop with "Try again" while a try is left, "Deleted on Nov 11, 2026"), then
 the large files waiting for their pages and the files not uploaded. `#batch-summary` is a **polite live
 region** (`role="status"`) with the counts in one sentence ("5 documents: 2 ready to download, 1 needs your
 decisions, 1 converting, 1 waiting. 1 file was not uploaded."); no names. While a document is waiting or
@@ -938,21 +939,65 @@ day and is deleted with its day.
   it is deleted by the same clock or by "Delete now", it cannot be named as the earlier version
   of a revised upload, and its page says what it is, where it comes from and its license.
 
+## Job states (`web/states.py`)
+
+One function, `states.state_of(facts)`, says what state a job is in from its stored facts:
+its status, error code, tries, attempts, lease, sample flag and open decisions, and for a
+finished job with an outcome code its stored result. `states.load` does the same for a list
+from the jobs' columns alone. Every surface prints what it returns, and none keeps its own
+words (F-033): the job page's title, status box, next steps and "What you can do", the
+polled fragment's `data-title` and `data-summary` (the tab title and the browser notice),
+My documents (label, badge, group, next step), the batch page, the parts listed on a
+part's page, the review screen's finish line, the record (page and CSV), the retry route's
+offer and the admin queue (F-213).
+
+| Key | Label | When | Group | Next step |
+|---|---|---|---|---|
+| `waiting` | Waiting | queued | Working | none |
+| `waiting_reset` | Waiting until 00:00 UTC | queued, today's budget spent | Working | none |
+| `converting` | Converting | running, its lease current | Working | none |
+| `restarting` | Restarting | running past its lease, or put back after a lost attempt | Working | none |
+| `stopped_file` | Stopped: this file cannot be converted as it is | failed by the file (encrypted, unreadable, scanned, no content, ...) | Needs you | Upload it again |
+| `stopped_service` | Stopped: not caused by your file | failed by the service, a try left | Needs you | Try again (N left) |
+| `stopped_no_tries` | Stopped | failed by the service with no try left, or a stop a try cannot help | Needs you | Upload it again as a new document |
+| `stopped_limit` | Stopped: too large for one conversion | the job's own caps, out of memory | Needs you | Upload it again |
+| `stopped_unknown` | Stopped | a missing or unknown code; names the step it stopped in | Needs you | Try again (N left) |
+| `needs_decisions` | Needs your decisions | finished, decisions open | Needs you | Review |
+| `partly_converted` | Partly converted | finished, none open, a gap note | Ready | Convert the missing parts, or Download |
+| `ready` | Ready to share | finished, nothing left | Ready | Download, Share |
+| `sample` | Sample | the recorded sample | its state's | Open |
+| `deleted` | Deleted on Nov 11, 2026 | past its deletion time (the batch page) | Needs you | Upload it again |
+
+A finished job's gaps (an outage, a budget stop, pages kept as pictures) are notes under
+the state ("Outcome codes on finished jobs", below); a note with nothing in it is not
+shown (F-319). A stopped job says nothing about decisions in its old result (F-314) and is
+not offered "Keep for 7 days": only `needs_decisions`, `partly_converted` and `ready` have
+something to keep (F-316). Steps are the owner's; a reviewer gets Review, a viewer none.
+The badge color (`status-*` in app.css) comes from the tone and only repeats the words.
+`tests/test_web_batch.py` walks every key and checks each surface prints its label.
+
+Not in the table yet, because nothing stored says so: the final checks of a conversion,
+a canceled job (no cancel code, column or route), and "checking", "paused for an update"
+and "waiting its turn" (P9). "Convert it in parts" for a job that is too large and "Report
+this" for an unknown stop are not offered: no route does either from a stored job.
+
 ## My documents (`web/documents.py`)
 
-`/app` is a to-do list (UX review BW5): "Needs your decisions" (finished with decisions
-still open, oldest first, with a "Review next" button to the first one's review
-screen), then "Ready to download" (newest first), then "Converting, waiting or stopped".
-A summary line counts them ("2 documents need your decisions (5 decisions in all) · 1
-ready to download · 1 converting"). Each row leads with the file name that was uploaded
+`/app` is a to-do list (UX review BW5, F-414), grouped by the state's tone ("Job states"
+above): "Needs you" (finished with decisions still open, oldest first, with a "Review
+next" button to the first one's review screen; then every stopped document, newest first,
+its reason in its label and "Try again" as its next step while a try is left), then
+"Working" (waiting, converting, restarting), then "Ready" (newest first). A summary line
+counts them ("2 documents need your decisions (5 decisions in all) · 1 stopped · 1
+converting · 1 ready to download"). Each row leads with the file name that was uploaded
 (`DocumentRow.name`; "book.pdf, pages 31-59" for a part), because generated titles repeat
 across a course's files; the document's title sits under it ("Titled “…”") when it says
 something else, with pages and upload time. A title the person chose themselves (T1-7)
 and the recorded sample lead with the title. The row then has the status in words, when
 it is deleted automatically, and one next step (Review or Download) beside a Delete link
 to the confirmation page; "Upload a revised version" is on the document's own page, not
-repeated in every row. A partly converted result says so first ("Stopped early, 2
-decisions to make"). When there are documents the list comes before the upload form, and
+repeated in every row. The status is the state's label ("Needs your decisions: 2
+decisions to make", "Partly converted", "Stopped: not caused by your file"). When there are documents the list comes before the upload form, and
 "Upload another file" beside the heading jumps to it; after a refused upload, and for
 someone with no documents, the form comes first.
 
@@ -1548,21 +1593,26 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   write is logged (`progress_write_failed`) and skipped. A requeued job starts again with
   none. Only a converter that takes `stage_progress` gets it.
 - **Outcome codes on finished jobs** (`worker.result_outcome`; status `done`, results
-  available, but incomplete). The job page and the documents list show them instead of
-  "Finished" (`web/outcome.py`), and `ops.aggregate` counts them as `job error:<code>`:
+  available, but incomplete). They are gap notes of the job's state (`states.gaps_of`,
+  words from `web/outcome.py`): the state is "Needs your decisions" while any decision is
+  open, else "Partly converted", never "Ready to share". A note with nothing in it is not
+  shown (F-319: never "0 of N were not converted"). `ops.aggregate` counts them as
+  `job error:<code>`:
 
   | Code | Cause | What the user is told |
   |---|---|---|
-  | `budget_daily` | The daily cap ran out part way | "Stopped early": N of M equations and figures not converted, originals kept; upload again after 00:00 UTC |
-  | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | "Stopped early": split the PDF |
-  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with drawings or writing nothing could be read from), or handwriting on typed pages kept as images | "Finished, with pages not converted" ("Finished, with handwriting not converted" when only handwriting on typed pages was kept): which pages are handwritten, scanned or unread; that the HTML keeps it (or each one) as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
+  | `budget_daily` | The daily cap ran out part way | Note "Stopped early": N of M equations and figures not converted, originals kept; "Convert the missing parts" after 00:00 UTC |
+  | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | Note "Stopped early": split the PDF |
+  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with drawings or writing nothing could be read from), or handwriting on typed pages kept as images | Note "Pages kept as pictures": which pages are handwritten, scanned or unread, or have handwriting on typed text; that the HTML keeps it (or each one) as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
   | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
 
   A finished job with no code whose equations, figures and tables mostly failed with
-  `model_api_error` or `model_timeout` is shown as "Stopped: the AI service did not
-  answer" (`outcome.MODEL_OUTAGE`, read from the stored result on the job page; nothing
-  is stored on the job, and it goes away once enough of them are filled in). "Convert
-  the missing parts" on that page tries it again ("Trying a document again", below).
+  `model_api_error` or `model_timeout` has the note "Service outage" ("The AI service did
+  not answer for N of M ..."; read from the stored result on the job page; nothing is
+  stored on the job, and it goes away once enough of them are filled in). Each of those
+  items is an open decision, so the lists, which read no result, show the job as "Needs
+  your decisions". "Convert the missing parts" on that page tries it again ("Trying a
+  document again", below).
 
 ### Trying a document again (`web/retry.py`, `web/step_cache.py`)
 
@@ -1571,7 +1621,7 @@ a dead end:
 
 | The document | The button | Why |
 |---|---|---|
-| Failed with `timeout`, `lease_expired`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` | "Try again" | Stopped by something that is not about the file. The other failure codes (a handwritten or scanned file, `no_content`, a removed account) are not offered a retry: it would stop the same way |
+| Failed with `timeout`, `lease_expired`, `conversion_unavailable`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` ("Stopped: not caused by your file"), or with a code this version does not know ("Stopped", which names the step it stopped in) | "Try again (N left)" | Stopped by something that is not about the file, or not known to be. The file's own stops (a handwritten or scanned file, `no_content`), the limits (`budget_job_*`, `conversion_oom`) and a removed account are not offered a retry: it would stop the same way. With no tries left the state is "Stopped", says how many times it was tried, and offers only "Upload it again as a new document" (F-315) |
 | Finished with `budget_daily`, or converted while the AI service was down | "Convert the missing parts" | Only the parts that were not converted are sent again |
 
 `POST /jobs/{id}/retry` (owner only, CSRF, rate limits `retry` per address and `retry_user`
@@ -1690,23 +1740,13 @@ reflow, htmx, no JavaScript), `tests/test_job_source_facts.py`,
 
 From top to bottom:
 
-1. **The status box**, a polite live region, with a headline that says what is left
-   to do (MF5 of the UX review; `job_page.headline`):
-
-   | State | Label | Sentence |
-   |---|---|---|
-   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go (an estimate). You can leave this page; it keeps its place." |
-   | queued, today's budget spent | Waiting | the `waiting_budget` outcome |
-   | converting | Converting | the step it is on: "Reading the equations and checking each against your PDF's text." |
-   | stopped by a spend cap | Stopped early | the outcome's message (and the open decisions) |
-   | AI service outage | Stopped: the AI service did not answer | "... Nothing is wrong with your PDF ..." |
-   | pages kept as images | Finished, with pages not converted | which pages and why (handwritten, scanned, nothing readable); hidden text not used |
-   | decisions open | Converted | "3 decisions need you before you give it to students." |
-   | no decision open, parts shown as images | Ready | "1 equation is shown as an image that screen readers cannot read." |
-   | nothing left | Ready to share | "Everything was converted." |
-   | failed | Stopped | why (the failure codes above) |
-
-   The tab title follows the label. The estimate while waiting is the pages ahead (in
+1. **The status box**, a polite live region (`#job-status-region`), with the job's state
+   ("Job states", above): its badge and label, its one-line message ("2 documents ahead of
+   yours (1 is yours), about 3 minutes to go (an estimate). You can leave this page; it
+   keeps its place.", the step it is on, "3 decisions need you before you give it to
+   students.", why it stopped) and its gap notes. The state is said there once: the
+   heading over the actions names the task ("Review" or "Download"), not the state again
+   (F-415). The tab title follows the label. The estimate while waiting is the pages ahead (in
    the worker's claim order), what is left of the jobs converting and the job's own
    pages, at the pace of the last 20 finished jobs (start to finish, per page; 10 s a
    page with none to go by: `views.seconds_per_page`); the sentence says it is an
@@ -2102,7 +2142,7 @@ are unchanged.
 sentence and code. Previous and next decision links close the card. After Accept, Save
 edit or the "Reject" button the form redirects (303) to the next decision still open
 after this one (`queue.next_open`, wrapping round), or to the done state, the finish
-line as the job page says it (`SplitBuilder.ready`, from `job_page.headline` and
+line as the job page says it (`SplitBuilder.ready`, from the job's state and
 `job_page.Finish`): **Ready to share** ("You made 3 decisions on October 9." or "Nothing
 in this file needed your decision."), or **Ready** with what is shown as an image ("2
 tables are shown as an image that screen readers cannot read."), then **Download the
@@ -2523,7 +2563,7 @@ an edit or an error, and when `tools=1`) with, in this order:
   into `DocumentResult.omitted` (`OmittedPage`): nothing downstream sees them (the queue, the
   counts, the student file), the file says "Page 1 of the original PDF was left out of this
   file." in its note, links to elements on it are taken off at render, and the job page lists the
-  notice `page_omitted`. A page that was kept whole as an image comes off `image_only_pages` while it is out (a job whose only such pages were left out is no longer "Finished, with pages not converted"). The last page left cannot be left out. **Put page N back** moves it all
+  notice `page_omitted`. A page that was kept whole as an image comes off `image_only_pages` while it is out (a job whose only such pages were left out no longer has the "Pages kept as pictures" note). The last page left cannot be left out. **Put page N back** moves it all
   home; Undo does the same.
 
 Every one of these is a write like a decision: the job row is locked, the stored result changed,
@@ -2778,10 +2818,10 @@ worth a look)". The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
 HTML file that did not pass, each as a sentence from `web/messages.py` with its code
-("All 11 checks passed" otherwise). An incomplete or failed job's outcome
-(`web/outcome.py`: "Stopped early", "Finished, with pages not converted", a scanned or
-empty PDF) replaces the plain status in the page title, the status box and the
-status box (once; the section under it, "What you can do", has the retry or the safe ways on), and a finished but incomplete job gets a note at
+("All 11 checks passed" otherwise). An incomplete or failed job's state ("Job states":
+a stop with its reason, or a finished job's gap notes, "Stopped early" or "Pages kept as
+pictures") is the page title and the status box (once; the section under it, "What you can
+do", has the retry or the safe ways on), and a finished but incomplete job gets a note at
 the top of its results.
 
 **Messages.** `web/messages.py` maps every `(Check.name, Check.code)` pair and every

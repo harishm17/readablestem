@@ -32,10 +32,15 @@
           </th>
           <td role="cell" data-label="Status">
             <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>
-            {% if row.action == "review" %}
-            <a id="batch-act-{{ row.id }}" href="/jobs/{{ row.id }}/review">Review<span class="visually-hidden"> {{ row.name }}</span></a>
-            {% elif row.action == "download" %}
-            <a id="batch-act-{{ row.id }}" href="/jobs/{{ row.id }}/download">Download<span class="visually-hidden"> {{ row.name }}</span></a>
+            {# The state's next step (web/states.py): a link, or "Try again" as a form. #}
+            {% set step = row.action %}
+            {% if step and step.form %}
+            <form method="post" action="{{ step.href }}" class="inline-form">
+              <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+              <button type="submit" id="batch-act-{{ row.id }}" class="button-secondary button-small">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></button>
+            </form>
+            {% elif step %}
+            <a id="batch-act-{{ row.id }}" href="{{ step.href }}">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></a>
             {% endif %}
           </td>
         </tr>

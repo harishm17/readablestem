@@ -57,6 +57,7 @@ from readablestem.web import (
     retention,
     sample,
     shares,
+    states,
     upload_result,
 )
 from readablestem.web import combine as combine_rules
@@ -93,7 +94,6 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.outcome import JobOutcome, job_outcome
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left
 from readablestem.web.security import VIEW_CSP
@@ -1424,39 +1424,32 @@ def _course_error_page(
 # --------------------------------------------------------------------------- status
 
 
-def load_job_status(
-    request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, JobOutcome | None]:
-    """The job's view model (with the job page's data) plus its outcome (`web.outcome`),
-    from one read."""
+def load_job_status(request: Request, job_id: str, user: CurrentUser) -> JobView:
+    """The job's view model with the job page's data and its state (`web.states`), from one
+    read."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = current_html(ctx, session, job_access(session, job_id, user, VIEW))
-        view = job_view(
+        # Today's budget matters to a waiting job and to the parts listed beside one.
+        waits = job.status == JobStatus.QUEUED or bool(job.part_group)
+        closed = waits and conversions_closed(ctx, user) is not None
+        return job_view(
             session,
             job,
             with_page=True,
             role=shares.role_of(session, job, user) or VIEW,
+            context=states.Context(
+                budget_closed=closed, image_pages_offered=ctx.settings.feature_image_pages
+            ),
         )
-        status, error_code, result_json = str(job.status), job.error_code, job.result_json
-    budget_closed = status == JobStatus.QUEUED and conversions_closed(ctx, user) is not None
-    outcome = job_outcome(
-        status=status,
-        error_code=error_code,
-        result_json=result_json,
-        budget_closed=budget_closed,
-        image_pages_offered=ctx.settings.feature_image_pages,
-    )
-    return view, outcome
 
 
-def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
+def status_context(job: JobView) -> dict[str, Any]:
     """What `_job_status.html` needs. `status_version` changes whenever the fragment
-    would look different, outcome included (htmx polling answers 204 until then)."""
-    version = f"{job.version}-{outcome.code}" if outcome is not None else job.version
-    counts = job.summary.counts if job.summary is not None else None
-    audience = "owner" if job.is_owner else ("review" if job.can_review else "view")
-    headline = page_rules.headline(job.status, job.status_detail, outcome, counts, audience)
+    would look different, the state included (htmx polling answers 204 until then)."""
+    state = job.state
+    assert state is not None  # `load_job_status` always works it out
+    version = f"{job.version}-{state.key}"
     # The AI service is not answering right now (T3-1, `web.provider_health`): said on a
     # document that is waiting or converting, and beside "Try again". The status version
     # changes with it, so a page left open hears when it starts and stops.
@@ -1467,10 +1460,8 @@ def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
         version += "-down"
     return {
         "job": job,
-        "outcome": outcome,
+        "state": state,
         "status_version": version,
-        "headline": headline,
-        "open_line": page_rules.open_decisions_line(counts.decisions, audience) if counts else "",
         "provider_down": down,
         "conversion_event": analytics.conversion_props(job),  # product analytics, if enabled
     }
@@ -1481,17 +1472,21 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     """Status page. Without JavaScript it reloads itself only if the user opted in
     (`?auto=1`, offered in a <noscript> link); htmx polls otherwise.
 
-    `outcome` (label, message, `partial`) is in the context for the status box, which
-    shows it instead of the plain status when the job is incomplete or waiting.
+    `state` (`web.states`) is in the context: the status box, the tab title and the next
+    steps all print it.
     """
-    job, outcome = load_job_status(request, job_id, user)
-    context = status_context(job, outcome) | {"auto_reload": auto == "1"}
+    job = load_job_status(request, job_id, user)
+    context = status_context(job) | {"auto_reload": auto == "1"}
     context["course"] = _job_course(request, job_id, user)  # notation memory
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     context["word_export"] = export_docx.available()  # the Word button needs pandoc
-    # When "Keep for 7 days" would delete it (None: the button is not offered).
-    context["keep_until"] = retention.keep_offer(job.retention_mode, job.retain_until)
+    # When "Keep for 7 days" would delete it (None: the button is not offered). Only a state
+    # with something to keep offers it (F-316).
+    keeps = job.state is not None and job.state.keeps
+    context["keep_until"] = (
+        retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
+    )
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
@@ -1506,15 +1501,14 @@ def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Res
     screen reader back to the top of the page and loses the reader's place, while the
     status region already announces the change and the link is one step away.
     """
-    job, outcome = load_job_status(request, job_id, user)
-    context = status_context(job, outcome)
+    job = load_job_status(request, job_id, user)
+    context = status_context(job)
     if v and v == context["status_version"]:
         return Response(status_code=204)
     context["results_link"] = job.finished
     if request.headers.get("HX-Request") == "true":
         # htmx sets document.title from a top-level <title> in the fragment.
-        headline: page_rules.Headline = context["headline"]
-        context["page_title"] = f"{headline.label}: {job.title}"
+        context["page_title"] = f"{context['state'].label}: {job.title}"
     return render(request, "_job_status.html", context)
 
 
@@ -1523,7 +1517,7 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     """The list of steps with their counts, polled by htmx outside the status box's live
     region (so a screen reader is not told every element). 204 while unchanged; once the
     job has finished, an empty fragment that stops polling."""
-    job, _ = load_job_status(request, job_id, user)
+    job = load_job_status(request, job_id, user)
     if v and v == job.progress_version:
         return Response(status_code=204)
     return render(request, "_job_progress.html", {"job": job})
@@ -1548,7 +1542,7 @@ def draft(
     the main way on. Every download of a draft without this page's confirm is sent here
     (`output.check`), with the file type it asked for. With no decision open, the job page's
     finish line. A person who can only view is never offered a draft."""
-    job, _ = load_job_status(request, job_id, user)
+    job = load_job_status(request, job_id, user)
     if job.status != JobStatus.DONE or job.page is None:
         raise PageError(409, "Not ready yet", "This document has not finished converting.",
                         context={"job_id": job_id})  # fmt: skip

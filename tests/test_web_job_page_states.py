@@ -21,6 +21,8 @@ from readablestem.core.types import (
     SourceFacts,
     Status,
 )
+from readablestem.web import states
+from readablestem.web.db import Job, JobStatus, session_scope
 
 
 @pytest.fixture
@@ -80,9 +82,12 @@ def stored(web, job_id: str) -> DocumentResult:
 def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
+    # The state is said once: decisions open is never "Converted" or "Ready" (F-033).
+    label = states.TABLE["needs_decisions"].label
+    assert title(html) == f"{label}: SECRET-HEADING Kinematics | ReadableSTEM"
     status = page_text(section_of_status(html))
-    assert "Converted 3 decisions need you before you give it to students." in status
+    assert label in status and "Converted" not in status
+    assert "3 decisions need you before you give it to students." in status
     actions = html[
         html.index('id="next-actions"') : html.index("</ul>", html.index("next-actions"))
     ]
@@ -140,16 +145,70 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
             )
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert (
-        title(html)
-        == "Stopped: the AI service did not answer: SECRET-HEADING Kinematics | ReadableSTEM"
-    )
+    # Decisions are open, so that is the state; the outage is its gap note.
+    label = states.TABLE["needs_decisions"].label
+    assert title(html) == f"{label}: SECRET-HEADING Kinematics | ReadableSTEM"
     text = page_text(html)
     assert "did not answer for 4 of 4 equations and figures" in text
     assert "Nothing is wrong with your PDF" in text
     assert "4 decisions need you before you give it to students." in text
     assert 'id="partial-note"' in html
     assert "All 0 checks" not in text
+
+
+def stop(web, job_id: str, code: str, retries: int = 0) -> None:
+    """The job as a stopped conversion leaves it: its earlier result still stored, and the
+    worker's progress stopped part way through the figures."""
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.status, job.error_code, job.retries = JobStatus.FAILED, code, retries
+        job.progress_json = {"stages": {"layout": {"done": 1, "total": 1}, "figures": {}}}
+
+
+def test_a_stopped_job_offers_no_decisions_and_nothing_to_keep(web):
+    """F-314, F-316: a stopped job's stored result had 3 decisions open; the page does not say
+    they need you (there is no review to open) and does not offer to keep the document."""
+    job_id = convert(web)
+    stop(web, job_id, "timeout")
+    html = web.browser.get(f"/jobs/{job_id}").text
+    status = page_text(section_of_status(html))
+    assert states.TABLE["stopped_service"].label in status
+    assert "decisions need you" not in page_text(html)
+    assert f'action="/jobs/{job_id}/keep"' not in html
+    assert f'action="/jobs/{job_id}/retry"' in html
+
+
+def test_a_job_with_no_tries_left_is_never_told_to_try_again(web):
+    """F-315: with the three tries used, nothing on the page offers "Try again"."""
+    job_id = convert(web)
+    stop(web, job_id, "timeout", retries=states.MAX_RETRIES_PER_JOB)
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert states.TABLE["stopped_no_tries"].label in page_text(section_of_status(html))
+    assert "Try again" not in page_text(html)
+    assert f'action="/jobs/{job_id}/retry"' not in html
+
+
+def test_an_unknown_stop_names_its_step_and_can_be_tried_again(web):
+    """F-317: a code this version does not know says the step it stopped in, that the cause is
+    not known, and offers "Try again" while tries are left."""
+    job_id = convert(web)
+    stop(web, job_id, "a_code_this_version_does_not_know")
+    html = web.browser.get(f"/jobs/{job_id}").text
+    status = page_text(section_of_status(html))
+    assert states.TABLE["stopped_unknown"].label in status
+    assert any(words in status for words in states.STEP_WORDS.values())
+    assert states.UNKNOWN_CAUSE in status
+    assert f'action="/jobs/{job_id}/retry"' in html
+
+
+def test_the_state_is_said_once_not_again_as_the_heading_over_the_actions(web):
+    """F-415: the status box says the state; the heading over the actions names the task."""
+    job_id = convert(web)
+    html = web.browser.get(f"/jobs/{job_id}").text
+    heading = re.search(r'<h2 id="decisions-heading">([^<]*)</h2>', html)
+    said = title(html).split(":")[0]  # the state, as the title and the status box say it
+    assert heading and heading.group(1).strip() != said
 
 
 # --------------------------------------------------------------------------- counts

@@ -28,6 +28,7 @@ from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout
 from readablestem.pipeline.run import convert_pdf
+from readablestem.web import states
 from readablestem.web.db import Job, User, session_scope
 from readablestem.web.worker import Worker, result_outcome
 
@@ -373,7 +374,8 @@ def test_a_course_pdf_with_kept_pages_is_reported_and_decided_once_per_reason(en
     assert (job.status, job.error_code) == ("done", "pages_not_converted")
 
     page = text_of(env.browser.get(f"/jobs/{job_id}").text)
-    assert "Finished, with pages not converted" in page
+    # Decisions are open, so that is the state; the kept pages are its gap note.
+    assert states.TABLE["needs_decisions"].label in page
     assert "Pages 2 and 3 are handwritten, so they were not converted." in page
     assert "Page 4 is a scanned image, so it was not converted." in page
     assert "Hidden text that a tablet or a text recognition (OCR) program guessed" in page
@@ -480,14 +482,14 @@ def test_a_kept_page_stays_a_marked_image_after_its_group_decision(env):
     ("name", "says", "figures"),
     [
         ("note_titled.pdf", "drawings or writing this tool could not read", 0),
-        ("typed_with_note.pdf", "Finished, with handwriting not converted", 0),
+        ("typed_with_note.pdf", "handwriting on typed text", 0),
         ("framed_plots.pdf", None, 5),
         # The second final verify's: full-page plots with their axes, axes drawn as one
         # path, timelines, hand marks over typed lines.
         ("full_page_plots.pdf", None, 4),
         ("open_axes.pdf", None, 2),
         ("timelines.pdf", None, 2),
-        ("marks_over_text.pdf", "Finished, with handwriting not converted", 0),
+        ("marks_over_text.pdf", "handwriting on typed text", 0),
     ],
 )
 def test_nothing_dropped_is_ever_called_converted_on_the_job_page(env, name, says, figures):

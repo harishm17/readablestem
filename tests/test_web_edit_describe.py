@@ -233,13 +233,13 @@ def test_the_last_page_cannot_be_left_out(review):
 
 
 def test_leaving_out_the_only_kept_page_ends_its_outcome_and_putting_it_back_restores_it(kept):
-    """The job was "Finished, with pages not converted" because of page 2; without it the
+    """The job had a "pages kept as pictures" gap note because of page 2; without it the
     file has nothing of the kind, and the job page does not say so any more."""
     job = kept.job(kept.job_id)
     assert job.error_code == "pages_not_converted"
     page = kept.browser.get(f"/jobs/{kept.job_id}").text
-    assert "Finished, with pages not converted" in page
+    assert 'id="partial-note"' in page
     pages_post(kept, 2, "omit", version=current_version(kept))
-    assert "Finished, with pages not converted" not in kept.browser.get(f"/jobs/{kept.job_id}").text
+    assert 'id="partial-note"' not in kept.browser.get(f"/jobs/{kept.job_id}").text
     pages_post(kept, 2, "restore", version=current_version(kept))
-    assert "Finished, with pages not converted" in kept.browser.get(f"/jobs/{kept.job_id}").text
+    assert 'id="partial-note"' in kept.browser.get(f"/jobs/{kept.job_id}").text

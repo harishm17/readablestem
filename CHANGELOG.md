@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: one state table for a job (branch feat/job-state-table)
+
+- `web/states.py` says a job's state from its stored facts: a key, label, tone, one-line
+  message, next steps, whether it is final, and its gap notes. The job page (title, status
+  box, "What you can do", the tab title and browser notice), My documents, the batch page,
+  the parts list, the review screen's finish line, the record, the retry offer and the admin
+  queue all print it; their own label dictionaries (`views.STATUS_LABELS`,
+  `outcome.job_outcome`, `job_page.headline`) are gone.
+- A finished job with decisions open is "Needs your decisions" everywhere, never
+  "Converted"; a budget stop, an outage or pages kept as pictures are notes under the state
+  ("Stopped early", "Service outage", "Pages kept as pictures"), and a note with nothing in it
+  ("0 of N") is not shown.
+- Stops say whose fault it was ("Stopped: this file cannot be converted as it is", "Stopped:
+  not caused by your file", "Stopped: too large for one conversion"); an unknown stop names
+  the step it stopped in and offers "Try again" while a try is left; with no tries left
+  nothing offers "Try again". A stopped job no longer says its old result's decisions need
+  you and is not offered "Keep for 7 days".
+- My documents groups "Needs you" (decisions, then stopped documents with "Try again"),
+  "Working" and "Ready". The heading over the job page's actions names the task ("Review",
+  "Download") instead of repeating the state.
+
 ## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
 
 - Every review write records a content-free `decision_outcome` event beside `decision_made`:

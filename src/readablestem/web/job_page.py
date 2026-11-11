@@ -9,10 +9,9 @@ wording is tested in one place. Design notes:
   short list ("Equations: 14 of 21 read and checked against your PDF's text"). The
   status box, a polite live region, only says which step is running, so a screen
   reader hears a change per step, not per element; the counts are in a list outside it.
-- **Headline** (`headline`, MF5 of the UX review): the label and sentence come from what
-  is left to do. Precedence: an AI outage, a stop or scanned pages (`web.outcome`),
-  then open decisions, then parts shown as images, then "Ready to share". A finished
-  job is never just "Finished" while something waits for the instructor.
+- **State**: the label, sentence and next step of the status box are the job's state
+  (`web.states`), one table for every surface; this module gives it the sentence about
+  open decisions (`open_decisions_line`) and the progress words.
 - **Counts** (`breakdown`, MF6): one breakdown everywhere. Every item is in exactly one
   of "waiting for your decision", "accepted for you" and "decided by you", so the three
   add up to the items; decisions are counted as on the review screen (a group of
@@ -58,7 +57,6 @@ from readablestem.pipeline.source_facts import flattened_parts
 from readablestem.pipeline.speech import GREEK, SYMBOLS
 from readablestem.web import notice_places
 from readablestem.web.messages import explain_notice
-from readablestem.web.outcome import JobOutcome
 
 # --------------------------------------------------------------------------- words
 
@@ -346,21 +344,7 @@ def kinds_phrase(counts: dict[str, int]) -> str:
     return join_words(parts) or plural(sum(counts.values()), "part")
 
 
-# --------------------------------------------------------------------------- headline
-
-Badge = Literal["done", "running", "failed", "queued"]
-# Outcome codes after which the instructor should convert again, not share.
-STOPPED = frozenset({"budget_daily", "budget_job_usd", "budget_job_calls", "model_outage"})
-
-
-@dataclass(frozen=True)
-class Headline:
-    """The status box: a short label, one sentence, and what kind of state it is."""
-
-    label: str
-    message: str
-    badge: Badge
-    state: str  # "queued", "running", "failed", "stopped", "decisions", "images", "ready"
+# --------------------------------------------------------------------------- decisions
 
 
 def open_decisions_line(count: int, audience: str = "owner") -> str:
@@ -378,43 +362,6 @@ def open_decisions_line(count: int, audience: str = "owner") -> str:
     # "Before you give it to students", not "before you share it": sharing with a colleague
     # to work on it together is fine at any time, and is a different act (`_job_sharing.html`).
     return f"{many} {'needs' if count == 1 else 'need'} you before you give it to students."
-
-
-def headline(
-    status: str,
-    detail: str,
-    outcome: JobOutcome | None,
-    counts: Breakdown | None,
-    audience: str = "owner",
-) -> Headline:
-    """The status box for any job: `detail` is the plain status sentence
-    (`views.JobView.status_detail`), `outcome` the job's outcome (`web.outcome`), `counts`
-    a finished job's breakdown, `audience` "owner", "review" or "view" (what the person
-    reading may do about the open decisions)."""
-    if status == "queued":
-        if outcome is not None:
-            return Headline(outcome.label, outcome.message, "queued", "queued")
-        return Headline("Waiting", detail, "queued", "queued")
-    if status == "running":
-        return Headline("Converting", detail, "running", "running")
-    if status != "done":
-        message = outcome.message if outcome is not None else detail
-        return Headline("Stopped", message, "failed", "failed")
-    if outcome is not None:
-        state = "stopped" if outcome.code in STOPPED else "images"
-        return Headline(outcome.label, outcome.message, "failed", state)
-    counts = counts or Breakdown()
-    if counts.decisions:
-        message = open_decisions_line(counts.decisions, audience)
-        return Headline("Converted", message, "running", "decisions")
-    if counts.as_image:
-        verb = "is" if counts.as_image == 1 else "are"
-        message = (
-            f"{kinds_phrase(counts.as_image_kinds)} {verb} shown as an image that screen "
-            "readers cannot read."
-        )
-        return Headline("Ready", message, "done", "images")
-    return Headline("Ready to share", "Everything was converted.", "done", "ready")
 
 
 # --------------------------------------------------------------------------- before/after

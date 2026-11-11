@@ -46,6 +46,7 @@ from readablestem.models import OFFLINE_DEFAULTS, make_vision_client
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import estimate_max_cost_usd
 from readablestem.pipeline.run import convert_pdf
+from readablestem.web import states
 from readablestem.web.auth import set_allowed
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, SpendDay, User, session_scope, utcnow
@@ -181,7 +182,10 @@ def test_a_job_the_daily_cap_stops_part_way_is_not_shown_as_a_normal_success(env
     assert f"{len(failed)} of {len(model_fixes)} equations and figures were not converted" in text
     assert "After 00:00 UTC" in text and "Convert the missing parts" in text
     assert "The accessible HTML is ready" not in text
-    assert "Stopped early" in page_text(env.browser.get("/app").text)
+    # The list says what is left to do, never that it is ready (F-033).
+    listed = page_text(env.browser.get("/app").text)
+    assert states.TABLE["ready"].label not in listed
+    assert any(states.TABLE[k].label in listed for k in ("needs_decisions", "partly_converted"))
     # The partial result is still there to use.
     assert fetch(env.browser, f"/jobs/{job_id}/download").status_code == 200
 

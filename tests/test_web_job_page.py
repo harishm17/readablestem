@@ -15,6 +15,7 @@ import pytest
 
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
 from readablestem.core.types import Check, PageStats, Status
+from readablestem.web import states
 from readablestem.web.db import Job, session_scope
 from readablestem.web.outcome import FAILED_MESSAGES
 from readablestem.web.views import job_error_message
@@ -64,6 +65,9 @@ def convert(web, **update) -> str:
 # --------------------------------------------------------------------------- outcomes
 
 
+NEEDS = states.TABLE["needs_decisions"].label
+
+
 def stop_part_way(web) -> None:
     """The fake result as a daily-cap stop leaves it: the abstained equation was never
     converted because the budget ran out."""
@@ -77,7 +81,8 @@ def test_a_job_stopped_early_says_so_in_the_title_status_and_results(web):
     job_id = convert(web, stopped_by="budget_daily")
     assert web.job(job_id).error_code == "budget_daily"
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Stopped early: SECRET-HEADING Kinematics | ReadableSTEM"
+    # Decisions are still open, so that is the state; the stop is its gap note (F-033).
+    assert title(html) == f"{NEEDS}: SECRET-HEADING Kinematics | ReadableSTEM"
     text = page_text(html)
     assert "1 of 4 equations and figures were not converted" in text
     assert "The accessible HTML is ready" not in text
@@ -86,16 +91,22 @@ def test_a_job_stopped_early_says_so_in_the_title_status_and_results(web):
     assert 'id="partial-note"' in html
 
 
+def test_a_budget_stop_that_left_nothing_unconverted_has_no_gap_note(web):
+    """F-319: a job stored with a budget stop but nothing left out says no "0 of N"."""
+    job_id = convert(web, stopped_by="budget_daily")
+    assert web.job(job_id).error_code == "budget_daily"
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert "0 of" not in page_text(html)
+    assert 'id="partial-note"' not in html
+
+
 def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     pages = [PageStats(page=p, elements=1, fixes=1, cost_usd=0, latency_ms=0) for p in (0, 1)]
     result = web.converter.output.result
     result.stats.per_page = pages
     job_id = convert(web, image_only_pages=[1])
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert (
-        title(html)
-        == "Finished, with pages not converted: SECRET-HEADING Kinematics | ReadableSTEM"
-    )
+    assert title(html) == f"{NEEDS}: SECRET-HEADING Kinematics | ReadableSTEM"
     assert "Page 2 is a scanned image, so it was not converted." in page_text(html)
     assert 'id="partial-note"' in html
 

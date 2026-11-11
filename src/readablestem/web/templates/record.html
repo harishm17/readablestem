@@ -25,6 +25,7 @@
     <div><dt>Language</dt><dd>{{ record.language }}</dd></div>
     <div><dt>Record made on</dt><dd>{{ long_when(record.made_at) }}</dd></div>
     <div><dt>Reference</dt><dd>{{ record.job_ref }}</dd></div>
+    {% if record.state %}<div><dt>State</dt><dd>{{ record.state }}</dd></div>{% endif %}
     {% if record.downloaded is not none %}<div><dt>File types downloaded</dt><dd>{{ record.downloaded|join(", ") or "None yet" }}</dd></div>{% endif %}
   </dl>
 </section>
@@ -40,6 +41,7 @@
     <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
     <li>{{ c.as_image }} {{ "part" if c.as_image == 1 else "parts" }} shown as pictures of the original.</li>
     {% for name, n in record.by_hand.items() %}<li>{{ name }}: {{ n }}.</li>{% endfor %}
+    {% for title, text in record.gaps %}<li>{{ title }}: {{ text }}</li>{% endfor %}
     {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
   </ul>
 </section>

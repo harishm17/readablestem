@@ -81,12 +81,14 @@
 
 <section aria-labelledby="queue-heading">
   <h2 id="queue-heading">Queue</h2>
-  <dl class="summary-list">
-    <div><dt>Waiting</dt><dd>{{ queue.queued }}</dd></div>
-    <div><dt>Converting</dt><dd>{{ queue.running }}</dd></div>
-    <div><dt>Finished (not yet deleted)</dt><dd>{{ queue.done }}</dd></div>
-    <div><dt>Stopped (not yet deleted)</dt><dd>{{ queue.failed }}</dd></div>
+  {# Jobs not yet deleted, by state, in the words of every other page (web/states.py). #}
+  {% if queue %}
+  <dl class="summary-list" id="queue-states">
+    {% for label, n in queue.items() %}<div><dt>{{ label }}</dt><dd>{{ n }}</dd></div>{% endfor %}
   </dl>
+  {% else %}
+  <p>No documents are stored.</p>
+  {% endif %}
 </section>
 
 <section aria-labelledby="allowlist-heading">

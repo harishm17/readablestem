@@ -1,12 +1,14 @@
-"""My documents as a to-do list (UX review BW5): what needs a decision first, then what is
-ready to download, then the rest, each document under its own title.
+"""My documents as a to-do list (UX review BW5, F-414): what needs the person first, then
+what is still working, then what is ready, each document under its own title. A row's words,
+badge and next step are its state (`web.states`), and the group is the state's tone:
 
-- "Needs your decisions": finished, with decisions still open. Oldest first: it is a
-  queue of work, and the oldest is deleted first. "Review next" opens the first one's
-  review screen, which starts at its first open decision.
-- "Ready to download": finished with no decision open, newest first. A result that is
-  only partly converted (a budget stop, scanned pages) says so in its status.
-- "Converting, waiting or stopped": newest first, as uploaded.
+- "Needs you": finished with decisions still open, oldest first (it is a queue of work, and
+  the oldest is deleted first), then every stopped document, newest first, each with its
+  reason in its label and its next step ("Try again" as a form). "Review next" opens the
+  first one's review screen, which starts at its first open decision.
+- "Working": waiting, converting or restarting, newest first.
+- "Ready": finished with no decision open, newest first. A result that is only partly
+  converted (a budget stop, scanned pages) says so in its label.
 
 A document is led by the file name the person uploaded (with the pages of a part), and its
 title (the PDF's title or its first heading, as in the HTML's `<title>`) sits under it when it
@@ -40,10 +42,9 @@ from sqlalchemy.orm import Session
 
 from readablestem.core import triage
 from readablestem.core.types import Fix
-from readablestem.web import titles
+from readablestem.web import states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus
-from readablestem.web.outcome import job_outcome
 
 # The assembler's title for a PDF with no title and no level-1 heading: the file name
 # says more.
@@ -64,10 +65,9 @@ class DocumentRow:
     status: str  # a JobStatus value
     created_at: datetime | None
     retain_until: datetime | None
-    label: str = ""  # the status in words
-    badge: str = ""  # status-<badge> (app.css): the colour only repeats the words
     open_decisions: int = 0
-    partial: bool = False
+    # The job's state (`web.states`): its label, badge, group and next step.
+    state: states.State | None = None
     # One part of a larger file converted in parts (T3-3): the pages it holds, "31-59".
     part_label: str = ""
     is_sample: bool = False  # the recorded sample document (T3-9)
@@ -92,15 +92,35 @@ class DocumentRow:
         return "" if self.title == self.filename else self.title
 
     @property
-    def group(self) -> str:
-        if self.status != JobStatus.DONE:
-            return "other"
-        return "decide" if self.open_decisions else "ready"
+    def label(self) -> str:
+        """The state's label, with what it is waiting for or how far it has got: "Needs your
+        decisions: 3 decisions to make", "Converting: 4 of 10 pages done"."""
+        assert self.state is not None
+        label = self.state.label
+        if self.state.key == "converting":
+            return f"{label}: {self.pages_done} of {plural(self.pages, 'page', 'pages')} done"
+        if self.decide and self.open_decisions:
+            return f"{label}: {plural(self.open_decisions, 'decision', 'decisions')} to make"
+        return label
 
     @property
-    def action(self) -> str | None:
-        """The one next step offered in the row: "review" or "download"."""
-        return {"decide": "review", "ready": "download"}.get(self.group)
+    def badge(self) -> str:
+        """status-<badge> (app.css): the color only repeats the words."""
+        return self.state.badge if self.state is not None else ""
+
+    @property
+    def group(self) -> str:
+        return self.state.group if self.state is not None else states.WORK
+
+    @property
+    def action(self) -> states.Step | None:
+        """The one next step offered in the row (the state's first)."""
+        return self.state.primary if self.state is not None else None
+
+    @property
+    def decide(self) -> bool:
+        """Finished, with decisions open: a row "Review next" can open."""
+        return self.group == states.NEEDS and not (self.state and self.state.stopped)
 
 
 @dataclass
@@ -128,13 +148,14 @@ class DocumentList:
 
     @property
     def review_next(self) -> DocumentRow | None:
-        rows = self.group("decide").rows
+        rows = [row for row in self.group(states.NEEDS).rows if row.decide]
         return rows[0] if rows else None
 
     @property
     def summary(self) -> str:
-        """'2 need your decisions (5 in all) · 1 ready to download · 1 converting'."""
-        decide, ready = self.group("decide").rows, self.group("ready").rows
+        """The groups in their order: '2 need your decisions (5 in all) · 1 stopped ·
+        1 converting · 1 ready to download'."""
+        decide = [row for row in self.group(states.NEEDS).rows if row.decide]
         parts = []
         if decide:
             total = sum(row.open_decisions for row in decide)
@@ -143,17 +164,17 @@ class DocumentList:
                 f"{plural(len(decide), 'document', 'documents')} {verb} your decisions "
                 f"({plural(total, 'decision', 'decisions')} in all)"
             )
+        tones = [row.state.tone for row in self.rows if row.state is not None]
+        for tone, words in (
+            (states.FAILED, "stopped"),
+            (states.WORKING, "converting"),
+            (states.WAITING, "waiting"),
+        ):
+            if tones.count(tone):
+                parts.append(f"{tones.count(tone)} {words}")
+        ready = self.group(states.READY).rows
         if ready:
             parts.append(f"{len(ready)} ready to download")
-        converting = sum(row.status == JobStatus.RUNNING for row in self.rows)
-        waiting = sum(row.status == JobStatus.QUEUED for row in self.rows)
-        stopped = sum(row.status == JobStatus.FAILED for row in self.rows)
-        if converting:
-            parts.append(f"{converting} converting")
-        if waiting:
-            parts.append(f"{waiting} waiting")
-        if stopped:
-            parts.append(f"{stopped} stopped")
         return " · ".join(parts)
 
     @property
@@ -267,11 +288,10 @@ def documents(
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
     stored = _stored_facts(session, [job.id for job in jobs if job.status == JobStatus.DONE])
-    groups = [
-        Group("decide", "Needs your decisions"),
-        Group("ready", "Ready to download"),
-        Group("other", "Converting, waiting or stopped"),
-    ]
+    found = states.load(
+        session, [job.id for job in jobs], context=states.Context(budget_closed=budget_closed)
+    )
+    groups = [Group(key, heading) for key, heading in states.GROUP_HEADINGS.items()]
     by_key = {g.key: g for g in groups}
     for job in jobs:
         title, open_count, own = stored.get(job.id, (None, 0, None))
@@ -288,10 +308,14 @@ def documents(
             part_label=job.part_label or "",
             is_sample=bool(job.is_sample),
             titled_by_you=bool(own),
+            state=found.get(job.id),
         )
-        _label(row, job.error_code, budget_closed)
         by_key[row.group].rows.append(row)
-    by_key["decide"].rows.reverse()  # oldest first (module docstring)
+    # Decisions oldest first, then the stopped documents newest first (module docstring).
+    needs = by_key[states.NEEDS].rows
+    by_key[states.NEEDS].rows = [r for r in reversed(needs) if r.decide] + [
+        r for r in needs if not r.decide
+    ]
     # The same digest `list_version` makes, from the rows already read: no second query.
     keys = sorted((j.id, j.status, j.pages_done, j.result_version, j.error_code) for j in jobs)
     return DocumentList(groups=groups, version=_version(keys, budget_closed))
@@ -320,25 +344,3 @@ def _stored_facts(session: Session, done: list[str]) -> dict[str, tuple[str, int
             job.result_json = job.result_json  # the set event stores the two facts
             stored[job.id] = (job.result_title or "", job.open_decisions or 0, job.title_override)
     return stored
-
-
-def _label(row: DocumentRow, error_code: str | None, budget_closed: bool) -> None:
-    outcome = job_outcome(status=row.status, error_code=error_code, budget_closed=budget_closed)
-    row.partial = bool(outcome and outcome.partial)
-    if row.status == JobStatus.QUEUED:
-        row.label, row.badge = (outcome.label if outcome else "Waiting"), "queued"
-    elif row.status == JobStatus.RUNNING:
-        row.label = f"Converting: {row.pages_done} of {plural(row.pages, 'page', 'pages')} done"
-        row.badge = "running"
-    elif row.status == JobStatus.FAILED:
-        row.label, row.badge = (outcome.label if outcome else "Stopped"), "failed"
-    elif outcome is not None and row.partial:
-        # Partly converted (a budget stop, scanned pages): say so first, whatever is open.
-        decide = plural(row.open_decisions, "decision", "decisions")
-        row.label = outcome.label + (f", {decide} to make" if row.open_decisions else "")
-        row.badge = "partial"
-    elif row.open_decisions:
-        row.label = f"{plural(row.open_decisions, 'decision', 'decisions')} to make"
-        row.badge = "decisions"
-    else:
-        row.label, row.badge = "Ready to download", "done"

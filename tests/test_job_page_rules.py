@@ -25,8 +25,7 @@ from readablestem.core.types import (
     SourceFacts,
     Status,
 )
-from readablestem.web import job_page
-from readablestem.web.outcome import job_outcome
+from readablestem.web import job_page, states
 
 MATH = "http://www.w3.org/1998/Math/MathML"
 
@@ -73,13 +72,17 @@ def outage_result(failed: int, total: int) -> dict:
 
 
 def test_an_ai_outage_is_not_finished():
-    outcome = job_outcome(status="done", error_code=None, result_json=outage_result(3, 4))
-    assert outcome is not None and outcome.code == "model_outage" and outcome.partial
-    assert outcome.label == "Stopped: the AI service did not answer"
-    assert "3 of 4 equations and figures" in outcome.message
-    assert "Nothing is wrong with your PDF" in outcome.message
-    assert job_outcome(status="done", error_code=None, result_json=outage_result(2, 4)) is None
-    assert job_outcome(status="done", error_code=None, result_json=outage_result(0, 4)) is None
+    def state(failed: int, total: int) -> states.State:
+        facts = states.Facts(id="j", status="done", result_json=outage_result(failed, total))
+        return states.state_of(facts)
+
+    outage = state(3, 4)
+    assert outage.key == "partly_converted" and not outage.shareable
+    assert [g.code for g in outage.gaps] == ["service_outage"]
+    assert "3 of 4 equations and figures" in outage.message
+    assert "Nothing is wrong with your PDF" in outage.message
+    assert outage.retry is not None and outage.retry.kind == "missing"
+    assert state(2, 4).key == "ready" and state(0, 4).key == "ready"
 
 
 # --------------------------------------------------------------------------- reading
