@@ -58,6 +58,7 @@ from defusedxml import ElementTree as SafeET
 from PIL import Image
 
 from readablestem.core.childenv import child_env
+from readablestem.pipeline import output_chars
 from readablestem.pipeline.export_canvas import _DATA_URI, _find, _Node, _parse, _write
 from readablestem.pipeline.export_epub import _HEADING, _LANGUAGE, _sanitise, _text
 
@@ -87,9 +88,17 @@ for _prefix, _uri in _NAMESPACES.items():
     ET.register_namespace(_prefix, _uri)
 
 
+# Parts of the Word file that hold no document text, left out of the character rule: the
+# list styles draw their bullets with Symbol and Wingdings glyphs at private-use code points
+# (U+F0B7, U+F0A7), as Word itself does; Word shows them as list markers, not as text.
+_STYLE_PARTS = frozenset({"word/numbering.xml"})
+
+
 class DocxExportError(ValueError):
     """The document cannot be written as a Word file. `code` is a short category (no
-    document text): `unavailable`, `failed`, `timeout`, `equations`, `invalid`."""
+    document text): `unavailable`, `failed`, `timeout`, `equations`, `invalid`,
+    `unreadable_character` (the built file holds a character that is not text,
+    `output_chars`: the page never holds one, so it is the export's own)."""
 
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -380,4 +389,6 @@ def export_docx(
     data, (equations, pictures, tables, headers) = _rebuild(data, title)
     if equations != n_math:
         raise DocxExportError("equations")
+    if output_chars.count_in_zip(data, skip=_STYLE_PARTS):
+        raise DocxExportError("unreadable_character")
     return DocxExport(title, lang, data, equations, n_headings, pictures, tables, headers)

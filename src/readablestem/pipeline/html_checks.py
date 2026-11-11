@@ -20,6 +20,7 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.link_href | unsafe_link | an `<a>` href that is not http, https, mailto or a "#id" here |
 | html.lang_tags | invalid_lang | a `lang` value that is not a well-formed BCP 47 tag |
 | html.text_contrast | low_contrast | a colour class (`tc-...`) below 4.5:1 on white |
+| html.characters | unreadable_character | a character that is not text, or the gap for one |
 | html.sentence_holes | sentence_hole | a gap in a sentence of a page kept for unread content |
 
 A link in the text (`<a href>`) loads nothing, so it is not an external resource; the
@@ -37,6 +38,12 @@ that note and the picture, a sentence with punctuation straight after a space ("
 .", "Acceleration, , is") or an article before a hyphen ("the -direction") is where
 something drawn on the page (an equation drawn with lines) was read into nothing (F-451).
 Maths, pictures and the tool's own words inside the text count as something there.
+
+The character rule (`output_chars`) fails on a private-use character, U+FFFD, a
+noncharacter or a control other than tab and line end, anywhere in the file, and on the
+marked gap the student page writes in place of one: each is a place a screen reader says
+nothing or "question mark". Rules added after the first set carry the day they were added
+(`RULE_ADDED`), stored with a failed check (`Check.added_on`).
 
 Documents with a `<table>` get five more rules (`_table_rules`, docs/tables.md), so a
 document without one gets exactly the rules above:
@@ -67,6 +74,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date
 from functools import cache
 from html.parser import HTMLParser
 from importlib import resources
@@ -74,7 +82,7 @@ from itertools import pairwise
 from typing import Any, Literal
 
 from readablestem.core.types import Check, is_safe_href
-from readablestem.pipeline import contrast
+from readablestem.pipeline import contrast, output_chars
 from readablestem.pipeline.assemble import AUTHORED_CLASS, UNREAD_PARTS_CLASS
 from readablestem.pipeline.inline_text import COLOUR_CLASS_PREFIX
 from readablestem.pipeline.language import is_language_tag
@@ -107,6 +115,13 @@ _TEXT_BLOCKS = frozenset(
 )
 _SOMETHING = "\ufffc"  # stands for maths, a picture or the tool's words inside a sentence
 _DARK_BLOCK = re.compile(r"@media[^{}]*prefers-color-scheme\s*:\s*dark[^{}]*\{")
+
+# The day each rule added after the first set came in. A failed check stores it, so a
+# document that was ready and fails a new rule can say since when the rule exists.
+RULE_ADDED: dict[str, date] = {
+    "html.sentence_holes": date(2026, 11, 11),
+    "html.characters": date(2026, 11, 11),
+}
 
 AXE_VERSION = "4.14.0"
 AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
@@ -276,7 +291,11 @@ class _Collector(HTMLParser):
 
 
 def _check(name: str, passed: bool, code: str, severity: Severity = "error") -> Check:
-    return Check(name=name, passed=passed, severity=severity, code=None if passed else code)
+    if passed:
+        return Check(name=name, passed=True, severity=severity)
+    return Check(
+        name=name, passed=False, severity=severity, code=code, added_on=RULE_ADDED.get(name)
+    )
 
 
 def _skips_a_level(levels: list[int]) -> bool:
@@ -311,6 +330,11 @@ def static_checks(html: str) -> list[Check]:
         ),
         _check("html.self_contained", doc.external == 0, "external_resource"),
         _check("html.wording", not _BANNED.search(authored), "banned_wording"),
+        _check(
+            "html.characters",
+            not output_chars.count(html) and output_chars.UNREADABLE not in html,
+            "unreadable_character",
+        ),
         *_text_checks(doc),
         *_unread_page_rules(doc),
         # Only for documents with a <table>, so they come last.

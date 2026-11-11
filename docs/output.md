@@ -12,6 +12,7 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ReadableSTEM 0.1.0">
+<meta name="readablestem-render" content="3">   (assemble.RENDER_VERSION: an older page is made again)
 <title>Speed and Velocity</title>
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
@@ -1083,6 +1084,12 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 | `html.link_href` | `unsafe_link` (an `href` that is not http, https, mailto, or `#` and an id in the file) |
 | `html.lang_tags` | `invalid_lang` (a `lang` value that is not a well-formed BCP 47 tag) |
 | `html.text_contrast` | `low_contrast` (a `tc-` colour class below 4.5:1 on white) |
+| `html.characters` | `unreadable_character` (a character that is not text, or the gap that stands for one; see "Characters that are not text") |
+| `html.sentence_holes` | `sentence_hole` (a page kept for unread content only: a lone stop or a dangling "the -x" in its text) |
+
+A failed check of a rule added after launch carries `added_on`, the day the rule was
+added (`html_checks.RULE_ADDED`), so a document that was ready can be told why it is not
+now. Checks stored without the field load with `added_on=None`.
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/readablestem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
@@ -1104,6 +1111,21 @@ callers, on `run.PipelineOutput.checks`). The CLI prints them and writes them to
 it makes the file again after review decisions (once for a run of decisions: web.md,
 "Review screen"). `static_checks(result.html)` is deterministic
 and fast, so anyone holding only the HTML can recompute them.
+
+## Characters that are not text (`pipeline/output_chars.py`)
+
+No output holds a character that is not text: control characters, private-use code points
+(a symbol font that gives no letter), noncharacters and U+FFFD. A screen reader says
+nothing or "question mark" for them. `render_html` writes each one as
+`<span class="flagged-inline readablestem">[unreadable character]</span>` (with `lang="en"` on a page in another language)
+in the text, and as plain `[unreadable character]` in the title, attributes and maths, so
+the student hears where something is missing; `html.characters` then fails so the job page
+says to compare those places with the PDF. Titles from `web/titles.py` and
+`web/combine.py` are cleaned the same way, so file names and `contents.txt` are clean too.
+Every export reads the page, and each checks its own built text again: Canvas (and so the
+Cartridge) and EPUB refuse with the code `unreadable_character`, Word with the
+`DocxExportError` of that code (its list styles, `word/numbering.xml`, are left out: Word
+draws bullets with Symbol glyphs at private-use code points); the HTML file stays available.
 
 ## How `convert_pdf` fills it in
 

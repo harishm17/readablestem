@@ -70,6 +70,7 @@ from readablestem.pipeline import (
     figure_images,
     inline_text,
     navigation,
+    output_chars,
     table_html,
     table_math,
 )
@@ -92,7 +93,7 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # (`RENDER_META`), and the web app makes a stored page again from its stored result when
 # the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
 # documents converted before it, not only new ones and ones somebody edits again.
-RENDER_VERSION = 2
+RENDER_VERSION = 3
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -1702,7 +1703,7 @@ def render_html(
         )
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
-    return "\n".join(
+    page = "\n".join(
         [
             "<!doctype html>",
             f'<html lang="{_escape(_clean_lang(lang))}">',
@@ -1728,3 +1729,9 @@ def render_html(
             "",
         ]
     )
+    # No character that is not text reaches the student (`output_chars`): a marked gap in
+    # its place, which every output made from the page carries and Listen speaks.
+    gap = _authored_in_english(
+        f'<span class="flagged-inline {AUTHORED_CLASS}">{output_chars.UNREADABLE}</span>', lang
+    )
+    return output_chars.mark_html(page, gap)

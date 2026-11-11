@@ -342,6 +342,10 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "language code.",
     ("html.text_contrast", "low_contrast"): "Some colored text is too light to read easily "
     "on the white background.",
+    ("html.characters", "unreadable_character"): "Some characters in the document are not "
+    "text (a symbol the PDF gives no letter for, or a damaged character), so a screen reader "
+    'would say nothing or "question mark" there. Students see "[unreadable character]" in '
+    "each place instead; compare those places with the PDF.",
     # A page kept as a picture for unread content (pipeline.html_checks, F-451)
     ("html.sentence_holes", "sentence_hole"): "A sentence on a page that could not be read in "
     "full has a gap where something is missing, often an equation drawn as lines, so a screen "

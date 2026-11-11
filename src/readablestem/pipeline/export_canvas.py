@@ -41,7 +41,7 @@ from html import escape
 from html.parser import HTMLParser
 from io import BytesIO
 
-from readablestem.pipeline import navigation
+from readablestem.pipeline import navigation, output_chars
 
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
@@ -138,8 +138,26 @@ HIDDEN_CLASS = "visually-hidden"
 CANVAS_HIDDEN_CLASS = "screenreader-only"  # Canvas's own class for the same thing
 
 
+NOT_TEXT = "unreadable_character"
+
+
 class CanvasExportError(ValueError):
-    """The document cannot be exported (an image of a kind this module does not write)."""
+    """The document cannot be exported. `code` is a short category (no document text):
+    `image_type` (an image of a kind this module does not write, or no course number) or
+    `unreadable_character` (the built file holds a character that is not text,
+    `output_chars`: a defect of the export, since the page never holds one)."""
+
+    def __init__(self, message: str, code: str = "image_type") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def check_text(*parts: str | None) -> None:
+    """The output rule on an export's own text, after it is built (`output_chars`): no
+    character that is not text. Raises `CanvasExportError` with the code
+    "unreadable_character" (an EPUB's own error when called from there)."""
+    if any(part and output_chars.count(part) for part in parts):
+        raise CanvasExportError("the file holds a character that is not text", NOT_TEXT)
 
 
 def valid_course_number(text: str) -> bool:
@@ -552,7 +570,9 @@ def export_canvas(
         if len(page_html) > CANVAS_PAGE_LIMIT:
             notes.page_too_large, page_html = True, None
 
-    return CanvasExport(folder, title, lang, index_html, page_html, images, notes, course_number)
+    export = CanvasExport(folder, title, lang, index_html, page_html, images, notes, course_number)
+    check_text(folder, title, index_html, page_html, readme(export))
+    return export
 
 
 # ----------------------------------------------------------------------------- the zip

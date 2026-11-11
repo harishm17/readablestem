@@ -1875,6 +1875,21 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
     )
 
 
+def export_failed_words(version: str, code: str) -> str:
+    """Why a Canvas or EPUB version cannot be made, in words: a picture it cannot hold, or
+    (`unreadable_character`) a character that is not text in the built file, which the
+    page never holds, so the version is not offered as finished."""
+    if code == export_canvas.NOT_TEXT:
+        return (
+            f"The {version} could not be made from this document. The HTML file is still "
+            "available from the job page."
+        )
+    return (
+        f"It has a picture in a form the {version} cannot hold. The HTML file is still "
+        "available from the job page."
+    )
+
+
 def _canvas_export(
     ctx: AppContext, user: CurrentUser, job_id: str, number: str | None
 ) -> tuple[export_canvas.CanvasExport, str, str, int]:
@@ -1897,13 +1912,12 @@ def _canvas_export(
             folder=export_canvas.folder_name(title, job_ref),
             course_number=number,
         )
-    except export_canvas.CanvasExportError:
-        log_event(logger, "canvas_export_failed", code="image_type")
+    except export_canvas.CanvasExportError as exc:
+        log_event(logger, "canvas_export_failed", code=exc.code)
         raise PageError(
             409,
             "This document cannot be made for Canvas",
-            "It has a picture in a form the Canvas version cannot hold. The HTML file is "
-            "still available from the job page.",
+            export_failed_words("Canvas version", exc.code),
             context={"job_id": job_ref},
         ) from None
     return export, title, job_ref, still_open

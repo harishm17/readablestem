@@ -41,7 +41,7 @@ def _cmd_epub(args: argparse.Namespace) -> int:
     try:
         result = export_epub(html, title=args.title)
         data = build_epub(result)
-    except CanvasExportError as exc:  # also EpubExportError: a picture the book cannot hold
+    except CanvasExportError as exc:  # also EpubExportError: a picture, or a non-text character
         print(f"cannot write an EPUB: {exc}", file=sys.stderr)
         return 2
     try:

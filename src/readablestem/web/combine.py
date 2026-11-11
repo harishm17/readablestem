@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline import combine
+from readablestem.pipeline import combine, output_chars
 from readablestem.web import documents, ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
@@ -76,11 +76,12 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
 
 def title_of(first: Job) -> str:
     """What the file is called: the title the instructor chose for the first part, else the
-    source's file name without the part tag and extension."""
+    source's file name without the part tag and extension. It names the Word and EPUB files
+    too, so a character that is not text in it is written as `output_chars.UNREADABLE`."""
     if first.title_override and first.title_override.strip():
-        return first.title_override.strip()
+        return output_chars.plain(first.title_override.strip())
     stem = _PART_SUFFIX.sub("", first.filename.rpartition(".")[0] or first.filename)
-    return " ".join(stem.split()) or DEFAULT_TITLE
+    return output_chars.plain(" ".join(stem.split())) or DEFAULT_TITLE
 
 
 def combined_html(

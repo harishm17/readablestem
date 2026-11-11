@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from readablestem.pipeline import assemble
+from readablestem.pipeline import assemble, output_chars
 
 MAX_TITLE = 200
 MAX_CONTACT = 254
@@ -78,12 +78,14 @@ def suggested(result_title: str | None, heading_texts: list[str]) -> str:
 
 def effective_title(override: str | None, result_title: object, filename: str) -> str:
     """What a list or a heading calls the document: the instructor's title, else the PDF's
-    title without its section number, else the file name."""
+    title without its section number, else the file name. It names the Word, EPUB, Canvas and
+    Cartridge files too, so a character that is not text in it (a PDF title in a symbol
+    font) is written as `output_chars.UNREADABLE`, as on the student page."""
     if override and override.strip():
-        return override.strip()
+        return output_chars.plain(override.strip())
     if isinstance(result_title, str) and result_title.strip():
         text = assemble.strip_section_number(" ".join(result_title.split()))
         generic = text.casefold().rstrip(".:") in assemble.GENERIC_TITLES
         if text and text != assemble.DEFAULT_TITLE and not generic:
-            return text
-    return filename
+            return output_chars.plain(text)
+    return output_chars.plain(filename)
