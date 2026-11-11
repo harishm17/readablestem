@@ -22,7 +22,7 @@ from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
 from readablestem.source.convert import SourceFailed
 from readablestem.web.db import Blob, Job, JobStatus, QuotaDay, session_scope
-from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, loss_upload, make_zip, needs_latexml, png_bytes
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x^2$.\n\\end{document}\n"
 
@@ -317,26 +317,37 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
 @needs_latexml
 @pytest.mark.parametrize("name", list(LOSSES))
 def test_a_source_that_loses_content_never_ends_as_converted(name, tmp_path, caplog):
+    """A source that would lose content stops and names why, or its file holds what it would
+    have lost and the page never claims more than it converted (SW42.2, SW42.4)."""
     import logging
 
     caplog.set_level(logging.INFO)
-    text, code, shown, _ = LOSSES[name]
+    row = LOSSES[name]
     env = WebEnv(tmp_path, feature_latex_source=True)
     env.converter = convert_pdf  # ty: ignore[invalid-assignment]
     with env.running() as client:
         env.allow(ALICE)
         login(client, ALICE)
-        response = send(client, text.encode(), f"{name}.tex")
+        data, filename = loss_upload(name)
+        response = send(client, data, filename)
         assert response.status_code == 303
         job_id = job_id_from(response)
         env.run_worker()
         job = env.job(job_id)
-        assert job.status == JobStatus.FAILED and job.error_code == code
-        assert job.result_json is None  # nothing a student could be given
         page = client.get(f"/jobs/{job_id}").text
+        if row.code is None:
+            assert job.status == JobStatus.DONE and job.result_json is not None
+            assert row.shown in (job.html or "")
+            kinds = [e["kind"] for e in job.result_json["elements"]]
+            assert kinds.count("figure") == row.figures
+            if row.decision is not None:
+                assert "Everything was converted" not in page
+            return
+        assert job.status == JobStatus.FAILED and job.error_code == row.code
+        assert job.result_json is None  # nothing a student could be given
         assert "Everything was converted" not in page and "Try again" not in page
-        assert html.escape(shown, quote=False) in page  # the file or command is named
-    assert shown not in caplog.text  # names stay out of the logs
+        assert html.escape(row.shown, quote=False) in page  # the file or command is named
+    assert row.shown not in caplog.text  # names stay out of the logs
 
 
 @needs_latexml

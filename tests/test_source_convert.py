@@ -12,7 +12,7 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.source import envelope
 from readablestem.source.convert import SourceFailed, convert_source
 from readablestem.source.support import SUPPORT
-from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, loss_upload, make_zip, needs_latexml, png_bytes
 
 pytestmark = needs_latexml
 
@@ -139,23 +139,43 @@ def test_conversions_one_after_another_each_get_the_gate():
 
 @pytest.mark.parametrize("name", list(LOSSES))
 def test_the_report_names_what_latexml_said(name, tmp_path):
+    """Each source that would lose content stops with the names for the job page (SW42.2), or
+    converts with what it holds read and its decisions required (SW42.4), never leaving
+    anything unread."""
     from readablestem.source import latexml
     from readablestem.source import report as source_report
 
-    text, code, _, (level, category, expected, where) = LOSSES[name]
-    (tmp_path / "main.tex").write_text(text)
-    latexml.convert(tmp_path, "main.tex", tmp_path / "out")
-    report = source_report.parse(
-        tmp_path / "out", project=tmp_path, loaded=source_report.loaded_packages({"main.tex": text})
-    )
-    found = {(p.level, p.category, p.name, p.file) for p in [*report.problems, *report.missing]}
-    assert (level, category, expected, where) in found
-    assert report.log_errors >= 1
-    # and the conversion stops, with the names for the job page (SW42.2)
-    blob = envelope.wrap("tex", f"{name}.tex", None, text.encode())
-    with pytest.raises(SourceFailed) as raised:
-        convert_source(blob, settings=get_settings(), client=FakeVisionClient())
-    assert raised.value.code == code and raised.value.detail
+    row = LOSSES[name]
+    if row.line is not None:
+        (tmp_path / "main.tex").write_text(row.text)
+        latexml.convert(tmp_path, "main.tex", tmp_path / "out")
+        report = source_report.parse(
+            tmp_path / "out",
+            project=tmp_path,
+            loaded=source_report.loaded_packages({"main.tex": row.text}),
+        )
+        found = {(p.level, p.category, p.name, p.file) for p in [*report.problems, *report.missing]}
+        assert row.line in found
+        assert report.log_errors >= 1
+    data, filename = loss_upload(name)
+    kind = "zip" if filename.endswith(".zip") else "tex"
+    blob = envelope.wrap(kind, filename, "main.tex" if kind == "zip" else None, data)
+    if row.code is not None:
+        with pytest.raises(SourceFailed) as raised:
+            convert_source(blob, settings=get_settings(), client=FakeVisionClient())
+        assert raised.value.code == row.code and raised.value.detail
+        assert all(raised.value.detail.get(key) == value for key, value in row.detail)
+        return
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    assert row.shown in result.html
+    assert sum(1 for e in result.elements if e.kind is Kind.FIGURE) == row.figures
+    if row.decision is not None:
+        assert any(
+            f.review == "required" and any(c.code == row.decision for c in f.checks if not c.passed)
+            for f in result.fixes
+        )
+    assert result.source_report is not None
+    assert (result.source_report.unread_words, result.source_report.unread_pictures) == (0, 0)
 
 
 # ------------------------------------------------------------ classes and packages (WS18.1)
