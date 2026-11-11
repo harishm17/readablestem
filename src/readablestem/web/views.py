@@ -187,7 +187,8 @@ def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
             return (
                 f"This source uses {count} from the package {detail['package']}, which is not "
                 f"a standard TeX package: {names}{first_at}. This tool does not read package "
-                f"files from the upload, so {them} would appear to students as raw code and "
+                f"files from the upload, so {they.lower()} would appear to students as raw code "
+                "and "
                 f"nothing was converted. Copy the definitions you use into the source (a file "
                 "it reads with \\input counts), or upload the PDF."
             )
