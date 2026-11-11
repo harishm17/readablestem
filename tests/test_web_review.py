@@ -28,6 +28,7 @@ from fixtures.web.support import (
     upload,
     with_file,
 )
+from readablestem.core import uid
 from readablestem.core.types import (
     Check,
     ConversionOutput,
@@ -380,6 +381,35 @@ def test_unknown_action_or_element(web):
     assert post(web, "p9-e9", action="accept").status_code == 404
     assert post(web, "p1-e1", action="accept").status_code == 404  # a paragraph: no fix
     assert post(web, "bad id!", action="accept").status_code == 404
+
+
+def test_a_stored_result_keeps_its_decisions_and_answers_to_stable_ids(web):
+    """The stored result has today's shape (positional ids, no uid anywhere). Its decisions
+    stay on their elements, and a stable id in an address reaches the element it names:
+    p1-e3 and p1-e5 are identical (block equations with no text), told apart by order."""
+    post(web, "p1-e3", action="accept")
+    decided = result(web)
+    uids = uid.assign(decided)
+    first, second = uids.uid("p1-e3"), uids.uid("p1-e5")
+    assert first and second and first != second
+    assert uids.resolve(first) == "p1-e3" and uids.resolve("p1-e3") == "p1-e3"
+
+    assert post(web, second, action="reject").status_code == 303
+    after = result(web)
+    accepted, rejected = after.fix_for("p1-e3"), after.fix_for("p1-e5")
+    assert accepted is not None and accepted.status is Status.ACCEPTED and accepted.reviewed
+    assert rejected is not None and rejected.status is Status.REJECTED and rejected.reviewed
+    assert [e.element_id for e in edits(web)] == ["p1-e3", "p1-e5"]
+    assert uid.assign(after).by_id == uids.by_id  # a decision renames nothing
+
+    crop = web.browser.get(f"/jobs/{web.job_id}/crops/{second}.png")
+    assert crop.status_code == 200
+    assert crop.content == web.browser.get(f"/jobs/{web.job_id}/crops/p1-e5.png").content
+    # A stable id that names no element is not matched to the nearest one.
+    nothing = "u1-" + "0" * 16
+    assert post(web, nothing, action="accept").status_code == 404
+    assert web.browser.get(f"/jobs/{web.job_id}/crops/{nothing}.png").status_code == 404
+    assert result(web).fixes == after.fixes
 
 
 def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
