@@ -1,0 +1,56 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\title{Notes on Convergence of Series}
+\author{A. Instructor\thanks{Department of Mathematics.}}
+\date{Fall 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+These notes prove the ratio test and apply it to power series, following the treatment in~\cite{rudin}.
+\end{abstract}
+
+\section{Definitions}\label{sec:defs}
+\begin{definition}\label{def:conv}
+A series $\sum_{n=1}^\infty a_n$ \emph{converges} if its partial sums $s_N = \sum_{n=1}^N a_n$ have a finite limit.
+\end{definition}
+
+\section{The ratio test}\label{sec:ratio}
+\begin{lemma}\label{lem:geom}
+If $|r| < 1$ then $\sum_{n=0}^\infty r^n = \frac{1}{1-r}$.
+\end{lemma}
+\begin{proof}
+The partial sums are
+\begin{equation}\label{eq:partial}
+ s_N = \frac{1 - r^{N+1}}{1 - r},
+\end{equation}
+and $r^{N+1} \to 0$.
+\end{proof}
+
+\begin{theorem}[Ratio test]\label{thm:ratio}
+Let $a_n > 0$ and suppose $\lim_{n\to\infty} a_{n+1}/a_n = L$. If $L < 1$ the series converges; if $L > 1$ it diverges.
+\end{theorem}
+\begin{proof}
+Choose $r$ with $L < r < 1$. For large $n$, $a_{n+1} \le r a_n$, so the tail is bounded by a geometric series, which converges by Lemma~\ref{lem:geom} and equation~\eqref{eq:partial}. See also Definition~\ref{def:conv} and~\cite[Ch.~3]{rudin, apostol}.
+\end{proof}
+
+\begin{remark}
+When $L = 1$ the test says nothing: compare $\sum 1/n$ and $\sum 1/n^2$.\footnote{Both have $L = 1$; the first diverges and the second converges.}
+\end{remark}
+
+Section~\ref{sec:defs} gave the definition and Theorem~\ref{thm:ratio} on page~\pageref{thm:ratio} is the main result.
+
+\begin{thebibliography}{9}
+\bibitem{rudin} W. Rudin, \emph{Principles of Mathematical Analysis}, 3rd ed., McGraw-Hill, 1976.
+\bibitem{apostol} T. M. Apostol, \emph{Calculus, Volume 1}, 2nd ed., Wiley, 1967.
+\end{thebibliography}
+\end{document}

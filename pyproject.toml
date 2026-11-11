@@ -97,6 +97,8 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 "src/readablestem/ops/**" = ["T20"]
 "scripts/**" = ["T20"]
 "tests/**" = ["T20"]
+# The text of a test page is written as it appears on the page.
+"tests/workflows/builders/**" = ["T20", "E501"]
 "proof/**" = ["T20"]
 "data/**" = ["T20"]
 "site/**" = ["T20"]

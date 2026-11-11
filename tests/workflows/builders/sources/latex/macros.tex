@@ -1,0 +1,30 @@
+\documentclass{article}
+\usepackage{amsmath,amssymb}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\inner}[2]{\langle #1, #2 \rangle}
+\newcommand{\dd}[2][]{\frac{d #1}{d #2}}
+\renewcommand{\vec}[1]{\mathbf{#1}}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\def\eps{\varepsilon}
+\let\oldemph\emph
+\renewcommand{\emph}[1]{\textbf{\oldemph{#1}}}
+\newenvironment{problem}[1]{\par\medskip\noindent\textbf{Problem #1.}\ }{\par\medskip}
+\newcommand{\points}[1]{\hfill(#1 points)}
+
+\begin{document}
+\section*{Homework 3: linear algebra}
+
+\begin{problem}{1}
+For $\vec{x}, \vec{y} \in \R^n$ show that $|\inner{\vec{x}}{\vec{y}}| \le \norm{\vec{x}}\,\norm{\vec{y}}$. \points{5}
+\end{problem}
+
+\begin{problem}{2}
+Show that $\tr(AB) = \tr(BA)$ and find $\argmin_{\vec{w}} \norm{X\vec{w} - \vec{y}}^2$. \points{10}
+\end{problem}
+
+\begin{problem}{3}
+Let $\eps > 0$. If $f(t) = e^{-t^2}$, compute $\dd[f]{t}$ and show that $|f(t)| < \eps$ for large $t$. This is \emph{important}. \points{5}
+\end{problem}
+\end{document}

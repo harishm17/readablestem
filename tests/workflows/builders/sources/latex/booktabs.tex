@@ -1,0 +1,26 @@
+\documentclass{article}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage[version=4]{mhchem}
+\begin{document}
+\section*{Lab 6 results}
+Table~\ref{tab:rates} gives the reaction rates for \ce{2H2O2 -> 2H2O + O2} with each catalyst.
+\begin{table}[h]
+\centering
+\caption{Initial rates by catalyst and temperature.}\label{tab:rates}
+\begin{tabular}{llrr}
+\toprule
+Catalyst & Temperature & \multicolumn{2}{c}{Rate (\si{\milli\mole\per\second})} \\
+\cmidrule(lr){3-4}
+ & & Trial 1 & Trial 2 \\
+\midrule
+\multirow{2}{*}{\ce{MnO2}} & \SI{20}{\celsius} & 0.42 & 0.45 \\
+ & \SI{40}{\celsius} & 0.91 & 0.88 \\
+\multirow{2}{*}{Catalase} & \SI{20}{\celsius} & 1.70 & 1.66 \\
+ & \SI{40}{\celsius} & 0.35 & 0.31 \\
+\bottomrule
+\end{tabular}
+\end{table}
+The enzyme loses activity above \SI{37}{\celsius}.
+\end{document}
