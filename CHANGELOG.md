@@ -63,9 +63,12 @@
 ## Unreleased: pipeline 0.5.11 (integration/wave-1a)
 
 - `PIPELINE_VERSION` 0.5.11: the font code tables and the figure label crop (both below) change
-  the text and the figure boxes of a PDF page, so results and eval reports made from here on
-  say so. Results from 0.5.10 load unchanged. Every stored step answer was keyed on 0.5.10, so a
-  conversion run again asks its steps again, not only those of the pages that changed.
+  the text and the figure boxes of a PDF page, and the LaTeX class and package table (above)
+  changes which LaTeX sources convert and what a stopped one records, so results and eval
+  reports made from here on say so. One raise for the wave: 0.5.11 was not released when the
+  table was merged. Results from 0.5.10 load unchanged. Every stored step answer was keyed on
+  0.5.10, so a conversion run again asks its steps again, not only those of the pages that
+  changed.
 
 ## Unreleased: one state table for a job (branch feat/job-state-table)
 

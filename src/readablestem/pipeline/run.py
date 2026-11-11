@@ -229,8 +229,11 @@ log = logging.getLogger(__name__)
 # ligatures and accents at control codes, Symbol's Greek, Wingdings bullets. A vector chart's
 # figure takes its outer labels (axis values, category names, a rotated or centered axis title),
 # so its crop grows to them; a small drawing on a typed page is handwriting only with pen
-# evidence in its strokes (a skeletal structure's bonds now go to the figure step). Results from
-# 0.5.10 load unchanged.
+# evidence in its strokes (a skeletal structure's bonds now go to the figure step). A LaTeX
+# source's outcome changes too (`source.support`, the same unreleased wave): a source in a class
+# read as an article converts instead of stopping on that class, one in a refused class or
+# package stops in the conversion child with its code and name, and a package stop records
+# whether the package is the instructor's own. Results from 0.5.10 load unchanged.
 PIPELINE_VERSION = "0.5.11"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
