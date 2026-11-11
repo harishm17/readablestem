@@ -161,10 +161,20 @@ def env_job(env, job_id: str) -> Job:
 
 
 def stop(env, job_id: str) -> None:
-    """The conversion stopped part way (the day's budget ran out): "Convert the missing parts"."""
+    """The conversion stopped part way (the day's budget ran out): "Convert the missing parts".
+    As a real stop leaves it, one equation was never converted; a budget stop with nothing
+    left out offers no try (F-319)."""
     with session_scope(env.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
+        result = dict(job.result_json or {})
+        result["fixes"] = [
+            {**f, "status": "failed", "reason": "budget_daily"}
+            if f.get("element_id") == "p1-e5"
+            else f
+            for f in result.get("fixes") or []
+        ]
+        job.result_json = result
         job.error_code = "budget_daily"
         job.status = JobStatus.DONE
 

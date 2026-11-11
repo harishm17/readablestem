@@ -14,7 +14,7 @@ import pytest
 import test_web_postgres as shared
 from fixtures.web.support import fake_result, make_pdf, make_settings
 from readablestem.ops.retention import purge_old_events
-from readablestem.web import db, documents, events
+from readablestem.web import db, documents, events, states
 
 pytestmark = pytest.mark.postgres
 
@@ -48,13 +48,13 @@ def test_the_documents_list_reads_titles_and_open_decisions_on_postgres(factory)
     with db.session_scope(factory) as session:
         listing = documents.documents(session, user_id, now=now, budget_closed=False)
         version = documents.list_version(session, user_id, now=now, budget_closed=False)
-    (decide,) = listing.group("decide").rows
+    (decide,) = listing.group(states.NEEDS).rows
     assert (decide.title, decide.filename, decide.open_decisions) == (
         "Week 1: Vectors",
         "week1.pdf",
         3,
     )
-    assert [row.title for row in listing.group("other").rows] == ["queued.pdf"]
+    assert [row.title for row in listing.group(states.WORK).rows] == ["queued.pdf"]
     assert listing.version == version and listing.unfinished == 1
 
 
