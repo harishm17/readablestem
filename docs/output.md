@@ -1002,8 +1002,10 @@ so it says no more than was done. It has no review screen's words ("needs review
   flagged, on October 9, 2026."; and the same with " 1 part was kept as the tool wrote it
   without a check passing." after an "Accept anyway". An optional note nobody opened is
   among the flagged parts and never among the reviewed ones. The date is the day of the
-  last decision (`render_html(checked_on=...)`: the job page's re-render passes it,
-  `web/review.py rerender_html` today's); the pipeline never passes one;
+  last decision (`render_html(checked_on=...)`, which the job page's re-render reads from
+  the review log); with no recorded decision (decisions carried from an earlier
+  conversion, the pipeline) there is no date. When the page count is known
+  (`render_html(pages=...)`), the pages-left-out sentence says "(7 of 8)";
 - when something is a picture of the original, how many: "4 parts could not be converted
   and are shown as pictures of the original, marked "Not converted" or "Needs a
   description": ask your instructor for a version you can read." (for a LaTeX source,

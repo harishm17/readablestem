@@ -7,17 +7,25 @@ figure waiting for a decision, so 3 decisions are open until a test makes them.
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import re
+import zipfile
 from html import unescape
 
 import pytest
 
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token, upload
 from readablestem.core.types import (
+    Check,
     DocumentResult,
+    Element,
+    EquationFix,
+    Fix,
     Kind,
     Notice,
+    OmittedPage,
     SourceFacts,
     Status,
 )
@@ -226,6 +234,171 @@ def test_the_counts_add_up_and_match_the_review_screen(web):
     assert "1 equation is shown as an image that screen readers cannot read." in results
     review = page_text(web.browser.get(f"/jobs/{job_id}/review").text)
     assert "3" in review and "Decisions to make 3" in results
+
+
+# --------------------------------------------------------------------------- what was checked
+
+# A page stored before the statement existed: no render meta, so the app makes it again from
+# the result (`routes.jobs.current_html`) and every surface reads the same result.
+OLD_PAGE = "<!doctype html><html lang='en'><head><title>T</title></head><body></body></html>"
+
+
+def clean(result: DocumentResult) -> None:
+    """The fake result with every part converted and nothing flagged (a clean typed page)."""
+    result.elements = [e for e in result.elements if e.id != "p1-e5"]
+    result.fixes = [f for f in result.fixes if f.element_id != "p1-e5"]
+    for fix in result.fixes:
+        fix.status, fix.reviewed, fix.checks = Status.ACCEPTED, False, []
+    result.html = OLD_PAGE
+
+
+def equations(result: DocumentResult, n: int, **fix) -> None:
+    """`n` block equations in place of the fake result's parts; with `fix`, each has a
+    converted proposal with those fields."""
+    result.elements = [result.elements[0]] + [
+        Element(id=f"p1-q{i}", kind=Kind.EQUATION, page=0, bbox=(0, i, 1, i + 1),
+                order=i + 1, display="block")
+        for i in range(n)
+    ]  # fmt: skip
+    result.fixes = [result.fixes[0]]
+    if fix:
+        result.fixes += [
+            Fix(element_id=f"p1-q{i}", kind=Kind.EQUATION,
+                equation=EquationFix(latex="x", mathml="<math><mi>x</mi></math>",
+                                     speech="x", display="block"), **fix)
+            for i in range(n)
+        ]  # fmt: skip
+    result.html = OLD_PAGE
+
+
+def no_mathml(result: DocumentResult) -> None:
+    equations(result, 61)  # found, but no proposal was written for any
+
+
+def pages_left_out(result: DocumentResult) -> None:
+    clean(result)
+    result.stats.pages = 8
+    result.omitted = [OmittedPage(page=p) for p in range(1, 8)]
+
+
+def accepted_anyway(result: DocumentResult) -> None:
+    failing = Check(name="mathml.parses", passed=False, severity="error", code="bad_mathml")
+    equations(result, 34, status=Status.ACCEPTED, reviewed=True, checks=[failing])
+
+
+def optional_unopened(result: DocumentResult) -> None:
+    equations(result, 26, status=Status.ACCEPTED, review="optional")
+
+
+def statement_of(web, job_id: str) -> dict[str, object]:
+    """What each surface says about the job: the student page (its notice and its note),
+    the job page, the EPUB's accessibility metadata and the record's CSV."""
+    student = web.browser.get(f"/jobs/{job_id}/view").text
+    note = student[student.index('<footer id="about-conversion"') :]
+    notice = re.search(r'<section id="checked-notice".*?</section>', student, flags=re.S)
+    job = web.browser.get(f"/jobs/{job_id}").text
+    epub = zipfile.ZipFile(io.BytesIO(web.browser.get(f"/jobs/{job_id}/download.epub").content))
+    package = unescape(epub.read("EPUB/package.opf").decode())
+    rows = csv.reader(io.StringIO(web.browser.get(f"/jobs/{job_id}/record.csv").text))
+    return {
+        "note": page_text(note[: note.index("</footer>")]),
+        "notice": page_text(notice.group(0)) if notice else "",
+        "state": title(job).split(":")[0],
+        "job": page_text(job),
+        "summary": re.search(r'accessibilitySummary">([^<]*)<', package).group(1),
+        "sufficient": "accessModeSufficient" in package,
+        "csv": {r[1]: r[7] for r in rows if r and r[0] == "summary"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("make", "expected"),
+    [
+        pytest.param(
+            no_mathml,
+            {
+                "state": "Ready",
+                "job": "61 equations are shown as images that screen readers cannot read.",
+                "note": "61 parts could not be converted and are shown as pictures",
+                "notice": "Part 1 not converted: equation, page 1",
+                "summary": "0 of 61 equations are MathML.",
+                "csv": {"Shown as pictures of the original": "61"},
+            },
+            id="0-of-61-equations-in-mathml",
+        ),
+        pytest.param(
+            pages_left_out,
+            {
+                "state": "Ready",
+                "job": "7 of 8 pages were left out.",
+                "note": "Pages 2, 3, 4, 5, 6, 7 and 8 (7 of 8) of the original PDF were left out",
+                "notice": "Which pages were left out",
+                "summary": "were left out of this file",
+                "csv": {"Every part the tool found was converted.": "No"},
+            },
+            id="7-of-8-pages-left-out",
+        ),
+        pytest.param(
+            accepted_anyway,
+            {
+                "state": "Ready to share",
+                "job": "You reviewed 34 of 34 flagged parts. 34 parts kept with a check failing.",
+                "note": "Your instructor reviewed 34 of 34 parts the tool flagged. 34 parts were "
+                "kept as the tool wrote them without a check passing.",
+                "notice": "",
+                "summary": "34 parts were kept as the tool wrote them without a check passing.",
+                "csv": {"Accepted by a person with a check failing": "34"},
+            },
+            id="34-of-34-accepted-anyway",
+        ),
+        pytest.param(
+            optional_unopened,
+            {
+                "state": "Ready to share",
+                "job": "Nobody has reviewed this file yet. 26 optional notes not opened.",
+                "note": "This version has not been reviewed by a person.",
+                "notice": "This version has not been reviewed by a person.",
+                "summary": "This version has not been reviewed by a person.",
+                "csv": {"Optional notes never opened": "26"},
+            },
+            id="26-optional-never-opened",
+        ),
+        pytest.param(
+            clean,
+            {
+                "state": "Ready to share",
+                "job": "Every part the tool found was converted.",
+                "note": "Its equations are written so that screen readers can read them aloud.",
+                "notice": "This version has not been reviewed by a person.",
+                "summary": "2 of 2 equations are MathML.",
+                "csv": {"Every part the tool found was converted.": "Yes"},
+            },
+            id="clean-typed-control",
+        ),
+    ],
+)
+def test_every_surface_says_what_was_converted_and_reviewed(web, make, expected):
+    """SW7 (F-034, F-110): the student page, its opening notice, the job's state, the job
+    page, the EPUB's accessibility summary and the record say one statement, from one model,
+    and none says more than was done: no "Ready to share" or "Everything was converted"
+    while a part is a picture or a page is left out, no "reviewed" for notes nobody opened,
+    and an "Accept anyway" said apart."""
+    make(web.converter.output.result)
+    said = statement_of(web, convert(web))
+    assert said["state"] == expected["state"]
+    assert expected["job"] in said["job"]
+    assert expected["note"] in said["note"]
+    if expected["notice"]:
+        assert expected["notice"] in said["notice"]
+    else:
+        assert said["notice"] == ""  # reviewed, nothing a picture or left out
+    assert expected["summary"] in said["summary"]
+    # Text alone is enough only when nothing is a picture or left out.
+    assert said["sufficient"] == (expected["state"] == "Ready to share")
+    for label, value in expected["csv"].items():
+        assert said["csv"][label] == value
+    for words in ("Everything was converted", "checked the parts", "Your instructor checked"):
+        assert words not in said["job"] + said["note"] + said["summary"]
 
 
 # --------------------------------------------------------------------------- progress

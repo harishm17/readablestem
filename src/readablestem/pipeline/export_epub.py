@@ -474,7 +474,8 @@ def export_epub(
     publication's id (default a UUID made from the document, so the same document keeps the
     same one)."""
     root = _parse(html)
-    statement = page_meta(root, SUMMARY_META)
+    statement = page_meta(root, SUMMARY_META)  # read before `_prepare` drops the head
+    text_sufficient = page_meta(root, SUFFICIENT_META) == "textual"
     html_tag = _find(root, "html")
     body = _find(root, "body")
     if html_tag is None or body is None:
@@ -512,7 +513,7 @@ def export_epub(
         has_math=has_math,
         n_headings=n_headings,
         n_pages=len(pages),
-        text_sufficient=page_meta(root, SUFFICIENT_META) == "textual",
+        text_sufficient=text_sufficient,
     )
     lang_attr = escape(lang, quote=True)
     head = f'<meta charset="utf-8"/><title>{escape(_clean(title))}</title>' + "".join(

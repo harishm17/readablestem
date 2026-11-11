@@ -1669,6 +1669,7 @@ def render_html(
     pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
     origin: str = "pdf",
+    pages: int | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1695,7 +1696,8 @@ def render_html(
     its page in the PDF it was cut from (a part of a longer file). `footnote_ids`: the element
     ids of footnotes (`Notice` code "footnote"), whose marks and notes are linked both ways.
     `origin`: "pdf" or, for a document made from a LaTeX source, "latex" or "beamer"
-    (`DocumentResult.origin`): the student note's first sentence says so.
+    (`DocumentResult.origin`): the student note's first sentence says so. `pages`: how many
+    pages the document has, when known, so the note can say "7 of 8" pages were left out.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -1739,6 +1741,7 @@ def render_html(
         elements=elements,
         fixes=fixes,
         left_out_pages=omitted_pages or (),
+        pages=pages,
         reviewed_on=checked_on,
         origin=origin,
     )
