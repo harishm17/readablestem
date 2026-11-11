@@ -674,8 +674,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   rule read and no entry of its skip list (`ltx_reader.SKIP`, each entry with its reason)
   covers: `SourceReport.unread_words`, `unread_pictures` and the first 12 words. Either above 0
   adds the required notice `source_unread`, whose line on the job page gives the counts and the
-  first words, and the job's outcome ("Finished, with parts not converted") replaces
-  "Everything was converted".
+  first words, and the finished job has the gap note "Parts not read" (`states.gaps_of`), so
+  it is "Partly converted" and never "Ready to share".
 - **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
   read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
   frame is a heading (its title) and its content: sections are the top level, frames sit one level
@@ -1705,6 +1705,11 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   items is an open decision, so the lists, which read no result, show the job as "Needs
   your decisions". "Convert the missing parts" on that page tries it again ("Trying a
   document again", below).
+
+  A finished LaTeX source job with no code whose reader left words or pictures unread
+  (`SourceReport.unread_words`, `unread_pictures`) has the note "Parts not read", with the
+  counts and no words of the source. Converting again reads the same way, so the note offers
+  no retry, and the job can still be shared (`states.FINAL_GAPS`, like pages kept as pictures).
 
 ### Trying a document again (`web/retry.py`, `web/step_cache.py`)
 
