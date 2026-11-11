@@ -18,7 +18,7 @@ from readablestem.core.types import Status
 from readablestem.web.db import Job, session_scope
 from readablestem.web.security import VIEW_CSP
 
-DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "demo" / "index.html"
 
 
 @pytest.fixture

@@ -11,8 +11,8 @@ from datetime import date
 from functools import cache
 from pathlib import Path
 
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
@@ -26,13 +26,17 @@ from readablestem.web.health import ops_freshness, readiness
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.recipients import privacy_context
+from readablestem.web.sample import DEMO_DIR
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.speech_diff import read_text_layer
 
 router = APIRouter()
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
-DEMO_PAGE = STATIC_DIR / "demo" / "index.html"
+# The demo is stored data in `web/demo/`, not a static file: the routes below read it, so it
+# has one address (`/demo`, with the sandbox header) and none under `/static` (web.dev_only).
+DEMO_PAGE = DEMO_DIR / "index.html"
+DEMO_PDF = DEMO_DIR / "source.pdf"
 
 
 @cache
@@ -79,17 +83,19 @@ def landing(request: Request) -> Response:
     )
 
 
-@router.get("/style")
-def style_page(request: Request) -> Response:
-    """The tokens and components on one page, for the people who build the site and for
-    the screenshot and axe checks. Not in `seo.PUBLIC_PAGES`, so it is `noindex` and not in
-    the sitemap; nothing links to it."""
-    return render(request, "style.html", {"active": "style"})
+@router.get("/demo/source.pdf")
+def demo_source() -> Response:
+    """Page 3 of the demo's source PDF, which the landing page links (OpenStax, CC BY 4.0)."""
+    if not DEMO_PDF.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        DEMO_PDF, media_type="application/pdf", headers={"Cache-Control": "public, max-age=3600"}
+    )
 
 
 @router.get("/demo")
 def demo(request: Request) -> Response:
-    """A converted sample document, once one has been generated into static/demo/.
+    """A converted sample document, once one has been generated into web/demo/.
 
     It is a converted document like any other (inline styles, data: images), so it gets
     the same sandboxed policy as /jobs/{id}/view.

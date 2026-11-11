@@ -1,6 +1,6 @@
 """T3-9: the sample document, a recorded conversion to practise on before risking a real file.
 
-It is made from the recorded result and the source PDF under static/demo/, with no model call
+It is made from the recorded result and the source PDF under web/demo/, with no model call
 for anyone, no pages, no spend, no place taken from the caps, and nothing in the usage
 numbers; everything else about it is an ordinary finished document of its owner.
 """

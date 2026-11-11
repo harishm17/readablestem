@@ -9,7 +9,7 @@ depend on screen reader behavior are not claimed as supported.
 
 You test three things:
 
-- **A.** The committed demo page, `/demo` (file: `src/readablestem/web/static/demo/index.html`).
+- **A.** The committed demo page, `/demo` (file: `src/readablestem/web/demo/index.html`).
 - **B.** One converted page of your choice (a download from a finished job).
 - **C.** The review screen of the web app (last section).
 

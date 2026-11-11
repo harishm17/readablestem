@@ -181,7 +181,7 @@ def test_licence_is_worded_the_same_way_everywhere(pages):
     assert LICENCE_SENTENCE in squash(pages["/terms"])
     assert 'id="open-source"' in pages["/terms"]
     for committed in (
-        "src/readablestem/web/static/demo/index.html",
+        "src/readablestem/web/demo/index.html",
         "site/examples/physics-2-1/converted.html",
         "site/examples/physics-2-2/converted.html",
     ):

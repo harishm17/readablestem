@@ -70,7 +70,7 @@ PYTHON_ROOTS = [
 PYTHON_SKIP_PARTS = {"vendor", "prompts", "__pycache__"}
 
 TEMPLATE_ROOTS = [SRC / "web" / "templates", ROOT / "site" / "templates"]
-STATIC_PAGES = [SRC / "web" / "static" / "demo" / "index.html"]
+STATIC_PAGES = [SRC / "web" / "demo" / "index.html"]
 STATIC_SCRIPTS = [SRC / "web" / "static" / "app.js", SRC / "web" / "static" / "parts.js"]
 
 _JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.S)

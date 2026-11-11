@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
-DEMO_PAGE = WEB_DIR / "static" / "demo" / "index.html"
+DEMO_PAGE = WEB_DIR / "demo" / "index.html"
 # Pages anyone can open without signing in.
 PUBLIC_TEMPLATES = (
     "landing.html",
@@ -213,9 +213,9 @@ def launch_blockers(
         if 'class="draft-note"' in text:
             items.append(f"web/templates/{name}: still shows the draft note")
     if not DEMO_PAGE.is_file():
-        items.append("web/static/demo/index.html: no demo yet (readablestem demo build)")
+        items.append("web/demo/index.html: no demo yet (readablestem demo build)")
     elif FAKE_DEMO_MARKER in DEMO_PAGE.read_text(encoding="utf-8"):
-        items.append("web/static/demo/index.html: placeholder output from --fake; rebuild it")
+        items.append("web/demo/index.html: placeholder output from --fake; rebuild it")
     if repo_root is not None:
         eval_dir = repo_root / "data" / "eval"
         if not list(eval_dir.glob("baseline-*.json")):

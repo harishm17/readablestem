@@ -22,7 +22,7 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
-from readablestem.web import analytics, office_convert, recipients, report_item, seo
+from readablestem.web import analytics, dev_only, office_convert, recipients, report_item, seo
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
@@ -70,7 +70,7 @@ class AppContext:
 
     @property
     def dev_login_enabled(self) -> bool:
-        return self.settings.dev_login_enabled and self.settings.env in {"dev", "test"}
+        return self.settings.dev_login_enabled and dev_only.available(self.settings)
 
     @property
     def latex_source_on(self) -> bool:

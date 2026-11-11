@@ -35,7 +35,7 @@ are here. `uv run readablestem ops launch-check` lists the checks a deploy has t
 ## See it
 
 A converted page is committed so you can judge the output without running anything: open
-[`src/readablestem/web/static/demo/index.html`](src/readablestem/web/static/demo/index.html) in a
+[`src/readablestem/web/demo/index.html`](src/readablestem/web/demo/index.html) in a
 browser. It is OpenStax *Physics* section 2.3, converted with the real models; the PDF it
 came from sits beside it. The page shows the pipeline's output as it came, with the two required
 decisions the review screen asks about (the repeated headings "Solution" and "Discussion"). The

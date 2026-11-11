@@ -7,7 +7,7 @@ equations, figures); `sample` is the hand-written fixture. Their golden files we
 written by the pipeline 0.3.0 assembler and changed since only on purpose (the student
 note and its flag notes), so this test is how the content features keep their promise
 that a stored result, and a document without the new kinds, is written exactly as
-before. `demo` is the live public demo's stored result (`web/static/demo/report.json`,
+before. `demo` is the live public demo's stored result (`web/demo/report.json`,
 pipeline 0.4.0 with every content flag off): it changes whenever the demo is rebuilt. The
 `flags_off_*` cases convert two LaTeX fixtures with every content flag off and the
 offline model client, so a flag-off change anywhere in the pipeline shows as a diff.
@@ -30,7 +30,7 @@ from readablestem.pipeline.assemble import render_html
 
 HERE = Path(__file__).parent
 GOLDEN = HERE / "fixtures" / "assemble" / "golden"
-DEMO_REPORT = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "report.json"
+DEMO_REPORT = Path(readablestem.__file__).parent / "web" / "demo" / "report.json"
 STORED_DEMO_0_2_0 = HERE / "fixtures" / "stored" / "demo-report-0.2.0.json"
 SAMPLE = HERE / "fixtures" / "assemble" / "sample_document.json"
 

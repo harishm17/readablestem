@@ -54,7 +54,7 @@ Everything is committed. Nothing is fetched or generated at build time.
   the three files that `readablestem demo build` writes: `report.json` (the stored result),
   `converted.html` (the output) and `source.pdf` (the exact input). `meta.json` may point at
   the files elsewhere in the repository with `artefacts`, `html`, `pdf` and `report`: the
-  Physics 2.3 example uses the app's own demo under `src/readablestem/web/static/demo/`, and the
+  Physics 2.3 example uses the app's own demo under `src/readablestem/web/demo/`, and the
   lecture-notes fixture uses `tests/fixtures/layout/lecture_notes.pdf`.
 - **The review decisions.** The build loads the stored result with the app's own models and
   helpers (`web.review.group_fixes`, `web.messages`, `web.compare`, `web.speech_diff`) and
@@ -132,7 +132,7 @@ stemcheck report and the stored PDFs.
 are `web/static/tokens.css` (fonts, color in light and dark, type, space, radius, widths, layers
 and the paper palette); buttons are `web/static/controls.css`; the other components are in
 `web/static/app.css` under "Components", each with its responsive and forced-color rules beside
-it (`DESIGN.md`, "Stylesheets"). `/style` shows every one in the
+it (`DESIGN.md`, "Stylesheets"). `/style` (a builder page: dev and test only, 404 in production) shows every one in the
 visitor's theme (it is `noindex`, not in the sitemap, and nothing links to it). Pages people read
 (landing, guides, help, offices, privacy, terms, limits) set `{% block body_class %}mode-read{%
 endblock %}`: serif h1 and h2, 18px text in a 68ch column. App screens keep Source Sans 3
@@ -140,6 +140,6 @@ headings at 16px. Fonts are self-hosted (`web/static/vendor/README.md`); no page
 outside request. `tests/test_design_tokens.py` checks the contrast of every token pair, the
 14px floor and the font budget.
 
-The landing page's "Hear the difference" is built by `scripts/hero_assets.py` from `web/static/demo/` (an
+The landing page's "Hear the difference" is built by `scripts/hero_assets.py` from `web/demo/` (an
 equation-only crop of the PDF page, text layer, MathML, reading, font subset into `web/static/hero/` and `vendor/fonts/`); the app never runs it and
 `tests/test_hero_assets.py` regenerates and compares. The proof tiles on /limits and the comparison chart (compact on the landing page) come from `web/proof_facts.py` (PROOF.md, parsed once into `proof_facts.json`).
