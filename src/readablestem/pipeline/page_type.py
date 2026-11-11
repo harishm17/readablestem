@@ -350,12 +350,6 @@ class InkStats:
     ink_share: float = 0.0  # share of the page the pen strokes' boxes cover
 
     @property
-    def out_of_time(self) -> bool:
-        """Not analysed because the clock guard fired: a slower machine reaches this and a
-        faster one does not."""
-        return self.cause == INK_TIME
-
-    @property
     def repeat_share(self) -> float:
         return self.repeated / self.candidates if self.candidates else 0.0
 

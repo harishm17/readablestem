@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: no clock decides what a page contains (branch fix/ink-work-budget)
+
+- **The ink analysis is bounded per page by counts of work** (plan WS14.9). It used to have
+  10 seconds of wall-clock time for a whole document, so a slower or busier machine could
+  type a page without its ink, and a handwritten page then read as typed. Now each page has
+  its own allowance: at most 200,000 path items and 500,000 pieces of flattened path
+  (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`), the same on every machine; the corpus's
+  largest page has 117,162 and 207,522. A clock stays only as a guard against a hang,
+  60 seconds a page (`INK_GUARD_S`), about 40 times the slowest corpus page.
+- **A page whose drawings were not analysed says so and why.** Its stored page type keeps
+  the cause (`ink_cause`: `work` or `time`; older results load without it), the job writes
+  a "not finished" fact per page (`work_budget` for a count, `time_limit` for the guard, for
+  both `page_type` and `ink_strokes`), a page read for its text gets the notice
+  `drawings_not_analysed` under "Worth checking", and the job page no longer says
+  "Everything was converted" for it.
+- **The upload probe's count of scanned and handwritten pages can say "at least N".** The
+  probe has a document allowance of 1,000,000 path items (`PROBE_MAX_ITEMS`) and a 20 s
+  guard (`PROBE_GUARD_S`) inside its 30 s child; a page past either is counted as possibly
+  handwritten, so a request to read such pages still applies.
+
 ## Unreleased: the measuring ground (branch feat/stage0-ground)
 
 Nothing here changes what a converted document contains. It is what later changes are

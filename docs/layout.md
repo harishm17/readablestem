@@ -1498,18 +1498,28 @@ The decisions in the rules, with the measured values next to each threshold in t
   that holds its middle is not near-white (a dark slide's background, a colored panel),
   or no fill holds it and a picture does. A dark slide's white diagram and its white
   chalk-style writing were dropped as invisible; a white box on the white page still is.
-- **Time budget** (C1.6): the ink analysis (pure Python) gets 10 s per document
-  (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analyzed
-  (`INK_MAX_ITEMS`); such a page says `ink_not_analysed`. Measured on this machine,
-  pinned to one core: the upload probe on a 19.6 MB file of 17 pages of dense synthetic
-  ink (no text layer) took 13.8 s alone and 17.4 s with another busy process on the same
-  core, under the probe's 30 s limit; the file was accepted, because pages not analyzed
-  in time never refuse an upload. Not measured on the host's CPU allowance. A page not analyzed
-  with less than a line of typed text is kept as its image beside that text; with a line
-  or more it is read as before (its drawings are figures for the figure model), unless a
-  drawing fills the page, which keeps the page image (the safety net below). So writing
-  under a long typed header that does not fill the page becomes a figure the model
-  describes, once the budget has run out.
+- **Work budget** (C1.6, plan WS14.9): the ink analysis (pure Python) is bounded per page by
+  counts of work, which are the same on every machine (`page_type.InkBudget`). A page with
+  more than 200,000 path items (`INK_MAX_ITEMS`), or whose paths the analysis cuts into more
+  than 500,000 pieces (`INK_MAX_SEGMENTS`), is not analyzed. On the corpus (2026-11-11, 329
+  pages) the most a page has is 117,162 items and 207,522 pieces, and the slowest page takes
+  1.6 s, so no corpus page reaches a limit. Because the budget is per page, what a page holds
+  never depends on how long the pages before it took. A clock stays only as a guard against
+  a hang: 60 s a page (`INK_GUARD_S`), about 40 times the slowest corpus page. Such a page says
+  `ink_not_analysed`, and its stored page type says why (`ink_cause`: `work` or `time`); the
+  conversion writes a "not finished" fact for it (`page_type`, `work_budget` or `time_limit`),
+  and a page read for its text gets the notice `drawings_not_analysed` ("Worth checking"), so
+  the job page does not say "Everything was converted". A page not analyzed with less than a
+  line of typed text is kept as its image beside that text; with a line or more it is read as
+  before (its drawings are figures for the figure model), unless a drawing fills the page,
+  which keeps the page image (the safety net below).
+- **The upload probe's budget**: the probe reads every page that is not clearly typed inside a
+  child that is killed after 30 s, so the document has an allowance of 1,000,000 path items
+  (`PROBE_MAX_ITEMS`; the corpus's largest, a handwritten upload, has 386,717 on such pages)
+  and one deadline of 20 s as the guard (`PROBE_GUARD_S`). A page past either is not analyzed:
+  it never refuses the upload, and the count of scanned and handwritten pages
+  (`image_page_count`) says "at least N" (`ImagePageCount`); a request to read such pages
+  then still applies.
 - **Page cap** (`page_type.PAGE_MAX_PATHS` = 50,000 drawings, `PAGE_MAX_ITEMS` = 500,000
   path items): the budget above is checked only after the work that costs most, and one
   dense page costs seconds and tens of megabytes of Python objects whatever the budget (a
@@ -1897,9 +1907,11 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 - Regions are a proximity guess: tightly spaced lines become one region (use `lines`), and a far
   superscript or answer can be a region of its own.
 - Limits and time: the caps and the budget are `page_type`'s (`PAGE_MAX_PATHS`, `INK_MAX_ITEMS`,
-  `InkBudget`, `INK_BUDGET_S`); `extract_ink` takes the document's `InkBudget`, checks it in
-  every phase and inside the loops, and over a cap, more than 20,000 strokes (`MAX_STROKES`) or
-  the budget returns an empty result with `analysed` false. Grouping finds neighbors with a
+  `INK_MAX_SEGMENTS`, `InkBudget`, `INK_GUARD_S`); `extract_ink` counts the pieces its curves
+  are cut into against the budget, checks the clock guard in every phase and inside the loops,
+  and over a cap, more than 20,000 strokes (`MAX_STROKES`) or the budget returns an empty
+  result with `analysed` false and its `cause`. The budget is per page, so a fresh one (a
+  stored result shown again, `run.recrop`) reads a page as the conversion did. Grouping finds neighbors with a
   grid hash, so it is near linear: 50,000 strokes in a column, a row or at random group in
   1 to 3 s on this machine; strokes piled on one spot (over 1,000 in one grid cell) are an
   overrun, not a stall. Reading outlines costs about 3 ms a stroke (0.5 s for the 150 strokes
@@ -1913,7 +1925,7 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 A handwritten page whose ink `ink_strokes` can read is read from its picture as before (one
 vision call, ADR 0007); the strokes are used beside it, never instead of it. A page qualifies
 when `page_type` calls it `handwritten` (or `handwritten_ocr`) and `extract_ink` analyzed it
-within the document's ink budget with at least 3 strokes (`image_page_vector.analyse`, through
+within the page's ink budget with at least 3 strokes (`image_page_vector.analyse`, through
 `layout.page_ink`). A scan, a photo, a typed page and a page over the caps go through the pass
 exactly as before. Measured on the vector dev set, a clean re-render of the ink does not make the
 reader read better than a scan (docs/eval-handwriting.md), so the strokes serve pictures a person

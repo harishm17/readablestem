@@ -178,10 +178,11 @@ When a job ends `done`, the worker keeps what it took of the models and of the c
   done of elements); `image_page`, one row for each page the limit kept from being read;
   `second_reader`, when its time ran out (`time_limit`) or its own dollar share was spent
   (`cap_reached`), with the equations read of those it could have read; `page_type`, one
-  row for each page that was typed without its ink because the document's time for the ink
-  analysis had run out (`time_limit`; such a page may be handwriting that was not seen as
-  handwriting); `ink_strokes`, when the same time ran out while the strokes of handwritten
-  pages were read for their pictures (pages read of pages).
+  row for each page that was typed without its ink because its ink analysis stopped
+  (`work_budget` when a count of work ran out, the same on every machine; `time_limit` when
+  the clock guard against a hang fired; such a page may be handwriting that was not seen as
+  handwriting); `ink_strokes`, one row for each handwritten page whose strokes were not read
+  for its pictures, for the same two reasons.
   `web.step_facts.not_finished(session, job_id)` is the one place a page or a count reads
   them, and each is also a `job_not_finished` log line.
 

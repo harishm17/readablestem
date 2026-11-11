@@ -3201,9 +3201,10 @@ file at full speed. At a quarter of the speed the time ran out, one page was typ
 its ink and so was not seen as handwriting, and its page type, elements, fixes and HTML all
 changed with nothing saying why. The stop now writes the fact (`page_type` with
 `time_limit` for each such page, and `ink_strokes` when the strokes were not read), and the
-test passes with an empty `KNOWN` list. The budget is still a clock: a slower machine can
-still give that file a different document, and now says so. Making it a count of work is
-the next step for it. The table search's time limit was not reached by any corpus upload at
+test passes with an empty `KNOWN` list. Since plan WS14.9 (2026-11-11) the budget is a count
+of work for each page (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`) and the clock only a
+guard against a hang (`INK_GUARD_S`, 60 s a page), so at a quarter of the speed that upload
+keeps the page's handwriting and gives the same document. The table search's time limit was not reached by any corpus upload at
 a quarter of the speed; it is listed in the clock table and gets its own fact with the
 table work.
 
