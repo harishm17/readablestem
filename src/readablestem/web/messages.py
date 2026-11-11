@@ -342,6 +342,11 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "language code.",
     ("html.text_contrast", "low_contrast"): "Some colored text is too light to read easily "
     "on the white background.",
+    # A page kept as a picture for unread content (pipeline.html_checks, F-451)
+    ("html.sentence_holes", "sentence_hole"): "A sentence on a page that could not be read in "
+    "full has a gap where something is missing, often an equation drawn as lines, so a screen "
+    "reader reads the sentence with nothing in its place. Students are told so at the start "
+    "of that page's text; compare the text with the picture of the page.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
     ("axe", "axe_error"): "The automatic accessibility check (axe-core) could not run on the "
