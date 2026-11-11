@@ -568,6 +568,43 @@ or models than the code under test, so a prompt change cannot pass on an old com
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
+### Development and held-out, and the two bars (`eval/split.py`, `eval bar`)
+
+A bar set on the pages a fix was built on says nothing about the next document, and a score
+under settings production does not run is a score for another product. So, for every eval
+added from November 2026 on:
+
+1. The set is split into development and held-out by document, never by page:
+   `split.split(seed, {document id: sha256 of the file})`. A document's side depends only on
+   the seed and its id, so a new document moves no other.
+2. Thresholds, prompts, worked examples and rules are tuned on the development side only.
+   The held-out side is read only by the scorer, and `Split.verify` checks its hash (ids and
+   file hashes) against the registered one before a run.
+3. Each eval has two bars. The release bar is the first held-out measurement under the
+   production profile (`ops/production.profile.toml`): a release may not be worse. The goal
+   bar is the figure the fix is built toward.
+4. A held-out set that was used to choose between designs is spent. Its documents are passed
+   as `spent` and are development from then on; new ones are drawn.
+
+A report says four things about its run: `split.name` and `split.set_sha256`
+(`Split.stamp`), `profile.sha256` and `pipeline_version`.
+
+```bash
+uv run readablestem eval bar report.json --measure order.clean --at-least 0.9
+uv run readablestem eval bar report.json --measure errors_per_100 --at-most 3 --kind goal
+```
+
+| Output starts with | Exit | When |
+|---|---|---|
+| `bar met` | 0 | held-out documents, production profile, the number meets the bar |
+| `bar not met` | 1 | held-out documents, production profile, the number does not |
+| `development score` | 2 | scored on development documents, or not under the production profile |
+| `refused` | 2 | the report lacks one of the four, or has no number at `metrics.<measure>` |
+
+The older reports (`eval pipeline`, the 15 registered sections of `gold/heldout.py`) record
+their profile and pipeline version but no split, so `eval bar` refuses them: their bars are
+the ones `eval gate` checks.
+
 ## Report format
 
 `eval pipeline` writes one JSON report per task (default `data/eval/latest-<task>.json`):

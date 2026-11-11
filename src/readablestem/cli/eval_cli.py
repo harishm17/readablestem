@@ -851,6 +851,24 @@ def _cmd_gate(args: argparse.Namespace) -> int:
         return _error(f"cannot read reports or tolerances: {exc}")
 
 
+def _cmd_bar(args: argparse.Namespace) -> int:
+    """`eval bar REPORT --measure NAME --at-least X`: hold one number of a report against a
+    bar. Only a held-out score under the production profile can meet one (eval/split.py)."""
+    from readablestem.eval import split
+
+    if not args.report.is_file():
+        return _error(f"report not found: {args.report}")
+    try:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        return _error(f"cannot read {args.report}: {exc}")
+    verdict = split.judge(
+        report, args.measure, at_least=args.at_least, at_most=args.at_most, kind=args.kind
+    )
+    print(verdict.line)
+    return verdict.exit_code
+
+
 def _cmd_promote(args: argparse.Namespace) -> int:
     """Copy a reviewed report to data/eval/<baseline|latest>-<task>.json for the CI gate.
 
@@ -1578,6 +1596,19 @@ def register(
         help="refuse (exit 2) a current report made with other prompts or models than this code",
     )
     gate.set_defaults(func=_cmd_gate)
+
+    bar = group.add_parser(
+        "bar",
+        help="hold one number of a report against a bar: only a held-out score under the "
+        "production profile can meet one",
+    )
+    bar.add_argument("report", type=Path, help="a report that records its split and profile")
+    bar.add_argument("--measure", required=True, help="a number under metrics (dots go deeper)")
+    limit = bar.add_mutually_exclusive_group(required=True)
+    limit.add_argument("--at-least", type=float, metavar="X")
+    limit.add_argument("--at-most", type=float, metavar="X")
+    bar.add_argument("--kind", choices=["release", "goal"], default="release")
+    bar.set_defaults(func=_cmd_bar)
 
     promote = group.add_parser(
         "promote", help="copy a reviewed report to data/eval as the baseline or latest"
