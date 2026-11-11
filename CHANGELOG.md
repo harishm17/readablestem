@@ -11,8 +11,8 @@
 - Layout: a small drawing on a typed page is called handwriting only with pen evidence in the
   strokes themselves, on half its paths or more: a page-type pen stroke; a stroke that passes the
   same tests at any length (a signature); or a short straight stroke (a tick, a cross) whose lines
-  all run off the axes, are not all one length, and neither meet another stroke's ends nor lie
-  alongside its lines. A hand mark over typed text still counts too. Being an open stroke no longer
+  all run off the axes, are not all one length, and neither meet another stroke's ends, lie
+  alongside its lines nor repeat their length exactly. A hand mark over typed text still counts too. Being an open stroke no longer
   counts: a skeletal structure's bond lines now go to the figure step as a drawing instead of
   "handwriting, not converted" (F-400, WS6.10), while a grader's tick, cross or signature stays
   handwriting. The page type's pen test no longer takes a circle's arc for a pen stroke (a printed

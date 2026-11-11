@@ -166,11 +166,13 @@ LEFTOVER_MIN_PT = 6.0
 # the glyphs of one formula drawn as outlines): MIN_DRAWING_PT.
 LEFTOVER_REACH = 24.0
 # Pen evidence of a short straight stroke, too few points for the page type's tests (a
-# tick, a cross, a slash: `_hand_lines`, `_hand_strokes`). Each line runs off both axes by
-# more than HAND_OBLIQUE of its run (about 5 degrees, as the page type's oblique test);
-# its lines are not all one length within HAND_SAME (a printed chevron, a zigzag of equal
-# bonds); and no end meets another stroke's within HAND_MEET, no line lies alongside
-# another stroke's within HAND_PARALLEL (a skeletal formula's bonds and double bonds).
+# tick, a cross, a slash: `_hand_strokes`). Each line runs off both axes by more than
+# HAND_OBLIQUE of its run (about 5 degrees, as the page type's oblique test); its lines
+# are not all one length within HAND_SAME (a printed chevron, a zigzag of equal bonds);
+# no end meets another stroke's within HAND_MEET, no line lies alongside another
+# stroke's within HAND_PARALLEL (a skeletal formula's bonds and double bonds), and no
+# line has the length of another stroke's line to rounding precision
+# (page_type.SIZE_TWIN_TOLERANCE: machine drawings repeat sizes, hands never do).
 HAND_OBLIQUE = 0.08
 HAND_SAME = 0.02
 HAND_MEET = 0.75  # pt
@@ -4970,8 +4972,8 @@ class _Path:
     fill_only: bool = False
     # Pen evidence of an open stroke, set in `_page_paths`: the page type's pen tests at
     # any length (`page_type.pen_line`: a signature), or, for a short stroke of straight
-    # lines, those lines (`_hand_lines`: a tick), which count once nothing else in their
-    # group touches them (`_hand_strokes`).
+    # lines, those lines (`_short_lines`: a tick, a bond), which `_hand_strokes` judges
+    # with the rest of their group.
     pen: bool = False
     lines: tuple[tuple[float, float, float, float], ...] = ()
 
@@ -5044,7 +5046,7 @@ def _page_paths(
             path.ends = _subpath_ends(items, display)
             if kind == "shape":
                 path.pen = page_type.pen_line(items, float(drawing.get("width") or 0.0))
-                path.lines = _hand_lines(items, segments)
+                path.lines = _short_lines(items, segments)
         if open_stroke and kind == "shape" and max(width, height) >= MIN_IMAGE_PT:
             path.turns = _turns(items, segments)  # an open polyline (`_diagram_signs`)
         if curved and kind == "shape" and not open_stroke:  # a closed or filled hand mark
@@ -5147,13 +5149,13 @@ def _turns(items: Sequence[Any], segments: list[tuple[float, float, float, float
 SUBPATH_ENDS = 16  # at most this many subpath starts and ends are kept per path
 
 
-def _hand_lines(
+def _short_lines(
     items: Sequence[Any], segments: Sequence[tuple[float, float, float, float]]
 ) -> tuple[tuple[float, float, float, float], ...]:
-    """The lines (display space) of a short open stroke of straight lines, too few points
-    for the page type's pen tests: one after another, each off both axes (HAND_OBLIQUE),
-    not all one length (HAND_SAME). A line drawn there and back (how MuPDF reports a
-    closed single line) counts once. Empty for anything else."""
+    """The lines (display space) of a short open stroke of straight lines, one after
+    another, too few points for the page type's pen tests (a tick, a bond). A line drawn
+    there and back (how MuPDF reports a closed single line) counts once. Empty for
+    anything else. `_hand_strokes` decides which are a pen's."""
     if len(segments) != len(items):
         return ()  # curves or rectangles
     lines: list[tuple[float, float, float, float]] = []
@@ -5163,16 +5165,7 @@ def _hand_lines(
         if lines and math.dist(seg[:2], lines[-1][2:]) > 0.05:
             return ()  # a second stroke
         lines.append(seg)
-    if not 0 < len(lines) < page_type.STROKE_MIN_POINTS - 1:
-        return ()
-    for x0, y0, x1, y1 in lines:
-        dx, dy = abs(x1 - x0), abs(y1 - y0)
-        if min(dx, dy) <= HAND_OBLIQUE * (dx + dy):
-            return ()
-    lengths = [math.dist(s[:2], s[2:]) for s in lines]
-    if len(lines) > 1 and max(lengths) - min(lengths) <= HAND_SAME * max(lengths):
-        return ()
-    return tuple(lines)
+    return tuple(lines) if 0 < len(lines) < page_type.STROKE_MIN_POINTS - 1 else ()
 
 
 def _subpath_ends(items: Sequence[Any], display: _Display) -> tuple[tuple[float, float], ...]:
@@ -9456,14 +9449,22 @@ def _leftover_drawings(
 
 
 def _hand_strokes(members: Sequence[_Path]) -> set[int]:
-    """Ids of the short straight strokes (`_Path.lines`) of a group that touch nothing
-    else in it: no end within HAND_MEET of another open stroke's end or inside a filled
-    shape (an arrow's head), and no line alongside another stroke's line (HAND_PARALLEL).
-    A skeletal formula's bonds meet at their ends and its double bonds run side by side;
-    a hand's tick, cross or slash does neither."""
+    """Ids of the short straight strokes (`_Path.lines`) of a group drawn as a hand draws:
+    every line off both axes (HAND_OBLIQUE), not all one length (HAND_SAME), and nothing
+    else in the group touching or copying them: no end within HAND_MEET of another open
+    stroke's end or inside a filled shape (an arrow's head), no line alongside another
+    stroke's line (HAND_PARALLEL), none of the same length as another stroke's line
+    (`_same_length`). A skeletal formula's bonds meet at their ends, run side by side and
+    repeat one length; a hand's tick, cross or slash does none of that."""
     found: set[int] = set()
     for p in members:
-        if not p.lines:
+        if not p.lines or any(
+            min(abs(x1 - x0), abs(y1 - y0)) <= HAND_OBLIQUE * (abs(x1 - x0) + abs(y1 - y0))
+            for x0, y0, x1, y1 in p.lines
+        ):
+            continue
+        lengths = [math.dist(s[:2], s[2:]) for s in p.lines]
+        if len(lengths) > 1 and max(lengths) - min(lengths) <= HAND_SAME * max(lengths):
             continue
         ends = (p.lines[0][:2], p.lines[-1][2:])
         touches = False
@@ -9474,13 +9475,21 @@ def _hand_strokes(members: Sequence[_Path]) -> set[int]:
             touches = (
                 any(math.dist(a, b) <= HAND_MEET for a in ends for b in near)
                 or (q.filled and any(_centre_inside((x, y, x, y), _pad(q.bbox)) for x, y in ends))
-                or any(_alongside(s, t) for s in p.lines for t in q.lines)
+                or any(_alongside(s, t) or _same_length(s, t) for s in p.lines for t in q.lines)
             )
             if touches:
                 break
         if not touches:
             found.add(id(p))
     return found
+
+
+def _same_length(
+    s: tuple[float, float, float, float], t: tuple[float, float, float, float]
+) -> bool:
+    """Two lines of one length to rounding precision (page_type.SIZE_TWIN_TOLERANCE)."""
+    a, b = math.dist(s[:2], s[2:]), math.dist(t[:2], t[2:])
+    return abs(a - b) <= max(page_type.SIZE_TWIN_TOLERANCE * a, page_type.SIZE_TWIN_ABS)
 
 
 def _pad(box: BBox, by: float = HAND_MEET) -> BBox:

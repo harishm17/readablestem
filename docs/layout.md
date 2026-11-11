@@ -1188,11 +1188,13 @@ maths by the document's evidence; the equation step's own tiers then decide it.
     (`page_type.pen_line`: a signature or a wavy line longer than the 90 pt stroke limit,
     which the page's own ink count keeps);
   - a short open stroke of straight lines, too few points for those tests (a tick, a
-    cross, a slash: `_hand_lines`, `_hand_strokes`), when every line runs more than about
-    5 degrees off both axes, its lines are not all one length within 2% (a printed
+    cross, a slash: `_short_lines`, `_hand_strokes`), when every line runs more than
+    about 5 degrees off both axes, its lines are not all one length within 2% (a printed
     chevron), no end comes within 0.75 pt of another stroke's end or lies in a filled
-    shape of the group (an arrowhead), and no line lies alongside another stroke's line,
-    parallel within 1 degree (a double bond).
+    shape of the group (an arrowhead), no line lies alongside another stroke's line,
+    parallel within 1 degree (a double bond), and no line has the length of another
+    stroke's line to rounding precision (0.1%, the page type's size-twin test: machine
+    drawings repeat sizes, hands do not; a printed cross of two equal lines).
 
   Being an open stroke is no evidence by itself (2026-11-11, WS6.10): a skeletal
   structure's single straight bonds, meeting at their ends or running parallel, were cut
