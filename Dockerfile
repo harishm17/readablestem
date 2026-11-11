@@ -90,8 +90,11 @@ RUN if [ "$INSTALL_LIBREOFFICE" = "true" ]; then \
 # 3.7 package is 201,810 kB; the trixie package is of the same order, read the real figure
 # from the first build's `docker history`). pandoc is GPL-2.0-or-later and is only ever run,
 # never linked (THIRD_PARTY_NOTICES.md). Without it the job page shows no Word button.
+# Its version is fixed here (docs/dependencies.md): the markup of the Word file depends on it. A
+# Debian point release that replaces this version fails the step until the pin is moved, which
+# is a change someone makes on purpose and the tests then run against.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends pandoc \
+    && apt-get install -y --no-install-recommends pandoc=3.1.11.1+ds-2 \
     && rm -rf /var/lib/apt/lists/* \
     && pandoc --version | head -n 1
 
@@ -115,11 +118,13 @@ RUN apt-get update \
 # ImageMagick is locked down right after the install: its policy allows only PNG, JPEG and GIF
 # and names PS, EPS, PDF, XPS, URL and the rest as denied (source/imagemagick-policy.xml). The
 # build fails if no policy file was replaced or the policy does not list the PDF denial.
+# LaTeXML's version is fixed for the same reason as pandoc's; bubblewrap and util-linux follow
+# Debian's security updates (docs/dependencies.md says why for each).
 ARG INSTALL_LATEXML=false
 COPY src/readablestem/source/imagemagick-policy.xml /opt/imagemagick-policy.xml
 RUN if [ "$INSTALL_LATEXML" = "true" ]; then \
         apt-get update \
-        && apt-get install -y --no-install-recommends latexml bubblewrap util-linux \
+        && apt-get install -y --no-install-recommends latexml=0.8.8-2 bubblewrap util-linux \
         && rm -rf /var/lib/apt/lists/* \
         && for dir in $(ls -d /etc/ImageMagick-*); do cp /opt/imagemagick-policy.xml "$dir/policy.xml"; done \
         && identify -list policy | grep -c 'pattern: PDF' \

@@ -179,6 +179,7 @@ snapshot before the change (from an old `src/` as above) and one after.
 | `src/readablestem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
 | `src/readablestem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
 | `src/readablestem/gold/layout_gold.py` | reading-order gold from a document's source (LaTeXML HTML, OpenStax XHTML, a written unit list), the page rules, a set's registry and the sample a person checks (see docs/eval.md) |
+| `src/readablestem/gold/layout_sources.py` | fetches the sources of a reading-order gold set and picks its documents by seeded rules with no model: arXiv papers and course handouts through LaTeXML in the sandbox, CC BY OpenStax books by position (see docs/eval.md) |
 | `src/readablestem/eval/split.py` | development and held-out by document, and `eval bar`: only a held-out score under the production profile meets a bar |
 | `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
@@ -261,6 +262,16 @@ step) needs to account for this.
   `--set heldout` command refuses a path inside the repository, `--fake`, and gold that
   is not the registered gold.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.
+- Every dependency has a row in docs/dependencies.md, which `scripts/dependency_record.py
+  --write` makes from `uv.lock`, the `Dockerfile`, each package's own metadata and
+  `data/dependency_facts.toml`. Run it after either file changes. The test suite fails for
+  a locked package with no row, a license that is neither permissive nor accepted in the
+  facts file with a reason, a package that reads a stranger's bytes and names no limits or no
+  hostile-input tests, and a system package with neither a version in the `Dockerfile` nor
+  a stated rule. A new dependency gets its facts before its first use.
+- The command line starts with the packages of the image alone: a development package
+  (lxml, python-docx, pytest) is imported inside the function that needs it, never at the top
+  of a module the command line loads.
 
 
 ## The student file in three browsers

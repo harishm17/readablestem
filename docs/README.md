@@ -46,6 +46,7 @@ arrived at; read them by question, not front to back.
 | How does the web app work (routes, sign-in, review screen, retention)? | [web.md](web.md) |
 | How do I run, test and extend it? | [development.md](development.md) |
 | What is the threat model, what protects it, and how do I report a problem? | [security.md](security.md) |
+| What does the app depend on, under which licenses, and what limits the parts that read a stranger's file? | [dependencies.md](dependencies.md) (generated; the rules are in [development.md](development.md)) |
 | What is the static reviewer demo under `site/`, and how is it built? | [site.md](site.md) |
 | What do I give an accessibility or procurement office? | [vendor-information.md](vendor-information.md), the site's `/for-accessibility-offices` page and its downloadable one-page summary (web.md), and the review record each document has (web.md "The review record") |
 | What is in the EPUB export? | [output.md](output.md), "The EPUB export" |
