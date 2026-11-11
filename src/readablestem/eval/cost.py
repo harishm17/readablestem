@@ -143,7 +143,7 @@ def report(measured: Sequence[Converted], *, open_pool_usd: float) -> dict[str, 
     by_step: dict[str, list[float]] = defaultdict(list)  # dollars of each page the step ran on
     calls: dict[str, int] = defaultdict(int)
     models: dict[str, set[str]] = defaultdict(set)
-    rows = []
+    rows: list[dict[str, Any]] = []
     for done in counted:
         dollars = page_dollars(done)
         for kind, page in zip(done.kinds, dollars, strict=True):
@@ -170,7 +170,7 @@ def report(measured: Sequence[Converted], *, open_pool_usd: float) -> dict[str, 
 
     pages = sum(len(values) for values in by_kind.values())
     total = sum(sum(values) for values in by_kind.values())
-    kinds = {
+    kinds: dict[str, dict[str, Any]] = {
         kind: {
             "pages": len(by_kind[kind]),
             "documents": len(documents[kind]),

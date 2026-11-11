@@ -1127,8 +1127,9 @@ class Worker:
         if output.facts is None:
             return None
         before: list[StageFact] = []
-        if attempt.claim.attempt == 1 and job.started_at is not None:
-            waited = (as_utc(job.started_at) - as_utc(job.created_at)).total_seconds()
+        started, created = as_utc(job.started_at), as_utc(job.created_at)
+        if attempt.claim.attempt == 1 and started is not None and created is not None:
+            waited = (started - created).total_seconds()
             before.append(StageFact(stage="queue_wait", seconds=round(max(0.0, waited), 4)))
         after: list[StageFact] = []
         if attempt.began is not None and attempt.converted is not None:

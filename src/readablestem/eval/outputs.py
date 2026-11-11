@@ -155,7 +155,7 @@ def _table(measured: Iterable[Converted]) -> dict[str, Any]:
     sizes = {output: dict.fromkeys(SIZES, 0) for output in OUTPUTS}
     built = dict.fromkeys(OUTPUTS, 0)
     failed: dict[str, Counter[str]] = {output: Counter() for output in OUTPUTS}
-    rows = []
+    rows: list[dict[str, Any]] = []
     pages = uploads = 0
     for done in measured:
         audit = done.outputs or {}

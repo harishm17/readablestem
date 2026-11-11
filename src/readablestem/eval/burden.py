@@ -94,7 +94,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
     items: Counter[str] = Counter()
     reasons: Counter[str] = Counter()
     every_page: list[int] = []
-    rows = []
+    rows: list[dict[str, Any]] = []
     for done in counted:
         counts = page_counts(done)
         every_page += counts

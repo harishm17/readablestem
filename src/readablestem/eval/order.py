@@ -488,7 +488,7 @@ def score_blocks(
 
     `margins` are the lines printed in the page's margins.
     """
-    heard = []
+    heard: list[dict[str, Any]] = []
     for order, element in enumerate(elements):
         tokens = _plain_words(element["text"])
         heard.append({**element, "order": order, "tk": tokens, "sh": _shingles(tokens)})
@@ -595,7 +595,7 @@ def score_blocks(
             for gram in set(kept):
                 if len(places[gram]) == 1 and in_blocks[gram] == 1:
                     blocks_in_element[owner[places[gram][0]]].add(index)
-        positions.append((index, statistics.median(spots) if spots else None))
+        positions.append((index, float(statistics.median(spots)) if spots else None))
         if spots:
             middle, reach = statistics.median(spots), 2 * len(tokens) + 4
             near_spots = [spot for spot in spots if abs(spot - middle) <= reach]

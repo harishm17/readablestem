@@ -1025,11 +1025,69 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     return 1 if verdict.judged else 2
 
 
+def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | int:
+    """`eval order --set`: the documents of a layout gold set scored (or read from
+    `--from`), and the set's registry; an exit code when it cannot be done. The folder must
+    be the registered one, and a held-out set is scored only when the caller says the
+    score is for a release."""
+    from readablestem.cli import layout_gold as sets
+    from readablestem.eval import measure, order_report
+    from readablestem.gold import layout_gold
+
+    listed = sets.registry_path(args.set, args.registry)
+    root = sets.set_root(args.set, args.root)
+    if not listed.is_file():
+        return _error(f"no registry at {listed}")
+    registry = json.loads(listed.read_text(encoding="utf-8"))
+    if registry["side"] == "held-out":
+        if not args.for_release:
+            return _error(
+                f"{args.set} is a held-out set: it is scored for a release, once, and a score "
+                "read while the reader is being changed spends it (--for-release)"
+            )
+        if args.against is not None:
+            return _error("a held-out set is held to its release bar, not compared page by page")
+        if args.records is not None or args.records_from is not None:
+            return _error(
+                "a held-out set's pages are not kept: --records and --from are not for it"
+            )
+    known = {row["id"] for row in registry["documents"]}
+    if args.records_from is not None:
+        try:
+            kept = json.loads(args.records_from.read_text(encoding="utf-8"))
+            run = [measure.Converted.from_dict(row) for row in kept["runs"][0]]
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            return _error(f"cannot read {args.records_from}: {exc}")
+        unknown = sorted({done.upload for done in run} - known)
+        if unknown:
+            return _error(f"{args.records_from}: not documents of {args.set}: {', '.join(unknown)}")
+        return run, registry
+    if not (root / "gold").is_dir():
+        return _error(f"no set at {root} (a folder with files/ and gold/)")
+    problems = layout_gold.verify_set(root, registry)
+    if problems:
+        return _error(f"{root} is not the registered set: " + "; ".join(problems[:5]))
+    unknown = sorted(set(args.only or ()) - known)
+    if unknown:
+        return _error(f"not in {args.set}: {', '.join(unknown)}")
+
+    def said(done: Any) -> None:
+        print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
+
+    run = order_report.set_run(root, only=args.only or (), at_once=args.at_once, said=said)
+    if args.records is not None:
+        args.records.parent.mkdir(parents=True, exist_ok=True)
+        kept = {"runs": [[done.as_dict() for done in run]]}
+        args.records.write_text(json.dumps(kept), encoding="utf-8")
+    return run, registry
+
+
 def _cmd_order(args: argparse.Namespace) -> int:
     """`eval order`: whether each gold page of the corpus is read in order, and what else
     is wrong on a page that is, in the page a student is given and in what the pipeline
     holds, from a replay under the production profile, and the bar against an earlier
-    record (`eval.order_report`). Spends nothing. Exit code 0: the bar is met or none was
+    record (`eval.order_report`). With `--set`, the pages of a layout gold set, each file
+    converted with no model. Spends nothing. Exit code 0: the bar is met or none was
     asked; 1: a page that was right is not right now; 2: the two records cannot be
     compared, or nothing could be measured."""
     from readablestem.eval import corpus, measure, order_report
@@ -1040,14 +1098,26 @@ def _cmd_order(args: argparse.Namespace) -> int:
             before = json.loads(args.against.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             return _error(f"cannot read {args.against}: {exc}")
-    if not (args.only or args.records_from):
-        args.only = sorted(entry.id for entry in corpus.load_manifest().values() if entry.gold)
-    measured = _measured(args, runs=1)
-    if isinstance(measured, int):
-        return measured
-    (run,), settings = measured[0][:1], measured[1]
-    metrics = order_report.report(run)
-    record = measure.record(run, settings, metrics)
+    if args.set is not None:
+        scored = _scored_set(args)
+        if isinstance(scored, int):
+            return scored
+        run, registry = scored
+        settings = order_report.set_settings()
+        held_out = registry["side"] == "held-out"
+        metrics = order_report.report(run, order_report.set_groups(registry), listed=not held_out)
+        of_set = order_report.set_stamp(registry, [done.upload for done in run])
+        record = measure.record(run, settings, metrics, of_set=of_set | {"client": "none"})
+    else:
+        if not (args.only or args.records_from):
+            with_gold = (entry.id for entry in corpus.load_manifest().values() if entry.gold)
+            args.only = sorted(with_gold)
+        measured = _measured(args, runs=1)
+        if isinstance(measured, int):
+            return measured
+        (run,), settings = measured[0][:1], measured[1]
+        metrics = order_report.report(run)
+        record = measure.record(run, settings, metrics)
     _write_record(args.out, record)
     verdict = None if before is None else order_report.judge(record, before)
     print(order_report.render(record, verdict))
@@ -1961,6 +2031,19 @@ def register(
     )
     _add_measure_args(order, at_once=4)
     order.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    order.add_argument(
+        "--set",
+        metavar="NAME",
+        help="score a layout gold set (data/gold/layout/NAME.json) and not the corpus: each "
+        "file converted with no model",
+    )
+    order.add_argument("--root", type=Path, help="the set's folder (default: the cache's)")
+    order.add_argument("--registry", type=Path, help="default: data/gold/layout/<set>.json")
+    order.add_argument(
+        "--for-release",
+        action="store_true",
+        help="score a held-out set: once, for a release, never while the reader is changed",
+    )
     order.set_defaults(func=_cmd_order)
 
     outputs = group.add_parser(

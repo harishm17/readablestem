@@ -13,6 +13,7 @@ import pytest
 from readablestem.cli.main import main
 from readablestem.eval import corpus, measure, order
 from readablestem.eval.measure import Converted
+from readablestem.gold import layout_gold
 from readablestem.pipeline import assemble, layout
 
 ENTRIES = corpus.load_manifest()
@@ -276,3 +277,35 @@ def test_a_page_that_was_right_and_is_not_fails_the_bar(tmp_path, capsys) -> Non
     older["metrics"]["scorer"] -= 1
     Path(before).write_text(json.dumps(older))
     assert eval_order("--from", good, "--against", before) == 2
+
+
+def test_a_layout_gold_set_is_scored_with_no_model_and_a_held_out_one_only_for_a_release(
+    tmp_path,
+) -> None:
+    entry = ENTRIES["s01_newsletter_3col"]
+    root = tmp_path / "set"
+    (root / "files").mkdir(parents=True)
+    (root / "gold").mkdir()
+    (root / "files" / "news.pdf").write_bytes(corpus.document(entry))
+    gold = corpus.load_gold(entry) | {"id": "news", "kind": "made here", "source": "a test"}
+    (root / "gold" / "news.json").write_text(json.dumps(gold))
+
+    def eval_order(side: str, *args: str) -> tuple[int, dict]:
+        registry, out = tmp_path / f"{side}.json", tmp_path / f"{side}-record.json"
+        registry.write_text(json.dumps(layout_gold.registry_of(root, "tiny", "a test", side)))
+        named = ["--set", "tiny", "--root", str(root), "--registry", str(registry)]
+        code = main(["eval", "order", *named, "--out", str(out), *args])
+        return code, json.loads(out.read_text()) if out.is_file() else {}
+
+    code, record = eval_order("development")
+    assert code == 0 and record["set"] == "tiny" and record["split"]["name"] == "development"
+    student = record["metrics"]["sources"]["html"]
+    assert student["all"]["pages"] == 1 and set(student["groups"]) == {"made here"}
+    assert [page["page"] for page in record["metrics"]["pages"]] == [1]
+
+    # A held-out set is not scored while the reader is worked on, and its record names no page.
+    assert eval_order("held-out") == (2, {})
+    code, record = eval_order("held-out", "--for-release")
+    assert code == 0 and record["split"]["name"] == "held-out"
+    assert record["metrics"]["sources"]["html"]["all"]["pages"] == 1
+    assert record["metrics"]["pages"] == []

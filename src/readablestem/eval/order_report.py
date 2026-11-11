@@ -35,16 +35,27 @@ named as not measured.
 The bar (`judge`): against an earlier record of the same documents, scored by the same
 version of the scorer, no page that was right is not right now. A page that became right
 is named too. The corpus is a development set: these figures meet no release bar.
+
+A layout gold set (`gold/layout_gold.py`: a folder of files and gold built from their
+sources, registered under `data/gold/layout/`) is scored by `set_run`: each file converted
+as a job converts it under production's behavior settings, with no model. An equation, a
+picture and a table then keep what the file gives, which is what the reading order is made
+of. Its groups are the registry's kinds of document. A held-out set is scored for a
+release and not while the reader is being changed: its record holds totals and no page,
+so no failing page can be looked up.
 """
 
 from __future__ import annotations
 
+import json
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from readablestem.eval import corpus, measure, order
+from readablestem.eval import corpus, measure, order, split
 from readablestem.eval.measure import Converted
 
 SOURCES = ("html", "elements")
@@ -57,15 +68,102 @@ BESIDE = ("furniture", "stray", "cut", "merged", "heading_merged", "caption_wron
 OTHER = "other"
 
 
-def group_of(entry_id: str) -> str:
-    """The manifest's group of a file's gold pages."""
-    labels = corpus.load_manifest()[entry_id].labels or {}
-    return labels.get("group") or OTHER
+def corpus_groups() -> dict[str, str]:
+    """The manifest's group of each corpus file with gold."""
+    return {
+        entry.id: (entry.labels or {}).get("group") or OTHER
+        for entry in corpus.load_manifest().values()
+        if entry.gold
+    }
+
+
+def set_groups(registry: Mapping[str, Any]) -> dict[str, str]:
+    """The kind of each document of a layout gold set, from its registry."""
+    return {row["id"]: row.get("kind") or OTHER for row in registry["documents"]}
+
+
+def set_stamp(registry: Mapping[str, Any], names: Iterable[str]) -> dict[str, Any]:
+    """What a record of a layout gold set says of its documents: the set's name and the
+    side, count and hash of the documents scored (`measure.record`'s `of_set`)."""
+    rows = {row["id"]: row for row in registry["documents"]}
+    names = tuple(sorted(set(names) & set(rows)))
+    hashes = {name: rows[name]["pdf_sha256"] + rows[name]["gold_sha256"] for name in names}
+    held_out = registry["side"] == split.HELD_OUT
+    chosen = split.Split(
+        seed=registry["set"],
+        development=() if held_out else names,
+        held_out=names if held_out else (),
+        hashes=hashes,
+    )
+    return {"set": registry["set"], "split": chosen.stamp(registry["side"])}
+
+
+def set_settings() -> Any:
+    """Production's behavior settings for a conversion that asks no model."""
+    from readablestem.config import Settings
+    from readablestem.ops import profile
+
+    base = Settings(_env_file=None, env="test", **measure.ROOM)  # type: ignore[call-arg]
+    return profile.load().apply(base)
+
+
+def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
+    """One document of a set, converted with no model and scored (a process of `set_run`)."""
+    from readablestem.core.types import ConversionOptions, StepFacts
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+
+    gold = json.loads(Path(gold_path).read_text(encoding="utf-8"))
+    pdf = Path(pdf_path).read_bytes()
+    settings = set_settings()
+    try:
+        output = convert_isolated(
+            pdf,
+            settings=settings,
+            client=FakeVisionClient(),
+            options=ConversionOptions.from_settings(settings),
+            concurrency=settings.model_concurrency,
+        )
+    except ConversionFailed as exc:
+        return Converted(gold["id"], error=str(exc.code)).as_dict()
+    done = Converted(
+        gold["id"],
+        pages=output.result.stats.pages,
+        facts=output.facts or StepFacts(),
+        order=measure.order_of(gold, pdf, output.result),
+    )
+    return done.as_dict()
+
+
+def set_run(
+    root: Path,
+    *,
+    only: Sequence[str] = (),
+    at_once: int = 1,
+    said: Callable[[Converted], None] | None = None,
+) -> list[Converted]:
+    """Each document of a layout gold set's folder (`files/<id>.pdf`, `gold/<id>.json`)
+    converted as a job converts it, with no model, and scored: `at_once` at a time, each in
+    a process of its own. `said` is called as each one ends."""
+    from readablestem.gold import layout_gold
+
+    wanted = [
+        (str(pdf), str(root / "gold" / f"{doc_id}.json"))
+        for doc_id, pdf, _gold in layout_gold.documents(root)
+        if not only or doc_id in only
+    ]
+    measured = []
+    with ProcessPoolExecutor(max_workers=max(1, at_once), max_tasks_per_child=1) as pool:
+        for raw in pool.map(_set_document, *zip(*wanted, strict=True)) if wanted else ():
+            measured.append(Converted.from_dict(raw))
+            if said is not None:
+                said(measured[-1])
+    return measured
 
 
 def _sums(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """Every count added up over `rows`, and on how many pages each of `BESIDE` is found."""
-    sums = dict(order.total(list(rows)))
+    sums: dict[str, Any] = dict(order.total(list(rows)))
     sums["pages_with"] = {count: sum(1 for row in rows if row.get(count)) for count in BESIDE}
     return sums
 
@@ -88,9 +186,17 @@ def _why(row: dict[str, Any]) -> list[str]:
     return found or ["not clean"]
 
 
-def report(measured: Sequence[Converted]) -> dict[str, Any]:
+def report(
+    measured: Sequence[Converted],
+    groups: Mapping[str, str] | None = None,
+    *,
+    listed: bool = True,
+) -> dict[str, Any]:
     """The figures of a measured replay, as plain data: the `metrics` of an order record
-    (`measure.record`), which `render` prints and `judge` holds the bar on."""
+    (`measure.record`), which `render` prints and `judge` holds the bar on. `groups`: the
+    group of each document (the corpus's when not given). `listed` False keeps the totals
+    and no page: a held-out set's record names no page."""
+    group_of: Mapping[str, str] = corpus_groups() if groups is None else groups
     scored = [done for done in measured if not done.error and done.order is not None]
     failed = sorted(done.upload for done in measured if done.error)
     whole = [done for done in scored if not done.missed]
@@ -98,7 +204,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
 
     def rows_of(uploads: Iterable[Converted], source: str) -> list[dict[str, Any]]:
         return [
-            {**row, "upload": done.upload, "group": group_of(done.upload.split("+")[0])}
+            {**row, "upload": done.upload, "group": group_of.get(done.upload.split("+")[0], OTHER)}
             for done in uploads
             for row in (done.order or {}).get(source, [])
         ]
@@ -106,10 +212,10 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
     sources = {}
     for source in SOURCES:
         rows = rows_of(whole, source)
-        groups = sorted({row["group"] for row in rows})
+        found = sorted({row["group"] for row in rows})
         sources[source] = {
             "all": _sums(rows),
-            "groups": {name: _sums([r for r in rows if r["group"] == name]) for name in groups},
+            "groups": {name: _sums([r for r in rows if r["group"] == name]) for name in found},
             "main": _sums([r for r in rows if r["group"] in ("real", "self-made")]),
             "apart": _sums(rows_of([d for d in scored if d.missed], source)),
         }
@@ -129,6 +235,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
             page[source] = kept | ({} if row["right"] else {"why": _why(row)})
     return {
         "scorer": order.VERSION,
+        "listed": listed,
         "uploads": {
             "measured": len(whole),
             "answers_missing": dict(sorted(short.items())),
@@ -136,7 +243,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
             "without_gold": sum(1 for done in measured if not done.error and done.order is None),
         },
         "sources": sources,
-        "pages": [pages[key] for key in sorted(pages)],
+        "pages": [pages[key] for key in sorted(pages)] if listed else [],
     }
 
 
@@ -177,6 +284,8 @@ def judge(now: dict[str, Any], before: dict[str, Any], *, source: str = "html") 
             if source in page
         }
 
+    if not (one.get("listed", True) and other.get("listed", True)):
+        return Verdict(False, "a held-out set's record names no page to compare")
     was, is_now = right(other), right(one)
     gone = sorted(set(was) - set(is_now))
     if gone:
@@ -276,6 +385,12 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
     for source in SOURCES:
         lines.append(order.table_row(source, Counter(sources[source]["all"])))
     wrong = [page for page in made["pages"] if "html" in page and not page["html"]["right"]]
+    if not made.get("listed", True):
+        lines += [
+            "",
+            "A held-out set: no page is named here or in the record, and a failing page is "
+            "not looked at.",
+        ]
     if wrong:
         lines += ["", f"the {len(wrong)} pages not right in the page a student is given:"]
         lines += _table(

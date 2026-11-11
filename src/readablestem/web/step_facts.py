@@ -17,6 +17,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -168,10 +169,5 @@ def log_job(job_id: str, pages: int, facts: StepFacts) -> None:
             done=stop.done,
             of=stop.of,
         )
-    log_event(
-        logger,
-        "job_stages",
-        job_id=job_id,
-        pages=pages,
-        **{f"{fact.stage}_s": round(fact.seconds, 2) for fact in facts.stages},
-    )
+    seconds: dict[str, Any] = {f"{fact.stage}_s": round(fact.seconds, 2) for fact in facts.stages}
+    log_event(logger, "job_stages", job_id=job_id, pages=pages, **seconds)

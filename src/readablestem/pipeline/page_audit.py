@@ -387,7 +387,9 @@ def worst_case_usd(request: VisionRequest) -> float:
     )
 
 
-def _judged(reply: Reply, ids: frozenset[str]) -> tuple[str, str | None, list[Finding]]:
+def _judged(
+    reply: Reply, ids: frozenset[str]
+) -> tuple[Literal["pass", "flagged", "not_audited"], str | None, list[Finding]]:
     """(verdict, reason, findings) of a reply that parsed. A finding of an element that is
     not on the page, or with a box off the picture, makes the whole reply unusable."""
     if any(one not in ids for finding in reply.findings for one in finding.elements):

@@ -74,7 +74,7 @@ DENSE_MATH = 9
 _SCAN_PAGE = ("scan_no_text", "scan_ocr", "handwritten", "handwritten_ocr")
 # The largest corpus file is 39 pages and under 8 MB, and a replay spends nothing: the limits
 # on size and on a day's spending are not what is measured.
-ROOM = {
+ROOM: dict[str, Any] = {
     "max_pages_per_job": 60,
     "max_source_pages": 60,
     "max_upload_mb": 25,
@@ -139,7 +139,9 @@ class Converted:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Converted:
-        return cls(**(raw | {"facts": StepFacts.model_validate(raw.get("facts") or {})}))
+        fields: dict[str, Any] = dict(raw)
+        fields["facts"] = StepFacts.model_validate(raw.get("facts") or {})
+        return cls(**fields)
 
 
 def every_upload() -> list[Upload]:
@@ -333,21 +335,31 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
 
 
 def order_rows(entry_id: str, pdf: bytes, result: DocumentResult) -> dict[str, list] | None:
-    """The reading-order counts of a file's gold pages against a conversion of it, or None
-    when the file has no gold. Each gold page is given the lines printed in its margins,
-    so that a running head that is read is counted as furniture."""
+    """The reading-order counts of a corpus file's gold pages against a conversion of it
+    (`order_of`), or None when the file has no gold."""
+    entry = corpus.load_manifest()[entry_id]
+    if not entry.gold:
+        return None
+    return order_of(corpus.load_gold(entry, pdf), pdf, result)
+
+
+def order_of(gold: dict[str, Any], pdf: bytes, result: DocumentResult) -> dict[str, list]:
+    """The reading-order counts of each gold page (`eval.order.score_document`) against a
+    conversion of its file: under `elements` for what the pipeline holds and under `html`
+    for the page a student is given. The `detail` of a row holds the document's words and
+    is left out. Each gold page is given the lines printed in its margins, so that a
+    running head that is read is counted as furniture."""
     import pymupdf
 
     from readablestem.eval import order
     from readablestem.gold import layout_gold
 
-    entry = corpus.load_manifest()[entry_id]
-    if not entry.gold:
-        return None
-    gold = corpus.load_gold(entry, pdf)
     with pymupdf.open(stream=pdf, filetype="pdf") as opened:
-        for page in gold["pages"]:
-            page["margins"] = layout_gold.margin_lines(opened[page["page"] - 1])
+        pages = [
+            page | {"margins": layout_gold.margin_lines(opened[page["page"] - 1])}
+            for page in gold["pages"]
+        ]
+    gold = gold | {"pages": pages}
     heard = {
         "elements": order.elements_from_result(result.elements),
         "html": order.elements_from_html(result.html),
@@ -479,7 +491,7 @@ def _tell(pids: Iterable[int], what: signal.Signals) -> None:
             os.kill(pid, what)
 
 
-def _held_back(process: subprocess.Popen[bytes], share: float) -> int | None:
+def _held_back(process: subprocess.Popen[Any], share: float) -> int | None:
     """Wait for `process` while it and everything it started run for only `share` of the
     time: they are stopped and continued ten times a second. To every clock the conversion
     reads, that is a machine with that share of this one to give. Returns the exit status,
@@ -586,11 +598,16 @@ def machine() -> dict[str, Any]:
 
 
 def record(
-    measured: Iterable[Converted], settings: Settings, metrics: dict[str, Any]
+    measured: Iterable[Converted],
+    settings: Settings,
+    metrics: dict[str, Any],
+    *,
+    of_set: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A report of a measured replay: what it says about itself, then its figures under
-    `metrics`, the shape `readablestem eval bar` reads."""
-    return stamps(measured, settings) | {"metrics": metrics}
+    `metrics`, the shape `readablestem eval bar` reads. `of_set`: the `set` and the `split`
+    of a run that is not of the corpus."""
+    return stamps(measured, settings, of_set=of_set) | {"metrics": metrics}
 
 
 def header(record: dict[str, Any]) -> list[str]:
@@ -600,7 +617,8 @@ def header(record: dict[str, Any]) -> list[str]:
 
     chosen = record.get("split") or {}
     lines = [
-        f"Set: the corpus, a {chosen.get('name')} set of {chosen.get('documents')} documents "
+        f"Set: {record.get('set') or 'the corpus'}, a {chosen.get('name')} set of "
+        f"{chosen.get('documents')} documents "
         f"({str(chosen.get('set_sha256'))[:12]}). Pipeline {record.get('pipeline_version')}, "
         f"commit {record.get('commit')}.",
         profile.stamp_line(record.get("profile")),
@@ -627,23 +645,28 @@ def header(record: dict[str, Any]) -> list[str]:
     return lines
 
 
-def stamps(measured: Iterable[Converted], settings: Settings) -> dict[str, Any]:
+def stamps(
+    measured: Iterable[Converted], settings: Settings, *, of_set: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """What a report of a measured replay says about itself (`eval.split`): the documents and
     their side, the settings, the code, and the steps that stopped before they were done
-    (a step stopped by a clock gives another result on a busier machine)."""
+    (a step stopped by a clock gives another result on a busier machine). `of_set`: the
+    `set` and the `split` of a run that is not of the corpus."""
     from readablestem.eval import run_record, split
     from readablestem.ops import profile
     from readablestem.pipeline.run import PIPELINE_VERSION
 
     measured = list(measured)
-    manifest = corpus.load_manifest()
-    names = sorted({done.upload.split("+")[0] for done in measured})
-    hashes = {name: manifest[name].sha256 or manifest[name].builder for name in names}
-    # Every corpus file has been read while the readers were built.
-    chosen = split.Split(seed="corpus", development=tuple(names), held_out=(), hashes=hashes)
+    if of_set is None:
+        manifest = corpus.load_manifest()
+        names = sorted({done.upload.split("+")[0] for done in measured})
+        hashes = {name: manifest[name].sha256 or manifest[name].builder for name in names}
+        # Every corpus file has been read while the readers were built.
+        chosen = split.Split(seed="corpus", development=tuple(names), held_out=(), hashes=hashes)
+        of_set = {"split": chosen.stamp(split.DEVELOPMENT)}
     sha, dirty = run_record.source_state(corpus.REPO)
     return {
-        "split": chosen.stamp(split.DEVELOPMENT),
+        **of_set,
         "profile": profile.stamp(settings),
         "pipeline_version": PIPELINE_VERSION,
         "commit": sha + ("+changes" if dirty else ""),

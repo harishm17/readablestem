@@ -114,7 +114,7 @@ def report(runs: Sequence[Sequence[Converted]], *, allowance: float = ALLOWANCE)
     stage_total: dict[str, float] = defaultdict(float)
     order: list[str] = []
     call_s: dict[str, list[float]] = defaultdict(list)
-    rows = []
+    rows: list[dict[str, Any]] = []
     for done in measured:
         for fact in done.facts.stages:
             if fact.stage not in order:
