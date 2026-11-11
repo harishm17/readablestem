@@ -682,7 +682,7 @@ def before_after(result: DocumentResult, summary: CheckedSummary | None = None) 
                 f"No: {plural(facts.bold_maths_letters, 'bold letter')} in the math "
                 f"{'is' if facts.bold_maths_letters == 1 else 'are'} stored as plain "
                 "letters, so a vector reads like any other letter.",
-                "Yes: bold letters are written as bold math. A letter the tool read "
+                f"{yes}: bold letters are written as bold math. A letter the tool read "
                 "differently from your PDF is one of your decisions.",
             )
         )

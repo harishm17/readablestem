@@ -3,7 +3,7 @@
 A page to print and a CSV, made from what the app has stored about one finished job: the
 stored result, the review decisions (`ReviewEdit`: who, when, what the tool had and what the
 decision made of it) and the settings the instructor made. It says what the tool did, what a
-person decided and when, which parts were not converted, which automatic checks ran, and,
+person decided and when, which parts were not converted, which structure checks ran, and,
 in plain words, what was not checked.
 
 It is a record, not a verdict. It never says the document meets a standard or a law, and
@@ -57,7 +57,7 @@ from readablestem.web.views import KIND_LABELS
 
 STATEMENT = (
     "This record lists what the tool did to this document, what a person decided and when, "
-    "which parts were not converted, and which automatic checks ran. It does not say that "
+    "which parts were not converted, and which structure checks ran. It does not say that "
     "the document meets any standard or law, and nobody at the tool has looked at the "
     "document. The accessibility office makes that judgment."
 )

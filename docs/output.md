@@ -84,7 +84,7 @@ default file is byte for byte as before; the golden tests cover that). The job p
 | `index.html` | The whole document with no `<style>` block. Each rule of the stylesheet is written into `style` attributes (selectors by tag, class, attribute, descendant and child, in cascade order), keeping only properties Canvas keeps. Every `data:` image is `images/image-NN.png` (or `.jpg`; one file per distinct picture). `tabindex` and `headers` stay, because a file is not sanitized. |
 | `images/` | The pictures, as files. |
 | `canvas-page.html` | Only with a course number. The same content as a fragment: no `<html>`, `<head>`, `<title>`, `<main>`, inside `<div lang>`; no `tabindex` and `headers` (Canvas removes them, so the file says what survives); rules for bare `p`, `h1`-`h6`, `ul`, `ol`, `li` left to Canvas's own styles; headings one level down (Canvas shows the page title as the top heading) unless the document has an `h6`; pictures at `/courses/<number>/file_contents/course%20files/<folder>/images/image-NN.png`. Not offered when it would exceed a Page's 500 KB body limit. |
-| `README.txt` | Plain steps for the instructor, with the folder name and course number filled in, and only the "what Canvas still changes" notes that apply to this document. |
+| `README.txt` | First the page's statement of what was converted and reviewed (its `readablestem-summary`), then plain steps for the instructor, with the folder name and course number filled in, and only the "what Canvas still changes" notes that apply to this document. |
 
 The folder name is `<ascii title>-<first 6 characters of the job id>` (`folder_name`). The
 instructor makes that folder in Files, uploads the zip into it and expands it, so the
@@ -280,12 +280,16 @@ no network, no model.
   non-empty alt text; `longDescription` only when every `<figure>` has a figure description
   (a `<details class="figure-description">` inside it or right after it); `pageNavigation`
   when there is a page list. Also `schema:accessMode` (textual, and visual when there are
-  pictures), `accessibilityHazard` `none` (no script, audio or video is written) and an
-  `accessibilitySummary`. `accessModeSufficient` (`textual`) is left out while the document
-  still has flagged items, because then a person has not yet made it sufficient. A page list
+  pictures). The `accessibilitySummary` is the page's statement (`readablestem-summary` in
+  its head: how many equations are MathML, how much a person reviewed, what is a picture or
+  left out, "Check it before students use it."); `accessModeSufficient` `textual` only when
+  the page says the text alone is enough and no item is flagged; `accessibilityHazard`
+  `none` (no script, audio or video is written) only for a page with that statement. A page
+  without it (made before it existed) gets "This file does not record what was converted or
+  reviewed." and the hazard `unknown`. A page list
   also adds `dc:source` ("Source PDF", `source-of` pagination).
 - **No claim of conformance.** The package has no `dcterms:conformsTo` and the summary says the
-  tool assists and does not certify. The tests run EPUBCheck 5.4 (no errors or warnings) and
+  tool assists with accessibility. The tests run EPUBCheck 5.4 (no errors or warnings) and
   DAISY Ace (no serious or critical violation) on the golden documents, the demo, the LaTeX
   conversions and a synthetic page with page markers, when both are installed
   (`.github/workflows/epub.yml` installs them in CI, Ace from the lockfile in `.github/ace`,
@@ -983,37 +987,49 @@ section of the document's outline.
 ## The note for students ("About this version")
 
 The file ends with a short note for the people who read it, in a `<footer>` after
-`</main>` (`id="about-conversion"`, MF7 of the UX review). It has no counts and no
-review words ("needs review", "rejected"): those are for the instructor, on the job page
-(docs/web.md "The job page"). In order:
+`</main>` (`id="about-conversion"`, MF7 of the UX review). Its sentences are the summary's
+(`pipeline.checked`, docs/web.md "What was checked"), made by `pipeline/checked_words.py`,
+so it says no more than was done. It has no review screen's words ("needs review",
+"rejected"). In order:
 
 - what this is: "This is a web version of a PDF from your course, made with ReadableSTEM, a
-  tool that assists with accessibility.", plus "Its equations are written so that screen
-  readers can read them aloud." when the file has converted equations;
-- whether the instructor has checked it: nothing when the tool asked nothing and nobody
-  changed anything; "Some parts were made by the tool and have not been checked by your
-  instructor yet." while a decision is open (a draft download); "Your instructor checked
-  the parts the tool was unsure about on 9 October 2026." once every decision is made.
-  The date is `render_html(checked_on=...)`: the review screen passes the day of the
-  re-render that follows a decision (`web/review.py rerender_html`, UTC), the language
-  control the day of the last decision; the pipeline never passes one, so a result
-  renders the same from storage;
-- when something is shown as an image of the original: "Some parts could not be
-  converted. They are shown as pictures of the original, marked "Not converted" or
-  "Needs a description": ask your instructor for a version you can read.", and when whole
-  pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
-  scanned pages and were not converted." (`assemble.kept_pages_note`);
+  tool that assists with accessibility.", plus how many equations a screen reader can read:
+  "Its equations are written so that screen readers can read them aloud." when all are, "2
+  of its 5 equations are written so that screen readers can read them aloud; the others are
+  pictures." when some are, nothing when none is (the pictures sentence says so);
+- what a person reviewed, in one of three forms: "This version has not been reviewed by a
+  person." until someone makes a decision; "Your instructor reviewed 3 of 5 parts the tool
+  flagged, on October 9, 2026."; and the same with " 1 part was kept as the tool wrote it
+  without a check passing." after an "Accept anyway". An optional note nobody opened is
+  among the flagged parts and never among the reviewed ones. The date is the day of the
+  last decision (`render_html(checked_on=...)`: the job page's re-render passes it,
+  `web/review.py rerender_html` today's); the pipeline never passes one;
+- when something is a picture of the original, how many: "4 parts could not be converted
+  and are shown as pictures of the original, marked "Not converted" or "Needs a
+  description": ask your instructor for a version you can read." (for a LaTeX source,
+  "shown as they were written in LaTeX"); when whole pages are kept as images, which ones
+  (`assemble.kept_pages_note`);
+- when pages were left out, which: "Pages 2, 3 and 4 (3 of 8) of the original PDF were left
+  out of this file.";
 - when pages were read from an image of the page: "Page 2 was converted from an image of the
   page: it starts with a note and the original page to check it against."
   (`assemble.image_pages_note`);
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
-The wording is final for the beta: the note does not name screen
-readers, and "checked" appears only once an instructor has made a decision (the feature
-review's challenge, 10.3 row 4, would say "decided by your instructor" instead, since the
-tool only knows that decisions were made). Model cost is not in the HTML: the file is meant for
-students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
+The note says "reviewed" for what a person did and never "checked" (the tool's checks are
+"structure checks", and they are not mentioned to students). Model cost is not in the HTML:
+the file is meant for students.
+
+The same statement opens the page, in `<main>` before the content, when nobody has reviewed
+it or a part is a picture or left out: a `<section id="checked-notice"
+aria-labelledby="checked-notice-title">` (a region named "Before you read", no live role, so
+it is read once in the page's order) with the statement and a list of links: "About this
+version", one per picture ("Part 1 not converted: equation, page 3", numbered so no two
+links have the same name; after ten, the rest are counted) and "Which pages were left out".
+The statement is also in the head, `<meta name="readablestem-summary">` (plus
+`<meta name="readablestem-access-sufficient" content="textual">` when the text alone is
+enough), for the files made from the page. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
 Text the tool writes (notes, labels, the student note) carries `class="readablestem"`. The
 `banned_wording` check reads only that text, so course content that legitimately uses
