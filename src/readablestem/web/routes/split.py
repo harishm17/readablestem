@@ -43,7 +43,7 @@ from markupsafe import Markup
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
-from readablestem.core import triage
+from readablestem.core import triage, uid
 from readablestem.core.types import DocumentResult, Element, Fix, Kind, Status
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
@@ -105,7 +105,7 @@ from readablestem.web.review import (
     item_labels,
     item_numbers,
 )
-from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, element_ref, job_access, require_done
 from readablestem.web.routes.review import (
     GROUP_FLASH,
     HEADING_GROUP_FLASH,
@@ -602,7 +602,10 @@ class SplitBuilder:
 
     def select(self, key: str) -> tuple[queue.Decision | None, Fix | None]:
         """The decision named by `key`, or an item outside the queue (an optional check or
-        an accepted item), or the first decision still open."""
+        an accepted item), or the first decision still open. `key` may be an element's
+        stable id (`core.uid`); one that names nothing is not looked for by place."""
+        if key and uid.is_uid(key):
+            key = uid.assign(self.result).resolve(key) or ""
         if key and ELEMENT_ID.match(key):
             decision = queue.find(self.queue, key)
             if decision is not None:
@@ -1525,6 +1528,7 @@ def live_check(
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
     _, result, _ = _load(request, job_id, user)
+    element_id = element_ref(result, element_id)
     fix = result.fix_for(element_id)
     if fix is None or fix.kind is not Kind.EQUATION:
         raise PageError(404, *NOT_FOUND)
@@ -1670,6 +1674,7 @@ def region_image(request: Request, job_id: str, element_id: str, user: UserDep) 
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
     _, result, _ = _load(request, job_id, user)
+    element_id = element_ref(result, element_id)
     element = next((e for e in result.elements if e.id == element_id), None)
     fix = result.fix_for(element_id)
     if element is None or fix is None:

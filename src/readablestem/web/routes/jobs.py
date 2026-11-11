@@ -30,7 +30,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from readablestem.core import sandbox
+from readablestem.core import sandbox, uid
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import (
     export_canvas,
@@ -119,6 +119,20 @@ NOT_FOUND = (
     "There is no document at this address that this account can open. Check the address and "
     "your account, or ask the sender.",
 )
+
+
+def element_ref(result: DocumentResult, ref: str) -> str:
+    """The element id a route works with for `ref`, the id in its address: `ref` itself, or
+    the element a stable id of any version names (`core.uid`). A stable id that names no
+    element of this document is a 404, never the element nearest to it."""
+    if not uid.is_uid(ref):
+        return ref
+    found = uid.assign(result).resolve(ref)
+    if found is None:
+        raise PageError(404, *NOT_FOUND)
+    return found
+
+
 # What the owner of a deleted document sees at its old address (UX review MF10).
 DELETED = ("This document has been deleted", "This document has been deleted.")
 # Opt-in reload interval for the job page without JavaScript: long enough to hear the
@@ -1925,6 +1939,11 @@ def crop(request: Request, job_id: str, element_id: str, user: UserDep) -> Respo
         raise PageError(404, *NOT_FOUND)
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, VIEW)
+        if uid.is_uid(element_id):  # the result is read only to resolve a stable id
+            if not job.result_json:
+                raise PageError(404, *NOT_FOUND)
+            result = DocumentResult.model_validate(job.result_json)
+            element_id = element_ref(result, element_id)
         png = session.scalar(
             select(Blob.content).where(
                 Blob.job_id == job.id, Blob.kind == "crop", Blob.element_id == element_id
