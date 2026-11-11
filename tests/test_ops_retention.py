@@ -17,10 +17,11 @@ from fixtures.ops.seed import (
     review,
     sentinel_result,
 )
+from readablestem.core.types import CallFact, StageFact, StepFacts
 from readablestem.ops import aggregate, retention
 from readablestem.ops.aggregate import aggregate_finished
 from readablestem.ops.retention import PurgeStats, delete_jobs, purge_expired
-from readablestem.web import db
+from readablestem.web import db, step_facts
 
 EXPIRED = NOW - timedelta(minutes=1)
 KEPT = NOW + timedelta(hours=1)
@@ -47,10 +48,17 @@ def counts(factory) -> tuple[int, int, int, int]:
 def test_purge_deletes_expired_jobs_with_everything_derived(factory):
     with db.session_scope(factory) as s:
         user = add_user(s)
-        add_job(s, user, retain_until=EXPIRED, aggregated=True, blobs=2, edits=[("p1-e1", "edit")])
+        gone = add_job(
+            s, user, retain_until=EXPIRED, aggregated=True, blobs=2, edits=[("p1-e1", "edit")]
+        )
         add_job(s, user, retain_until=EXPIRED, blobs=1)  # finished, never aggregated
         add_job(s, user, retain_until=EXPIRED, status=db.JobStatus.QUEUED, finished_at=None)
         keep = add_job(s, user, retain_until=KEPT, blobs=1, edits=[("p1-e1", "accept")])
+        facts = StepFacts(
+            calls=[CallFact(step="describe", page=1)], stages=[StageFact(stage="steps", seconds=1)]
+        )
+        step_facts.keep(s, gone, facts)
+        step_facts.keep(s, keep, facts)
 
     stats = purge_expired(factory, NOW)
 
@@ -58,6 +66,7 @@ def test_purge_deletes_expired_jobs_with_everything_derived(factory):
     assert stats == PurgeStats(jobs_deleted=3, blobs_deleted=3, unaggregated_deleted=0)
     assert counts(factory) == (1, 1, 1, 1)  # users are account data, not document data
     with db.session_scope(factory) as s:
+        assert step_facts.kept(s, [gone, keep]) == {keep: facts}  # what a job took goes with it
         assert s.query(db.Job).one().id == keep
         rows = aggregate_rows(s)
     assert rows[("job", "status:done")] == 1  # the queued job is not a finished one

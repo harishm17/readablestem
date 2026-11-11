@@ -77,6 +77,7 @@ from readablestem.core.types import (
     ModelCall,
     ProgressEvent,
     Step,
+    StepFacts,
 )
 from readablestem.web import conversion_child as protocol
 from readablestem.web.logsafe import log_event
@@ -814,6 +815,7 @@ class _Conversion:
                 result=DocumentResult.model_validate(header["result"]),
                 crops=dict(zip(ids, crops, strict=True)),
                 checks=[Check.model_validate(c) for c in header["checks"]],
+                facts=StepFacts.model_validate(facts) if (facts := header.get("facts")) else None,
             )
         except ValueError:  # pydantic's ValidationError
             raise _Protocol("result") from None

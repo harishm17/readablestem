@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded
@@ -53,7 +53,7 @@ from readablestem.core.types import (
     SecondReaderSummary,
     Status,
 )
-from readablestem.models.math_readers.base import MathReader, ReadRequest
+from readablestem.models.math_readers.base import MathReader, ReaderCall, ReadRequest
 from readablestem.observability.logging import log_fields
 from readablestem.pipeline import equation_step, math_canonical, reading_alternatives
 from readablestem.pipeline.math_canonical import Kind as Sameness
@@ -91,6 +91,8 @@ class Summary:
     over_budget: int = 0
     seconds: float = 0.0
     cost_usd: float = 0.0
+    # Each read made, with the page of its equation (`pipeline.step_facts`).
+    calls: list[tuple[int, ReaderCall]] = field(default_factory=list)
 
     def record(self) -> SecondReaderSummary:
         return SecondReaderSummary(
@@ -219,6 +221,7 @@ def reconcile(
             skip(UNAVAILABLE)
             continue
         summary.cost_usd += result.call.cost_usd
+        summary.calls.append((element.page, result.call))
         if not result.candidates:
             skip(UNAVAILABLE)
             continue

@@ -104,6 +104,20 @@ def register(
     )
     report.add_argument("--days", type=int, default=7, help="UTC days back, today included")
     report.set_defaults(func=_cmd_report)
+    steps = sub.add_parser(
+        "step-report",
+        help="model calls, tokens, dollars and seconds of finished jobs, by step and by "
+        "stage (no content)",
+    )
+    steps.add_argument(
+        "--job", action="append", default=[], metavar="ID", help="only this job (repeatable)"
+    )
+    steps.add_argument(
+        "--days", type=float, default=7.0, help="jobs finished in the last DAYS days (default 7)"
+    )
+    steps.add_argument("--last", type=int, help="at most this many jobs, the newest first")
+    steps.add_argument("--json", action="store_true", help="the report as JSON")
+    steps.set_defaults(func=_cmd_step_report)
     export = sub.add_parser(
         "export-opted-in",
         help="copy opted-in jobs (crops, results, review labels) for error analysis",
@@ -371,6 +385,30 @@ def _cmd_report(args: argparse.Namespace) -> int:
     except SQLAlchemyError as exc:
         return _db_error(exc)
     print(text, end="")
+    return 0
+
+
+def _cmd_step_report(args: argparse.Namespace) -> int:
+    """Prints codes, counts, seconds and dollars only (`ops.step_report`)."""
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    from readablestem.ops import step_report
+    from readablestem.web import step_facts
+    from readablestem.web.db import session_scope
+
+    try:
+        with session_scope(_factory()) as session:
+            jobs = step_facts.measured(
+                session,
+                job_ids=args.job or None,
+                since=None if args.job else datetime.now(UTC) - timedelta(days=args.days),
+                last=args.last,
+            )
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    made = step_report.report(jobs)
+    print(json.dumps(made.as_dict(), indent=2) if args.json else step_report.render(made))
     return 0
 
 

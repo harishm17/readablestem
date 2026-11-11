@@ -3053,6 +3053,9 @@ test fails when a table with a user id is added without it.
   it when the two were merged) and `d3f8a1c5b920` (`upload_results`: the answer to an upload of
   several files, kept an hour). `tests/test_web_migrations.py` checks the chain, the one head
   and both downgrades.
+- `8b1d5f3a9e04` (step facts, after `c2f4a8d61e57`): the tables `job_calls` and `job_stages`
+  (operations.md, "Step facts and the step report"). Additive; the downgrade drops them.
+  `tests/test_web_jobs_migrations.py` runs it up and down on SQLite.
 - `a6c2e9f4b713` (open sign-up): `users.access_tier` (server default
   `invited`, which is also the backfill: every existing account was added by an admin),
   `spend_days.open_spent_usd` and `open_held_usd`, `quota_days.rereads` (all server default 0)

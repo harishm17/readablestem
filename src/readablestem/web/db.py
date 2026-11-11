@@ -242,6 +242,47 @@ class StepRecord(Base):
     __table_args__ = (UniqueConstraint("job_id", "element_id", name="uq_step_record_slot"),)
 
 
+class JobCall(Base):
+    """One request a job sent to a model, with the page it was about (`core.types.CallFact`,
+    kept by `web.step_facts`). Codes, counts, seconds and dollars: no document text and
+    nobody's id. The rows of a job are replaced each time it is converted, and deleted
+    with it."""
+
+    __tablename__ = "job_calls"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)  # its place among the job's calls
+    step: Mapped[str] = mapped_column(String(32))
+    page: Mapped[int | None] = mapped_column(Integer)  # 0-based; NULL: the whole document
+    model: Mapped[str] = mapped_column(String(64))
+    counted: Mapped[bool] = mapped_column(Boolean)  # in the job's call count
+    input_tokens: Mapped[int] = mapped_column(Integer)
+    cached_input_tokens: Mapped[int] = mapped_column(Integer)
+    cache_creation_input_tokens: Mapped[int] = mapped_column(Integer)
+    output_tokens: Mapped[int] = mapped_column(Integer)
+    reasoning_tokens: Mapped[int] = mapped_column(Integer)
+    cost_usd: Mapped[float] = mapped_column(Float)
+    seconds: Mapped[float] = mapped_column(Float)
+    attempt: Mapped[int] = mapped_column(Integer)
+    is_fallback: Mapped[bool] = mapped_column(Boolean)
+    outcome: Mapped[str] = mapped_column(String(32))
+
+
+class JobStage(Base):
+    """The wall time of one stage of a job's last conversion (`core.types.StageFact`). The
+    stages of a job do not overlap; `queue_wait` is the time before a worker took it.
+    Replaced and deleted like `JobCall`."""
+
+    __tablename__ = "job_stages"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)  # the order the stages began in
+    stage: Mapped[str] = mapped_column(String(32))
+    seconds: Mapped[float] = mapped_column(Float)
+
+
 class ReviewEdit(Base):
     """A reviewer's decision on one fix. Kept only as long as its job."""
 

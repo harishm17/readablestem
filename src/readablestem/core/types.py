@@ -1212,11 +1212,50 @@ class DocumentResult(BaseModel):
         return next((f for f in self.fixes if f.element_id == element_id), None)
 
 
+class CallFact(BaseModel):
+    """One request a conversion sent to a model, with the page it was about. Content-free:
+    codes, counts, seconds and dollars (`pipeline.step_facts`)."""
+
+    # A `ModelCall.step`, or "second_check" (a `Verification`) or "second_reader".
+    step: str
+    page: int | None = None  # 0-based; None for a request about the whole document
+    model: str = ""
+    # Whether it is in the job's call count. A second check or second reading is not: only
+    # its dollars count toward the job's limits.
+    counted: bool = True
+    input_tokens: int = 0  # the whole prompt, cached and cache-written tokens included
+    cached_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost_usd: float = 0.0
+    seconds: float = 0.0
+    attempt: int = 1
+    is_fallback: bool = False
+    outcome: str = "ok"
+
+
+class StageFact(BaseModel):
+    """The wall time of one stage of a job. The stages of a job do not overlap."""
+
+    stage: str
+    seconds: float
+
+
+class StepFacts(BaseModel):
+    """What a conversion measured of itself (`pipeline.step_facts`). Content-free."""
+
+    calls: list[CallFact] = Field(default_factory=list)
+    stages: list[StageFact] = Field(default_factory=list)
+
+
 class ConversionOutput(BaseModel):
-    """Return value of `pipeline.run.convert_pdf`: the result plus element crops (PNG)."""
+    """Return value of `pipeline.run.convert_pdf`: the result plus element crops (PNG), and
+    the conversion's own measurements when it made any."""
 
     result: DocumentResult
     crops: dict[str, bytes] = Field(default_factory=dict)  # element_id -> PNG bytes
+    facts: StepFacts | None = None
 
 
 # --------------------------------------------------------------------------- notation

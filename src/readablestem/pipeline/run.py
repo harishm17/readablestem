@@ -111,6 +111,7 @@ from readablestem.core import triage
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import (
     BBox,
+    CallFact,
     Check,
     ConversionOptions,
     ConversionOutput,
@@ -153,6 +154,7 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    step_facts,
     table_math,
     table_step,
     tagged,
@@ -1552,6 +1554,7 @@ def _page_math_pass(
     pages: list[int] | None,
     concurrency: int,
     tracer: Tracer,
+    measured: list[CallFact],
 ) -> tuple[Any, PageMathSummary]:
     """The page math pass (ADR 0006) and the second layout run that lays its verified plan
     over layout's rules. Fails open: a page the model could not answer, a cap that stopped
@@ -1567,6 +1570,8 @@ def _page_math_pass(
         result = page_math.run(client, settings, offered, concurrency=concurrency)
         plan = result.plan
         calls = result.calls
+        for number, asked in plan.pages.items():
+            measured.extend(step_facts.of_calls(asked.calls, number))
         applied = page_math_reconcile.PageMathHook(plan)
         answered = [n for n, p in plan.pages.items() if p.failed is None]
         if answered:
@@ -1625,6 +1630,7 @@ def _page_witness_pass(
     settings: Settings,
     concurrency: int,
     tracer: Tracer,
+    measured: list[CallFact],
 ) -> tuple[list[Element], PageWitnessSummary]:
     """The page witness (`pipeline/page_witness.py`) over the document's maths pages and its
     reconciliation with the elements layout found (`pipeline/witness_reconcile.py`): the
@@ -1647,6 +1653,8 @@ def _page_witness_pass(
         result = page_witness.run(client, settings, offered, concurrency=concurrency)
         plan = result.plan
         calls = result.calls
+        for number, asked in plan.pages.items():
+            measured.extend(step_facts.of_calls(asked.calls, number))
         reconciled = witness_reconcile.ReconcileStats()
         try:
             done = witness_reconcile.reconcile(elements, plan, collector.rows, collector.objects)
@@ -1703,6 +1711,7 @@ def _image_pages_pass(
     concurrency: int,
     tracer: Tracer,
     observer: Callable[[ModelCall], None] | None,
+    measured: list[CallFact],
     step_cache: StepCache | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept scanned and handwritten pages from a picture of each (ADR 0007).
@@ -1763,6 +1772,8 @@ def _image_pages_pass(
             if page_built is not None:
                 built[number] = page_built
         summary = image_page.summarise(result.reads, built, settings, result.stopped)
+        for number, read in result.reads.items():
+            measured.extend(step_facts.of_calls(read.calls, number))
         _annotate(
             span,
             cost_usd=summary.cost_usd,
@@ -1794,6 +1805,10 @@ def _convert(
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    # What this conversion measures of itself (`pipeline.step_facts`): each stage's wall
+    # time, and every request to a model with its page.
+    watch = step_facts.Stopwatch()
+    measured: list[CallFact] = []
     # The page-level passes ask through the job's kept answers when it has any.
     page_client: VisionClient = (
         client if step_cache is None else _PageAnswers(client, step_cache, settings)
@@ -1802,6 +1817,7 @@ def _convert(
         cached = _CachedDocument(pdf_bytes)
         try:
             _send(stage_progress, "layout")
+            watch.stage("layout")
             collector = (
                 page_math_reconcile.PageMathHook()
                 if options.page_math or options.page_witness
@@ -1821,6 +1837,7 @@ def _convert(
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
             if collector is not None and options.page_math:
+                watch.stage("page_math")
                 doc, page_math_summary = _page_math_pass(
                     pdf_bytes,
                     doc,
@@ -1830,8 +1847,10 @@ def _convert(
                     pages=pages,
                     concurrency=concurrency,
                     tracer=tracer,
+                    measured=measured,
                 )
             if collector is not None and options.page_witness:
+                watch.stage("page_witness")
                 witnessed, witness_summary = _page_witness_pass(
                     pdf_bytes,
                     doc,
@@ -1840,7 +1859,9 @@ def _convert(
                     settings=settings,
                     concurrency=concurrency,
                     tracer=tracer,
+                    measured=measured,
                 )
+            watch.stage("layout")
             elements = sorted(
                 doc.elements if witnessed is None else witnessed, key=lambda e: e.order
             )
@@ -1853,6 +1874,7 @@ def _convert(
             image_summary: ImagePagesSummary | None = None
             vector_pages: dict[int, image_page_vector.VectorPage] = {}
             if options.image_pages:
+                watch.stage("image_pages")
                 # (a picture under a text layer that does not cover it is kept as an
                 # unread page and read as a scan: `page_type.reads_image`)
                 to_read = {
@@ -1880,7 +1902,9 @@ def _convert(
                     tracer=tracer,
                     observer=call_observer,
                     step_cache=step_cache,
+                    measured=measured,
                 )
+                watch.stage("layout")
                 for number in image_built:
                     kept.pop(number)  # read: no longer an image kept whole
                 # What layout read from a page the pass read (the watermark, header or page
@@ -1934,6 +1958,7 @@ def _convert(
                 for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 
+            watch.stage("steps")
             _process(run, elements, page_list, cached, text_and_headings)
             text = made[0]
             elements = text.elements
@@ -1945,6 +1970,7 @@ def _convert(
         reading_cost = 0.0
         reading_notices: list[Notice] = []
         if image_built and settings.image_pages_second_reader != "off":
+            watch.stage("second_readings")
             with _span(tracer, "second_readings") as reading_span:
                 share = image_page_reconcile.share_s(
                     settings, time_limit_s, time.perf_counter() - started
@@ -1952,6 +1978,9 @@ def _convert(
                 reconciled = _second_readings(elements, run, settings, readers, share_s=share)
                 if reconciled is not None:
                     reading_cost = reconciled.cost_usd
+                    measured.extend(
+                        step_facts.of_reader_call(call, page) for page, call in reconciled.calls
+                    )
                     reading_notices = reconciled.notices()
                     if image_summary is not None:
                         image_summary.second_reader = reconciled.record()
@@ -1962,10 +1991,14 @@ def _convert(
                         differed=reconciled.differed,
                         cost_usd=reconciled.cost_usd,
                     )
+        watch.stage("assemble")
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         elements, run.fixes = table_math.settle(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
+        page_of = {e.id: e.page for e in elements}
+        for fix in ordered:
+            measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
@@ -1984,7 +2017,9 @@ def _convert(
                 footnote_ids=footnotes,
             )
             _send(stage_progress, "checks")
+            watch.stage("checks")
             checks = html_checks.static_checks(html)
+        facts = step_facts.gathered(measured, watch)
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
         if page_math_summary is not None:
@@ -2085,4 +2120,4 @@ def _convert(
         result.prompt_versions["image_page"] = image_page.PROMPT_VERSION
         if settings.image_pages_second_reading:
             result.prompt_versions["image_page_crops"] = image_page_check.PROMPT_VERSION
-    return PipelineOutput(result=result, crops=run.crops, checks=checks)
+    return PipelineOutput(result=result, crops=run.crops, checks=checks, facts=facts)

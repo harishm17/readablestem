@@ -4,6 +4,7 @@ replay, per-user daily spend, the sign-up cap warning, and the larger connection
 from __future__ import annotations
 
 import csv
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -15,6 +16,7 @@ from fixtures.web.support import ADMIN, WebEnv, login
 from readablestem.cli.main import main
 from readablestem.config import get_settings
 from readablestem.core.budget import BudgetExceeded
+from readablestem.core.types import CallFact, StageFact, StepFacts
 from readablestem.ops import heartbeat
 from readablestem.ops.retention import (
     erase_user,
@@ -23,7 +25,7 @@ from readablestem.ops.retention import (
     replay_erasures,
     user_hash,
 )
-from readablestem.web import db
+from readablestem.web import db, step_facts
 from readablestem.web.database import utc_today
 from readablestem.web.db import (
     ErasureLedger,
@@ -261,6 +263,68 @@ def test_the_admin_page_lists_spend_by_pseudonym_never_by_email(tmp_path):
         in page
     )
     assert f"u-{admin_id[:8]}" in page and ADMIN not in page.split("Spend by person")[1][:400]
+
+
+def test_the_admin_page_and_the_step_report_show_what_recent_documents_took(
+    tmp_path, capsys, monkeypatch
+):
+    env = WebEnv(tmp_path)
+    ended = datetime.now(UTC) - timedelta(hours=1)
+    facts = StepFacts(
+        calls=[
+            CallFact(
+                step="describe",
+                page=page,
+                model="model-a",
+                input_tokens=1000,
+                cached_input_tokens=cached,
+                cost_usd=0.04,
+                seconds=3.0,
+            )
+            for page, cached in ((1, 0), (2, 600))
+        ],
+        stages=[
+            StageFact(stage="queue_wait", seconds=40.0),
+            StageFact(stage="layout", seconds=2.0),
+            StageFact(stage="steps", seconds=6.0),
+        ],
+    )
+    with env.running() as web:
+        login(web, ADMIN)
+        with session_scope(env.ctx.factory) as session:
+            admin = session.scalar(select(User).where(User.email == ADMIN))
+            assert admin is not None
+            job = db.Job(
+                user_id=admin.id,
+                filename="notes.pdf",
+                status="done",
+                page_count=2,
+                cost_usd=0.08,
+                model_calls=2,
+                started_at=ended - timedelta(seconds=8),
+                finished_at=ended,
+                retain_until=ended + timedelta(days=1),
+            )
+            session.add(job)
+            session.flush()
+            step_facts.keep(session, job.id, facts)
+        page = " ".join(web.get("/admin").text.split())
+        shown = page.split("Model work of recent documents")[1].split("</section>")[0]
+        # 600 of 2,000 input tokens came from the cache; 8 s and $0.08 over two pages.
+        assert all(figure in shown for figure in ("30%", "4.0", "$0.04"))
+        monkeypatch.setenv("DATABASE_URL", str(env.ctx.factory.kw["bind"].url))
+        get_settings.cache_clear()
+        try:
+            capsys.readouterr()
+            assert main(["ops", "step-report", "--json"]) == 0
+        finally:
+            get_settings.cache_clear()
+    made = json.loads(capsys.readouterr().out)
+    assert (made["jobs"], made["pages"], made["calls"]) == (1, 2, 2)
+    assert made["usd"] == made["settled_usd"] == pytest.approx(0.08)
+    assert made["cache_read"] == pytest.approx(0.3)
+    assert [stage["stage"] for stage in made["stages"]] == ["queue_wait", "layout", "steps"]
+    assert (made["stage_s"], made["wall_s"]) == (8.0, 8.0)
 
 
 # --------------------------------------------------------------------------- sign-up cap

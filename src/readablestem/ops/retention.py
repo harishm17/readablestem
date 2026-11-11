@@ -60,7 +60,9 @@ from readablestem.web.db import (
     ErasureLedger,
     Event,
     Job,
+    JobCall,
     JobShare,
+    JobStage,
     LinkedEmail,
     LoginLink,
     PendingUpload,
@@ -252,6 +254,8 @@ def delete_jobs(
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     session.execute(delete(JobShare).where(JobShare.job_id.in_(ids)))
     session.execute(delete(StepRecord).where(StepRecord.job_id.in_(ids)))
+    session.execute(delete(JobCall).where(JobCall.job_id.in_(ids)))
+    session.execute(delete(JobStage).where(JobStage.job_id.in_(ids)))
     jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
     # The student-file images made from the figures are kept in memory for a while
     # (`pipeline.figure_images`); a deleted document's go with it.

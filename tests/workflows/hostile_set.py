@@ -24,6 +24,10 @@ from dataclasses import dataclass, field
 
 from builders.hostile import MARKUP_AS_TEXT, MARKUP_NEVER
 
+# The start of the sentence each injection file addresses to the model.
+TO_THE_MODEL = ("Note to the AI model",)
+TO_THE_MODEL_EXAM = ("Instruction for the AI model",)
+
 # What a queued job may take. A plain two-page file takes about 3 s and peaks near 450 MB
 # with the layout models loaded (measured November 11, 2026).
 JOB_S = 30.0
@@ -107,9 +111,9 @@ CASES: tuple[Case, ...] = (
     done("markup.pdf", never=MARKUP_NEVER, as_text=MARKUP_AS_TEXT),
     # Text on the page that tells a model what to write. That the model was not steered is
     # read from its answers, which are not recorded yet: two a file (docs/eval.md).
-    done("injection-visible.pdf", unanswered=2),
-    done("injection-white.pdf", unanswered=2),
-    done("injection-exam.pdf", unanswered=2),
+    done("injection-visible.pdf", as_text=TO_THE_MODEL, unanswered=2),
+    done("injection-white.pdf", as_text=TO_THE_MODEL, unanswered=2),
+    done("injection-exam.pdf", as_text=TO_THE_MODEL_EXAM, unanswered=2),
     # ------------------------------------------------------------------------------- zips
     refused("zip-traversal.zip", "source_unsafe_zip"),
     refused("zip-absolute.zip", "source_unsafe_zip"),

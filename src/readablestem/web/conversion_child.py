@@ -482,6 +482,7 @@ def _main(args: list[str]) -> int:
             "op": "done",
             "result": output.result.model_dump(mode="json"),
             "checks": [c.model_dump(mode="json") for c in getattr(output, "checks", [])],
+            "facts": output.facts.model_dump(mode="json") if output.facts else None,
             "crop_ids": list(output.crops),
         }
         blobs = list(output.crops.values())
