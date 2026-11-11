@@ -11,6 +11,12 @@
   publisher's URL does not serve stable bytes.
 - `builder`: a file a builder under `tests/workflows/builders/` makes on demand.
 
+The model answers recorded for these files (`eval/answers.py`) are replayed by the workflow
+tests, which call nothing. An answer repeats what its file says (an equation, a table, the
+words of a scanned page), so it goes where its file may go: `answers.jsonl.gz` in the corpus
+folder holds the answers read from files that may be committed, and `KEPT_OUT`, in the
+cache beside the fetched files, holds the rest. `scripts/corpus_refresh.py` rebuilds both.
+
 Reading-order labels ("gold") sit in `gold/`, one file per entry. For committed and builder
 entries the labels hold the text of each block. For public entries they hold no text: each
 block is a list of character ranges into the page's own words, so the text exists only once
@@ -19,6 +25,7 @@ the file has been fetched, and a hash per block proves it was rebuilt exactly.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import importlib
 import json
@@ -41,7 +48,11 @@ import pymupdf
 REPO = Path(__file__).resolve().parents[3]
 CORPUS = REPO / "tests" / "workflows" / "corpus"
 MANIFEST = CORPUS / "corpus.json"
-CACHE = REPO / ".cache" / "corpus"
+ANSWERS = CORPUS / "answers.jsonl.gz"
+# Fetched files, and the answers read from them. `CORPUS_CACHE` names a folder that several
+# checkouts share.
+CACHE = Path(os.environ.get("CORPUS_CACHE") or REPO / ".cache" / "corpus")
+KEPT_OUT = CACHE / "answers.jsonl.gz"
 
 # Sites a public entry may be fetched from, and sites an entry may cite without fetching.
 FETCH_HOSTS = frozenset({"ocw.mit.edu", "arxiv.org", "upload.wikimedia.org"})
@@ -101,6 +112,12 @@ class Entry:
     def own(self) -> bool:
         """Made for this repository, so no one else's license applies."""
         return self.license == OWN_LICENSE
+
+    @property
+    def may_commit(self) -> bool:
+        """Whether the file, and so an answer that repeats what it says, may be in the
+        repository."""
+        return self.own or self.license in COMMIT_LICENSES
 
 
 def sha256(data: bytes) -> str:
@@ -381,6 +398,29 @@ def document(entry: Entry, *, cache: Path = CACHE, get: Fetcher = download) -> b
     if entry.kind == "committed":
         return verify((CORPUS / entry.path).read_bytes(), entry.sha256, entry.path)
     return _builders().build(entry.builder)
+
+
+# --- Recorded answers -----------------------------------------------------------------
+
+
+def read_answers(path: Path = ANSWERS) -> list[dict]:
+    """The recorded answers, one row per model answer. None recorded yet: an empty list."""
+    if not path.is_file():
+        return []
+    with gzip.open(path, "rt", encoding="utf-8") as lines:
+        return [json.loads(line) for line in lines if line.strip()]
+
+
+def write_answers(rows: list[dict], path: Path = ANSWERS) -> None:
+    """Write `rows` as the recorded answers: sorted by step and key (answers under one key
+    keep their order) and with no time in the archive, so the same rows give the same bytes
+    and a refresh that changed nothing changes nothing."""
+    from readablestem.proof.bundle import dump_line
+
+    ordered = sorted(rows, key=lambda row: (row["step"], row["k"]))  # a stable sort
+    text = "".join(dump_line(row) + "\n" for row in ordered)
+    with path.open("wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as out:
+        out.write(text.encode("utf-8"))
 
 
 # --- Gold -----------------------------------------------------------------------------

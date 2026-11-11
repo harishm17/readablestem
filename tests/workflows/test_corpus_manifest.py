@@ -40,7 +40,7 @@ def test_every_entry_names_its_source_license_and_hash() -> None:
 
 
 def test_every_file_in_the_corpus_folder_is_listed_and_matches_its_hash() -> None:
-    listed = {"corpus.json", "README.md", "print_selfmade.py"}
+    listed = {"corpus.json", "README.md", "print_selfmade.py", corpus.ANSWERS.name}
     for entry in ENTRIES.values():
         if entry.kind == "committed":
             listed.add(entry.path)

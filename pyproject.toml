@@ -124,11 +124,12 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -m 'not network and not live_model and not browser and not slow'"
+addopts = "-ra -m 'not network and not live_model and not browser and not slow and not workflow'"
 markers = [
     "network: hits the live OpenStax API (run with: uv run pytest -m network)",
     "live_model: calls the real OpenAI or Anthropic API and costs money (run with: uv run pytest -m live_model)",
     "browser: needs Playwright Chromium (run with: uv run pytest -m browser)",
     "postgres: needs a Postgres server (DATABASE_URL or embedded pgserver)",
     "slow: minutes-long upgrade checks (run with: make fuzz-tables)",
+    "workflow: converts corpus files through the app from recorded answers (run with: uv run pytest -m workflow -n auto --dist loadfile)",
 ]

@@ -132,6 +132,22 @@ def test_offline_refuses_a_missing_answer_and_sends_nothing(tmp_path: Path) -> N
     assert not (tmp_path / "none.jsonl").exists()
 
 
+def test_a_run_stops_paying_for_new_answers_at_its_limit(tmp_path: Path) -> None:
+    path = tmp_path / "answers.jsonl"
+    inner = FakeVisionClient(defaults={"equation": ANSWER})
+    first = CachedClient(inner, path, settings())
+    _, paid = first.run(request(), EquationOutput)
+    assert paid.cost_usd > 0
+
+    # The limit is for the process and the file: a second client finds it spent. What the
+    # file already holds is still answered, and is not counted as spending.
+    capped = CachedClient(inner, path, settings(), live_limit_usd=paid.cost_usd)
+    parsed, call = capped.run(request(images=[PNG + b"2"]), EquationOutput)
+    assert parsed is None and call.outcome == "refused" and call.cost_usd == 0.0
+    assert capped.run(request(), EquationOutput)[0] is not None
+    assert len(inner.requests) == 1 and len(load_rows(path)) == 1
+
+
 def test_an_answer_lost_to_an_outage_is_not_kept(tmp_path: Path) -> None:
     path = tmp_path / "a.jsonl"
     inner = FakeVisionClient(fail_models={"claude-opus-5-5": "api_error"})

@@ -35,6 +35,7 @@ operations = [
   "MODEL_ANSWERS_FILE",
   "MODEL_ANSWERS_OFFLINE",
   "MODEL_ANSWERS_REKEY",
+  "MODEL_ANSWERS_LIVE_USD",
   "DECISIONS_TIMEOUT_S",
   "DECISIONS_CANARY",
   "CLAUDE_CHECK_TIMEOUT_S",
@@ -136,9 +137,9 @@ ANTHROPIC_REFUSAL_FALLBACK = { value = true, source = "not stated; code default"
 AUTO_ACCEPT_CONFIDENCE = { value = 0.85, source = "not stated; code default" }
 ABSTAIN_CONFIDENCE = { value = 0.4, source = "not stated; code default" }
 DECISIONS_MODEL = { value = "gpt-6-luna", source = "not stated; code default" }
-DECISIONS_FIGURE_VERIFY = { value = true, source = "not stated; code default" }
+DECISIONS_FIGURE_VERIFY = { value = false, source = "railway variables as recorded for the audit server of 2026-11-09; does nothing while MODEL_PROVIDER=anthropic (.railway/railway.ts:98)" }
 DECISIONS_FIGURE_FLAG_BELOW = { value = 0.5, source = "not stated; code default" }
-DECISIONS_EQUATION_SHADOW = { value = true, source = "not stated; code default" }
+DECISIONS_EQUATION_SHADOW = { value = false, source = "railway variables as recorded for the audit server of 2026-11-09; does nothing while MODEL_PROVIDER=anthropic (.railway/railway.ts:98)" }
 DECISIONS_EQUATION_FLAG_AT = { value = 0.2, source = "not stated; code default" }
 CLAUDE_SECOND_CHECK = { value = "off", source = ".railway/railway.ts:136-138 and docs/deploy-railway.md:163 at 693cca24, off since 2026-11-09" }
 CLAUDE_CHECK_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }

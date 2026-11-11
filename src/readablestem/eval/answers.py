@@ -27,6 +27,11 @@ A file recorded under the older key (before the answer format and the fence were
 it) is read with `rekey`: a request found only under its old key is answered from that row,
 and the row is appended again under the new key, so one replay of the runs a file was made
 for moves it to the new keys without a call. Rows no run asks for stay as they were.
+
+`live_limit_usd` bounds what a process spends on new answers for one file: once the calls
+it paid for add up to the limit, a miss is refused as it is offline. Replayed answers cost
+nothing and do not count. The limit is checked before a call, so the overshoot is at most
+the calls already on their way.
 """
 
 from __future__ import annotations
@@ -56,6 +61,8 @@ __all__ = [
 
 _FILE_LOCKS: dict[Path, threading.Lock] = {}
 _FILE_LOCKS_GUARD = threading.Lock()
+# What this process has paid for new answers, by answers file (`live_limit_usd`).
+_LIVE_SPENT: dict[Path, float] = {}
 
 
 def _file_lock(path: Path) -> threading.Lock:
@@ -80,13 +87,24 @@ class CachedClient:
 
     `inner` None (offline): a miss comes back refused, with no call and no cost.
     `rekey`: a request the file holds only under its older key is answered from that row and
-    the row is written again under the new key (module docstring)."""
+    the row is written again under the new key (module docstring).
+    `live_limit_usd`: stop asking `inner` once this process has paid that much for new
+    answers in this file."""
 
-    def __init__(self, inner: Any, path: Path, settings: Settings, *, rekey: bool = False) -> None:
+    def __init__(
+        self,
+        inner: Any,
+        path: Path,
+        settings: Settings,
+        *,
+        rekey: bool = False,
+        live_limit_usd: float | None = None,
+    ) -> None:
         self._inner = inner
         self._path = path
         self._settings = settings
         self._rekey = rekey
+        self._live_limit = live_limit_usd
         self._lock = threading.Lock()
         self._answers = AnswerSet(load_rows(path))
         self._local = threading.local()  # per thread: did the last first attempt only stage?
@@ -97,6 +115,8 @@ class CachedClient:
         self.misses = 0
         self.rekeyed = 0
         self.missed_because: Counter[str] = Counter()
+        # The keys this client answered from the file or wrote to it: what a refresh keeps.
+        self.used: set[str] = set()
         self.live_cost_usd = 0.0
         self.replayed_cost_usd = 0.0
         self._steps: dict[str, dict[str, float]] = {}
@@ -129,6 +149,7 @@ class CachedClient:
             if row is not None:
                 self.hits += 1
                 self.rekeyed += moved is not None
+                self.used.add(key)
             else:
                 self.misses += 1
                 self.missed_because[self._answers.why_missing(parts)] += 1
@@ -145,7 +166,7 @@ class CachedClient:
                 return schema.model_validate(payload), call
             except ValueError:
                 return None, call.model_copy(update={"outcome": "invalid_output"})
-        if self._inner is None:
+        if self._inner is None or self._limit_spent():
             call = ModelCall(
                 step=request.step,
                 model=request.model,
@@ -159,11 +180,20 @@ class CachedClient:
             self._local.staged = True
             return parsed, call
         self.live_cost_usd += call.cost_usd
+        with _file_lock(self._path):
+            spent = _LIVE_SPENT.get(self._path.resolve(), 0.0)
+            _LIVE_SPENT[self._path.resolve()] = spent + call.cost_usd
         self._tally(call)
         # An answer lost to an outage or a budget stop is not worth keeping: ask again later.
         if call.outcome in ("ok", "invalid_output", "refused"):
             self.record(key, request.step, parsed, call, parts)
         return parsed, call
+
+    def _limit_spent(self) -> bool:
+        if self._live_limit is None:
+            return False
+        with _file_lock(self._path):
+            return _LIVE_SPENT.get(self._path.resolve(), 0.0) >= self._live_limit
 
     def record(
         self,
@@ -187,6 +217,7 @@ class CachedClient:
 
     def _write(self, row: dict[str, Any]) -> None:
         self._answers.add(row)
+        self.used.add(row["k"])
         # One lock per file for the process: the web app builds a client per job and per
         # re-read, and two of them may append to the same file at once.
         with _file_lock(self._path):

@@ -179,10 +179,12 @@ class Settings(BaseSettings):
     # With MODEL_ANSWERS_OFFLINE=true a miss is refused instead of asked, so a replay spends
     # nothing. Ignored with FAKE_MODELS. Refused in production. MODEL_ANSWERS_REKEY=true reads
     # a file recorded under the older key: a request found only under its old key is answered
-    # from that row, and the row is written again under the new one.
+    # from that row, and the row is written again under the new one. MODEL_ANSWERS_LIVE_USD
+    # bounds what one process pays for answers the file lacks: past it a miss is refused.
     model_answers_file: Path | None = None
     model_answers_offline: bool = False
     model_answers_rekey: bool = False
+    model_answers_live_usd: float | None = Field(default=None, ge=0)
 
     # --- second automated check: the OpenAI Decisions API (ADR 0005, docs/steps.md)
     # All the DECISIONS_* settings take effect only with MODEL_PROVIDER=openai

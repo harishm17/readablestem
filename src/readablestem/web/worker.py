@@ -207,7 +207,8 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
 
     With MODEL_ANSWERS_FILE (dev and test only) the real client sits behind the file of
     recorded answers: a recorded request is answered from it at no cost, any other is asked
-    and appended (or, with MODEL_ANSWERS_OFFLINE, refused). Conversions and review-screen
+    and appended (or, with MODEL_ANSWERS_OFFLINE or past MODEL_ANSWERS_LIVE_USD, refused).
+    Conversions and review-screen
     re-reads both come through here, so both are recorded.
     """
     from readablestem import models
@@ -224,6 +225,7 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
         settings.model_answers_file,
         settings,
         rekey=settings.model_answers_rekey,
+        live_limit_usd=settings.model_answers_live_usd,
     )
     keep_second_check_answers(client, cached, offline=offline)
     return cached
