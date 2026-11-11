@@ -39,7 +39,9 @@ _RANGES = [
     "\x0b\x0c",
     "\x0e-\x1f",
     "\x7f-\x9f",  # DEL and the C1 controls
-    "\ud800-\udfff",  # lone surrogates
+    # Lone surrogates, escaped for `re` (raw string): a str literal holding them cannot be
+    # encoded as UTF-8 (tests/test_source_portability.py).
+    r"\ud800-\udfff",
     "\ue000-\uf8ff",  # private use
     "\ufdd0-\ufdef",  # noncharacters
     "\ufffd\ufffe\uffff",  # the replacement character, noncharacters
