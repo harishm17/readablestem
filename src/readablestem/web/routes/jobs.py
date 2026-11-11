@@ -1416,7 +1416,9 @@ def load_job_status(request: Request, job_id: str, user: CurrentUser) -> JobView
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = current_html(ctx, session, job_access(session, job_id, user, VIEW))
-        closed = job.status == JobStatus.QUEUED and conversions_closed(ctx, user) is not None
+        # Today's budget matters to a waiting job and to the parts listed beside one.
+        waits = job.status == JobStatus.QUEUED or bool(job.part_group)
+        closed = waits and conversions_closed(ctx, user) is not None
         return job_view(
             session,
             job,
@@ -1467,7 +1469,7 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     context["word_export"] = export_docx.available()  # the Word button needs pandoc
     # When "Keep for 7 days" would delete it (None: the button is not offered). Only a state
     # with something to keep offers it (F-316).
-    keeps = context["state"].keeps
+    keeps = job.state is not None and job.state.keeps
     context["keep_until"] = (
         retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
     )

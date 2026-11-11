@@ -91,6 +91,15 @@ def test_a_job_stopped_early_says_so_in_the_title_status_and_results(web):
     assert 'id="partial-note"' in html
 
 
+def test_a_budget_stop_that_left_nothing_unconverted_has_no_gap_note(web):
+    """F-319: a job stored with a budget stop but nothing left out says no "0 of N"."""
+    job_id = convert(web, stopped_by="budget_daily")
+    assert web.job(job_id).error_code == "budget_daily"
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert "0 of" not in page_text(html)
+    assert 'id="partial-note"' not in html
+
+
 def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     pages = [PageStats(page=p, elements=1, fixes=1, cost_usd=0, latency_ms=0) for p in (0, 1)]
     result = web.converter.output.result

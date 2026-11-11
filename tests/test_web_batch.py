@@ -4,12 +4,15 @@ with its live status and its summary line, polling, "Download all", and who may 
 
 from __future__ import annotations
 
+import copy
 import re
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import select
 
 from fixtures.web.support import (
+    ADMIN,
     ALICE,
     BOB,
     WebEnv,
@@ -20,8 +23,17 @@ from fixtures.web.support import (
 )
 from readablestem.core import sandbox
 from readablestem.source import latexml
-from readablestem.web import access
-from readablestem.web.db import Job, QuotaDay, User, session_scope
+from readablestem.web import access, states
+from readablestem.web.database import utc_today
+from readablestem.web.db import (
+    Job,
+    JobStatus,
+    QuotaDay,
+    SpendDay,
+    User,
+    session_scope,
+    utcnow,
+)
 from source_support import make_zip
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x$.\n\\end{document}\n"
@@ -325,3 +337,90 @@ def test_a_deleted_document_is_a_deleted_row(web):
     assert delete.status_code in {200, 303}
     text = text_of(web.alice.get(url).text)
     assert "1 deleted" in text
+
+
+# --------------------------------------------------------------------------- one state table
+
+
+def _decide_all(result: dict) -> dict:
+    result = copy.deepcopy(result)
+    for fix in result["fixes"]:
+        fix["status"], fix["review"], fix["reason"] = "accepted", "none", None
+    return result
+
+
+def _set_state(job: Job, key: str) -> None:
+    """Stored facts that make `key` (`web.states`), on a converted job with 3 decisions open."""
+    now = utcnow()
+    if key in {"waiting", "restarting"}:
+        job.status, job.attempts, job.attempts_at_retry = JobStatus.QUEUED, 0, 0
+        job.attempts = 1 if key == "restarting" else 0  # put back after a lost attempt
+    elif key == "converting":
+        job.status, job.lease_until, job.pages_done = JobStatus.RUNNING, now + timedelta(hours=1), 0
+    elif key.startswith("stopped_"):
+        job.status = JobStatus.FAILED
+        job.error_code = {
+            "stopped_service": "timeout",
+            "stopped_no_tries": "timeout",
+            "stopped_file": "encrypted",
+            "stopped_limit": "budget_job_usd",
+            "stopped_unknown": "a_code_this_version_does_not_know",
+        }[key]
+        job.retries = 3 if key == "stopped_no_tries" else 0
+    elif key in {"partly_converted", "ready", "sample"}:
+        job.result_json = _decide_all(job.result_json or {})
+        job.error_code = "pages_not_converted" if key == "partly_converted" else None
+        job.is_sample = key == "sample"
+    elif key == "deleted":
+        job.retain_until = now - timedelta(minutes=1)
+
+
+def _badge(html: str, start: str) -> str:
+    at = html.index(start)
+    found = re.search(r'status-badge[^"]*">([^<]*)<', html[at : html.index("</tr>", at)])
+    assert found, start
+    return found.group(1).strip()
+
+
+# Every key of the table that stored facts make on this branch; `waiting_reset` needs the
+# day's budget spent and is checked after the others.
+WALKED = [k for k in states.TABLE if k != "waiting_reset"]
+
+
+def test_every_state_reads_the_same_on_every_surface_from_the_one_table(web):
+    """F-033, F-046, F-213: the job page, My documents, the batch page, the parts list and the
+    admin queue all print a state's label from `states.TABLE`; none keeps its own words."""
+    keys = ["host", *WALKED]
+    url = batch_url(send_zip(web.alice, make_zip({f"{k}.pdf": make_pdf(1) for k in keys})))
+    run_all(web)
+    by_key: dict[str, str] = {}
+    with session_scope(web.ctx.factory) as session:
+        for n, job in enumerate(sorted(session.scalars(select(Job)), key=lambda j: j.filename)):
+            key = job.filename.removesuffix(".pdf")
+            by_key[key] = job.id
+            job.part_group, job.part_label = "one-file", f"{n + 1}-{n + 1}"
+            _set_state(job, key)
+    admin = web.client()
+    web.allow(ADMIN, admin=True)
+    login(admin, ADMIN)
+
+    def check(key: str, label: str) -> None:
+        job_id = by_key[key]
+        batch = web.alice.get(url).text
+        if key == "deleted":
+            assert label.split("{")[0] in text_of(batch[batch.index("deleted.pdf") :])
+            return
+        page = web.alice.get(f"/jobs/{job_id}").text
+        assert re.search(r"<title>\s*" + re.escape(label) + ":", page), (key, label)
+        listing = web.alice.get("/app/documents").text
+        assert _badge(listing, f'id="doc-{job_id}"').startswith(label), key
+        assert _badge(batch, f'id="batch-doc-{job_id}"').startswith(label), key
+        parts = web.alice.get(f"/jobs/{by_key['host']}").text
+        assert f'href="/jobs/{job_id}">Pages ' in parts and f"({label})" in text_of(parts), key
+        assert f"<dt>{label}</dt>" in admin.get("/admin").text, key
+
+    for key in WALKED:
+        check(key, states.TABLE[key].label)
+    with session_scope(web.ctx.factory) as session:
+        session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))  # the day's cap
+    check("waiting", states.TABLE["waiting_reset"].label.format(time="00:00 UTC"))

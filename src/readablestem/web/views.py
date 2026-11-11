@@ -669,7 +669,7 @@ def job_view(
         part_label=job.part_label or "",
         is_sample=bool(job.is_sample),
         sample=sample_view() if job.is_sample and with_page else None,
-        parts=part_links(session, job) if with_page and job.part_group and owner else [],
+        parts=part_links(session, job, context) if with_page and job.part_group and owner else [],
         combinable=len(combine_rules.kept_parts(session, job)) if with_page and owner else 0,
         role=role,
         shared_by=_owner_name(session, job) if not owner else "",
@@ -729,9 +729,9 @@ def _carried_ids(job: Job) -> frozenset[str]:
     return frozenset(i for i in ids if isinstance(i, str)) if isinstance(ids, list) else frozenset()
 
 
-def part_links(session: Session, job: Job) -> list[PartLink]:
+def part_links(session: Session, job: Job, context: states.Context | None = None) -> list[PartLink]:
     """The parts of the same larger file that the person still keeps, in page order (the
-    pages are the label's first number)."""
+    pages are the label's first number), each with its state as the list shows it."""
     rows = session.execute(
         select(Job.id, Job.part_label, Job.status, Job.created_at)
         .where(
@@ -747,7 +747,11 @@ def part_links(session: Session, job: Job) -> list[PartLink]:
         return int(digits[0]) if digits else 0
 
     ordered = sorted(rows, key=lambda r: (first_page(r.part_label), r.created_at))
-    found = states.load(session, [r.id for r in ordered])
+    found = states.load(
+        session,
+        [r.id for r in ordered],
+        context=states.Context(budget_closed=bool(context and context.budget_closed)),
+    )
     return [
         PartLink(r.id, r.part_label or "", str(r.status), r.id == job.id, found.get(r.id))
         for r in ordered

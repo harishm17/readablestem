@@ -74,22 +74,16 @@ def _pages_text(pages: list[int]) -> str:
 
 KEPT = "The HTML keeps their original images, marked “Not converted”."
 
-# A finished job converted while the AI service was down: most of its equations, figures
-# and tables failed because the service returned errors or did not answer in time. Read
-# from the stored result (the job itself carries no code), so it shows only where the
-# result is loaded (the job page), and it goes away once the instructor has filled
-# enough of them in on the review screen.
-MODEL_OUTAGE = "model_outage"
 # Figures kept as images before any model work: never sent to the service.
 KEPT_IMAGE_REASONS = frozenset(
     {"scanned_page", "handwritten_page", "unread_page", "handwriting_on_page"}
 )
+# A finished job converted while the AI service was down: most of its equations, figures
+# and tables failed because the service returned errors or did not answer in time. Read
+# from the stored result (the job itself carries no code); every such item is an open
+# decision, so a list that reads no result shows the job as needing decisions, and the
+# note goes away once the instructor has filled enough of them in on the review screen.
 OUTAGE_REASONS = frozenset({"model_api_error", "model_timeout"})
-
-
-def is_outage(result_json: dict[str, Any] | None) -> bool:
-    """A finished job converted while the AI service was down (`_outage`)."""
-    return _outage(result_json) is not None
 
 
 def _outage(result_json: dict[str, Any] | None) -> tuple[int, int, str] | None:

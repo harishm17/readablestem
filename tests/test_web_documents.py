@@ -20,7 +20,8 @@ from fixtures.web.support import (
     upload,
 )
 from readablestem.core.types import Status
-from readablestem.web.db import Job, session_scope
+from readablestem.web import states
+from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.pdf_probe import ProbeRejected, probe
 
 LAYOUT = Path(__file__).resolve().parent / "fixtures" / "layout"
@@ -129,6 +130,23 @@ class Reads:
 
         event.remove(self.engine, "before_cursor_execute", self._listener)
         return self.sql
+
+
+def test_a_stopped_document_is_listed_with_what_needs_you_and_offers_try_again(web):
+    """F-414: a stopped document is not grouped with the ones still working: it is under
+    "Needs you" with its reason in its label and "Try again" as its next step."""
+    finish(web, filename="decide.pdf")
+    stopped = finish(web, filename="stopped.pdf")
+    waiting = job_id_from(upload(web.browser, make_pdf(1), filename="waiting.pdf"))
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, stopped)
+        assert job is not None
+        job.status, job.error_code = JobStatus.FAILED, "timeout"
+    html = web.browser.get("/app/documents").text
+    needs = html[html.index(f'id="docs-{states.NEEDS}"') : html.index("</table>")]
+    assert f'id="doc-{stopped}"' in needs and f'id="doc-{waiting}"' not in needs
+    assert states.TABLE["stopped_service"].label in text(needs)
+    assert re.search(rf'action="/jobs/{stopped}/retry".*?id="act-{stopped}"', needs, re.S)
 
 
 def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
