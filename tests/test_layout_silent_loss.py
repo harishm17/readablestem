@@ -97,6 +97,31 @@ def _tick(page, x, y, size=12.0, colour=(0.8, 0.1, 0.1)) -> None:
     shape.commit()
 
 
+def _seal(page, centre, r, colour=(0.75, 0.1, 0.15)) -> tuple:
+    """A printed seal: two rings open at the foot, drawn as even Bezier arcs, round a
+    filled star."""
+    cx, cy = centre
+    shape = page.new_shape()
+    for radius in (r, 0.75 * r):
+        a, k = math.radians(110), math.radians(80)  # four arcs of 80 degrees, open below
+        for _ in range(4):
+            t = 4 / 3 * math.tan(k / 4)
+            p0 = (cx + radius * math.cos(a), cy + radius * math.sin(a))
+            p3 = (cx + radius * math.cos(a + k), cy + radius * math.sin(a + k))
+            c1 = (p0[0] - t * radius * math.sin(a), p0[1] + t * radius * math.cos(a))
+            c2 = (p3[0] + t * radius * math.sin(a + k), p3[1] - t * radius * math.cos(a + k))
+            shape.draw_bezier(p0, c1, c2, p3)
+            a += k
+        shape.finish(color=colour, width=1.5, closePath=False)
+    star = [(cx + r * (0.55 if i % 2 == 0 else 0.22) * math.sin(i * math.pi / 5),
+             cy - r * (0.55 if i % 2 == 0 else 0.22) * math.cos(i * math.pi / 5))
+            for i in range(10)]  # fmt: skip
+    shape.draw_polyline(star)
+    shape.finish(color=None, fill=colour, closePath=True)
+    shape.commit()
+    return cx - r, cy - r, cx + r, cy + r
+
+
 def _photo(w: int, h: int, seed: int = 5) -> pymupdf.Pixmap:
     rng = random.Random(seed)
     data = bytearray(w * h * 3)
@@ -206,16 +231,19 @@ def test_a_step_plot_drawn_in_separate_lines_is_a_figure(little_text):
 
 @pytest.mark.parametrize(
     ("marks", "pen"),
-    [("tick", False), ("ticks and cross", False), ("straight strokes", False),
+    [("tick", True), ("ticks and cross", True), ("straight strokes", True),
      ("mixed pen widths", True), ("one stroke", True), ("two strokes over text", True),
-     ("signature", False), ("glyph outline in a line of text", False)],
+     ("signature", True), ("glyph outline in a line of text", False),
+     ("printed curved stamp", False)],
 )  # fmt: skip
 def test_marks_on_a_typed_page_are_kept_and_named_handwriting_only_with_pen_evidence(marks, pen):
-    # Every mark ends in an element. Only marks the page type takes for pen strokes are
-    # cut out as handwriting ("not converted"); a tick of three points, straight strokes
-    # and a stroke too long for the stroke tests have no pen evidence and go to the
-    # figure step as drawings, and a filled outline set inside a line of typed text is a
-    # glyph drawn as a path (WS6.10: F-364's outline maths, F-400's bond lines).
+    # Every mark ends in an element. Marks with pen evidence in their strokes are cut out
+    # as handwriting ("not converted"): the page type's pen strokes, a stroke too long for
+    # them that still bends as a pen does (the signature), and short straight strokes
+    # that neither meet another at its ends nor run beside it (a tick, a cross, loose
+    # strokes). A filled outline set inside a line of typed text is a glyph drawn as a
+    # path, and a printed seal (filled outlines, rings that turn evenly) is a drawing:
+    # both go to the figure step (WS6.10: F-364's outline maths, F-400's bond lines).
     doc = pymupdf.open()
     page = _page(doc)
     _title(page, "Quiz 1, question 2")
@@ -259,6 +287,8 @@ def test_marks_on_a_typed_page_are_kept_and_named_handwriting_only_with_pen_evid
         writer.commit()
         page.insert_text((after + 3, y), "for the whole run.", fontsize=11)
         boxes = writer.word_boxes
+    elif marks == "printed curved stamp":
+        boxes = [_seal(page, (450, end + 30), 11)]
     else:  # one stroke, too long for the stroke tests, under the text
         shape = page.new_shape()
         y = end + 20

@@ -171,6 +171,10 @@ ZIGZAG_MAX = 0.3  # share of turns that are sharp and reverse the last sharp tur
 SIG_GRID = 0.2  # pt / pt^2: perimeter and area rounded to this are compared for repeats
 SIG_TURN = 0.25  # rad: total turning rounded to this; coarse, as PDF coordinates are
 #                  written with few decimals and copies differ by rounding noise
+# A circle's arc (`_arc`), not a pen stroke: every turn per unit length within this share
+# of their mean, all one way. A printed seal's open ring turns evenly; a pen's curvature
+# changes as it goes.
+ARC_SPREAD = 0.25
 
 # Pen consistency (filled ribbons only): one pen gives one ribbon width. Share of filled
 # strokes whose width is within PEN_BAND x the median of strokes of the same colour.
@@ -1027,16 +1031,19 @@ def _candidate(
     closed: bool,
     filled: bool,
     width: float,
-    display: _Display,
+    display: _Display | None,
     sources: tuple[int, ...],
     colour: tuple = (),
+    max_side: float = STROKE_MAX_SIDE,
 ) -> _Candidate | None:
-    """None for anything that cannot be a pen stroke (too small, too big, rectilinear)."""
+    """None for anything that cannot be a pen stroke (too small, too big, rectilinear).
+    `display` None leaves the box in the drawing's own frame; `max_side` is raised only by
+    `pen_line`."""
     if len(pts) < 2:
         return None
     x0, y0, x1, y1 = _box(pts)
     side = max(x1 - x0, y1 - y0)
-    if side < STROKE_MIN_SIDE or side > STROKE_MAX_SIDE:
+    if side < STROKE_MIN_SIDE or side > max_side:
         return None
     oblique = 0
     perimeter = 0.0
@@ -1071,7 +1078,7 @@ def _candidate(
         prev = (dx, dy)
     if curves == 0 and oblique < OBLIQUE_MIN:
         return None  # rectangles, rules, ticks, table grids, step lines
-    box = display.box((x0, y0, x1, y1))
+    box = display.box((x0, y0, x1, y1)) if display else (x0, y0, x1, y1)
     if closed:
         ax, ay = pts[-1]
         bx, by = pts[0]
@@ -1094,7 +1101,40 @@ def _candidate(
         ok, machine = False, True  # a blob (disc, region, island), not a pen ribbon
     if ok and zig > ZIGZAG_MAX:
         ok, machine = False, True  # jagged: random-step decorations, random walks
+    if ok and not closed and _arc(pts):
+        ok, machine = False, True  # a circle's arc: a printed seal's open ring
     return _Candidate(box, sig, ok, filled and closed, ribbon, sources, colour, machine)
+
+
+def pen_line(items: Sequence[Any], width: float) -> bool:
+    """One open stroked path that the pen tests take for a pen stroke at any length: its
+    subpaths run on end to end as one line, which has enough points, bends more than half
+    a circle, is not jagged and is not a circle's arc (`_candidate`, with no
+    STROKE_MAX_SIDE). For layout's small drawings (`_leftover_drawings`): a signature or a
+    wavy underline runs past the size limit that keeps plot lines and frames out of the
+    page's own ink count, which this does not change."""
+    pts: list[tuple[float, float]] = []
+    curves = lines = 0
+    for sub in _subpaths(items):
+        flat, c, n = _flatten(sub)
+        if not flat or (pts and math.dist(flat[0], pts[-1]) >= 0.3):
+            return False  # a rectangle, or a second stroke
+        pts.extend(flat[1:] if pts else flat)
+        curves, lines = curves + c, lines + n
+    found = _candidate(pts, curves, lines, False, False, width, None, (), max_side=math.inf)
+    return found is not None and found.stroke
+
+
+def _arc(pts: Sequence[tuple[float, float]]) -> bool:
+    """The line turns one way at an even rate (ARC_SPREAD): a circle's arc, printed."""
+    rates = []
+    for a, b, c in zip(pts, pts[1:], pts[2:], strict=False):
+        ux, uy, vx, vy = b[0] - a[0], b[1] - a[1], c[0] - b[0], c[1] - b[1]
+        run = (math.hypot(ux, uy) + math.hypot(vx, vy)) / 2
+        if run:
+            rates.append(math.atan2(ux * vy - uy * vx, ux * vx + uy * vy) / run)
+    mean = sum(rates) / len(rates) if rates else 0.0
+    return bool(mean) and all(abs(r - mean) <= ARC_SPREAD * abs(mean) for r in rates)
 
 
 def _size_twin_share(boxes: Sequence[BBox]) -> float:

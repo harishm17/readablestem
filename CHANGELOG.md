@@ -8,11 +8,16 @@
   paragraphs, and the figure's crop now shows them (F-399, WS6.12 fixes 1 and 2). On the 12
   sealed generated figure documents: label kinds inside a figure 206 of 282 (122 before), printed
   labels 255 of 420 (149), no body text or caption lost, the same 54 of 60 figures found.
-- Layout: a small drawing on a typed page is called handwriting only with pen evidence (the page
-  type's pen strokes on half its paths, or a hand mark over typed text). A skeletal structure's
-  bond lines, a three-point tick, a cross of two lines and a long one-stroke squiggle now go to the
-  figure step as drawings instead of "handwriting, not converted" (F-400, WS6.10). A page-type pen
-  stroke that is a filled glyph outline inside a typed line is a small drawing too (F-364).
+- Layout: a small drawing on a typed page is called handwriting only with pen evidence in the
+  strokes themselves, on half its paths or more: a page-type pen stroke; a stroke that passes the
+  same tests at any length (a signature); or a short straight stroke (a tick, a cross) whose lines
+  all run off the axes, are not all one length, and neither meet another stroke's ends nor lie
+  alongside its lines. A hand mark over typed text still counts too. Being an open stroke no longer
+  counts: a skeletal structure's bond lines now go to the figure step as a drawing instead of
+  "handwriting, not converted" (F-400, WS6.10), while a grader's tick, cross or signature stays
+  handwriting. The page type's pen test no longer takes a circle's arc for a pen stroke (a printed
+  seal's open ring). A page-type pen stroke that is a filled glyph outline inside a typed line is a
+  small drawing too (F-364).
 - Figure step: labels newly in a figure change its text, so its step key changes and a re-run
   reads such figures again.
 
