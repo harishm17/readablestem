@@ -991,6 +991,36 @@ def _cmd_speed(args: argparse.Namespace) -> int:
     return 1 if verdict.judged else 2
 
 
+def _cmd_burden(args: argparse.Namespace) -> int:
+    """`eval burden`: decisions a page asks of a reviewer, by page kind, by what is decided
+    and by why it was asked, from a replay of the corpus under the production profile, and
+    the bar against an earlier record (`eval.burden`). Spends nothing. Exit code 0: the bar
+    is met or none was asked; 1: a page kind asks for more than before; 2: the two records
+    cannot be compared."""
+    from readablestem.eval import burden, measure
+
+    before = None
+    if args.against is not None:
+        try:
+            before = json.loads(args.against.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return _error(f"cannot read {args.against}: {exc}")
+    measured = _measured(args, runs=1)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = burden.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    verdict = None if before is None else burden.judge(record, before, allowance=args.allowance)
+    print(burden.render(record, verdict))
+    if not metrics["uploads"]["measured"]:
+        return _error("no upload could be measured")
+    if verdict is None or verdict.met:
+        return 0
+    return 1 if verdict.judged else 2
+
+
 def _cmd_page_audit(args: argparse.Namespace) -> int:
     """`eval page-audit`: the page audit in shadow on the corpus or on a layout gold set's
     folder (`eval.page_audit_eval`). It writes verdicts and changes no output. Exit code 0:
@@ -1849,6 +1879,22 @@ def register(
         help="how much slower a page kind may be (0.10; 1.0 on a shared runner)",
     )
     speed.set_defaults(func=_cmd_speed)
+
+    burden = group.add_parser(
+        "burden",
+        help="decisions a page asks of a reviewer, by page kind and by why, from a replay of "
+        "the corpus under the production profile, and the bar against an earlier record "
+        "(spends nothing)",
+    )
+    _add_measure_args(burden, at_once=4)
+    burden.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    burden.add_argument(
+        "--allowance",
+        type=float,
+        default=0.0,
+        help="how many more decisions a page a page kind may ask for than before (0)",
+    )
+    burden.set_defaults(func=_cmd_burden)
 
     page_audit = group.add_parser(
         "page-audit",

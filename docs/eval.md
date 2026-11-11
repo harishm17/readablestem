@@ -2839,9 +2839,9 @@ lacks, and what a reading-order bar met on it therefore does not cover yet:
   economics): the walk takes books in seeded order and does not choose by subject. Their
   pages count as textbook layout, not as mathematics.
 
-## What a page costs and how long it takes (`eval cost`, `eval speed`)
+## What a page costs, how long it takes and what it asks (`eval cost`, `eval speed`, `eval burden`)
 
-Both commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
+The three commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
 Every upload of the corpus (`corpus.UPLOADS`: each file once, and again with the boxes a
 person would tick for it) is converted the way the worker converts a job: production's
 behavior settings (`ops/production.profile.toml`), the job's own caps, the conversion in a
@@ -2851,7 +2851,8 @@ and nothing is spent. The database and the web app are not part of it.
 Each upload is measured in a fresh process, one at a time by default, so its highest memory
 use and its start-up are its own and no cache carries over. What is kept for an upload is
 content-free: its pages and the kind of each, its step facts (operations.md, "Step facts and
-the step report"), dollars, wall and CPU seconds, and peak memory.
+the step report"), dollars, wall and CPU seconds, peak memory, and each decision it asks of
+a reviewer (page, kind and reason codes).
 
 **A page has one kind**, the first of these that fits, so that the kinds add up to the run:
 
@@ -2870,12 +2871,13 @@ uv run readablestem eval speed --runs 2 --cores 2/3 --out speed.json --against d
 uv run readablestem eval cost --only s15_charts_figures      # one file
 uv run readablestem eval speed --records kept.json           # keep what was measured
 uv run readablestem eval cost --from kept.json               # report on it again, measure nothing
+uv run readablestem eval burden --out burden.json --against data/eval/burden-corpus.json
 ```
 
-Both reports record the four things `eval bar` asks for, with the commit and the machine,
+The reports record the four things `eval bar` asks for, with the commit and the machine,
 and hold their figures under `metrics`, so `eval bar` can read one
 (`--measure kinds.dense_math.usd_page.p95`). The corpus is a development set: it was chosen
-to cover kinds of document, and the readers were built while looking at it. So neither
+to cover kinds of document, and the readers were built while looking at it. So no
 report can meet a bar or carry a public claim, and each says "Proof owed" in its header. A
 replay of held-out whole documents needs a recording that does not exist yet.
 
@@ -2994,7 +2996,116 @@ were recorded a request took 1.4 s at the median for an equation, 2.6 s for a fi
 for a table and 8.9 s for a page read as a picture. The conversion process held at most
 515 MB and the process that called it 424 MB.
 
-What neither report has yet:
+### `eval burden`
+
+How many decisions a page asks of the person who reviews it, before anyone has reviewed.
+
+**One definition.** A decision is what the review screen counts: a fix the pipeline marked
+`required`, with a group of repeated headings (or of pages kept as pictures for one reason)
+as one decision. `core/triage.py` holds it (`units`, `required_decisions`, and `decisions`,
+which returns the same decisions as rows: page, kind, reason codes, members). The review
+screen, the documents list, the review record, the weekly report, the command line's
+summary and this report all count through it. Building the report found two counters that
+did not: `triage.review_load` and the weekly report's review-load table counted only
+equations, figures, headings and tables, so the paragraphs of a page read from its picture
+(6 decisions in this corpus) were on the review screen and in neither. Both now count every
+kind of fix.
+
+A decision is on the page of its first member. The report prints:
+
+- decisions a page over the whole set, and a document's decisions a page at the median and
+  the 95th percentile over documents (what one instructor meets);
+- decisions of one page by page kind, at the median and the 95th percentile, with the share
+  of pages that ask nothing;
+- decisions by what is decided (equation, figure, heading, table, paragraph);
+- decisions by why they were asked, each with its rate per 100 pages. The reason codes are
+  `triage.tier_reasons`: a failed check's code, the fix's own reason, a repeated heading,
+  or `below_accept` when only the confidence held it back. A decision with two reasons is
+  counted under both;
+- the documents that ask the most a page.
+
+An upload whose recording lacks an answer it asks for is left out and named: an unanswered
+request fails its element, and that decision would be the recording's, not the
+conversion's. A record kept before decisions were measured is "not measured", not a
+document that asks nothing.
+
+**The bar** (`--against RECORD`): the whole set and every page kind with at least 10 pages
+ask for no more decisions a page than in the earlier record (`--allowance`, 0 by default).
+Two records are compared only when they are of the same documents and measured the same
+number of uploads.
+
+| Exit | When |
+|---|---|
+| 0 | the bar is met, or no record was given |
+| 1 | the set or a page kind asks for more than before; the lines name each |
+| 2 | not judged: other documents, or a different number of uploads measured |
+
+**Fewer is not better by itself.** A change that stops asking about something wrong lowers
+this figure and raises the errors nobody is told about. The bar is read with the counts of
+silent errors (the lane evals and the page audit), never alone.
+
+Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
+report leaves out, for the same 126 answers.
+
+| | |
+|---|---|
+| Required decisions | 567 |
+| Decisions a page, whole set | 1.80 |
+| A document's decisions a page | 0.29 at the median, 7.44 at p95, 10.21 at the most |
+| A page's decisions | 0 at the median, 9 at p95, 25 at the most |
+| Pages that ask nothing | 56% |
+
+| Page kind | Pages | Documents | Decisions | A page | Median page | p95 | Most |
+|---|---|---|---|---|---|---|---|
+| `dense_math` | 30 | 10 | 314 | 10.47 | 9 | 25 | 25 |
+| `figure` | 60 | 19 | 105 | 1.75 | 1 | 7 | 13 |
+| `scan` | 25 | 10 | 28 | 1.12 | 1 | 4 | 9 |
+| `slide` | 45 | 3 | 13 | 0.29 | 0 | 2 | 5 |
+| `table` | 24 | 17 | 12 | 0.50 | 0 | 1 | 2 |
+| `typical` | 131 | 43 | 95 | 0.73 | 0 | 5 | 8 |
+
+| What is decided | Decisions |
+|---|---|
+| equation | 384 |
+| figure | 122 |
+| heading | 44 |
+| table | 11 |
+| paragraph (a page read from its picture) | 6 |
+
+| Why it was asked (the ten most frequent of 37 codes) | Decisions | Per 100 pages |
+|---|---|---|
+| `below_accept` | 154 | 48.9 |
+| `symbol_mismatch` | 143 | 45.4 |
+| `sign_mismatch` | 52 | 16.5 |
+| `glyph_style_mismatch` | 51 | 16.2 |
+| `low_confidence` | 41 | 13.0 |
+| `heading.weak_evidence` | 38 | 12.1 |
+| `heading.sentence_like` | 28 | 8.9 |
+| `style_cosmetic` | 26 | 8.2 |
+| `long_description_unsure` | 22 | 7.0 |
+| `text_layer_mismatch` | 19 | 6.0 |
+
+What the baseline shows:
+
+- **The load is equations.** 384 of the 567 decisions are equations, and the 30 dense
+  math pages (a tenth of the pages) ask for 314 of them: 10.5 a page, 25 on the worst. One
+  14-page solution set asks for 143. More than half of all pages ask nothing.
+- **Two reasons are half of it.** `below_accept` (the reading passed every check and its
+  confidence stayed under the accept bar) and `symbol_mismatch` (a symbol of the text
+  layer is not in the reading) are on 297 decisions. Whether those flags find errors is
+  what the equation measurements answer; this report only says where the questions are.
+- A document's 0.29 at the median against 1.80 for the set says the same thing from the
+  other side: most documents ask little and a few ask most of it.
+
+Two documents carry goals of their own, set before this report existed, and both are in the
+table of documents the report prints: the notes chapter `w_notes_6042_ch2` asks 3.36 a page
+today against a goal of 1.0 or fewer, and the solution set `w_solutions_1802` asks 10.21
+against 4.0 or fewer. Neither is met. They are development documents, so meeting them here
+proves nothing by itself; the release bar is judged on a held-out replay, which does not
+exist yet.
+
+What none of the reports has yet:
 
 - A replay of held-out whole documents (the recording is not made), and so a bar or a
   public figure.
@@ -3152,7 +3263,7 @@ limits is still owed.
 | `src/readablestem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
 | `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
-| `src/readablestem/eval/cost.py`, `eval/speed.py` | `eval cost` and `eval speed`: the reports made from a measured replay, and the speed bar |
+| `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
 | `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |

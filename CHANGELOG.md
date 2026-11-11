@@ -31,6 +31,16 @@ measured and replayed against.
   kind and by step and seconds a page by kind and stage, from a measured replay of the
   corpus under the production profile. The Sonnet cache-read price was double the published
   rate and is corrected.
+- **What a page asks of a reviewer** (`readablestem eval burden`): required decisions a
+  page by page kind, by what is decided and by why it was asked, from the same measured
+  replay, with a bar against an earlier record (no page kind asks for more). The count is
+  the review screen's own (`core.triage.decisions`). Baseline on the corpus: 1.80 a page
+  over 315 pages, 10.5 on dense math pages, and 56% of pages ask nothing.
+- **Fixed: two counters left out a page's paragraphs.** The command line's "decisions
+  needed" summary, the eval's review load and the weekly report's review-load table
+  counted only equations, figures, headings and tables. A page read from its picture asks
+  about its paragraphs too, and the review screen counted those. Every counter now counts
+  every kind of fix.
 - **The page audit, in shadow** (`pipeline/page_audit.py`, `readablestem eval page-audit`):
   one request a page that sets the page's picture beside its converted text and answers
   with fault codes, element ids and boxes, never text. A page is a pass, flagged, or not
@@ -41,7 +51,8 @@ measured and replayed against.
   suite.
 - The production profile lists the page audit's three behavior settings at their code
   defaults, so its hash changes with no change to what production runs.
-## Unreleased: the content budget (branch fix/content-size-budget, WS26.8, F-559)
+
+## Unreleased: the content budget (branch fix/content-size-budget, WS26.9, F-559)
 
 - A PDF whose page's drawing instructions inflate past 32 MiB, or whose document's past
   128 MiB, is refused at upload with `content_too_large` (422, "too large to read"), before

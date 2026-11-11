@@ -57,6 +57,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Kind, StepFacts
 from readablestem.eval import corpus
 from readablestem.pipeline import step_facts
@@ -119,6 +120,10 @@ class Converted:
     error: str = ""
     # A hash of each part of the result with its timing left out (`parts`).
     parts: dict[str, str] = field(default_factory=dict)
+    # Each decision the conversion asked of a reviewer (`core.triage.decisions`): its page
+    # (0-based, None when no element holds it), kind, reasons and members. None in a record
+    # made before this was kept, which is not the same as a document that asks nothing.
+    decisions: list[dict[str, Any]] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
@@ -363,6 +368,7 @@ def convert(upload: Upload, settings: Settings) -> Converted:
         peak_mb=round(after.ru_maxrss / 1024, 1),
         own_peak_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
         parts=parts(result),
+        decisions=[asdict(decision) for decision in triage.decisions(result)],
     )
 
 
