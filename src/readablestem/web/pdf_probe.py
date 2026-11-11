@@ -65,6 +65,8 @@ import sys
 import unicodedata
 from typing import TYPE_CHECKING
 
+from readablestem.core.images import MAX_UPLOAD_IMAGE_PIXELS
+
 if TYPE_CHECKING:
     import pymupdf
 
@@ -154,6 +156,16 @@ def _image_pages(doc: pymupdf.Document) -> int:
         return 0
 
 
+def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
+    """Pixels of the biggest image on a page, from the image objects' stated sizes: nothing
+    is decoded. Rendering or reading a page decodes its images, and a few hundred bytes can
+    state 20,000 x 20,000 pixels (`core.images`)."""
+    try:
+        return max((w * h for _, _, w, h, *_ in doc.get_page_images(number)), default=0)
+    except (RuntimeError, ValueError):
+        return 0  # unreadable page objects fail the checks after this one
+
+
 def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
     """Refuse oversized pages and documents with nothing to convert (module docstring)."""
     from readablestem.pipeline.page_type import document_refusal
@@ -162,6 +174,8 @@ def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> N
         for page in doc:
             if max(page.rect.width, page.rect.height) > MAX_PAGE_SIDE_PT:
                 raise ProbeRejected("page_too_large")
+            if _largest_image_pixels(doc, page.number) > MAX_UPLOAD_IMAGE_PIXELS:
+                raise ProbeRejected("image_too_large")
         reason = document_refusal(doc)
     except ProbeRejected:
         raise

@@ -15,8 +15,9 @@ import os
 import stat
 from pathlib import Path
 
+from readablestem.core.images import MAX_IMAGE_PIXELS, within_budget
+
 MAX_FILE_BYTES = 30 * 1024 * 1024
-MAX_PIXELS = 40_000_000
 MAX_SIDE_PX = 2400
 PDF_DPI = 150
 _OK_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".pdf"}
@@ -47,7 +48,7 @@ def _raster_to_png(raw: bytes) -> bytes | None:
     try:
         with Image.open(io.BytesIO(raw)) as image:
             width, height = image.size
-            if width * height > MAX_PIXELS or width < 1 or height < 1:
+            if width * height > MAX_IMAGE_PIXELS or width < 1 or height < 1:
                 return None
             image.load()
             if image.mode not in ("RGB", "RGBA", "L"):
@@ -74,6 +75,9 @@ def _pdf_to_png(raw: bytes) -> bytes | None:
             page = document[0]
             rect = page.rect
             if rect.width <= 0 or rect.height <= 0 or rect.width * rect.height > 20_000_000:
+                return None
+            # Drawing the page decodes its pictures: not one over the pixel budget.
+            if any(not within_budget(w, h) for _, _, w, h, *_ in document.get_page_images(0)):
                 return None
             scale = min(PDF_DPI / 72, MAX_SIDE_PX / max(rect.width, rect.height))
             pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)

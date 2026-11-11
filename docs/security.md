@@ -550,6 +550,25 @@ exception or a hang. File names are reduced to a plain base name (control and bi
 characters dropped, 200 characters), are shown only to their owner, escaped, and never reach
 a header or a log.
 
+### Pixel budget
+
+A small file can hold a huge picture: a one-colour canvas of 20,000 x 20,000 pixels is a few
+hundred bytes in a PDF and takes seconds and hundreds of megabytes to decode. Every place
+that decodes an image reads its width and height first (the PNG or image header with Pillow,
+the PDF object's `Width` and `Height` with MuPDF) and does not decode one over
+`core.images.MAX_IMAGE_PIXELS` (40 million): the layout step treats it as "not plain" and
+keeps the picture, the figure and image-page steps leave the image as it is, and the docx
+export and the proof replay skip it. The sites are `pipeline/layout.py`,
+`pipeline/image_page.py`, `pipeline/image_page_check.py`, `pipeline/figure_images.py`,
+`pipeline/export_docx.py`, `source/figures.py`, `models/images.py`,
+`models/math_readers/local_reader.py`, `proof/replay.py` and `eval/invented/figures.py`; new
+code opens images through `core.images.open_within_budget`. In the layout step a page's
+picture list is read once per document (a picture shown on every page is decoded or hashed
+once, not once per page), and the time spent decoding is summed against `DECODE_BUDGET_S`
+(30 s); over it the job fails with `image_too_large`. The upload probe refuses a PDF whose
+embedded picture is over `MAX_UPLOAD_IMAGE_PIXELS` (100 million, above a 600 dpi A3 scan)
+with the same code (422), before any quota is spent.
+
 ### Output escaping
 
 Jinja autoescape is on for every template. Everything a model or a PDF controls and that

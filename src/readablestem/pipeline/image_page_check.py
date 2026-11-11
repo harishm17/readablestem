@@ -154,8 +154,10 @@ def cut(png: bytes, box: tuple[int, int, int, int], margin: int = CROP_MARGIN_PX
     pixels, as PNG; None when it cannot be made."""
     from PIL import Image
 
+    from readablestem.core.images import open_within_budget
+
     try:
-        with Image.open(io.BytesIO(png)) as image:
+        with open_within_budget(png) as image:
             image = image.convert("RGB")
             x0, y0, x1, y1 = box
             region = (

@@ -144,6 +144,8 @@ FAILED_MESSAGES = {
     "converted or sent anywhere. Tell the person who runs this site.",
     "access_removed": "Your access to this tool was removed, so this document was not converted.",
     "page_too_large": "The PDF has a page that is too large to convert.",
+    "image_too_large": "The PDF has a picture that is too large to read. Nothing was converted. "
+    "Export the PDF again with its pictures at a normal size (300 dpi is plenty) and upload that.",
     "too_complex": "A page of this PDF has so many separate shapes that reading it takes more "
     "time or memory than a conversion may use. Nothing was converted. Export a simpler or "
     "flattened PDF, or split the page off and upload the rest.",

@@ -58,7 +58,6 @@ answer leaves the page in `kept_pages` and it is kept as its image, as before.
 
 from __future__ import annotations
 
-import io
 import logging
 import re
 import unicodedata
@@ -73,6 +72,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from readablestem.config import ConfigError, Settings
 from readablestem.core import triage, types
 from readablestem.core.budget import BudgetExceeded
+from readablestem.core.images import open_within_budget
 from readablestem.core.types import (
     IMAGE_PAGE_OMISSION_REASON,
     BBox,
@@ -510,9 +510,7 @@ class Ink:
     """The page picture as a mask of ink, to trim a block's box to what is drawn in it."""
 
     def __init__(self, png: bytes) -> None:
-        from PIL import Image
-
-        with Image.open(io.BytesIO(png)) as image:
+        with open_within_budget(png) as image:
             gray = np.asarray(image.convert("L"), dtype=np.uint8)
         self.height, self.width = gray.shape
         paper = float(np.percentile(gray, 90))

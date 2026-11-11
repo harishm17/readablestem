@@ -76,6 +76,7 @@ from typing import Any, Literal
 
 import pymupdf
 
+from readablestem.core import images as pixel_budget
 from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
@@ -421,6 +422,7 @@ class LayoutError(ValueError):
         super().__init__(message)
         # "unreadable" | "encrypted" | "too_many_pages" | "no_pages" | "page_out_of_range"
         # | "too_complex" (a page needs more time or memory to read than a conversion has)
+        # | "image_too_large" (decoding its pictures took longer than a job may spend)
         self.code = code
 
 
@@ -6475,10 +6477,66 @@ def _raster_figures(
     return figures
 
 
+def _images_in_budget(page: pymupdf.Page) -> bool:
+    """Whether every image the page lists is within the pixel budget (`core.images`), by
+    the sizes their PDF objects state: only then may anything hash or decode them."""
+    try:
+        return all(
+            pixel_budget.within_budget(width, height)
+            for _, _, width, height, *_ in page.parent.get_page_images(page.number, full=True)
+        )
+    except (RuntimeError, ValueError):
+        return False
+
+
+def _image_infos(page: pymupdf.Page, *, hashes: bool = False) -> list[dict[str, Any]]:
+    """`page.get_image_info()`; with `hashes`, each image's `digest` too, but only on a page
+    whose images are all within the pixel budget: hashing decodes them (twice a page's
+    images, on every call, in PyMuPDF's own `xrefs=True`), so on a page with one over it the
+    infos come without digests."""
+    if not hashes or not _images_in_budget(page):
+        return page.get_image_info()
+    memo = _decode_memo(page.parent)
+    started = time.perf_counter()
+    try:
+        return page.get_image_info(hashes=True)
+    finally:
+        _charge(memo, started)
+
+
 def _image_xrefs(page: pymupdf.Page, count: int) -> list[int]:
     """The xref of each of the page's images, in `get_image_info` order (0 for an inline
-    image, or when the lists disagree)."""
-    xrefs = [int(info.get("xref") or 0) for info in page.get_image_info(xrefs=True)]
+    image, or when the lists disagree). Images are told apart by a digest of their pixels
+    (kept per image for the document, not made again for every page) when the page's images
+    are all within the pixel budget; else by their stated size, an image whose size another
+    listed image shares being 0."""
+    doc, number = page.parent, page.number
+    infos = page.get_image_info()
+    if len(infos) != count:
+        return [0] * count
+    listed = doc.get_page_images(number)
+    if _images_in_budget(page):
+        memo = _decode_memo(doc)
+        started = time.perf_counter()
+        try:
+            hashed = page.get_image_info(hashes=True)
+            by_digest: dict[bytes, int] = {}
+            for item in listed:
+                xref = item[0]
+                if xref not in memo.digests:
+                    memo.digests[xref] = pymupdf.Pixmap(doc, xref).digest
+                by_digest[memo.digests[xref]] = xref
+        finally:
+            _charge(memo, started)
+        xrefs = [by_digest.get(info.get("digest"), 0) for info in hashed]
+    else:
+        by_size: dict[tuple[int, int], list[int]] = {}
+        for item in listed:
+            by_size.setdefault((item[2], item[3]), []).append(item[0])
+        xrefs = []
+        for info in infos:
+            same = by_size.get((info.get("width"), info.get("height")), [])
+            xrefs.append(same[0] if len(same) == 1 else 0)
     return xrefs if len(xrefs) == count else [0] * count
 
 
@@ -6493,17 +6551,78 @@ ALPHA_SEEN = 13
 SEEN_WHOLE = 0.98
 
 
+class _DecodeMemo:
+    """What `_plain_image` has answered for one open document: the answer per image (a
+    picture a template repeats on every page is decoded once) and the seconds all its
+    decodes took, which `images.DECODE_BUDGET_S` bounds for the job."""
+
+    def __init__(self) -> None:
+        self.answers: dict[int, bool] = {}
+        self.digests: dict[int, bytes] = {}  # a digest of each image's pixels, by xref
+        self.spent_s = 0.0
+
+
+def _charge(memo: _DecodeMemo, started: float) -> None:
+    """Add the time since `started` to the document's decode time; past the job's budget
+    the layout stops (`image_too_large`)."""
+    memo.spent_s += time.perf_counter() - started
+    if memo.spent_s > pixel_budget.DECODE_BUDGET_S:
+        raise LayoutError("image_too_large", "the pictures took too long to read")
+
+
+def _decode_memo(doc: pymupdf.Document) -> _DecodeMemo:
+    memo = getattr(doc, "_rs_decode_memo", None)
+    if memo is None:
+        memo = doc._rs_decode_memo = _DecodeMemo()  # type: ignore[attr-defined]
+    return memo
+
+
+def _image_size(doc: pymupdf.Document, xref: int) -> tuple[int, int]:
+    """Width and height in pixels as the image's PDF object states them, read without
+    decoding it ((0, 0) when it does not say)."""
+    try:
+        width, height = (doc.xref_get_key(xref, key)[1] for key in ("Width", "Height"))
+        return int(width), int(height)
+    except (RuntimeError, ValueError, IndexError, TypeError):
+        return 0, 0
+
+
 def _plain_image(doc: pymupdf.Document | None, xref: int) -> bool:
     """The image shows no picture: nothing in it is seen (a transparent spacer), or it is
     seen whole in one colour or a smooth gradient (a wash, a template's background). A
     picture with transparent parts (ink on a transparent overlay, a stencil mask's
-    shapes) is not plain, and neither is an image that cannot be read (an inline one)."""
+    shapes) is not plain, and neither is an image that cannot be read (an inline one) or
+    that is over the pixel budget (`core.images`): that one is not decoded at all, so a
+    small file holding a huge canvas costs nothing here. The answer is kept per image for
+    the document; the decodes of one job together may take `DECODE_BUDGET_S` seconds, then
+    the layout stops with `image_too_large`."""
     if doc is None or xref <= 0:
         return False
+    memo = _decode_memo(doc)
+    if xref not in memo.answers:
+        started = time.perf_counter()
+        try:
+            memo.answers[xref] = _decide_plain(doc, xref)
+        finally:
+            _charge(memo, started)
+    return memo.answers[xref]
+
+
+def _decide_plain(doc: pymupdf.Document, xref: int) -> bool:
+    """`_plain_image` for an image not seen before."""
+    mask_xref = 0
+    try:
+        key = doc.xref_get_key(xref, "SMask")
+        if key[0] == "xref":
+            mask_xref = int(key[1].split()[0])
+    except (RuntimeError, ValueError, IndexError):
+        return False
+    for wanted in (xref, mask_xref):
+        if wanted and not pixel_budget.within_budget(*_image_size(doc, wanted)):
+            return False  # not decoded: too many pixels, or a size the object does not give
     try:
         pix = pymupdf.Pixmap(doc, xref)
-        key = doc.xref_get_key(xref, "SMask")
-        mask = pymupdf.Pixmap(doc, int(key[1].split()[0])) if key[0] == "xref" else None
+        mask = pymupdf.Pixmap(doc, mask_xref) if mask_xref else None
         if pix.colorspace is None:  # a stencil mask: its alpha is what is painted
             mask, pix = pix, None
         if pix is not None and (pix.alpha or pix.colorspace.n not in (1, 3)):
@@ -10093,7 +10212,7 @@ def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[
     grows on every page and would make every step differ."""
     marks: list[slides.Mark] = []
     display = _Display.of(page)
-    for info in page.get_image_info(hashes=True):
+    for info in _image_infos(page, hashes=True):
         if info["bbox"][2] - info["bbox"][0] <= 0 or info["bbox"][3] - info["bbox"][1] <= 0:
             continue  # an image with no area shows nothing (an overlay's hidden item)
         digest = info.get("digest")

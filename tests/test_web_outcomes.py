@@ -142,6 +142,22 @@ def huge_page_pdf() -> bytes:
     return data
 
 
+def huge_image_pdf() -> bytes:
+    """A small file whose picture states 20,000 x 20,000 pixels: decoding it would take
+    seconds and hundreds of megabytes, so the upload is refused before anything reads it."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Kinematics")
+    pixmap = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, 100, 50), False)
+    pixmap.set_rect(pixmap.irect, (200,))
+    xref = page.insert_image(pymupdf.Rect(72, 100, 272, 200), pixmap=pixmap)
+    doc.xref_set_key(xref, "Width", "20000")
+    doc.xref_set_key(xref, "Height", "20000")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
 # --------------------------------------------------------------------------- budget stops
 
 
@@ -345,8 +361,9 @@ def test_stopping_the_worker_cancels_the_running_job_and_ends_its_lease(env):
         (scanned_pdf(2), "scanned", "is scanned, so this tool cannot convert it"),
         (blank_pdf(), "no_content", "Every page of notes.pdf is blank"),
         (huge_page_pdf(), "page_too_large", "too large to convert"),
+        (huge_image_pdf(), "image_too_large", "has a picture that is too large to read"),
     ],
-    ids=["scanned", "blank", "huge-page"],
+    ids=["scanned", "blank", "huge-page", "huge-image"],
 )
 def test_pdfs_with_nothing_to_convert_are_refused_at_upload(env, data, code, message):
     response = upload(env.browser, data)

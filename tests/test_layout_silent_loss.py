@@ -364,6 +364,28 @@ def test_a_spacer_or_a_one_colour_image_is_still_decoration():
     assert _figures(out) == [] and out.kept_pages == {}
 
 
+def test_a_picture_over_the_pixel_budget_is_kept_and_never_decoded():
+    # A flat grey page background is decoration. One whose object states 9,000 x 9,000
+    # pixels (81 million, over `core.images.MAX_IMAGE_PIXELS`) is not looked at: decoding a
+    # small file's huge canvas holds the worker for seconds a page (F-503), so the page
+    # keeps its picture, as for any picture that is not known to be plain.
+    def page_over_a_background(stated: int | None) -> bytes:
+        doc = pymupdf.open()
+        page = _page(doc)
+        wash = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, 100, 140), False)
+        wash.set_rect(wash.irect, (238,))
+        xref = page.insert_image(page.rect, pixmap=wash)
+        page.insert_text((72, 90), "Notes", fontsize=24)
+        _paragraphs(page, n=3)
+        if stated:
+            doc.xref_set_key(xref, "Width", str(stated))
+            doc.xref_set_key(xref, "Height", str(stated))
+        return doc.tobytes()
+
+    assert layout.analyze(page_over_a_background(None)).kept_pages == {}
+    assert layout.analyze(page_over_a_background(9000)).kept_pages == {0: "unread_page"}
+
+
 # --------------------------------------------------------------------------- margins
 
 

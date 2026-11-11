@@ -42,6 +42,7 @@ from unittest import mock
 
 from PIL import Image, PngImagePlugin
 
+from readablestem.core.images import open_within_budget
 from readablestem.core.types import Check, ModelCall
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.verifier import (
@@ -91,7 +92,7 @@ def pixel_identity(png: bytes) -> str:
     """SHA-256 of the decoded pixels ("px:..."), or of the bytes ("raw:...") when the
     data is not an image PIL can read."""
     try:
-        with Image.open(io.BytesIO(png)) as image:
+        with open_within_budget(png) as image:
             rgba = image.convert("RGBA")
     except (OSError, ValueError, SyntaxError):
         return "raw:" + hashlib.sha256(png).hexdigest()
