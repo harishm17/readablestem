@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased: pipeline 0.5.11 (integration/wave-1a)
+
+- `PIPELINE_VERSION` 0.5.11: the font code tables and the figure label crop (both below) change
+  the text and the figure boxes of a PDF page, so results and eval reports made from here on
+  say so. Results from 0.5.10 load unchanged. Every stored step answer was keyed on 0.5.10, so a
+  conversion run again asks its steps again, not only those of the pages that changed.
+
 ## Unreleased: one state table for a job (branch feat/job-state-table)
 
 - `web/states.py` says a job's state from its stored facts: a key, label, tone, one-line
@@ -80,7 +87,8 @@
   read. The private-use bullet rules that were mapped by code point alone (`_TEXT_MAP`,
   `_BULLET_GLYPHS`, the table detector's bullets) moved into it, so U+F0A7 is a small square only
   in Wingdings. Element text changes on documents with these fonts, so the step keys of their
-  elements change and stored answers for them are asked again; no `PIPELINE_VERSION` bump.
+  elements change and stored answers for them are asked again. Merged with the figure label
+  crop under pipeline 0.5.11 (below).
 - New setting `FONT_CODE_TABLES` (on). `false` keeps only the two old private-use bullet rules.
   Declared on `web` in `railway.ts`.
 

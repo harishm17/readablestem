@@ -224,7 +224,14 @@ log = logging.getLogger(__name__)
 # (`DocumentResult.source_report`, `source.report`), and a source that loses content outside a
 # formula stops with a code that names the cause. PDFs are unchanged. Results from 0.5.9 load
 # unchanged and are not judged again.
-PIPELINE_VERSION = "0.5.10"
+# 0.5.11 (2026-11-11): the text and figure boxes of a PDF page change. Codes of symbol and TeX
+# fonts are read as what the font draws (`font_codes`, behind FONT_CODE_TABLES, on): TeX's
+# ligatures and accents at control codes, Symbol's Greek, Wingdings bullets. A vector chart's
+# figure takes its outer labels (axis values, category names, a rotated or centered axis title),
+# so its crop grows to them; a small drawing on a typed page is handwriting only with pen
+# evidence in its strokes (a skeletal structure's bonds now go to the figure step). Results from
+# 0.5.10 load unchanged.
+PIPELINE_VERSION = "0.5.11"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

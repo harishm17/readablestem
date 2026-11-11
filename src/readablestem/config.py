@@ -133,8 +133,8 @@ class Settings(BaseSettings):
     # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
     # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to
     # before. Production's value is in the profile. Turning it on changes equation crops and
-    # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped (0.5.10 or
-    # later) in the change that enables it.
+    # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped (past 0.5.11,
+    # the version now) in the change that enables it.
     layout_display_grouping: bool = False
     # The codes of symbol and TeX fonts read as what the font draws, by the font's name
     # (`pipeline/font_codes.py`, docs/layout.md): Symbol, Wingdings, MT-Extra and the APS
