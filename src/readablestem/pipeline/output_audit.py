@@ -50,7 +50,9 @@ What a format cannot hold is not asked of it, and each such limit is one rule he
 table can mark a header row and nothing else, so a header column of the page is not asked
 of the Word file; a note's mark is numbered by each format in its own way, so the mark's
 digits are not compared; a voice adds the word "link" and reads a table row by row, so
-spoken words are compared by their letters. A thing written once for a voice and once for
+spoken words are compared by their letters; the transcript closes the space before a full
+stop, so a sentence's gap is judged where the page has it and counted for the transcript
+when the transcript says that sentence. A thing written once for a voice and once for
 the eyes (a formula in a table cell) is one thing: a Word file that shows both is counted
 as text twice.
 
@@ -870,6 +872,14 @@ def _out_of_order(positions: Sequence[int]) -> int:
     return len(positions) - len(tails)
 
 
+def _gap(block: Block) -> bool:
+    """Whether a block of the document's own words has a gap in a sentence. A line straight
+    after a formula that stands alone may open with punctuation: the formula ended the
+    sentence before it."""
+    text = (THING if block.follows else "") + block.text
+    return block.part in ("", "about") and has_hole(text)
+
+
 def _own_counts(inventory: Inventory, lang: str) -> Iterator[Count]:
     """What is wrong in an output by itself, whatever it was made from."""
     out = inventory.output
@@ -903,8 +913,9 @@ def _own_counts(inventory: Inventory, lang: str) -> Iterator[Count]:
             yield Count("out_lang", out, None, place)
     for block in inventory.blocks:
         # Punctuation that opens the line after a displayed formula is the formula's.
-        text = (THING if block.follows else "") + block.text
-        if block.part in ("", "about") and has_hole(text):
+        # The transcript closes the space before a full stop that the rule looks for, so
+        # its gaps are judged at the page's place (`_against_page`).
+        if out != TRANSCRIPT and _gap(block):
             yield Count("out_hole", out, block.page, block.id)
 
 
@@ -950,6 +961,10 @@ def _against_page(output: Inventory, page: Inventory) -> Iterator[Count]:
             block.role, "out_text_lost"
         )
         yield Count(code, out, block.page, block.id)
+    if spoken:  # a sentence with a gap on the page is said with its gap
+        for block in wanted:
+            if _gap(block):
+                yield Count("out_hole", out, block.page, block.id)
 
     def long(blocks: Iterable[Block]) -> Counter[str]:
         return Counter(
