@@ -555,6 +555,9 @@ def apply_review(
     if keeps_bare and form.get("acknowledge") not in _TICKED:
         raise ReviewInvalid([FieldError(field_id("acknowledge", element_id), FIGURE_KEEP_ACK)])
     element = next((e for e in result.elements if e.id == element_id), None)
+    if action == "reject" and reject_keeps(result.origin, fix, element) == "nothing":
+        # Not offered on the card; a stored or hand-made form is refused the same way.
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), NOTHING_TO_KEEP)])
     before = snapshot(fix)
     origin = form.get("origin", "")
     offered = (
@@ -1272,6 +1275,29 @@ KEPT_IMAGE_ONLY = (
     "This stays an image of the original, marked “Not converted”: there is nothing else "
     "to choose for it."
 )
+
+
+# --------------------------------------------------------------------------- what reject keeps
+
+# Kinds whose "reject" keeps the original as a picture (`assemble.original`).
+KEPT_AS_PICTURE = frozenset({Kind.EQUATION, Kind.TABLE, Kind.PARAGRAPH})
+NOTHING_TO_KEEP = (
+    "There is no picture of the original to keep for this item, so it cannot be kept as "
+    "one: edit it or accept it."
+)
+
+
+def reject_keeps(origin: str, fix: Fix, element: Element | None) -> str:
+    """What "reject" would leave in the student file for an item that keeps its original:
+    "picture" (a PDF's crop), "written" (a LaTeX source's own text, shown as it was written)
+    or "nothing" (no picture and no text: the file would say only that the original is not
+    available, so the choice is not offered and a posted one is refused). "" for every other
+    kind. A source has no page pictures until its witness gives them (plan WS18.4)."""
+    if fix.kind not in KEPT_AS_PICTURE:
+        return ""
+    if origin == "pdf":
+        return "picture"
+    return "written" if element is not None and (element.text or "").strip() else "nothing"
 
 
 def is_kept_image(fix: Fix) -> bool:

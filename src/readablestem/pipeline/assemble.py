@@ -133,12 +133,23 @@ FLAGGED_NOTE = (
     "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
     "instructor for a version you can read."
 )
+# The same for a LaTeX source, whose parts are shown as written, never as pictures.
+FLAGGED_NOTE_SOURCE = (
+    "Some parts could not be converted. They are shown as they were written in LaTeX, "
+    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
+    "instructor for a version you can read."
+)
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # The flag notes speak to students, as the about section does (UX review MF7): what is
 # missing, and whom to ask. Never reviewer wording ("review", "publishing").
 EQUATION_NOTE = (
     "This equation is shown as an image of the original, so screen readers cannot read "
     "it. Ask your instructor for a version you can read."
+)
+# The same for a formula of a LaTeX source, shown as it was written (no picture).
+EQUATION_WRITTEN_NOTE = (
+    "This equation is shown as it was written in LaTeX, so screen readers may not read it "
+    "well. Ask your instructor for a version you can read."
 )
 FIGURE_NOTE = (
     "This figure has no text description yet. Ask your instructor for a description of it."
@@ -694,6 +705,9 @@ class _Renderer:
     last_page: int | None = None
     footnote_ids: Collection[str] = ()
     noterefs: dict[str, str] = field(default_factory=dict)
+    # "pdf", or "latex" / "beamer" for a source (`DocumentResult.origin`): a source's
+    # original is its own text, shown as written, never a missing picture.
+    origin: str = "pdf"
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -1039,7 +1053,8 @@ class _Renderer:
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
         original = self.original(element, self.image_alt(element, equation_alt(element))) + label
-        return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
+        note = EQUATION_NOTE if self.has_picture(element) else EQUATION_WRITTEN_NOTE
+        return self.flag_block(element, reason, original, "Not converted.", note)
 
     def picture_size(self, element: Element, png: bytes | None) -> str:
         """The `width` and `height` of a crop's `<img>`: a figure or table at its printed
@@ -1181,13 +1196,20 @@ class _Renderer:
         described = (fix.described or "").strip() if fix is not None else ""
         return described or default
 
+    def has_picture(self, element: Element) -> bool:
+        """The element's original is a picture (a crop), not a source's own text."""
+        return self.origin == "pdf" or element.id in self.crops
+
     def original(self, element: Element, alt: str) -> str:
-        """The crop as an <img>, or the extracted text when there is no image."""
+        """The crop as an <img>, or the extracted text when there is no image. A source's
+        text is its own, shown as written: no picture was ever missing."""
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
             size = self.picture_size(element, self.crops.get(element.id))
             return f'<img src="{src}" alt="{_escape(alt)}"{size}>'
         text = (element.text or "").strip()
+        if text and not self.has_picture(element):
+            return f'<p class="original-text">{_escape(text)}</p>'
         unavailable = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
         if text:
             return f'<p class="original-text">{_escape(text)}</p>{unavailable}'
@@ -1315,7 +1337,8 @@ def _about_section(
         origin, ABOUT_WORDING
     )
     what = f"{opening} {MATHS_NOTE}" if maths else opening
-    flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
+    flagged_words = FLAGGED_NOTE if origin == "pdf" else FLAGGED_NOTE_SOURCE
+    flagged_note = f"<p>{flagged_words}</p>\n" if flagged else ""
     if pages_line := kept_pages_note(kept_pages or []):
         flagged_note += f"<p>{pages_line}</p>\n"
     if converted := image_pages_note(image_pages or []):
@@ -1587,6 +1610,7 @@ def render_html(
         pdf_pages=pdf_pages or {},
         mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
+        origin=origin,
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell

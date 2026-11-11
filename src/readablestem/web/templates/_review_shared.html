@@ -63,10 +63,12 @@
    block, apart from the choices above it, with what students get named beside the button. #}
 {% macro keep_original(item, legend) %}
 {% set eid = item.element_id %}
+{% if item.can_reject %}
 <div class="fallback" role="group" aria-label="{{ legend }}">
   <button type="submit" name="action" value="reject" class="button-secondary" data-tone="quiet" data-role="reject" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ item.label|lower }})</span></button>
   <p class="hint" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>
 </div>
+{% endif %}
 {% endmacro %}
 
 {# A figure's alt text and the "Decorative" box. The guidance is for the kind of figure it is

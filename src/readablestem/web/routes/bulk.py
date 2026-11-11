@@ -70,7 +70,7 @@ def confirm_page(
     labels = item_labels(result)
     items = [
         _item(fix, elements.get(fix.element_id), numbers[fix.element_id], job.id, crop_ids, None,
-              labels.get(fix.element_id))
+              labels.get(fix.element_id), origin=result.origin)
         for fix in bulk_accept.candidates(result, slug)
     ]  # fmt: skip
     split = view == "split"

@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login
 from readablestem.core import sandbox
+from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
 from readablestem.source.convert import SourceFailed
@@ -351,3 +352,24 @@ class TestRealConversion:
         review = env.browser.get(f"/jobs/{job_id}/review/list")
         assert review.status_code == 200 and "Figure" in review.text
         assert "of the PDF" not in review.text or "PDF" in review.text
+        # No choice that leads nowhere (SW18.5): no link back to this list, and a link to
+        # an item lands on it.
+        assert f'href="/jobs/{job_id}/review"' not in review.text
+        assert f"/jobs/{job_id}/review?page=" not in review.text
+        result = DocumentResult.model_validate(env.job(job_id).result_json)
+        formula = next(f for f in result.fixes if f.kind is Kind.EQUATION and f.pending)
+        table = next(f for f in result.fixes if f.kind is Kind.TABLE)
+        to_item = env.browser.get(f"/jobs/{job_id}/review?item={formula.element_id}")
+        assert to_item.headers["location"].endswith(f"/review/list#item-{formula.element_id}")
+        # "Reject" keeps a formula as written; a table with nothing to keep is refused.
+        token = csrf_from(review.text)
+        for fix in (table, formula):
+            env.browser.post(
+                f"/jobs/{job_id}/review/{fix.element_id}",
+                data={"csrf_token": token, "action": "reject", "view": "list"},
+            )
+        after = DocumentResult.model_validate(env.job(job_id).result_json)
+        assert after.fix_for(table.element_id).status is Status.ACCEPTED  # ty: ignore[possibly-missing-attribute]
+        assert after.fix_for(formula.element_id).status is Status.REJECTED  # ty: ignore[possibly-missing-attribute]
+        student = env.browser.get(f"/jobs/{job_id}/view").text
+        assert "not available" not in student and "\\badmacro" in student

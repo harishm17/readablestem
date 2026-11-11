@@ -178,11 +178,11 @@
     {% if item.can_accept %}
     <button type="submit" name="action" value="accept" class="button-secondary">Accept<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
-    {% if item.kind != "equation" %}<button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
+    {% if item.kind != "equation" and item.can_reject %}<button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
   </div>
   {% if item.kind == "equation" %}
   {{ keep_original(item, "If it cannot be converted") }}
-  {% else %}
+  {% elif item.can_reject %}
   <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>
   {% endif %}
   {% endif %}
@@ -363,8 +363,8 @@
   <p>{% if remaining %}<strong>{{ remaining }} {{ "decision" if remaining == 1 else "decisions" }} left:</strong>
     {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left to decide.{% endif %}{% if optional %}
     {{ counted(optional|length, "optional check", "optional checks") }} below{% if second_checks %}, {{ second_checks }} worth a look{% endif %}.{% endif %}</p>
-  <p class="list-links"><a href="/jobs/{{ job.id }}/review">Review screen</a>
-    {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols</a>
+  <p class="list-links">{% if has_pages %}<a href="/jobs/{{ job.id }}/review">Review screen</a>
+    {% endif %}    {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols</a>
     {% endif %}
     <a href="/jobs/{{ job.id }}">Results</a>
     <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Accessible HTML</a>
@@ -395,7 +395,7 @@
         <li><a href="#optional-checks">Optional checks</a>: {{ optional|length + note_rows|length }}</li>
         <li><a href="#decided">Your decisions</a>: {{ done|selectattr("by_you")|list|length }}</li>
         <li><a href="#accepted">Accepted automatically</a>: {{ done|rejectattr("by_you")|list|length }}</li>
-        <li><a href="#page-changes">Page changes</a></li>
+        {% if has_pages %}<li><a href="#page-changes">Page changes</a></li>{% endif %}
       </ul>
     </nav>
     {# Many decisions: accept the ones no check found fault with, after seeing the list. #}
@@ -546,6 +546,7 @@
 
 {# T3-5, T3-16: what the tool did not propose. The tools sit beside the page, on the review
    screen; one link to each page's. #}
+{% if has_pages %}
 <section id="page-changes" class="review-section" aria-labelledby="page-changes-title" tabindex="-1">
   <h2 id="page-changes-title">Page changes</h2>
   <p>Change words, add a missed picture or equation, or leave a page out, on the review screen.</p>
@@ -555,5 +556,6 @@
     {% endfor %}
   </ul>
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}
