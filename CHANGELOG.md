@@ -11,7 +11,9 @@
   those sentences (SW7: F-034, F-110).
 - The student note counts what a person reviewed ("Your instructor reviewed 3 of 5 parts the
   tool flagged"), never counts an optional note nobody opened, says parts kept with a check
-  failing apart, and says how many parts are pictures and which pages were left out.
+  failing apart, and says how many parts are pictures and which pages were left out ("7 of
+  8" when the page count is known). A re-render with no recorded decision (decisions
+  carried from an earlier conversion) writes no date; it used to write today's.
 - "Ready to share" only when nothing is a picture, nothing is left out, no structure check
   failed and nothing is open; otherwise the new state "Ready" says what remains. "Everything
   was converted" is now "Every part the tool found was converted."
