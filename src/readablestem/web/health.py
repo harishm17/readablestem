@@ -1,6 +1,8 @@
 """Readiness (`/readyz`) and the SIGTERM hook.
 
-`/healthz/ops` says the scheduled tasks ran: the backup within 26 hours, the cron within 2.
+`/healthz/ops` says the scheduled tasks ran: the backup within 26 hours, the cron within 2. It
+answers with the status word alone; which task is late, the storage and the sandbox probe are
+the admin's (`ops_report`, `/admin`).
 `/healthz` says the process answers and the database does. `/readyz` says the service can
 do its job: the database answers, the worker thread is alive and not stuck, and the model
 provider is set up. Each check is one word; nothing in the answer comes from a setting's
@@ -59,6 +61,24 @@ def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
     if full:  # new uploads are being refused until the purge has caught up (`web.storage`)
         stale = sorted([*stale, "storage"])
     return not stale, stale
+
+
+def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
+    """`(fresh, details)` for the admin: the status word, the stale names, the storage
+    report and the sandbox probe. None of it is public (`/healthz/ops` gives the word only)."""
+    ok, stale = ops_freshness(ctx)
+    try:
+        with session_scope(ctx.factory) as session:
+            stored: dict[str, int | bool] | None = storage.report(session, ctx.settings)
+    except Exception:
+        stored = None
+    details: dict[str, object] = {
+        "status": "ok" if ok else "stale",
+        "stale": stale,
+        "storage": stored,
+        "sandbox": ctx.sandbox.public(),
+    }
+    return ok, details
 
 
 def _worker_check(ctx: AppContext) -> str:

@@ -236,6 +236,8 @@ def upload_error_message(
         "part.",
         "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
         "large to convert. Course documents are usually Letter or A4 size.",
+        "image_too_large": f"{name} has a picture that is too large to read. Export the PDF "
+        "again with its pictures at a normal size (300 dpi is plenty) and upload that.",
         # Every page handwritten or scanned (pipeline.page_type.refusal_code). Never "run
         # OCR first": that makes exactly the files refused here. One sentence for what
         # happened (the error summary's link), then why and what to do (the field's

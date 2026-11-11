@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
 from readablestem.pipeline import export_docx
-from readablestem.web import analytics, office_convert, offices, proof_facts, seo, storage
+from readablestem.web import analytics, office_convert, offices, proof_facts, seo
 from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -362,21 +362,9 @@ def readyz(request: Request) -> Response:
 
 @router.get("/healthz/ops")
 def healthz_ops(request: Request) -> Response:
-    """Did the daily backup and the hourly cron finish well lately (ops.heartbeat)? 200, or
-    503 listing only the names that are stale. Content-free, like /readyz."""
-    ctx = get_ctx(request)
-    ok, stale = ops_freshness(ctx)
-    try:
-        with session_scope(ctx.factory) as session:
-            stored = storage.report(session, ctx.settings)
-    except Exception:
-        stored = None
-    return JSONResponse(
-        {
-            "status": "ok" if ok else "stale",
-            "stale": stale,
-            "storage": stored,
-            "sandbox": ctx.sandbox.public(),
-        },
-        status_code=200 if ok else 503,
-    )
+    """Did the daily backup and the hourly cron finish well lately (ops.heartbeat)? 200 or
+    503 with the status word alone, for an outside check that reads the status code. Which
+    task is late, the storage and the sandbox probe are for the admin (`/admin`,
+    `/admin/health`)."""
+    ok, _ = ops_freshness(get_ctx(request))
+    return JSONResponse({"status": "ok" if ok else "stale"}, status_code=200 if ok else 503)

@@ -91,7 +91,7 @@ from readablestem.web.security import (
     SecurityHeadersMiddleware,
 )
 from readablestem.web.seo import CrawlerRequestsMiddleware
-from readablestem.web.spend import DbSpendGuard, largest_reservation_usd
+from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import (
     ClientFactory,
@@ -412,7 +412,7 @@ def create_app(
             open_cap_usd=settings.open_tier_daily_spend_cap_usd,
         ),
         oauth=make_oauth(settings),
-        min_headroom_usd=largest_reservation_usd(settings),
+        min_headroom_usd=conversion_headroom_usd(settings),
         tracer=_job_tracer(settings),
         uploads=UploadGate(limit=settings.max_concurrent_uploads),
     )

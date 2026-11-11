@@ -45,7 +45,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/status"): PUBLIC,
     ("GET", "/healthz"): PUBLIC,
     ("GET", "/readyz"): PUBLIC,  # is the database reachable; no document data
-    ("GET", "/healthz/ops"): PUBLIC,  # names of stale scheduled tasks; no document data
+    ("GET", "/healthz/ops"): PUBLIC,  # the status word only
     # Crawler files and the static showcase (routes/discovery.py): no user data.
     ("GET", "/robots.txt"): PUBLIC,
     ("GET", "/sitemap.xml"): PUBLIC,
@@ -70,6 +70,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/logout"): PUBLIC,
     ("POST", "/internal/cron/aggregate-and-purge"): CRON,
     ("GET", "/admin"): ADMIN_ONLY,
+    ("GET", "/admin/health"): ADMIN_ONLY,  # stale task names, storage, sandbox probe
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
     ("POST", "/admin/users/block"): ADMIN_ONLY,  # open sign-up: stop an account

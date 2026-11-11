@@ -55,9 +55,9 @@ from pathlib import Path
 from xml.etree import ElementTree as ET  # only serialises what defusedxml parsed
 
 from defusedxml import ElementTree as SafeET
-from PIL import Image
 
 from readablestem.core.childenv import child_env
+from readablestem.core.images import open_within_budget
 from readablestem.pipeline.export_canvas import _DATA_URI, _find, _Node, _parse, _write
 from readablestem.pipeline.export_epub import _HEADING, _LANGUAGE, _sanitise, _text
 
@@ -200,7 +200,7 @@ def _webp_to_png(root: _Node) -> None:
             continue
         try:
             raw = base64.b64decode(re.sub(r"\s+", "", match.group("data")), validate=True)
-            with Image.open(io.BytesIO(raw)) as picture:
+            with open_within_budget(raw) as picture:
                 buffer = io.BytesIO()
                 picture.convert("RGBA").save(buffer, "PNG")
         except (ValueError, OSError):

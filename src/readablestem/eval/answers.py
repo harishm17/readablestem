@@ -217,3 +217,26 @@ class CachedClient:
             "live_cost_usd": round(self.live_cost_usd, 6),
             "replayed_cost_usd": round(self.replayed_cost_usd, 6),
         }
+
+
+def keep_second_check_answers(client: Any, cached: CachedClient, *, offline: bool) -> None:
+    """The Claude second check asks the model too: its answers go into the same file under
+    their own step ("check"), so a replay spends nothing on it either. `client` is the real
+    client the check hangs on, `cached` the one the pipeline sees. Offline, the check is
+    handed to `cached` (whose inner client is None, so it has none of its own) behind a
+    `CachedClient` that refuses a missing verdict: the check runs as it did when recorded,
+    and a verdict the file lacks comes back as an unanswered check, with no call."""
+    from readablestem.models.claude_verifier import ClaudeVerifier
+
+    verifier = getattr(client, "verifier", None)
+    if not isinstance(verifier, ClaudeVerifier):
+        return
+
+    def wrap(inner: Any) -> Any:
+        check = CachedClient(None if offline else inner, cached._path, inner.settings)
+        cached.second_check = check
+        return check
+
+    verifier.wrap_client(wrap)
+    if offline:
+        cached.verifier = verifier

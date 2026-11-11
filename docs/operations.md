@@ -15,7 +15,7 @@ cover.
 | Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
 | Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to a `.part` file, checked (gzip, completion line, restore into a scratch database, every table and the schema version present), then moved into the `/backups` volume; dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`, or `backup_failed reason=...` and exit 1. Records the `backup` heartbeat. See "Backups and restore" |
-| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes, and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
+| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes (which one is late is on the admin page, `/admin`), and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
 | Deploy health check of `/healthz` | On every deploy, Railway | A new deployment takes traffic only once `/healthz` answers (timeout 300 s) |
 | Outside-in check of `/readyz` | Every 5 minutes, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set; a failed run is emailed by GitHub. This is the only check of `/readyz` |
 | Outside-in check of `/healthz/ops` and `/demo` | Every 3 hours, GitHub Actions `uptime.yml` | Same variable and the same email. GitHub turns scheduled workflows off after 60 days with no commit to a public repository ("Health, readiness and shutdown") |
@@ -86,8 +86,8 @@ person), which were 20 and 30 before 2026-11-03. The database is on a 5000 MB vo
   alone is not enough (100 x 250 MB is 25 GB): the global one is the bound.
 - **Whole service**: `STORAGE_GLOBAL_MAX_MB` (2000) of stored upload bytes. Over it new
   uploads get a 503 page ("Uploads are paused while storage catches up", logged as
-  `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 with `"stale": ["storage"]`
-  and `"storage": {"stored_mb", "limit_mb", "full"}`, which the GitHub uptime job reads. Why
+  `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 (`/admin/health` names `"stale": ["storage"]`
+  and gives `"storage": {"stored_mb", "limit_mb", "full"}`); the GitHub uptime job reads the status code. Why
   2000 and not 60% of the volume: the daily backup restores its dump into a second database on
   the same volume (`restore_check`), so the volume holds about twice the data for those minutes.
   Raise it only with the volume (`allowOnlineResize` is on), and set the three variables in the
@@ -387,7 +387,8 @@ failures, for example the weekly GitHub workflow.
 |---|---|---|
 | `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Railway's deploy health check (`.railway/railway.ts`); the Dockerfile's HEALTHCHECK for local Docker |
 | `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | GitHub `uptime.yml` every 5 minutes; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
-| `GET /healthz/ops` | 200 `{"status":"ok","stale":[]}`, or 503 `{"status":"stale","stale":["backup"]}` naming only the tasks that are late (`database` if the table could not be read) | GitHub `uptime.yml` every 3 hours; you, with `curl` |
+| `GET /healthz/ops` | 200 `{"status":"ok"}`, or 503 `{"status":"stale"}`: the status word and nothing else, so it says no task, setting or number to someone who is not signed in | GitHub `uptime.yml` every 3 hours, which reads the status code; you, with `curl` |
+| `GET /admin/health` | Admin only. The same status code with the detail: `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}`; `stale` names only the tasks that are late (`database` if the table could not be read, `storage` while full). The admin page shows the same under "Scheduled tasks, storage and sandbox" | you, signed in as an admin |
 
 `/readyz` has three checks, each one word and never a setting's value (so no key, URL or
 model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
@@ -410,7 +411,7 @@ own (a read of two rows), and it is not in the access log (`logging._QUIET_ROUTE
 `uptime.yml` (not necessarily the repository owner; Settings > Notifications > Actions, for that
 account). Whoever should get the mail should be the one who commits any change to those lines. Every 5 minutes one job calls `/readyz` (with two retries), so an outage
 is mailed within about ten minutes, then once per failed run until it is fixed. Every 3 hours a
-second job calls `/healthz/ops` and `/demo` and prints the 503 body, which names the stale task;
+second job calls `/healthz/ops` and `/demo` and fails on a 503 (the admin page and `/admin/health` name the stale task);
 three hours keeps a late backup or cron to a few mails a day instead of one per five minutes, and
 finds a missed cron within five hours and a missed backup within 29. Two limits to know:
 
@@ -671,7 +672,7 @@ itself, in the background, when it starts and LaTeXML is in the image
 (`web/sandbox_status.py`; `SANDBOX_PROBE_AT_STARTUP`, default on, `SANDBOX_PROBE_TIMEOUT_S`, default
 240). It is the same probe with `--require-latexml`. It logs one line, `sandbox_probe result=PASS|FAIL
 <check>=<value> ...` (the probe's own check names and one-word answers, nothing else), and
-`/healthz/ops` shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
+`/admin/health` (admin only) shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
 `not_installed` or `not_run`), `result`, `checks`, `bound_mb`, `cgroup`, `seccomp`, `checked_at`.
 Neither start-up nor `/healthz` waits for it. In production (2026-11-04) the probe reports PASS on the Landlock backend, and
 `FEATURE_LATEX_SOURCE` is on; `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off by choice, until real

@@ -67,6 +67,18 @@
   </dl>
 </section>
 
+<section aria-labelledby="ops-heading">
+  <h2 id="ops-heading">Scheduled tasks, storage and sandbox</h2>
+  <dl class="summary-list">
+    <div><dt>Backup and cron</dt><dd>{% if ops.stale %}Late: {{ ops.stale|join(", ") }}{% else %}Both finished well lately{% endif %}</dd></div>
+    {% if ops.storage %}
+    <div><dt>Stored uploads</dt><dd>{{ ops.storage.stored_mb }} MB of {{ ops.storage.limit_mb }} MB{% if ops.storage.full %} (full: new uploads are refused){% endif %}</dd></div>
+    {% endif %}
+    <div><dt>Sandbox probe</dt><dd>{{ ops.sandbox.state }}</dd></div>
+  </dl>
+  <p>The same as JSON: <a href="/admin/health">/admin/health</a>.</p>
+</section>
+
 <section aria-labelledby="queue-heading">
   <h2 id="queue-heading">Queue</h2>
   <dl class="summary-list">

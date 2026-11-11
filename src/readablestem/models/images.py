@@ -12,6 +12,7 @@ import io
 
 from PIL import Image
 
+from readablestem.core.images import open_within_budget
 from readablestem.models.pricing import png_size
 
 
@@ -24,7 +25,7 @@ def shrink_png(png: bytes, max_edge: int | None) -> bytes:
     if size is None or max(size) <= max_edge:
         return png
     try:
-        with Image.open(io.BytesIO(png)) as image:
+        with open_within_budget(png) as image:
             image.load()
             scale = max_edge / max(image.size)
             target = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))

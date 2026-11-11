@@ -42,6 +42,8 @@ import threading
 import time
 from collections import OrderedDict
 
+from readablestem.core.images import within_budget
+from readablestem.models.pricing import png_size as png_header_size
 from readablestem.pipeline.safe_html import escape_text
 
 log = logging.getLogger(__name__)
@@ -121,6 +123,9 @@ def _student_image(png: bytes, figure_type: str | None) -> tuple[str, bytes]:
     try:
         import pymupdf
     except ImportError:  # pragma: no cover - a core dependency
+        return "image/png", png
+    size = png_header_size(png)  # the header only: an image over the pixel budget is not decoded
+    if size is not None and not within_budget(*size):
         return "image/png", png
     with _lock():
         try:
