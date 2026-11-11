@@ -20,6 +20,7 @@ copy is final. Each item names the file to change; none of it is document conten
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -128,6 +129,101 @@ def recipients_notice_problem(settings: Settings) -> str | None:
     return None
 
 
+def sent_material_problems(settings: Settings, *, today: date | None = None) -> list[str]:
+    """What stops these settings from sending what they send: for each kind of material that
+    is on (`web.recipients.sent_material`), the rendered privacy notice must state it in its
+    own words, the rendered vendor line must carry its words, and the row must be dated with
+    the day it was first stated in public, not later than `today` (UTC). A setting that sends
+    something new therefore cannot start in production before the page says so with its date
+    (privacy.html, "Changes to this notice"). Empty when all is stated."""
+    from readablestem.web.recipients import html_text, sent_material, vendor_line_text
+
+    notice = rendered_notice(settings)
+    if notice is None:
+        return ["web/templates/privacy.html is missing"]
+    vendor = vendor_line_text(settings, templates_dir=TEMPLATES_DIR)
+    if vendor is None:
+        return ["web/templates/_vendor_line.html is missing"]
+    today = today or datetime.now(UTC).date()
+    problems = []
+    for m in sent_material(settings):
+        switches = [s.upper() for s in m.switches if getattr(settings, s)] or ["always on"]
+        sends = f"{' and '.join(switches)} sends {m.label.lower()}"
+        if html_text(m.what) not in notice or html_text(m.stored) not in notice:
+            problems.append(
+                f"web/templates/privacy.html: {sends} but the privacy notice does not say so"
+            )
+        for _slot, words in m.vendor:
+            if words.format(to=" and ".join(m.to)) not in vendor:
+                problems.append(
+                    f"web/templates/_vendor_line.html: {sends} but the vendor line does not say so"
+                )
+                break
+        if m.stated is None:
+            problems.append(
+                f"web/recipients.py: {sends} but its row has no date it was first stated in public"
+            )
+        elif m.stated > today:
+            problems.append(
+                f"web/recipients.py: {sends} but its row is dated {m.stated.isoformat()}, "
+                "a day still to come"
+            )
+        elif m.stated_text not in notice:
+            problems.append(
+                f"web/templates/privacy.html: {sends} but the notice does not show the day "
+                f"it was first stated ({m.stated_text})"
+            )
+    return problems
+
+
+def privacy_claim_problems(settings: Settings) -> list[str]:
+    """The privacy notice's statements about what is stored and when it is deleted, each
+    checked against the setting or the code it describes (until a register of claims exists,
+    this is that register for the notice): the retention clocks (`RETENTION_HOURS`, the
+    7-day choice of `web.retention`, `OPT_IN_RETENTION_DAYS`), the backups
+    (`web.offices.BACKUP_DAYS`), the usage notes (`web.events`: kept `EVENT_RETENTION_DAYS`,
+    the review outcomes and the counts their totals need), the courses kept with
+    FEATURE_NOTATION_MEMORY and the names kept for a LaTeX source. What is sent is
+    `sent_material_problems`; who receives it is `unnamed_recipients`. Empty when every
+    statement is there."""
+    from readablestem.web import events, offices, retention
+
+    notice = rendered_notice(settings)
+    if notice is None:
+        return ["web/templates/privacy.html is missing"]
+    claims = [
+        (True, f"{settings.retention_hours} hours after you last worked on it", "RETENTION_HOURS"),
+        (True, f"{retention.WEEK_DAYS} days after you last worked on it", "web.retention"),
+        (True, f"{settings.opt_in_retention_days} days after upload", "OPT_IN_RETENTION_DAYS"),
+        (True, f"kept for about {offices.BACKUP_DAYS} days", "web.offices.BACKUP_DAYS"),
+        (
+            settings.events_enabled,
+            f"deleted after {events.EVENT_RETENTION_DAYS} days",
+            "EVENTS_ENABLED (web.events)",
+        ),
+        (
+            settings.events_enabled,
+            f"at least {events.MIN_ACCOUNTS} accounts and {events.MIN_DOCUMENTS} documents",
+            "EVENTS_ENABLED (web.events.outcome_cells)",
+        ),
+        (
+            settings.feature_notation_memory,
+            "Your courses and their notation",
+            "FEATURE_NOTATION_MEMORY",
+        ),
+        (
+            settings.feature_latex_source,
+            "the names of the files, packages and commands LaTeX reported a problem with",
+            "FEATURE_LATEX_SOURCE (Job.error_detail)",
+        ),
+    ]
+    return [
+        f"web/templates/privacy.html: does not say {words!r} ({source})"
+        for on, words, source in claims
+        if on and words not in notice
+    ]
+
+
 def second_reader_problem(settings: Settings) -> str | None:
     """Why `IMAGE_PAGES_SECOND_READER` cannot work with these settings, or None. Only the local
     reader runs in the conversion child (no keys, no network); a Claude or OpenAI reader needs
@@ -171,16 +267,6 @@ def launch_blockers(
                 ANALYTICS_NOTICE_WORD,
                 "ANALYTICS_ENABLED sends page views to PostHog",
             ),
-            (
-                settings.feature_tables,
-                "rebuild tables",
-                "FEATURE_TABLES sends tables to the model provider",
-            ),
-            (
-                settings.feature_notation_memory,
-                "notation",
-                "FEATURE_NOTATION_MEMORY keeps courses and sends their notation",
-            ),
         ):
             if on and word not in notice:
                 items.append(
@@ -191,6 +277,10 @@ def launch_blockers(
                 f"web/templates/privacy.html: {what} to {name} but the privacy notice does "
                 f"not name {name}"
             )
+        # What is sent (FEATURE_TABLES, FEATURE_NOTATION_MEMORY and every other sending
+        # setting) and what is stored and deleted: each statement checked against its source.
+        items.extend(sent_material_problems(settings))
+        items.extend(privacy_claim_problems(settings))
     if settings is not None and settings.signup_open and notice is not None:
         for phrase, what in OPEN_SIGNUP_NOTICE:
             if phrase not in notice:

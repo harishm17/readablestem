@@ -67,12 +67,11 @@ def data_items(context: dict[str, Any]) -> list[DataItem]:
     """The data a conversion moves, from the context `offices_context` builds (the settings'
     features, the companies that receive documents, the retention times)."""
     recipients = context["recipients"]
-    model = tuple(r.name for r in recipients if "model" in r.purposes)
-    readers = tuple(r.name for r in recipients if "handwriting" in r.purposes)
     hours, days = context["retention_hours"], context["opt_in_days"]
     ours = (
-        f"{hours} hours after the instructor last works on it; 7 days if the instructor keeps "
-        f"it; {days} days if the instructor also lets us look at the results"
+        f"{hours} hours after the instructor last works on it; {context['week_days']} days if "
+        f"the instructor keeps it; {days} days if the instructor also lets us look at the "
+        "results"
     )
     same = "With us: the same schedule"
 
@@ -81,41 +80,13 @@ def data_items(context: dict[str, Any]) -> list[DataItem]:
             f"{name}: {COMPANY_KEEPS[name]}" for name in names if name in COMPANY_KEEPS
         )
 
-    parts = "equations, figures and tables" if context["tables_on"] else "equations and figures"
-    items = [
-        DataItem("The uploaded file and its file name", ("Railway",), ours),
-        DataItem(
-            f"Images of {parts} cut from the PDF, with a little nearby text",
-            ("Railway", *model),
-            f"{same}. {with_company(model)}",
-        ),
+    items = [DataItem("The uploaded file and its file name", ("Railway",), ours)]
+    # One row per kind of material sent to a model, in the privacy page's words
+    # (web/recipients.py `sent_material`).
+    items += [
+        DataItem(m.what, ("Railway", *m.to), f"{same}. {with_company(m.to)}")
+        for m in context["sent_material"]
     ]
-    if context["notation_on"]:
-        items.append(
-            DataItem(
-                "A course's notation (its symbols and what they mean), for a document uploaded "
-                "to that course",
-                ("Railway", *model),
-                f"{same}. {with_company(model)}",
-            )
-        )
-    if context["image_pages_on"]:
-        items.append(
-            DataItem(
-                "A picture of each scanned or handwritten page, only if the instructor checks "
-                "“Convert scanned or handwritten pages”",
-                ("Railway", *model),
-                f"{same}. {with_company(model)}",
-            )
-        )
-    if readers:
-        items.append(
-            DataItem(
-                "A close-up of a handwritten expression, to be read a second time",
-                ("Railway", *readers),
-                f"{same}. {with_company(readers)}",
-            )
-        )
     items += [
         DataItem(
             "The result and the review decisions",

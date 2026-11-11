@@ -29,7 +29,8 @@
 <h2>What is sent where</h2>
 <p>The instructor uploads a PDF over HTTPS to the app, hosted by Railway in the United States.
   Students do not sign in. The PDF file, its file name and the instructor's email address are
-  never sent to {{ model_names }}.</p>
+  never sent to {{ model_names }}{% if whole_pages_sent %}; pictures of whole pages are, as the
+  table says{% endif %}.</p>
 {{ matrix(data_items, "What is sent where, and for how long") }}
 <p>{{ model_names }} {{ "states" if model_companies|length == 1 else "state" }} that
   {{ "it does" if model_companies|length == 1 else "they do" }} not train on API data by

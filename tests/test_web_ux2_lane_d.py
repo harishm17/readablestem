@@ -74,7 +74,8 @@ def test_the_matrix_the_company_table_and_the_summary_are_written_from_one_list(
     # full-page images and the course notation the summary used to leave out.
     joined = " ".join(labels)
     assert "tables" in joined and "scanned or handwritten page" in joined
-    assert "course's notation" in joined and "close-up of a handwritten expression" in joined
+    assert "course's notation" in joined
+    assert "close-up picture of a handwritten expression" in joined
     with env.running() as client:
         page = client.get(offices.PAGE_PATH).text
         summary = client.get(offices.SUMMARY_PATH).text

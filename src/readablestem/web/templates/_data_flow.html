@@ -1,10 +1,11 @@
 {# The data-flow diagram of /for-accessibility-offices. Presentation attributes only (the
    page's CSP allows no style attributes). Its text equivalent is the numbered list under it
    on the page, and the title and description here repeat that list's content for a screen
-   reader that reads the image on its own. Company names come from web/recipients.py. #}
+   reader that reads the image on its own. Company names, and what the app sends
+   (`sent_short`, `whole_pages_sent`: the list of what is sent), come from web/recipients.py. #}
 <svg class="data-flow" viewBox="0 0 360 520" role="img" aria-labelledby="flow-title flow-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif" font-size="14">
   <title id="flow-title">How a document moves through ReadableSTEM</title>
-  <desc id="flow-desc">Four boxes in a column, joined by arrows. The instructor's browser sends the PDF to the ReadableSTEM app and its database, hosted by Railway in the United States. The app sends images of equations and figures, with a little nearby text, to {{ model_names }}. {{ model_names }} returns proposed LaTeX and descriptions. The instructor reviews them and downloads the result as a web page. The PDF itself, its file name and the instructor's email address are not sent to {{ model_names }}.</desc>
+  <desc id="flow-desc">Four boxes in a column, joined by arrows. The instructor's browser sends the PDF to the ReadableSTEM app and its database, hosted by Railway in the United States. The app sends {{ sent_short }} to {{ model_names }}. {{ model_names }} returns proposed LaTeX and descriptions. The instructor reviews them and downloads the result as a web page. The PDF itself, its file name and the instructor's email address are not sent to {{ model_names }}.</desc>
   <defs>
     <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#1a4fa0"/>
@@ -36,7 +37,7 @@
   </g>
   <g fill="#1b1b1f" font-size="12.5" aria-hidden="true">
     <text x="192" y="120">PDF</text>
-    <text x="192" y="288">images and nearby text</text>
+    <text x="192" y="288">{{ "images, page pictures and text" if whole_pages_sent else "images and nearby text" }}</text>
     <text x="192" y="424">proposals, then review</text>
   </g>
 </svg>

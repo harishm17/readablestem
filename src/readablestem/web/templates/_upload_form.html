@@ -155,7 +155,8 @@
             <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting;
               it is refused without it. In a mixed PDF, scanned pages stay pictures marked
               “Not converted” unless you check it. Slower; you check every converted equation
-              and table.</p>
+              and table.{% for m in sent_material|default([]) if m.key == "scanned_pages" %} A
+              picture of each such page goes to {{ m.to|join(" and ") }}.{% endfor %}</p>
           </div>
           {% endif %}
         </div>

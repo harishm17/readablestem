@@ -83,19 +83,19 @@
 
 <h2 id="who-else-sees">Who else sees your documents</h2>
 <ul>
+  {# What each company receives is the list of what is sent (web/recipients.py
+     `sent_material`): one item per kind of material the settings send, with what is kept
+     from the answer. A setting that sends something new adds its item here, and a
+     production start is refused until it shows (ops/launch.py). #}
   {% for r in recipients %}
-  {% if "model" in r.purposes %}
-  <li><strong>{{ r.name }}.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
-    and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
-    nearby text, are sent to {{ r.name }}'s API{% if r.name == "Anthropic" %} (the Claude models){% endif %}.{% if notation_on %} For a document you upload
-    for one of your courses, that course's notation (its symbols and what they mean) is
-    sent with the equations.{% endif %}{% if image_pages_on %} If you check “Convert scanned or
-    handwritten pages”, a picture of each scanned or handwritten page is sent as well.{% endif %}{% if "handwriting" in r.purposes %}
-    A close-up picture of a handwritten expression can also be sent, to be read a second time.{% endif %}
-    {{ retention(r.name) }}</li>
-  {% elif "handwriting" in r.purposes %}
-  <li><strong>{{ r.name }}.</strong> A close-up picture of a handwritten expression can be sent
-    to {{ r.name }}'s API, to be read a second time. No other text goes with it.
+  {% if r.gets_documents %}
+  <li><strong>{{ r.name }}.</strong> Sent to {{ r.name }}'s API{% if r.name == "Anthropic" %}
+    (the Claude models){% endif %}:
+    <ul>
+      {% for m in sent_material if r.name in m.to %}
+      <li>{{ m.what }} {{ m.stored }}</li>
+      {% endfor %}
+    </ul>
     {{ retention(r.name) }}</li>
   {% elif "hosting" in r.purposes %}
   <li><strong>{{ r.name }}</strong> hosts the app and its database (Railway Postgres), in its
@@ -194,8 +194,16 @@
   you signed in, uploaded, made a review decision or downloaded, and your answers to the
   two optional questions after a download. Each note is a random id, a time, a category
   and at most a number; to notice the same file uploaded twice, it keeps a scrambled
-  fingerprint from which the file cannot be rebuilt ("Delete now" removes it). No
-  cookies or scripts are used for this. These notes are deleted after {{ event_days }}
+  fingerprint from which the file cannot be rebuilt ("Delete now" removes it). For each
+  review decision, notes also record, in fixed categories and never in words from your
+  document: what kind of item it was (for example an equation or a heading), the reason the
+  tool asked about it or that it did not ask, what you did (kept, edited, replaced, rejected,
+  removed or added), whether the item was read from a page or from LaTeX source, whether the
+  tool showed it to you or you found it, whether the decision covered one item or several,
+  how it was saved, and the tool's version. Totals of these notes are read only when they
+  come from at least {{ outcome_min_accounts }} accounts and {{ outcome_min_documents }}
+  documents and no one account gives more than {{ (outcome_max_share * 100)|round|int }}% of
+  them or of their pages. No cookies or scripts are used for this. These notes are deleted after {{ event_days }}
   days, or with your account.</p>
 {% endif %}
 </details>
@@ -231,15 +239,23 @@
 </details>
 
 <h2>Where it is processed</h2>
-<p>The app and its database run on Railway, in its United States region. Images and nearby
-  text of equations and figures are sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in
-  the United States for processing, as described above. If you are outside the United
-  States, your documents are therefore transferred there.</p>
+<p>The app and its database run on Railway, in its United States region. What is listed
+  under “Who else sees your documents” is sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in
+  the United States for processing. If you are outside the United States, your documents are
+  therefore transferred there.</p>
 
 <h2>Changes to this notice</h2>
 <p>If this notice changes in a way that affects what is stored or who receives it, we will
   say so on this page, with the date, before the change takes effect{% if not signup_open %}, and email the people
   on the beta list{% endif %}.</p>
+{# One line per kind of material sent, with the day it was first stated here
+   (web/recipients.py `Material.stated`). #}
+<p>When each kind of material sent to a model was first named on this page:</p>
+<ul>
+  {% for m in sent_material %}
+  <li>{{ m.label }}: {{ m.stated_text or "not yet dated" }}.</li>
+  {% endfor %}
+</ul>
 
 <h2>Requests, takedowns and rights</h2>
 <p>You can delete your account and everything in it yourself, any time you are signed in
