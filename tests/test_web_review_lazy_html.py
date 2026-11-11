@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from fixtures.web.support import fetch
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline.assemble import CHECKED
 from readablestem.web.db import Job, session_scope
@@ -25,14 +26,14 @@ def decisions(site: Site) -> list[str]:
 def test_every_way_to_get_the_file_or_its_checks_refreshes_it(site, path):
     review(site, decisions(site)[0], action="reject")
     assert site.job(site.job_id).html_stale is True
-    response = site.browser.get(f"/jobs/{site.job_id}{path}")
+    response = fetch(site.browser, f"/jobs/{site.job_id}{path}")
     assert response.status_code == 200, path
     assert site.job(site.job_id).html_stale is False, path
 
 
 def test_undo_marks_the_file_out_of_date_like_any_other_write(site):
     review(site, decisions(site)[0], action="reject")
-    site.browser.get(f"/jobs/{site.job_id}/download")
+    fetch(site.browser, f"/jobs/{site.job_id}/download")
     version = site.job(site.job_id).result_version
     page = site.browser.get(f"/jobs/{site.job_id}/review").text
     token = csrf_from(page)
@@ -51,7 +52,7 @@ def test_the_student_note_is_dated_by_the_last_decision_not_by_the_render(site):
 
         for edit in session.query(ReviewEdit).filter_by(job_id=site.job_id):
             edit.created_at = edit.created_at.replace(year=2026, month=1, day=2)
-    served = site.browser.get(f"/jobs/{site.job_id}/download").text
+    served = fetch(site.browser, f"/jobs/{site.job_id}/download").text
     assert f"{CHECKED} on January 2, 2026." in served, served[-600:]
 
 
@@ -82,7 +83,7 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
         ]
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = True
-    assert 'alttext="' not in site.browser.get(f"/jobs/{site.job_id}/download").text
+    assert 'alttext="' not in fetch(site.browser, f"/jobs/{site.job_id}/download").text
 
     site.ctx.settings.mathml_alttext = True
     try:
@@ -90,7 +91,7 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
             job = session.get(Job, site.job_id)
             assert job is not None
             job.html_stale = True
-        served = site.browser.get(f"/jobs/{site.job_id}/download").text
+        served = fetch(site.browser, f"/jobs/{site.job_id}/download").text
         assert 'alttext="x equals 2"' in served
         token = csrf_from(site.browser.get(f"/jobs/{site.job_id}/review").text)
         contact = site.browser.post(

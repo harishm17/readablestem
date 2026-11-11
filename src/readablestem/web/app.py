@@ -41,7 +41,7 @@ from readablestem.core import sandbox
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
-from readablestem.web import analytics, seo
+from readablestem.web import analytics, output, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -233,6 +233,13 @@ def _on_login_required(request: Request, exc: Exception) -> Response:
         remember_return(request)
         return RedirectResponse("/login", status_code=303)
     return signed_out_page(request, status_code=401)
+
+
+def _on_draft_confirm(request: Request, exc: Exception) -> Response:
+    """A draft asked for without the draft page's confirm (`web.output.check`): the page asks
+    first, so a typed or bookmarked address cannot skip the question."""
+    assert isinstance(exc, output.DraftConfirm)
+    return RedirectResponse(exc.url, status_code=303)
 
 
 def _on_csrf_failed(request: Request, exc: Exception) -> Response:
@@ -491,6 +498,7 @@ def create_app(
     app.add_exception_handler(PageError, _on_page_error)
     app.add_exception_handler(LoginRequired, _on_login_required)
     app.add_exception_handler(CsrfFailed, _on_csrf_failed)
+    app.add_exception_handler(output.DraftConfirm, _on_draft_confirm)
     app.add_exception_handler(StarletteHTTPException, _on_http_error)
     app.add_exception_handler(RequestValidationError, _on_validation_error)
     for unavailable in (OperationalError, InterfaceError, SATimeoutError):

@@ -84,7 +84,8 @@
     {% if job.can_review %}<li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>{% endif %}
     <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
     <li><a href="/jobs/{{ job.id }}/listen">Listen as a student</a></li>
-    <li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>
+    {# A person who can only view is never offered a draft (SW21); the route refuses it too. #}
+    {% if job.can_review %}<li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>{% endif %}
   </ul>
   {# ux-a: under the download link, where to post the file and the two questions. #}
   {% include "_after_download.html" %}

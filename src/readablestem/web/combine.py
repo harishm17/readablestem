@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import combine
-from readablestem.web import documents, ranges
+from readablestem.web import output, ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
@@ -45,7 +45,7 @@ class KeptPart:
 def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[KeptPart]:
     """The finished parts of `job`'s source that its owner still keeps, in page order.
     `job` must be a part; one that is not has none. A part with a decision still open is a
-    draft and is held back, as "Download all" holds it back (`web.routes.bundle`). When two
+    draft and is held back by the same rule as a download (`web.output.export_state`). When two
     parts name a page in common (the same pages converted twice) the newest is kept and the
     older one left out, so the file never holds a page twice."""
     if not job.part_group:
@@ -67,7 +67,7 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
         pages = ranges.pages_of_label(row.part_label)
         if pages is None or len(pages) != row.page_count or taken & set(pages):
             continue
-        if documents.open_decisions((row.result_json or {}).get("fixes")):
+        if output.export_state(row).key != output.READY:  # a draft is never joined (SW21)
             continue
         taken.update(pages)
         kept.append(KeptPart(row, pages))

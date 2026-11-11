@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, upload
+from fixtures.web.support import ALICE, WebEnv, fetch, job_id_from, login, make_pdf, upload
 from readablestem.web import analytics
 from readablestem.web.security import APP_CSP
 
@@ -239,10 +239,10 @@ def test_the_loader_is_absent_from_everything_the_tool_produces(on, upstream):
     on.run_worker()
     outputs: dict[str, str] = {}
     outputs["view"] = client.get(f"/jobs/{job}/view").text
-    outputs["download"] = client.get(f"/jobs/{job}/download").text
+    outputs["download"] = fetch(client, f"/jobs/{job}/download").text
     outputs["demo"] = client.get("/demo").text
-    canvas = client.get(f"/jobs/{job}/download/canvas")
-    cartridge = client.get(f"/jobs/{job}/download/cartridge")
+    canvas = fetch(client, f"/jobs/{job}/download/canvas")
+    cartridge = fetch(client, f"/jobs/{job}/download/cartridge")
     for name, response in (("canvas", canvas), ("cartridge", cartridge)):
         assert response.status_code == 200, name
         with zipfile.ZipFile(BytesIO(response.content)) as archive:

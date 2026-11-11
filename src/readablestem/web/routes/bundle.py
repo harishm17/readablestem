@@ -26,7 +26,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from readablestem.pipeline import export_docx, export_epub
-from readablestem.web import bundle, documents, events, notation, retention
+from readablestem.web import bundle, documents, events, notation, output, retention
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, get_ctx
 from readablestem.web.logsafe import log_event
@@ -78,8 +78,7 @@ def _zip_response(
             job = session.get(Job, job_id)
             if job is None or (job.html is None and not job.html_stale):
                 continue
-            result = job.result_json or {}
-            if documents.open_decisions(result.get("fixes")):
+            if output.export_state(job).key != output.READY:  # a draft stays out (SW21)
                 held_back += 1
                 continue
             if len(items) >= cap:  # the zip is full: do not make (or restart) the rest

@@ -247,7 +247,7 @@ def test_the_draft_and_the_language_work_without_javascript(site, browser, jobs)
     page.goto(f"{site.base}/jobs/{job_id}")
     page.get_by_role("link", name="Download a draft (3 decisions open)").click()
     assert page.get_by_role("heading", level=1).inner_text().startswith("Download a draft of")
-    assert page.get_by_role("link", name="Download the draft anyway").is_visible()
+    assert page.get_by_role("button", name="Download the draft anyway (the HTML file)").is_visible()
     page.get_by_role("link", name="Review 3 decisions first").click()
     assert "/review" in page.url
     page.goto(f"{site.base}/jobs/{job_id}")

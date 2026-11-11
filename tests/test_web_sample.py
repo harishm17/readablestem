@@ -14,7 +14,17 @@ from html import unescape
 import pytest
 from sqlalchemy import func, select
 
-from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, login, make_pdf, token, upload
+from fixtures.web.support import (
+    ALICE,
+    BOB,
+    WebEnv,
+    csrf_from,
+    fetch,
+    login,
+    make_pdf,
+    token,
+    upload,
+)
 from readablestem.core.types import DocumentResult
 from readablestem.ops.aggregate import aggregate_finished
 from readablestem.ops.retention import purge_expired
@@ -122,7 +132,7 @@ def test_it_is_not_counted_in_the_usage_numbers(web):
     )
     assert decided.status_code in {200, 303}
     assert web.alice.get(f"/jobs/{job_id}/view").status_code == 200
-    assert web.alice.get(f"/jobs/{job_id}/download").status_code == 200
+    assert fetch(web.alice, f"/jobs/{job_id}/download").status_code == 200
     assert table_count(web, ReviewEdit) >= 1
     with session_scope(web.ctx.factory) as session:
         mine = session.scalar(

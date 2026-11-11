@@ -26,6 +26,7 @@ from fixtures.web.support import (
     BOB,
     WebEnv,
     fake_output,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -166,7 +167,7 @@ def test_a_job_the_daily_cap_stops_part_way_is_not_shown_as_a_normal_success(env
     assert "The accessible HTML is ready" not in text
     assert "Stopped early" in page_text(env.browser.get("/app").text)
     # The partial result is still there to use.
-    assert env.browser.get(f"/jobs/{job_id}/download").status_code == 200
+    assert fetch(env.browser, f"/jobs/{job_id}/download").status_code == 200
 
 
 def test_a_per_job_cap_stop_says_to_split_the_document(env):

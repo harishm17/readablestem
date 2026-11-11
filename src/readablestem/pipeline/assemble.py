@@ -134,6 +134,10 @@ FLAGGED_NOTE = (
     "instructor for a version you can read."
 )
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
+# A draft (`mark_draft`): a file that left the tool with decisions still open says so before
+# anything else, and its head says so to a program (SW21). An honesty claim: one string.
+DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'
+DRAFT_CLASS = "draft-mark"
 # The flag notes speak to students, as the about section does (UX review MF7): what is
 # missing, and whom to ask. Never reviewer wording ("review", "publishing").
 EQUATION_NOTE = (
@@ -1330,6 +1334,36 @@ def _about_section(
         f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
         f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
     )
+
+
+def draft_banner(open_decisions: int) -> str:
+    """The first words of a draft file: how many decisions are still open, and that it is
+    not for students (SW21)."""
+    many = "1 decision is" if open_decisions == 1 else f"{open_decisions} decisions are"
+    return f"Draft: {many} still open. Not for students."
+
+
+_HEAD_TAG = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
+_BODY_TAG = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+
+
+def mark_draft(html: str, open_decisions: int) -> str:
+    """`html` marked as a draft: the state in its head for programs, and the banner as the
+    first thing in its body, so it comes first in reading order and is said in words, not
+    colour alone. The Word, EPUB, Canvas and Cartridge files are made from the marked HTML,
+    so the banner is inside each of them as well. Without a `<head>` or `<body>` (a fragment)
+    the banner goes first."""
+    word, colon, rest = draft_banner(open_decisions).partition(":")
+    banner = (
+        f'<p class="{DRAFT_CLASS}" role="note" lang="en" style="border: 3px solid; '
+        f'padding: 0.75em 1em; margin: 0.5rem; font-size: 1.25em">'
+        f"<strong>{word}{colon}</strong>{_escape(rest)}</p>"
+    )
+    if head := _HEAD_TAG.search(html):
+        html = html[: head.end()] + DRAFT_STATE_META + html[head.end() :]
+    if body := _BODY_TAG.search(html):
+        return html[: body.end()] + banner + html[body.end() :]
+    return banner + html
 
 
 def _contact_sentence(contact: str | None) -> str:

@@ -18,6 +18,7 @@ from fixtures.web.support import (
     ALICE,
     WebEnv,
     csrf_from,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -347,7 +348,7 @@ def test_hostile_names_are_shown_escaped_and_never_reach_headers(web):
         body = web.browser.get(path).text
         assert "<img src=x" not in body, path
         assert "onerror=alert" not in body.replace("&", "") or "&lt;img" in body, path
-    download = web.browser.get(f"/jobs/{job_id}/download")
+    download = fetch(web.browser, f"/jobs/{job_id}/download")
     assert "x-evil" not in {key.lower() for key in download.headers}
     assert "\r" not in download.headers["content-disposition"]
     assert "\n" not in download.headers["content-disposition"]
