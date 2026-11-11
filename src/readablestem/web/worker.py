@@ -105,6 +105,7 @@ from readablestem.core.types import (
     StepFacts,
 )
 from readablestem.ops import limits
+from readablestem.pipeline import step_facts as pipeline_step_facts
 from readablestem.web import access, carry_edits, events, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
@@ -1131,9 +1132,9 @@ class Worker:
             before.append(StageFact(stage="queue_wait", seconds=round(max(0.0, waited), 4)))
         after: list[StageFact] = []
         if attempt.began is not None and attempt.converted is not None:
-            inside = sum(fact.seconds for fact in output.facts.stages)
-            outside = attempt.converted - attempt.began - inside
-            before.append(StageFact(stage="start_up", seconds=round(max(0.0, outside), 4)))
+            before.append(
+                pipeline_step_facts.start_up(output.facts, attempt.converted - attempt.began)
+            )
             stored = time.monotonic() - attempt.converted
             after.append(StageFact(stage="store", seconds=round(stored, 4)))
         return StepFacts(calls=output.facts.calls, stages=[*before, *output.facts.stages, *after])

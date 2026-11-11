@@ -5,10 +5,12 @@ https://developers.openai.com/api/docs/pricing on 2026-10-07 (standard tier, sho
 context). Reasoning tokens are billed as output tokens and are already included in
 `output_tokens`. Update `PRICES_CHECKED` when you re-check.
 
-The Anthropic rows (`claude-*`) are from the Claude API model and pricing table of
-2026-10-06 (first-party API, standard tier, no batch discount), re-read on 2026-10-13; see
-the block above them for the cache rules. Thinking tokens are billed as output tokens and
-are included in `output_tokens`. `ANTHROPIC_PRICES_CHECKED` is their date.
+The Anthropic rows (`claude-*`) are from the Claude API model and pricing table
+(`ANTHROPIC_PRICES_SOURCE`; first-party API, standard tier, no batch discount), read again
+on `ANTHROPIC_PRICES_CHECKED`; see the block above them for the cache rules. Thinking tokens
+are billed as output tokens and are included in `output_tokens`. A copy of the published
+figures as read that day is `tests/fixtures/models/anthropic_prices.json`, and
+`tests/test_pricing.py` holds the rows to it: change both from a new reading, never one.
 
 The Decisions API (the second automated check, `models.decisions_client`) has a price
 list of its own, `DECISIONS_PRICES`, at the end of this module.
@@ -22,7 +24,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 PRICES_CHECKED = "2026-10-07"
-ANTHROPIC_PRICES_CHECKED = "2026-10-13"
+ANTHROPIC_PRICES_CHECKED = "2026-11-11"
+ANTHROPIC_PRICES_SOURCE = "https://platform.claude.com/docs/en/about-claude/pricing"
 
 # Upper bound used when reserving spend before a call. OpenAI bills a high-detail image by
 # 512 px tiles; a crop the pipeline sends is at most 2048 px on its long side, which stays
@@ -78,12 +81,20 @@ PRICES: dict[str, Price] = {
 
 # --- Anthropic Claude API ---------------------------------------------------------------
 #
-# From the model table of the claude-api reference (2026-10-06) and its prompt-caching and
-# model notes. Cache reads are 0.1x the input rate on Haiku 5.5, 0.05x on Opus 5.5 ($0.20)
-# and, for Sonnet 5.5, $0.20 (0.1x). A cache write costs 1.25x the input rate for the
-# 5-minute lifetime (the only one the client asks for; 2x for 1 hour). Haiku 5.5 has two
-# rate cards, chosen by prompt length: $0.10 / $0.50 up to 100K tokens, $0.50 / $2.50
-# beyond, with the same multipliers.
+# From the model table of the Claude API reference and its prompt-caching and model notes,
+# as read on `ANTHROPIC_PRICES_CHECKED`. Cache reads are 0.1x the input rate on Haiku 5.5,
+# 0.05x on Opus 5.5 ($0.20) and on Sonnet 5.5 ($0.10), and 0.025x on Fable 5.2 ($0.20). A
+# cache write costs 1.25x the input rate for the 5-minute lifetime (the only one the client
+# asks for; 2x for 1 hour). Haiku 5.5 has two rate cards, chosen by prompt length: $0.10 /
+# $0.50 up to 100K tokens, $0.50 / $2.50 beyond, with the same multipliers.
+#
+# Sonnet 5.5's cache reads were $0.20 here until 2026-11-11, twice the published rate, so
+# the cached part of a second check was overstated; nothing was understated.
+#
+# claude-fable-5-2 has a row so that a ladder with it can be costed from a recording. No
+# step is set to it, and the client's requests have not been tried against it: by the API
+# reference it always thinks, refuses a forced tool choice, and takes no server-side
+# fallback in a batch.
 #
 # The reservation's upper bound for these models (`estimate_max_cost_usd`):
 # - images: a high-resolution image is at most about 4784 tokens (2576 px on the long
@@ -141,9 +152,19 @@ PRICES.update(
             thinking_tokens=THINKING_ALLOWANCE_TOKENS,
             pixels_per_token=IMAGE_PIXELS_PER_TOKEN,
         ),
+        "claude-fable-5-2": Price(
+            input=8.00,
+            cached_input=0.20,
+            output=40.00,
+            cache_write=10.00,
+            max_image_tokens=ANTHROPIC_IMAGE_TOKENS,
+            base_input_tokens=ANTHROPIC_BASE_INPUT_TOKENS,
+            thinking_tokens=THINKING_ALLOWANCE_TOKENS,
+            pixels_per_token=IMAGE_PIXELS_PER_TOKEN,
+        ),
         "claude-sonnet-5-5": Price(
             input=2.00,
-            cached_input=0.20,
+            cached_input=0.10,
             output=10.00,
             cache_write=2.50,
             max_image_tokens=ANTHROPIC_IMAGE_TOKENS,
@@ -165,9 +186,12 @@ PRICES.update(
         ),
     }
 )
-# The Message Batches API bills every token at half the standard rate (re-read 2026-10-14).
+# The Message Batches API bills every token at half the standard rate (re-read 2026-11-11).
 BATCH_DISCOUNT = 0.5
 ANTHROPIC_MODELS: frozenset[str] = frozenset(m for m in PRICES if m.startswith("claude-"))
+# Priced so that a recording can be costed with them, and not to be set as a role's model:
+# the client's requests have not been tried against them (see the block above the rows).
+COSTED_ONLY: frozenset[str] = frozenset({"claude-fable-5-2"})
 
 
 class UnknownModelError(KeyError):

@@ -2839,6 +2839,173 @@ lacks, and what a reading-order bar met on it therefore does not cover yet:
   economics): the walk takes books in seeded order and does not choose by subject. Their
   pages count as textbook layout, not as mathematics.
 
+## What a page costs and how long it takes (`eval cost`, `eval speed`)
+
+Both commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
+Every upload of the corpus (`corpus.UPLOADS`: each file once, and again with the boxes a
+person would tick for it) is converted the way the worker converts a job: production's
+behavior settings (`ops/production.profile.toml`), the job's own caps, the conversion in a
+process of its own, and the recorded answers in front of the model client. Nothing is sent
+and nothing is spent. The database and the web app are not part of it.
+
+Each upload is measured in a fresh process, one at a time by default, so its highest memory
+use and its start-up are its own and no cache carries over. What is kept for an upload is
+content-free: its pages and the kind of each, its step facts (operations.md, "Step facts and
+the step report"), dollars, wall and CPU seconds, and peak memory.
+
+**A page has one kind**, the first of these that fits, so that the kinds add up to the run:
+
+| Kind | A page that |
+|---|---|
+| `scan` | is scanned or handwritten: read from its picture when the upload asked for that, kept as a picture when it did not |
+| `source` | is a unit of a document read from its LaTeX source |
+| `slide` | has the shape of a slide |
+| `dense_math` | has 9 equations or more |
+| `table`, then `figure` | has one |
+| `typical` | is none of these |
+
+```bash
+uv run readablestem eval cost --out data/eval/cost-corpus.json
+uv run readablestem eval speed --runs 2 --cores 2/3 --out speed.json --against data/eval/speed-corpus.json
+uv run readablestem eval cost --only s15_charts_figures      # one file
+uv run readablestem eval speed --records kept.json           # keep what was measured
+uv run readablestem eval cost --from kept.json               # report on it again, measure nothing
+```
+
+Both reports record the four things `eval bar` asks for, with the commit and the machine,
+and hold their figures under `metrics`, so `eval bar` can read one
+(`--measure kinds.dense_math.usd_page.p95`). The corpus is a development set: it was chosen
+to cover kinds of document, and the readers were built while looking at it. So neither
+report can meet a bar or carry a public claim, and each says "Proof owed" in its header. A
+replay of held-out whole documents needs a recording that does not exist yet.
+
+### `eval cost`
+
+A request to a model is a step fact with the page it was about. A page's dollars are the
+dollars of its requests, plus an even share of any request about the whole document, so the
+pages of a document add up to the document. The report prints:
+
+- a document's dollars a page (its cost divided by its pages), over the documents;
+- dollars of one page by page kind, at the median and the 95th percentile, with the mean;
+- dollars by step, over the pages the step ran on, and its mean over every page;
+- the mean of each step on each kind of page;
+- the steps of the accuracy round that are not built (page audit, text check, line-strip
+  check, table read, figure checker, structure read, cheap first read of a scan): what the
+  run spent on each, which is 0 until it runs, and the estimate for one unit with what it
+  rests on;
+- the two figures the public pages are built from (`TYPICAL_PAGE_USD` and `DENSE_PAGE_USD`
+  in `ops/limits.py`) beside what this run measured, and how many pages a day's open pool
+  pays for with and without the checks.
+
+An upload whose recording lacks an answer it asks for is left out and named: a refused
+request costs nothing, so its pages would look cheaper than they are.
+
+First run (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages, $4.85 in the recording; `data/eval/cost-corpus.json`). Ten uploads are left out for
+the 126 answers still owed ("Recording and replay").
+
+| Page kind | Pages | Documents | Median | p95 | Mean |
+|---|---|---|---|---|---|
+| `scan` | 25 | 10 | $0.0295 | $0.0569 | $0.0246 |
+| `slide` | 45 | 3 | $0.0000 | $0.0202 | $0.0053 |
+| `dense_math` | 30 | 10 | $0.0716 | $0.1365 | $0.0676 |
+| `table` | 24 | 17 | $0.0059 | $0.0486 | $0.0152 |
+| `figure` | 60 | 19 | $0.0174 | $0.0450 | $0.0220 |
+| `typical` | 131 | 43 | $0.0000 | $0.0091 | $0.0022 |
+
+| Step | Requests | Pages it ran on | Median of such a page | p95 | Mean over every page | Total |
+|---|---|---|---|---|---|---|
+| `equation` | 1,314 | 87 | $0.0065 | $0.1119 | $0.0070 | $2.21 |
+| `figure` | 260 | 92 | $0.0157 | $0.0510 | $0.0058 | $1.81 |
+| `image_page` | 14 | 13 | $0.0364 | $0.0707 | $0.0016 | $0.49 |
+| `table` | 44 | 28 | $0.0021 | $0.0486 | $0.0011 | $0.34 |
+
+What the first run shows:
+
+- **Most pages cost nothing.** A page of text alone sends nothing to a model, so the median
+  `typical` page is $0. The money is in the pages with equations (46% of it on 87 pages),
+  figures and tables. "What a typical page costs" has meant a document's cost divided by
+  its pages: $0.0055 at the median document here, $0.043 at the 95th percentile and $0.012
+  on average.
+- **The kept figures stay.** `TYPICAL_PAGE_USD` is $0.0145 and `DENSE_PAGE_USD` is $0.034
+  to $0.092, the audit's measurements. This run's dense pages are $0.072 at the median and
+  $0.137 at the 95th percentile, above the kept range's top; that is a development set
+  with one 14-page solution set in it, so the range is not changed from it, and the
+  held-out replay decides.
+- Every dollar of every job is on a step fact: the difference between a result's dollars
+  and its facts' dollars is 0 for all 73 uploads.
+
+### `eval speed`
+
+A replay waits on no model, so its seconds are the local work. The report prints:
+
+- seconds a page by page kind, at the median and the 95th percentile. The conversion does
+  not time each page yet, so a page is given its document's seconds divided by its pages:
+  exact for a document of one kind, blurred for a mixed one;
+- seconds a page by stage (`layout`, `image_pages`, `steps`, `assemble`, `checks`), over the
+  documents that have the stage, with the stage's mean over every page and its share;
+- start-up apart, as seconds of a job: starting the conversion process and loading its code
+  takes the same time for 1 page and for 40;
+- wall and CPU seconds apart, and the most memory held by the conversion process and by the
+  process that called it;
+- what the models took when the answers were recorded, per step, apart from all of the
+  above.
+
+`--runs N` replays the corpus N times and counts each upload's fastest run: a slow run is
+the machine, a fast one cannot be. `--cores A/B` pins run 1 to CPU list A and run 2 to B.
+Where two runs of the same code differ by more than the allowance at a kind's median, the
+report says the machine was too busy to judge.
+
+**The bar** (`--against RECORD`): no page kind is slower than in the earlier record by more
+than a tenth (`--allowance`, 1.0 for a shared runner) at the median or at the 95th
+percentile. Two records are compared only when they name the same CPU model and core count.
+
+| Exit | When |
+|---|---|
+| 0 | the bar is met, or no record was given |
+| 1 | a page kind is slower than allowed; the lines name each |
+| 2 | not judged: another machine class, or the machine was too busy |
+
+First measurement (2026-11-11, pipeline 0.5.10, production profile, all 73 uploads, 338
+pages, the faster of two runs on cores 2 and 3 of an AMD Ryzen 7 5800H). No speed record is
+kept from it: other work ran on the machine, the two runs differ by more than the allowance
+on `dense_math`, and the report says so ("the machine was too busy to judge"). The figures
+show the scale and where the time goes; the record `--against` compares with is made on a
+quiet machine and kept as `data/eval/speed-corpus.json`.
+
+| | Median | p95 |
+|---|---|---|
+| Wall seconds a page, start-up apart | 0.71 | 2.57 |
+| CPU seconds a page, start-up included | 1.63 | 3.73 |
+| Start-up of a job (seconds) | 2.00 | 2.04 |
+
+| Page kind | Pages | Documents | Median s | p95 s |
+|---|---|---|---|---|
+| `scan` | 25 | 10 | 0.77 | 4.06 |
+| `slide` | 45 | 3 | 0.20 | 0.55 |
+| `dense_math` | 34 | 13 | 0.84 | 1.70 |
+| `table` | 29 | 22 | 1.00 | 1.61 |
+| `figure` | 64 | 20 | 0.69 | 1.39 |
+| `typical` | 141 | 49 | 0.52 | 1.21 |
+
+Layout is 66% of the local time (0.48 s a page at the median), the steps' own work 24%,
+assembly 7% and the checks 1%. The models are not waited for in a replay; when the answers
+were recorded a request took 1.4 s at the median for an equation, 2.6 s for a figure, 3.2 s
+for a table and 8.9 s for a page read as a picture. The conversion process held at most
+515 MB and the process that called it 424 MB.
+
+What neither report has yet:
+
+- A replay of held-out whole documents (the recording is not made), and so a bar or a
+  public figure.
+- Seconds of one page. They come with the per-page trace of the conversion; until then a
+  kind's seconds are those of the documents its pages are in.
+- A long document. The longest corpus file has 39 pages; the 100-page math-heavy document
+  the audit timed is not in the corpus.
+- A LaTeX source, a Word or a PowerPoint file: the corpus has none whose answers are
+  recorded, so the `source` kind has no row.
+- How long a background (batch) check takes to come back: no batch answer is recorded.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -2890,6 +3057,9 @@ lacks, and what a reading-order bar met on it therefore does not cover yet:
 | `src/readablestem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
 | `src/readablestem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
+| `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
+| `src/readablestem/eval/cost.py`, `eval/speed.py` | `eval cost` and `eval speed`: the reports made from a measured replay, and the speed bar |
+| `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |
 | `scripts/dev_chem_classes.py` | the outcome classes of a chemistry run, what harms a listener, `--speech` |
 | `src/readablestem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |

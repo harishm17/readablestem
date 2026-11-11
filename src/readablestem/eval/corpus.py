@@ -400,6 +400,26 @@ def document(entry: Entry, *, cache: Path = CACHE, get: Fetcher = download) -> b
     return _builders().build(entry.builder)
 
 
+# --- How a file is uploaded -------------------------------------------------------------
+
+# Every file is uploaded once with no box of the upload form ticked, except these: the boxes
+# a person would tick for the file ("image_pages": convert the scanned and handwritten pages;
+# "exam": it is an exam). The workflow tests and the cost and speed measures upload each file
+# these ways and no other.
+SCAN = {"image_pages": True}
+UPLOADS: dict[str, tuple[dict[str, bool], ...]] = {
+    "w_exam_5111": ({}, {"exam": True}),
+    "w_handwritten_6006": (SCAN,),
+    "w_scan_slides": (SCAN,),
+    "w_mixed_slides": (SCAN,),
+}
+
+
+def uploads(entry_id: str) -> tuple[dict[str, bool], ...]:
+    """The ways the file `entry_id` is uploaded, each as the boxes ticked."""
+    return UPLOADS.get(entry_id, ({},))
+
+
 # --- Recorded answers -----------------------------------------------------------------
 
 

@@ -70,14 +70,8 @@ ROOM = {
     "daily_spend_cap_usd": 1000.0,
 }
 
-# How a person uploads a corpus file: every file once with no box ticked, except these.
-SCAN = {"image_pages": True}
-UPLOADS: dict[str, tuple[dict[str, bool], ...]] = {
-    "w_exam_5111": ({}, {"exam": True}),
-    "w_handwritten_6006": (SCAN,),
-    "w_scan_slides": (SCAN,),
-    "w_mixed_slides": (SCAN,),
-}
+# How a person uploads a corpus file (`corpus.UPLOADS`).
+UPLOADS = corpus.UPLOADS
 # Files whose conversion asks for answers that are not recorded yet, with how many: the
 # next refresh owes them (docs/eval.md, "Recording and replay").
 OWED = {

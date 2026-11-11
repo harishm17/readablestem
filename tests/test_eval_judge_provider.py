@@ -49,11 +49,19 @@ def test_claude_run_is_judged_by_opus_whatever_its_own_main_model_is():
         assert run.anthropic_refusal_fallback is False
 
 
-def test_a_model_without_a_price_is_refused_by_the_settings():
+@pytest.mark.parametrize(
+    ("model", "why"),
+    [
+        ("claude-unknown-9", "no price for ANTHROPIC_MAIN_MODEL"),
+        # Priced for costing a recording; no request has been tried against it.
+        ("claude-fable-5-2", "have not been tried"),
+    ],
+)
+def test_a_model_without_a_price_or_never_tried_is_refused_by_the_settings(model, why):
     from pydantic import ValidationError
 
-    with pytest.raises(ValidationError, match="no price for ANTHROPIC_MAIN_MODEL"):
-        judge.judge_settings(settings(), "anthropic", "claude-unknown-9")
+    with pytest.raises(ValidationError, match=why):
+        judge.judge_settings(settings(), "anthropic", model)
 
 
 def test_the_claude_judge_gets_its_own_client_on_the_runs_budget(monkeypatch):

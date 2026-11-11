@@ -181,6 +181,9 @@ snapshot before the change (from an old `src/` as above) and one after.
 | `src/readablestem/gold/layout_gold.py` | reading-order gold from a document's source (LaTeXML HTML, OpenStax XHTML, a written unit list), the page rules, a set's registry and the sample a person checks (see docs/eval.md) |
 | `src/readablestem/gold/layout_sources.py` | fetches the sources of a reading-order gold set and picks its documents by seeded rules with no model: arXiv papers and course handouts through LaTeXML in the sandbox, CC BY OpenStax books by position (see docs/eval.md) |
 | `src/readablestem/eval/split.py` | development and held-out by document, and `eval bar`: only a held-out score under the production profile meets a bar |
+| `src/readablestem/eval/measure.py` | a measured replay of the test corpus under the production profile: each upload converted as a job is, in its own process (page kinds, step facts, dollars, seconds, memory) |
+| `src/readablestem/eval/cost.py` | `eval cost`: dollars a page by page kind and by step, the steps not built yet with their estimates, the open pool's reach |
+| `src/readablestem/eval/speed.py` | `eval speed`: seconds a page by page kind and by stage, start-up, memory, and the bar against an earlier record |
 | `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/readablestem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |

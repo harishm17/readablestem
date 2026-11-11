@@ -869,6 +869,128 @@ def _cmd_bar(args: argparse.Namespace) -> int:
     return verdict.exit_code
 
 
+def _measured(args: argparse.Namespace, runs: int) -> tuple[list[list[Any]], Any] | int:
+    """The measured replays `eval cost` and `eval speed` report on: read from `--from`, or
+    made now (`eval.measure`) and written to `--records`."""
+    from readablestem.eval import corpus, measure
+
+    settings = measure.replay_settings(corpus.ANSWERS)
+    if args.records_from is not None:
+        if not args.records_from.is_file():
+            return _error(f"records not found: {args.records_from}")
+        try:
+            kept = json.loads(args.records_from.read_text(encoding="utf-8"))
+            made = [[measure.Converted.from_dict(row) for row in run] for run in kept["runs"]]
+        except (ValueError, KeyError, TypeError) as exc:
+            return _error(f"cannot read {args.records_from}: {exc}")
+        known = {upload.name for upload in measure.every_upload()}
+        unknown = sorted({done.upload for run in made for done in run} - known)
+        if unknown:
+            return _error(f"{args.records_from}: not uploads of the corpus: {', '.join(unknown)}")
+        return made, settings
+    uploads = measure.every_upload()
+    if args.only:
+        unknown = sorted(set(args.only) - {upload.entry for upload in uploads})
+        if unknown:
+            return _error(f"not in the corpus: {', '.join(unknown)}")
+        uploads = [upload for upload in uploads if upload.entry in args.only]
+    cores = [part for part in (args.cores or "").split("/") if part]
+    made = []
+    for number in range(runs):
+
+        def said(done: Any, number: int = number) -> None:
+            ended = done.error or f"{done.pages} pages, {done.wall_s:.1f} s, ${done.usd:.4f}"
+            print(f"run {number + 1}: {done.upload}: {ended}", file=sys.stderr, flush=True)
+
+        made.append(
+            measure.run(
+                uploads,
+                at_once=args.at_once,
+                cores=cores[number % len(cores)] if cores else None,
+                said=said,
+            )
+        )
+    if args.records is not None:
+        args.records.parent.mkdir(parents=True, exist_ok=True)
+        kept = {"runs": [[done.as_dict() for done in run] for run in made]}
+        args.records.write_text(json.dumps(kept), encoding="utf-8")
+    return made, settings
+
+
+def _add_measure_args(parser: argparse.ArgumentParser, *, at_once: int) -> None:
+    parser.add_argument(
+        "--only", action="append", metavar="ID", help="a corpus file to measure (repeatable)"
+    )
+    parser.add_argument(
+        "--at-once",
+        type=_positive_int,
+        default=at_once,
+        help=f"uploads converted at the same time (default {at_once})",
+    )
+    parser.add_argument(
+        "--cores", help="CPU list to pin a run to; a list per run, separated by / (0-3/4-7)"
+    )
+    parser.add_argument("--records", type=Path, help="write what was measured, to report again")
+    parser.add_argument(
+        "--from",
+        dest="records_from",
+        type=Path,
+        help="report on records written by --records and measure nothing",
+    )
+    parser.add_argument("--out", type=Path, help="write the report as JSON")
+
+
+def _write_record(path: Path | None, record: dict[str, Any]) -> None:
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+
+
+def _cmd_cost(args: argparse.Namespace) -> int:
+    """`eval cost`: dollars a page by page kind and by step, from a replay of the corpus
+    under the production profile (`eval.cost`). Spends nothing."""
+    from readablestem.eval import cost, measure
+
+    measured = _measured(args, runs=1)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = cost.report(run, open_pool_usd=settings.open_tier_daily_spend_cap_usd)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(cost.render(record))
+    return 0 if metrics["uploads"]["measured"] else _error("no upload could be measured")
+
+
+def _cmd_speed(args: argparse.Namespace) -> int:
+    """`eval speed`: seconds a page by page kind and by stage, from replays of the corpus
+    under the production profile, and the bar against an earlier record (`eval.speed`).
+    Exit code 0: the bar is met or none was asked; 1: a page kind is slower than allowed;
+    2: the two records cannot be compared."""
+    from readablestem.eval import measure, speed
+
+    before = None
+    if args.against is not None:
+        try:
+            before = json.loads(args.against.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return _error(f"cannot read {args.against}: {exc}")
+    measured = _measured(args, runs=args.runs)
+    if isinstance(measured, int):
+        return measured
+    runs, settings = measured
+    metrics = speed.report(runs, allowance=args.allowance)
+    record = measure.record(speed.fastest(runs), settings, metrics)
+    _write_record(args.out, record)
+    verdict = None if before is None else speed.judge(record, before, allowance=args.allowance)
+    print(speed.render(record, verdict))
+    if not metrics["uploads"]["measured"]:
+        return _error("no upload could be measured")
+    if verdict is None or verdict.met:
+        return 0
+    return 1 if verdict.judged else 2
+
+
 def _cmd_promote(args: argparse.Namespace) -> int:
     """Copy a reviewed report to data/eval/<baseline|latest>-<task>.json for the CI gate.
 
@@ -1609,6 +1731,32 @@ def register(
     limit.add_argument("--at-most", type=float, metavar="X")
     bar.add_argument("--kind", choices=["release", "goal"], default="release")
     bar.set_defaults(func=_cmd_bar)
+
+    cost = group.add_parser(
+        "cost",
+        help="dollars a page by page kind and by step, from a replay of the corpus under "
+        "the production profile (spends nothing)",
+    )
+    _add_measure_args(cost, at_once=4)
+    cost.set_defaults(func=_cmd_cost)
+
+    speed = group.add_parser(
+        "speed",
+        help="seconds a page by page kind and by stage, from replays of the corpus under "
+        "the production profile, and the bar against an earlier record",
+    )
+    _add_measure_args(speed, at_once=1)
+    speed.add_argument(
+        "--runs", type=_positive_int, default=2, help="replays; an upload's fastest counts (2)"
+    )
+    speed.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    speed.add_argument(
+        "--allowance",
+        type=float,
+        default=0.10,
+        help="how much slower a page kind may be (0.10; 1.0 on a shared runner)",
+    )
+    speed.set_defaults(func=_cmd_speed)
 
     promote = group.add_parser(
         "promote", help="copy a reviewed report to data/eval as the baseline or latest"

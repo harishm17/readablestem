@@ -600,16 +600,13 @@ class Settings(BaseSettings):
         have a price (the spend limits cannot work without one)."""
         if self.model_provider != "anthropic":
             return self
-        from readablestem.models.pricing import ANTHROPIC_MODELS
+        from readablestem.models.pricing import ANTHROPIC_MODELS, COSTED_ONLY
 
-        unpriced = [
-            f"{name}={model!r}"
-            for name, model in (
-                ("ANTHROPIC_MAIN_MODEL", self.anthropic_main_model),
-                ("ANTHROPIC_CHEAP_MODEL", self.anthropic_cheap_model),
-            )
-            if model not in ANTHROPIC_MODELS
-        ]
+        roles = (
+            ("ANTHROPIC_MAIN_MODEL", self.anthropic_main_model),
+            ("ANTHROPIC_CHEAP_MODEL", self.anthropic_cheap_model),
+        )
+        unpriced = [f"{name}={model!r}" for name, model in roles if model not in ANTHROPIC_MODELS]
         if unpriced:
             raise ValueError(
                 "no price for "
@@ -617,6 +614,13 @@ class Settings(BaseSettings):
                 + "; the Claude models with a price are "
                 + ", ".join(sorted(ANTHROPIC_MODELS))
                 + " (add others to models/pricing.py)"
+            )
+        untried = [f"{name}={model!r}" for name, model in roles if model in COSTED_ONLY]
+        if untried:
+            raise ValueError(
+                ", ".join(untried)
+                + ": the model has a price so that a recording can be costed with it, and"
+                " the client's requests have not been tried against it (models/pricing.py)"
             )
         self.main_model = self.anthropic_main_model
         self.cheap_model = self.anthropic_cheap_model

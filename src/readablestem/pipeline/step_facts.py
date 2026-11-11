@@ -29,6 +29,9 @@ from readablestem.core.types import CallFact, Fix, ModelCall, StageFact, StepFac
 # job already has, and only their dollars count toward its limits (`core.budget.JobBudget`).
 SECOND_CHECK = "second_check"
 SECOND_READER = "second_reader"
+# The stage a caller adds for what its call of the conversion took outside the conversion's
+# own stages (`start_up`).
+START_UP = "start_up"
 
 
 class Stopwatch:
@@ -56,6 +59,13 @@ class Stopwatch:
         self._close()
         self._name = None
         return [StageFact(stage=name, seconds=round(s, 4)) for name, s in self._seconds.items()]
+
+
+def start_up(facts: StepFacts, call_seconds: float) -> StageFact:
+    """What a conversion call of `call_seconds` took outside the conversion's own stages:
+    starting its process, loading its code, and passing the file in and the result back."""
+    inside = sum(fact.seconds for fact in facts.stages)
+    return StageFact(stage=START_UP, seconds=round(max(0.0, call_seconds - inside), 4))
 
 
 def of_call(call: ModelCall, page: int | None) -> CallFact:

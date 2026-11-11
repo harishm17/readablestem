@@ -233,10 +233,11 @@ Things that differ from OpenAI, all on by default and safe to leave:
   `ANTHROPIC_REFUSAL_FALLBACK=false` turns it off). `claude-haiku-5-5` has no such fallback;
   a decline there is a `refused` outcome, which the app then retries on the other model as
   usual. The fallback model is billed at its own rates; the reservation uses the dearer.
-- Prices (`models/pricing.py`, checked 2026-10-13): claude-opus-5-5 $4 / $20 per million
-  tokens (cache read $0.20, write $5), claude-sonnet-5-5 $2 / $10 (read $0.20, write $2.50),
+- Prices (`models/pricing.py`, checked 2026-11-11): claude-opus-5-5 $4 / $20 per million
+  tokens (cache read $0.20, write $5), claude-sonnet-5-5 $2 / $10 (read $0.10, write $2.50),
   claude-haiku-5-5 $0.10 / $0.50 for prompts up to 100K tokens, $0.50 / $2.50 above
-  (read 0.1x, write 1.25x).
+  (read 0.1x, write 1.25x). claude-fable-5-2 ($8 / $40, read $0.20, write $10) has a row so
+  that a ladder with it can be costed; no step uses it.
 - The instructions are cached (5 minutes), so from a job's second call on, the instruction
   tokens are billed at the cache-read rate.
 - A reservation (the worst case held before each call, then replaced by the real cost) is
@@ -268,6 +269,12 @@ Decisions second check off), measured with `readablestem convert` on 1 vCPU
 | The same with long descriptions on (the beta setting) | $0.209, 61 calls: $0.0070 a page |
 | 5 table pages, tables off / on | $0.036 / $0.083: $0.0067 more per rebuilt table |
 | Dense held-out pages (the held-out run) | about $0.014 a page |
+
+`readablestem eval cost` measures these from a replay of the test corpus, by page kind and
+by step, and `readablestem eval speed` the seconds and the memory (eval.md, "What a page
+costs and how long it takes"). The two figures the public pages are built from,
+`TYPICAL_PAGE_USD` ($0.0145) and `DENSE_PAGE_USD` ($0.034 to $0.092), are kept in
+`ops/limits.py` and are changed only from a replay of held-out documents.
 
 The planning rate is **$0.015 a dense page** (`ops/limits.py`, `PLANNING_USD_PER_PAGE`);
 a 100-page document (the most one job takes, `MAX_PAGES_PER_JOB`) at that rate is $1.50. Worst-case reservations on `claude-opus-5-5`:
