@@ -164,6 +164,11 @@ KEPT_IMAGE_WORDS = {
         "This page is shown as a picture, so a screen reader cannot read it. Ask your "
         "instructor for a text version.",
     ),
+    "page_read_failed": (
+        "Page {page}: this page could not be read.",
+        "This page could not be read, so it is shown as a picture and a screen reader cannot "
+        "read it. Ask your instructor for a text version.",
+    ),
     "handwriting_on_page": (
         "Handwriting on page {page}, not converted to text.",
         "This is a picture of handwriting on the page, so a screen reader cannot read it. "
@@ -201,7 +206,9 @@ IMAGE_PAGE_CSS = """\
 }
 """
 # The about section names the pages kept whole as images.
-KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"})
+KEPT_PAGE_REASONS = frozenset(
+    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed"}
+)
 
 # Fix statuses whose proposal is not used: the original stays, flagged.
 NOT_CONVERTED = KEPT_ORIGINAL_STATUSES

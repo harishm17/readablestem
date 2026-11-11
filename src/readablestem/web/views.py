@@ -330,6 +330,7 @@ KEPT_IMAGE_NOUNS = {
     "handwritten_page": ("the handwritten page", "the handwritten pages"),
     "scanned_page": ("the scanned page", "the scanned pages"),
     "unread_page": ("the page kept as an image", "the pages kept as images"),
+    "page_read_failed": ("the page that could not be read", "the pages that could not be read"),
     "handwriting_on_page": ("the handwriting on a typed page", "the handwriting on typed pages"),
 }
 

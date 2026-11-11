@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import bisect
 import hashlib
+import logging
 import math
 import re
 import statistics
@@ -76,6 +77,8 @@ from typing import Any, Literal
 
 import pymupdf
 
+from readablestem.config import ConfigError
+from readablestem.core.budget import BudgetExceeded
 from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
@@ -89,6 +92,7 @@ from readablestem.core.types import (
     TableGrid,
     inline_marker,
 )
+from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import (
     chem,
     equation_images,
@@ -119,6 +123,8 @@ from readablestem.pipeline.parse import (
     equation_score,
     is_math_alphanumeric,
 )
+
+log = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------------------- thresholds
 # Sizes are PDF points unless the name says otherwise. docs/layout.md explains each one.
@@ -422,6 +428,17 @@ class LayoutError(ValueError):
         # "unreadable" | "encrypted" | "too_many_pages" | "no_pages" | "page_out_of_range"
         # | "too_complex" (a page needs more time or memory to read than a conversion has)
         self.code = code
+
+
+# Errors that stop a job on purpose: a spend cap or a cancel (`JobCancelled` is a
+# `BudgetExceeded`), a configuration error (`run.FATAL_ERRORS`) and a refusal of the file.
+# The page guard in `_analyze_document` lets them through; it keeps a page only for a bug.
+_STOPS: tuple[type[Exception], ...] = (
+    BudgetExceeded,
+    ConfigError,
+    UnknownModelError,
+    LayoutError,
+)
 
 
 @dataclass
@@ -1452,6 +1469,8 @@ class _Row:
         letters. The numbers of a fraction (beside an operator, or in a sentence) are not
         scripts of anything."""
         counts = Counter(round(c.size * 2) / 2 for c in self.plain)
+        if not counts:  # a row with no characters has no size; the body default, as elsewhere
+            return 10.0
         size = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
         larger = [s for s in counts if s > 0 and SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
         if not larger:
@@ -1484,7 +1503,8 @@ class _Row:
     @cached_property
     def baseline(self) -> float:
         main = [c.baseline for c in self.plain if abs(c.size - self.size) <= 0.5]
-        return statistics.median(main or [c.baseline for c in self.plain])
+        every = main or [c.baseline for c in self.plain]
+        return statistics.median(every) if every else 0.0  # no characters: nothing to sit on
 
     @cached_property
     def text(self) -> str:
@@ -5651,11 +5671,21 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
                 or all(c.c in ",.;:" for c in before)  # the comma that ends the maths
             )
         ):
-            out.append(_Row(row.chars[:start], column=row.column, marker=row.marker))
+            out.append(
+                _Row(row.chars[:start], column=row.column, marker=_marker_left(row.marker, start))
+            )
             out.append(_Row(row.chars[start:], column=row.column))
         else:
             out.append(row)
     return out
+
+
+def _marker_left(marker: _Marker | None, cut: int) -> _Marker | None:
+    """The list marker a row keeps when its characters from `cut` on are cut off: the marker
+    only while some of the item's text stays after it. A row that is the marker and nothing
+    else ("1 ." with its equation number cut away) is a line of text, not an empty list item
+    (`_paragraph_pieces` would slice the marker off and be left with no characters)."""
+    return marker if marker is not None and marker.end < cut else None
 
 
 def _mark_case_rows(rows: list[_Row]) -> None:
@@ -5755,7 +5785,7 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
         if cut is None:
             out.append(row)
             continue
-        out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
+        out.append(_Row(row.chars[:cut], column=row.column, marker=_marker_left(row.marker, cut)))
         out.append(_Row(row.chars[cut:], column=row.column))
     return out
 
@@ -9970,31 +10000,49 @@ def _analyze_document(
     )
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
     label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
-    pages = [
-        _kept_page(doc[n], n)
-        if n in kept and n not in text_kept
-        else _page_blocks(
-            doc[n],
-            n,
-            prepared[n][0],
-            prepared[n][1],
-            ctx,
-            paths[n],
-            margins,
-            found[n],
-            page_type.ink_regions(types[n]),
-            page_sized=not INK_REASONS & set(types[n].reasons),
-            little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
-            strokes=_light_ink(types[n]),
-            dropped=prepared[n][2],
-            ink_sources=types[n].ink.ink_drawings,
-            mixed_ink=types[n].kind == "mixed_ink",
-            label_keys=label_keys,
-            covers=_covered_points(doc[n], types[n]),
-            page_math=page_math,
-        )
-        for n in selected
-    ]
+    pages: list[_PageBlocks] = []
+    failures: list[tuple[int, Exception]] = []
+    read_pages = 0  # the pages `_page_blocks` was asked to read
+    for n in selected:
+        if n in kept and n not in text_kept:
+            pages.append(_kept_page(doc[n], n))
+            continue
+        read_pages += 1
+        try:
+            pages.append(
+                _page_blocks(
+                    doc[n],
+                    n,
+                    prepared[n][0],
+                    prepared[n][1],
+                    ctx,
+                    paths[n],
+                    margins,
+                    found[n],
+                    page_type.ink_regions(types[n]),
+                    page_sized=not INK_REASONS & set(types[n].reasons),
+                    little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
+                    strokes=_light_ink(types[n]),
+                    dropped=prepared[n][2],
+                    ink_sources=types[n].ink.ink_drawings,
+                    mixed_ink=types[n].kind == "mixed_ink",
+                    label_keys=label_keys,
+                    covers=_covered_points(doc[n], types[n]),
+                    page_math=page_math,
+                )
+            )
+        except _STOPS:
+            raise  # a stop on purpose (cancel, spend cap, configuration), not a page's fault
+        except Exception as exc:
+            # One page that raises must not end the document: it is kept as its picture
+            # (`PAGE_READ_FAILED`) and the others are read. Only the class and the place are
+            # logged, never a message, which can quote the page.
+            _log_page_failure(n, exc)
+            failures.append((n, exc))
+            kept[n] = page_type.PAGE_READ_FAILED
+            pages.append(_kept_page(doc[n], n))
+    if failures and len(failures) == read_pages:
+        raise failures[0][1]  # no page could be read: the document fails, as before
     _glossary_entries(pages)
     _settle_bold_letters(pages)
     _promote_numbered_lines(pages, ctx)
@@ -10153,6 +10201,16 @@ def _kept_whole(kind: page_type.PageTypeResult) -> bool:
     """The page is kept as its page image and nothing on it is read (a kept page that has
     visible typed text keeps that text, `text_kept` in `_analyze_document`)."""
     return page_type.kept_reason(kind) is not None and not page_type.keeps_text(kind)
+
+
+def _log_page_failure(number: int, exc: Exception) -> None:
+    """Say that a page could not be read: the page, the error's class and where it was
+    raised. Never the message or any text of the page (rules: no content in logs)."""
+    tb = exc.__traceback__
+    while tb is not None and tb.tb_next is not None:
+        tb = tb.tb_next
+    where = f"{tb.tb_frame.f_code.co_name}:{tb.tb_lineno}" if tb is not None else "unknown"
+    log.warning("layout could not read page %d: %s at %s", number + 1, type(exc).__name__, where)
 
 
 def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:

@@ -625,6 +625,16 @@ PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
             "from it, so a student using a screen reader hears only that for the rest.",
         ),
     },
+    "page_read_failed": {
+        "title": ("Page that could not be read", "Pages that could not be read"),
+        "lead": ("{pages} could not be read.", "{pages} could not be read."),
+        "explain": (
+            "The rest of the document was read. In the HTML the page is an image marked "
+            "“Not converted”, so a student using a screen reader hears only that for it.",
+            "The rest of the document was read. In the HTML each page is an image marked "
+            "“Not converted”, so a student using a screen reader hears only that for it.",
+        ),
+    },
     "handwriting_on_page": {
         "title": ("Handwriting on a typed page", "Handwriting on typed pages"),
         "lead": ("{pages} has handwriting on it.", "{pages} have handwriting on them."),

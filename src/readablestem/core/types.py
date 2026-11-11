@@ -832,6 +832,7 @@ NOTICE_CODES = frozenset(
         "handwritten_page",  # a handwritten page, kept as an image (not converted)
         "handwriting_on_page",  # handwriting on a typed page, kept as an image of it
         "unread_page",  # drawings or images, nothing read from them: page kept as image
+        "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
         # Review edits (T3-16): a page the reviewer left out of the student file.
