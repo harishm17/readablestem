@@ -66,6 +66,13 @@
     Nothing is sent to an AI service until you choose the pages. The sample document is
     a recorded conversion of a published textbook section, not your file: it is deleted on the
     same schedule as your own documents.</li>
+  {# The one submit rule (web/forms.py, `request_tokens`): deleted at sign-out, with the
+     account, and by the hourly purge after SESSION_MAX_AGE_S (7 days). #}
+  <li>When you press a button that saves, adds or starts something, we keep a random token,
+    which form it was and the outcome of the request (the page it led to and its notice), so
+    that a second press gets the same answer instead of doing it twice. It holds no document
+    content. It is deleted when you sign out, with your account, and at the latest after
+    7 days; the token of an account deletion is kept without the account for those 7 days.</li>
   {# The Railway `backup` service (.railway/railway.ts) dumps the database daily and keeps the
      last 6 dumps (docs/deploy-railway.md, "Backups"). Keep this sentence true: if the
      schedule or the kept time changes, change the sentence. #}

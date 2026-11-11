@@ -325,6 +325,57 @@ same. It is a 404 either way. The
   constant time with the session's. `tests/test_web_auth.py` lists every POST route and
   checks each refuses a forged token, so a new route cannot skip the check unnoticed.
 
+## Forms: the one submit rule (`web/forms.py`, `templates/components/forms.html`, SW43)
+
+A form that saves, adds, starts or deletes something is answered once, however often it is
+sent: a double click, a tap on a slow phone, Back and send again, a retry by the browser.
+
+- **The form.** `form(key, action, attrs)` (`components/forms.html`, imported `with context`)
+  draws a POST form of the registry's form `key` (`web.forms.FORMS`: one row per route, with
+  its kind, its busy label and what a repeat did before the rule). It writes the CSRF token
+  and a **request token**, `secrets.token_urlsafe(24)`, minted for that drawing of the form.
+  The upload reads its body itself, so its token also rides in the action's query string
+  (`token_in_action`). `submit_button(label, busy)` draws a button with its own busy label
+  (SW10's button macro takes it over).
+- **The handler.** `@submit_once("key")`, under the route's decorator. The first request
+  with a token runs the handler; the table row `request_tokens` (user, token, form key) is
+  inserted in the first commit that writes, so it shares the action's transaction (an action
+  that fails writes neither). When the handler has answered, the row keeps the outcome: the
+  status, the redirect target and the one-time notices. An answer of 400 or more, or an
+  error, removes the row, so the form can be sent again; a request that writes nothing keeps
+  no row.
+- **A repeat.** The same token from the same person again: the stored outcome is answered
+  (its notices shown again) and nothing runs (`request_replayed` is logged with the form key
+  only). A repeat that arrives while the first request is still running waits for it (in the
+  process, a lock per token; across processes, the unique key on `(user_id, token)`) and gets
+  the same answer; after 5 minutes it gets a 409 "Still saving" page that says nothing was
+  done twice. A token is looked up for its own user only, so another person's token replays
+  nothing: their request runs as their own.
+- **Another token, same thing.** A second form drawn before the first click saved carries a
+  new token. Where the thing is already as asked, the answer is the first click's, not an
+  error: a review decision the item already has, made by the same reviewer, is "Already
+  saved" (no write, no new version); Add course for a name the person already has opens that
+  course; Add a symbol with the same meaning and note says the course already has it; removing
+  a share that is gone, or Try again on a document that is waiting or converting, answers as
+  the first click did; linking an address already linked to the same instructor says so.
+- **Without a token** (every POST form outside the review, create and convert forms of
+  stage 1, and any request without the field) the handler runs as it did before the rule.
+- **Not CSRF.** The request token is not a CSRF token and replaces none: every route still
+  checks `csrf_token` first (`require_csrf`; the upload checks it after the replay, which
+  runs nothing).
+- **In the browser** (`static/app.js`, "The one submit rule"): the pressed button gets
+  `aria-busy="true"` and `aria-disabled="true"` (not `disabled`, which would drop it from
+  the focus order and from the request), its busy label ("Saving…", from
+  `web.forms.BUSY_LABELS`), and a polite live region says the same; a second click or Enter
+  sends nothing. It is ready again when the page comes back from the browser's page cache
+  and after an htmx request of the form itself. `controls.css` has the pressed and busy
+  looks, also in forced colors, and moves nothing when reduced motion is asked for.
+- **How long.** The rows go when the session ends (sign-out, a block or removal, an unlinked
+  address), with the account (`erase_user`) and, at the latest, 7 days after they were made
+  (`SESSION_MAX_AGE_S`, the hourly purge: `tokens_deleted`). Account deletion's own row is
+  kept without a user, tied to the browser by a session marker, so a second click on Delete
+  my account gets the Deleted page instead of an error; the purge removes it after 7 days.
+
 ## Sign-up modes and access tiers (`web/access.py`, `web/auth.py`, `web/routes/account.py`)
 
 `SIGNUP_MODE` decides what happens to a verified sign-in that has no account.
@@ -3120,6 +3171,9 @@ white text on the numbered discs at least 4.5:1.
   account (email, name, last sign-in), which the person can delete from `/account`. For
   people with an account the sign-in identity (provider, issuer, subject id and, for
   Microsoft, the directory id) is kept with the account and erased with it.
+- Request tokens (`request_tokens`, "Forms: the one submit rule") hold a random token, the
+  form and the outcome of the request (status, redirect target, the one-time notices), no
+  document content; they go at sign-out, with the account, and after 7 days at the latest.
 - Usage events are content-free and pseudonymous (see "Usage events"); the privacy page
   has one line on them (its final wording is Harish's) and admins see them per day and
   per pseudonym only.
@@ -3178,6 +3232,12 @@ test fails when a table with a user id is added without it.
   lower case, `role` `view` or `review`; unique per document and address). Additive: nothing else
   changes, and the downgrade drops the table (the shares are lost, the documents are not).
   `a6c2e9f4b713` and `e1a7c3b95d24` above are no longer the head.
+- `8b3d5f0e2a71` (the one submit rule, after `c2f4a8d61e57`): the table `request_tokens`
+  (`user_id`, nullable for account deletion's own row; `token`; `route`, the form key;
+  `outcome`, the status, redirect target and notices; `created_at`), unique on
+  `(user_id, token)`. Content-free: a random token, the form and the answer. Additive; the
+  downgrade drops the table. `tests/test_web_jobs_migrations.py` runs it up and down on
+  SQLite and `tests/test_web_postgres.py` on Postgres.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
