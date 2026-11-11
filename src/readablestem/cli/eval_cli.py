@@ -875,6 +875,7 @@ def _cmd_ledger(args: argparse.Namespace) -> int:
     Measures nothing and spends nothing. Exit code 0: no held-out figure is worse than its
     release bar; 1: one is, or `--for-release` and a row with a release bar has no held-out
     figure of this release; 2: refused."""
+    from readablestem.config import Settings
     from readablestem.eval import corpus, ledger, run_record
     from readablestem.ops import profile
 
@@ -884,15 +885,10 @@ def _cmd_ledger(args: argparse.Namespace) -> int:
         production = profile.load()
     except (OSError, ValueError) as exc:
         return _error(f"refused: no production profile to name the release by ({exc})")
-    stamp = {
-        "name": production.name,
-        "sha256": production.sha256,
-        "confirmed": production.confirmed,
-        "differs": [],
-        "counted_off": [],
-    }
+    # The profile's own settings, so the stamp also names the switches this image counts off.
+    settings = production.apply(Settings(_env_file=None, env="test"))  # type: ignore[call-arg]
     sha, dirty = run_record.source_state(corpus.REPO)
-    stamps = ledger.stamps(stamp, sha + ("+changes" if dirty else ""))
+    stamps = ledger.stamps(profile.stamp(settings, production), sha + ("+changes" if dirty else ""))
     release = f"{stamps['pipeline_version']}+{production.sha256[:12]}"
     try:
         bars = ledger.read_bars(bars_path)
