@@ -450,7 +450,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "
     "guessed from the page ({count} characters) was not used.",
-    "drawings_not_analysed": "The drawings on this page were not analysed, so handwriting on "
+    "drawings_not_analysed": "The drawings on this page were not analyzed, so handwriting on "
     "it may be missing: compare the page with the original.",
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "

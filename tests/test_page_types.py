@@ -255,10 +255,10 @@ def test_a_page_the_guard_stops_is_named_in_the_checks_and_the_count_is_at_least
     # ... as the job page counts it once no decision is left open
     counts = job_page.breakdown([f for f in result.fixes if not f.pending], result.notices)
 
-    lines = [c for c in checks.worth_checking + checks.not_handled if "not analysed" in c.text]
+    lines = [c for c in checks.worth_checking + checks.not_handled if "not analyzed" in c.text]
     assert [line.where for line in lines] == ["Page 1"]
     headline = job_page.headline("done", "", None, counts)
-    assert headline.state != "ready" and "not analysed" in headline.message
+    assert headline.state != "ready" and "not analyzed" in headline.message
     # The upload's count: a scan is a scan whatever its drawings, but a page of drawings
     # nobody analysed may be handwriting.
     doc = pymupdf.open()

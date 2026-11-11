@@ -870,7 +870,7 @@ def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int
 
 def page_ink(pdf_bytes: bytes, page: int, *, budget: Any = None) -> tuple[Any, BBox]:
     """The pen strokes of a page (`ink_strokes.PageInk`) and the page's box in points, read
-    within the document's ink `budget` (`page_type.InkBudget`). Same document cache and lock as
+    within the ink `budget` (`page_type.InkBudget`). Same document cache and lock as
     `crop`."""
     from readablestem.pipeline import ink_strokes
 

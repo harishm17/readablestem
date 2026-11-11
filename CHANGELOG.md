@@ -9,7 +9,7 @@
   (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`), the same on every machine; the corpus's
   largest page has 117,162 and 207,522. A clock stays only as a guard against a hang,
   60 seconds a page (`INK_GUARD_S`), about 40 times the slowest corpus page.
-- **A page whose drawings were not analysed says so and why.** Its stored page type keeps
+- **A page whose drawings were not analyzed says so and why.** Its stored page type keeps
   the cause (`ink_cause`: `work` or `time`; older results load without it), the job writes
   a "not finished" fact per page (`work_budget` for a count, `time_limit` for the guard, for
   both `page_type` and `ink_strokes`), a page read for its text gets the notice

@@ -423,7 +423,7 @@ def headline(
         return Headline("Ready", message, "done", "images")
     if counts.unanalysed_pages:
         message = (
-            f"The drawings on {plural(counts.unanalysed_pages, 'page')} were not analysed, so "
+            f"The drawings on {plural(counts.unanalysed_pages, 'page')} were not analyzed, so "
             "check the notices before you share it."
         )
         return Headline("Ready", message, "done", "images")
