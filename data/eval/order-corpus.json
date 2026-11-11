@@ -16,7 +16,7 @@
   ]
  },
  "pipeline_version": "0.5.10",
- "commit": "22bd548e83a76ffb0f4ce2e777f0e8186279d4b4",
+ "commit": "4946e273fb7a302ac91aba911bc4f4fe364f76d8",
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
   "cores": 16
@@ -24,6 +24,7 @@
  "not_finished": [],
  "metrics": {
   "scorer": 5,
+  "listed": true,
   "uploads": {
    "measured": 44,
    "answers_missing": {
@@ -80,7 +81,9 @@
       "merged": 13,
       "heading_merged": 2,
       "caption_wrong": 1
-     }
+     },
+     "documents": 44,
+     "documents_right": 24
     },
     "groups": {
      "edge": {
@@ -127,7 +130,9 @@
        "merged": 0,
        "heading_merged": 0,
        "caption_wrong": 0
-      }
+      },
+      "documents": 8,
+      "documents_right": 4
      },
      "real": {
       "found": 582,
@@ -173,7 +178,9 @@
        "merged": 10,
        "heading_merged": 1,
        "caption_wrong": 1
-      }
+      },
+      "documents": 17,
+      "documents_right": 9
      },
      "self-made": {
       "found": 532,
@@ -219,7 +226,9 @@
        "merged": 3,
        "heading_merged": 1,
        "caption_wrong": 0
-      }
+      },
+      "documents": 19,
+      "documents_right": 11
      }
     },
     "main": {
@@ -266,7 +275,9 @@
       "merged": 13,
       "heading_merged": 2,
       "caption_wrong": 1
-     }
+     },
+     "documents": 36,
+     "documents_right": 20
     },
     "apart": {
      "found": 45,
@@ -312,7 +323,9 @@
       "merged": 1,
       "heading_merged": 0,
       "caption_wrong": 0
-     }
+     },
+     "documents": 3,
+     "documents_right": 0
     }
    },
    "elements": {
@@ -360,7 +373,9 @@
       "merged": 13,
       "heading_merged": 2,
       "caption_wrong": 1
-     }
+     },
+     "documents": 44,
+     "documents_right": 25
     },
     "groups": {
      "edge": {
@@ -407,7 +422,9 @@
        "merged": 0,
        "heading_merged": 0,
        "caption_wrong": 0
-      }
+      },
+      "documents": 8,
+      "documents_right": 4
      },
      "real": {
       "found": 583,
@@ -453,7 +470,9 @@
        "merged": 10,
        "heading_merged": 1,
        "caption_wrong": 1
-      }
+      },
+      "documents": 17,
+      "documents_right": 10
      },
      "self-made": {
       "found": 534,
@@ -499,7 +518,9 @@
        "merged": 3,
        "heading_merged": 1,
        "caption_wrong": 0
-      }
+      },
+      "documents": 19,
+      "documents_right": 11
      }
     },
     "main": {
@@ -546,7 +567,9 @@
       "merged": 13,
       "heading_merged": 2,
       "caption_wrong": 1
-     }
+     },
+     "documents": 36,
+     "documents_right": 21
     },
     "apart": {
      "found": 45,
@@ -592,7 +615,9 @@
       "merged": 1,
       "heading_merged": 0,
       "caption_wrong": 0
-     }
+     },
+     "documents": 3,
+     "documents_right": 0
     }
    }
   },
