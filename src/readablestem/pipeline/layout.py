@@ -6712,10 +6712,17 @@ def _vector_figures(
         # nor the round bullets of a list in a panel.
         curves = [p for p in members if p.curved and not _bullet_mark(p, index)]
         curved = len(curves) >= 3 or any(_area(p.bbox) >= 0.05 * width * height for p in curves)
+        # A filled shape that holds a line of text is shading behind it, and a filled strip
+        # along a whole side of the cluster is a side of its frame (a shaded contents box
+        # drawn as a frame of four strips and one rectangle per entry): neither is a bar.
         bars = [
             p
             for p in members
-            if p.filled and p.bbox[3] - p.bbox[1] >= 4 and p.bbox[2] - p.bbox[0] <= 0.5 * width
+            if p.filled
+            and p.bbox[3] - p.bbox[1] >= 4
+            and p.bbox[2] - p.bbox[0] <= 0.5 * width
+            and not any(_centre_inside(r.bbox, p.bbox) for r in inside)
+            and not _frame_side(p.bbox, box)
         ]
         if fills_page:
             if not page_sized:
@@ -7268,6 +7275,15 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
     if path.kind == "vrule":
         return y1 - y0 >= big * h and (x1 <= edge * w or x0 >= (1 - edge) * w)
     return False
+
+
+def _frame_side(bbox: BBox, box: BBox) -> bool:
+    """A strip along one whole side of `box`: as tall as it at its left or right edge, or
+    as wide as it at its top or bottom edge."""
+    x0, y0, x1, y1 = bbox
+    tall = y1 - y0 >= 0.8 * (box[3] - box[1]) and (x0 <= box[0] + 1 or x1 >= box[2] - 1)
+    wide = x1 - x0 >= 0.8 * (box[2] - box[0]) and (y0 <= box[1] + 1 or y1 >= box[3] - 1)
+    return tall or wide
 
 
 def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
