@@ -19,7 +19,7 @@ fixed questions about an input with probabilities instead of text. Measured on
 2026-10-08 (931 API probes, then three task studies; research notes outside the repo):
 gpt-6-luna only; $0.10 per 1M input tokens and no output charge; about 0.14 s per
 request; deterministic (the same request gets the same answers); probabilities that rank
-errors well but are not calibrated; choice answers that favour the first value listed
+errors well but are not calibrated; choice answers that favor the first value listed
 (+0.11 on average); undocumented limits of 200 questions and 10 score levels; image
 `detail` defaulting to "auto", which costs about 4.8x "high" on large images; and the
 request parameters `store`, `prompt_cache_key`, `temperature`, `seed`, `reasoning` and
@@ -101,7 +101,7 @@ Drafted from what the repository shows; the author confirms or edits.
   confidence, which ranked errors poorly in the sample (AUROC 0.35). It is cheap (2-4% of
   a job's spend) and fails open, so an outage changes nothing.
 - **Harder.** It rests on a public-beta API with undocumented limits and refused
-  parameters. Its probabilities are not calibrated and favour the first choice listed, so
+  parameters. Its probabilities are not calibrated and favor the first choice listed, so
   it can only add an optional note, never a required decision. The drift canary and the
   extra eval metrics are more to maintain. On the 30-equation sample it found no real
   meaning-level error to rank (AUROC 0.45), so its value for equations is unproven.

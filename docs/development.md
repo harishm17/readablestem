@@ -260,7 +260,7 @@ step) needs to account for this.
 `tests/test_student_file_browsers.py` opens the committed demo document (as the pipeline
 writes it, and as the Canvas export's `index.html`) in Chromium, Firefox and WebKit at 1280
 and 375 CSS px and checks that the page loads without errors, the pictures load, and the
-MathML is drawn as maths (fractions stacked, scripts raised and lowered, nothing cut off).
+MathML is drawn as math (fractions stacked, scripts raised and lowered, nothing cut off).
 Install the engines you want (`uv run playwright install chromium firefox webkit`; WebKit
 also needs `uv run playwright install-deps webkit`) and run
 `uv run pytest -m browser tests/test_student_file_browsers.py -rs`. An engine that is not

@@ -117,19 +117,19 @@ readings; disagreement with TexTeller on the clean crops caught 17 and flagged 1
 (8 of the 11 wrong readings that had no review at all). One set, 74 expressions, one run: a
 signal to confirm on a larger set, not a result.
 
-**Licence (read 2026-11-03; not legal advice).**
+**License (read 2026-11-03; not legal advice).**
 
-| Part | Licence | Source |
+| Part | License | Source |
 |---|---|---|
 | TexTeller code | Apache-2.0 | `LICENSE` of github.com/OleehyO/TexTeller |
 | TexTeller weights (huggingface.co/OleehyO/TexTeller at the revision pinned in `local_weights.py`; the `TexTeller_en` variant too) | Apache-2.0 | the model cards' `license:` field and the README badge |
 | Training data: Tex80M (80 million pairs: LaTeX-rendered formulas and a handwritten subset), and the older 550K set the first versions used | Apache-2.0 (card of `OleehyO/latex-formulas-80M`); OpenRAIL (card of `OleehyO/latex-formulas`) | the dataset cards |
 
-The weights licence allows use in a free public service, so the reader was built. It does not
+The weights license allows use in a free public service, so the reader was built. It does not
 settle two things. First, the handwritten part of the training data is, in the authors' words,
 "collected entirely from existing open source work, which includes all test sets". The public
 handwritten-formula sets are mostly non-commercial or research-only (MathWriting is CC BY-NC-SA
-4.0), and whether that carries over to a model trained on them is not answered by the licence
+4.0), and whether that carries over to a model trained on them is not answered by the license
 text. Second, the model has probably seen the MathWriting test ink the practice set is made
 of, so 0.66 may be too high. The variant that was trained from scratch with the benchmark test
 sets removed (`TexTeller_en`) scores 0.554 on the same 74 clean crops; as a flag it catches 16
@@ -211,7 +211,7 @@ note on the fix, a `Check` named `image_page.second_reader`:
 
 | Code | When | Shown to the reviewer | Else |
 |---|---|---|---|
-| `second_reader_agrees` (a check on the fix) | the two readings agree | no (a passed check; the record keeps it) | the item stays a required decision: handwritten maths is always asked (`enforce_maths_required`), and two readers of the same ink can be wrong the same way, so agreement is not acceptance |
+| `second_reader_agrees` (a check on the fix) | the two readings agree | no (a passed check; the record keeps it) | the item stays a required decision: handwritten math is always asked (`enforce_maths_required`), and two readers of the same ink can be wrong the same way, so agreement is not acceptance |
 | `second_reader_differs` (a check on the fix) | they differ | yes: "A second reader looked at the picture of this equation and read it differently ..." | where the difference is at most 3 stretches of at most 6 LaTeX tokens, `Element.alternatives` is filled from `reading_alternatives.from_reading` (only options that convert, at most 3 each): the review card's choices (docs/web.md) |
 | `second_reader_unavailable` (a notice for the document, with a count) | no reading for some equations: timeout, refusal, invalid output, an error, a reading that does not pass the LaTeX checks, no time left in the share, or a spend limit of the job's own | once on the job page, not on each equation | nothing else changes |
 | `second_reader_budget` (a notice for the document, with a count) | the readers' own dollar share (`MATH_READER_MAX_USD_PER_JOB`) is spent | once on the job page | nothing else changes; no more reads are made |

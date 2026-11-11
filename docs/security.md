@@ -582,7 +582,7 @@ a wrong alt text or equation, which the instructor reviews.
   download, failure and deletion and finds the markers in no log record, stdout line, cookie,
   response header, event, aggregate or quota row. `test_web_ops.py` does the same for logs
   alone.
-- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person ticks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
+- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person checks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
   answers 404 immediately, and the hourly purge (cron, with the worker as a backstop) deletes
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
@@ -652,7 +652,7 @@ have regression tests; 7 to 9 are wording.
 Checked and found sound (tests added as regression guards, no code change): headers on
 every response kind; CSRF on every state-changing route; owner checks and IDOR on all 29
 routes that take an id; admin routes; session fixation and cross-copy sign-out; dev login in
-production; Microsoft tenant and Google allowlist behaviour; size, page and probe limits
+production; Microsoft tenant and Google allowlist behavior; size, page and probe limits
 including a 1 GiB decompression bomb; hostile PDFs; file name handling; escaping of every
 model and PDF field; no document content in logs, events, aggregates, cookies or headers;
 the retention clock and erasure; no 500 for junk in any parameter of any route.
@@ -680,7 +680,7 @@ Triage of what the scanners reported:
 | B105 / S105 hardcoded password (13) | `pipeline/vendor/rapid_table.py`, `core/notation.py`, `web/compare.py`, others | False positives: variables named `token` that hold text tokens, and the OAuth `code_challenge_method` constant |
 | B311 / S311 `random` (6) | evaluation sampling, retry back-off in `models/openai_client.py` | False positives: no token, id or secret is made with `random` (ids use `uuid4`, tokens use `secrets`) |
 | B101 / S101 `assert` (5) | exception-handler type narrowing | False positives: not used for authorisation or validation |
-| semgrep `plaintext-http-link` (2) | `static/demo/index.html` | False positive: the Creative Commons licence link inside the OpenStax attribution the licence requires; a link, not a resource |
+| semgrep `plaintext-http-link` (2) | `static/demo/index.html` | False positive: the Creative Commons license link inside the OpenStax attribution the license requires; a link, not a resource |
 
 ## Residual risks, accepted for the beta
 

@@ -7,7 +7,7 @@ recorded runs only: no model call, no PDF, $0. The setting is off.
 ## Method
 
 - **Data.** `src/readablestem/eval/flag_features.py` reads the items of recorded runs (the registered
-  "cells" reading of `scripts/realworld_report.py`: table maths cells count as equations) and makes a row
+  "cells" reading of `scripts/realworld_report.py`: table math cells count as equations) and makes a row
   per aligned equation with the features of `pipeline/flag_policy.py`, computed from the recorded pair by
   the same function the step calls live. `uv run python -m readablestem.eval.flag_features dump OUT.jsonl`
   writes the rows (features, no equation text); `fit` fits; `report` prints the tables below.

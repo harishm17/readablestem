@@ -44,7 +44,7 @@ so `/healthz/ops` goes stale 150 minutes after the last good one.
 ## Retention
 
 Each job gets `retain_until` when it is uploaded: `RETENTION_HOURS` (24) later, 7 days later when
-the instructor ticked "Keep for 7 days" (or has it as their default on the Account page,
+the instructor checked "Keep for 7 days" (or has it as their default on the Account page,
 `users.keep_week_default`), or `OPT_IN_RETENTION_DAYS` (30) when they opted in. The hourly purge deletes every
 job past that time together with everything derived from the document: the uploaded PDF,
 the crops, the result JSON, the HTML, the filename and the review edits. It deletes the
@@ -179,7 +179,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
 | `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`, `error:handwritten`; on done jobs the outcome code (`error:budget_daily`, `error:pages_not_converted`; `error:scanned_pages` before page types) |
-| `page` | `page_type:<kind>` | analysed pages of a job by page type (`born_digital`, `handwritten_ocr`, `scan_ocr`, ...; `pipeline.page_type`, docs/layout.md "Hidden text and page types"): the signal for whether handwriting and scans are common enough to matter |
+| `page` | `page_type:<kind>` | analyzed pages of a job by page type (`born_digital`, `handwritten_ocr`, `scan_ocr`, ...; `pipeline.page_type`, docs/layout.md "Hidden text and page types"): the signal for whether handwriting and scans are common enough to matter |
 | `page` | `page_type_reason:<code>` | their content-free reason codes (`invisible_text`, `text_covered`, `ocr_font`, `ink_writing`, `hidden_ratio`, `text_not_covering_content`, `ink_not_analysed`, `drawings_over_cap`, ...) |
 | `job` | `pages` | pages of done jobs (a sum, not a count of jobs) |
 | `job` | `cost_microusd` | model spend of done jobs in millionths of a dollar (a sum): `sum(cost_microusd) / sum(pages) / 1e6` is the production cost per page |
@@ -375,7 +375,7 @@ of the model or the service, seen the day it happens.
   question wording, new canary cases) or a drift you have looked at and accept:
   `... ops decisions-canary --max-usd 0.02 --record`, review the diff of
   `canary_expected.json`, commit it with the change, and re-check the thresholds on
-  labelled data (docs/eval.md).
+  labeled data (docs/eval.md).
 
 No alert is wired to the drift line (the log-based alert policies in `deploy/deploy.sh` are
 the Cloud Run path only). To get one on Railway, run the canary somewhere that can mail

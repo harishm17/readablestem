@@ -24,6 +24,6 @@ tested and what has not.
 A row's level changes only with its evidence: when a test is added, removed or changed, update
 the row that names it. The keyboard rows rest on `tests/test_web_keyboard_browser.py` (a Tab
 walk of every page and the main flows, with the helpers in `tests/fixtures/web/keyboard.py`);
-the focus ring's colours on `tests/test_web_focus_style.py`. The other browser suites named in
+the focus ring's colors on `tests/test_web_focus_style.py`. The other browser suites named in
 the report are listed in its evidence table. Wording rules from [CONTRIBUTING.md](../../CONTRIBUTING.md)
 apply: no claim of conformance, a guarantee, or a checked result.

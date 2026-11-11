@@ -86,7 +86,7 @@ Production settings with the Anthropic provider (main model claude-opus-5-5 at e
 | matched_exact_lenient (aligned pairs only) | 0.5666 | 1,379/2,434 | [0.4361, 0.6619] | [0.5468, 0.5861] | 0.5629 / 0.5703 |
 | detection_recall | 0.8890 | 2,434/2,738 | [0.8454, 0.9176] | [0.8767, 0.9002] | 0.8890 / 0.8890 |
 | detection_precision | 0.7349 | 2,434/3,312 | [0.5974, 0.8295] | [0.7196, 0.7497] | 0.7349 / 0.7349 |
-| detection_precision, without prose maths | 0.8223 | 2,434/2,960 | [0.7532, 0.8853] | [0.8081, 0.8356] | 0.8223 / 0.8223 |
+| detection_precision, without prose math | 0.8223 | 2,434/2,960 | [0.7532, 0.8853] | [0.8081, 0.8356] | 0.8223 / 0.8223 |
 
 Rates have every gold equation as denominator; an equation with no aligned output counts as wrong. G1 equations (operators packed into OpenStax text) can fail exact match even when the answer is right. `unflagged_wrong_per_100` is wrong aligned equations that no required decision pointed at, per 100 gold equations.
 
@@ -138,7 +138,7 @@ Counted per fix, and a fix can have several reasons, so the counts add up to mor
 | fragment | 182 |
 | other | 344 |
 
-`prose_math`: maths the source wrote as plain text, so the gold has no MathML for it; `fragment`: a piece of a gold equation or of a broken formula.
+`prose_math`: math the source wrote as plain text, so the gold has no MathML for it; `fragment`: a piece of a gold equation or of a broken formula.
 
 **Per section (runs pooled)**
 
@@ -579,7 +579,7 @@ A section that is not ok scores as found nothing: its gold items stay in every d
 
 ## Comparison with open PDF parsers
 
-The parsers solve a different problem: getting a PDF's text into an LLM. They are here because they are what an engineer reaches for first, and because equations, headings and reading order are the hard part of both problems. The comparison is on the measures they share, and there is no overall score and no winner. Every parser runs on the same PDFs, byte for byte, with the tool's defaults on CPU, once per section, in a fresh process; a crash, an empty output or a 30-minute limit scores the section as found nothing. Each parser's Markdown export is read by the same reader as the chatbot's HTML (`eval.invented.read`), its maths converted and aligned to gold by the same code as ReadableSTEM's.
+The parsers solve a different problem: getting a PDF's text into an LLM. They are here because they are what an engineer reaches for first, and because equations, headings and reading order are the hard part of both problems. The comparison is on the measures they share, and there is no overall score and no winner. Every parser runs on the same PDFs, byte for byte, with the tool's defaults on CPU, once per section, in a fresh process; a crash, an empty output or a 30-minute limit scores the section as found nothing. Each parser's Markdown export is read by the same reader as the chatbot's HTML (`eval.invented.read`), its math converted and aligned to gold by the same code as ReadableSTEM's.
 
 **What each system is built for (not failures: design differences)**
 
@@ -594,7 +594,7 @@ The parsers solve a different problem: getting a PDF's text into an LLM. They ar
 
 | System | Why |
 |---|---|
-| Marker 2.0.0 | waits for a licence decision: its weights' licence counts evaluating as use and bars competing services, with no research exception |
+| Marker 2.0.0 | waits for a license decision: its weights' license counts evaluating as use and bars competing services, with no research exception |
 | Nougat 0.1.17 | on CPU the first of three development pages took 19 minutes; trained on arXiv papers; unmaintained since 2023 |
 | olmOCR 0.4.27 | needs an NVIDIA GPU with at least 12 GB; the machine has no working driver |
 | Mathpix | paid API; no key on the machine |

@@ -5,7 +5,7 @@ the end). It checks what the automated tests cannot: what a screen reader says. 
 results will feed the draft accessibility conformance report ([acr/acr-draft.md](acr/acr-draft.md);
 it is not published) and the testing line in [vendor-information.md](vendor-information.md), which
 today says nobody has tested with a screen reader. Until a session is recorded, rows that
-depend on screen reader behaviour are not claimed as supported.
+depend on screen reader behavior are not claimed as supported.
 
 You test three things:
 
@@ -60,13 +60,13 @@ write what you heard in Notes. "Row" points to the results table below.
 | 6 | VO+Cmd+H to a heading, then VO+Right through a paragraph. | Text reads as text; a link says "link" and reads its own words ("Figure 2.12"), not "click here". | R5 |
 | 7 | Find the first equation. On the demo: "d sub 0 equals 0" in the paragraph "As we said before..." (inline), then the display equation under it, a fraction (delta d over delta t). VO+Right onto each. | Announced as math, and read as a sentence; for the inline one roughly "d sub 0 equals 0". The tool's own reading says "bold d" for the bold d; VoiceOver may say just "d". Write down what you hear. | R6 |
 | 8 | On the fraction, VO+Shift+Down, then VO+Right a few times, then VO+Shift+Up. | You can step inside: the top part (delta d), then the bottom (delta t), and back out. It is spoken as a fraction, not flat text. If VoiceOver says only "math" and you cannot enter, fail. | R6, R7 |
-| 9 | Find an equation with a number. On the demo: the display equation labelled 2.9, near "Find the tangent line". | Announced with its number ("Equation 2.9"). The number is not a lone digit. | R6 |
+| 9 | Find an equation with a number. On the demo: the display equation labeled 2.9, near "Find the tangent line". | Announced with its number ("Equation 2.9"). The number is not a lone digit. | R6 |
 | 10 | Find the multi-line calculation. On the demo: under "Solution" of the worked example, "v equals delta d over delta t ...". VO+Shift+Down into it. | You can reach each row, and the rows come in order. (The tool's reading says "row 1: ...; row 2: ..." through "250 meters per second".) | R6, R7 |
 | 11 | Find a subscript in text. On the demo: "v avg" in "average velocity, v avg and the intercept". | Heard as a subscript ("sub" or "subscript"), not run together as "vavg". | R6 |
 | 12 | Press Tab from the top and watch the focus ring. | Tab visits only links and wide equations or tables (scroll boxes). No trap; Shift+Tab goes back. Every stop is visible and named. | R8 |
 | 13 | Find a figure (VO+Right, or the rotor). | "Image" and its description (for example "Line graph of position in km versus time in minutes: ..."), then the caption. Not a file name. | R9 |
 | 14 | B only, if it has a figure with a long description ("Description of Figure ..."): open it with VO+Space. | "Description of Figure N", collapsed, then expanded, then the text. | R9 |
-| 15 | B only, if it has a table: Rotor, Tables; VO+Shift+Down into it; arrow with VO+Arrows. | "Table, N rows, M columns", the caption first. Moving across a cell says its column header, down a column its row header ("Time, 10 s"). Header names are words, including headers that are maths. | R10 |
+| 15 | B only, if it has a table: Rotor, Tables; VO+Shift+Down into it; arrow with VO+Arrows. | "Table, N rows, M columns", the caption first. Moving across a cell says its column header, down a column its row header ("Time, 10 s"). Header names are words, including headers that are math. | R10 |
 | 16 | B only, if it has page markers: step through the page. | "Page 12" markers read as text between blocks, never in the middle of a sentence. | R11 |
 | 17 | B only, if it has footnotes: go to a note mark. | The mark reads as a link; following it reaches the note; "Back to the text" returns. | R11 |
 | 18 | Go to the end of the page. | "About this version" and the short note for students. | R12 |
@@ -88,7 +88,7 @@ you have none, upload a one-page PDF once.
 | 26 | Shift+Tab once from that heading. | "Undo, button". Press it: "Undone. It is waiting for your decision again." | R14, R16 |
 | 27 | On an item, open "Edit the LaTeX" (or the alt text field), enter something invalid or empty, Save edit. | The error summary takes focus and is spoken; the field is named and keeps what you typed. | R15 |
 | 28 | Reject or "Keep as image" on one item. | A status line says what happened. | R14, R16 |
-| 29 | Tab to the page image's region and to a mark. | "Page 1 image with 5 marks", then marks named like "1: Equation 5, needs your decision (1 of 3)". A mark has text, not only colour. | R14 |
+| 29 | Tab to the page image's region and to a mark. | "Page 1 image with 5 marks", then marks named like "1: Equation 5, needs your decision (1 of 3)". A mark has text, not only color. | R14 |
 | 30 | Leave the single-key shortcuts (N, P, A, E) off. | They are off by default because single keys can collide with VoiceOver's quick keys. Do not turn them on for this test. | none |
 
 ## Results (fill in)
@@ -104,7 +104,7 @@ report.
 | R3 | Skip link works | 2.4.1 bypass blocks | n/a | | | |
 | R4 | Contents navigation works | 2.4.1, 2.4.5 multiple ways | n/a | | n/a | |
 | R5 | Links make sense from their text | 2.4.4 link purpose, 1.3.1 | | | n/a | |
-| R6 | Equations are announced and spoken as maths | 1.1.1 non-text content, 1.3.1, 4.1.2 name, role, value | | | n/a | |
+| R6 | Equations are announced and spoken as math | 1.1.1 non-text content, 1.3.1, 4.1.2 name, role, value | | | n/a | |
 | R7 | You can step into a fraction or matrix | 1.3.1, 4.1.2 | | | n/a | |
 | R8 | Keyboard only: no trap, order matches reading, focus visible | 2.1.1 keyboard, 2.1.2 no keyboard trap, 2.4.3 focus order, 2.4.7 focus visible | | | | |
 | R9 | Figure alt text and long descriptions | 1.1.1 | | | n/a | |

@@ -33,7 +33,7 @@ arrived at; read them by question, not front to back.
 | How well are chemistry formulas read on five held-out sections, and what did a second round of chemistry prompts do (not shipped)? | [eval-chemistry-heldout.md](eval-chemistry-heldout.md); [eval-chemistry-round2.md](eval-chemistry-round2.md) |
 | How is the invented-content rate (output the PDF does not support) computed? | [eval-invented.md](eval-invented.md) |
 | How is the recorded proof run replayed with one command (`make proof`)? | [proof.md](proof.md); [../PROOF.md](../PROOF.md) |
-| Why are maths in table cells missed, do the misses carry glyph evidence the rules ignore, and why were wrong equations not flagged? (no model, recorded runs) | [eval-equation-diagnostics.md](eval-equation-diagnostics.md) |
+| Why are math in table cells missed, do the misses carry glyph evidence the rules ignore, and why were wrong equations not flagged? (no model, recorded runs) | [eval-equation-diagnostics.md](eval-equation-diagnostics.md) |
 | What do the glyph checks (a reading's extent past its box, letter styles from the fonts) do to flag recall and decisions, replayed on recorded runs? | [eval-equation-glyph-checks.md](eval-equation-glyph-checks.md) |
 | Which accepted equations does a small calibrated rule (`FLAG_POLICY`) ask a person about, fitted on development and replayed on fresh2 to fresh4? | [eval-flag-policy.md](eval-flag-policy.md) |
 
@@ -81,5 +81,5 @@ says how to report a vulnerability.
 - **Private research.** Some evidence (the PDF-parser comparison, the handwriting corpus,
   the lab-manual table set) comes from the author's private research folder. Where a number
   depends on it, the doc says so, and the number cannot be reproduced from this repository.
-- **Licences.** Which files are under which licence is listed in
+- **Licenses.** Which files are under which license is listed in
   [../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

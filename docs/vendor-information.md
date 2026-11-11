@@ -39,7 +39,7 @@ decided and when, what was not converted, and what was not checked.
   equations (goal 60%). Earlier test (version 0.4.0): headings F1 0.96; a model judged 97% of figure descriptions acceptable.
   Chemistry is the weakest area. The tool accepts what its checks pass without a person
   looking; the review record lists those parts.
-- **Scanned and handwritten pages** convert only when the instructor ticks "Convert scanned or
+- **Scanned and handwritten pages** convert only when the instructor checks "Convert scanned or
   handwritten pages" (a server setting). A person decides on every converted equation and
   table, and the original page stays in the file. On nine real papers made into scans, about 2
   in 3 equations were exactly right. Handwriting: 0.57 on 24 held-out pages.

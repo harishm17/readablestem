@@ -1,7 +1,7 @@
 # One-command reproduction (`make proof`)
 
 `make proof` (or `uv run readablestem proof`) turns the recorded run in `proof/bundles/` into
-`PROOF.md`: every table, with its intervals, its limits and the licence notices. It needs no
+`PROOF.md`: every table, with its intervals, its limits and the license notices. It needs no
 API key, no network (after the one-time table-model download described below) and no money, and it writes the same bytes on every machine that has
 the dependency versions in `uv.lock`.
 
@@ -37,7 +37,7 @@ make proof            # writes PROOF.md; `git diff PROOF.md` shows nothing
 ### The table-structure model is an input of the replay
 
 The recording was made with the SLANet-plus table-structure model (7.5 MB, Apache-2.0)
-present. The pipeline builds its model requests from the tables that model recognises. The
+present. The pipeline builds its model requests from the tables that model recognizes. The
 file is not in the repository. Without it the pipeline falls back to PyMuPDF's own grid,
 asks for different model answers, and the replay stops with exit code 5
 (`document.run1: 64 request(s) have no recorded answer`). The command prints
@@ -235,7 +235,7 @@ computed from files the bundle holds, by stages (`src/readablestem/proof/stages.
 | human labels and judge agreement | `proof/labels.py` | not written: those labels are the author's, and none exist yet; the stage prints "not computed" |
 
 `proof/systems.py` is the shared scorer: each output file is read by one reader
-(`eval.invented.read`), its maths converted the way ReadableSTEM converts its own model's LaTeX,
+(`eval.invented.read`), its math converted the way ReadableSTEM converts its own model's LaTeX,
 aligned to the gold equations by the document task's code, and its headings matched by the
 headings task's code. The stages print the claims of preregistration section 8.3 (family A:
 the chatbot, 5 comparisons; family B: each parser, 2 comparisons each, Bonferroni-corrected)

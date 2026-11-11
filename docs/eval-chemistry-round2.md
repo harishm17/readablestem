@@ -14,7 +14,7 @@ The first commit of this branch holds the candidate text; the second takes it ou
   a condition inside the one `\ce` (`\ce{Zn^2+(aq, 0.10 M)}`), gas and precipitate marks
   (`\ce{BaSO4 v}`), the excited nuclide (`\ce{^{60}_{28}Ni^*}`), one `\ce` per half-reaction with
   its label as `\text{}` beside it, a redox couple as two `\ce` around a slash, cell notation as
-  one `\ce` per species with the bars as maths, quantities (`K`, `\Delta H^\circ`, `E^\circ_\text{cell}`)
+  one `\ce` per species with the bars as math, quantities (`K`, `\Delta H^\circ`, `E^\circ_\text{cell}`)
   as ordinary LaTeX around the species.
 - The old example that produced an italic "a q", `\mathrm{Zn^{2+}(aq,\ 0.10\ M)}`, was dropped
   and the reason given in the text. Prompt style follows Anthropic's guidance for the models in

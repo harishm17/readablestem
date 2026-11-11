@@ -144,7 +144,7 @@ by the converter, as on the development set); College Physics is 0.831 against 0
     and 3 have a text layer but the rows of the derivation are not one run of it (the text layer
     puts other text between them or orders them differently: `18p + 6q + 15p + 5q` over
     `18p + 15p + 6q + 5q`; `0n + 5` over `0`; the fractions of 3-1). **(b) span problem: 5**, all
-    pictures: the element swallowed neighbouring text (Lewis structure with its captions, a
+    pictures: the element swallowed neighboring text (Lewis structure with its captions, a
     sentence with a sign matrix, two merged multi-item pictures, a right-hand commentary column).
     **(c) a wrong or invented reading: 0** (with 30 draws, an upper bound of about 10% at 95% for
     the share of the 124). The sample is mostly 4-3 and 4-6 because that is where the pictures are;
@@ -189,7 +189,7 @@ by the converter, as on the development set); College Physics is 0.831 against 0
 (`docs/eval-page-math.md`, "Against the chatbot recipe, on the same development pages"; development
 sets, one run each of the registered recipe through the proof's own code, spend $2.91.) On 114 dev-v2
 pages: Haiku arm 0.514 on the primary score against ReadableSTEM's 0.486; on slice B (49 pages):
-Opus 0.586, Haiku 0.580, ReadableSTEM 0.597 (flag off). On the maths sections of B the primary is a tie
+Opus 0.586, Haiku 0.580, ReadableSTEM 0.597 (flag off). On the math sections of B the primary is a tie
 (0.749, 0.730, 0.738) and the chatbots lead on the symbols score (0.97 against 0.92) and recall
 (0.99 against 0.97); on the two chemistry sections the Opus arm wrote `\ce{...}` formulas the
 converter cannot read. The development calibration and the held-out re-measurement agree: with the

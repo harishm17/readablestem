@@ -35,7 +35,7 @@ pipeline changes. The version a result is measured under is the **pipeline versi
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
-report from an older version is not edited to look current: it stays labelled with the
+report from an older version is not edited to look current: it stays labeled with the
 version it was made under.
 
 The committed development-set reports (checked against the files by `tests/test_eval_docs.py`):
@@ -193,7 +193,7 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `exact_lenient_ci95` | Wilson 95% interval for `exact_lenient` |
 | `mean_teds` | mean of TEDS = 1 - TED / max(nodes), Zhang-Shasha tree edit distance on normalised trees; 0 with no proposal |
 | `proposal_rate` | share where the step proposed MathML at all |
-| `secondary_stream_v2` | the labelled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
+| `secondary_stream_v2` | the labeled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
 | `by_status` | per `Fix.status` (accepted, needs_review, abstained, failed): `n`, `share`, `exact_lenient`, `mean_teds`. Shows whether "accepted" really is more accurate than "needs review" |
 | `by_route` | same, per route: `cheap` (cheap model only), `main` (main model only), `escalated` (cheap first, then main), `fallback` (any call made as a fallback), `none` (no call) |
 | `by_display` | same, per gold `display` (block, inline) |
@@ -216,7 +216,7 @@ are packing gaps: the answer key writes `<mtext>time =</mtext>`, `<mn>-5</mn>` o
 code points for the same dash, mu, prime or degree sign. The held-out run could not score
 230 of 1,217 matched equations exact for this reason (A4). So the equations and document
 tasks, `eval equations` and the reproduce check also score every equation as a *stream of
-symbols* and report it beside the primary scorer, labelled `secondary`; it never replaces
+symbols* and report it beside the primary scorer, labeled `secondary`; it never replaces
 it and the primary numbers, the gate and the committed reports do not change. Rules, in
 order: the same lenient normalisation as the primary scorer; every token split into atoms
 (a number, a letter, one other character; a word is its letters); look-alike characters
@@ -312,7 +312,7 @@ line, cells separated by " | "), the OpenStax alt as a reference (not an answer 
 the caption, fenced and capped at 1000 / 400 / 250 / 150 characters. Output:
 `accurate`, `complete`, `invented_values` (bools), `score` (1-5), `table_values_ok`
 (null without a table; true when every value equals a printed one or, read off the
-chart, lies within half of the axis's smallest labelled step), `table_wrong_values`,
+chart, lies within half of the axis's smallest labeled step), `table_wrong_values`,
 `confidence`. **Long pass** = accurate and complete and no invented values. The report
 gains `metrics.long_descriptions` and a "Long descriptions" table:
 
@@ -326,7 +326,7 @@ gains `metrics.long_descriptions` and a "Long descriptions" table:
 | `unsure` | long descriptions the model marked unsure (an optional note each) |
 | `data_tables`, `table_values_ok_rate`, `table_wrong_values` | data tables proposed; the share whose values were all within tolerance; cells outside it |
 | `values_from_text` | tables whose every number is in the PDF text (always 0 here: the inputs are images) |
-| `colour_only` | figures flagged as telling things apart by colour alone |
+| `colour_only` | figures flagged as telling things apart by color alone |
 | `required_decisions`, `tables_offered` | figures needing a decision; data tables read from the image, offered as optional extras (not in the file until a reviewer adds them, never a decision; `required_for_values` in reports before 2026-10-09, when each was a decision) |
 
 The long judge is not calibrated against human labels yet. The 13 gold figures are too few for a
@@ -354,11 +354,11 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `matched_exact_lenient` | `exact_lenient` over matched pairs (no proposal = wrong) |
 | `matched_mean_teds` | mean TEDS over matched pairs |
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
-| `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (maths OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
+| `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (math OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
 | `detection_precision_excluding_prose_math` | matched / (predicted - `prose_math`): an estimate, since the gold cannot confirm those are formulas |
-| `unmatched_text_layer_supported`, `unmatched_text_layer_supported_by_reason`, `unmatched_not_supported` | the unmatched predictions the PDF's own text supports: not a fragment, and the transcription uses the same letters, digits and Greek letters as the region's text layer (`text_layer_symbols_differ` is False). That is real maths the gold wrote as text (A15: 176 of the 439 unmatched on the held-out run), kept apart from fragments, which agree with their own text trivially and never count as supported. Needs a model run: without proposals (`--fake`) nothing is supported. Per unmatched entry: `text_layer_supported` |
+| `unmatched_text_layer_supported`, `unmatched_text_layer_supported_by_reason`, `unmatched_not_supported` | the unmatched predictions the PDF's own text supports: not a fragment, and the transcription uses the same letters, digits and Greek letters as the region's text layer (`text_layer_symbols_differ` is False). That is real math the gold wrote as text (A15: 176 of the 439 unmatched on the held-out run), kept apart from fragments, which agree with their own text trivially and never count as supported. Needs a model run: without proposals (`--fake`) nothing is supported. Per unmatched entry: `text_layer_supported` |
 | `detection_precision_excluding_text_layer_supported` | matched / (predicted - supported extras): the detection precision with the artefact taken out, beside the unchanged `detection_precision` and the heuristic `..._excluding_prose_math` |
-| `secondary_stream_v2` | the labelled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
+| `secondary_stream_v2` | the labeled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
 | `prose_classes` | only with dev-v2 gold: the scripts, code, glossary and hyphen scorers (see "Extended development set") |
 | `split_gold_equations` | gold equations the pipeline found as several pieces |
 | `chemistry` | only when the gold has chemistry equations (ids with `chemistry`); report fields beside the scorers, never in their place. `chem_right_excl_times`: `n`, `right`, `rate` of chemically right (`exact_chem`) with the lone multiplication sign gold left out of both (the sentence around it says "times"), `lone_times` (how many were left out) and `chem_right_n`, `chem_right`, `chem_right_rate` with them kept. `silent_harm`: `n`, `n_gold` and `per_100_gold` (counts only: no item ids, so a held-out report names no items) of aligned equations that are wrong on `exact_chem`, not a required decision, and spoken differently from the gold (a reading that lacks only a prefix nuclide's atomic number the page does not show is not harm). Neither number is read by `eval gate`, a floor or a tolerance: they are for reading, not for passing or failing a change. Per pair: `silent_harm`; per page: `chem_lone_times_gold_ids` (`eval/equations_chem.py`) |
@@ -370,7 +370,7 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
 | `review_load` | see "Review load": every kind's decisions per section and per PDF page, optional notes per PDF page, `equation_flags` (matched equations, wrong = not `exact_lenient`; also `equation_flags_excluding_scorer_gaps`), `heading_flags` (the headings task's rule, on the same PDF), `flags` and `flags_excluding_scorer_gaps` (both together), and `wrong_not_required` |
 
-TODO(Harish): document precision is now limited mostly by prose maths (in
+TODO(Harish): document precision is now limited mostly by prose math (in
 document-run1, 25 inline formulas OpenStax wrote as HTML, with no gold MathML). Decide
 whether to add them to the gold set (hand-written MathML for those spans) or keep
 scoring them apart as `detection_precision_excluding_prose_math`; the report gives both
@@ -461,7 +461,7 @@ uv run readablestem eval pipeline --task document --set dev-v2 ... --speech
 ```
 
 Per equation (`--out`): the spoken strings under each engine for ours and the gold, whether
-MathCAT recognised chemistry (`data-chem-formula` or `data-chem-equation` in its canonical
+MathCAT recognized chemistry (`data-chem-formula` or `data-chem-equation` in its canonical
 MathML) on each side, a word diff, and a class (`chemistry`, `table or matrix`, `prescripts`,
 `limits, accents, arrows`, `fraction`, `root`, `scripts`, `text in math`, `plain`; or the
 `class` the input gave). Per set: the share of ours whose speech equals the gold's under each
@@ -976,7 +976,7 @@ figure prompt is not the production one): 9 required decisions (0.209 per PDF pa
 heading groups; the equation the flags-off run asked about was read right this time),
 27 optional notes (0.628 per PDF page: the 5 chart data tables read from the image are
 optional extras), matched exact_lenient 0.767, 64 predicted equations (bold letters in
-prose made maths), 0 static and 0 axe violations. These replace the estimate in "What
+prose made math), 0 static and 0 axe violations. These replace the estimate in "What
 this gives for the targets" below: flags off 0.233 (target 0.25), flags on 0.209 (target
 0.28).
 
@@ -985,7 +985,7 @@ this gives for the targets" below: flags off 0.233 (target 0.25), flags on 0.209
 | equations | 30 | exact_lenient 0.767 (95% CI 0.591-0.882; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.864 | $0.0017 per equation |
 | headings | 121 | recall 1.000 (CI 0.969-1.000), level accuracy 0.992, precision 0.877 (every extra is NEEDS_REVIEW) | no model calls |
 | figures | 13 | image-aware judge pass 1.000 (CI 0.772-1.000), factual errors 0 (judge not yet calibrated) | $0.0039 per figure |
-| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations; 0.233 required decisions per PDF page | $0.0034 per PDF page |
+| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose math), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations; 0.233 required decisions per PDF page | $0.0034 per PDF page |
 | tables (local) | 197 gold data tables | recall 0.909, precision 0.984, TEDS 0.866 (0.954 on found), header exact 0.812 | no model calls |
 
 The 0.3.0 runs of 2026-10-09 for comparison: equations exact_lenient 0.733 (CI
@@ -1134,7 +1134,7 @@ dropped minus 45/45, minus to plus 45/45, `=` to `<`, `≤` or `≈` 146/146 eac
 products (the handout's `𝛚 × 𝐫`), never scientific notation (`1.1 × 10²`), as the policy
 says.
 
-A review of the check printed its own equations with Tectonic in 8 maths font setups,
+A review of the check printed its own equations with Tectonic in 8 math font setups,
 Chromium, KaTeX and LibreOffice (docs/steps.md "Review of the check"): on its 429 right
 answers the check flagged 57 before the fixes and 6 after, and caught 51 of 52 wrong
 answers (43 before); a dot product of arrow vectors read as a cross product is caught
@@ -1204,7 +1204,7 @@ cells; `eval/table_maths.py`), and the chemistry measurements are in [chemistry.
 
 ### Gold
 
-| Set | Where | Licence | Documents | Data tables | Layout tables |
+| Set | Where | License | Documents | Data tables | Layout tables |
 |---|---|---|---|---|---|
 | OpenStax | `data/gold/tables/` (13 pages of *Physics* and *Statistics*, table records only) | CC BY 4.0 | 13 pages x 3 print styles = 39 | 54 x 3 = 162 | 10 x 3 = 30 (the "Key Terms" grids) |
 | Authored | `data/authored/tables/` (`README.md` there) | MIT | 6 | 35 (32 source tables; 3 run over two pages) | 3 |
@@ -1230,7 +1230,7 @@ cells; `eval/table_maths.py`), and the chemistry measurements are in [chemistry.
   pages on the reference prints; a report gives `pages_differ_from_reference` (0 on this
   machine for all 192 prints).
 - **Authored documents** cover what the OpenStax prints lack: LaTeX (Tectonic) and Word
-  (exported by LibreOffice) toolchains, explicit row headers, two-level headers, maths in
+  (exported by LibreOffice) toolchains, explicit row headers, two-level headers, math in
   header cells, tables split across pages (one gold table per page, sharing a `cluster`),
   an unruled LaTeX table, PowerPoint's default table style, a form laid out as a table,
   and table-like traps (a matrix, `align*`, `cases`, multiple choice in two columns).
@@ -1250,17 +1250,17 @@ an image still counts as found. A step that raises becomes a FAILED fix
 
 | Metric | Definition |
 |---|---|
-| `detection_recall`, `detection_precision` | A predicted data table matches a gold table on the same page by content (gold has no boxes): word-token F1 >= 0.5, or F1 of the letters and digits >= 0.7 for maths-heavy tables (ranked on one scale as F1 - 0.2), pairs taken greedily, best first, one to one. A prediction matched to a layout table counts neither way. Predictions the pipeline itself called layout tables (`is_data` False) are not data tables and take no part |
-| `teds`, `teds_found` | TEDS (Zhong et al. 2020): 1 - TED / max(nodes) over table -> row -> cell trees. Unit cost to delete or insert a node; relabelling a cell costs 1 for another tag or span, else the normalised Levenshtein distance of its text (`eval/ted.py` relabel hook). Text is NFKC, one delta, one minus, no spaces. `teds` counts a missed table as 0; `teds_found` is over found tables only. Headers are ignored, as in table-bench, so its numbers reproduce |
+| `detection_recall`, `detection_precision` | A predicted data table matches a gold table on the same page by content (gold has no boxes): word-token F1 >= 0.5, or F1 of the letters and digits >= 0.7 for math-heavy tables (ranked on one scale as F1 - 0.2), pairs taken greedily, best first, one to one. A prediction matched to a layout table counts neither way. Predictions the pipeline itself called layout tables (`is_data` False) are not data tables and take no part |
+| `teds`, `teds_found` | TEDS (Zhong et al. 2020): 1 - TED / max(nodes) over table -> row -> cell trees. Unit cost to delete or insert a node; relabeling a cell costs 1 for another tag or span, else the normalised Levenshtein distance of its text (`eval/ted.py` relabel hook). Text is NFKC, one delta, one minus, no spaces. `teds` counts a missed table as 0; `teds_found` is over found tables only. Headers are ignored, as in table-bench, so its numbers reproduce |
 | `teds_structure` (`_found`) | the same with cell text ignored |
 | `teds_with_headers` (`_found`) | the same, with a header cell (and its direction) a different tag from a data cell |
 | `headers.column`, `headers.row` | precision, recall and F1 of header cells as (row, column, scope, text), micro-averaged over found tables; `exact`: share of gold tables with such headers whose header texts (a multiset) equal gold's; a missed table is not exact. Header texts are compared after `header_text` (2026-10-09): a raised mark the grid read from the PDF writes "^([1])" counts as "[1]", as gold's text drops the raise |
 | `column_header_exact` | `headers.column.exact`: the headline header number (OpenStax marks only column headers, so row headers proposed for an identifying first column are a convention gap, counted apart as `row_headers_where_gold_has_none`). `headers.share_found_without_headers`: found tables given no header cell at all |
 | `header_exact` | table-bench's: all header texts equal gold's |
 | `data_vs_layout` | `accuracy_on_negatives`: layout tables no data-table prediction matched; `data_called_layout`: missed data tables a layout-table prediction covers |
-| `maths` | per gold maths cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |
+| `maths` | per gold math cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |
 | `text_fidelity` | cells whose text is gold's (exact after `fidelity_text`, else the same letters and digits); `wrong_cells` per table = max(predicted cells left over, gold cells left over), so a misread number is one, two cells merged into one are two; `wrong_cells_not_flagged`: wrong cells in found tables whose fix is not a required decision. Must be 0. `fidelity_text` (2026-10-09) makes the ways gold and a reader write the same thing one: gold's text drops a superscript's raise ("10–18" for 10⁻¹⁸) while a cell writes 10^-18, 10^{-18} or 10⁻¹⁸; gold's stacked 1/3 reads "13" ("1/3" and ⅓ too); a "____" fill-in blank is an empty cell, however long; a raised mark the grid read from the PDF writes "^([1])" is "[1]"; and a gold footnote row (`<tfoot>`, printed under the table) counts only when the prediction has it. TEDS keeps table-bench's normalisation |
-| `by_style`, `by_feature` | recall, precision, TEDS and column headers per print style and authored, and for tables with spans, maths or row headers |
+| `by_style`, `by_feature` | recall, precision, TEDS and column headers per print style and authored, and for tables with spans, math or row headers |
 | `review_load` | the table fixes' tiers (`core.triage`): `required_decisions`, per table and per PDF page, `optional`, `needs_review_share`, `kept_as_image`, `required_by_reason`; `flags` (precision and recall over found tables, wrong = a wrong cell, another structure, column headers not exact, or kept as an image) and `wrong_not_required` |
 | `cost` | `per_table_usd`, `per_pdf_page_usd`, `seconds_per_table_p50`/`p95` (model time), model calls; `latency_ms` is per document, wall clock (layout, crops, the step; printing excluded) |
 
@@ -1305,24 +1305,24 @@ is one: `private-inputs/tables/` (git-ignored; or `--real-dir`) with the PDFs an
 ```
 
 Pages are 0-based; boxes are PDF points in PyMuPDF's page frame (`Element.bbox`'s);
-`pages` (optional) limits the check to the pages that were labelled. A predicted data
-table is a real table when it shares at least half of the smaller box with a labelled one;
-a labelled table is found at full extent when one prediction covers at least 90% of it and
+`pages` (optional) limits the check to the pages that were labeled. A predicted data
+table is a real table when it shares at least half of the smaller box with a labeled one;
+a labeled table is found at full extent when one prediction covers at least 90% of it and
 at least 75% of that prediction lies inside it (not cut short, not merged with a plot).
-`metrics.real_documents` holds counts only: documents, pages, labelled, predicted and true
+`metrics.real_documents` holds counts only: documents, pages, labeled, predicted and true
 tables, `precision`, `full_extent_recall` (Wilson intervals), `any_extent_recall`, error
 codes and the labels file's SHA-256. No file name, page or text leaves the private folder.
 The research's four public manuals are copyrighted: use them for local work only, never
 commit them or their labels.
 
 `data/real-tables/` is a committed set of the same shape: five openly licensed (CC BY 4.0)
-lecture notes, textbook and tutorial extracts, 64 pages, 25 labelled tables, with the floors and
-the licences in its README. Run it with `--real-dir data/real-tables`, free and without a model
+lecture notes, textbook and tutorial extracts, 64 pages, 25 labeled tables, with the floors and
+the licenses in its README. Run it with `--real-dir data/real-tables`, free and without a model
 (about four minutes). First measured 2026-10-21: precision 1.000 (14 of 14), full-extent recall
 0.560 (14 of 25): the recall floor was missed. It is a development set now (the detector was
 tuned on it, docs/tables.md "Recall on real documents"): after the fixes precision 1.000 (23 of 23)
 and recall 0.920 (23 of 25). `data/real-tables-heldout/` is a fresh set of seven CC BY papers, 58
-pages, 39 labelled tables, registered (documents, labels, floors, selection rule) before any
+pages, 39 labeled tables, registered (documents, labels, floors, selection rule) before any
 detection ran on it and run once: precision 0.914, full-extent recall 0.744, both under the floors
 (docs/tables.md has the table-by-table account). A second fresh set, `data/real-tables-heldout2/`
 (ten CC BY documents, 100 pages, 58 tables, registered before the run), gave precision 1.000 (55 of
@@ -1405,16 +1405,16 @@ option being off by default). Small: read the intervals.
 | alt factual errors | 0 | 0 |
 | long descriptions | 9 of 13: every chart and diagram (9), no photo or painting; mean 480 characters | |
 | long judge pass | 9 of 9 (CI 0.701-1.000): accurate 9, complete 9, invented values 0, mean score 5.0 | |
-| data tables | 3 (the position-time graphs with marked or labelled points), values within tolerance 3 of 3, 0 wrong cells | |
+| data tables | 3 (the position-time graphs with marked or labeled points), values within tolerance 3 of 3, 0 wrong cells | |
 | values from the PDF text | 0 of 3 (the inputs are images) | |
-| decisions added | 3 required (`values_from_image`; since 2026-10-09 a note, the table an optional extra: 0 required), 0 optional notes (no description marked unsure), 0 colour-only flags | 0 |
+| decisions added | 3 required (`values_from_image`; since 2026-10-09 a note, the table an optional extra: 0 required), 0 optional notes (no description marked unsure), 0 color-only flags | 0 |
 | cost | $0.0040 per figure for the step; $0.124 for the run with both judges | $0.0035 per figure |
 | step latency | p50 7.7 s, p95 15.9 s (sum of call latencies) | p50 5.8 s, p95 10.0 s |
 
 Reading it:
 
 - The long descriptions follow the W3C two-part pattern: axes with units and ranges,
-  the trend, the labelled points, and "about" for values read off an axis. The judge
+  the trend, the labeled points, and "about" for values read off an axis. The judge
   found every table value within tolerance, but every table asked for a decision because
   its values came from pixels (since 2026-10-09 such a table is not written and asks
   nothing: the review screen offers it, "Add the data table"); in a PDF whose chart
@@ -1502,7 +1502,7 @@ The document task on the same three OpenStax sections (43 PDF pages, `data/gold`
 | new: ruled key-term grids the model calls "not a data table" (`not_data_table`, kept as an image) | | 2 |
 | optional notes per PDF page | 0.535 | 0.535 |
 | equations exact (lenient), matched and end to end | 0.733 / 0.733 | 0.733 / 0.733 |
-| predicted equations (unmatched "other") | 55 (1) | 64 (10: bold letters in prose made maths, review none) |
+| predicted equations (unmatched "other") | 55 (1) | 64 (10: bold letters in prose made math, review none) |
 | static and axe violations | 0 / 0 | 0 / 0 |
 | cost | $0.141 | $0.142 |
 
@@ -1540,7 +1540,7 @@ tables, $0.034):
   writes `10^-18` as text), "13" for ⅓, "____" fill-in blanks the model leaves empty,
   and a footnote row gold keeps inside the table.
 
-So the floor of 0 needs either a scorer that knows these spellings or a few labelled
+So the floor of 0 needs either a scorer that knows these spellings or a few labeled
 exceptions before it can gate model runs (TODO(Harish) in gate.py stands). Superscript
 powers written as `^` in text cells are a prompt issue for the table step to take up.
 Both were done afterwards (below): the scorer knows these spellings (`fidelity_text`),
@@ -1552,7 +1552,7 @@ and the wrapped row is joined back; the model runs are not repeated yet.
 |---|---|---|---|---|
 | `tests/fixtures/layout/latex/tables.pdf` | 4 | 6 | equations only; all 5 detected tables rebuilt and ACCEPTED on gpt-6-luna, every check passed | $0.019 |
 | `tests/fixtures/layout/latex/problem_set.pdf` | 1 | 0 | | $0.007 |
-| `tests/fixtures/layout/latex/links_language_colour.pdf` | 1 | 0 | 4 web links, 4 cross-references and 2 internal links all resolve; the French passage is marked; 2 colour classes, the lowest at 4.53:1 | $0.003 |
+| `tests/fixtures/layout/latex/links_language_colour.pdf` | 1 | 0 | 4 web links, 4 cross-references and 2 internal links all resolve; the French passage is marked; 2 color classes, the lowest at 4.53:1 | $0.003 |
 | demo `source.pdf` (OpenStax Physics 2.3) | 13 | 9 (0.3.0 demo: 3) | the same 3 headings; 5 chart data tables read from the image; 1 equation whose bold v the model dropped (a right catch) | $0.066 |
 
 All four pass the static checks and axe. The committed demo was rebuilt afterwards with
@@ -1616,7 +1616,7 @@ those are not review load. Headings and tables do not depend on the model:
 | heading decisions (groups counted once) | 9 | 9 |
 | table decisions | 0 | 0 |
 | optional heading notes | 20 | 20 |
-| predicted equations | 55 | 64 (bold letters in prose made maths) |
+| predicted equations | 55 | 64 (bold letters in prose made math) |
 | static and axe violations | 0 / 0 | 0 / 0 |
 
 The 9 heading decisions are the 0.3.0 report's 9.
@@ -1690,9 +1690,9 @@ the matrix of what the app does with each page ("text", "text_and_ink_images",
 "page_image", "nothing"), every error with its counts, and the time per page. Kinds,
 counts and file names only: never page text. No model is called.
 
-The labelled sets are not in this repository: the research corpus holds derivatives of
+The labeled sets are not in this repository: the research corpus holds derivatives of
 a real lecturer's handwritten notes and PDFs from local research folders, and lives with
-the author's private research (996 labelled pages). The
+the author's private research (996 labeled pages). The
 results, and why only one of them is out of sample, are in docs/layout.md "Accuracy,
 honestly": page-type-v5 on fresh set 4 (31 pages built after it was frozen) 27 of 31
 kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 989
@@ -1721,14 +1721,14 @@ them and covering the page, chart labels in the bands, near-white paint on a dar
 ground) were checked the same way. The document task offline (`--fake`): identical
 per-page rows. Layout on the repository's PDFs: the same elements on the three printed
 gold sections, the 42 cached OpenStax renders, the LaTeX and layout fixtures and the
-demo source; the authored tables slides lose a figure made of their table's coloured
+demo source; the authored tables slides lose a figure made of their table's colored
 cells (the white lines between them are now seen, so the table's grid is drawn), with
 the tables eval (local) the same to the last digit; and one handwriting fixture,
 `overlays.pdf`, changes as intended (its page under a transparent picture of hand-drawn
 circles keeps its image; its half-page striped mask is a figure). The 110 sweep PDFs: 3 LOST verdicts left, all
 the generator's subtitle that was never written (41 before), 56 converted, 38 kept with
 a decision, 13 refused; only the three typed controls say "Everything was converted".
-On the research corpus (909 pages; labels as in "Page types"), no page labelled
+On the research corpus (909 pages; labels as in "Page types"), no page labeled
 born-digital keeps its image or changes kind. Twelve of them change: three keep the
 same elements (a figure gains its white lines), seven gain content that was dropped
 before (a report's two screenshots under their captions and a brochure's cover
@@ -1748,7 +1748,7 @@ the demo source, the layout, LaTeX, tables and handwriting fixtures): the same e
 and kept pages everywhere but one handwriting fixture, whose machine-drawn curve's box
 grows by the start of a subpath MuPDF left out. Page types: the same 984 kinds and 989
 actions on the 996-page corpus, 29 and 35 on the skeptic's 41 pages, 29 and 29 on fresh
-set 4. On the research corpus's 909 analysed pages, no page changes kind or kept image;
+set 4. On the research corpus's 909 analyzed pages, no page changes kind or kept image;
 three born-digital pages change only a figure's box or path count, and one `mixed_ink`
 page gains two handwriting regions (red pen marks over its typed lines). The 110 sweep
 PDFs end to end: the same verdicts (56 converted, 38 kept with a decision, 13 refused;
@@ -1756,13 +1756,13 @@ the three LOST items are the generator's subtitle that was never written), and t
 framed full-page plot has no painted pixel outside its elements (88 cells before). The
 86 evidence PDFs and the 90 handwriting pages: the same verdicts and decisions; two
 full-page charts read their tick labels as the figure's, not as one-digit paragraphs,
-and a 30-page file of notes has more of its pages analysed within the 10 s ink budget
-(called handwritten, not "not analysed"; kept as images either way): the machine's load,
+and a 30-page file of notes has more of its pages analyzed within the 10 s ink budget
+(called handwritten, not "not analyzed"; kept as images either way): the machine's load,
 not the change, as the base code run alone gives the same.
 
 The drawings sweep's fixes (2026-10-13, docs/layout.md "Figures": evidence of a plot,
 boxes round text and diagrams, bonds, boxes joined by wires, dots round a letter, hand
-marks circled or filled in another colour and over equations, answer fields, icons round
+marks circled or filled in another color and over equations, answer fields, icons round
 a glyph) were checked the same way, no model called, against the branch before them
 (`91697be`) and the merged base (`9071495`). The document task offline (`--fake`): the
 same report and per-document rows as the base, timing aside (the same 80 required
@@ -1770,12 +1770,12 @@ decisions of the offline client). Layout on the 96 born-digital PDFs (the 42 cac
 OpenStax renders, the three printed gold sections, the authored tables, the demo source,
 the layout, LaTeX, tables and handwriting fixtures): the same refusals, kept pages, kinds
 and elements as before the fixes; against the base, only the five handwriting fixtures
-the previous fix targeted differ. The research corpus's 909 analysed pages, the
+the previous fix targeted differ. The research corpus's 909 analyzed pages, the
 skeptic's 41, fresh set 4 and the evidence and sweep sets: no page changes kind, kept
 image or elements, except a slide whose title, 18 pt and its only text, is read as a
 heading instead of a figure's label, and one page of the 30-page file of notes that ran
-out of the 10 s ink budget (called not analysed instead of handwritten, and kept as an
-image either way: the base code run twice on its own analyses 26 and 27 of its pages).
+out of the 10 s ink budget (called not analyzed instead of handwritten, and kept as an
+image either way: the base code run twice on its own analyzes 26 and 27 of its pages).
 The checks found four opposite errors in the first versions of the fixes, each fixed and
 pinned by a control before the end: a worked example's frames round paragraphs with a
 grid of cell borders made one figure of the box (its open chain of rules was taken for a
@@ -1876,7 +1876,7 @@ It is a development set: numbers on it say nothing about documents in general, a
 tuned against it is not validated until it passes a set nobody tuned against.
 
 **What it holds.** Gold for OpenStax sections and authored documents, with every item
-labelled with the Tier 2 classes it belongs to. Items per class (the `summary.md` table;
+labeled with the Tier 2 classes it belongs to. Items per class (the `summary.md` table;
 `readablestem gold devset summary` prints it; Check counts are totals of the sealed part):
 
 | Class | Item | Backlog | Target | OpenStax | Authored | Dev | Check |
@@ -1910,11 +1910,11 @@ labelled with the Tier 2 classes it belongs to. Items per class (the `summary.md
 An item is an equation (record with `classes`), a sub- or superscript run in a paragraph
 (`script` records), a heading, a table, a code block, a glossary entry, or a word hyphenated
 at a line end (`hyphen_break` records, authored documents only). "Target" is the least wanted
-across the whole set (the maths classes 20 to 40).
+across the whole set (the math classes 20 to 40).
 
-**Sources and licences.**
+**Sources and licenses.**
 
-| Part | Source | Licence | Toolchain |
+| Part | Source | License | Toolchain |
 |---|---|---|---|
 | OpenStax sections | Algebra and Trigonometry, College Algebra, Elementary Algebra, Chemistry: Atoms First (retired first editions) | CC BY 4.0, attribution in `ATTRIBUTION.md` and in every record | Chromium print by `eval render` (the document, headings, equations and figures tasks print them as for any gold page) |
 | Authored documents | written for this project (`data/dev-v2/authored/build_authored.py`) | MIT | LaTeX built by Tectonic 0.17, Word files made with python-docx and exported by LibreOffice 26.2, HTML printed by Chromium |
@@ -2076,7 +2076,7 @@ tasks that run no model give a first look at how the layout step does here, on t
 headings precision 0.890, recall 0.917, level accuracy 0.898 over 683 gold headings (28 pages);
 tables, local mode, detection recall 0.774 and precision 0.911, TEDS 0.718 (31 documents,
 53 gold data tables; 52 of 67 layout tables kept out); document, detection precision
-0.647 and recall 0.825 (the unmatched predictions are mostly prose maths and fragments).
+0.647 and recall 0.825 (the unmatched predictions are mostly prose math and fragments).
 These are layout-only figures from one run, not a baseline anyone has agreed to; the gold
 manifest hashes are in the reports (`df760b3f59cd...` dev, `2cea9ea7f587...` check).
 
@@ -2143,7 +2143,7 @@ sealed check part. Code: a gold block is *exact* when some `<pre>` holds its lin
 their indentation (trailing spaces aside), *flat* when it does when each line's indentation
 is ignored. Glossary: *term found* when a `<dt>` holds the term, *entry right* when the
 `<dd>` after it also starts with the first 25 letters and digits of the definition (ASCII
-letters and digits only, so the maths in a term, a placeholder here, does not decide it).
+letters and digits only, so the math in a term, a placeholder here, does not decide it).
 
 | Dev part, 126 glossary entries, 40 code blocks | Before (6c8bbda) | After T2-16 |
 |---|---|---|
@@ -2157,10 +2157,10 @@ Before, code was one or two flowing paragraphs per block ("def bisect(f, lo, hi,
 were paragraphs or, with a bold term, headings. The 14 entries not found: the ten of the
 Word fixture's unruled two-column table (a glossary set as a table the table step does not
 claim) and four OpenStax entries: "half-life (t1/2)" and "positron (...)", whose gold
-terms have their maths written out as text while the output has it as an equation, and
+terms have their math written out as text while the output has it as an equation, and
 "nuclide" and "radioisotope", whose term is the last line of a page and definition the first
 of the next. The 3 "entry right" misses that remain among the found terms are gold
-definitions that begin with a parenthesis of maths the fake client cannot convert. The
+definitions that begin with a parenthesis of math the fake client cannot convert. The
 code is tuned on this set, which is all authored (the dev part has no OpenStax code), so
 it shows the shapes handled, not a rate on other documents.
 
@@ -2189,7 +2189,7 @@ docs/layout.md "Review tiers" has the table and the choice (one decision per gro
 ### Structure fixes (2026-11-02)
 
 Six layout fixes (docs/layout.md: "The PDF's outline", plain numbered lines, run-in labels,
-maths in headings, page and line joins, the document's spelling of compounds), measured with
+math in headings, page and line joins, the document's spelling of compounds), measured with
 the offline tasks only: `eval pipeline --task headings --fake`, `--task document --fake` (no
 model call; every call is refused, so its equation numbers are 0 and only layout, headings
 and the HTML checks mean anything) and `eval.structure_check`, before (3e2b7cd, a clean
@@ -2226,7 +2226,7 @@ held-out data was used.
   (inset against the page's edge, not the column's) 2 of them (recall 0.9136). Both were
   dropped for the inset against the column's edge, which loses none: docs/layout.md "Run-in
   labels".
-- Not measured by these tasks: page joins, wrapped inline maths and compounds (no gold of
+- Not measured by these tasks: page joins, wrapped inline math and compounds (no gold of
   their own). A survey of the 67 PDFs in the repository (authored dev-v2 documents and test
   fixtures, 1 to 8 pages) changed 8 of them: 2 paragraphs joined over a page break (both
   reading right: "... Aluminium" / "sulfate has the formula ..."), no wrapped inline
@@ -2284,7 +2284,7 @@ Prose runs are scored by the `prose_classes` scorer (`eval/prose_classes.py`, fr
 `<sub>`/`<sup>` or as a script inside inline MathML, flattened when its digits are glued on as
 text, lost when its context is not there (counts of runs):
 
-| Class | n | before: scripted (sub/sup + maths) | flattened | lost | after: scripted | flattened | lost |
+| Class | n | before: scripted (sub/sup + math) | flattened | lost | after: scripted | flattened | lost |
 |---|---|---|---|---|---|---|---|
 | Units with superscripts (`prose_unit_power`) | 146 | 77 (0 + 77) | 55 | 14 | 129 (120 + 9) | 4 | 13 |
 | Chemical scripts (`prose_chem_script`) | 263 | 76 (0 + 76) | 144 | 43 | 235 (214 + 21) | 13 | 15 |
@@ -2347,9 +2347,9 @@ writes `<mtext>`):
   these changes were built for are the scripts and the pictures.
 
 No gold file, golden output or held-out number changed. Three tests that encoded the old
-behaviour were rewritten (`test_layout_analyze`: an upright x with a raised 2 is raised text,
-not maths; `test_layout_fixtures`: "3 m/s2" in a text font is raised text; `test_layout_silent_loss`:
-a picture of maths is held as an equation, not as a figure).
+behavior were rewritten (`test_layout_analyze`: an upright x with a raised 2 is raised text,
+not math; `test_layout_fixtures`: "3 m/s2" in a text font is raised text; `test_layout_silent_loss`:
+a picture of math is held as an equation, not as a figure).
 
 ## Model cost (2026-10-14; T3-22, T3-23, T3-24, T3-29, T2-19, T3-21)
 
@@ -2589,7 +2589,7 @@ the machine, which changed the layout of 2.1; it is not used.
 | `src/readablestem/cli/devset.py`, `src/readablestem/eval/devset_media.py` | `gold devset ...`, `--set dev-v2`; authored PDFs as eval inputs |
 | `data/dev-v2/` | the extended development set (`README.md` there): dev gold, authored documents and their builder, sealed check archive, seal, selection |
 | `tests/test_devset*.py` | classes, selection, seal and the committed set (offline) |
-| `src/readablestem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
+| `src/readablestem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, math, fidelity, review load, real documents, report |
 | `src/readablestem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
 | `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
 | `data/authored/tables/` | authored table documents (MIT): sources, PDFs, gold, `make_authored.py` |

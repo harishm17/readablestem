@@ -13,8 +13,8 @@ test exists. About 45 minutes the first time.
 |---|---|---|
 | Does the paste page keep text, headings, tables, links, alt text, MathML and ids after Canvas's sanitizer rules? | `test_export_canvas.py` (a model of the sanitizer built from canvas-lms's own list) | Canvas's editor (TinyMCE) cleaning a page again when someone opens it for editing; link rewriting; MathJax |
 | Is the cartridge a well-formed CC 1.3 package of web content? | `test_export_cartridge.py` (`check_cartridge`) | The IMS validator; how any LMS reads it |
-| Do the equations carry the maths font stack, and does Canvas's list keep it? | `test_export_maths_fonts.py` | Which font a reader's computer then uses |
-| Is the student file drawn as maths (fractions stacked, scripts raised, nothing cut off) at 1280 and 375 px, with pictures loading? | `test_student_file_browsers.py` in Chromium, Firefox and WebKit (an engine that is not installed is skipped) | Canvas's own page around it |
+| Do the equations carry the math font stack, and does Canvas's list keep it? | `test_export_maths_fonts.py` | Which font a reader's computer then uses |
+| Is the student file drawn as math (fractions stacked, scripts raised, nothing cut off) at 1280 and 375 px, with pictures loading? | `test_student_file_browsers.py` in Chromium, Firefox and WebKit (an engine that is not installed is skipped) | Canvas's own page around it |
 | Do the pages of the app pass axe? | `test_web_*_browser.py` | The Canvas pages |
 
 ## Before you start
@@ -54,7 +54,7 @@ On the job page, download both: **For Canvas (zip with images)** with your cours
    (b) Drawn by the browser (the same look as `index.html` opened from your computer).
    (c) Shown as plain text or not at all.
    Then, if (b): which font? Windows and Mac usually differ. If it looks like a sans-serif
-   fallback with badly placed parts, the stack found no maths font: note the operating
+   fallback with badly placed parts, the stack found no math font: note the operating
    system and browser.
 6. Open the page for editing and save it again without changing anything, then view it:
    does anything disappear (this is Canvas's editor cleaning it)? Compare the equations,
@@ -62,7 +62,7 @@ On the job page, download both: **For Canvas (zip with images)** with your cours
 7. On a phone (Canvas Student app or a mobile browser at the page's address): can you read
    the page, are the equations cut off, can you scroll a wide equation or table sideways?
 8. Screen reader, if available: move through the headings list, the table (does it say the
-   column header with each cell?) and the equation (does it read as maths?). A pasted page
+   column header with each cell?) and the equation (does it read as math?). A pasted page
    loses `headers` on irregular tables and `tabindex` on scroll boxes: the README says so;
    note whether it matters in practice.
 9. Navigation: in the saved page, do the contents list's links jump to the headings, are the
@@ -87,7 +87,7 @@ On the job page, download both: **For Canvas (zip with images)** with your cours
 6. If you can, import the same file into **Blackboard**, **Moodle** or **D2L** and
    write what each did. A free Moodle sandbox (sandbox.moodledemo.net) is enough.
 
-## C. The maths font stack
+## C. The math font stack
 
 The stack is written on each `<math>` as `Latin Modern Math, STIX Two Math, Cambria Math,
 Noto Sans Math, Libertinus Math, TeX Gyre Pagella Math, XITS Math, Asana Math, DejaVu Math

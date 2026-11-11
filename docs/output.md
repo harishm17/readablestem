@@ -43,7 +43,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
 - If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
-- An optional plain-text `notice` opens `<main>` as a labelled, outlined note ("Note:
+- An optional plain-text `notice` opens `<main>` as a labeled, outlined note ("Note:
   ..."). The CLI uses it for `--fake` runs, whose answers are placeholders: the file has
   to say so before any content, because the CLI has no review step.
 
@@ -56,7 +56,7 @@ breaks it: Canvas's sanitizer keeps only http, https and relative image sources,
 removes the `<style>` block, `<main>` and `tabindex`, so the hidden "Equation" labels
 show, printed list markers double ("1. (a)") and wide equations lose their scroll box
 (read from Canvas's sanitizer allowlist, FEATURE-REVIEW "Beta 5"; not yet tried in a live
-course). Pipeline 0.4.0 output loses more: the colour of coloured text
+course). Pipeline 0.4.0 output loses more: the color of colored text
 (FEATURE_COLOUR's runs are `.tc-*` rules in `<style>`, so "the terms shown in red"
 then points at nothing), the `headers` attribute (allowed on neither `td` nor `th`), so
 an irregular table's header associations go, and the tab stops of wide tables' and
@@ -64,7 +64,7 @@ chart data tables' scroll boxes (`tabindex`); `details`, `summary`, `caption`,
 `colgroup` and `math` survive. Moodle's HTML purifier drops `data:` images and MathML. The app's help page
 `/help/posting` (`web/templates/help_posting.html`) gives the steps for Canvas (upload to
 Files, link it where the PDF was, check it in Student View), says to make the HTML the
-main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
+main version, with the PDF kept only as a labeled print copy (28 CFR 35.202 and the
 Justice Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
 page links to it under the download link. The steps are stated as not yet tried in a live
 Canvas course; once they have been (Canvas Lite, then UTD), update both pages and the Canvas
@@ -109,14 +109,14 @@ no byte) and that every picture keeps its alt text and an address Canvas keeps, 
 equation its MathML, and headings, tables (caption, `th`, `scope`, spans), links, ids,
 language and text are as in the source.
 
-The equations carry a maths font stack in the Canvas versions (T3-8,
+The equations carry a math font stack in the Canvas versions (T3-8,
 `export_canvas.MATH_FONT_STACK`): `font-family` on each `<math>`, written as a `style`
 attribute like every other carried rule. Canvas keeps `font-family` (it is in its list) but
 has no style block and no `@font-face`, so the stack can only name fonts the reader's
 computer has; native MathML in Chrome, Edge, Firefox and Safari needs a font with an
 OpenType MATH table, and the stack lists the families that have one, with the browser's own
 `math` family last. The default student file is unchanged (the golden files cover that), so
-it uses the browser's default maths font as before. If Canvas draws the equations with its
+it uses the browser's default math font as before. If Canvas draws the equations with its
 MathJax instead, the stack is not used; `docs/canvas-sandbox-test.md` has the step that
 shows which happens.
 
@@ -130,7 +130,7 @@ pictures; nothing in the text, MathML, alt text, headings, tables or links is ch
 | File | What it is |
 |---|---|
 | `imsmanifest.xml` | Metadata (schema `IMS Common Cartridge`, version `1.3.0`, the document's title and language), one organization (a rooted hierarchy: an empty root item holding one item, titled as the document, that points at the page), and one resource of type `webcontent` listing the page and its pictures |
-| `web_resources/<folder>/index.html` | The Canvas version's page (styles written into the page, the maths font stack, pictures as relative files) |
+| `web_resources/<folder>/index.html` | The Canvas version's page (styles written into the page, the math font stack, pictures as relative files) |
 | `web_resources/<folder>/images/image-NN.png` | The pictures |
 
 The folder is the same `<ascii title>-<first 6 characters of the job id>` as the Canvas zip,
@@ -158,9 +158,9 @@ What Canvas still removes, and why that is accepted:
 - `font-weight`, `overflow-wrap` and `caption-side` (not in Canvas's CSS list; the browser matrix test finds the one visible effect, a long unbroken web address in the source note running past a 375 px screen in the standalone `index.html`): bold on the
   "Not converted." label, table captions and figure-description summaries shows in normal
   weight, and a very long unbroken string may not wrap. The label's text and the border
-  still carry the meaning ("never by colour alone").
+  still carry the meaning ("never by color alone").
 - `:focus-visible`, `@media print`, the dark-scheme block and the narrow-screen margin of
-  the about section: Canvas has its own focus rings, colours and layout.
+  the about section: Canvas has its own focus rings, colors and layout.
 - `.visually-hidden` uses `clip: rect(0,0,0,0)` instead of `clip-path` (not allowed), plus
   Canvas's own `screenreader-only` class, so the hidden "Equation" labels stay hidden.
 - MathML is kept (all presentation elements the pipeline writes are on the list). Canvas
@@ -212,7 +212,7 @@ our own would be a second MathML reader to keep right.
   (inside the document by bookmark); tables with their caption; alt text on each picture; the
   document language and title; equations as `m:oMath`. The export fails
   (`equations`) rather than hand over a file with fewer equations than the HTML has `<math>`.
-- **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colours
+- **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colors
   of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
   pictures, and any conformance claim: the tool assists, and nobody has checked how the file
   reads in Word with a screen reader. The review record says so.
@@ -448,7 +448,7 @@ and each part's equations, figures and tables as in the part.
 - **Ids.** `p{n}-e{k}` is rewritten to the source page, which no other part has; any other
   id gets `s{part number}-` in front. The same rewrite is applied everywhere an id is named,
   including the equation markers inside text (their length changes, so the offsets of links,
-  colour runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
+  color runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
 - **Title.** The title the instructor chose for the first part, else the source file's name
   without the part tag and extension; the contact line is the first part's that has one.
 - **Not done.** It is not offered as
@@ -464,8 +464,8 @@ first row), `<th scope="row">`, a body split into one `<tbody>` per section with
 `scope="rowgroup"` on a full-width section heading, and `headers`/`id` only when scope
 cannot say which headers apply (a row header after data cells, a column header below the
 header rows, or nested column headers whose spans cross). Cell text and captions are
-escaped; a maths cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
-header cell that is only maths also gets its reading (`speech.mathml_to_speech`) as
+escaped; a math cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
+header cell that is only math also gets its reading (`speech.mathml_to_speech`) as
 visually hidden text, with the MathML hidden from assistive technology: browsers name a
 `<th>` from its text, never from MathML, and screen readers announce a cell's headers by
 name (the static rule `html.table_header_text` does not count MathML as header text). A
@@ -581,7 +581,7 @@ as printed (`list_marker`: "•", "a.", "(iii)"), `list_ordered` and `list_level
 
 A display equation's number (`Element.equation_label`, "(2.4)", "2.4", "Eq. 2.4") is not
 part of its crop or its MathML: layout keeps it out (docs/layout.md). The assembler writes
-it after the maths, as printed, with a visually hidden "Equation " in front so a screen
+it after the math, as printed, with a visually hidden "Equation " in front so a screen
 reader says "Equation (2.4)" rather than a bare number:
 
 ```html
@@ -589,8 +589,8 @@ reader says "Equation (2.4)" rather than a bare number:
   <span class="equation-label"><span class="visually-hidden readablestem">Equation </span>2.4</span></div>
 ```
 
-The wrapper is a flex row that wraps: the maths takes the remaining width and stays
-centred, the number sits at the right. The maths never shrinks below its own width, so
+The wrapper is a flex row that wraps: the math takes the remaining width and stays
+centerd, the number sits at the right. The math never shrinks below its own width, so
 when both do not fit (a long equation on a 320 px screen) the number moves to the next
 line, right-aligned, instead of being painted over (WCAG 1.4.10). An equation that was
 not converted keeps its number too, after the original image in the flagged box.
@@ -613,9 +613,9 @@ phone become named tab stops:
 
 Which ones is an estimate from the MathML (`assemble.estimate_width_em`: token widths,
 fractions as wide as their wider part, scripts at 71%, table columns): at least
-`WIDE_EQUATION_EM` (11 em of the maths font), against the 14.5 em that fit in the 288 px
+`WIDE_EQUATION_EM` (11 em of the math font), against the 14.5 em that fit in the 288 px
 column of a 320 px screen. On the gold equations the estimate was within -18% and +44%
-of Chromium's widths; the margin covers other maths fonts. A wide inline equation gets
+of Chromium's widths; the margin covers other math fonts. A wide inline equation gets
 its own scroll box (`.equation-scroll`, an inline block); short ones stay plain, since
 a scroll box sits on the line differently. `tests/test_assemble_wide.py` checks in
 Chromium at 320 px that the page does not scroll sideways, that every gold equation
@@ -640,8 +640,8 @@ characters) the alt text is `Equation (2.4), not converted` (the number as print
 and label are unchanged. In a document in another language the alt text is marked
 `lang="en"`, as the other fixed words are.
 
-- The flag is a dashed border **and** a text label, never colour alone (WCAG 1.4.1). The
-  border survives forced-colours mode and printing.
+- The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The
+  border survives forced-colors mode and printing.
 - The note is a `<p role="note">`. On an inline equation the visible label is
   `aria-hidden`, because the alt text already says the same thing.
 - `data-status` and `data-reason` carry content-free codes for tooling. Reasons come from
@@ -666,8 +666,8 @@ and written as ordinary elements (`pipeline/image_page.py`); with the flag off, 
 read fails, it is a page kept as an image as before ("Flagged items"). What the output holds
 for such a page:
 
-- **The notice and the original.** The page starts with a bordered note, labelled in words and
-  not by colour alone: "**Converted from an image of the page.** Check it against the
+- **The notice and the original.** The page starts with a bordered note, labeled in words and
+  not by color alone: "**Converted from an image of the page.** Check it against the
   original.", and under it a `<details>` whose summary reads "Show the original page N". Opened,
   it shows the page's own picture (a JPEG at the student file's size, `figure_images`) with the
   alt text "Original of page N, shown for checking the converted text." No script: the control
@@ -731,7 +731,7 @@ The assembler replaces each marker with the equation's MathML, or with the flagg
 
 All running text (paragraphs, list items, headings, captions) goes through
 `inline_text.render_inline_text`, which places the equations and, for an element's own
-stored text, writes its links and colour runs. Text without either is written exactly
+stored text, writes its links and color runs. Text without either is written exactly
 as before pipeline 0.4.0.
 
 ## Links and cross-references
@@ -764,8 +764,8 @@ items and headings; offsets are into the stored text, markers included.
   written in two pieces around it.
 - A span that starts or ends inside a marker, reaches past the text, or overlaps an
   earlier link is skipped, so a stored result edited by hand cannot break the markup.
-- Links keep the browser's link style (colour and underline), so they are not told apart
-  by colour alone. A long URL as link text wraps (`overflow-wrap: break-word` on
+- Links keep the browser's link style (color and underline), so they are not told apart
+  by color alone. A long URL as link text wraps (`overflow-wrap: break-word` on
   `<main>`), so the page still reflows at 320 px.
 - Link text that does not say where it goes ("click here", a long bare URL with next to
   no text around it) is kept as printed, with the optional notice `link_text_unclear`:
@@ -784,7 +784,7 @@ found confidently in another language carries its own (`Element.lang`), written 
   du trajet, et elle s’exprime en mètres par seconde.</p>
 ```
 
-A screen reader switches voice for that paragraph (WCAG 3.1.2), and MathCAT speaks maths
+A screen reader switches voice for that paragraph (WCAG 3.1.2), and MathCAT speaks math
 in the page's language. Where the document language came from is
 `DocumentResult.lang_source`: "pdf" (`/Lang`), "detected" (from the body text, notice
 `lang_detected`), "default" ("en" because nothing else was found, notice `lang_assumed`)
@@ -804,7 +804,7 @@ Raised and lowered text of upright text (`Element.script_runs`: g/cm3, a footnot
 subscript; formulas and ions such as H2O and Na+, and a nuclide's numbers before its symbol, are
 inline equations since 2026-10-21, see "Chemistry" below and docs/layout.md) is
 written as `<sup>` and `<sub>` inside the paragraph, list item or heading, inside any link or
-colour:
+color:
 
 ```html
 <p id="p1-e2">Gold is 19.3 g/cm<sup>3</sup>, and the measurement is in Nature<sup>1</sup>.</p>
@@ -836,7 +836,7 @@ Formulas, ions, state symbols, reactions and concentrations are inline or displa
 ```
 
 - An element symbol is one `mi` (`Na`, not `N` and `a`; `NaCl` is `Na` and `Cl`; upright by
-  `mathvariant="normal"` only beside other maths, see below), and a
+  `mathvariant="normal"` only beside other math, see below), and a
   charge or a count hangs on the symbol it belongs to: the converter wrote `\mathrm{Na^+}` as
   `N`, `msup(a, +)` and a reader said "N a to the power plus"; it is now `msup(Na, +)` ("N a
   plus"). A word the model wrote in one `\text{...}` is split the same way. Only real element
@@ -861,7 +861,7 @@ Formulas, ions, state symbols, reactions and concentrations are inline or displa
 - A subscript or superscript after a closing bracket belongs to the whole group, `[A]_0` is
   `msub(mrow([A]), 0)` and `Al_2(SO_4)_3` has `msub(mrow((SO4)), 3)`; the converter used to hang
   it on the bracket alone (`msub(], 0)`), which was read "close bracket sub 0". This is done for
-  every `(...)` and `[...]` that carries a script, in chemistry and in maths.
+  every `(...)` and `[...]` that carries a script, in chemistry and in math.
 - A reaction arrow is an `mo` (`\longrightarrow` came out as an `mi`).
 - The review screen's reading says "H 2 O", "S O 4 2 minus", "aqueous", "reacts to form", "is in
   equilibrium with", "the concentration of H 3 O plus" (`pipeline/speech_chem.py`); the reading is
@@ -871,11 +871,11 @@ A formula's own MathML is checked like any other (`mathml.*` checks) and against
 layer. A reading the model wrote as mhchem (`\ce{...}`) that the converter does not read is
 refused by the LaTeX check, so the equation stays a picture with a required decision.
 
-## Coloured text (FEATURE_COLOUR)
+## Colored text (FEATURE_COLOUR)
 
-With the flag on, text printed in a colour other than the body's keeps a colour in the
-output (`Element.colour_runs`; which colours count is in docs/layout.md "Colour"). Each
-printed colour gets one class, `tc-` and its hex digits, and one CSS rule added only to
+With the flag on, text printed in a color other than the body's keeps a color in the
+output (`Element.colour_runs`; which colors count is in docs/layout.md "Color"). Each
+printed color gets one class, `tc-` and its hex digits, and one CSS rule added only to
 documents that have it:
 
 ```html
@@ -890,20 +890,20 @@ documents that have it:
   each problem.</span></p>
 ```
 
-The rule's colour reaches 4.5:1 on the white background (WCAG 1.4.3): a colour that
+The rule's color reaches 4.5:1 on the white background (WCAG 1.4.3): a color that
 already does is kept exactly; any other is made darker, keeping its hue, in OKLCH
 (`pipeline.contrast.with_contrast`: lightness lowered until the contrast is reached,
 chroma lowered only as far as sRGB needs). So pure red becomes `#ee0000`, light grey
-`#767676`, yellow a dark yellow. For a reader whose browser asks for dark colours (see
-"Dark colours") each class has a second rule in the dark-scheme `@media` block: the
-printed colour, lightened as far as 4.5:1 on `#121212` needs (no colour reaches 4.5:1 on
-both pages). Colour spans sit inside links and may wrap maths (which takes the colour); linked
-text itself keeps the link colour.
+`#767676`, yellow a dark yellow. For a reader whose browser asks for dark colors (see
+"Dark colors") each class has a second rule in the dark-scheme `@media` block: the
+printed color, lightened as far as 4.5:1 on `#121212` needs (no color reaches 4.5:1 on
+both pages). Color spans sit inside links and may wrap math (which takes the color); linked
+text itself keeps the link color.
 
-Colour alone tells a screen reader nothing, so text that refers to colour near coloured
+Color alone tells a screen reader nothing, so text that refers to color near colored
 text ("shown in red") gets the optional notice `colour_reference`: the instructor may want
-to add a cue that does not depend on seeing it. With the flag off, coloured text is
-written in the body colour, as in pipeline 0.3.0.
+to add a cue that does not depend on seeing it. With the flag off, colored text is
+written in the body color, as in pipeline 0.3.0.
 
 ## MathML is rebuilt, never pasted
 
@@ -915,7 +915,7 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
    "not converted".
 2. Walk the tree and write back only allowlisted presentation elements (MathML Core plus
    `menclose`) and layout attributes (`mathvariant`, `stretchy`, `columnalign`, ...).
-   `href`, event handlers, `style`, `class`, `id` and colours are dropped. Attribute values
+   `href`, event handlers, `style`, `class`, `id` and colors are dropped. Attribute values
    must match `[A-Za-z0-9 .%+-]{0,64}`. All text is escaped. The one MathML 4 speech attribute
    kept is `intent`, on the `<math>` element only and only as `:chemical-formula` or
    `:chemical-equation` (`core/mathml_intent.py`); any other `intent` value, or `intent` on any
@@ -933,7 +933,7 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
    shows anyway; annotations and alternatives are dropped.
 5. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
    rejects the whole equation, which then falls back to the original image with
-   `data-reason="mathml_rejected"`. Dropping just the unknown element would show maths
+   `data-reason="mathml_rejected"`. Dropping just the unknown element would show math
    with a silent hole in it, and a wrong equation read aloud is worse than an honest "not
    converted".
 5. More than 64 levels deep, more than 5,000 nodes, or no text at all also rejects it.
@@ -974,7 +974,7 @@ file with at most one `<h1>` is written as before. `assemble.title_shift` decide
 repaired outline, for the renderer and for tests. The move comes after the repair above,
 so the review screen's levels (`would_write`, "In the document: level N") are the levels
 before it: in a slide deck its numbers are one less than the file's. The "About this
-version" title is a labelled paragraph, not a heading: the `<footer>` is named by it
+version" title is a labeled paragraph, not a heading: the `<footer>` is named by it
 (`aria-labelledby`), so a screen reader user reaches it as a landmark, and it is not a
 section of the document's outline.
 
@@ -1022,12 +1022,12 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 About 35 lines of inline CSS:
 
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
-  (about 17:1 contrast; for a dark scheme see "Dark colours");
+  (about 17:1 contrast; for a dark scheme see "Dark colors");
 - images at their printed size (PDF points x 96/72) and never wider than the column; an
   equation kept as a picture is the exception ("Equations kept as pictures" below);
 - display equations scroll sideways inside their `.equation` box when wider than the
   screen (see "Wide equations");
-- block maths keep the browser's own `display: block math` and centring (overriding
+- block math keep the browser's own `display: block math` and centring (overriding
   `display` on `<math>` breaks MathML layout);
 - lists with a hanging indent for printed markers (reset for anything nested in such an
   item, since `text-indent` is inherited), equation numbers to the right of their
@@ -1035,12 +1035,12 @@ About 35 lines of inline CSS:
   readers still read it);
 - a visible `:focus-visible` outline and a print rule that keeps flagged boxes together;
 - only in documents that have one: a figure's folded description (a bold summary with
-  the browser's own marker, no new colours) and table rules.
+  the browser's own marker, no new colors) and table rules.
 
-Documents with coloured text (FEATURE_COLOUR) get two rules per printed colour (see
-"Coloured text"); documents with rebuilt tables get the table rules.
+Documents with colored text (FEATURE_COLOUR) get two rules per printed color (see
+"Colored text"); documents with rebuilt tables get the table rules.
 
-### Dark colours (T3-14)
+### Dark colors (T3-14)
 
 `:root { color-scheme: light dark; }` lets the browser choose its own scheme for what the
 file does not style (links, scrollbars), and a `@media screen and (prefers-color-scheme:
@@ -1049,11 +1049,11 @@ page, `#ececec` text (about 15:1), the dashed boxes of unconverted items and the
 in `#ffa066` and the focus ring in `#8ab4f8` (both above 3:1 on the page), a thin
 `#8c8c8c` edge on pictures (they are white-backed crops and would otherwise be a bare
 white block), and dark versions of the code block and table rules (borders `#767676` and
-`#a6a6a6`). MathML takes the text colour (nothing sets one on it), so equations follow the
-scheme. Pictures are not inverted: a figure's colours mean something. The block is
+`#a6a6a6`). MathML takes the text color (nothing sets one on it), so equations follow the
+scheme. Pictures are not inverted: a figure's colors mean something. The block is
 `screen` only, so printing a file from a dark browser gives dark text on white paper.
 Features add their dark rules to their own CSS (code, tables), so a document pays for
-what it uses. The static check `html.text_contrast` reads both pages (a colour class
+what it uses. The static check `html.text_contrast` reads both pages (a color class
 must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), and
 `tests/test_assemble_dark.py` runs axe in both schemes in Chromium (browser suite).
 
@@ -1082,14 +1082,14 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 | `html.link_text` | `empty_link` (an `<a>` with no text or img alt in it) |
 | `html.link_href` | `unsafe_link` (an `href` that is not http, https, mailto, or `#` and an id in the file) |
 | `html.lang_tags` | `invalid_lang` (a `lang` value that is not a well-formed BCP 47 tag) |
-| `html.text_contrast` | `low_contrast` (a `tc-` colour class below 4.5:1 on white) |
+| `html.text_contrast` | `low_contrast` (a `tc-` color class below 4.5:1 on white) |
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/readablestem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
 `wcag2aa`, `wcag21aa` and `wcag22aa` rules (`AXE_TAGS`; `wcag22aa` is axe's WCAG 2.2 AA set,
 in 4.14.0 target size, 2.5.8). Run on the output fixtures (the golden files, the LaTeX
 conversions, the test documents of the browser suite) it reported nothing in light or dark
-colours, so no change to the output was needed for it; the one violation it did report while
+colors, so no change to the output was needed for it; the one violation it did report while
 the navigation was written (`aria-prohibited-attr`: a role axe accepts on `hr` only) is why the
 page markers are an `hr`. The page runs with networking off. Each violation
 becomes `Check(name="axe.<rule>", code="<rule>")`, an error for serious or critical
@@ -1118,13 +1118,13 @@ and fast, so anyone holding only the HTML can recompute them.
    page N.
 3. Once every crop is made and the steps are at work, on the same thread:
    `text_pass.apply` (links, cross-references, the document and passage languages, and
-   with FEATURE_COLOUR the colour runs; docs/layout.md "The text pass"; it sets `lang`,
+   with FEATURE_COLOUR the color runs; docs/layout.md "The text pass"; it sets `lang`,
    `lang_source` and its notices on the result, and never fails the run) and
    `heading_step.heading_fixes` on all elements (if it raises, every heading becomes
    FAILED `internal_error` and renders as a paragraph). Neither changes anything a step
    reads or needs a model, so they run while the models answer rather than before the
    first request.
-4. Each step gets ~600 characters of neighbouring text as untrusted `context_text`: for an
+4. Each step gets ~600 characters of neighboring text as untrusted `context_text`: for an
    inline equation, its paragraph or list item around the marker (`[this equation]`
    marks the spot); otherwise the end of the previous text element (paragraph, heading or
    list item) and the start of the next. Other
@@ -1153,13 +1153,13 @@ and fast, so anyone holding only the HTML can recompute them.
 9. `pipeline.source_facts.measure` reads the PDF once more for the job page's
    before/after card (tagged, /Lang, title, bookmarks, pictures and, in a tagged PDF,
    pictures with alt text, links; from the elements and fixes: equations, those whose
-   text layer loses a fraction, root or script, bold maths letters stored as plain
+   text layer loses a fraction, root or script, bold math letters stored as plain
    characters, tables). Numbers only; a fact it cannot read keeps its default, and it
    never fails the run.
 10. `render_html` (with the caller's optional `notice` and `source_note`), then
    `static_checks`.
 11. `pipeline.notices.from_fixes` derives the notices that follow from the fixes (a
-   table shown as an image, a scanned page, a colour-only figure, a chart or diagram
+   table shown as an image, a scanned page, a color-only figure, a chart or diagram
    without a long description when long descriptions are on) and merges them with the
    others on `DocumentResult.notices` (one per code and element, or code and page with a
    count).
@@ -1259,18 +1259,18 @@ Keep the two in step when a limit changes.
   part.
 - Link text is kept as printed, also when it says nothing on its own ("click here"):
   only the instructor can reword it (the job page lists it as worth checking).
-- Language detection needs about 20 words of prose; a short handout of mostly maths is
+- Language detection needs about 20 words of prose; a short handout of mostly math is
   assumed to be English unless the PDF says otherwise. A passage is marked only when it
   is a whole paragraph or list item in another language (a quoted phrase inside an
   English sentence is not).
-- Colour inside figures stays in the image; colour in headings is not kept.
+- Color inside figures stays in the image; color in headings is not kept.
 
 
 ## Review edits that reach the file (T3-5, T3-16)
 
 - **A description in words** (`Fix.described`) is the alt text of an equation, table or page
   kept as an image, instead of the PDF's text marked not checked or the fixed words. It is
-  cleaned and checked as alt text and escaped when written. The image is still labelled "Not
+  cleaned and checked as alt text and escaped when written. The image is still labeled "Not
   converted."
 - **Pages left out** (`DocumentResult.omitted`) are not in the file; the student note says
   "Page 1 of the original PDF was left out of this file." (`assemble.omitted_pages_note`), and an

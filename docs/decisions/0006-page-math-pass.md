@@ -20,7 +20,7 @@ sees only the crop, so it cannot correct a bad span. Recognition error is the sa
 chatbot's (2.6%).
 
 A whole-page reader has what a crop lacks: the sentence, the exercise's number, the
-neighbouring lines. A cheap model reads a page for about $0.001 (claude-haiku-5-5). What we
+neighboring lines. A cheap model reads a page for about $0.001 (claude-haiku-5-5). What we
 cannot do is let it write the document: the chatbots invent (29% of their equations have no
 partner in the answer key against 2.7% for ReadableSTEM). So the page reader may *propose
 spans and a second reading*, and everything it proposes must be anchored in the PDF's own
@@ -40,7 +40,7 @@ mathematics is. Layout's rules stay as the fallback and as the check.
    `equation_number`, `not_math_but_looks_like_it`) and its LaTeX reading. The prompt states
    the semantics: an exercise or item number is never part of an equation; a system or an
    aligned derivation is one block; an inline fraction is one expression; a lone variable in
-   a sentence is inline maths; prose commentary beside steps is not part of the equation.
+   a sentence is inline math; prose commentary beside steps is not part of the equation.
    claude-haiku-5-5 at effort `medium` (`ANTHROPIC_EFFORT_PAGE_MATH`; `low` was measured on a
    development slice and cuts the answer key's spans right about 0.20 of the time against 0.32
    for `medium`, for $0.001 against $0.0016 a page).
@@ -55,7 +55,7 @@ mathematics is. Layout's rules stay as the fallback and as the check.
    text: the document's text still comes from the text layer, and the MathML still comes from
    the equation step reading a crop. The pass only chooses spans and offers a second reading.
 3. **Reconciliation with layout** (`pipeline/page_math_reconcile.py`, applied inside
-   layout's page analysis through a small hook; layout is analysed twice when the flag is on,
+   layout's page analysis through a small hook; layout is analyzed twice when the flag is on,
    the second time with the verified plan). A verified expression replaces layout's cut only
    where it is safe to: a row is cut at the anchor's offsets, exercise and equation numbers
    are cut off into their own rows (an equation number goes through layout's existing
@@ -63,7 +63,7 @@ mathematics is. Layout's rules stay as the fallback and as the check.
    *where layout found no display equation there, or where the span covers every row of the
    regions it overlaps* (a system layout split, a determinant it left a row out of; rows with
    no letter or digit, the brackets, are taken in). A block span that would split a layout
-   region, or leave in a shared row a piece layout reads as maths, is refused and layout's cut
+   region, or leave in a shared row a piece layout reads as math, is refused and layout's cut
    stays: on the development set the splits cost more than they gained (aligned derivations,
    which the answer key keeps whole). An inline expression becomes an inline run at its
    offsets (single variables included; glued word endings such as the "th" of "nth" go with
@@ -87,7 +87,7 @@ mathematics is. Layout's rules stay as the fallback and as the check.
    recorded like every model call (`DocumentStats`, the eval's `--answers` recording), count
    against the job's dollar caps and its call cap (one call per page).
 
-**Failure behaviour.** Fail open: a refused, invalid or over-budget page pass, a stale plan
+**Failure behavior.** Fail open: a refused, invalid or over-budget page pass, a stale plan
 or an exception while applying it leaves that page exactly as layout alone would have it.
 The anchors never reach the model as instructions: the text layer travels as fenced
 untrusted context, with the length limit raised for this step (`VisionRequest.context_limit`).
@@ -134,7 +134,7 @@ variant that only compares readings and never changes spans was not built or mea
 
 ## Update 2026-11-04: still not on
 
-`FEATURE_PAGE_MATH` is still off by default in code and is not among the flags that are on in production ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The status above stands: Proposed. Equation work since then went into other settings (`EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`), which are on in production. A second mechanism with the same aim, the page witness (`FEATURE_PAGE_WITNESS`, 2026-11-03: one model call per maths page whose disagreements with the crop readings become decisions), is not in this record. It was tested on twelve development papers ([eval-equation-round5.md](../eval-equation-round5.md)), changed no reading, hit its registered stop rule (a gain of 0.0 points against the 2 needed) and stays off.
+`FEATURE_PAGE_MATH` is still off by default in code and is not among the flags that are on in production ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The status above stands: Proposed. Equation work since then went into other settings (`EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`), which are on in production. A second mechanism with the same aim, the page witness (`FEATURE_PAGE_WITNESS`, 2026-11-03: one model call per math page whose disagreements with the crop readings become decisions), is not in this record. It was tested on twelve development papers ([eval-equation-round5.md](../eval-equation-round5.md)), changed no reading, hit its registered stop rule (a gain of 0.0 points against the 2 needed) and stays off.
 
 ## Update 2026-10-21: real LaTeX PDFs
 

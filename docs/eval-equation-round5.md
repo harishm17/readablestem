@@ -5,7 +5,7 @@ every model answer recorded under `~/.cache/readablestem/realworld/runs/dev/` (`
 `e1-sonnet`, `e1-witness-opus`). Runner: `scripts/eq_dev_run.py`. Intervals are 95% cluster bootstraps
 over papers (`scripts/realworld_report.py`), so with 12 papers they are wide.
 
-**The short version.** The page witness (`FEATURE_PAGE_WITNESS`, one model call per maths page that reads
+**The short version.** The page witness (`FEATURE_PAGE_WITNESS`, one model call per math page that reads
 every formula, see docs/steps.md) did not change a single reading and found no equation the pipeline had
 missed. Exact matches and detection are the same to the digit with it on and off. It did what the rule
 for it says: disagreements became required decisions, and those caught more wrong equations. Silent
@@ -24,7 +24,7 @@ exact is 0.0 points against the +2 needed, so the experiment stops here.** The f
 - **Witness arm.** The same, with `FEATURE_PAGE_WITNESS` on and `PAGE_WITNESS_MODEL`
   `claude-sonnet-5-5`, effort medium, output limit 12,288, call timeout 240 s. Control answers replayed, so
   the new spend is the witness calls and the crop calls of anything they changed (nothing).
-- **Scoring.** Reading B (the maths cells of a rebuilt table count as equations, as in a chatbot's HTML),
+- **Scoring.** Reading B (the math cells of a rebuilt table count as equations, as in a chatbot's HTML),
   as in docs/eval-equation-round3.md; the notation-neutral and spoken-equal readings are the secondaries.
   Only the pipeline's code was run: the chatbot arm is the recorded one, re-scored by today's converter
   (`--rescore-chat`).
@@ -66,7 +66,7 @@ overlap; n = 6).
   dropped for a quote that held nowhere or an overlap).
 - **Where it stood against the elements** (formulas): 643 had the same extent as an element (within one
   glyph), 83 overlapped one with a different extent, 21 lay inside another element, 71 were witness-only
-  without maths glyphs (left out by the glyph gate), and none was witness-only with glyph evidence. So
+  without math glyphs (left out by the glyph gate), and none was witness-only with glyph evidence. So
   detection additions: **0**. Whether the 71 without glyph evidence contain missed equations was not
   measured.
 - **Readings changed: 0 of 914 aligned equations.** In the 18 disagreements the glyph adjudication kept
@@ -173,7 +173,7 @@ quotes the wrong stretch more often than the layout does.
 **What the glyphs can separate.** The one case the text layer settles is a written slash against a drawn
 fraction (`-2/3` read as `-\frac{2}{3}`: the text layer has the slash, a fraction bar is never text); in 2 of the
 7 witness-right cases the crop made that mistake. Brackets do not separate: the text of an element often holds the
-bracket of its neighbour (`(R_{*,1})` against gold `R_{*,1}`), which the crop's clean-up drops on purpose; a
+bracket of its neighbor (`(R_{*,1})` against gold `R_{*,1}`), which the crop's clean-up drops on purpose; a
 bracket mark picked the witness there and was removed again. The other witness-right cases (a relation read as
 `\succsim` for `\asymp`, `\ldots`, `\left` delimiters) are not told apart by the bag or the slash.
 
@@ -205,12 +205,12 @@ the same page (exact under the lenient comparison, or tree similarity of 0.6 or 
 | no gold equation | 33 (21 of them a number and a unit) | 11 (block formulas the run reads elsewhere) |
 
 So 17 to 25 of 182 missed gold equations (1.6 to 2.3 points of recall) lie in the 92 formulas, at about a quarter
-precision. Nothing in the data separates them: the maths-glyph counts are the same (0 to 3 characters of 3 to
+precision. Nothing in the data separates them: the math-glyph counts are the same (0 to 3 characters of 3 to
 11) on the right and wrong ones, since a plain number, a percentage or a unit is typeset in the text font
 whether or not the author put it in `$...$`; whether a quantity is gold is the author's convention, and "a number
 and a unit" is on both sides (`9.8 m/s^2` is gold, `0.5 s` is not). The D3 evidence (docs/eval-equation-diagnostics.md:
 45 to 70% of undetected running-text equations carry some, against 4% background) does not reach these, which are
-the ones with none. The gate ("maths glyphs and clear of every other element") is therefore not buggy and
+the ones with none. The gate ("math glyphs and clear of every other element") is therefore not buggy and
 loosening it would add about 90 required decisions (1.6 a page) for 17 to 25 true ones; it was left as it is.
 
 **Sonnet against Opus, at $0** (6 papers with the recorded Opus chatbot, 546 gold). On the 269 equations that
