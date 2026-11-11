@@ -1537,6 +1537,35 @@ The decisions in the rules, with the measured values next to each threshold in t
   groups are the same ones (`_cluster_scan` is the plain version it is tested against);
   on a page of 40,000 strokes it took 38 s and now takes under a second.
 
+**A page that raises** does not stop the document. If any step that works on one page at a
+time raises on a page (a bug), that page is kept as its image with the reason `page_read_failed`
+(a required decision, the words "This page could not be read"), and every other page is read.
+One rule, `layout._PageGuard`, covers them all: reading the page (`_read_page`), the slide-deck
+view of the page, the page's share of the margin statistic, the page-type adjustments, table
+claims (`_claim_tables`) and rows (`_prepare_rows`, the plot and answer-field marks), a page's
+list-marker candidates, its label keys, the page's blocks (`_page_blocks`), its elements
+(`_to_elements`) and the safety net's look at it. The log has the page number and the error's
+class and place, never its message or any text of the page. A spend cap, a cancel, a
+configuration error and a refusal of the file (`LayoutError`) are not taken for a page that
+raised. A document in which every page it was to read has raised still fails, counted over the
+document and not per step: a page that raised in one step and another page in a later one
+count together (`_PageGuard.settle`, after every step).
+
+What a page that failed leaves out: the steps after it do not read it (its rows, paths, tables,
+prepared rows and page type are dropped, and `page_types` has no entry for it, so the hidden-text
+notices do not mention it); the margin filter does not take it as a reference page, and its
+rows count for nothing in list markers or label keys. The document-wide steps work on the pages
+that are left. A table that goes on from the page before is not joined to a page that failed. A
+paragraph that goes on from the failed page onto the next is written there as a paragraph of its
+own, not lost to the join. The
+steps that look at several pages together stay unguarded, since one page cannot be blamed for
+them: the margin statistic's thresholds, the body size and line pitch, the document's
+spellings, the list-marker judgement, glossary entries, bold letters, numbered lines, run-in
+labels, joins over a page break, the outline, notices, footnote and contents links, and the
+slide-deck finish. The safety net is different: when its look at a page raises, the page keeps
+the elements read from it and gets its picture beside them, as when something painted was left
+unread.
+
 **The safety net** (C1.1, independent of the page types): after layout, a page keeps its
 page image, with a decision (`unread_page`), when something painted on it was read into
 nothing. The elements read from it stay; the image comes after them. It fires when:

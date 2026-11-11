@@ -243,7 +243,12 @@ SCANNED_PAGE_REASON = page_type.SCANNED_PAGE
 # Fix reasons of what is kept as an image before any model work: a whole page, and a
 # region of handwriting on a typed page (module docstring).
 PAGE_REASONS = frozenset(
-    {page_type.SCANNED_PAGE, page_type.HANDWRITTEN_PAGE, page_type.UNREAD_PAGE}
+    {
+        page_type.SCANNED_PAGE,
+        page_type.HANDWRITTEN_PAGE,
+        page_type.UNREAD_PAGE,
+        page_type.PAGE_READ_FAILED,
+    }
 )
 KEPT_REASONS = PAGE_REASONS | {page_type.HANDWRITING_ON_PAGE}
 # `Fix.group_key` of the kept images with one reason: "pg-" + the first one's element id

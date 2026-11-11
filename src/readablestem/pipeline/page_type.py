@@ -257,6 +257,9 @@ SCANNED_PAGE = "scanned_page"
 HANDWRITTEN_PAGE = "handwritten_page"
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 UNREAD_PAGE = "unread_page"  # painted, but nothing could be read from it
+# Layout raised while reading the page (a bug, not a property of the page): kept as its image,
+# the other pages are read. Set by `layout._analyze_document`, never by `kept_reason`.
+PAGE_READ_FAILED = "page_read_failed"
 # Element reason of a handwriting region layout cuts out of a typed page.
 HANDWRITING_REGION = "handwriting"
 

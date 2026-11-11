@@ -424,6 +424,8 @@ REASON_MESSAGES: dict[str, str] = {
     "checked).",
     "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
     "image, marked “Not converted”.",
+    "page_read_failed": "This page could not be read, so it is kept as an image, marked "
+    "“Not converted”. The rest of the document was read.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
     "convert handwriting on typed pages, so it is kept as an image after the typed text.",
 }
@@ -442,6 +444,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "handwritten_page": "Handwritten, not converted: the page is kept as an image.",
     "unread_page": "Drawings or writing this tool could not read, not converted: the page is "
     "kept as an image, after any text read from it.",
+    "page_read_failed": "This page could not be read, so it is kept as an image. The rest of "
+    "the document was read.",
     "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "

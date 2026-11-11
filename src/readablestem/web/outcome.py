@@ -96,7 +96,7 @@ KEPT = "The HTML keeps their original images, marked “Not converted”."
 MODEL_OUTAGE = "model_outage"
 # Figures kept as images before any model work: never sent to the service.
 KEPT_IMAGE_REASONS = frozenset(
-    {"scanned_page", "handwritten_page", "unread_page", "handwriting_on_page"}
+    {"scanned_page", "handwritten_page", "unread_page", "page_read_failed", "handwriting_on_page"}
 )
 OUTAGE_REASONS = frozenset({"model_api_error", "model_timeout"})
 
@@ -251,6 +251,7 @@ PAGE_WORDS = {
         "has drawings or writing this tool could not read",
         "have drawings or writing this tool could not read",
     ),
+    "page_read_failed": ("could not be read", "could not be read"),
 }
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 HIDDEN_FEW = 3  # pipeline.page_type.HIDDEN_FEW: hidden characters that count as a layer

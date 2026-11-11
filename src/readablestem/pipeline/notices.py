@@ -10,9 +10,10 @@ written by the steps (the figure and table work only set their fix fields):
 
 - `table_not_rebuilt` (required): a table shown as an image of the original, because
   the step did not rebuild it, a spend cap stopped it, or the reviewer kept the image;
-- `scanned_page`, `handwritten_page`, `unread_page` (required): the figure that stands
-  for a page kept as its image (scanned, handwritten, or painted with nothing read from
-  it), and `handwriting_on_page` (required): the image of handwriting on a typed page.
+- `scanned_page`, `handwritten_page`, `unread_page`, `page_read_failed` (required): the
+  figure that stands for a page kept as its image (scanned, handwritten, painted with
+  nothing read from it, or one that layout raised on), and `handwriting_on_page`
+  (required): the image of handwriting on a typed page.
   Their decision is the figure's fix, one per reason for the whole document
   (`pipeline.page_type`, `run.PAGE_GROUP_PREFIX`);
 - `colour_only` (optional): a figure with `FigureFix.colour_only`;
@@ -45,12 +46,15 @@ TABLE_NOT_REBUILT = "table_not_rebuilt"
 SCANNED_PAGE = "scanned_page"
 HANDWRITTEN_PAGE = "handwritten_page"
 UNREAD_PAGE = "unread_page"
+PAGE_READ_FAILED = "page_read_failed"
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 COLOUR_ONLY = "colour_only"
 LONG_DESCRIPTION_MISSING = "long_description_missing"
 # The reasons of figures kept as images before any model work; each is its own notice
 # code (`pipeline.page_type`).
-KEPT_IMAGE_CODES = frozenset({SCANNED_PAGE, HANDWRITTEN_PAGE, UNREAD_PAGE, HANDWRITING_ON_PAGE})
+KEPT_IMAGE_CODES = frozenset(
+    {SCANNED_PAGE, HANDWRITTEN_PAGE, UNREAD_PAGE, PAGE_READ_FAILED, HANDWRITING_ON_PAGE}
+)
 # Codes this module derives from the fixes; any stored notice with one of them is
 # replaced by `current`.
 DERIVED_CODES = frozenset({TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING}) | (
