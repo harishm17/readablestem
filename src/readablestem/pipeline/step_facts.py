@@ -45,7 +45,7 @@ from readablestem.core.types import (
 # job already has, and only their dollars count toward its limits (`core.budget.JobBudget`).
 SECOND_CHECK = "second_check"
 SECOND_READER = "second_reader"
-# The two steps the ink analysis's clock can stop: typing a page, and reading the strokes
+# The two steps the ink analysis's budget can stop: typing a page, and reading the strokes
 # of a handwritten page for its pictures.
 PAGE_TYPE = "page_type"
 INK_STROKES = "ink_strokes"
@@ -173,6 +173,23 @@ def pages_capped(
     """The facts of a step that reads whole pages, for the pages it did not read: the ones
     the job's limit kept it from, or with another `reason` the ones its clock did."""
     return [NotFinished(step=step, page=page, reason=reason, of=1) for page in pages]
+
+
+def ink_stopped(step: str, pages: dict[int, str]) -> list[NotFinished]:
+    """The facts of an ink step (`PAGE_TYPE`, `INK_STROKES`) for the pages its budget stopped,
+    `pages` mapping each to its cause (`page_type.InkBudget`): a count of work is
+    "work_budget", the clock guard "time_limit"."""
+    from readablestem.pipeline.page_type import INK_TIME
+
+    return [
+        NotFinished(
+            step=step,
+            page=page,
+            reason="time_limit" if cause == INK_TIME else "work_budget",
+            of=1,
+        )
+        for page, cause in sorted(pages.items())
+    ]
 
 
 def stopped(step: str, reason: NotFinishedReason, *, done: int, of: int) -> list[NotFinished]:

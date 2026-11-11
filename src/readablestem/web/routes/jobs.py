@@ -975,11 +975,13 @@ def _place_files(
                 pages, found = inspect_pdf_detail(
                     data, max_pages=s.source_page_limit, timeout_s=limit_s, allow_image_pages=True
                 )
+                may_have = found.possible
             else:
                 pages = inspect_pdf_isolated(data, max_pages=s.source_page_limit, timeout_s=limit_s)
-                found = 0
-            # The request applies to a file with scanned or handwritten pages and to no other.
-            convert_images = image_pages and found > 0
+                may_have = False
+            # The request applies to a file with scanned or handwritten pages and to no other
+            # (or that may have one: a page whose drawings were not analysed).
+            convert_images = image_pages and may_have
             if len(data) > s.upload_limit_bytes:  # the PDF made from a Word file can be big
                 raise UploadRejected("too_large")
         except UploadRejected as exc:

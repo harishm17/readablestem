@@ -68,7 +68,8 @@ def test_the_probe_counts_the_pages_layout_will_keep_as_scanned_or_handwritten(n
 
     data = (Path(__file__).parent / "fixtures" / "handwriting" / name).read_bytes()
     kept = [r for r in layout.analyze(data).kept_pages.values() if r in IMAGE_REASONS]
-    assert inspect(data, max_pages=30, allow_image_pages=True)[1] == len(kept)
+    count = inspect(data, max_pages=30, allow_image_pages=True)[1]
+    assert (count.found, count.words) == (len(kept), str(len(kept)))
 
 
 # ------------------------------------------------------------------------------ the form

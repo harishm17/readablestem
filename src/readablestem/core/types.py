@@ -851,6 +851,9 @@ NOTICE_CODES = frozenset(
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
+        # The page's drawings were not checked for handwriting: over a count of work, or the
+        # clock guard fired (`page_type.InkBudget`, plan WS14.9). Its typed text was read.
+        "drawings_not_analysed",
         # Review edits (T3-16): a page the reviewer left out of the student file.
         "page_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
@@ -947,6 +950,10 @@ class PageType(BaseModel):
     ink_pen_share: float = Field(default=0.0, ge=0.0, le=1.0)
     ink_size_twins: float = Field(default=0.0, ge=0.0, le=1.0)
     annot_strokes: int = Field(default=0, ge=0)
+    # Why the ink was not analysed, beside the reason "ink_not_analysed": "work" (a count of
+    # work ran out, the same on every machine) or "time" (the clock guard fired). None when
+    # it was analysed, and in a record stored before this was kept.
+    ink_cause: str | None = Field(default=None, exclude_if=lambda v: v is None)
     producer: str = "other"  # a coarse family of the producing software, a hint only
     classifier_version: str = "page-type-v5.1"
 

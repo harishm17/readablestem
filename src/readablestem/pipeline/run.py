@@ -1811,9 +1811,10 @@ def _convert(
     watch = step_facts.Stopwatch()
     measured: list[CallFact] = []
     # Pages a layout run typed without their ink, and handwritten pages whose strokes were
-    # not read, because the time for the ink analysis ran out (`page_type.InkBudget`).
-    ink_late: set[int] = set()
-    strokes_late: list[NotFinished] = []
+    # not read, each with its cause: a count of work ran out, or the clock guard fired
+    # (`page_type.InkBudget`).
+    ink_late: dict[int, str] = {}
+    strokes_late: dict[int, str] = {}
     # The page-level passes ask through the job's kept answers when it has any.
     page_client: VisionClient = (
         client if step_cache is None else _PageAnswers(client, step_cache, settings)
@@ -1838,7 +1839,7 @@ def _convert(
                 max_pages=settings.max_pages_per_job,
                 **extra,
             )
-            ink_late.update(page_type.out_of_time(getattr(doc, "page_types", None) or {}))
+            ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
@@ -1856,7 +1857,7 @@ def _convert(
                     measured=measured,
                 )
                 # (the pass lays the plan over a second layout run, which types the pages again)
-                ink_late.update(page_type.out_of_time(getattr(doc, "page_types", None) or {}))
+                ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
             if collector is not None and options.page_witness:
                 watch.stage("page_witness")
                 witnessed, witness_summary = _page_witness_pass(
@@ -1897,20 +1898,9 @@ def _convert(
                     page_kinds = {
                         n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()
                     }
-                    ink_time = page_type.InkBudget()
                     vector_pages = image_page_vector.analyse(
-                        pdf_bytes, to_read, page_kinds, budget=ink_time
+                        pdf_bytes, to_read, page_kinds, stopped=strokes_late
                     )
-                    if ink_time.ran_out:
-                        written = [
-                            n for n in to_read if page_kinds.get(n) in page_type.HANDWRITTEN_KINDS
-                        ]
-                        strokes_late = step_facts.stopped(
-                            step_facts.INK_STROKES,
-                            "time_limit",
-                            done=len(vector_pages),
-                            of=len(written),
-                        )
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
                     to_read,
@@ -2057,9 +2047,8 @@ def _convert(
                 "image_page",
                 [r.page for r in image_summary.per_page if r.outcome == "budget_exceeded"],
             )
-        stops += strokes_late + step_facts.pages_capped(
-            step_facts.PAGE_TYPE, sorted(ink_late), "time_limit"
-        )
+        stops += step_facts.ink_stopped(step_facts.PAGE_TYPE, ink_late)
+        stops += step_facts.ink_stopped(step_facts.INK_STROKES, strokes_late)
         facts = step_facts.gathered(measured, watch, stops + step_facts.capped(ordered))
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)

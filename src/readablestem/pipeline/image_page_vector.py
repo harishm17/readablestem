@@ -180,11 +180,13 @@ def analyse(
     kinds: Mapping[int, str],
     *,
     budget: page_type.InkBudget | None = None,
+    stopped: dict[int, str] | None = None,
 ) -> dict[int, VectorPage]:
     """The strokes of each of `pages` (0-based) whose `page_type` kind (`kinds`) is handwritten
-    and that `ink_strokes` analysed within `budget` (the document's ink budget; a fresh one
-    when not given). Any other page, and one that fails, is left out: it is read from its
-    picture as before."""
+    and that `ink_strokes` analysed within `budget` (`page_type.InkBudget`, counted per page; a
+    fresh one when not given). Any other page, and one that fails, is left out: it is read from
+    its picture as before. A page the budget stopped is put in `stopped` with its cause, for
+    the caller's "not finished" facts."""
     from readablestem.pipeline import layout
 
     budget = budget or page_type.InkBudget()
@@ -197,6 +199,8 @@ def analyse(
         except Exception as exc:  # strokes are never worth failing a conversion for
             log.warning("page ink failed: %s", type(exc).__name__)
             continue
+        if not ink.analysed and stopped is not None:
+            stopped[number] = ink.cause or page_type.INK_WORK
         if ink.analysed and len(ink.strokes) >= MIN_STROKES:
             found[number] = VectorPage(number, tuple(ink.strokes), frame)
     return found

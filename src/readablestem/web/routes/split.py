@@ -688,7 +688,7 @@ class SplitBuilder:
             outcome = job_outcome(
                 status=str(job.status), error_code=job.error_code, result_json=job.result_json
             )
-        counts = job_page.breakdown(self.result.fixes)
+        counts = job_page.breakdown(self.result.fixes, self.result.notices)
         line = job_page.headline("done", "", outcome, counts)
         finish = job_page.Finish(
             decided_units=counts.decided_units,

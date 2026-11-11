@@ -502,7 +502,8 @@ class Layout:
     lang: str = "en"  # PDF /Lang if present, else "en"
     # Layout facts the job page lists ("Not handled in this file", review "none"): a
     # block of program code, a footnote (`_layout_notices`), hidden text left out
-    # (`_hidden_text_notices`). Codes, ids and counts only.
+    # (`_hidden_text_notices`), drawings not analysed (`_ink_notices`). Codes, ids and
+    # counts only.
     notices: list[Notice] = field(default_factory=list)
     # Per analysed page, what it is (`pipeline.page_type`; `to_record` gives the stored,
     # content-free form).
@@ -10364,7 +10365,7 @@ def _analyze_document(
         page_sizes=[p.size for p in pages],
         title=title,
         lang=_document_lang(doc),
-        notices=notices + _hidden_text_notices(types, kept),
+        notices=notices + _hidden_text_notices(types, kept) + _ink_notices(types, kept),
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
     )
@@ -10630,6 +10631,20 @@ def _edge_band(path: _Path, page_rect: pymupdf.Rect) -> bool:
     return (touches_y and y1 - y0 <= FRAME_EDGE_BAND * h) or (
         touches_x and x1 - x0 <= FRAME_EDGE_BAND * w
     )
+
+
+NOT_ANALYSED = "drawings_not_analysed"
+
+
+def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str]) -> list[Notice]:
+    """A page read for its text whose drawings were not analysed (`page_type.InkBudget`: a
+    count of work ran out, or the clock guard fired) may hold handwriting nobody looked for:
+    "Worth checking". A page kept whole as its image has a notice and a decision of its own."""
+    return [
+        Notice(code=NOT_ANALYSED, page=number, review="optional")
+        for number, kind in sorted(types.items())
+        if not kind.ink.analysed and number not in kept
+    ]
 
 
 def _hidden_text_notices(

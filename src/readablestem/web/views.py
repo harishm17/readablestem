@@ -491,7 +491,7 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
         list_items=sum(e.kind is Kind.LIST_ITEM for e in result.elements),
         checks_run=len(result.html_checks),
         failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],
-        counts=job_page.breakdown(result.fixes),
+        counts=job_page.breakdown(result.fixes, result.notices),
     )
 
 
