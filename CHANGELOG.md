@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: font code tables (branch fix/font-code-tables)
+
+- Text: codes of symbol and TeX fonts are read as what the font draws, by the font's name
+  (`pipeline/font_codes.py`, one table module; docs/layout.md "Font code tables"). Symbol, Wingdings
+  bullets and arrow, MT-Extra's ℓ and the APS math font's signs
+  are mapped; TeX's ligatures at control codes ("effects" no longer loses "ff"), accents printed
+  over a letter ("Ren´e"), and a glyph that starts several lines (a bullet from an icon font) are
+  read. The private-use bullet rules that were mapped by code point alone (`_TEXT_MAP`,
+  `_BULLET_GLYPHS`, the table detector's bullets) moved into it, so U+F0A7 is a small square only
+  in Wingdings. Element text changes on documents with these fonts, so the step keys of their
+  elements change and stored answers for them are asked again; no `PIPELINE_VERSION` bump.
+- New setting `FONT_CODE_TABLES` (on). `false` keeps only the two old private-use bullet rules.
+  Declared on `web` in `railway.ts`.
+
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 
 - Upload: one visible line beside "Upload and convert" says who receives the pictures of equations

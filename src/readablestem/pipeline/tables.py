@@ -250,10 +250,11 @@ TABLE_CAPTION = re.compile(
 _LEADERS = re.compile(r"(?:\.\s?){5,}|\u2026{2,}|(?:[\u00b7\u2219\u22c5]\s?){5,}")
 # Spacing accents TeX and Word draw above a letter (as layout's _ACCENTS).
 _ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
-# Bullets that start a list item (as layout's _BULLET_GLYPHS, with Wingdings' U+F0A7).
+# Bullets that start a list item (as layout's _BULLET_GLYPHS; the private-use bullets of Symbol
+# and Wingdings arrive here already mapped, `font_codes`).
 _BULLETS = frozenset(
     "\u2022\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u27a2\u25ba\u25b8\u25b6"
-    "\u25b9\u27a4\u25c6\u25c7\uf0b7\uf0a7"
+    "\u25b9\u27a4\u25c6\u25c7"
 )
 # Dots that are bullets when a space follows them (base-14 Helvetica prints U+2022 as
 # a middle dot); maths (a dot product) otherwise.

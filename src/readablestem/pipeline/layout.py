@@ -92,6 +92,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import (
     chem,
     equation_images,
+    font_codes,
     glyph_math,
     glyph_reconcile,
     hyphens,
@@ -268,14 +269,13 @@ EQUATION_NUMBER = re.compile(
 # "2.4" or "2.4a" without brackets (OpenStax, many Word templates): an equation number only
 # when it sits on the same line as maths, well to its right.
 BARE_EQUATION_NUMBER = re.compile(r"^\d{1,3}(?:\.\d{1,3}){1,2}[a-z]?$")
-# Glyphs that start list items. Word draws bullets in the Symbol font (as U+2022 or the
-# private-use U+F0B7), and Symbol is a maths font, so without this every bullet would be
-# an inline equation. Other private-use Symbol code points are Greek letters (U+F061 is
-# alpha) and stay maths; Wingdings bullets are not in a maths font in the first place.
+# Glyphs that start list items. Word draws bullets in the Symbol font (as U+2022; its
+# private-use U+F0B7 and the Wingdings bullets are mapped to these by `font_codes`), and Symbol
+# is a maths font, so without this every bullet would be an inline equation.
 # Beamer draws its triangles with the AMS symbol font (U+25B6), also a maths font.
 _BULLET_GLYPHS = frozenset(
     "\u2022\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u27a2\u2713\u2714\u25ba\u25b8"
-    "\u25b6\u25b9\u25bb\u27a4\u25c6\u25c7\u2666\u2756\uf0b7"
+    "\u25b6\u25b9\u25bb\u27a4\u25c6\u25c7\u2666\u2756"
 )
 # Bullets only at the start of a line and followed by a space (LaTeX's second-level "\u2013",
 # third-level "\u2217", Markdown's "-" and "*"); maths or punctuation anywhere else. They
@@ -305,12 +305,11 @@ _JUNK_TITLE = re.compile(
 # Applied to every piece of text taken from the document: invisible characters go; the
 # inline-marker brackets (core.types.INLINE_MARKER) become look-alike white square
 # brackets, so text in the PDF cannot fake a marker (layout is the only producer of
-# markers); Word's private-use Symbol bullet becomes U+2022.
+# markers). Private-use codes of symbol fonts are mapped by `font_codes`, by font name.
 _TEXT_MAP: dict[int, str | None] = {
     **dict.fromkeys(map(ord, "\u00ad\u200b\u200c\u200d\u2060\ufeff")),
     ord("\u27e6"): "\u301a",
     ord("\u27e7"): "\u301b",
-    ord("\uf0b7"): "\u2022",
 }
 
 # Character classes for maths detection. Symbols that only occur in maths (signs such as
@@ -1601,11 +1600,13 @@ def _raw_blocks(page: pymupdf.Page) -> list[dict]:
 
 
 def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
-    """`page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]` with each ligature's
+    """`page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]` with the codes of
+    symbol and TeX fonts read as what they draw (`font_codes`) and each ligature's
     characters given their own share of the glyph's width (`_spread_ligatures`). Every
     place layout reads characters from the PDF goes through here (rows, line glyphs, the
     text pass's glyphs), so no path sees the zero-width boxes ligatures come out with."""
     blocks = page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]
+    font_codes.remap(blocks)
     for block in blocks:
         if block.get("type") == 0:
             for line in block["lines"]:

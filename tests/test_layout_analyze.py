@@ -491,3 +491,66 @@ def test_analysis_logs_nothing_about_the_document(caplog):
     analyze(one_page(lambda p: write(p, 72, 100, ["Confidential student feedback here."])))
     assert not [r for r in caplog.records if r.name.startswith("readablestem")]
     assert "Confidential" not in caplog.text
+
+
+# ---------------------------------------------------------------- font codes
+
+
+def font_page(font: str, rows: list[str], differences: str = "") -> bytes:
+    """A one-page PDF whose rows are set in a font named `font` that has no font program
+    and no ToUnicode map, so the text layer gives the codes as they are. `rows` are PDF
+    string literals; `differences` names glyphs for codes (`1 /uniF0A7`) as Word does."""
+    stream = "BT /F1 11 Tf 15 TL 72 700 Td\n" + "".join(f"({row}) Tj T*\n" for row in rows) + "ET"
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R"
+        " /Resources << /Font << /F1 5 0 R >> >> >>",
+        f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
+        f"<< /Type /Font /Subtype /Type1 /BaseFont /{font} /Encoding << /BaseEncoding"
+        f" /WinAnsiEncoding /Differences [{differences}] >> >>",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+    return out
+
+
+@pytest.mark.parametrize(
+    ("font", "rows", "differences", "expected"),
+    [
+        # Word's Wingdings bullets, as the private-use code or as the Latin-1 letter
+        ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF0A7", ["▪"]),
+        ("Wingdings-Regular", ["\\374 first point", "\\374 second point"], "", ["✓"]),
+        # the same private-use code in Symbol is a club, not a bullet
+        ("SymbolMT", ["\\001 first point", "\\001 second point"], "1 /uniF0A7", []),
+        # unreadable glyphs of an icon font that start several lines are bullets
+        ("IconsRegular", ["\\001 first point", "\\001 second point"], "1 /uniE001", ["•"]),
+    ],
+)
+def test_bullets_of_symbol_fonts_are_list_items_by_font_name(font, rows, differences, expected):
+    elements = analyze(font_page(font, rows, differences)).elements
+    assert [e.list_marker for e in elements if e.kind == Kind.LIST_ITEM] == expected * 2
+    assert not any("" in (e.text or "") or "" in (e.text or "") for e in elements)
+
+
+@pytest.mark.parametrize(
+    ("font", "row", "differences", "word"),
+    [
+        ("SymbolMT", "The ligand (h5-C5H5) binds iron.", "", "η5"),
+        ("Symbol", "The angle \\001 is small.", "1 /uniF071", "θ"),
+        ("MT-Extra", "The length \\001 is small.", "1 /uniF06C", "\u2113"),
+        ("AdvP4C4E74", "The sum a\\376b\\274c is small.", "", "a+b=c"),
+        ("CMR10", "The e\\013ects are small.", "11 /uni000B", "effects"),
+    ],
+)
+def test_codes_are_read_as_what_their_font_draws(font, row, differences, word):
+    rows = ["Plain text on the first line.", row, "Plain text on the last line."]
+    text = " ".join(e.text or "" for e in analyze(font_page(font, rows, differences)).elements)
+    assert word in text

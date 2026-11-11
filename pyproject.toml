@@ -109,6 +109,8 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 # Look-alike dashes, minus signs and relations are what the sign check is about.
 "src/readablestem/pipeline/signs.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_sign_check.py" = ["RUF001", "RUF002", "RUF003"]
+# Look-alike characters are what the font tables map between.
+"src/readablestem/pipeline/font_codes.py" = ["RUF001", "RUF002", "RUF003"]
 # Imports the `env` fixture of test_web_worker.py to use it.
 "tests/test_web_worker_poll.py" = ["F811"]
 # Fences, arrows, minus and dash signs are what the extended development set classifies by.

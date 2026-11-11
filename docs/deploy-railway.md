@@ -199,6 +199,7 @@ As of 2026-11-04 (pipeline version 0.5.9). The values live in Railway, not in th
 | State in production | Settings |
 |---|---|
 | On | `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `FEATURE_TABLES`, `FEATURE_IMAGE_PAGES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_NOTATION_MEMORY` |
+| Code default (on), no value set in Railway | `FONT_CODE_TABLES`: set it to `false` on `web` to go back to the old private-use bullet rules without a deploy (declared in `railway.ts`; element text changes on documents with symbol fonts, so their stored step answers are asked again) |
 | Off | `LAYOUT_DISPLAY_GROUPING`; `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP` (until real decks and course sources have been tried, see "LaTeXML") |
 
 The other flags `railway.ts` names (`FEATURE_COLOUR`, `FEATURE_PAGE_WITNESS`, the `IMAGE_PAGES_*`
