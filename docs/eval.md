@@ -3431,6 +3431,108 @@ runs of one input) are judged on pages whose faults a person marked. No live run
 recorded yet: the first shadow recording of the corpus waits for the owner's approval of
 its cap.
 
+## The quality ledger (`eval ledger`)
+
+Each eval above reports its own lane on its own set. The ledger
+(`src/readablestem/eval/ledger.py`) is one list of rows over all of them, led by the rows
+that say what a student meets: how often a whole course document reaches them with an error
+nobody was asked about. It measures nothing and spends nothing. It reads the records the
+evals keep in `data/eval` (`order-*.json`, `burden-*.json`, `outputs-*.json` and
+`whole-*.json`), and for every row and every record that feeds the row it prints the counts,
+the figure, a bound and a label.
+
+```bash
+uv run readablestem eval ledger --out data/eval/ledger.json
+uv run readablestem eval ledger --for-release          # the check a release runs
+uv run readablestem eval ledger --register-bars        # after the first held-out run
+```
+
+**The labels.**
+
+| Label | What it says |
+|---|---|
+| held-out | scored on held-out documents, under the production profile, by this release |
+| development score | scored on documents the readers were built on, or under settings that are not the production profile; it guards against going backward and meets no bar |
+| earlier release | the record was made by another pipeline version, or under another profile, than the code that prints the ledger; it says nothing of this release, so the evals are run again for every release |
+| not measured: proof owed | no record feeds the row; the report says what proof is owed |
+
+**The bound.** A count from a sample allows more than it shows: no error in 237 formulas
+still allows about 1.3 in 100. Every figure is printed with a one-sided 95% bound on the
+side that matters (the upper one where lower is better): exact for a share
+(Clopper-Pearson) and for a rate of events (Poisson), an order statistic for a median. The
+bound treats pages as independent. Errors come in clusters by document, so the true bound
+is wider, and the rows that count documents are the ones to read for that.
+
+**The two bars.** The goal bar is the figure a lane is built toward, written with the row.
+It is met only when the bound is inside it, not when the figure is. A goal of none is met by
+a count of none, and the line still prints what that count allows. The release bar is the
+figure of the first held-out run, kept in `data/eval/ledger-bars.json` with the set it was
+measured on. `--register-bars` writes the bars that are missing; a bar is replaced only by
+naming its row (`--replace-bar ROW`), and a figure from a run in which a step stopped early
+is no baseline and is not written. A release may not be worse than its release bar, held as
+measured, with no bound. Only a held-out line is held against either bar.
+
+Exit code 0: no held-out line is worse than its release bar. 1: one is, or, with
+`--for-release`, a row that has a release bar has no held-out figure of this release on the
+bar's set. 2: refused. A record that does not say its split, its set's hash, the profile's
+hash and the pipeline version is not read around: the run stops and names the file.
+
+**The whole-document record** (`whole-<set>.json`) is what the top rows are made of. Its
+`metrics` hold one row a document, with no name: `pages`, `silent_errors` (anything wrong in
+the student file that carried no required decision), `doubt_false` and `doubt_true` (doubt
+flags: a check or a reader disagreed, and the flag turned out false or true) and
+`rule_required` (decisions a rule asks for whatever the readers say, by rule). Beside them,
+`rule_owners` (who shows on held-out pages what a rule catches) and `hand_sample` (the pages
+that passed every check and were read by hand, and how many had a fault). False flags per
+true flag is over doubt flags only. A rule-required decision is printed on its rule's line,
+with the rule's owner, and in no ratio. The record is written by the run that audits
+held-out whole documents and samples the pages it passed. That run needs a recording that
+does not exist yet, so no such record is kept and the top rows are not measured.
+
+**The file** (`--out`) holds, per release and row, the figures, their labels, the counts
+and both bars, and no word of any document. Its lanes are named as the outcome events name
+theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_outcome`
+event's, so the admin page can set production's numbers of the same release (false flags
+per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
+
+**Today** (`data/eval/ledger.json`, release `0.5.10+62b4f1678d36`). No row has a held-out
+figure and no release bar is registered: every line below is a development score.
+
+| Row | Set | Figure | Counts | 95% bound | Label | Goal bar |
+|---|---|---|---|---|---|---|
+| Required decisions a page, the median document | corpus | 0.29 | 63 documents | 0.60 | development score | at most 1.00 |
+| Pages not read right in the student page, by the scorer | corpus | 28.4 per 100 | 25 of 88 pages | 37.4 per 100 | development score | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 44.2 per 100 | 118 of 267 pages | 49.4 per 100 | development score | - |
+| Documents with every gold page right | corpus | 54.5% | 24 of 44 documents | 41.1% | development score | - |
+| Documents with every gold page right | layout-dev-1 | 13.3% | 8 of 60 documents | 6.8% | development score | - |
+| Pages that read a running head, a page number or a stamp aloud | corpus | 17.0 per 100 | 15 of 88 pages | 25.0 per 100 | development score | at most 2.0 per 100 |
+| Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 54.3 per 100 | 145 of 267 pages | 59.5 per 100 | development score | at most 2.0 per 100 |
+| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | development score | - |
+| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | development score | - |
+| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | development score | none |
+
+Read with care:
+
+- "Required decisions a page" is the median over documents of a document's decisions a
+  page, as production counts it. Its bound is an order statistic of
+  63 documents of a set chosen to cover kinds of
+  document, not sampled from what people upload.
+- The corpus line of the page rows counts every gold page measured whole
+  (88, the edge pages with the others); `eval order`'s
+  "of 78" leaves the edge pages out.
+- Every gold page is right in 24 of 44 corpus documents and in
+  8 of 60 documents of `layout-dev-1`. A document's gold pages are
+  the ones labeled, which in a layout set is a sample of its pages.
+- The output rows count places, and one fault can be many places: most of the HTML file's
+  are proposals still open that the page does not mark (`eval outputs`, above).
+
+Not measured, with the proof each is owed printed by the command: silent errors, documents with no silent error, false flags per true flag, doubt flags only, pages that passed every check and had a fault, read by hand, flags of the page check, and verdicts that change between two runs of one input, formulas whose meaning is wrong, with no flag, boxes that hold the whole formula, formulas inside tables read wrong, private-use or U+FFFD characters on a page with no flag, pages with a text error and no flag, words changed on a print page, wrong tables shown with no decision, wrong stated values on vector charts, drawn structures wrong with no question; and the rule-required decisions by rule.
+
 ## The same file gives the same document on any machine
 
 A score or a replay means something only if a result does not depend on the machine that
@@ -3538,6 +3640,8 @@ limits is still owed.
 | `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
 | `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
 | `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
+| `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |
+| `data/eval/ledger.json`, `data/eval/ledger-bars.json` | the last ledger, and the release bars once a held-out run has been registered (none yet) |
 | `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |

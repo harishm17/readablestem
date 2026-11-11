@@ -31,6 +31,13 @@ measured and replayed against.
   kind and by step and seconds a page by kind and stage, from a measured replay of the
   corpus under the production profile. The Sonnet cache-read price was double the published
   rate and is corrected.
+- **The quality ledger** (`readablestem eval ledger`): one table over the evals' kept
+  records, led by the whole-document rows (silent errors per 100 pages, documents with no
+  silent error, required decisions a page, false flags per true flag). Every figure is
+  printed with its counts, a one-sided 95% bound and a label (held-out, development score,
+  earlier release, or not measured with the proof owed). A goal is met only when the bound
+  is inside it, a held-out figure worse than its release bar fails the run, and a record
+  without its stamps is refused. No row has a held-out figure yet.
 - **Reading order** (`readablestem eval order`): the gold pages of the corpus are scored in
   the page a student is given and in the element list, from the measured replay, with a bar
   that no page that was right is made wrong. The scorer (version 5) counts what a right page
