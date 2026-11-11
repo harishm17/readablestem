@@ -37,7 +37,7 @@ from readablestem.core.types import (
 from readablestem.models import make_vision_client
 from readablestem.models.fake import image_key
 from readablestem.pipeline import run as pipeline_run
-from readablestem.web import provider_health, retry
+from readablestem.web import provider_health, retry, states
 from readablestem.web.app import create_app
 from readablestem.web.auth import set_allowed
 from readablestem.web.db import Job, QuotaDay, StepRecord, session_scope
@@ -290,7 +290,8 @@ def test_a_conversion_during_an_outage_is_not_a_dead_end(site):
     # The job page says what happened and offers the way on; the status page says the
     # service is not answering.
     page = text_of(site.browser.get(f"/jobs/{job_id}").text)
-    assert "Stopped: the AI service did not answer" in page
+    assert "The AI service did not answer" in page
+    assert states.TABLE["ready"].label not in page
     assert "Convert the missing parts" in page
     assert "Nothing is wrong with your PDF" in page
     assert "The AI service is not answering right now" in page

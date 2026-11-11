@@ -19,7 +19,7 @@ from fixtures.web.support import (
     token,
     upload,
 )
-from readablestem.web import outcome
+from readablestem.web import outcome, states
 from readablestem.web.db import Job, session_scope
 
 
@@ -145,11 +145,14 @@ def test_a_stopped_scan_job_is_feature_aware_and_the_message_is_not_repeated():
     asked = outcome.failed_message("handwritten", image_pages_offered=True)
     assert asked and "cannot convert" not in asked
     assert "such pages are read only when you ask" in asked and outcome.OPT_IN_ROUTE in asked
-    # the job outcome carries it, for the status box
-    stopped = outcome.job_outcome(status="failed", error_code="scanned", image_pages_offered=True)
-    assert stopped and stopped.label == "Stopped" and "checked" in stopped.message
-    other = outcome.job_outcome(status="failed", error_code="no_content", image_pages_offered=True)
-    assert other and other.message == outcome.FAILED_MESSAGES["no_content"]
+    # the job's state carries it, for the status box
+    offered = states.Context(image_pages_offered=True)
+    scanned = states.Facts(id="j", status="failed", error_code="scanned")
+    stopped = states.state_of(scanned, context=offered)
+    assert stopped.key == "stopped_file" and "checked" in stopped.message
+    empty = states.Facts(id="j", status="failed", error_code="no_content")
+    other = states.state_of(empty, context=offered)
+    assert other.message == outcome.FAILED_MESSAGES["no_content"]
 
 
 # --------------------------------------------------------------------------- deleted, expired

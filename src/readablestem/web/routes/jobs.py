@@ -1526,7 +1526,7 @@ def draft(
     the main way on. Every download of a draft without this page's confirm is sent here
     (`output.check`), with the file type it asked for. With no decision open, the job page's
     finish line. A person who can only view is never offered a draft."""
-    job, _ = load_job_status(request, job_id, user)
+    job = load_job_status(request, job_id, user)
     if job.status != JobStatus.DONE or job.page is None:
         raise PageError(409, "Not ready yet", "This document has not finished converting.",
                         context={"job_id": job_id})  # fmt: skip

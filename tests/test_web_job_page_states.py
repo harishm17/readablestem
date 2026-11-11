@@ -21,6 +21,7 @@ from readablestem.core.types import (
     SourceFacts,
     Status,
 )
+from readablestem.web import states
 
 
 @pytest.fixture
@@ -80,9 +81,12 @@ def stored(web, job_id: str) -> DocumentResult:
 def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
+    # The state is said once: decisions open is never "Converted" or "Ready" (F-033).
+    label = states.TABLE["needs_decisions"].label
+    assert title(html) == f"{label}: SECRET-HEADING Kinematics | ReadableSTEM"
     status = page_text(section_of_status(html))
-    assert "Converted 3 decisions need you before you give it to students." in status
+    assert label in status and "Converted" not in status
+    assert "3 decisions need you before you give it to students." in status
     actions = html[
         html.index('id="next-actions"') : html.index("</ul>", html.index("next-actions"))
     ]
@@ -140,10 +144,9 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
             )
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert (
-        title(html)
-        == "Stopped: the AI service did not answer: SECRET-HEADING Kinematics | ReadableSTEM"
-    )
+    # Decisions are open, so that is the state; the outage is its gap note.
+    label = states.TABLE["needs_decisions"].label
+    assert title(html) == f"{label}: SECRET-HEADING Kinematics | ReadableSTEM"
     text = page_text(html)
     assert "did not answer for 4 of 4 equations and figures" in text
     assert "Nothing is wrong with your PDF" in text
