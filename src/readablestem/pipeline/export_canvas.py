@@ -41,7 +41,8 @@ from html import escape
 from html.parser import HTMLParser
 from io import BytesIO
 
-from readablestem.pipeline import navigation, output_chars
+from readablestem.pipeline import checked_words, navigation, output_chars
+from readablestem.pipeline.assemble import SUMMARY_META
 
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
@@ -429,6 +430,9 @@ class CanvasExport:
     images: dict[str, bytes]  # "images/image-01.png" -> bytes
     notes: Notes
     course_number: str | None = None
+    # The page's statement of what was converted and reviewed (`pipeline.checked`, from its
+    # head, `assemble.SUMMARY_META`): the README's first lines. "" for a page without one.
+    statement: str = ""
 
 
 def _styles_of(root: _Node) -> str:
@@ -441,6 +445,14 @@ def _styles_of(root: _Node) -> str:
 
 def _find(root: _Node, tag: str) -> _Node | None:
     return next((n for n in root.walk() if n.tag == tag), None)
+
+
+def page_meta(root: _Node, name: str) -> str | None:
+    """The content of the page's `<meta name=...>`, or None when it has none."""
+    for node in root.walk():
+        if node.tag == "meta" and node.attrs.get("name") == name:
+            return node.attrs.get("content", "")
+    return None
 
 
 def _inline_styles(root: _Node, rules: list[_Rule], notes: Notes, *, page: bool) -> None:
@@ -523,6 +535,7 @@ def export_canvas(
 
     notes = Notes()
     standalone = _parse(html)
+    statement = page_meta(standalone, SUMMARY_META) or ""
     rules = _parse_css(_styles_of(standalone) + _MATH_RULE, notes)
     root_tag = _find(standalone, "html")
     lang = (root_tag.attrs.get("lang") if root_tag else None) or "en"
@@ -570,7 +583,9 @@ def export_canvas(
         if len(page_html) > CANVAS_PAGE_LIMIT:
             notes.page_too_large, page_html = True, None
 
-    export = CanvasExport(folder, title, lang, index_html, page_html, images, notes, course_number)
+    export = CanvasExport(
+        folder, title, lang, index_html, page_html, images, notes, course_number, statement
+    )
     check_text(folder, title, index_html, page_html, readme(export))
     return export
 
@@ -594,8 +609,7 @@ def readme(export: CanvasExport) -> str:
     paste = export.page_html is not None
     lines = [
         f"Canvas version of: {' '.join(export.title.split())}",
-        "Made by ReadableSTEM, a tool that assists with accessibility. Read the result through",
-        "once before you share it.",
+        *_wrap(export.statement or checked_words.SUMMARY_UNKNOWN, ""),
         "",
         "WHAT IS IN THIS ZIP",
         "  index.html         the whole document as one web page. Canvas removes style blocks,",

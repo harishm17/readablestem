@@ -336,7 +336,7 @@ ACTION_ROWS = {
 
 # --------------------------------------------------------------------------- exports
 
-SUMMARY_TOOL = "Made by ReadableSTEM, which assists with accessibility and does not certify it."
+SUMMARY_TOOL = "Made by ReadableSTEM, a tool that assists with accessibility."
 SUMMARY_UNKNOWN = (
     f"{SUMMARY_TOOL} This file does not record what was converted or reviewed. Check it before "
     "students use it."
