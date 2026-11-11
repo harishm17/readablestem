@@ -75,6 +75,6 @@ on Railway. Since this record a second sandbox backend
 was added, Landlock with a seccomp filter (`core/landlock_exec.py`, `core/sandbox.py`;
 docs/security.md, "Landlock backend"), which the sandbox uses where bubblewrap cannot start; the
 probe reports which of its steps fails (`landlock_step`, `landlock_errno`, `can_<call>` on
-`/healthz/ops`). A switch takes effect only while the probe on the deployed image passes, and the sentence in
+`/admin/health`). A switch takes effect only while the probe on the deployed image passes, and the sentence in
 decision 2 that the sandbox is bubblewrap should be read as "bubblewrap or Landlock". The alternative
 named in decision 3 (a separate service with no secrets) is still not built.

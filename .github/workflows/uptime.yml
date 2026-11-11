@@ -66,7 +66,7 @@ jobs:
           fi
           base="${LIVE_URL%/}"
           status=0
-          # A 503 body names the stale tasks (backup, cron); print it so the email's log shows it.
+          # The body is the status word only; an admin sees which task is late on /admin.
           if ! curl -sS --max-time 30 --retry 2 --retry-delay 10 --fail-with-body \
             -w "\n/healthz/ops %{http_code} in %{time_total}s\n" "$base/healthz/ops"; then
             echo "::error::/healthz/ops is not ok: the daily backup or the hourly cron did not finish lately"

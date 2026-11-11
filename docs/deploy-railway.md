@@ -327,7 +327,8 @@ Publisher verification (Branding & properties) is only needed if an IT team asks
    the worker thread and the model provider to be set up, so a provider problem would block a deploy
    that is otherwise fine and a worker starting late would be read as a failed deploy. `/readyz` is
    what the GitHub uptime check (every 5 minutes) and your own monitoring should read. `/healthz/ops`
-   says the backup and the cron ran lately (below). Railway's health check
+   says the backup and the cron ran lately, as a status word only (below); the admin page and
+   `/admin/health` say which one is late. Railway's health check
    sends its requests from the host name `healthcheck.railway.app`; the app does not restrict host
    names, so nothing needs adding.
 6. **Deploy,** watch the build and deploy logs. The first deploy creates the schema.
@@ -494,7 +495,7 @@ two `LaTeXML version 0.8.8` lines and the `1` printed by the policy check. Nothi
 LaTeXML until the LaTeX-source switch (`FEATURE_LATEX_SOURCE`) is on, and that switch stays off
 until `readablestem ops sandbox-probe --require-latexml` prints PASS on the deployed image
 (docs/operations.md, "Sandbox probe"); the web process also runs that probe at start-up, shows it
-on `/healthz/ops` under `sandbox`, and keeps the source features switched off in effect unless it
+on `/admin/health` under `sandbox` (admin only), and keeps the source features switched off in effect unless it
 passed, so a flag set by mistake does nothing under a FAIL.
 
 **Status today (2026-11-04).** `FEATURE_LATEX_SOURCE` is on in production since 13:53 UTC: the
@@ -523,7 +524,7 @@ isolation, memory, task, task-growth and real-LaTeXML checks all ok). `FEATURE_B
   whether Railway keeps the ENTRYPOINT behind a custom start command is not something this
   repository has verified): it runs the image's CMD behind the ENTRYPOINT. `cron` and `backup` do
   have start commands; they run no sandbox. After a deploy, `init_process=tini` in the probe on
-  `/healthz/ops` (`sandbox.checks`) shows the ENTRYPOINT is in force; any other name means the
+  `/admin/health` (`sandbox.checks`, admin only) shows the ENTRYPOINT is in force; any other name means the
   app is pid 1 again. In the container reproduction below, the cleanup probe leaves one zombie
   with the app as pid 1 and none with an init (`podman run --init`).
 - **The task limit must be the kernel's count, not `/proc`'s** (found after #153 was deployed).
@@ -540,7 +541,7 @@ isolation, memory, task, task-growth and real-LaTeXML checks all ok). `FEATURE_B
   `latexml_timed_out=` and `latexml_log=` (the end of LaTeXML's own output for the probe's fixed
   document, paths removed), and `group_cap_forked=`, `group_cap_exit=`, `group_cap_timed_out=`.
 - **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only while the web
-  process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); it was switched on after
+  process's start-up probe reports PASS (`/admin/health`, `sandbox.result`); it was switched on after
   a deploy showed PASS there (2026-11-04), and a later FAIL switches it off in effect. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even
   then, until real Beamer decks and real course sources (zips of projects) have been tried through
   the Landlock sandbox on the deployed service.

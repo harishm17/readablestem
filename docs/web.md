@@ -189,7 +189,8 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
-| GET `/healthz/ops` | anyone | `{"status": "ok", "stale": [], "storage": {"stored_mb": 0, "limit_mb": 2000, "full": false}}`, or 503 `{"status": "stale", "stale": ["backup"], ...}` naming only the late tasks: the daily backup (older than 26 h) and the hourly cron (older than 2 h), from `ops_heartbeat` (`ops/heartbeat.py`), and `storage` while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads. Totals in megabytes only: no setting value but that limit, no content |
+| GET `/healthz/ops` | anyone | `{"status": "ok"}`, or 503 `{"status": "stale"}`: the status word and nothing else. Stale means the daily backup (older than 26 h) or the hourly cron (older than 2 h) did not report to `ops_heartbeat` (`ops/heartbeat.py`), or the service holds `STORAGE_GLOBAL_MAX_MB` of uploads |
+| GET `/admin/health` | admin | `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}` with the same status code: which tasks are late, the stored megabytes against the limit and the sandbox probe. The admin page shows the same |
 | GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone

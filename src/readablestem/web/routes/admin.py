@@ -15,7 +15,7 @@ from datetime import timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import case, func, select
 
 from readablestem.web import access, events, linked_emails
@@ -29,6 +29,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.health import ops_report
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import signups_today
 
@@ -148,6 +149,7 @@ def admin_context(request: Request) -> dict[str, Any]:
         "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,
+        "ops": ops_report(ctx)[1],
         "active": "admin",
         "errors": [],
         "email_error": "",
@@ -161,6 +163,17 @@ def admin_context(request: Request) -> dict[str, Any]:
 @router.get("/admin")
 def admin_page(request: Request, user: AdminDep) -> Response:
     return render(request, "admin.html", admin_context(request))
+
+
+@router.get("/admin/health")
+def admin_health(request: Request, user: AdminDep) -> Response:
+    """What `/healthz/ops` used to show everyone: which scheduled tasks are late, the stored
+    megabytes against the limit and the sandbox probe. Admin only; 503 while a task is late,
+    like the public route."""
+    ok, details = ops_report(get_ctx(request))
+    return JSONResponse(
+        details, status_code=200 if ok else 503, headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.post("/admin/allowlist", dependencies=[Depends(require_csrf)])

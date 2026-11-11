@@ -58,7 +58,9 @@ def add_user(factory, email: str = "p@example.org") -> str:
 # --------------------------------------------------------------------------- heartbeats
 
 
-def test_healthz_ops_is_503_and_names_the_database_when_it_cannot_be_read(tmp_path, monkeypatch):
+def test_healthz_ops_is_503_with_the_status_word_and_the_admin_sees_the_database_named(
+    tmp_path, monkeypatch
+):
     env = WebEnv(tmp_path)
 
     def broken(*_args, **_kwargs):
@@ -66,10 +68,14 @@ def test_healthz_ops_is_503_and_names_the_database_when_it_cannot_be_read(tmp_pa
 
     monkeypatch.setattr(heartbeat, "stale_names", broken)
     with env.running() as web:
-        response = web.get("/healthz/ops")
-    assert response.status_code == 503
-    assert response.json()["stale"] == ["database"]
-    assert "secret" not in response.text
+        public = web.get("/healthz/ops")
+        login(web, ADMIN)
+        detail = web.get("/admin/health")
+    # Anyone gets the status word and the status code, and nothing else.
+    assert public.status_code == 503 and public.json() == {"status": "stale"}
+    # The admin is told what is late.
+    assert detail.status_code == 503 and detail.json()["stale"] == ["database"]
+    assert "secret" not in public.text + detail.text
 
 
 # --------------------------------------------------------------------------- cron CLI
