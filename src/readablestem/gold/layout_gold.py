@@ -65,6 +65,21 @@ Line = dict[str, Any]
 Assigned = list[tuple[int, float] | None]
 
 
+def margin_lines(page: pymupdf.Page) -> list[str]:
+    """The lines printed in a page's top and bottom margins, and the lines set at an angle
+    at one of its edges: where running heads, page numbers and stamps stand. (A line set at
+    an angle inside the page is a drawing's label.) `eval/order.py` counts an element that
+    reads one of them and holds no word of a gold block."""
+    lines, stamps, (width, height) = pdf_lines(page)
+
+    def at_an_edge(box: tuple[float, float, float, float]) -> bool:
+        across = box[2] < 0.07 * width or box[0] > 0.93 * width
+        return across or box[3] < 0.07 * height or box[1] > 0.94 * height
+
+    in_bands = [line["text"] for line in lines if line.get("zone")]
+    return in_bands + [stamp["text"] for stamp in stamps if at_an_edge(stamp["box"])]
+
+
 def tok(text: str | None) -> list[str]:
     return TOK.findall(unicodedata.normalize("NFKC", text or "").lower())
 

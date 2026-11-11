@@ -24,14 +24,43 @@ Per page, over the gold blocks whose role is not `dropped`:
 - `right`: clean, and also no margin stamp read inside the text, no index or glossary
   entries joined, and numbered blanks in order, on pages whose gold lists those things.
 
-`pairs`, `pairs_ok`, `stitched`, `split` and `lost` are the first scorer's element-level
-counts, kept so old numbers stay comparable.
+Five further counts name what a page that is `right` can still have wrong. Each is counted
+on every page, and `faultless` is `right` with none of them (on gold made from a source,
+which has a `coverage`, with no `furniture` in place of no `stray`):
 
-Optional gold fields: `mtext` (the block's text with tokens that are not source words
-replaced by `zqzq`, skipped everywhere), `float` (a caption the typesetter moved: scored for
-being whole, not for order), `entry` and `unit` (index or glossary entries), `coarse` (a
-block only checked for presence, like a table); and on the page, `stamps` and `numrun`.
-Gold without them scores exactly as scorer version 3 did.
+- `stray`: text elements none of whose words any gold block accounts for: a running head,
+  a page number, a stamp, a paragraph read a second time, a drawing's lettering read as
+  paragraphs where the gold has no figure block that holds it. A gold block accounts for the
+  copy of its words nearest its place, so a running head that repeats a heading is still
+  stray. A piece of a block read apart from the rest (a paragraph's last line, a contents
+  entry's page number) is not stray: the block is cut or broken, and is counted there. Gold
+  made from a document's source does not hold every word of the page (a table's cells, a
+  formula's line, an author's address), so there `stray` also counts text that belongs on
+  the page.
+- `furniture`: the stray elements that are the page's furniture: the words of a `dropped`
+  block, or of a line printed in the page's margins (the page's `margins`, read from the
+  file by `gold.layout_gold.margin_lines`: the top and bottom bands, and a line set at an
+  angle at the page's edge). This is the count of running heads, page numbers and stamps a
+  listener hears, on every kind of gold. A footnote printed in the bottom band that the
+  gold does not hold is counted too.
+- `cut`: unbroken blocks of 6 or more words heard in two or more elements. A display
+  equation standing between the two parts is not a cut. Where the gold was labeled by hand
+  (`by_hand`: a block may hold two paragraphs), only a cut inside a sentence is counted.
+- `merged`: neighbouring gold blocks heard in one element (two list items as one
+  paragraph), and `heading_merged`, the part of them where one of the two is a heading.
+  Not counted: two pieces of one source unit (a paragraph a column cuts; in gold labeled
+  by hand, a body block that ends inside a sentence and the one after it), two index
+  entries (that is `ejoin`), and an element that is a table. A block of one to three words
+  whose place is inside another block's words is not counted: a lost heading whose word
+  occurs in a sentence is lost, not merged.
+- `caption_wrong` of `caption_judged`: captions that stand next to a figure or table block
+  in the gold and are heard with, or nearest to, another picture or table. Judged only when
+  the page has as many pictures (or tables) in the output as in the gold, and at least two.
+
+What the five do not see: a formula missing from a sentence or from a line of its own (the
+gold masks the tokens that are not source words, but a mask is also a drawing's label or
+another column's word on the same line, so it does not say where a formula stands), a wrong
+word inside a block that keeps its 4-grams, and the role an element was given.
 """
 
 from __future__ import annotations
@@ -43,10 +72,15 @@ import statistics
 import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from typing import Any
 
-VERSION = 4
+VERSION = 5
 MASK = "zqzq"
 COARSE_ROLES = ("table", "figure", "form")
+EQUATIONS = ("equation", "math")
+PICTURES = ("figure", "image")
+NOT_TEXT = (*EQUATIONS, *PICTURES, "table")
+FURTHER = ("stray", "cut", "merged", "caption_wrong")
 
 _LEAD = re.compile(
     r"^\s*(?:\(?(?:\d{1,3}(?:\.\d{1,3})*|[A-Za-z]|[ivxIVX]{1,4})[.):]"
@@ -58,6 +92,7 @@ _MASKS = re.compile(rf"(?:{MASK})+")
 _PLACEHOLDER = re.compile(r"⟦([^⟧]+)⟧")
 _MARKED = re.compile(r"^\(?([A-Za-z]|\d{1,2})[.)]\s")
 _NUMBER = re.compile(r"(?<![\d.])(\d{1,3})\.(?!\d)")
+_ENDS = re.compile(r"[.!?:;][\"'”’)\]]*\s*$")  # noqa: RUF001
 
 Element = dict
 Pages = dict[int, list[Element]]
@@ -74,6 +109,20 @@ def words(text: str) -> list[str]:
 
 def grams(tokens: list[str], n: int = 4) -> list[tuple[str, ...]]:
     return [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
+
+
+def _every_word(text: str) -> list[str]:
+    """`words` without the stripping: a list marker and a page number are words too."""
+    return re.findall(r"[^\W\d_]+|\d+", unicodedata.normalize("NFKC", text or "").lower())
+
+
+def _count(hay: list[str], needle: list[str], inside: set[int] | None = None) -> int:
+    """How often `needle` occurs in `hay` (at places that are all in `inside`)."""
+    n = len(needle)
+    return sum(
+        hay[at : at + n] == needle and (inside is None or inside.issuperset(range(at, at + n)))
+        for at in range(len(hay) - n + 1)
+    )
 
 
 def _text(block: dict) -> str:
@@ -115,6 +164,29 @@ def elements_from_layout(records: Iterable[dict]) -> Pages:
     for elements in pages.values():
         elements.sort(key=lambda e: e["order"])
     return pages
+
+
+def elements_from_result(elements: Iterable[Any]) -> Pages:
+    """Elements by page from a conversion's elements (`DocumentResult.elements`): what the
+    pipeline holds before any file is written. A table is heard as its caption and then
+    its cells, row by row."""
+    records = []
+    for element in elements:
+        record = {
+            "id": element.id,
+            "kind": str(element.kind),
+            "page": element.page + 1,
+            "order": element.order,
+            "text": element.text,
+            "caption": element.caption,
+            "list_marker": element.list_marker,
+        }
+        if element.table is not None:
+            cells = sorted(element.table.cells, key=lambda cell: (cell.row, cell.col))
+            record["table_text"] = " ".join(cell.text for cell in cells)
+            record["caption"] = element.table.caption
+        records.append(record)
+    return elements_from_layout(records)
 
 
 _BLOCK_TAGS = frozenset(
@@ -171,8 +243,12 @@ class _Heard(html.parser.HTMLParser):
             self.tables += 1
             if self.tables == 1:
                 self._start(tag)
-        elif tag in _BLOCK_TAGS and not self.tables:
+        elif self.tables:
+            return
+        elif tag in _BLOCK_TAGS or (tag == "math" and not self.open):
             self._start(tag)
+        elif tag == "figure":
+            self.pages[self.page].append({"kind": "figure", "text": ""})
 
     def _start(self, tag: str) -> None:
         # A block opened inside another (a nested list in a list item): the parent's text so
@@ -196,7 +272,7 @@ class _Heard(html.parser.HTMLParser):
             self.tables -= 1
             if self.tables == 0:
                 self._end("table")
-        elif tag in _BLOCK_TAGS and not self.tables:
+        elif (tag in _BLOCK_TAGS or tag == "math") and not self.tables:
             self._end(tag)
 
     def _end(self, tag: str) -> None:
@@ -218,7 +294,11 @@ class _Heard(html.parser.HTMLParser):
 
 
 def elements_from_html(document: str) -> Pages:
-    """Elements by page from the student HTML, with pages cut at the page-break markers."""
+    """Elements by page from the student HTML, with pages cut at the page-break markers.
+
+    A display equation is one element of kind `math`, and a `<figure>` is an element of kind
+    `figure` with no words: the description a listener hears there is not the document's.
+    """
     parser = _Heard()
     parser.feed(document)
     for elements in parser.pages.values():
@@ -336,8 +416,17 @@ def _element_counts(blocks: list[dict], elements: list[dict]) -> dict:
 # --- The stream scores ------------------------------------------------------------------
 
 
-def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
-    """One page's counts (see the module text). `detail` lists each fault found."""
+def score_blocks(
+    blocks: list[dict],
+    elements: list[Element],
+    *,
+    by_hand: bool = False,
+    margins: Iterable[str] = (),
+) -> dict:
+    """One page's counts (see the module text). `detail` lists each fault found.
+
+    `margins` are the lines printed in the page's margins.
+    """
     heard = []
     for order, element in enumerate(elements):
         tokens = _plain_words(element["text"])
@@ -346,8 +435,10 @@ def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
 
     stream: list[str] = []
     owner: list[int] = []
+    owned: dict[int, range] = {}
     for order, element in enumerate(heard):
         mine = words(element["text"])
+        owned[order] = range(len(stream), len(stream) + len(mine))
         stream += mine
         owner += [order] * len(mine)
     places = defaultdict(list)
@@ -375,6 +466,9 @@ def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
     flow_tot = flow_ok = broken = 0
     positions: list[tuple[int, float | None]] = []
     blocks_in_element = defaultdict(set)
+    claims: dict[int, list[int]] = {}  # a block's words in the stream, by block
+    short: set[int] = set()  # blocks of one to three words
+    whole: set[int] = set()  # blocks of 6 or more words that are found and not broken
 
     def last_place() -> float:
         return next((place for _, place in reversed(positions) if place is not None), -1)
@@ -394,6 +488,12 @@ def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
             hits = [i for i in range(len(stream) - n + 1) if stream[i : i + n] == tokens]
             after = [i for i in hits if i > last_place()]
             positions.append((index, after[0] if after else (hits[-1] if hits else None)))
+            # An element that is exactly the block holds it, wherever its words occur again.
+            alone = [i for i in hits if owned[owner[i]] == range(i, i + n)]
+            place = alone[0] if alone else positions[-1][1]
+            if place is not None:
+                claims[index] = list(range(int(place), int(place) + n))
+                short.add(index)
             continue
         kept = [g for g in block_grams if g in places]
         # A 4-gram that occurs more than once is placed at the occurrence nearest the
@@ -429,10 +529,16 @@ def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
                     broken += 1
                     ends = (owner[near[0]], owner[min(near[-1], len(owner) - 1)])
                     detail.append(["broken", block["role"], _text(block)[:70], *ends])
+                else:
+                    whole.add(index)
             for gram in set(kept):
                 if len(places[gram]) == 1 and in_blocks[gram] == 1:
                     blocks_in_element[owner[places[gram][0]]].add(index)
         positions.append((index, statistics.median(spots) if spots else None))
+        if spots:
+            middle, reach = statistics.median(spots), 2 * len(tokens) + 4
+            near_spots = [spot for spot in spots if abs(spot - middle) <= reach]
+            claims[index] = sorted({at for spot in near_spots for at in range(spot, spot + 4)})
 
     def owner_at(place: float) -> int | None:
         return owner[min(max(int(place), 0), len(owner) - 1)] if owner else None
@@ -486,6 +592,14 @@ def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
                 ["ejoin", heard[element]["kind"], len(units), heard[element]["text"][:90]]
             )
 
+    places_of = (stream, owner, owned, claims)
+    row.update(_further(read, heard, places_of, whole, short, blocks_in_element, detail, by_hand))
+    furniture = [_every_word(text) for text in margins]
+    furniture += [_every_word(_text(block)) for block in blocks if block["role"] == "dropped"]
+    strays = [found for found in detail if found[0] == "stray"]
+    row["furniture"] = sum(
+        any(_one_line(_every_word(found[2]), line) for line in furniture) for found in strays
+    )
     row.update(
         tau_tot=count * (count - 1) // 2,
         tau_ok=tau_ok,
@@ -502,6 +616,125 @@ def score_blocks(blocks: list[dict], elements: list[Element]) -> dict:
     found_enough = row["found"] >= 0.5 * max(1, row["blocks"])
     row["clean"] = int(found_enough and broken == 0 and opairs_ok == opairs and xjoin == 0)
     return row
+
+
+def _one_line(said: list[str], line: list[str]) -> bool:
+    """Whether an element's words are a furniture line, a part of it of two or more words,
+    the whole of it and more, or the number at either end of it."""
+    if not said or not line:
+        return False
+    short, long = sorted((said, line), key=len)
+    if len(short) >= 2 or len(long) == 1:
+        return _count(long, short) > 0
+    return said[0].isdigit() and said[0] in (line[0], line[-1])
+
+
+def _further(
+    read: list[dict],
+    heard: list[dict],
+    places_of: tuple[list[str], list[int], dict[int, range], dict[int, list[int]]],
+    whole: set[int],
+    short: set[int],
+    blocks_in_element: dict[int, set[int]],
+    detail: list[list],
+    by_hand: bool,
+) -> dict:
+    """Stray elements, cut blocks, merged neighbours and captions on the wrong picture."""
+    stream, owner, owned, claims = places_of
+    out = dict.fromkeys(
+        ("stray", "cut", "merged", "heading_merged", "caption_judged", "caption_wrong"), 0
+    )
+
+    def texty(order: int) -> bool:
+        return heard[order]["kind"] not in NOT_TEXT and bool(owned[order])
+
+    claimed = {at for spots in claims.values() for at in spots}
+    coarse_words = {t for b in read if _is_coarse(b) for t in words(_text(b))}
+    gold_words = [_every_word(_text(block)) for block in read]
+    excused: Counter = Counter()
+    for order, element in enumerate(heard):
+        if not texty(order) or claimed.intersection(owned[order]):
+            continue
+        said = stream[owned[order].start : owned[order].stop]
+        # A table or a form is checked for presence only, so its words claim no place.
+        if 2 * len(set(said) & coarse_words) >= len(set(said)):
+            continue
+        # A piece of a block read apart from the rest: the gold has these words once more
+        # than the blocks' places account for.
+        in_gold = sum(_count(tokens, said) for tokens in gold_words)
+        if in_gold > _count(stream, said, claimed) + excused[tuple(said)]:
+            excused[tuple(said)] += 1
+            continue
+        out["stray"] += 1
+        detail.append(["stray", element["kind"], element["text"]])
+
+    for index in sorted(whole & set(claims)):
+        parts = [k for k, _ in itertools.groupby(owner[at] for at in claims[index])]
+        parts = [k for k, _ in itertools.groupby(k for k in parts if texty(k))]
+        for a, b in itertools.pairwise(parts):
+            between = range(min(a, b) + 1, max(a, b))
+            equation = any(heard[k]["kind"] in EQUATIONS for k in between)
+            if equation and not any(texty(k) for k in between):
+                continue
+            if not (by_hand and _ENDS.search(heard[min(a, b)]["text"])):
+                out["cut"] += 1
+                detail.append(["cut", read[index]["role"], _text(read[index])[:70], a, b])
+                break
+
+    by_long = {at for index, spots in claims.items() if index not in short for at in spots}
+
+    def holders(index: int) -> set[int]:
+        sure = {element for element, held in blocks_in_element.items() if index in held}
+        mine = claims.get(index, ())
+        if index in short and by_long.intersection(mine):
+            return set()
+        return sure or {owner[at] for at in mine}
+
+    flowing = [index for index, block in enumerate(read) if not block.get("float")]
+    for i, j in itertools.pairwise(flowing):
+        a, b = read[i], read[j]
+        if _is_coarse(a) or _is_coarse(b) or (a.get("entry") and b.get("entry")):
+            continue
+        if "unit" in a and a["unit"] == b.get("unit"):
+            continue
+        runs_on = a["role"] == b["role"] == "body" and not _ENDS.search(_text(a))
+        if by_hand and runs_on and _text(b)[:1].islower():
+            continue  # a sentence a column cuts is two blocks
+        shared = {k for k in holders(i) & holders(j) if heard[k]["kind"] != "table"}
+        if shared:
+            out["merged"] += 1
+            out["heading_merged"] += (a["role"] == "heading") != (b["role"] == "heading")
+            detail.append(["merged", a["role"] + "+" + b["role"], _text(a)[:40], _text(b)[:40]])
+
+    pictures = [order for order, e in enumerate(heard) if e["kind"] in PICTURES]
+    tables = [order for order, e in enumerate(heard) if e["kind"] == "table"]
+    things = pictures + tables
+    place: dict[int, int] = {}  # a gold figure or table block -> its element
+    for role, found in (("figure", pictures), ("table", tables)):
+        wanted = [index for index, block in enumerate(read) if block["role"] == role]
+        if len(wanted) == len(found):
+            place.update(zip(wanted, found, strict=True))
+    taken: set[int] = set()
+    for index, block in enumerate(read):
+        if block["role"] != "caption":
+            continue
+        beside = [k for k in (index - 1, index + 1) if 0 <= k < len(read) and k not in taken]
+        partner = next((k for k in beside if read[k]["role"] in ("figure", "table")), None)
+        if partner is None:
+            continue
+        taken.add(partner)
+        held = holders(index)
+        if partner not in place or not held or len(things) < 2:
+            continue
+        out["caption_judged"] += 1
+        on = held & set(things)
+        if not on:
+            least = min(abs(thing - k) for thing in things for k in held)
+            on = {thing for thing in things if any(abs(thing - k) == least for k in held)}
+        if place[partner] not in on:
+            out["caption_wrong"] += 1
+            detail.append(["caption_wrong", _text(block)[:70]])
+    return out
 
 
 def _stamps(page: dict, elements: list[Element]) -> dict:
@@ -561,13 +794,17 @@ def _number_run(page: dict, elements: list[Element]) -> dict:
     return out
 
 
-def score_page(page: dict, elements: list[Element]) -> dict:
+def score_page(page: dict, elements: list[Element], *, by_hand: bool = False) -> dict:
     """Every count for one gold page against the elements heard on it."""
-    row = score_blocks(page["blocks"], elements)
+    margins = page.get("margins") or ()
+    row = score_blocks(page["blocks"], elements, by_hand=by_hand, margins=margins)
     row.update(_stamps(page, elements))
     row.update(_number_run(page, elements))
     faults = row["stamp_in_text"] or row["ejoin"] or row["numrun_bad"]
     row["right"] = int(row["clean"] and not faults)
+    # Gold made from a source does not hold every word of the page: stray text is no fault.
+    further = ("furniture" if "coverage" in page else "stray", *FURTHER[1:])
+    row["faultless"] = int(row["right"] and not any(row[count] for count in further))
     return row
 
 
@@ -575,7 +812,7 @@ def score_document(gold: dict, pages: Pages) -> list[dict]:
     """One row per gold page of a document; a page the output lacks scores as empty."""
     rows = []
     for page in gold["pages"]:
-        row = score_page(page, pages.get(page["page"], []))
+        row = score_page(page, pages.get(page["page"], []), by_hand=bool(gold.get("by_hand")))
         rows.append({**row, "id": gold["id"], "page": page["page"]})
     return rows
 

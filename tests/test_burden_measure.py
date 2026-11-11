@@ -41,7 +41,7 @@ def burden(*args) -> int:
     return main(["eval", "burden", *map(str, args)])
 
 
-@pytest.mark.parametrize("command", ["cost", "speed", "burden", "outputs"])
+@pytest.mark.parametrize("command", ["cost", "speed", "burden", "outputs", "order"])
 def test_a_replay_in_which_nothing_could_be_measured_says_so(command, tmp_path, capsys):
     failed = [Converted("w_lecture_5111", pages=PAGES, error="conversion failed")]
     kept = tmp_path / "kept.json"

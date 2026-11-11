@@ -1,8 +1,8 @@
 {
  "labels": {
-  "read-from-page": {"method": "Candidate blocks from poppler pdftotext -bbox-layout, independent of this project's layout step; order and roles set by reading each rendered page; one pass, four blocks corrected in review the same day.", "date": "2026-11-10"},
-  "from-source": {"method": "Taken from the source the file was made from, where each block carries its role.", "date": "2026-11-10"},
-  "from-generator": {"method": "Written from the generator's text, so the intended order is known exactly.", "date": "2026-11-10"}
+  "read-from-page": {"by_hand": true, "group": "real", "method": "Candidate blocks from poppler pdftotext -bbox-layout, independent of this project's layout step; order and roles set by reading each rendered page; one pass, four blocks corrected in review the same day.", "date": "2026-11-10"},
+  "from-source": {"group": "self-made", "method": "Taken from the source the file was made from, where each block carries its role.", "date": "2026-11-10"},
+  "from-generator": {"group": "edge", "method": "Written from the generator's text, so the intended order is known exactly.", "date": "2026-11-10"}
  },
  "entries": [
   {

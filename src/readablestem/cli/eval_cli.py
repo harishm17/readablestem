@@ -1025,6 +1025,39 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     return 1 if verdict.judged else 2
 
 
+def _cmd_order(args: argparse.Namespace) -> int:
+    """`eval order`: whether each gold page of the corpus is read in order, and what else
+    is wrong on a page that is, in the page a student is given and in what the pipeline
+    holds, from a replay under the production profile, and the bar against an earlier
+    record (`eval.order_report`). Spends nothing. Exit code 0: the bar is met or none was
+    asked; 1: a page that was right is not right now; 2: the two records cannot be
+    compared, or nothing could be measured."""
+    from readablestem.eval import corpus, measure, order_report
+
+    before = None
+    if args.against is not None:
+        try:
+            before = json.loads(args.against.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return _error(f"cannot read {args.against}: {exc}")
+    if not (args.only or args.records_from):
+        args.only = sorted(entry.id for entry in corpus.load_manifest().values() if entry.gold)
+    measured = _measured(args, runs=1)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = order_report.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    verdict = None if before is None else order_report.judge(record, before)
+    print(order_report.render(record, verdict))
+    if not metrics["uploads"]["measured"] and not metrics["uploads"]["answers_missing"]:
+        return _error("no upload could be measured")
+    if verdict is None or verdict.met:
+        return 0
+    return 1 if verdict.judged else 2
+
+
 def _cmd_outputs(args: argparse.Namespace) -> int:
     """`eval outputs`: every file a student is given (the page, Word, EPUB, the two Canvas
     files, the Cartridge and the Listen transcript), built from a replay of the corpus under
@@ -1919,6 +1952,16 @@ def register(
         help="how many more decisions a page a page kind may ask for than before (0)",
     )
     burden.set_defaults(func=_cmd_burden)
+
+    order = group.add_parser(
+        "order",
+        help="whether each gold page is read in order and what else is wrong on it, in the "
+        "page a student is given, from a replay of the corpus, and the bar against an "
+        "earlier record (spends nothing)",
+    )
+    _add_measure_args(order, at_once=4)
+    order.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    order.set_defaults(func=_cmd_order)
 
     outputs = group.add_parser(
         "outputs",

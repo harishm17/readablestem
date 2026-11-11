@@ -128,6 +128,11 @@ class Converted:
     # wrong place, what each output held and the outputs that could not be built. None
     # when the replay was not asked to build them.
     outputs: dict[str, Any] | None = None
+    # The reading-order counts of each gold page (`eval.order.score_document`, without the
+    # `detail`, which holds the document's words), under `elements` for what the pipeline
+    # holds and under `html` for the page a student is given. None when the file has no
+    # gold, and in a record made before this was kept.
+    order: dict[str, list[dict[str, Any]]] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
@@ -327,10 +332,40 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
     return job.pdf, output.result
 
 
+def order_rows(entry_id: str, pdf: bytes, result: DocumentResult) -> dict[str, list] | None:
+    """The reading-order counts of a file's gold pages against a conversion of it, or None
+    when the file has no gold. Each gold page is given the lines printed in its margins,
+    so that a running head that is read is counted as furniture."""
+    import pymupdf
+
+    from readablestem.eval import order
+    from readablestem.gold import layout_gold
+
+    entry = corpus.load_manifest()[entry_id]
+    if not entry.gold:
+        return None
+    gold = corpus.load_gold(entry, pdf)
+    with pymupdf.open(stream=pdf, filetype="pdf") as opened:
+        for page in gold["pages"]:
+            page["margins"] = layout_gold.margin_lines(opened[page["page"] - 1])
+    heard = {
+        "elements": order.elements_from_result(result.elements),
+        "html": order.elements_from_html(result.html),
+    }
+    return {
+        source: [
+            {key: value for key, value in row.items() if key != "detail"}
+            for row in order.score_document(gold, pages)
+        ]
+        for source, pages in heard.items()
+    }
+
+
 def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Converted:
     """Convert one upload in a conversion process, as a job is converted, and measure it.
-    `outputs`: also build every file a student is given and audit it (`eval.outputs`),
-    after the measuring, so the seconds and the memory are the conversion's alone."""
+    `outputs`: also build every file a student is given and audit it (`eval.outputs`).
+    That, and the reading-order counts of a file with gold (`order_rows`), come after the
+    measuring, so the seconds and the memory are the conversion's alone."""
     from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
 
     job = _job(upload, settings)
@@ -384,6 +419,7 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
         parts=parts(result),
         decisions=[asdict(decision) for decision in triage.decisions(result)],
         outputs=audit,
+        order=order_rows(upload.entry, pdf, result),
     )
 
 
