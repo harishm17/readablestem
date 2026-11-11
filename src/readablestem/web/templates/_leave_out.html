@@ -1,3 +1,4 @@
+{% from "components/forms.html" import form with context %}
 {# "Leave this page out of the HTML" on the card of pages kept as images
    (routes/review.py `PageGroupView.leave_out`): one button per page, each a form that posts
    to the page tools' omit route and then goes on to the next decision. Undo takes it back.
@@ -10,12 +11,12 @@
   <p class="hint" id="leave-hint-{{ pg.key }}">A page left out is not in the HTML, and the file says it is not there. Any decisions still waiting on it are dropped with it. Choose Undo straight after, or the page tools later, to put it back.</p>
   <div class="button-row">
     {% for n in pg.leave_out %}
-    <form method="post" action="/jobs/{{ job.id }}/pages/{{ n }}/omit" class="inline-form">
-      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="after" value="review">{% if view == "list" and decision_filter.query %}<input type="hidden" name="flt" value="{{ decision_filter.query }}">{% endif %}
+    {% call form("review.omit_page", "/jobs/" ~ job.id ~ "/pages/" ~ n ~ "/omit", {"class": "inline-form"}) %}
+      <input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="after" value="review">{% if view == "list" and decision_filter.query %}<input type="hidden" name="flt" value="{{ decision_filter.query }}">{% endif %}
       <button type="submit" class="button-secondary" data-role="omit-page-card" aria-describedby="leave-hint-{{ pg.key }} leave-count-{{ pg.key }}-{{ n }}">{% if single %}Leave this page out of the HTML{% else %}Leave page {{ n }} out of the HTML{% endif %}</button>
       {% set drops = pg.leave_drops.get(n, 0) %}
       <span class="hint" id="leave-count-{{ pg.key }}-{{ n }}">{{ drops }} {{ "decision" if drops == 1 else "decisions" }} waiting on {{ "it" if single else "page " ~ n }} {{ "goes" if drops == 1 else "go" }} with it.</span>
-    </form>
+    {% endcall %}
     {% endfor %}
   </div>
 </div>

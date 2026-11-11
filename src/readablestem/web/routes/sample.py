@@ -16,6 +16,7 @@ from fastapi.responses import RedirectResponse, Response
 
 from readablestem.web import sample
 from readablestem.web.deps import PageError, UserDep, get_ctx, limited, require_csrf
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ router = APIRouter()
 
 
 @router.post("/sample", dependencies=[limited("sample"), Depends(require_csrf)])
+@submit_once("upload.sample")
 async def open_sample(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
     if not sample.available():

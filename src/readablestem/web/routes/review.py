@@ -91,6 +91,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.job_page import word_kind
 from readablestem.web.logsafe import log_event
 from readablestem.web.mathml import try_sanitize_mathml
@@ -1493,6 +1494,7 @@ def _refuse_stale(job: Job, version: str) -> None:
 
 
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
+@submit_once("review.decide")
 def review_action(
     request: Request,
     job_id: str,
@@ -1975,6 +1977,7 @@ UNDO_BACK = "Undone. {it} back as {was}."
 
 
 @router.post("/jobs/{job_id}/undo", dependencies=[Depends(require_csrf)])
+@submit_once("review.undo")
 def undo(
     request: Request,
     job_id: str,

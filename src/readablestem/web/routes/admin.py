@@ -30,6 +30,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.health import ops_report
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import signups_today
@@ -197,6 +198,7 @@ def admin_health(request: Request, user: AdminDep) -> Response:
 
 
 @router.post("/admin/allowlist", dependencies=[Depends(require_csrf)])
+@submit_once("admin.allow")
 def allow(
     request: Request,
     user: AdminDep,
@@ -229,6 +231,7 @@ def allow(
 
 
 @router.post("/admin/allowlist/remove", dependencies=[Depends(require_csrf)])
+@submit_once("admin.remove")
 def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     normalised = normalise_email(email)
     if normalised == user.email:
@@ -260,6 +263,7 @@ def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Re
 
 
 @router.post("/admin/users/block", dependencies=[Depends(require_csrf)])
+@submit_once("admin.block")
 def block(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     """Stop an account: signed out everywhere, its queued and running jobs stopped, and its
     sign-ins refused (in either sign-up mode) until it is unblocked."""
@@ -267,12 +271,14 @@ def block(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") 
 
 
 @router.post("/admin/users/unblock", dependencies=[Depends(require_csrf)])
+@submit_once("admin.unblock")
 def unblock(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     """Let a blocked account sign in again, with the tier it had."""
     return _block(request, user, email, blocked=False)
 
 
 @router.post("/admin/linked-emails", dependencies=[Depends(require_csrf)])
+@submit_once("admin.link")
 def link_email(
     request: Request,
     user: AdminDep,
@@ -304,6 +310,7 @@ def link_email(
 
 
 @router.post("/admin/linked-emails/remove", dependencies=[Depends(require_csrf)])
+@submit_once("admin.unlink")
 def unlink_email(request: Request, user: AdminDep, other: Annotated[str, Form()] = "") -> Response:
     linked = normalise_email(other)
     if linked is not None:

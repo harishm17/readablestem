@@ -38,6 +38,7 @@ from readablestem.web.deps import (
     get_ctx,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.page_edits import StructureChange
 from readablestem.web.review import (
@@ -218,6 +219,7 @@ def _page_action(
 
 
 @router.post("/jobs/{job_id}/pages/{number}/omit", dependencies=[Depends(require_csrf)])
+@submit_once("review.omit_page")
 def omit_page(
     request: Request,
     job_id: str,
@@ -234,6 +236,7 @@ def omit_page(
 
 
 @router.post("/jobs/{job_id}/pages/{number}/restore", dependencies=[Depends(require_csrf)])
+@submit_once("review.restore_page")
 def restore_page(
     request: Request,
     job_id: str,
@@ -299,6 +302,7 @@ def _page_of(request: Request, job_id: str, user: CurrentUser, ref: str) -> tupl
 
 
 @router.post("/jobs/{job_id}/edit/{element_id}", dependencies=[Depends(require_csrf)])
+@submit_once("review.edit_element")
 def edit_element(
     request: Request,
     job_id: str,
@@ -415,6 +419,7 @@ def region_preview(
 
 
 @router.post("/jobs/{job_id}/pages/{number}/add", dependencies=[Depends(require_csrf)])
+@submit_once("review.add_region")
 def add_region(
     request: Request,
     job_id: str,
@@ -606,6 +611,7 @@ def _marked_bulk(result: DocumentResult) -> list[ReviewChange]:
 
 
 @router.post("/jobs/{job_id}/tables/accept-clean", dependencies=[Depends(require_csrf)])
+@submit_once("review.accept_clean_tables")
 def accept_clean_tables(
     request: Request,
     job_id: str,
@@ -645,6 +651,7 @@ def accept_clean_tables(
 
 
 @router.post("/jobs/{job_id}/tables/{element_id}/read-cell", dependencies=[Depends(require_csrf)])
+@submit_once("review.read_cell")
 def read_cell(
     request: Request,
     job_id: str,

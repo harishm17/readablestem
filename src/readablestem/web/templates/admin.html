@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Admin{% endblock %}
 {% block content %}
 <h1>Admin</h1>
@@ -99,8 +100,7 @@
     signed themselves up is in the <strong>open</strong> tier; you can block them here.
     {% if people_rows %}The newest {{ people_rows }} accounts are listed; to block an older one, use
     "Block by email" below.{% endif %}</p>
-  <form method="post" action="/admin/allowlist" novalidate class="stack-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("admin.allow", "/admin/allowlist", {"novalidate": true, "class": "stack-form"}) %}
     <div class="field{% if email_error %} field-error{% endif %}">
       <label for="allow-email">Email address to allow</label>
       {% if email_error %}<p class="error-message" id="allow-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
@@ -113,7 +113,7 @@
       <p class="hint" id="allow-admin-hint">Leave it unchecked to keep the role of someone who is already listed.</p>
     </div>
     <button type="submit" class="button">Allow</button>
-  </form>
+  {% endcall %}
 
   {# A table wider than the screen scrolls in its box; the box is a named region a keyboard can
      reach (axe scrollable-region-focusable, T1-16). #}
@@ -134,11 +134,10 @@
           <ul class="plain-list">
             {% for other in person.linked %}
             <li>{{ other }}
-              <form method="post" action="/admin/linked-emails/remove" class="inline-form">
-                <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+              {% call form("admin.unlink", "/admin/linked-emails/remove", {"class": "inline-form"}) %}
                 <input type="hidden" name="other" value="{{ other }}">
                 <button type="submit" class="button-secondary">Unlink<span class="visually-hidden"> {{ other }} from {{ person.email }}</span></button>
-              </form>
+              {% endcall %}
             </li>
             {% endfor %}
           </ul>
@@ -147,11 +146,11 @@
         <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
         <td>
           {% if person.email != user.email %}
-          <form method="post" action="{{ '/admin/users/block' if person.tier == 'open' else '/admin/allowlist/remove' }}" class="inline-form">
-            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          {% set blocks = person.tier == "open" %}
+          {% call form("admin.block" if blocks else "admin.remove", "/admin/users/block" if blocks else "/admin/allowlist/remove", {"class": "inline-form"}) %}
             <input type="hidden" name="email" value="{{ person.email }}">
-            <button type="submit" class="button-secondary">{{ "Block" if person.tier == "open" else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></button>
-          </form>
+            <button type="submit" class="button-secondary">{{ "Block" if blocks else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></button>
+          {% endcall %}
           {% else %}
           You
           {% endif %}
@@ -165,14 +164,13 @@
   <h3 id="block-heading">Block by email</h3>
   <p>Stops any account, whether or not it is in the list above: it is signed out everywhere,
     its queued and running jobs are stopped, and its sign-ins are refused.</p>
-  <form method="post" action="/admin/users/block" novalidate class="stack-form" aria-labelledby="block-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("admin.block", "/admin/users/block", {"novalidate": true, "class": "stack-form", "aria-labelledby": "block-heading"}) %}
     <div class="field">
       <label for="block-email">Email address to block</label>
       <input type="email" id="block-email" name="email" autocomplete="off" spellcheck="false">
     </div>
     <button type="submit" class="button-secondary">Block</button>
-  </form>
+  {% endcall %}
 
   <h3 id="blocked-heading">Blocked accounts</h3>
   <p>Accounts that cannot sign in: people you removed or blocked. Their documents are deleted
@@ -192,11 +190,10 @@
         <td>{{ "Open" if person.tier == "open" else "Invited" }}</td>
         <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
         <td>
-          <form method="post" action="/admin/users/unblock" class="inline-form">
-            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          {% call form("admin.unblock", "/admin/users/unblock", {"class": "inline-form"}) %}
             <input type="hidden" name="email" value="{{ person.email }}">
             <button type="submit" class="button-secondary">Unblock<span class="visually-hidden"> {{ person.email }}</span></button>
-          </form>
+          {% endcall %}
         </td>
       </tr>
       {% endfor %}
@@ -212,8 +209,7 @@
     only under another, for example a personal account. The instructor must already be on
     the allowlist. Signing in with the other account opens the same documents. Unlinking it
     signs the instructor out everywhere.</p>
-  <form method="post" action="/admin/linked-emails" novalidate class="stack-form" aria-labelledby="link-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("admin.link", "/admin/linked-emails", {"novalidate": true, "class": "stack-form", "aria-labelledby": "link-heading"}) %}
     <div class="field">
       <label for="link-owner">Instructor's address on the allowlist</label>
       <input type="email" id="link-owner" name="email" autocomplete="off" spellcheck="false" value="{{ link_owner_value }}">
@@ -225,7 +221,7 @@
              value="{{ link_other_value }}"{% if link_error %} aria-invalid="true" aria-describedby="link-other-error"{% endif %}>
     </div>
     <button type="submit" class="button">Link account</button>
-  </form>
+  {% endcall %}
 </section>
 
 <section aria-labelledby="aggregates-heading">

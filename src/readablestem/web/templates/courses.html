@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Courses (routes/courses.py): only with FEATURE_NOTATION_MEMORY on. The list comes first
    (documents and symbols per course, and the next step for each); adding a course is below it,
    or first when there are none. #}
@@ -8,8 +9,7 @@
   {% if courses|length >= max_courses %}
   <p>You have {{ max_courses }} courses, the most allowed. Delete one to add another.</p>
   {% else %}
-  <form method="post" action="/courses" novalidate>
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.create", "/courses", {"novalidate": true}) %}
     {% set err = field_errors.get("name") %}
     <div class="field{% if err %} field-error{% endif %}">
       <label for="name">Course name</label>
@@ -19,7 +19,7 @@
              aria-describedby="name-hint{% if err %} name-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
     </div>
     <button type="submit" class="button">Add course</button>
-  </form>
+  {% endcall %}
   {% endif %}
 {% endmacro %}
 {% block content %}

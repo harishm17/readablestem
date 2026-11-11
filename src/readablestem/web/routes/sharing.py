@@ -29,6 +29,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
 from readablestem.web.shares import OWNER
@@ -126,6 +127,7 @@ def share_page(request: Request, job_id: str, user: UserDep) -> Response:
 
 
 @router.post("/jobs/{job_id}/share", dependencies=[Depends(require_csrf)])
+@submit_once("share.add")
 def add_share(
     request: Request,
     job_id: str,
@@ -165,6 +167,7 @@ def add_share(
 
 
 @router.post("/jobs/{job_id}/share/{share_id}/revoke", dependencies=[Depends(require_csrf)])
+@submit_once("share.revoke")
 def revoke_share(request: Request, job_id: str, share_id: str, user: UserDep) -> Response:
     """Take a person's access away. It stops on their next request."""
     ctx = get_ctx(request)

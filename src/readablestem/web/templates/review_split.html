@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# The review screen (routes/split.py): one decision at a time beside the page it is on.
    DOM order is decision, optional checks, page: on a phone that is the reading order,
    and on a wide screen CSS grid puts the page on the left. Every mark on the page is a
@@ -45,7 +46,7 @@
    kind of choice it was (web.review.CHOICE_ORIGINS). #}
 {% macro chips_form(p, chips, origin, who, prefix) %}
 {% set item = p.item %}{% set eid = item.element_id %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="chips-form">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "chips-form"}) %}
   {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="{{ origin }}">
   {% for group in chips.groups %}
   {% set gid = prefix ~ "-" ~ eid ~ "-" ~ loop.index %}
@@ -62,7 +63,7 @@
     </ul>
   </div>
   {% endfor %}
-</form>
+{% endcall %}
 {% endmacro %}
 
 {% macro save_button(item, main=False) %}
@@ -150,9 +151,9 @@
 {# The fix the table points to: an edit with only that letter changed, checked again like a
    typed one. A form of its own, so the edit box below is not sent; its button is in the
    choices above. #}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="suggest" id="suggest-{{ eid }}">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "suggest", "id": "suggest-" ~ eid}) %}
   {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="latex" value="{{ p.suggestion.latex }}">
-</form>
+{% endcall %}
 {% endif %}
 {{ equation_choices(p, item, anyway) }}
 {% if p.compare and p.compare.rows %}
@@ -198,17 +199,17 @@
   <p class="cmp-label">Other reading, {{ "read from the picture of the formula" if o.source == "crop" else "read from the whole page" }}</p>
   <div class="cmp-row" tabindex="0" role="group" aria-label="Other reading of {{ item.label|lower }}"><div class="cmp-math cmp-math-plain">{{ o.mathml }}</div></div>
   {% if o.speech|speakable %}<p class="speech" id="other-said-{{ eid }}"><span class="speech-label">Read aloud roughly as:</span> “{{ o.speech|speakable }}”</p>{% endif %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="suggest other-form">
+  {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "suggest other-form"}) %}
     {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="page_witness_choice">
     <button type="submit" name="latex" value="{{ o.latex }}" class="button-secondary" data-role="other"{% if o.speech|speakable %} aria-describedby="other-said-{{ eid }}"{% endif %}>Use the other reading<span class="visually-hidden"> for {{ item.label|lower }}</span></button>
-  </form>
+  {% endcall %}
   {% if o.chips %}
   <p class="hint">Or take only the symbols that differ:</p>
   {{ chips_form(p, o.chips, "page_witness_choice", "the other reading", "other-group") }}
   {% endif %}
 </section>
 {% endif %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" id="decide-{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"id": "decide-" ~ eid, "class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {# Closed by default: open only when typing is the way forward (an error, no proposal, a
      kept stale edit, or a meaning change with no one-click fix above). #}
@@ -223,7 +224,7 @@
     {% endif %}
   </details>
   {{ keep_original(item, "If it cannot be converted") }}
-</form>
+{% endcall %}
 {{ describe_box(item, "split") }}
 {% endmacro %}
 
@@ -248,7 +249,7 @@
 {% if item.data_table and not item.data_table_offered %}
 <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
 {% endif %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {{ alt_fields(item) }}
   {% if item.long_description is not none %}
@@ -273,17 +274,17 @@
     {{ figure_choices(item) }}
   </div>
   {{ figure_fallback(item) }}
-</form>
+{% endcall %}
 {% if item.data_table and item.data_table_offered %}
 <div class="data-offer">
   <p class="part-label">Optional: a data table for this chart</p>
   <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
   <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+  {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
     {{ hidden_fields() }}
     {{ error_line(item, "datatable") }}
     <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if item.errors.get('datatable') %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
-  </form>
+  {% endcall %}
 </div>
 {% endif %}
 {% endmacro %}
@@ -298,10 +299,10 @@
   <div><dt>Text as read from the image</dt><dd class="read-text">{{ item.read_text or "(no text)" }}</dd></div>
 </dl>
 {% if p.change_href %}<p class="notice-actions"><a class="button-secondary" href="{{ p.change_href }}" data-role="change-words">Change the words<span class="visually-hidden"> of {{ item.label|lower }}</span></a></p>{% endif %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {{ decide_row(item) }}
-</form>
+{% endcall %}
 {% endmacro %}
 
 {% macro heading_body(p) %}
@@ -314,7 +315,7 @@
   {% if item.heading_shown %}<div><dt>{% if item.heading_in_document %}In the document{% else %}If accepted{% endif %}</dt><dd>level {{ item.heading_shown }}</dd></div>{% endif %}
 </dl>
 {{ hear_button(item) }}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {% set err = item.errors.get("level") %}
   <div class="field field-inline{% if err %} field-error{% endif %}">
@@ -330,22 +331,22 @@
     </div>
   </div>
   {{ decide_row(item) }}
-</form>
+{% endcall %}
 {% endmacro %}
 
 {# The two direct answers for a group still waiting. The advice (web/heading_groups.py)
    decides which is the main button and goes first; the other stays one click away. #}
 {% macro group_keep_button(hg, main) %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ hg.key }}" class="inline-form">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ hg.key, {"class": "inline-form"}) %}
   {{ hidden_fields() }}
   <button type="submit" name="action" value="accept" class="{{ 'button' if main else 'button-secondary' }}" data-role="accept">Keep as headings{% if hg.level %} at level {{ hg.level }}{% endif %}<span class="visually-hidden"> (all {{ hg.keep }} “{{ hg.text }}”)</span></button>
-</form>
+{% endcall %}
 {% endmacro %}
 {% macro group_bold_button(hg, main) %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ hg.key }}" class="inline-form">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ hg.key, {"class": "inline-form"}) %}
   {{ hidden_fields() }}
   <button type="submit" name="action" value="reject" class="{{ 'button' if main else 'button-secondary' }}">Make bold text<span class="visually-hidden"> (all {{ hg.waiting }} “{{ hg.text }}”)</span></button>
-</form>
+{% endcall %}
 {% endmacro %}
 
 {# Up to three of the copies, each with the lines around it (the same region image as a
@@ -389,7 +390,7 @@
 {% elif hg.keep < n %}<p class="hint">{{ n - hg.keep }} would show at another level: choose a level below.</p>{% endif %}
 <details class="edit-box"{% if hg.error or not hg.keep %} open{% endif %}>
   <summary>Choose another level</summary>
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}">
+  {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key) %}
     {{ hidden_fields() }}
     <input type="hidden" name="action" value="edit">
     <div class="field field-inline{% if hg.error %} field-error{% endif %}">
@@ -402,7 +403,7 @@
         <button type="submit" class="button-secondary">Set the level for all {{ n }}<span class="visually-hidden"> “{{ hg.text }}”</span></button>
       </div>
     </div>
-  </form>
+  {% endcall %}
 </details>
 {# Each heading on its own, without leaving this screen: the copy, where it is, and its own two
    choices. Deciding one brings you back here while others still wait (`stay`). #}
@@ -415,13 +416,13 @@
       <p class="member-where"><a href="/jobs/{{ job.id }}/review?item={{ m.element_id }}">{{ m.label }}</a>{% if m.page %}, page {{ m.page }}{% endif %}{% if m.heading_level %}, proposed as level {{ m.heading_level }}{% endif %}</p>
       <img class="region-image" loading="lazy" src="/jobs/{{ job.id }}/regions/{{ m.element_id }}.png" alt="“{{ hg.text }}”{% if m.page %} on page {{ m.page }}{% endif %} of the PDF, with the lines around it.">
       {{ error_line(m, "actions") }}
-      <form method="post" action="/jobs/{{ job.id }}/review/{{ m.element_id }}" class="inline-form member-form">
+      {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ m.element_id, {"class": "inline-form member-form"}) %}
         {{ hidden_fields() }}<input type="hidden" name="stay" value="{{ key }}">
         <div class="decide-row">
           {% if m.can_accept %}<button type="submit" name="action" value="accept" class="button-secondary" data-role="member-keep">Keep heading<span class="visually-hidden"> ({{ m.label|lower }}, “{{ hg.text }}”)</span></button>{% endif %}
           <button type="submit" name="action" value="reject" class="button-secondary" data-role="member-bold">Make it bold<span class="visually-hidden"> ({{ m.label|lower }}, “{{ hg.text }}”)</span></button>
         </div>
-      </form>
+      {% endcall %}
     </li>
     {% endfor %}
   </ul>
@@ -437,16 +438,16 @@
 <p class="redo-lead" id="redo-{{ key }}">Change {{ all }}:</p>
 <div class="decide-row" id="group-actions-{{ key }}" role="group" aria-labelledby="redo-{{ key }}" tabindex="-1">
   {% if p.redo_keep %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+  {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key, {"class": "inline-form"}) %}
     {{ hidden_fields() }}<input type="hidden" name="scope" value="all">
     <button type="submit" name="action" value="accept" class="button-secondary">Keep as headings{% if hg.level %} at level {{ hg.level }}{% endif %}<span class="visually-hidden"> ({{ all }} “{{ hg.text }}”)</span></button>
-  </form>
+  {% endcall %}
   {% endif %}
   {% if p.redo_bold %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+  {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key, {"class": "inline-form"}) %}
     {{ hidden_fields() }}<input type="hidden" name="scope" value="all">
     <button type="submit" name="action" value="reject" class="button-secondary">Make bold text<span class="visually-hidden"> ({{ all }} “{{ hg.text }}”)</span></button>
-  </form>
+  {% endcall %}
   {% endif %}
 </div>
 <p class="aside-link">To change one of them, use <a href="{{ list_url }}#group-headings">the list view</a>.</p>
@@ -467,12 +468,12 @@
 {% if p.group_pages|length > 1 %}<p class="group-pages">On pages {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
 {% if pg.waiting %}
-<form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key, {"class": "inline-form"}) %}
   {{ hidden_fields() }}
   <div class="decide-row" id="group-actions-{{ key }}" tabindex="-1">
     <button type="submit" name="action" value="reject" class="button" data-role="reject" aria-describedby="hint-{{ key }}">{{ pg.button }}</button>
   </div>
-</form>
+{% endcall %}
 {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
 <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
 {{ leave_out_forms(pg, "split") }}
@@ -559,10 +560,10 @@
     <div class="decision-notice"{% if saved_target %} data-saved="/jobs/{{ job.id }}/review/{{ saved_target }}" data-saved-also="/jobs/{{ job.id }}/edit/{{ saved_target }} /jobs/{{ job.id }}/pages/{{ page.number }}/add"{% endif %}>
       <p id="decision-notice" role="status">{{ notice }}</p>
       {% if undo %}
-      <form method="post" action="/jobs/{{ job.id }}/undo" class="undo-form">
+      {% call form("review.undo", "/jobs/" ~ job.id ~ "/undo", {"class": "undo-form"}) %}
         {{ hidden_fields() }}
         <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> this decision</span></button>
-      </form>
+      {% endcall %}
       {% endif %}
     </div>
     {% endif %}
