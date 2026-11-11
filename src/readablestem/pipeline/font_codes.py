@@ -2,9 +2,10 @@
 
 A font with no table from its codes to characters (a Type 3 bitmap font from TeX, a symbol
 font subset, an icon font) comes out of the text layer as control characters, private-use
-code points, or plain letters that are not what is printed (Symbol's "h" is eta). `_clean` then drops the control characters without a trace
-("effects" becomes "eects", a bullet vanishes and its list becomes one paragraph) and passes the
-rest on as they are. This module is the one place a code is mapped. It rewrites, in place, the raw text
+code points, or plain letters that are not what is printed (Symbol's "h" is eta). `_clean`
+then drops the control characters without a trace ("effects" becomes "eects", a bullet vanishes
+and its list becomes one paragraph) and passes the rest on as they are. This module is the one
+place a code is mapped. It rewrites, in place, the raw text
 dictionary of one page (`layout._text_blocks`) before anything else reads it, so rows, list
 markers, maths detection and every output see the mapped character:
 
