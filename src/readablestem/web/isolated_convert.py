@@ -133,9 +133,43 @@ _DETAILS = frozenset({"low", "high", "auto"})
 
 
 class ConversionFailed(Exception):
-    """The child could not finish. `code` becomes `Job.error_code`."""
+    """The child could not finish. `code` becomes `Job.error_code`; `detail`, for a source
+    that would lose content, the names that stopped it (`Job.error_detail`)."""
 
     code = "internal_error"
+    detail: dict[str, Any] | None = None
+
+
+def _source_detail(raw: object) -> dict[str, Any] | None:
+    """The child's `detail` for a stopped source, rebuilt from what is expected only: at most
+    20 items of name, file and line, a count of the rest, and a class or package name. Every
+    string printable and at most 120 characters (`source.report.clean`)."""
+    from readablestem.source.report import MAX_DETAIL_ITEMS, clean
+
+    if not isinstance(raw, dict):
+        return None
+    items = []
+    for item in raw.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        line = item.get("line")
+        items.append(
+            {
+                "name": clean(str(item.get("name") or "")),
+                "file": clean(str(item.get("file") or "")),
+                "line": line if isinstance(line, int) and not isinstance(line, bool) else None,
+            }
+        )
+    more = raw.get("more")
+    detail: dict[str, Any] = {
+        "items": items[:MAX_DETAIL_ITEMS],
+        "more": more if isinstance(more, int) and not isinstance(more, bool) and more > 0 else 0,
+    }
+    for key in ("class", "package"):
+        value = raw.get(key)
+        if isinstance(value, str):
+            detail[key] = clean(value)
+    return detail
 
 
 class ConversionCrashed(ConversionFailed):
@@ -768,6 +802,7 @@ class _Conversion:
             code = "".join(c for c in str(header.get("code", "")) if c.isalnum() or c == "_")[:40]
             failure = ConversionFailed("the source could not be converted")
             failure.code = code or "source_failed"
+            failure.detail = _source_detail(header.get("detail"))
             return failure
         if kind == "oom":
             return ConversionOom("the child ran out of memory")

@@ -196,6 +196,9 @@ def test_a_figure_without_a_usable_picture_is_a_required_decision(tmp_path):
     fix = result.fixes[figure.id]
     assert fix.status is Status.FAILED and fix.reason == "source_figure_missing"
     assert fix.review == "required" and figure.id not in result.images
+    # the error node in block position is counted and tied to the figure (SW42.1)
+    assert result.error_nodes == 1
+    assert [(m.name, m.element_id) for m in result.marks] == [("{tikzpicture}", figure.id)]
 
 
 @pytest.mark.parametrize(

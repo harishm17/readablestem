@@ -658,12 +658,29 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   bindings, as it does where TeX Live is not installed: 2 s and the right answer. A package it has no
   binding for is then an unknown-command decision, never a slow raw-TeX run.
 - **Review.** A source has no pages to show, so its review is the list view; the split view
-  redirects to it. `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
+  redirects to it (at the item asked for, `#item-<id>`), and the list shows no "Review screen"
+  or "Page changes" link. A formula with no picture offers "Leave as written" in place of "Keep
+  as image" (`web.review.reject_keeps`): the student file shows its LaTeX, marked "Not
+  converted", never "The original image is not available."; an item with no picture and no
+  text (a source table) offers no such choice, and a posted one is refused.
+  `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
   room for the conversion's tasks: "The server is busy ... Try again") or `timeout` and the message "Upload
   the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
   itself is refused at once.
+- **Lost content stops the job.** LaTeXML exits 0 when it drops content; what it said is in its
+  log (`out/latexml.out`, `out/post.out`), which `source.report.parse` reads into
+  `DocumentResult.source_report` with the error nodes the reader found (`SourceReport`). A loss
+  outside a formula stops the job (`source.report.stop`): `source_missing_file` (an `\input` or
+  `\include` that is not in the upload), `source_syntax_error` (an unclosed brace or environment,
+  with its file and line), `source_unsupported_class` / `source_unsupported_package` (no binding,
+  and the document used what it defines; a `.sty` in the upload is not read either) or
+  `source_undefined`. The job page names the files and commands from `Job.error_detail` (at most
+  20, nullable JSON, migration `3c9a4e7d1b62`): document content, so never logged, cleared on
+  "Try again" and deleted with the job. A command LaTeX did not know inside a formula, and a
+  picture that is missing or of a kind not read, is a required decision on the review list with a
+  sentence naming it; warnings never block.
 
 ### Several files in one upload
 

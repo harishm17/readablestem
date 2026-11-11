@@ -11,7 +11,7 @@ from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.source import envelope
 from readablestem.source.convert import SourceFailed, convert_source
-from source_support import fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
 
 pytestmark = needs_latexml
 
@@ -131,3 +131,49 @@ def test_a_second_conversion_waits_for_the_first_and_gives_up_as_a_timeout(monke
 def test_conversions_one_after_another_each_get_the_gate():
     for _ in range(2):
         assert convert("bib").stats.required_decisions == 0
+
+
+# ------------------------------------------------------------------ what LaTeXML reported
+
+
+@pytest.mark.parametrize("name", list(LOSSES))
+def test_the_report_names_what_latexml_said(name, tmp_path):
+    from readablestem.source import latexml
+    from readablestem.source import report as source_report
+
+    text, code, _, (level, category, expected, where) = LOSSES[name]
+    (tmp_path / "main.tex").write_text(text)
+    latexml.convert(tmp_path, "main.tex", tmp_path / "out")
+    report = source_report.parse(
+        tmp_path / "out", project=tmp_path, loaded=source_report.loaded_packages({"m": text})
+    )
+    found = {(p.level, p.category, p.name, p.file) for p in [*report.problems, *report.missing]}
+    assert (level, category, expected, where) in found
+    assert report.log_errors >= 1
+    # and the conversion stops, with the names for the job page (SW42.2)
+    blob = envelope.wrap("tex", f"{name}.tex", None, text.encode())
+    with pytest.raises(SourceFailed) as raised:
+        convert_source(blob, settings=get_settings(), client=FakeVisionClient())
+    assert raised.value.code == code and raised.value.detail
+
+
+def test_a_clean_article_with_hyperref_has_an_empty_report():
+    blob = envelope.wrap(
+        "tex",
+        "clean.tex",
+        None,
+        b"\\documentclass{article}\\usepackage{hyperref}\\usepackage{amsmath}\n"
+        b"\\begin{document}\\section{One}Clean $a+b$ and \\url{https://example.org}.\n"
+        b"\\end{document}\n",
+    )
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    assert result.source_report is not None and result.source_report.empty
+    assert result.source_report.warnings == 8  # the helpers hyperref's binding asks for
+
+
+def test_every_error_node_is_counted_and_placed():
+    result = convert("broken_macro")
+    report = result.source_report
+    assert report is not None and report.error_nodes == 2 and report.unplaced_errors == 0
+    assert {m.name for m in report.marks} == {r"\mysterycommand", r"\anotherunknown"}
+    assert all(m.in_formula and m.element_id for m in report.marks)

@@ -882,12 +882,24 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
     lists = NoticeLists()
     for notice in notice_rules.current(result):
         line = _line(notice, fixes, labels, elements)
+        if notice.code == "source_error" and (names := _unknown_commands(result)):
+            line = replace(line, names=names, lead="The commands LaTeX did not know", place="")
         if notice_rules.section(notice) == "worth_checking":
             lists.worth_checking.append(line)
         else:
             lists.not_handled.append(line)
     lists.not_handled = _one_line_per_kept_page(lists.not_handled, fixes, labels)
     return lists
+
+
+def _unknown_commands(result: DocumentResult) -> tuple[str, ...]:
+    """A source job's commands that LaTeX did not know, in formulas, each once (at most 10):
+    names from the source (`DocumentResult.source_report`), for the owner's page."""
+    report = result.source_report
+    if report is None:
+        return ()
+    names = dict.fromkeys(m.name for m in report.marks if m.in_formula and m.name)
+    return tuple(list(names)[:10])
 
 
 def _one_line_per_kept_page(

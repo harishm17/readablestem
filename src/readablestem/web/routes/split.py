@@ -35,7 +35,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
@@ -1463,8 +1463,12 @@ def review_screen(
     `top`, `right`, `bottom`: the region being described for something to add."""
     shown = accepted == "1"
     _, loaded, _ = _load(request, job_id, user)
-    if loaded.origin != "pdf":  # a LaTeX source has no page to show beside its decisions
-        return RedirectResponse(f"/jobs/{job_id}/review/list", status_code=303)
+    if loaded.origin != "pdf":
+        # A LaTeX source has no page to show beside its decisions: its list, at the item a
+        # link asked for ("Decide it" on the job page), so the link does not lose its place.
+        known = item and loaded.fix_for(item) is not None
+        anchor = f"#item-{quote(item, safe='')}" if known else ""
+        return RedirectResponse(f"/jobs/{job_id}/review/list{anchor}", status_code=303)
     response = split_page(
         request,
         job_id,

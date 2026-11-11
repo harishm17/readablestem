@@ -396,8 +396,10 @@ def _classify(exc: BaseException) -> dict[str, Any]:
         return {"kind": "config", "message": str(exc)}
     from readablestem.source.convert import SourceFailed
 
-    if isinstance(exc, SourceFailed):  # a category code, never the source's own words
-        return {"kind": "source", "code": exc.code}
+    if isinstance(exc, SourceFailed):
+        # A category code; the names that stopped it (files, commands) go to the job's
+        # `error_detail` for its owner's page, never to a log (web.worker).
+        return {"kind": "source", "code": exc.code, "detail": exc.detail}
     if isinstance(exc, UnknownModelError):
         return {"kind": "unknown_model", "message": str(exc)}
     text = str(exc).lower()
