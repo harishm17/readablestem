@@ -106,6 +106,17 @@ def test_the_offices_page_says_what_happens_if_the_service_closes(tmp_path):
     ) in text_of(page)
 
 
+def test_the_maintainer_credit_links_to_the_continuity_section_that_exists(tmp_path):
+    """F-169: a visitor told one person runs this can reach what happens if that stops."""
+    env = WebEnv(tmp_path)
+    link = f'href="{offices.PAGE_PATH}#continuity"'
+    with env.running() as client:
+        assert 'id="continuity"' in client.get(offices.PAGE_PATH).text
+        assert link in client.get("/").text  # the signed-out footer and the landing page
+        signed_in(env, client)
+        assert link in client.get("/app").text  # the signed-in footer
+
+
 # ------------------------------------------------------------------ the refusal
 
 

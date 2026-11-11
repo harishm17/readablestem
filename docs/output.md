@@ -991,7 +991,7 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
 - whether the instructor has checked it: nothing when the tool asked nothing and nobody
   changed anything; "Some parts were made by the tool and have not been checked by your
   instructor yet." while a decision is open (a draft download); "Your instructor checked
-  the parts the tool was unsure about on 9 October 2026." once every decision is made.
+  the parts the tool was unsure about on October 9, 2026." once every decision is made.
   The date is `render_html(checked_on=...)`: the review screen passes the day of the
   re-render that follows a decision (`web/review.py rerender_html`, UTC), the language
   control the day of the last decision; the pipeline never passes one, so a result

@@ -1038,7 +1038,7 @@ shows on `/jobs/{id}/feedback` with an error summary and what was typed kept.
 ## Times
 
 Every time in the page body is a `<time datetime="...Z">` element written by the `utc`
-template filter, saying the time in UTC ("9 Oct 2026, 23:32 UTC"); `app.js` rewrites it
+template filter, saying the time in UTC ("Oct 9, 2026, 23:32 UTC"); `app.js` rewrites it
 in the reader's time zone with how far away it is ("Fri, Oct 9, 6:32 PM CDT (in 23
 hours)"), also in lists swapped in by htmx (a mutation observer looks only at the nodes that
 were inserted, not at the whole page again). Without JavaScript the UTC text stays (UX
@@ -1661,7 +1661,7 @@ From top to bottom:
    equation is an image marked "Not converted"."). The polled status links to the first
    decision as soon as the job finishes ("Start the review"), so it is one click from
    finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
-   decisions on 9 October." (or "Nothing in this file needed your decision."), the
+   decisions on October 9." (or "Nothing in this file needed your decision."), the
    download as the main button, the student version, then **"Where will you post it?"**
    (ux2-lane-a): one flat list of the ways the file leaves the tool, each with its own
    link and the recommended one first. "A course site or any web page (Recommended)" is
@@ -2031,7 +2031,7 @@ sentence and code. Previous and next decision links close the card. After Accept
 edit or the "Reject" button the form redirects (303) to the next decision still open
 after this one (`queue.next_open`, wrapping round), or to the done state, the finish
 line as the job page says it (`SplitBuilder.ready`, from `job_page.headline` and
-`job_page.Finish`): **Ready to share** ("You made 3 decisions on 9 October." or "Nothing
+`job_page.Finish`): **Ready to share** ("You made 3 decisions on October 9." or "Nothing
 in this file needed your decision."), or **Ready** with what is shown as an image ("2
 tables are shown as an image that screen readers cannot read."), then **Download the
 HTML file**, "Preview the student version", a line on reading it through before sharing

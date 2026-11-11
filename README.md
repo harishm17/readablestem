@@ -428,7 +428,7 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 ## Limits
 
 - **PDF in, web page out** (with Word, EPUB, Canvas zip and Common Cartridge downloads). Word and
-  PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF only).
+  PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF and LaTeX only).
   In production the limits are 150 pages a day and 250 MB stored for a new account and 300 pages
   a day and 300 MB for an invited one, 2000 MB stored in all, $6 of model spend for one
   document and $10 a day for the whole service.
