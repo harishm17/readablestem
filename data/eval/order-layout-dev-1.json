@@ -18,7 +18,7 @@
   ]
  },
  "pipeline_version": "0.5.10",
- "commit": "63e90e8efc6ec3082048af6067202d4018f3268f",
+ "commit": "00cb4cf7e3d792579e1abeb279bd2186c2308e5d",
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
   "cores": 16
@@ -79,7 +79,9 @@
       "merged": 68,
       "heading_merged": 22,
       "caption_wrong": 0
-     }
+     },
+     "documents": 60,
+     "documents_right": 8
     },
     "groups": {
      "paper": {
@@ -126,7 +128,9 @@
        "merged": 46,
        "heading_merged": 19,
        "caption_wrong": 0
-      }
+      },
+      "documents": 28,
+      "documents_right": 1
      },
      "selfmade": {
       "found": 748,
@@ -172,7 +176,9 @@
        "merged": 14,
        "heading_merged": 2,
        "caption_wrong": 0
-      }
+      },
+      "documents": 22,
+      "documents_right": 7
      },
      "textbook": {
       "found": 2405,
@@ -218,7 +224,9 @@
        "merged": 8,
        "heading_merged": 1,
        "caption_wrong": 0
-      }
+      },
+      "documents": 10,
+      "documents_right": 0
      }
     },
     "main": {
@@ -230,7 +238,9 @@
       "merged": 0,
       "heading_merged": 0,
       "caption_wrong": 0
-     }
+     },
+     "documents": 0,
+     "documents_right": 0
     },
     "apart": {
      "pages": 0,
@@ -241,7 +251,9 @@
       "merged": 0,
       "heading_merged": 0,
       "caption_wrong": 0
-     }
+     },
+     "documents": 0,
+     "documents_right": 0
     }
    },
    "elements": {
@@ -289,7 +301,9 @@
       "merged": 78,
       "heading_merged": 32,
       "caption_wrong": 0
-     }
+     },
+     "documents": 60,
+     "documents_right": 8
     },
     "groups": {
      "paper": {
@@ -336,7 +350,9 @@
        "merged": 46,
        "heading_merged": 19,
        "caption_wrong": 0
-      }
+      },
+      "documents": 28,
+      "documents_right": 1
      },
      "selfmade": {
       "found": 751,
@@ -382,7 +398,9 @@
        "merged": 13,
        "heading_merged": 2,
        "caption_wrong": 0
-      }
+      },
+      "documents": 22,
+      "documents_right": 7
      },
      "textbook": {
       "found": 2461,
@@ -428,7 +446,9 @@
        "merged": 19,
        "heading_merged": 11,
        "caption_wrong": 0
-      }
+      },
+      "documents": 10,
+      "documents_right": 0
      }
     },
     "main": {
@@ -440,7 +460,9 @@
       "merged": 0,
       "heading_merged": 0,
       "caption_wrong": 0
-     }
+     },
+     "documents": 0,
+     "documents_right": 0
     },
     "apart": {
      "pages": 0,
@@ -451,7 +473,9 @@
       "merged": 0,
       "heading_merged": 0,
       "caption_wrong": 0
-     }
+     },
+     "documents": 0,
+     "documents_right": 0
     }
    }
   },
