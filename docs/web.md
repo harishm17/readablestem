@@ -453,8 +453,10 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    past the PDF maximum, and the conversion's crash probe renders whole pages, about
    1 GB for an 18000 pt page), a PDF with an embedded picture of more than 100 million
    pixels (`image_too_large`; read from the picture's header, never decoded; docs/security.md,
-   "Pixel budget"), a PDF whose every page is handwritten or scanned
-   (`pipeline.page_type.document_refusal`: `handwritten` with a hidden recognition layer,
+   "Pixel budget"), a PDF with a page whose drawing instructions inflate past 32 MiB, or a
+   document past 128 MiB (`content_too_large`; counted through decoders that stop at the
+   budget, before anything parses a page; docs/security.md, "Content budget"), a PDF
+   whose every page is handwritten or scanned (`pipeline.page_type.document_refusal`: `handwritten` with a hidden recognition layer,
    `handwritten_no_text` without one, `scanned` with no text, `scanned_ocr` with a hidden
    OCR layer; text nobody sees never counts; each message says what the PDF is, that its
    hidden text is not used, that nothing was taken from the daily pages, and to upload a

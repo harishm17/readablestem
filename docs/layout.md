@@ -2162,6 +2162,9 @@ The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
 | `no_pages` | the file has no pages, or `pages=[]` |
 | `page_out_of_range` | a requested page index is negative or past the end |
 | `too_many_pages` | more pages requested (or in the file, with `pages=None`) than `max_pages` |
+| `content_too_large` | the object streams, a selected page or the selected pages together inflate past the content budget (`core.content_budget`; docs/security.md, "Content budget"), checked before any page is read |
+| `too_complex` | a page needs more time or memory to read than a conversion has |
+| `image_too_large` | decoding the pictures took longer than a job may spend (`core.images.DECODE_BUDGET_S`) |
 
 `crop` raises `ValueError` for bad arguments (`dpi <= 0`, `pad < 0`, `max_side_px < 16`) and
 for an element whose page or box is not in the PDF.

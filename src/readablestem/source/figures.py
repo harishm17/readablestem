@@ -4,8 +4,9 @@ folder only.
 The path comes from LaTeXML's HTML, which an uploaded document wrote, so it is treated as
 untrusted: it is resolved inside the project folder, must be a regular file (never a link,
 `os.O_NOFOLLOW`), and must be a PNG, JPEG, GIF or PDF (the first page). Sizes are capped before
-decoding (a decompression bomb is a small file with a huge canvas). Anything else is None: the
-figure then has no picture and becomes a decision.
+decoding (a decompression bomb is a small file with a huge canvas), and so is how far a PDF
+page's drawing instructions inflate (`core.content_budget`). Anything else is None: the figure
+then has no picture and becomes a decision.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import os
 import stat
 from pathlib import Path
 
+from readablestem.core import content_budget
 from readablestem.core.images import MAX_IMAGE_PIXELS, within_budget
 
 MAX_FILE_BYTES = 30 * 1024 * 1024
@@ -79,6 +81,8 @@ def _pdf_to_png(raw: bytes) -> bytes | None:
             # Drawing the page decodes its pictures: not one over the pixel budget.
             if any(not within_budget(w, h) for _, _, w, h, *_ in document.get_page_images(0)):
                 return None
+            # ... and parses its drawing instructions: not more than the content budget.
+            content_budget.check(document, [0])
             scale = min(PDF_DPI / 72, MAX_SIDE_PX / max(rect.width, rect.height))
             pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
             return pixmap.tobytes("png")

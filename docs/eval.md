@@ -2705,9 +2705,9 @@ once under bubblewrap and once under Landlock, where the machine can start each.
 
 As of 2026-11-11 the set has 36 files: 6 on the size of pages and pictures, 3 on page
 count, 8 on the structure of the PDF, 5 on content that must stay data, 8 zips and 6 LaTeX
-sources. 35 end as stated. One does not: a page whose content inflates to 256 MB from a
-260 KB file is taken, read for 7 s in the upload request and for 24 s by the worker
-(F-559); its case states the refusal the fix must give.
+sources. All 36 end as stated. The one that did not, a page whose content inflates to 256 MB
+from a 260 KB file (F-559), was taken and read for 7 s in the upload request and 24 s by the
+worker; the content budget (docs/security.md) now refuses it at upload in under a second.
 
 Owed:
 

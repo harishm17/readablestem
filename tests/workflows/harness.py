@@ -263,9 +263,10 @@ class ReplaySite:
 
     def convert(self, entry_id: str, *, image_pages: bool = False, exam: bool = False) -> str:
         """Upload the corpus file as the owner and convert it. Returns the job's id. Fails
-        the test when the conversion needed an answer the recording does not hold, unless
-        the file is listed in `OWED` with that many."""
-        replayable(entry_id)
+        the test when the upload is refused, or when the conversion needed an answer the
+        recording does not hold, unless the file is listed in `OWED` with that many. A file
+        this machine cannot replay is skipped only after its upload was taken, so every
+        corpus file present is shown to pass the upload's checks."""
         entry = corpus.load_manifest()[entry_id]
         before = len(self._clients)
         sent = upload(
@@ -278,6 +279,7 @@ class ReplaySite:
         if sent.status_code != 303:
             said = " ".join(sent.text.split())
             pytest.fail(f"{entry_id}: the upload was refused ({sent.status_code}): {said[-600:]}")
+        replayable(entry_id)
         job_id = job_id_from(sent)
         worker = Worker(
             self.settings,

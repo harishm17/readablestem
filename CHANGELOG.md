@@ -41,6 +41,23 @@ measured and replayed against.
   suite.
 - The production profile lists the page audit's three behavior settings at their code
   defaults, so its hash changes with no change to what production runs.
+## Unreleased: the content budget (branch fix/content-size-budget, WS26.8, F-559)
+
+- A PDF whose page's drawing instructions inflate past 32 MiB, or whose document's past
+  128 MiB, is refused at upload with `content_too_large` (422, "too large to read"), before
+  any quota is spent. The count runs through MuPDF's own decoders and stops at the budget:
+  content streams and arrays of them, the forms, tiling patterns, Type3 glyphs and annotation
+  appearances they draw, every filter and chain MuPDF applies, owner-password files; the
+  object streams are counted before the page tree is read. The hostile set's `stream-bomb.pdf`
+  (260 KB, one page of 256 MB) is refused in 0.36 s; it took 6.8 s of the upload request and
+  24 s of the worker.
+- `layout.analyze` makes the same check before any step reads a page, so a queued job,
+  `readablestem convert` and the evals stop with `content_too_large` too, and a PDF figure of
+  a LaTeX project over the budget is left without a picture. The budgets come from the
+  development corpus (largest page 3.0 MiB, largest document 9.9 MiB, 2026-11-11).
+- Workflow tests: `harness.ReplaySite.convert` uploads a corpus file before it skips one whose
+  recorded answers are kept out of the repository, so every file present passes the upload's
+  checks.
 
 ## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
 

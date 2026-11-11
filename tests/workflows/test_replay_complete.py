@@ -3,7 +3,9 @@
 Each file of the manifest is uploaded the way `harness.UPLOADS` says and converted by the
 real app from the recorded answers. A conversion that asks for an answer the recording
 lacks fails here with the step and what changed, unless the file is on `harness.OWED` with
-exactly that many answers still to record.
+exactly that many answers still to record. Every file present on the machine is uploaded,
+so each is shown to pass the upload's checks; one whose answers are kept out of the
+repository is skipped after its upload.
 
 The same conversions show that a job's step facts account for it: the model work they list
 is what the job settled, and their stages hold the job's time (`ops.step_report`).

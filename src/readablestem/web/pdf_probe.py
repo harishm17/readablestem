@@ -15,6 +15,11 @@ Besides counting pages it refuses, before any quota is spent:
 - pages larger than `MAX_PAGE_SIDE_PT` on a side ("page_too_large"). MuPDF accepts page
   boxes far beyond the PDF limit, and the conversion's crash probe renders whole pages:
   an 18000 pt page needs about 1 GB there, more than the instance has.
+- a page, or a document, whose drawing instructions inflate past the content budget
+  (`core.content_budget`, "content_too_large"): every step that reads a page parses all of
+  them again, and a 260 KB file can inflate to 256 MB. They are counted before anything
+  parses a page, through decoders that stop at the budget; the object streams are counted
+  the same way before the page count is read, since reading it loads them.
 - PDFs with nothing to convert (`pipeline.page_type.document_refusal`): every page
   handwritten ("handwritten", or "handwritten_no_text" without a hidden recognition
   layer), a scanned image ("scanned", or "scanned_ocr" with a hidden OCR layer), or
@@ -65,6 +70,7 @@ import sys
 import unicodedata
 from typing import TYPE_CHECKING
 
+from readablestem.core import content_budget
 from readablestem.core.images import MAX_UPLOAD_IMAGE_PIXELS
 
 if TYPE_CHECKING:
@@ -131,6 +137,12 @@ def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> 
         # password (permissions) open fine and are accepted.
         if doc.needs_pass:
             raise ProbeRejected("encrypted")
+        try:  # before the page count: counting the pages loads the object streams
+            content_budget.check_objects(doc)
+        except content_budget.ContentTooLarge:
+            raise ProbeRejected("content_too_large") from None
+        except Exception:  # a cross-reference table MuPDF cannot read
+            raise ProbeRejected("unreadable") from None
         pages = doc.page_count
         if pages == 0:
             # A file cut short (a download that did not finish) opens only after MuPDF
@@ -167,7 +179,8 @@ def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
 
 
 def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
-    """Refuse oversized pages and documents with nothing to convert (module docstring)."""
+    """Refuse oversized pages, too much content and documents with nothing to convert
+    (module docstring)."""
     from readablestem.pipeline.page_type import document_refusal
 
     try:
@@ -177,6 +190,10 @@ def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> N
                 raise ProbeRejected("page_too_large")
             if _largest_image_pixels(doc, number) > MAX_UPLOAD_IMAGE_PIXELS:
                 raise ProbeRejected("image_too_large")
+        try:  # before the text is read: reading it parses every content stream
+            content_budget.check(doc)
+        except content_budget.ContentTooLarge:
+            raise ProbeRejected("content_too_large") from None
         reason = document_refusal(doc)
     except ProbeRejected:
         raise
