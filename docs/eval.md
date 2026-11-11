@@ -2517,6 +2517,65 @@ without cost. The public demo and the site examples were written again from a ne
 conversions ($0.2744 in all) was discarded because the table-structure model was not found on
 the machine, which changed the layout of 2.1; it is not used.
 
+## The test corpus
+
+The workflow tests and the layout evals read one set of files, listed in
+`tests/workflows/corpus/corpus.json` and read through `src/readablestem/eval/corpus.py`.
+As of 2026-11-11 it has 61 entries; 47 of them have reading-order labels (91 pages).
+
+**Where a file may come from.** Every entry is one of three kinds.
+
+- `public` (19 entries): a file on MIT OpenCourseWare, arXiv or Wikimedia Commons. The
+  manifest pins the URL, the SHA-256, the size, the license and who to credit. The file is
+  fetched into `.cache/corpus/` (not committed) and the tests use a page range cut from it.
+  A download whose hash differs is refused and never reaches the cache.
+- `committed` (31 entries): a file in the corpus folder. 29 were made for this repository
+  and sit next to the HTML, LaTeX, Markdown or Word source they were printed from; each is
+  at most 200,000 bytes. The other 2 are ten-page cuts of OpenStax textbooks, kept because
+  the publisher's download URLs stopped serving the bytes that were measured.
+- `builder` (11 entries): a file made on demand by a builder in `tests/workflows/builders/`.
+  The builders make 71 files in all; 68 give the same bytes on every run, and their hashes
+  are in `builders/recorded.json`. The 3 encrypted ones cannot, and are checked by what
+  they contain.
+
+**Rules.**
+
+1. No file from an instructor's course, and nothing from the private audit corpus, is
+   committed, fetched or named. A manifest line that holds a path on one machine, or a URL
+   outside the allowed sites, fails to load.
+2. Someone else's file is committed only when its license is CC BY 4.0, CC0 or public
+   domain, with the attribution in the manifest and in the corpus README, and only up to
+   5,000,000 bytes. CC BY-NC-SA files (MIT OpenCourseWare) are fetched, never committed.
+3. A URL is pinned to one version. arXiv entries name the version (`v1`, `v4`).
+4. Only files listed here, or files a builder makes, are sent to a model.
+
+**Gold labels.** A gold file gives, for each page, the blocks in reading order, each with a
+role (heading, body, list, table, caption, footnote, aside, form, figure, or dropped for
+text that must not be read, such as a running header). For files made here the block text is
+stored. For anyone else's file no text is stored: a block is a list of character ranges into
+the page's words (PyMuPDF's words in file order, NFKC-normalized, joined with nothing
+between), the lengths of its tokens, and the SHA-256 of its text. `load_gold` rebuilds the
+text from the file and checks every hash, so a different file, or a PyMuPDF that reads the
+page differently, fails loudly instead of scoring against the wrong text. Where the labeled
+text is not among the page's words (chart axis labels and some mathematical glyphs), the
+characters are stored as written: 390 characters over 682 blocks.
+
+The public-page labels were made on 2026-11-10 from candidate blocks produced by poppler's
+`pdftotext -bbox-layout`, which is independent of this project's layout step; order and
+roles were set by reading each rendered page, in one pass, with four blocks corrected in
+review. They were not labeled twice by independent readers. Labels for files made here
+come from the source each file was printed from. The manifest's `labels` table records the
+method and date for every gold file.
+
+**Commands.**
+
+```bash
+uv run python -m readablestem.eval.corpus check            # committed and built files, no network
+uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 19 public files by hash
+uv run python tests/workflows/builders/record.py list      # the 71 built files and what each shows
+uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or network" for the rest
+```
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%

@@ -1,0 +1,32 @@
+{
+ "id": "s08_bibliography",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Course Reading List"},
+   {"role": "heading", "text": "References"},
+   {"role": "body", "text": "Sources cited in the course readings, listed alphabetically by first author."},
+   {"role": "list", "text": "Begon, M., Townsend, C. R., & Harper, J. L. (2006). Ecology: From individuals to ecosystems (4th ed.). Blackwell Publishing."},
+   {"role": "list", "text": "Carpenter, S. R., Caraco, N. F., Correll, D. L., Howarth, R. W., Sharpley, A. N., & Smith, V. H. (1998). Nonpoint pollution of surface waters with phosphorus and nitrogen. Ecological Applications, 8(3), 559–568."},
+   {"role": "list", "text": "Daily, G. C. (Ed.). (1997). Nature's services: Societal dependence on natural ecosystems. Island Press."},
+   {"role": "list", "text": "Hardin, G. (1968). The tragedy of the commons. Science, 162(3859), 1243–1248."},
+   {"role": "list", "text": "Intergovernmental Panel on Climate Change. (2021). Climate change 2021: The physical science basis. Cambridge University Press."},
+   {"role": "list", "text": "Kolbert, E. (2014). The sixth extinction: An unnatural history. Henry Holt and Company."},
+   {"role": "list", "text": "Leopold, A. (1949). A Sand County almanac and sketches here and there. Oxford University Press."},
+   {"role": "list", "text": "Odum, E. P., & Barrett, G. W. (2005). Fundamentals of ecology (5th ed.). Thomson Brooks/Cole."},
+   {"role": "list", "text": "Pimm, S. L., Jenkins, C. N., Abell, R., Brooks, T. M., Gittleman, J. L., Joppa, L. N., Raven, P. H., Roberts, C. M., & Sexton, J. O. (2014). The biodiversity of species and their rates of extinction, distribution, and protection. Science, 344(6187), 1246752."},
+   {"role": "list", "text": "Rockström, J., Steffen, W., Noone, K., Persson, Å., Chapin, F. S., Lambin, E. F., et al. (2009). A safe operating space for humanity. Nature, 461(7263), 472–475."},
+   {"role": "list", "text": "Smil, V. (2000). Cycles of life: Civilization and the biosphere. Scientific American Library."},
+   {"role": "list", "text": "Tilman, D., Fargione, J., Wolff, B., D'Antonio, C., Dobson, A., Howarth, R., et al. (2001). Forecasting agriculturally driven global environmental change. Science, 292(5515), 281–284."},
+   {"role": "list", "text": "United Nations Environment Programme. (2019). Global environment outlook 6: Healthy planet, healthy people. Cambridge University Press."},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Course Reading List"},
+   {"role": "list", "text": "Vitousek, P. M., Mooney, H. A., Lubchenco, J., & Melillo, J. M. (1997). Human domination of Earth's ecosystems. Science, 277(5325), 494–499."},
+   {"role": "list", "text": "Wilson, E. O. (1992). The diversity of life. Harvard University Press."},
+   {"role": "list", "text": "Worm, B., Barbier, E. B., Beaumont, N., Duffy, J. E., Folke, C., Halpern, B. S., et al. (2006). Impacts of biodiversity loss on ocean ecosystem services. Science, 314(5800), 787–790."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

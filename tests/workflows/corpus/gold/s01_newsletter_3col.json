@@ -1,0 +1,42 @@
+{
+ "id": "s01_newsletter_3col",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Green Notes: Autumn Issue"},
+   {"role": "heading", "text": "Green Notes"},
+   {"role": "body", "text": "Newsletter of the Department of Environmental Science, Autumn Issue, Volume 12"},
+   {"role": "heading", "text": "Welcome from the Chair"},
+   {"role": "body", "text": "Dear students, faculty and friends of the Department of Environmental Science. This has been a year of growth. Enrollment in our introductory ecology course rose by thirty percent, and three new faculty members joined us in the fall."},
+   {"role": "body", "text": "We also opened the renovated Hartwell Laboratory, which now has room for forty students at a time. Please stop by and see the new fume hoods, the shared microscope bench and the quiet study alcove on the second floor."},
+   {"role": "body", "text": "Thank you to everyone who contributed to the scholarship fund this spring. Your gifts supported fourteen undergraduate field placements."},
+   {"role": "heading", "text": "Student Spotlight: Maya Okafor"},
+   {"role": "body", "text": "Senior Maya Okafor spent last summer measuring nitrogen runoff in the Cedar Creek watershed. Her sampling plan used twelve stations along eleven kilometers of stream, visited every ten days."},
+   {"role": "body", "text": "\"I learned that clean data is mostly about being careful and consistent,\" Maya said. \"The hard part was the weather, not the chemistry.\" Her results will appear in the department poster session in April."},
+   {"role": "body", "text": "Maya plans to apply to graduate programs in hydrology and hopes to continue the Cedar Creek work as a thesis project."},
+   {"role": "aside", "text": "Clean data is mostly about being careful and consistent."},
+   {"role": "heading", "text": "Upcoming Events"},
+   {"role": "list", "text": "Oct 14 Seminar: Climate and the Water Cycle, Room 210, 4:00 p.m."},
+   {"role": "list", "text": "Oct 22 Fall Field Day at Cedar Creek, buses leave at 8:00 a.m."},
+   {"role": "list", "text": "Nov 3 Graduate school information night, Hartwell Hall lobby, 6:30 p.m."},
+   {"role": "list", "text": "Nov 18 Poster practice session, Room 105, 5:00 p.m."},
+   {"role": "list", "text": "Dec 5 Holiday potluck for students and faculty, 12:00 noon."},
+   {"role": "heading", "text": "New Course: Data for Field Science"},
+   {"role": "body", "text": "Starting next spring, ENVS 240 will teach students to clean, plot and analyze field data using spreadsheets and the R language. No programming background is required. The course meets Tuesdays and Thursdays from 2:00 to 3:15 p.m."},
+   {"role": "body", "text": "Each student will build a small data project from measurements they collect themselves, and present it in a two-minute talk at the end of the term."},
+   {"role": "heading", "text": "Research Briefs"},
+   {"role": "body", "text": "Dr. Lena Park's group reported that restored wetlands in the county store about 1.8 times more carbon per hectare than the farmland they replaced."},
+   {"role": "body", "text": "Dr. Tomas Rivera's team finished the third year of its pollinator survey. Native bee counts were steady, while honey bee counts fell by nine percent."},
+   {"role": "body", "text": "A new paper from the soils lab shows that adding biochar raised water retention in sandy plots by about one fifth."},
+   {"role": "heading", "text": "Tips for Field Safety"},
+   {"role": "body", "text": "Always carry a charged phone, a paper map and a whistle. Tell someone your route and your expected return time before you leave campus."},
+   {"role": "body", "text": "Wear closed-toe boots and long pants in tall grass. Check yourself for ticks at the end of every field day, and report any bite to the program office."},
+   {"role": "heading", "text": "Alumni Notes"},
+   {"role": "body", "text": "Priya Nair (class of 2019) now works as a water quality analyst for the regional utility and visited our seminar in September."},
+   {"role": "body", "text": "Carlos Mendes (class of 2015) was promoted to park ranger supervisor at Lake Ridge State Park."},
+   {"role": "heading", "text": "Library Corner"},
+   {"role": "body", "text": "The science library has extended its weekend hours to 10:00 a.m. to 8:00 p.m. during finals. Reserve a study room online, up to two hours at a time."},
+   {"role": "dropped", "text": "Page 1 of 1"}
+  ]}
+ ]
+}

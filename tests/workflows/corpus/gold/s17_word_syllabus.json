@@ -1,0 +1,34 @@
+{
+ "id": "s17_word_syllabus",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "heading", "text": "MATH 120: Statistics for the Life Sciences"},
+   {"role": "body", "text": "Department of Mathematics"},
+   {"role": "heading", "text": "Course Information"},
+   {"role": "body", "text": "This course introduces statistical thinking for students in biology, health and environmental science. Lectures meet Monday, Wednesday and Friday at 9:00 a.m. in Science Hall 104. 1"},
+   {"role": "heading", "text": "Prerequisites"},
+   {"role": "list", "text": "Precalculus or equivalent placement score"},
+   {"role": "list", "text": "Basic familiarity with spreadsheets"},
+   {"role": "heading", "text": "What You Will Learn"},
+   {"role": "list", "text": "Summarize data with tables, graphs and numerical measures."},
+   {"role": "list", "text": "Use probability to describe chance variation."},
+   {"role": "list", "text": "Estimate population quantities with confidence intervals."},
+   {"role": "list", "text": "Test claims with hypothesis tests and interpret p-values carefully."},
+   {"role": "heading", "text": "Assessment"},
+   {"role": "table", "text": "Component Weight Notes Weekly quizzes 20% Lowest two dropped Homework 20% Weekly, submitted online Midterm exams 30% Two exams, 15% each Final exam 30% Cumulative"},
+   {"role": "footnote", "text": "Lecture recordings are posted within 24 hours of each class."}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "heading", "text": "Policies"},
+   {"role": "heading", "text": "Attendance"},
+   {"role": "body", "text": "Attendance is expected but not graded. Quizzes cannot be made up, which is why the lowest two scores are dropped."},
+   {"role": "heading", "text": "Academic Integrity"},
+   {"role": "body", "text": "You may discuss homework with classmates. You must write your own solutions and list the names of anyone you worked with at the top of each submission."},
+   {"role": "heading", "text": "Accessibility"},
+   {"role": "body", "text": "If you use accommodations, send your letter to the instructor in the first week. Course materials can be provided in alternative formats on request."},
+   {"role": "heading", "text": "Textbook"},
+   {"role": "body", "text": "Required: Introductory Statistics (OpenStax), available free online. Chapters 1 through 10 are covered."}
+  ]}
+ ]
+}

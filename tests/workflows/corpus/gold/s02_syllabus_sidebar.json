@@ -1,0 +1,39 @@
+{
+ "id": "s02_syllabus_sidebar",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "ENVS 101 Syllabus, Fall 2026"},
+   {"role": "heading", "text": "ENVS 101: Introduction to Environmental Systems"},
+   {"role": "body", "text": "Fall 2026 · Mondays 10:00 to 11:50 a.m. · Hartwell Hall 210 · 4 credits"},
+   {"role": "heading", "text": "Course Description"},
+   {"role": "body", "text": "This course introduces the physical, chemical and biological processes that shape the natural environment. Students learn to measure environmental quantities, to read and draw graphs of field data, and to explain how energy and matter move through ecosystems."},
+   {"role": "heading", "text": "Learning Outcomes"},
+   {"role": "body", "text": "By the end of the course you should be able to:"},
+   {"role": "list", "text": "Describe the major nutrient cycles and the human activities that change them."},
+   {"role": "list", "text": "Collect field measurements with appropriate units and an estimate of error."},
+   {"role": "list", "text": "Build and interpret simple population growth models."},
+   {"role": "list", "text": "Communicate findings in a short written report and an oral presentation."},
+   {"role": "heading", "text": "Grading"},
+   {"role": "table", "text": "Component Weight Lab reports (four) 30% Problem sets (two) 15% Midterm exam 20% Reading responses (three) 10% Final project 25%"},
+   {"role": "heading", "text": "Late Work"},
+   {"role": "body", "text": "Work submitted up to two days late loses ten percent. After two days it is not accepted unless you have an approved accommodation or a documented emergency. Please contact the instructor before the deadline, not after."},
+   {"role": "heading", "text": "Instructor"},
+   {"role": "aside", "text": "Dr. Anita Rao anita.rao@example.edu Hartwell Hall 318"},
+   {"role": "heading", "text": "Office Hours"},
+   {"role": "aside", "text": "Tuesdays 1:00 to 3:00 p.m. and by appointment."},
+   {"role": "heading", "text": "Key Dates"},
+   {"role": "aside", "text": "Midterm: October 5 Project draft: November 16 Final presentations: November 30"},
+   {"role": "heading", "text": "Accessibility"},
+   {"role": "aside", "text": "If you need an accommodation, tell the instructor in the first two weeks."},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "ENVS 101 Syllabus, Fall 2026"},
+   {"role": "heading", "text": "Weekly Schedule"},
+   {"role": "body", "text": "The schedule may change; changes are announced in class and on the course site."},
+   {"role": "table", "text": "Week Date Topic Reading Due 1 Aug 24 Course overview; what is a system? Ch. 1 Quiz 0 (syllabus) 2 Aug 31 Measurement, units and error Ch. 2 Lab 1 report 3 Sep 7 Energy flows in ecosystems Ch. 3 Reading response 1 4 Sep 14 Nutrient cycles Ch. 4 Lab 2 report 5 Sep 21 Populations and growth models Ch. 5 Problem set 1 6 Sep 28 Midterm review and field trip Handout Field notes 7 Oct 5 Midterm exam None Midterm exam 8 Oct 12 Communities and succession Ch. 6 Reading response 2 9 Oct 19 Biodiversity and its loss Ch. 7 Lab 3 report 10 Oct 26 Climate and global change Ch. 8 Problem set 2 11 Nov 2 Water resources Ch. 9 Lab 4 report 12 Nov 9 Land use and policy Ch. 10 Reading response 3 13 Nov 16 Student project workshop None Project draft 14 Nov 30 Presentations and wrap-up None Final project"},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "id": "s06_landscape_table",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Section Schedule, Fall"},
+   {"role": "heading", "text": "Fall Section Schedule and Enrollment"},
+   {"role": "body", "text": "Times are start times; every section meets for 75 minutes. Wait list counts are as of the first day of classes."},
+   {"role": "table", "text": "Table 1. Section meeting times, rooms and enrollment, Fall term Section Instructor Mon Tue Wed Thu Fri Room Seats Enrolled Wait list A01 Rao 9:00 9:00 9:00 H210 40 38 0 A02 Rao 10:00 10:00 10:00 H210 40 40 6 B01 Park 13:00 13:00 H105 30 27 0 B02 Park 14:30 14:30 H105 30 30 4 C01 Rivera 11:00 11:00 L012 24 24 9 C02 Rivera 15:00 15:00 L012 24 19 0 D01 Nair 8:00 8:00 H318 20 12 0 D02 Nair 16:00 16:00 H318 20 20 2 E01 Okafor 12:00 12:00 12:00 L014 28 25 0 E02 Okafor 13:30 13:30 13:30 L014 28 28 7 F01 Mendes 10:00 10:00 H105 30 14 0 F02 Mendes 14:00 14:00 H105 30 29 1 G01 Hale 9:30 9:30 L012 24 22 0 G02 Hale 15:30 15:30 L012 24 24 5 H01 Chen 10:30 10:30 10:30 H210 40 31 0 H02 Chen 16:00 16:00 H210 40 36 0 J01 Singh 9:00 9:00 L014 28 26 0 J02 Singh 11:30 11:30 L014 28 28 3 K01 Moreau 13:00 13:00 H318 20 15 0 K02 Moreau 14:00 14:00 H318 20 18 0 A11 Rao 9:00 9:00 9:00 H210 40 38 0 A12 Rao 10:00 10:00 10:00 H210 40 40 6 B11 Park 13:00 13:00 H105 30 27 0 B12 Park 14:30 14:30 H105 30 30 4 C11 Rivera 11:00 11:00 L012 24 24 9 C12 Rivera 15:00 15:00 L012 24 19 0 D11 Nair 8:00 8:00 H318 20 12 0 D12 Nair 16:00 16:00 H318 20 20 2 E11 Okafor 12:00 12:00 12:00 L014 28 25 0 E12 Okafor 13:30 13:30 13:30 L014 28 28 7 F11 Mendes 10:00 10:00 H105 30 14 0 F12 Mendes 14:00 14:00 H105 30 29 1 G11 Hale 9:30 9:30 L012 24 22 0 G12 Hale 15:30 15:30 L012 24 24 5 H11 Chen 10:30 10:30 10:30 H210 40 31 0 H12 Chen 16:00 16:00 H210 40 36 0 J11 Singh 9:00 9:00 L014 28 26 0 J12 Singh 11:30 11:30 L014 28 28 3 K11 Moreau 13:00 13:00 H318 20 15 0 K12 Moreau 14:00 14:00 H318 20 18 0"},
+   {"role": "caption", "text": "Table 1. Section meeting times, rooms and enrollment, Fall term"},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Section Schedule, Fall"},
+   {"role": "footnote", "text": "Note: Rooms beginning with H are in Hartwell Hall; rooms beginning with L are laboratories in the Life Sciences Building."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

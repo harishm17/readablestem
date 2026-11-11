@@ -1,0 +1,17 @@
+{
+ "id": "r14_exam_513",
+ "encoding": "page-ranges",
+ "pages": [
+  {"page": 1, "stream_sha256": "10af95232b0d0e7814f2621facf1bddb7cc99b68f891d545ad894f7690fa8aad", "blocks": [
+   {"role": "body", "runs": [[0, 56]], "tokens": [13, 9, 2, 10, 3, 8, 2, 9], "sha256": "5760871983085d25755463228121ca0b43dc5654f2622f06dbca5cbaeb522393"},
+   {"role": "body", "runs": [[56, 87]], "tokens": [5, 4, 4, 7, 9, 2], "sha256": "86fc1b995ce075b5c613bbeb728ae637dc3b284eae881dd423adec5132cf5589"},
+   {"role": "heading", "runs": [[87, 101]], "tokens": [8, 4, 2], "sha256": "8132fd125912114b5e0fa1daa1e8dabf8cc567c65e702f03b87cca3231dfa303"},
+   {"role": "body", "runs": [[101, 160]], "tokens": [4, 4, 2, 4, 2, 4, 2, 10, 8, 3, 4, 12], "sha256": "47d8c9c33eb193e4a2dd88b296efecaf58785529b09b68fb40f85414d8dd6737"},
+   {"role": "body", "runs": [[160, 298]], "tokens": [9, 2, 4, 4, 4, 6, 4, 4, 6, 2, 7, 2, 4, 4, 4, 6, 4, 4, 6, 2, 6, 1, 2, 5, 9, 3, 9, 2, 3, 5, 5], "sha256": "f3bd083f1596d9bea289c9f27b79c87d9066fd602a6a39c3c029dd5b2109a8ae"},
+   {"role": "body", "runs": [[298, 354]], "tokens": [6, 6, 3, 11, 4, 3, 2, 7, 6, 3, 5], "sha256": "b1dbadb39b301f9f7a6e14e33bc2d62c5198373d249e1c3070d9d37d75c92623"},
+   {"role": "body", "runs": [[354, 441]], "tokens": [9, 5, 4, 4, 2, 7, 6, 3, 5, 3, 4, 2, 5, 1, 8, 5, 3, 5, 6], "sha256": "15e38f6bd32b65f802c10156e65229463b9cfac039d603c23b27b534c8057f36"},
+   {"role": "body", "runs": [[441, 634]], "tokens": [8, 7, 2, 4, 3, 10, 9, 2, 7, 7, 2, 7, 10, 6, 3, 10, 4, 11, 10, 3, 5, 8, 7, 4, 1, 3, 1, 7, 8, 3, 3, 2, 3, 4, 9], "sha256": "db228eda17ea00e73f51b73f45a0a0cac7f0b0eb2b82d492dc5be63da32b1a91"},
+   {"role": "body", "runs": [[634, 666]], "tokens": [3, 6, 3, 4, 2, 6, 2, 6], "sha256": "63647d04ee2e0bfae565d005f31b3be1b49a5f59c6075df2fb7313b752edac1e"}
+  ]}
+ ]
+}

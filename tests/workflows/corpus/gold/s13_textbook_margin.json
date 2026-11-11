@@ -1,0 +1,38 @@
+{
+ "id": "s13_textbook_margin",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Environmental Systems, Chapter 5"},
+   {"role": "body", "text": "CHAPTER 5"},
+   {"role": "heading", "text": "Population Growth"},
+   {"role": "body", "text": "Every population changes in size over time. Individuals are born, individuals die, and some move in or out. The balance of these four processes decides whether a population grows, shrinks or stays steady.1"},
+   {"role": "aside", "text": "Immigration and emigration are the movements of individuals into and out of a population."},
+   {"role": "heading", "text": "5.1 Exponential Growth"},
+   {"role": "body", "text": "When resources are unlimited, a population grows by a constant fraction each time period. The population after t periods is given by the equation below, where N0 is the starting size and r is the growth rate per period."},
+   {"role": "aside", "text": "Bacteria in a fresh flask of nutrient broth are a classic example of nearly exponential growth."},
+   {"role": "body", "text": "N(t) = N0 ert"},
+   {"role": "aside", "text": "Key idea: Exponential growth looks slow at first and then very fast. A population that doubles every day is 1,024 times larger after ten days."},
+   {"role": "body", "text": "Real populations cannot grow this way for long. Food, space and disease eventually slow the growth, which is why most populations show a different pattern."},
+   {"role": "aside", "text": "Thomas Malthus noticed this tension in 1798."},
+   {"role": "heading", "text": "5.2 Logistic Growth"},
+   {"role": "body", "text": "In the logistic model, growth slows as the population approaches the carrying capacity K. The growth rate falls to zero when N reaches K, and the population levels off at that size.2"},
+   {"role": "aside", "text": "Carrying capacity is the largest population the environment can support for a long time."},
+   {"role": "aside", "text": "Example 5.1: A pond can support 500 fish. If 50 fish are introduced and the growth rate is 0.4 per month, the population grows quickly at first and approaches 500 after about a year."},
+   {"role": "body", "text": "Ecologists test the logistic model by comparing its curve with counts from real populations, such as deer on an island or yeast in a flask."},
+   {"role": "footnote", "text": "1 Ecologists sometimes call births and deaths the natural increase of a population."},
+   {"role": "footnote", "text": "2 The logistic model was first proposed by Pierre Verhulst in 1838."},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Environmental Systems, Chapter 5"},
+   {"role": "heading", "text": "5.3 Review Questions"},
+   {"role": "list", "text": "Define carrying capacity in your own words."},
+   {"role": "list", "text": "Why can no real population grow exponentially forever?"},
+   {"role": "list", "text": "A culture starts with 100 cells and grows at 0.5 per hour. Estimate its size after four hours."},
+   {"role": "body", "text": "Answers to odd-numbered questions are at the back of the book."},
+   {"role": "aside", "text": "See Appendix B for worked solutions."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}
