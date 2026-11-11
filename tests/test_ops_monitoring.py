@@ -72,6 +72,23 @@ def test_healthz_ops_is_503_and_names_the_database_when_it_cannot_be_read(tmp_pa
     assert "secret" not in response.text
 
 
+def test_health_and_admin_show_the_production_profile_by_hash_and_setting_names(tmp_path):
+    from readablestem.ops import profile
+
+    shipped = profile.load()
+    env = WebEnv(tmp_path)
+    with env.running() as web:
+        health = web.get("/healthz/ops").json()
+        login(web, ADMIN)
+        page = web.get("/admin").text
+    assert health["profile"] == shipped.short_hash
+    assert "FEATURE_TABLES" not in str(health)  # the public route names no setting
+    section = page.split('id="profile-heading"')[1]
+    assert shipped.short_hash in section
+    # The test environment runs the code defaults, so the profile's switches differ: by name.
+    assert "<code>FEATURE_TABLES</code>" in section
+
+
 # --------------------------------------------------------------------------- cron CLI
 
 
