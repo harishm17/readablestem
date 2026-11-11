@@ -35,7 +35,6 @@ is.
   searching raw HTML. It converts only files of the corpus manifest, from recorded
   answers. A test that an open finding makes false is marked `@harness.finding("F-nnn")`,
   which fails the run once the finding is fixed until the mark is removed.
-  `tests/workflows/test_suite_rules.py` checks the names, the files and the marks.
 - **Only inputs that can be published.** Test and example documents must be your own work
   (contributed under MIT) or OpenStax material from books published under CC BY, with
   attribution.
