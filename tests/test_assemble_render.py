@@ -25,13 +25,9 @@ from readablestem.core.types import (
 from readablestem.pipeline.assemble import (
     ABOUT_TITLE,
     ABOUT_WORDING,
-    CHECKED,
     CONTACT,
     EQUATION_NOT_CONVERTED_ALT,
     FIGURE_NOT_DESCRIBED_ALT,
-    FLAGGED_NOTE,
-    MATHS_NOTE,
-    NOT_CHECKED_YET,
     render_html,
     sanitize_mathml,
 )
@@ -287,6 +283,7 @@ def test_hostile_text_is_escaped_everywhere():
     assert not [a for a in parsed.attrs if a[1].startswith("on")]
     assert {tag for tag, _, _ in parsed.attrs} <= {
         "html", "meta", "img", "h1", "p", "figure", "footer", "h2", "span", "div", "a",
+        "section",  # the notice that opens an unreviewed page (SW7)
     }  # fmt: skip
     assert "&lt;script&gt;alert(&#x27;p&#x27;)&lt;/script&gt;" in html
     assert 'alt="&quot;&gt;&lt;img src=x onerror=alert(4)&gt;"' in html
@@ -447,40 +444,43 @@ def about(html: str) -> str:
 
 def test_the_student_note_comes_after_main_and_speaks_to_students(sample_html):
     """The note is for the people who read the file (MF7 of the UX review): what it is,
-    whether the instructor has checked it, who to tell. No counts and no review words."""
+    how much of it a person reviewed and what is a picture (SW7: with their counts, so it
+    never says more than was done), who to tell. No review screen's words."""
     note = about(sample_html)
     assert sample_html.index("</main>") < sample_html.index('<footer id="about-conversion"')
     # Its title labels the footer region; it is not a heading in the outline (T3-13).
     assert f'<p id="about-conversion-title" class="about-title">{ABOUT_TITLE}</p>' in note
     assert 'aria-labelledby="about-conversion-title"' in note and "<h" not in note
-    assert ABOUT_WORDING in note and MATHS_NOTE in note and CONTACT in note
-    assert NOT_CHECKED_YET in note  # the sample has decisions still open
-    assert FLAGGED_NOTE in note
+    assert ABOUT_WORDING in note and CONTACT in note
+    assert "2 of its 5 equations are written so that screen readers can read them aloud" in note
+    # Decisions are still open: the 2 a person made are counted, the 4 still open are not.
+    assert "Your instructor reviewed 2 of 6 parts the tool flagged." in note
+    assert "4 parts could not be converted and are shown as pictures of the original" in note
     assert "<p>Test note.</p>" in note
-    for word in ("needs review", "rejected", "accepted", "reviewer", "("):
+    for word in ("needs review", "rejected", "accepted", "reviewer", "checked"):
         assert word not in note.lower(), word
-    text = re.sub(r"<[^>]+>", "", note).replace("readablestem", "")
-    assert not re.search(r"\d", text)  # no counts
 
 
-def test_the_note_says_checked_with_the_date_once_every_decision_is_made():
+def test_the_note_says_reviewed_with_the_date_once_a_person_decided():
     pairs = [heading("a", 0, 1), heading("b", 1, 2, Status.NEEDS_REVIEW)]
     elements, fixes = [e for e, _ in pairs], [f for _, f in pairs]
     draft = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
                         checked_on=date(2026, 10, 9))  # fmt: skip
-    assert NOT_CHECKED_YET in about(draft) and "2026" not in about(draft)
+    assert "<p>This version has not been reviewed by a person.</p>" in about(draft)
+    assert "2026" not in about(draft)
     fixes[1].status, fixes[1].reviewed = Status.ACCEPTED, True
     done = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
                        checked_on=date(2026, 10, 9))  # fmt: skip
-    assert f"<p>{CHECKED} on October 9, 2026.</p>" in about(done)
+    said = "<p>Your instructor reviewed 1 of 1 part the tool flagged, on October 9, 2026.</p>"
+    assert said in about(done)
     undated = render(elements, fixes)
-    assert f"<p>{CHECKED}.</p>" in about(undated)
+    assert "<p>Your instructor reviewed 1 of 1 part the tool flagged.</p>" in about(undated)
 
 
 def test_about_section_without_fixes_and_defaults():
     para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text="x")
     html = render([para], [], title="  ", lang="")
-    assert ABOUT_WORDING in html and MATHS_NOTE not in html  # no equations, no maths line
+    assert ABOUT_WORDING in html and "equations" not in html  # no equations, no maths line
     assert "<title>Converted document</title>" in html
     assert '<html lang="en">' in html
     assert "could not be converted" not in html

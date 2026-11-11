@@ -200,8 +200,6 @@ def left_out_owner(s: CheckedSummary) -> str:
 
 
 def checks_failed_sentence(s: CheckedSummary) -> str:
-    if not s.checks_run:
-        return NO_CHECKS
     if not s.checks_failed:
         return ""
     n = len(s.checks_failed)
@@ -213,11 +211,6 @@ def remains(s: CheckedSummary) -> str:
     nothing does)."""
     parts = [as_image_sentence(s), left_out_owner(s), checks_failed_sentence(s)]
     return " ".join(p for p in parts if p)
-
-
-def ready_message(s: CheckedSummary) -> str:
-    """The status message of a finished job with no open decision and no gap."""
-    return READY_ALL if s.ready_to_share else remains(s) or READY_ALL
 
 
 def checks_line(s: CheckedSummary, open_decisions: int = 0) -> str:
@@ -254,6 +247,37 @@ def finish_sentence(s: CheckedSummary) -> str:
     return text
 
 
+def card_equations(s: CheckedSummary) -> str:
+    """The before/after card's equation row: how many of the equations found are MathML."""
+    c = s.converted
+    images = c.pictures_by_kind.get("equation", 0)
+    text = f"{c.equations_mathml} of {c.equations} are MathML, read with their structure"
+    if images:
+        return f"{text}; {images} {'is' if images == 1 else 'are'} shown as an image."
+    return f"{text}."
+
+
+def notes_line(s: CheckedSummary) -> str:
+    """The optional notes nobody opened, never counted as reviewed ("" when none)."""
+    u = s.unopened
+    if not u:
+        return ""
+    return (
+        f"{plural(u, 'part')} {'was' if u == 1 else 'were'} accepted by the tool with an "
+        "optional note nobody has opened, so not reviewed"
+    )
+
+
+NOTES_HOLD = "None holds up the file."
+CHECKS_NOT_MEANING = (
+    "the structure checks look at the structure of the file, not at whether each part says "
+    "what you meant."
+)
+DID_NOT_RUN = (
+    "the axe accessibility test (we run it on our own documents) and testing with a screen reader."
+)
+
+
 def card_yes(s: CheckedSummary) -> str:
     """The start of a before/after row about structure (headings, lists, links): "Yes" only
     when every part the tool found was converted; otherwise only the converted parts have it."""
@@ -272,7 +296,7 @@ def record_pictures(s: CheckedSummary) -> str:
 
 def record_checks(s: CheckedSummary) -> str:
     if not s.checks_run:
-        return "No structure checks are stored for this file."
+        return NO_CHECKS
     head = (
         f"{s.checks_run} structure checks of the HTML file ran (language, title, order of "
         "headings, lists, links, tables and the alt attribute of every image)."

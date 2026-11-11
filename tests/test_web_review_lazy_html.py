@@ -8,7 +8,6 @@ import pytest
 
 from fixtures.web.support import fetch
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline.assemble import CHECKED
 from readablestem.web.db import Job, session_scope
 from test_web_pipeline import Site, csrf_from, paragraph, review, site  # noqa: F401
 
@@ -53,7 +52,7 @@ def test_the_student_note_is_dated_by_the_last_decision_not_by_the_render(site):
         for edit in session.query(ReviewEdit).filter_by(job_id=site.job_id):
             edit.created_at = edit.created_at.replace(year=2026, month=1, day=2)
     served = fetch(site.browser, f"/jobs/{site.job_id}/download").text
-    assert f"{CHECKED} on January 2, 2026." in served, served[-600:]
+    assert "the tool flagged, on January 2, 2026." in served, served[-600:]
 
 
 def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):

@@ -133,10 +133,13 @@
     <div><dt>Decisions made</dt><dd>{{ c.decided_units }}</dd></div>
   </dl>
   </details>
-  {# Said by the status box when the job is ready; here in every other state. #}
-  {% if c.as_image and state.key != "ready" %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
-  {% if c.notes %}
-  <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. None holds up the file.</p>
+  {# Said by the status box when the job is ready (web/states.py); here in every other
+     state. Every sentence is the summary's (pipeline/checked_words.py). #}
+  {% set pictures = checked_words.as_image_sentence(s.checked) %}
+  {% if pictures and state.key not in ["ready", "ready_remains"] %}<p id="items-count">{{ pictures }}</p>{% endif %}
+  {% set notes = checked_words.notes_line(s.checked) %}
+  {% if notes %}
+  <p id="notes-line">{{ notes }}{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. {{ checked_words.NOTES_HOLD }}</p>
   {% endif %}
   {% if c.decisions and job.can_review %}
   {# One link per kind, straight to its first decision on the review screen. A group of
@@ -152,25 +155,21 @@
   <p class="hint"><a href="/jobs/{{ job.id }}/review/list">All items as a list</a></p>
   {% endif %}
   {% if s.checks_run %}
-  <h3 id="checks-heading">Automatic checks of the HTML file</h3>
+  <h3 id="checks-heading">Structure checks of the HTML file</h3>
+  <p>{{ checked_words.checks_line(s.checked, c.decisions) }}</p>
   {% if s.failed_checks %}
-  {% set n = s.failed_checks|length %}
-  <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if c.decisions %} (they run again after each review decision){% endif %}:</p>
   <ul class="check-list" aria-labelledby="checks-heading">
     {% for check in s.failed_checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>
     {% endfor %}
   </ul>
-  {% else %}
-  <p>All {{ s.checks_run }} checks passed. They check structure, not whether the content is right.</p>
   {% endif %}
   {% endif %}
   {# T1-11: say what ran and what did not, so a pass is not read as more than it is. #}
   <details class="tech" id="checks-ran">
     <summary>What was checked, and what was not</summary>
-    <p><strong>Ran on this file:</strong>{% if s.checks_run %} {{ s.checks_run }} structure {{ "check" if s.checks_run == 1 else "checks" }}.{% else %} none stored.{% endif %}
-      <strong>Did not run on this file:</strong> the axe accessibility test (we run it on our own
-      documents) and testing with a screen reader.</p>
+    <p><strong>Ran on this file:</strong> {{ checked_words.checks_ran(s.checked) }}
+      <strong>Did not run on this file:</strong> {{ checked_words.DID_NOT_RUN }}</p>
   </details>
 </section>
 

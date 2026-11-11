@@ -37,6 +37,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from readablestem.core.types import DocumentResult
+from readablestem.pipeline import checked, checked_words
+from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import job_page
 from readablestem.web import outcome as words
 from readablestem.web.database import as_utc
@@ -95,11 +98,17 @@ TABLE: dict[str, Row] = {
     "needs_decisions": Row("Needs your decisions", NEEDS_YOU, True),
     "partly_converted": Row("Partly converted", GAPS, True),
     "ready": Row("Ready to share", DONE, True),
+    # Finished with no decision open, but a part is a picture, a page is left out or a
+    # structure check failed (or none is stored): "Ready" and what remains (SW7).
+    "ready_remains": Row("Ready", GAPS, True),
     "sample": Row("Sample", SAMPLE, True),
     "deleted": Row("Deleted on {date}", WAITING, True),
 }
 # The states that have something to keep, so "Keep for 7 days" is offered (F-316).
-KEEPS = frozenset({"needs_decisions", "partly_converted", "ready"})
+KEEPS = frozenset({"needs_decisions", "partly_converted", "ready", "ready_remains"})
+# The finished states with no decision open and no gap note: their message is the
+# summary's (`pipeline.checked`), never a template's.
+READY_KEYS = frozenset({"ready", "ready_remains"})
 
 # --------------------------------------------------------------------------- stop codes
 
@@ -226,10 +235,11 @@ class State:
 
     @property
     def shareable(self) -> bool:
-        """Whole enough to give to students: ready, or partly converted only because pages
-        are kept as pictures (converting again cannot read them); not a job a cap or an
-        outage stopped part way, whose missing parts can still be converted."""
-        if self.key == "ready":
+        """Whole enough to give to students: ready (the student page says what is a picture
+        or left out, `pipeline.checked`), or partly converted only because pages are kept as
+        pictures (converting again cannot read them); not a job a cap or an outage stopped
+        part way, whose missing parts can still be converted."""
+        if self.key in READY_KEYS:
             return True
         return self.key == "partly_converted" and all(
             g.code == "pages_as_pictures" for g in self.gaps
@@ -309,25 +319,21 @@ class Context:
 
 @dataclass(frozen=True)
 class Counts:
-    """The open required decisions of a finished job (today: its item fixes, a group of
-    repeated headings counted once), and what of it is shown as images, for the message."""
+    """The open required decisions of a finished job (a group of repeated headings counted
+    once), and the statement of what was converted, checked and reviewed
+    (`pipeline.checked.CheckedSummary`). `open` is the summary's own count when there is one;
+    the documents list passes the stored `jobs.open_decisions` alone for a job with decisions
+    open, made by the same function (`core.triage.review_load`)."""
 
     open: int = 0
-    as_image_sentence: str = ""  # "1 equation is shown as an image ..." when any is
+    summary: CheckedSummary | None = None
 
 
-def counts_of(breakdown: job_page.Breakdown | None) -> Counts:
-    """`Counts` from a finished result's breakdown (`job_page.breakdown`)."""
-    if breakdown is None:
+def counts_of(summary: CheckedSummary | None) -> Counts:
+    """`Counts` from a finished result's summary (`pipeline.checked.of_result`)."""
+    if summary is None:
         return Counts()
-    sentence = ""
-    if breakdown.as_image:
-        verb = "is" if breakdown.as_image == 1 else "are"
-        sentence = (
-            f"{job_page.kinds_phrase(breakdown.as_image_kinds)} {verb} shown as an image that "
-            "screen readers cannot read."
-        )
-    return Counts(breakdown.decisions, sentence)
+    return Counts(summary.open_required, summary)
 
 
 def tries_left(retries: int) -> int:
@@ -527,8 +533,13 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
         actions = [g.action for g in gaps if g.action is not None]
         steps = (*actions, download) if actions else (download,)
         return _make("partly_converted", " ".join(g.text for g in gaps), steps, gaps)
-    message = counts.as_image_sentence or "Everything was converted."
-    return _make("ready", message, (download, share) if viewer == "owner" else (download,))
+    steps = (download, share) if viewer == "owner" else (download,)
+    summary = counts.summary
+    if summary is not None and summary.ready_to_share:
+        return _make("ready", checked_words.READY_ALL, steps)
+    # Not known to be whole (no summary), or a part is a picture, a page is left out or a
+    # structure check failed: "Ready", and what remains, never "Ready to share".
+    return _make("ready_remains", checked_words.remains(summary) if summary else "", steps)
 
 
 # --------------------------------------------------------------------------- loading
@@ -551,17 +562,17 @@ _COLUMNS = (
 def load(
     session: Session, job_ids: Iterable[str], *, context: Context | None = None
 ) -> dict[str, State]:
-    """The state of each job, from its columns. A finished job with an outcome code has its
-    result read (only it can carry a gap note); others never are. A finished job from before
+    """The state of each job, from its columns. A finished job with no decision open, or
+    with an outcome code, has its result read: its label is the summary's
+    (`pipeline.checked`), and only a job with a code can carry a gap note. A job with
+    decisions open needs only the stored count. A finished job from before
     `jobs.open_decisions` existed has the column filled once (`documents.list_facts`)."""
     ids = list(dict.fromkeys(job_ids))
     if not ids:
         return {}
     rows = session.execute(select(*_COLUMNS).where(Job.id.in_(ids))).all()
     with_result = [
-        r.id
-        for r in rows
-        if r.status == JobStatus.DONE and (r.error_code or r.open_decisions is None)
+        r.id for r in rows if r.status == JobStatus.DONE and (r.error_code or not r.open_decisions)
     ]
     results: dict[str, tuple[Any, int | None]] = {}
     if with_result:
@@ -572,6 +583,9 @@ def load(
     out: dict[str, State] = {}
     for r in rows:
         result, opened = results.get(r.id, (None, r.open_decisions))
+        counts = Counts(open=int(opened or 0))
+        if result:
+            counts = counts_of(checked.of_result(DocumentResult.model_validate(result)))
         facts = Facts(
             id=r.id,
             status=str(r.status),
@@ -583,5 +597,5 @@ def load(
             lease_until=r.lease_until,
             is_sample=bool(r.is_sample),
         )
-        out[r.id] = state_of(facts, Counts(open=int(opened or 0)), context=context)
+        out[r.id] = state_of(facts, counts, context=context)
     return out

@@ -41,6 +41,7 @@ from readablestem.core import sandbox
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
+from readablestem.pipeline import checked_words
 from readablestem.web import analytics, output, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
@@ -192,6 +193,9 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     # Absolute address for link previews (og:image and og:url must be absolute); empty in
     # tests, where the tags fall back to relative addresses.
     env.globals["site_url"] = site_url.rstrip("/")  # ty: ignore[invalid-assignment]
+    # Every sentence about what was converted, checked or reviewed (SW7): templates print
+    # these, read from a `pipeline.checked.CheckedSummary`, and compose none of their own.
+    env.globals["checked_words"] = checked_words  # ty: ignore[invalid-assignment]
     # Structured data for the public pages (web.seo), with the same absolute address.
     env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
         seo.page_json_ld, site_url.rstrip("/")

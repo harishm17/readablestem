@@ -107,14 +107,17 @@ def section_of_status(html: str) -> str:
 def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     decide_everything(web, keep_as_image=())
     result = web.converter.output.result
-    result.fixes = [f for f in result.fixes if f.element_id != "p1-e5"]  # no image left
+    # No image left: the abstained equation goes, its element too (an element with no fix
+    # is shown as its picture, so the job would be only "Ready", SW7).
+    result.fixes = [f for f in result.fixes if f.element_id != "p1-e5"]
+    result.elements = [e for e in result.elements if e.id != "p1-e5"]
     for fix in result.fixes:
         fix.reviewed = False  # accepted by the pipeline: nothing needed a decision
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Ready to share: SECRET-HEADING Kinematics | ReadableSTEM"
     ready = page_text(section(html, "ready-heading"))
-    assert "Nothing in this file needed your decision." in ready
+    assert "The tool flagged nothing in this file for review, and nobody has reviewed it." in ready
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
     assert "Before you share" in ready and "Where will you post it?" in ready
     assert "Recommended" in ready
@@ -220,7 +223,7 @@ def test_the_counts_add_up_and_match_the_review_screen(web):
     results = page_text(section(html, "results-heading"))
     # Decisions are the one unit (T1-11): no count of items waiting, accepted or decided.
     assert "Of the 5 items" not in results and "were accepted for you" not in results
-    assert "1 equation is shown as an image of the original." in results, results
+    assert "1 equation is shown as an image that screen readers cannot read." in results
     review = page_text(web.browser.get(f"/jobs/{job_id}/review").text)
     assert "3" in review and "Decisions to make 3" in results
 

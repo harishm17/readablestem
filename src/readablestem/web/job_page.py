@@ -51,8 +51,11 @@ from readablestem.core.types import (
     SourceFacts,
     Status,
 )
+from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import language as languages
 from readablestem.pipeline import notices as notice_rules
+from readablestem.pipeline.checked import CheckedSummary, word_kind
+from readablestem.pipeline.checked_words import KIND_WORDS, join_words, kinds_phrase, plural
 from readablestem.pipeline.source_facts import flattened_parts
 from readablestem.pipeline.speech import GREEK, SYMBOLS
 from readablestem.web import notice_places
@@ -61,16 +64,8 @@ from readablestem.web.messages import explain_notice
 # --------------------------------------------------------------------------- words
 
 
-def plural(n: int, one: str, many: str | None = None) -> str:
-    """ "1 equation", "3 equations"."""
-    return f"{n} {one if n == 1 else (many or one + 's')}"
-
-
-def join_words(parts: list[str]) -> str:
-    """ "a", "a and b", "a, b and c"."""
-    if len(parts) <= 1:
-        return "".join(parts)
-    return ", ".join(parts[:-1]) + " and " + parts[-1]
+# `plural`, `join_words`, `kinds_phrase`, `KIND_WORDS` and `word_kind` are the summary's
+# (`pipeline.checked_words`, `pipeline.checked`), so the page names kinds as it does.
 
 
 # --------------------------------------------------------------------------- progress
@@ -270,14 +265,6 @@ class Breakdown:
             reasons.append("pages kept as images for the same reason are decided together")
         return "; ".join(reasons)
 
-    @property
-    def as_image_sentence(self) -> str:
-        """ "2 pages are shown as images of the original." ("" when none)."""
-        if not self.as_image:
-            return ""
-        verb = "is shown as an image" if self.as_image == 1 else "are shown as images"
-        return f"{kinds_phrase(self.as_image_kinds)} {verb} of the original."
-
 
 def shown_as_image(fix: Fix) -> bool:
     """The original is kept as an image in the HTML file (T1-3). Not a heading: "Make bold
@@ -310,38 +297,6 @@ def breakdown(fixes: list[Fix]) -> Breakdown:
         heading_groups=sum(f.kind is Kind.HEADING for f in grouped),
         page_groups=sum(word_kind(f) in ("page", "handwriting") for f in grouped),
     )
-
-
-KIND_WORDS = {
-    "equation": ("equation", "equations"),
-    "figure": ("figure", "figures"),
-    "table": ("table", "tables"),
-    "heading": ("heading", "headings"),
-    # Text read from an image of a page (ADR 0007): paragraphs and list items with a fix.
-    "paragraph": ("piece of text", "pieces of text"),
-    # Pages and handwriting kept as images (pipeline.page_type) are figures in the data
-    # model, but not in words.
-    "page": ("page", "pages"),
-    "handwriting": ("piece of handwriting", "pieces of handwriting"),
-}
-
-
-def word_kind(fix: Fix) -> str:
-    """The kind a fix is named by: "page" or "handwriting" for one kept as an image
-    before any model work, else its kind."""
-    if fix.kind is Kind.FIGURE and fix.reason in notice_rules.KEPT_IMAGE_CODES:
-        return "handwriting" if fix.reason == "handwriting_on_page" else "page"
-    return fix.kind.value
-
-
-def kinds_phrase(counts: dict[str, int]) -> str:
-    """ "1 equation and 2 figures" (in a fixed order)."""
-    parts = [
-        plural(counts[kind], one, many)
-        for kind, (one, many) in KIND_WORDS.items()
-        if counts.get(kind)
-    ]
-    return join_words(parts) or plural(sum(counts.values()), "part")
 
 
 # --------------------------------------------------------------------------- decisions
@@ -554,7 +509,7 @@ def _doc_lost(result: DocumentResult) -> list[str]:
     return [DOC_LOST_WORDS[p] for p in DOC_LOST_WORDS if p in found]
 
 
-def _equation_row(facts: SourceFacts, result: DocumentResult) -> Row:
+def _equation_row(facts: SourceFacts, result: DocumentResult, summary: CheckedSummary) -> Row:
     n, flat = facts.equations, facts.equations_flattened
     if flat:
         lost = join_words(_doc_lost(result)) or "their layout"
@@ -564,11 +519,7 @@ def _equation_row(facts: SourceFacts, result: DocumentResult) -> Row:
         )
     else:
         pdf = "The symbols are there, on one line; none of these has a fraction or script."
-    equations = [f for f in _first_fixes(result).values() if f.kind is Kind.EQUATION]
-    maths = sum(1 for f in equations if _used(f) and f.equation is not None)
-    images = sum(1 for f in equations if f.status in KEPT_ORIGINAL_STATUSES)
-    html = f"{maths} of {len(equations) or n} are MathML, read with their structure"
-    html += f"; {images} {'is' if images == 1 else 'are'} shown as an image." if images else "."
+    html = checked_words.card_equations(summary)
     if facts.tagged:
         pdf = "Your PDF is tagged; we did not check how its tags give the math. " + pdf
     return Row("hear equations with their structure", pdf, html)
@@ -608,20 +559,20 @@ def _figure_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
     return Row("hear what a figure shows", pdf, html + ".")
 
 
-def _heading_row(facts: SourceFacts, result: DocumentResult) -> Row:
+def _heading_row(facts: SourceFacts, result: DocumentResult, yes: str) -> Row:
     headings = sum(1 for f in _first_fixes(result).values() if f.kind is Kind.HEADING and _used(f))
     if facts.tagged:
         pdf = "Perhaps: your PDF is tagged, so it may mark headings (we did not check)."
     else:
         pdf = "No: nothing marks a heading"
         pdf += f", though it has {plural(facts.bookmarks, 'bookmark')}." if facts.bookmarks else "."
-    html = (
-        f"Yes: {plural(headings, 'heading')} in one outline." if headings else "No headings found."
-    )
+    html = "No headings found."
+    if headings:
+        html = f"{yes}: {plural(headings, 'heading')} in one outline."
     return Row("jump from section to section", pdf, html)
 
 
-def _list_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
+def _list_row(facts: SourceFacts, result: DocumentResult, yes: str) -> Row | None:
     ordered = sorted(result.elements, key=lambda e: e.order)
     items = [e for e in ordered if e.kind is Kind.LIST_ITEM]
     if not items:
@@ -635,7 +586,7 @@ def _list_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
         pdf = "Perhaps: your PDF is tagged, so it may mark lists (we did not check)."
     else:
         pdf = "No: bullets and numbers are read as characters; nothing says “list, 3 items”."
-    html = f"Yes: {plural(lists, 'list')} with {plural(len(items), 'item')}."
+    html = f"{yes}: {plural(lists, 'list')} with {plural(len(items), 'item')}."
     return Row("hear lists as lists", pdf, html)
 
 
@@ -671,13 +622,13 @@ def link_counts(facts: SourceFacts, result: DocumentResult) -> tuple[int, int, i
     return facts.links, kept, dropped
 
 
-def _link_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
+def _link_row(facts: SourceFacts, result: DocumentResult, yes: str) -> Row | None:
     if not facts.links:
         return None
     total, kept, dropped = link_counts(facts, result)
     pdf = f"Yes: {plural(total, 'link')}."
     if kept >= total:
-        return Row("follow the links", pdf, f"Yes: {plural(kept, 'link')}.")
+        return Row("follow the links", pdf, f"{yes}: {plural(kept, 'link')}.")
     html = f"{kept} of {plural(total, 'link')} kept"
     if not dropped:
         return Row("follow the links", pdf, html + ".")
@@ -712,14 +663,18 @@ def _language_row(facts: SourceFacts, result: DocumentResult) -> Row:
     return Row("hear the right language", pdf, html)
 
 
-def before_after(result: DocumentResult) -> Card | None:
-    """The card, or None for results measured before source facts existed."""
+def before_after(result: DocumentResult, summary: CheckedSummary | None = None) -> Card | None:
+    """The card, or None for results measured before source facts existed. Its equation
+    row and the start of its structure rows ("Yes", or "In the converted parts" when a part
+    is a picture or a page is left out) are the summary's (`pipeline.checked_words`)."""
     facts = result.source_facts
     if facts is None:
         return None
+    summary = summary or checked.of_result(result)
+    yes = checked_words.card_yes(summary)
     rows: list[Row | None] = []
     if facts.equations:
-        rows.append(_equation_row(facts, result))
+        rows.append(_equation_row(facts, result, summary))
     if facts.bold_maths_letters:
         rows.append(
             Row(
@@ -733,10 +688,10 @@ def before_after(result: DocumentResult) -> Card | None:
         )
     rows += [
         _figure_row(facts, result),
-        _heading_row(facts, result),
-        _list_row(facts, result),
+        _heading_row(facts, result, yes),
+        _list_row(facts, result, yes),
         _table_row(facts, result),
-        _link_row(facts, result),
+        _link_row(facts, result, yes),
     ]
     # Past seven rows the last ones go: a language to check comes before the title.
     tail = [_title_row(facts, result), _language_row(facts, result)]
@@ -938,25 +893,24 @@ def language_choices(current: str) -> list[tuple[str, str]]:
 
 @dataclass(frozen=True)
 class Finish:
-    """The "Ready to share" block (BW1 of the UX review), shown once no decision is open."""
+    """The finish line (BW1 of the UX review), shown once no decision is open: what people
+    reviewed, from the summary (`pipeline.checked_words.finish_sentence`), and the optional
+    notes nobody opened, never counted as reviewed."""
 
-    decided_units: int
-    last_decision: date | None
-    notes: int
+    summary: CheckedSummary
     not_handled: int
 
     @property
     def sentence(self) -> str:
-        return finish_sentence(self)
+        return checked_words.finish_sentence(self.summary)
 
+    @property
+    def notes(self) -> int:
+        return self.summary.unopened
 
-def finish_sentence(finish: Finish) -> str:
-    if not finish.decided_units:
-        return "Nothing in this file needed your decision."
-    when = (
-        f" on {finish.last_decision:%B} {finish.last_decision.day}" if finish.last_decision else ""
-    )
-    return f"You made {plural(finish.decided_units, 'decision')}{when}."
+    @property
+    def notes_line(self) -> str:
+        return checked_words.notes_line(self.summary)
 
 
 def draft_sentence(fixes: list[Fix]) -> str:
@@ -982,6 +936,7 @@ class PageData:
     """Everything the job page shows from a finished job's result."""
 
     counts: Breakdown
+    checked: CheckedSummary  # what was converted, checked and reviewed (`pipeline.checked`)
     found: str  # "Found 19 equations, 7 figures and 36 headings on 13 pages."
     card: Card | None
     notices: NoticeLists
@@ -1027,24 +982,21 @@ def page_data(result: DocumentResult, last_decision: date | None) -> PageData:
     from readablestem.web import queue
 
     counts = breakdown(result.fixes)
+    summary = checked.of_result(result, reviewed_on=last_decision)
     notices = notice_lists(result)
     first = queue.first_open(queue.decisions(result))
     return PageData(
         counts=counts,
+        checked=summary,
         found=found_sentence(result),
-        card=before_after(result),
+        card=before_after(result, summary),
         notices=notices,
         language=language_line(result),
         lang=result.lang,
         language_check=language_needs_check(result),
         language_choices=language_choices(result.lang),
         first_open=first.key if first is not None else None,
-        finish=Finish(
-            decided_units=counts.decided_units,
-            last_decision=last_decision,
-            notes=counts.notes,
-            not_handled=len(notices.not_handled),
-        ),
+        finish=Finish(summary, not_handled=len(notices.not_handled)),
         draft=draft_sentence(result.fixes),
         title_suggested=suggested_title(result),
     )

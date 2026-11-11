@@ -42,6 +42,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core import triage
 from readablestem.core.types import Fix
+from readablestem.pipeline import checked
 from readablestem.web import states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus
@@ -203,8 +204,10 @@ def _fixes(fixes: object) -> list[Fix]:
 
 
 def open_decisions(fixes: object) -> int:
-    """Decisions still open in a stored result's fixes (a heading group is one)."""
-    return triage.open_decisions(_fixes(fixes))
+    """Decisions still open in a stored result's fixes (a heading group is one): the
+    summary's count (`pipeline.checked.open_required`), which the stored
+    `jobs.open_decisions`, the draft gate and the job's state all read."""
+    return checked.open_required(_fixes(fixes))
 
 
 def list_facts(result: object) -> tuple[int, str]:

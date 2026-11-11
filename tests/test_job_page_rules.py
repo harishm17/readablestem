@@ -82,7 +82,9 @@ def test_an_ai_outage_is_not_finished():
     assert "3 of 4 equations and figures" in outage.message
     assert "Nothing is wrong with your PDF" in outage.message
     assert outage.retry is not None and outage.retry.kind == "missing"
-    assert state(2, 4).key == "ready" and state(0, 4).key == "ready"
+    # No outage gap; without a summary of what was converted the job is never "Ready to
+    # share" (SW7), only "Ready".
+    assert state(2, 4).key == "ready_remains" and state(0, 4).key == "ready_remains"
 
 
 # --------------------------------------------------------------------------- reading
@@ -165,8 +167,12 @@ def test_the_card_rows_say_what_is_lost_specifically_and_never_score():
     assert maths.html == "3 of 4 are MathML, read with their structure; 1 is shown as an image."
     assert rows["tell a bold vector from a plain letter"].pdf.startswith("No: 3 bold letters")
     assert rows["hear what a figure shows"].html == "1 of 1 figure has a short description."
-    assert rows["jump from section to section"].html == "Yes: 1 heading in one outline."
-    assert rows["hear lists as lists"].html == "Yes: 1 list with 2 items."
+    # One equation is a picture, so only the converted parts have the structure (SW7).
+    assert (
+        rows["jump from section to section"].html
+        == "In the converted parts: 1 heading in one outline."
+    )
+    assert rows["hear lists as lists"].html == "In the converted parts: 1 list with 2 items."
     # T1-15: the count says how many were kept, not "Yes" or "Not yet".
     assert rows["follow the links"].html == "0 of 2 links kept."
     for row in card.rows:

@@ -35,8 +35,10 @@ the content came from (a source file or the page) join it with the items that br
 The rules (the claims each surface may make):
 
 - `ready_to_share`: nothing is shown as a picture, nothing is left out, no structure check
-  failed (and some ran), and no decision is open. Otherwise the job is "Ready" with what
-  remains.
+  failed and no decision is open. Otherwise the job is "Ready" with what remains. A result
+  stored without checks (from before they existed) is not held back for that: its page is
+  made again, and checked, when it is next opened (`routes.jobs.current_html`), and no
+  sentence says a check passed that is not stored.
 - `all_found_converted`: every part the tool found was converted (no picture, no page left
   out). It is said as "every part the tool found", never "everything": parts the tool did not
   find (ink it could not read) are not counted until the page facts exist.
@@ -177,7 +179,7 @@ class CheckedSummary:
 
     @property
     def ready_to_share(self) -> bool:
-        return self.all_found_converted and self.checks_passed and not self.open_required
+        return self.all_found_converted and not self.checks_failed and not self.open_required
 
     @property
     def text_sufficient(self) -> bool:

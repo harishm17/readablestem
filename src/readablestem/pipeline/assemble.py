@@ -1416,7 +1416,6 @@ def _summary_meta(summary: checked.CheckedSummary) -> list[str]:
     return lines
 
 
-
 def draft_banner(open_decisions: int) -> str:
     """The first words of a draft file: how many decisions are still open, and that it is
     not for students (SW21)."""
