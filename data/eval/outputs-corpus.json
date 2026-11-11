@@ -1,0 +1,751 @@
+{
+ "split": {
+  "name": "development",
+  "seed": "corpus",
+  "set_sha256": "5dd6cabd1e55eef6af6f5885208c22d4b0b5d539b215384cfe0a64379ee44dd2",
+  "documents": 72
+ },
+ "profile": {
+  "name": "production",
+  "sha256": "62b4f1678d3695f82a93261d2178a8ec75af489c017418686a77000de360e5e8",
+  "confirmed": false,
+  "differs": [],
+  "counted_off": [
+   "FEATURE_LATEX_SOURCE",
+   "OFFICE_INPUT_ENABLED"
+  ]
+ },
+ "pipeline_version": "0.5.10",
+ "commit": "86e70d22a1985c6a92b15417c60e98fb9c30e43b",
+ "machine": {
+  "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+  "cores": 16
+ },
+ "not_finished": [],
+ "metrics": {
+  "uploads": {
+   "measured": 63,
+   "answers_missing": {
+    "ar3_sideways90": 2,
+    "ar4_sideways270": 2,
+    "d1_scripts": 14,
+    "e1_mc_columns": 6,
+    "e2_solutions_rubric": 6,
+    "e3_calendar": 2,
+    "f1_notation": 50,
+    "f2_figures": 30,
+    "f4_matrices": 12,
+    "w_lecture_5111": 2
+   },
+   "not_measured": []
+  },
+  "whole": {
+   "uploads": 63,
+   "pages": 315,
+   "built": {
+    "html": 63,
+    "docx": 63,
+    "epub": 63,
+    "canvas_index": 63,
+    "canvas_page": 63,
+    "cartridge": 63,
+    "transcript": 63
+   },
+   "failed": {},
+   "counts": {
+    "out_char": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_text_lost": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_text_twice": {
+     "html": 0,
+     "docx": 9,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_order": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_math_fallback": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_link_dead": {
+     "html": 0,
+     "docx": 74,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_alt_missing": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_table_header": {
+     "html": 1,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_heading": {
+     "html": 13,
+     "docx": 14,
+     "epub": 13,
+     "canvas_index": 13,
+     "canvas_page": 13,
+     "cartridge": 13,
+     "transcript": 13
+    },
+    "out_lang": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_note_lost": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_hole": {
+     "html": 43,
+     "docx": 43,
+     "epub": 43,
+     "canvas_index": 43,
+     "canvas_page": 43,
+     "cartridge": 43,
+     "transcript": 43
+    },
+    "out_notice_missing": {
+     "html": 519,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    }
+   },
+   "documents": {
+    "out_char": 0,
+    "out_text_lost": 0,
+    "out_text_twice": 4,
+    "out_order": 0,
+    "out_math_fallback": 0,
+    "out_link_dead": 8,
+    "out_alt_missing": 0,
+    "out_table_header": 1,
+    "out_heading": 14,
+    "out_lang": 0,
+    "out_note_lost": 0,
+    "out_hole": 6,
+    "out_notice_missing": 33
+   },
+   "sizes": {
+    "html": {
+     "blocks": 6913,
+     "equations": 1126,
+     "pictures": 287,
+     "tables": 32,
+     "links": 711,
+     "notes": 16
+    },
+    "docx": {
+     "blocks": 6218,
+     "equations": 1087,
+     "pictures": 326,
+     "tables": 32,
+     "links": 648,
+     "notes": 0
+    },
+    "epub": {
+     "blocks": 6913,
+     "equations": 1126,
+     "pictures": 287,
+     "tables": 32,
+     "links": 1629,
+     "notes": 16
+    },
+    "canvas_index": {
+     "blocks": 6913,
+     "equations": 1126,
+     "pictures": 287,
+     "tables": 32,
+     "links": 711,
+     "notes": 16
+    },
+    "canvas_page": {
+     "blocks": 6850,
+     "equations": 1126,
+     "pictures": 287,
+     "tables": 32,
+     "links": 648,
+     "notes": 16
+    },
+    "cartridge": {
+     "blocks": 6913,
+     "equations": 1126,
+     "pictures": 287,
+     "tables": 32,
+     "links": 711,
+     "notes": 16
+    },
+    "transcript": {
+     "blocks": 6718,
+     "equations": 603,
+     "pictures": 248,
+     "tables": 0,
+     "links": 0,
+     "notes": 81
+    }
+   },
+   "by_upload": [
+    {
+     "upload": "r16_openstax_physics_ch4_end",
+     "places": 177
+    },
+    {
+     "upload": "w_solutions_1802",
+     "places": 165
+    },
+    {
+     "upload": "w_notes_6042_ch2",
+     "places": 121
+    },
+    {
+     "upload": "w_slides_60001_lec10",
+     "places": 81
+    },
+    {
+     "upload": "w_exam_5111",
+     "places": 63
+    },
+    {
+     "upload": "w_exam_5111+exam",
+     "places": 63
+    },
+    {
+     "upload": "r05_labmanual_5310_lab1",
+     "places": 38
+    },
+    {
+     "upload": "r17_arxiv_ligo",
+     "places": 36
+    },
+    {
+     "upload": "r18_arxiv_opt",
+     "places": 26
+    },
+    {
+     "upload": "r11_recitation_2003sc",
+     "places": 25
+    },
+    {
+     "upload": "r15_openstax_chem_ch3",
+     "places": 18
+    },
+    {
+     "upload": "r14_exam_513",
+     "places": 17
+    },
+    {
+     "upload": "r20_newsletter_drp",
+     "places": 12
+    },
+    {
+     "upload": "w_lecture_560",
+     "places": 11
+    },
+    {
+     "upload": "w_mixed_slides+image_pages",
+     "places": 11
+    },
+    {
+     "upload": "r01_syllabus_16851",
+     "places": 10
+    },
+    {
+     "upload": "s17_word_syllabus",
+     "places": 9
+    },
+    {
+     "upload": "w_slides_60001_lec1",
+     "places": 9
+    },
+    {
+     "upload": "r21_infographic_orcid",
+     "places": 8
+    },
+    {
+     "upload": "a3_sideways_norotate",
+     "places": 7
+    },
+    {
+     "upload": "a6_two_up",
+     "places": 7
+    },
+    {
+     "upload": "a8_handout_3up",
+     "places": 7
+    },
+    {
+     "upload": "a9_handout_6up",
+     "places": 7
+    },
+    {
+     "upload": "b3_stamp",
+     "places": 7
+    },
+    {
+     "upload": "b4_line_numbers",
+     "places": 7
+    },
+    {
+     "upload": "r03_syllabus_21l708",
+     "places": 7
+    },
+    {
+     "upload": "w_scan_slides+image_pages",
+     "places": 7
+    },
+    {
+     "upload": "w_pset_801",
+     "places": 6
+    },
+    {
+     "upload": "s13_textbook_margin",
+     "places": 5
+    },
+    {
+     "upload": "r07_labnotebook_5310",
+     "places": 4
+    },
+    {
+     "upload": "r13_exam_3044",
+     "places": 4
+    },
+    {
+     "upload": "w_handwritten_6006+image_pages",
+     "places": 4
+    },
+    {
+     "upload": "r09_handout_14451",
+     "places": 3
+    },
+    {
+     "upload": "s10_slides_boxes",
+     "places": 3
+    },
+    {
+     "upload": "r04_grading_5310",
+     "places": 2
+    },
+    {
+     "upload": "s18_exam_twocol",
+     "places": 2
+    },
+    {
+     "upload": "r06_labsafety_5310",
+     "places": 1
+    },
+    {
+     "upload": "r19_poster_codesign",
+     "places": 1
+    },
+    {
+     "upload": "s02_syllabus_sidebar",
+     "places": 1
+    },
+    {
+     "upload": "s04_worksheet",
+     "places": 1
+    },
+    {
+     "upload": "s05_form_acroform",
+     "places": 1
+    },
+    {
+     "upload": "s15_charts_figures",
+     "places": 1
+    },
+    {
+     "upload": "s16_calendar_grid",
+     "places": 1
+    },
+    {
+     "upload": "a3b_sideways_270",
+     "places": 0
+    },
+    {
+     "upload": "b6_margin_identifier",
+     "places": 0
+    },
+    {
+     "upload": "d2_language_passages",
+     "places": 0
+    },
+    {
+     "upload": "d3_arabic_doc",
+     "places": 0
+    },
+    {
+     "upload": "d4_chinese_doc",
+     "places": 0
+    },
+    {
+     "upload": "f3_music",
+     "places": 0
+    },
+    {
+     "upload": "r02_syllabus_21l704",
+     "places": 0
+    },
+    {
+     "upload": "r08_labhandout_2996",
+     "places": 0
+    },
+    {
+     "upload": "r10_handout_4241",
+     "places": 0
+    },
+    {
+     "upload": "r12_exam_900sc",
+     "places": 0
+    },
+    {
+     "upload": "s01_newsletter_3col",
+     "places": 0
+    },
+    {
+     "upload": "s03_lab_callouts",
+     "places": 0
+    },
+    {
+     "upload": "s06_landscape_table",
+     "places": 0
+    },
+    {
+     "upload": "s07_glossary",
+     "places": 0
+    },
+    {
+     "upload": "s08_bibliography",
+     "places": 0
+    },
+    {
+     "upload": "s09_index",
+     "places": 0
+    },
+    {
+     "upload": "s11_layout_change",
+     "places": 0
+    },
+    {
+     "upload": "s12a_handout_tagged",
+     "places": 0
+    },
+    {
+     "upload": "s12b_handout_untagged",
+     "places": 0
+    },
+    {
+     "upload": "s14_toc_outline",
+     "places": 0
+    }
+   ]
+  },
+  "answers_missing": {
+   "uploads": 10,
+   "pages": 23,
+   "built": {
+    "html": 10,
+    "docx": 10,
+    "epub": 10,
+    "canvas_index": 10,
+    "canvas_page": 10,
+    "cartridge": 10,
+    "transcript": 10
+   },
+   "failed": {},
+   "counts": {
+    "out_char": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_text_lost": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_text_twice": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_order": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_math_fallback": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_link_dead": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_alt_missing": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_table_header": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_heading": {
+     "html": 2,
+     "docx": 2,
+     "epub": 2,
+     "canvas_index": 2,
+     "canvas_page": 2,
+     "cartridge": 2,
+     "transcript": 2
+    },
+    "out_lang": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_note_lost": {
+     "html": 0,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    },
+    "out_hole": {
+     "html": 8,
+     "docx": 8,
+     "epub": 8,
+     "canvas_index": 8,
+     "canvas_page": 8,
+     "cartridge": 8,
+     "transcript": 8
+    },
+    "out_notice_missing": {
+     "html": 44,
+     "docx": 0,
+     "epub": 0,
+     "canvas_index": 0,
+     "canvas_page": 0,
+     "cartridge": 0,
+     "transcript": 0
+    }
+   },
+   "documents": {
+    "out_char": 0,
+    "out_text_lost": 0,
+    "out_text_twice": 0,
+    "out_order": 0,
+    "out_math_fallback": 0,
+    "out_link_dead": 0,
+    "out_alt_missing": 0,
+    "out_table_header": 0,
+    "out_heading": 2,
+    "out_lang": 0,
+    "out_note_lost": 0,
+    "out_hole": 2,
+    "out_notice_missing": 7
+   },
+   "sizes": {
+    "html": {
+     "blocks": 619,
+     "equations": 68,
+     "pictures": 38,
+     "tables": 7,
+     "links": 43,
+     "notes": 0
+    },
+    "docx": {
+     "blocks": 555,
+     "equations": 42,
+     "pictures": 64,
+     "tables": 7,
+     "links": 33,
+     "notes": 0
+    },
+    "epub": {
+     "blocks": 619,
+     "equations": 68,
+     "pictures": 38,
+     "tables": 7,
+     "links": 103,
+     "notes": 0
+    },
+    "canvas_index": {
+     "blocks": 619,
+     "equations": 68,
+     "pictures": 38,
+     "tables": 7,
+     "links": 43,
+     "notes": 0
+    },
+    "canvas_page": {
+     "blocks": 609,
+     "equations": 68,
+     "pictures": 38,
+     "tables": 7,
+     "links": 33,
+     "notes": 0
+    },
+    "cartridge": {
+     "blocks": 619,
+     "equations": 68,
+     "pictures": 38,
+     "tables": 7,
+     "links": 43,
+     "notes": 0
+    },
+    "transcript": {
+     "blocks": 545,
+     "equations": 29,
+     "pictures": 15,
+     "tables": 0,
+     "links": 0,
+     "notes": 26
+    }
+   },
+   "by_upload": [
+    {
+     "upload": "w_lecture_5111",
+     "places": 80
+    },
+    {
+     "upload": "f1_notation",
+     "places": 14
+    },
+    {
+     "upload": "ar3_sideways90",
+     "places": 8
+    },
+    {
+     "upload": "ar4_sideways270",
+     "places": 8
+    },
+    {
+     "upload": "e1_mc_columns",
+     "places": 2
+    },
+    {
+     "upload": "e2_solutions_rubric",
+     "places": 1
+    },
+    {
+     "upload": "e3_calendar",
+     "places": 1
+    },
+    {
+     "upload": "d1_scripts",
+     "places": 0
+    },
+    {
+     "upload": "f2_figures",
+     "places": 0
+    },
+    {
+     "upload": "f4_matrices",
+     "places": 0
+    }
+   ]
+  }
+ }
+}

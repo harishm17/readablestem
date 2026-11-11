@@ -2839,9 +2839,9 @@ lacks, and what a reading-order bar met on it therefore does not cover yet:
   economics): the walk takes books in seeded order and does not choose by subject. Their
   pages count as textbook layout, not as mathematics.
 
-## What a page costs, how long it takes and what it asks (`eval cost`, `eval speed`, `eval burden`)
+## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
-The three commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
+The four commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
 Every upload of the corpus (`corpus.UPLOADS`: each file once, and again with the boxes a
 person would tick for it) is converted the way the worker converts a job: production's
 behavior settings (`ops/production.profile.toml`), the job's own caps, the conversion in a
@@ -2872,6 +2872,7 @@ uv run readablestem eval cost --only s15_charts_figures      # one file
 uv run readablestem eval speed --records kept.json           # keep what was measured
 uv run readablestem eval cost --from kept.json               # report on it again, measure nothing
 uv run readablestem eval burden --out burden.json --against data/eval/burden-corpus.json
+uv run readablestem eval outputs --out outputs.json         # builds and reads every file
 ```
 
 The reports record the four things `eval bar` asks for, with the commit and the machine,
@@ -2880,6 +2881,14 @@ and hold their figures under `metrics`, so `eval bar` can read one
 to cover kinds of document, and the readers were built while looking at it. So no
 report can meet a bar or carry a public claim, and each says "Proof owed" in its header. A
 replay of held-out whole documents needs a recording that does not exist yet.
+
+A report also lists the steps that stopped before they were done (`not_finished` in the
+record: the upload, the step, the page and the reason, from the step facts) and names them
+in its header. A step stopped at a time limit gives another result on a busier machine: one
+corpus run made while four test suites ran lost a handwritten page to the 10-second clock
+of the page-type step, and its counts differed from the run before it. A baseline is a run
+in which no step stopped at a time limit. When nothing could be measured, each command says
+so and exits with 2.
 
 ### `eval cost`
 
@@ -3105,6 +3114,141 @@ against 4.0 or fewer. Neither is met. They are development documents, so meeting
 proves nothing by itself; the release bar is judged on a held-out replay, which does not
 exist yet.
 
+### `eval outputs`
+
+Every other eval stops at the element list or at the markup of the student page. This one
+opens the files a student is given and counts what is wrong in them.
+
+**What is read.** From each converted upload the command builds the student page, the Word
+file, the EPUB, the two Canvas files (the page for a Canvas Page and the file for Canvas
+Files), the Common Cartridge and the Listen transcript, through the code the downloads use,
+and reads each one back from its bytes into one inventory (`pipeline/output_audit.py`):
+the blocks of words in reading order, the equations and whether each has a spoken form, the
+pictures and their alt text, the tables with their header cells, the links inside the file
+and whether each lands, the notes and the language. Words a reader hears and does not see
+(`alt`, `aria-label`, `alttext`, text for screen readers only) are read as what they are.
+
+**What is compared.** An export is right when it says what the page says, so each export is
+compared with the page it was made from. The page is compared with the stored result: every
+element has a place, in the stored order, and every open decision and kept picture is
+marked. Whether the words inside a place are the right words is the business of the lane
+evals and the page audit, and is not counted here.
+
+A count is one wrong place: a kind, the output, the page and the element id, and none of
+the document's words. Each place is counted once.
+
+| Kind | A place where |
+|---|---|
+| `out_char` | a character is not text (private use, a replacement character, a control) |
+| `out_text_lost` | words of the page are in no place of the output |
+| `out_text_twice` | words that are once on the page are twice in the output |
+| `out_order` | a block is in another order than on the page |
+| `out_math_fallback` | an equation is not an equation in the output, or has no spoken form |
+| `out_link_dead` | a link inside the file leads nowhere in it |
+| `out_alt_missing` | a picture that is not decoration has no alt text |
+| `out_table_header` | a table has no header cell where the page's has one |
+| `out_heading` | a heading is empty or skips a level, or the title is said twice |
+| `out_lang` | the file states no language, or another than the document's |
+| `out_note_lost` | a note of the page is not in the output |
+| `out_hole` | a sentence has a gap: a space before its full stop or comma, "the -x" |
+| `out_notice_missing` | an open decision or a kept picture has no note at its place |
+
+**What an output leaves out on purpose** is a written list (`output_audit.ABSENT_BY_DESIGN`),
+and nothing else may be missing: Word has no skip link and no visible page labels, the EPUB
+has neither and builds its own contents list, the Canvas page has no skip link, and the
+transcript says neither the page labels nor the title of the contents list.
+
+**What a format cannot hold is not asked of it.** Each limit is one rule:
+
+- A Word table can mark a row as a header and nothing else. A header column of the page is
+  not asked of the Word file.
+- Each format numbers a note's mark in its own way, so the mark's digits are not compared.
+  A Word footnote with no words is a mark that leads nowhere, and is a dead link.
+- A voice adds the word "link" before a link's name and reads a table row by row, so the
+  transcript's words are compared by their letters. The Listen page reads the first 8 rows
+  of a table and says how many more there are; the audit reads the transcript with every
+  row, so every row's words are checked.
+- The transcript closes the space before a full stop, and says a paragraph that is only a
+  formula in words. A gap is therefore judged where the page has it, and counted for the
+  transcript when the transcript says that sentence.
+- A formula in a table cell is written once for a voice and once for the eyes. It is one
+  thing: a file that shows both is counted as words twice.
+- A picture is decoration only where the page says so; an export is held to the page's
+  count of them.
+- MathML counts as a spoken form.
+
+**It measures the page before anyone has reviewed it.** The replay converts and nobody
+decides anything, so every proposal that waits for a required decision is open. A page that
+shows such a proposal with no mark at its place is counted under `out_notice_missing`. That
+is the largest figure below, and it is a count of the draft, which cannot leave as a
+finished file while a decision is open. It is counted because a draft can be downloaded
+after a confirm, and its reader has only the banner at the top to go by.
+
+**Known false positive.** `out_hole` also fires where the source itself writes a space
+before a colon or a full stop (a slide that sets "O(1) :"). Five of the places below are
+of that kind.
+
+```bash
+uv run readablestem eval outputs --out data/eval/outputs-corpus.json
+uv run readablestem eval outputs --only r18_arxiv_opt        # one file
+uv run readablestem eval outputs --from kept.json            # report on a kept replay
+```
+
+It spends nothing and gates nothing. Exit code 0: measured; 2: nothing could be measured.
+An upload whose recording lacks an answer is reported apart, as in the other reports.
+
+Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; `data/eval/outputs-corpus.json`). Every output of every upload could be built.
+
+| Kind | Page | Word | EPUB | Canvas file | Canvas page | Cartridge | Transcript | Documents |
+|---|---|---|---|---|---|---|---|---|
+| `out_char` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_text_lost` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_text_twice` | 0 | 9 | 0 | 0 | 0 | 0 | 0 | 4 |
+| `out_order` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_math_fallback` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_link_dead` | 0 | 74 | 0 | 0 | 0 | 0 | 0 | 8 |
+| `out_alt_missing` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_table_header` | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
+| `out_heading` | 13 | 14 | 13 | 13 | 13 | 13 | 13 | 14 |
+| `out_lang` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_note_lost` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_hole` | 43 | 43 | 43 | 43 | 43 | 43 | 43 | 6 |
+| `out_notice_missing` | 519 | 0 | 0 | 0 | 0 | 0 | 0 | 33 |
+
+What the figures are, checked place by place on 29 of the uploads:
+
+- **`out_notice_missing`, 519 on the page.** Proposals that wait for a required
+  decision and are shown with no mark (on the 29 uploads: 419 of 428; the other 9 are
+  formulas inside table cells, where a kept or open formula has no mark of its own and the
+  table has none). Every picture kept as the original with a place of its own is marked.
+  The exports copy the page, so the same places are unmarked in each; they are counted once,
+  on the page.
+- **`out_hole`, 43 in each written output.** Sentences that lost an inline formula
+  ("is denoted ."), stray punctuation left as a paragraph of its own, and a mis-decoded
+  ellipsis; five are the false positive above. The transcript says every one of these
+  sentences.
+- **`out_link_dead`, 74 in Word.** pandoc keeps an id on a heading and drops it on a
+  paragraph, so most links inside a Word file have no target. 13 of them are footnotes:
+  every note's mark becomes a Word footnote with no words, the note's text stays a
+  paragraph of the body, and its "Back to the text" link leads nowhere.
+- **`out_heading`, 13 in every output.** The page opens with the document title as
+  its `h1`, and the first heading of the document says the same words. In Word the title
+  paragraph is dropped when the two are equal; where they differ only in case it is not,
+  which is the one more in Word.
+- **`out_text_twice`, 9 in Word.** The words written for a voice beside a formula
+  in a table cell are ordinary text in Word, next to the formula.
+- **`out_table_header`, 1 on the page.** A table with no header cell and an open decision
+  on it.
+- Zero everywhere: a character that is not text, words lost, order, an equation with no
+  spoken form, a picture with no alt text, the language, a lost note.
+
+None of these is fixed here. The Word defects belong to the Word export's rebuild, the
+unmarked proposals to the page's notes, and the title to the one-`h1` rule; the counts are
+their baseline, and the release bar is 0 for `out_char`, `out_text_lost`, `out_link_dead`,
+`out_alt_missing` and `out_notice_missing`. They are development figures: the bar is judged
+on a held-out replay, which does not exist yet.
+
 What none of the reports has yet:
 
 - A replay of held-out whole documents (the recording is not made), and so a bar or a
@@ -3172,7 +3316,8 @@ made it. The rule (`core.types.NotFinished`, tests/test_determinism.py):
 - A limit on time, memory or money may only stop a step. It never quietly changes what a
   page contains.
 - A step that stops says so with a "not finished" fact: `{step, page, reason, done, of}`,
-  with no document text (operations.md, "Step facts and the step report").
+  with no document text (operations.md, "Step facts and the step report"). Every report made
+  from a measured replay lists these facts in its record and names the steps in its header.
 
 Three tests hold the rule:
 
@@ -3264,6 +3409,8 @@ limits is still owed.
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
 | `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
 | `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
+| `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
+| `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
 | `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |

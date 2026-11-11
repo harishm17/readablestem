@@ -36,6 +36,22 @@ measured and replayed against.
   replay, with a bar against an earlier record (no page kind asks for more). The count is
   the review screen's own (`core.triage.decisions`). Baseline on the corpus: 1.80 a page
   over 315 pages, 10.5 on dense math pages, and 56% of pages ask nothing.
+- **A replay report names the steps that stopped early.** A step stopped by a clock gives
+  another result on a busier machine, and a report made from such a run did not say so. The
+  record of `eval cost`, `eval speed`, `eval burden` and `eval outputs` now lists every step
+  that did not finish, and the printed header names them. Fixed with it: `eval cost`, `eval
+  speed` and `eval burden` ended with a traceback when no upload could be measured; they now
+  say so and exit with 2.
+- **Every file a student is given, read back and counted** (`readablestem eval
+  outputs`, `pipeline/output_audit.py`): the student page, the Word file, the EPUB, the
+  two Canvas files, the Cartridge and the Listen transcript are built from a replay of
+  the corpus, read from their bytes and compared, the exports with the page and the
+  page with the stored result. 13 kinds of wrong place are counted, each with its page
+  and element and none of the document's words. It gates nothing yet. The first run
+  found three defects of the Word export that were in no list: every note's mark is a
+  footnote with no words, the words written for a voice beside a formula in a table
+  cell are shown next to it, and the title is said twice when the first heading differs
+  from it only in case.
 - **Fixed: two counters left out a page's paragraphs.** The command line's "decisions
   needed" summary, the eval's review load and the weekly report's review-load table
   counted only equations, figures, headings and tables. A page read from its picture asks
