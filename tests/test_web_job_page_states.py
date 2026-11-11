@@ -27,6 +27,7 @@ from readablestem.core.types import (
     Notice,
     OmittedPage,
     SourceFacts,
+    SourceReport,
     Status,
 )
 from readablestem.web import states
@@ -290,6 +291,13 @@ def optional_unopened(result: DocumentResult) -> None:
     equations(result, 26, status=Status.ACCEPTED, review="optional")
 
 
+def source_unread(result: DocumentResult) -> None:
+    """A LaTeX source whose reader left 14 words unread (SW42.4), all else converted."""
+    clean(result)
+    result.origin = "latex"
+    result.source_report = SourceReport(unread_words=14, unread_start="Note")
+
+
 def statement_of(web, job_id: str) -> dict[str, object]:
     """What each surface says about the job: the student page (its notice and its note),
     the job page, the EPUB's accessibility metadata and the record's CSV."""
@@ -362,6 +370,18 @@ def statement_of(web, job_id: str) -> dict[str, object]:
                 "csv": {"Optional notes never opened": "26"},
             },
             id="26-optional-never-opened",
+        ),
+        pytest.param(
+            source_unread,
+            {
+                "state": "Partly converted",
+                "job": "14 words from it are not in the file",
+                "note": "14 words of the LaTeX source could not be read and are not in this file",
+                "notice": "14 words of the LaTeX source could not be read",
+                "summary": "14 words of the LaTeX source could not be read",
+                "csv": {"Every part the tool found was converted.": "No"},
+            },
+            id="14-source-words-not-read",
         ),
         pytest.param(
             clean,

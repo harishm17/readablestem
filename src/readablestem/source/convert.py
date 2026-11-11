@@ -390,6 +390,7 @@ def _finish(
         notice=notice,
         math_alttext=settings.mathml_alttext,
         origin=origin,
+        unread=(reading.unread_words, reading.unread_pictures),
     )
     pipeline._send(stage_progress, "checks")
     checks = html_checks.static_checks(html)

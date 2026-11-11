@@ -158,9 +158,37 @@ def left_out_sentence(s: CheckedSummary) -> str:
     return f"Pages {_pages_list(pages)}{of} of the original PDF were left out of this file."
 
 
+def _unread_phrase(s: CheckedSummary) -> str:
+    """ "14 words and 1 picture of the LaTeX source" ("" when it was read whole)."""
+    c = s.converted
+    parts = [plural(c.unread_words, "word")] if c.unread_words else []
+    parts += [plural(c.unread_pictures, "picture")] if c.unread_pictures else []
+    return f"{join_words(parts)} of the LaTeX source" if parts else ""
+
+
+def unread_sentence(s: CheckedSummary) -> str:
+    """What the reader of a LaTeX source did not read, for the student ("" when none)."""
+    if not (what := _unread_phrase(s)):
+        return ""
+    verb = "is" if s.unread == 1 else "are"
+    return (
+        f"{what[0].upper()}{what[1:]} could not be read and {verb} not in this file: ask your "
+        "instructor for a version you can read."
+    )
+
+
+def unread_owner(s: CheckedSummary) -> str:
+    """The same for the owner's lines ("" when none)."""
+    if not (what := _unread_phrase(s)):
+        return ""
+    return f"{what[0].upper()}{what[1:]} {'was' if s.unread == 1 else 'were'} not read."
+
+
 def statement(s: CheckedSummary) -> list[str]:
-    """The student statement: who reviewed it, what is a picture, what was left out."""
-    return [t for t in (review_sentence(s), pictures_sentence(s), left_out_sentence(s)) if t]
+    """The student statement: who reviewed it, what is a picture, what was left out or not
+    read."""
+    parts = (review_sentence(s), pictures_sentence(s), left_out_sentence(s), unread_sentence(s))
+    return [t for t in parts if t]
 
 
 def picture_link(number: int, kind: str, page: int) -> str:
@@ -209,7 +237,7 @@ def checks_failed_sentence(s: CheckedSummary) -> str:
 def remains(s: CheckedSummary) -> str:
     """What stands between a finished job with no open decision and "Ready to share" ("" when
     nothing does)."""
-    parts = [as_image_sentence(s), left_out_owner(s), checks_failed_sentence(s)]
+    parts = [as_image_sentence(s), left_out_owner(s), unread_owner(s), checks_failed_sentence(s)]
     return " ".join(p for p in parts if p)
 
 
@@ -291,7 +319,7 @@ def record_pictures(s: CheckedSummary) -> str:
     """The record's line when no part is listed as a picture."""
     if s.all_found_converted:
         return READY_ALL
-    return left_out_owner(s)
+    return " ".join(p for p in (left_out_owner(s), unread_owner(s)) if p)
 
 
 def record_checks(s: CheckedSummary) -> str:

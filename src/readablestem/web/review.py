@@ -1832,7 +1832,7 @@ def rerender_html(
     `math_alttext` is the app's `Settings.mathml_alttext`, the setting the first render used
     (T2-24): the file made again must read like the first one (None: the process settings).
     """
-    from readablestem.pipeline import assemble, html_checks
+    from readablestem.pipeline import assemble, checked, html_checks
 
     # The instructor's choices are passed only when there are any, so a file made without
     # them is made exactly as before.
@@ -1843,6 +1843,7 @@ def rerender_html(
         chosen |= {"contact": contact}
     html = assemble.render_html(
         origin=result.origin,
+        unread=checked.unread_of(result),
         title=title_override or result.title,
         **chosen,
         lang=result.lang,

@@ -1678,6 +1678,7 @@ def render_html(
     footnote_ids: Collection[str] = (),
     origin: str = "pdf",
     pages: int | None = None,
+    unread: tuple[int, int] = (0, 0),
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1706,6 +1707,8 @@ def render_html(
     `origin`: "pdf" or, for a document made from a LaTeX source, "latex" or "beamer"
     (`DocumentResult.origin`): the student note's first sentence says so. `pages`: how many
     pages the document has, when known, so the note can say "7 of 8" pages were left out.
+    `unread`: the words and pictures a LaTeX source's reader did not read
+    (`checked.unread_of`), which the student note says are not in the file.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -1752,6 +1755,7 @@ def render_html(
         pages=pages,
         reviewed_on=checked_on,
         origin=origin,
+        unread=unread,
     )
     about = _about_section(
         summary,

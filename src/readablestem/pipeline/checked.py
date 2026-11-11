@@ -52,7 +52,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 from readablestem.core import triage
@@ -110,6 +110,10 @@ class Converted:
     pictures: tuple[Picture, ...] = ()
     left_out_pages: tuple[int, ...] = ()  # 1-based
     pages: int | None = None  # pages in the document, when known
+    # What a LaTeX source's reader did not read (`SourceReport.unread_words`,
+    # `unread_pictures`): not in the file, so not everything found was converted.
+    unread_words: int = 0
+    unread_pictures: int = 0
 
     @property
     def pictures_by_kind(self) -> dict[str, int]:
@@ -167,8 +171,12 @@ class CheckedSummary:
         return len(self.converted.left_out_pages)
 
     @property
+    def unread(self) -> int:
+        return self.converted.unread_words + self.converted.unread_pictures
+
+    @property
     def all_found_converted(self) -> bool:
-        return not self.pictures and not self.left_out
+        return not self.pictures and not self.left_out and not self.unread
 
     @property
     def checks_passed(self) -> bool:
@@ -188,8 +196,8 @@ class CheckedSummary:
     @property
     def needs_notice(self) -> bool:
         """The student page opens with the statement: nobody reviewed it, or a part is a
-        picture or left out."""
-        return not self.reviewed or bool(self.pictures) or bool(self.left_out)
+        picture, left out or not read."""
+        return not self.reviewed or bool(self.pictures) or bool(self.left_out) or bool(self.unread)
 
 
 def _first_fixes(fixes: Iterable[Fix]) -> dict[str, Fix]:
@@ -275,16 +283,22 @@ def summarize(
     reviewed_on: date | None = None,
     version: str = "",
     origin: str = "pdf",
+    unread: tuple[int, int] = (0, 0),
 ) -> CheckedSummary:
     """The summary from the parts of a result. `html_checks` None: the page has not been
     checked yet (the renderer, before the checks run), which is not the same as none run.
-    `reviewed_on` is the day of the last review decision, said only once a person made one."""
+    `reviewed_on` is the day of the last review decision, said only once a person made one.
+    `unread`: the words and pictures a LaTeX source's reader did not read (`unread_of`)."""
     from readablestem.pipeline.checked_words import NEVER_CHECKED
 
     load = triage.review_load(fixes)
     checks = list(html_checks) if html_checks is not None else None
     return CheckedSummary(
-        converted=converted(elements, fixes, left_out_pages, pages),
+        converted=replace(
+            converted(elements, fixes, left_out_pages, pages),
+            unread_words=unread[0],
+            unread_pictures=unread[1],
+        ),
         load=load,
         checks_run=len(checks) if checks is not None else None,
         checks_failed=tuple(c for c in checks or () if not c.passed),
@@ -313,7 +327,17 @@ def of_result(
         reviewed_on=reviewed_on,
         version=version or result.pipeline_version,
         origin=result.origin,
+        unread=unread_of(result),
     )
+
+
+def unread_of(result: DocumentResult) -> tuple[int, int]:
+    """The words and pictures of a LaTeX source its reader did not read (SW42.4), (0, 0)
+    for a PDF or a source read whole."""
+    report = result.source_report
+    if report is None:
+        return (0, 0)
+    return (report.unread_words, report.unread_pictures)
 
 
 def open_required(fixes: Iterable[Fix]) -> int:
