@@ -368,6 +368,11 @@ class _Reader:
             # formulas are equations like any paragraph's
             self._paragraph(node)
             return True
+        if tag == "div" and (node.text or "").strip() and not _blocks_below(node):
+            # a block holding its text with no `p` (beamer's \framesubtitle): a paragraph,
+            # not children only, which would leave that text unread
+            self._paragraph(node)
+            return True
         self._walk_children(node, depth)
         return False
 
@@ -1095,6 +1100,11 @@ def _children_blocks(node: Node) -> bool:
     return any(
         _local(c.tag) in ("p", "div", "ul", "ol", "table", "figure", "section") for c in node.iter()
     )
+
+
+def _blocks_below(node: Node) -> bool:
+    """A block element under `node`, not counting `node` itself."""
+    return any(_children_blocks(c) for c in _children(node))
 
 
 def _paragraph_nodes(node: Node) -> list[Node]:

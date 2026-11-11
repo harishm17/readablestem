@@ -9,6 +9,8 @@
 - A float reads its tables or pictures and then everything else in it: the words beside a
   picture, a note under a table, every tabular of a table float. A `\captionof` caption goes to
   the picture before it. `\intertext` is a paragraph between the equations; `\date` is a line.
+  A Beamer `\framesubtitle` (a block holding its words with no paragraph inside) was dropped
+  and is now a paragraph under the frame's heading.
 - A formula LaTeX could not read that a table, a heading or a caption shows as LaTeX code makes
   that item a required decision, with a sentence naming the command. The same command in a
   description or the authors, where no item can hold a decision, stops the job.
