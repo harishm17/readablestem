@@ -4,7 +4,8 @@
 
 - `public`: a file on a public site. The manifest pins its URL, SHA-256 and size; `fetch`
   downloads it into `.cache/corpus/` and refuses bytes that do not match. The tests use a
-  page range cut from it. Nothing of the file is committed.
+  page range cut from it, with the pages listed in `pictures` replaced by a picture of
+  themselves, as a scanner gives. Nothing of the file is committed.
 - `committed`: a file in the corpus folder, either made for this repository (with the
   source it was made from) or an attributed cut of an openly licensed work whose
   publisher's URL does not serve stable bytes.
@@ -89,6 +90,7 @@ class Entry:
     bytes: int = 0
     url: str = ""
     pages: tuple[int, int] | None = None
+    pictures: tuple[int, ...] = ()
     path: str = ""
     made: dict | None = None
     builder: str = ""
@@ -195,6 +197,16 @@ def problems(raw: dict, root: Path = CORPUS, labels: dict | None = None) -> list
             and 1 <= pages[0] <= pages[1]
         ):
             out.append("pages must be [first, last], counted from 1")
+        elif "pictures" in raw:
+            count = pages[1] - pages[0] + 1
+            listed = raw["pictures"]
+            if not (
+                isinstance(listed, list)
+                and listed
+                and all(isinstance(n, int) and 1 <= n <= count for n in listed)
+                and listed == sorted(set(listed))
+            ):
+                out.append("pictures must list pages of the cut, counted from 1, in order")
         if not raw.get("attribution"):
             out.append("attribution is missing")
         if raw.get("path") or raw.get("builder"):
@@ -261,8 +273,9 @@ def load_manifest(path: Path = MANIFEST) -> dict[str, Entry]:
             wrong.extend(f"{name}: {line}" for line in found)
             continue
         fields = dict(raw)
-        if "pages" in fields:
-            fields["pages"] = tuple(fields["pages"])
+        for listed in ("pages", "pictures"):
+            if listed in fields:
+                fields[listed] = tuple(fields[listed])
         if "labels" in fields:
             fields["labels"] = methods[fields["labels"]]
         entries[name] = Entry(**fields)
@@ -334,6 +347,24 @@ def cut(data: bytes, first: int, last: int) -> bytes:
         return doc.tobytes(garbage=3, deflate=True, no_new_id=True)
 
 
+PICTURE_DPI = 100
+
+
+def as_pictures(data: bytes, pages: tuple[int, ...]) -> bytes:
+    """`data` with each listed page (counted from 1) replaced by a JPEG picture of itself:
+    a page with no words to read, as a scanner or a phone gives. The same bytes on every
+    run with the same PyMuPDF."""
+    with pymupdf.open(stream=data, filetype="pdf") as src, pymupdf.open() as out:
+        for index, page in enumerate(src):
+            if index + 1 not in pages:
+                out.insert_pdf(src, from_page=index, to_page=index)
+                continue
+            picture = page.get_pixmap(dpi=PICTURE_DPI).tobytes("jpeg")
+            sheet = out.new_page(width=page.rect.width, height=page.rect.height)
+            sheet.insert_image(sheet.rect, stream=picture)
+        return out.tobytes(garbage=3, deflate=True, no_new_id=True)
+
+
 def _builders():
     tests = str(REPO / "tests" / "workflows")
     if tests not in sys.path:
@@ -345,7 +376,8 @@ def document(entry: Entry, *, cache: Path = CACHE, get: Fetcher = download) -> b
     """The file the tests use for `entry`: the cut pages, the committed file or the build."""
     if entry.kind == "public":
         assert entry.pages is not None
-        return cut(fetch(entry, cache=cache, get=get), *entry.pages)
+        pages = cut(fetch(entry, cache=cache, get=get), *entry.pages)
+        return as_pictures(pages, entry.pictures) if entry.pictures else pages
     if entry.kind == "committed":
         return verify((CORPUS / entry.path).read_bytes(), entry.sha256, entry.path)
     return _builders().build(entry.builder)

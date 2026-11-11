@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import builders
+import pymupdf
 import pytest
 
 from readablestem.eval import corpus
@@ -65,6 +66,7 @@ def test_every_file_in_the_corpus_folder_is_listed_and_matches_its_hash() -> Non
         ({"sha256": "abc"}, "sha256"),
         ({"license": ""}, "license is missing"),
         ({"kind": "committed", "path": "../../secrets.pdf"}, "inside the corpus folder"),
+        ({"pictures": [9, 2]}, "pictures must list pages of the cut"),
     ],
 )
 def test_an_entry_that_breaks_a_rule_is_refused(change: dict, says: str) -> None:
@@ -126,6 +128,15 @@ def test_gold_without_text_rebuilds_the_labeled_text_from_the_file() -> None:
     other = next(e for e in ENTRIES.values() if e.kind == "committed" and e.own)
     with pytest.raises(corpus.CorpusError, match="not the words the gold was encoded against"):
         corpus.load_gold(entry, corpus.document(other))
+
+
+def test_a_page_listed_as_a_picture_has_no_words_and_the_rest_keep_theirs() -> None:
+    typed = corpus.document(ENTRIES["s02_syllabus_sidebar"])
+    made = corpus.as_pictures(typed, (2,))
+    assert made == corpus.as_pictures(typed, (2,))  # the same bytes on every run
+    with pymupdf.open(stream=made, filetype="pdf") as doc:
+        first, second = (page.get_text().strip() for page in doc)
+    assert first and not second
 
 
 def test_gold_for_a_file_made_here_reads_without_the_network() -> None:
