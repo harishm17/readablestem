@@ -40,9 +40,9 @@ _RANGES = [
     "\x0e-\x1f",
     "\x7f-\x9f",  # DEL and the C1 controls
     "\ud800-\udfff",  # lone surrogates
-    "-",  # private use
-    "﷐-﷯",  # noncharacters
-    "�￾￿",  # the replacement character, noncharacters
+    "\ue000-\uf8ff",  # private use
+    "\ufdd0-\ufdef",  # noncharacters
+    "\ufffd\ufffe\uffff",  # the replacement character, noncharacters
     *(f"{chr(plane << 16 | 0xFFFE)}{chr(plane << 16 | 0xFFFF)}" for plane in range(1, 15)),
     "\U000f0000-\U0010ffff",  # planes 15 and 16: private use and their noncharacters
 ]
