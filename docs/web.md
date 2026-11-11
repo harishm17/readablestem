@@ -45,7 +45,7 @@ made per process and a restart (or `--reload`) signs everyone out.
 ## Settings the web app uses
 
 All live in `readablestem.config.Settings` (environment or `.env`). The defaults below are
-the code's. What production runs is in the production profile (`src/readablestem/ops/production.profile.toml`): every behaviour setting with its production
+the code's. What production runs is in the production profile (`src/readablestem/ops/production.profile.toml`): every behavior setting with its production
 value and where that value came from. This page does not repeat those values.
 
 | Setting | Used for |

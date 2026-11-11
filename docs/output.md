@@ -1119,7 +1119,7 @@ No output holds a character that is not text: control characters, private-use co
 (a symbol font that gives no letter), noncharacters and U+FFFD. A screen reader says
 nothing or "question mark" for them. `render_html` writes each one as
 `<span class="flagged-inline readablestem">[unreadable character]</span>` (with `lang="en"` on a page in another language)
-in the text, and as plain `[unreadable character]` in the title, attributes and maths, so
+in the text, and as plain `[unreadable character]` in the title, attributes and math, so
 the student hears where something is missing; `html.characters` then fails so the job page
 says to compare those places with the PDF. Titles from `web/titles.py` and
 `web/combine.py` are cleaned the same way, so file names and `contents.txt` are clean too.

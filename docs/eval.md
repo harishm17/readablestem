@@ -818,7 +818,7 @@ uv run readablestem demo build --page 2-2-speed-and-velocity --max-usd 1.00
 It prints the page to PDF, converts it, and writes `index.html` (the converted page with a
 short note saying it is a precomputed demo of an OpenStax CC BY page, with attribution
 and a link to the original), `report.json` (the `DocumentResult` without the HTML) and
-`source.pdf` (the exact input) to `src/readablestem/web/static/demo/`. Pages outside the
+`source.pdf` (the exact input) to `src/readablestem/web/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
 ### Runs keep their recordings

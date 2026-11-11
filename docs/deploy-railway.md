@@ -192,11 +192,11 @@ only flags `TRUSTED_PROXY_HOPS=0`.
 
 ## Feature flags in production
 
-The production value of every behaviour setting (the feature flags, the equation checks, the
+The production value of every behavior setting (the feature flags, the equation checks, the
 models and their effort, the thresholds) is in the production profile,
 `src/readablestem/ops/production.profile.toml`, with the place each value was taken from. This page
 does not repeat them; `railway.ts` names every one of them on `web` with `preserve()`, and the
-defaults are in `src/readablestem/config.py`. Settings that are not about behaviour (secrets,
+defaults are in `src/readablestem/config.py`. Settings that are not about behavior (secrets,
 addresses, accounts, spend and size limits) are named in the profile's `operations` list only.
 
 The first profile was written from what the repository states, not from the dashboard, so it says

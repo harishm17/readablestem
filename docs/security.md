@@ -552,7 +552,7 @@ a header or a log.
 
 ### Pixel budget
 
-A small file can hold a huge picture: a one-colour canvas of 20,000 x 20,000 pixels is a few
+A small file can hold a huge picture: a one-color canvas of 20,000 x 20,000 pixels is a few
 hundred bytes in a PDF and takes seconds and hundreds of megabytes to decode. Every place
 that decodes an image reads its width and height first (the PNG or image header with Pillow,
 the PDF object's `Width` and `Height` with MuPDF) and does not decode one over
