@@ -4955,6 +4955,9 @@ class _Path:
     # are one drawing, `re` after `re`): what the table detector counts as bars. Empty for
     # any other path.
     rects: tuple[BBox, ...] = ()
+    # Painted as a fill with no stroke: how a glyph drawn as an outline is painted
+    # (`_glyph_outlines`).
+    fill_only: bool = False
 
 
 def _page_paths(
@@ -5018,6 +5021,7 @@ def _page_paths(
         open_stroke = stroked and not filled and not _encloses(items, drawing.get("closePath"))
         fill = filled and kind == "shape"
         path = _Path(box, kind, curved, fill, source, border, rules, open_stroke)
+        path.fill_only = filled and not stroked
         # What later tests read, only for the paths they look at (a page of handwriting
         # has tens of thousands of strokes, and the ink budget runs while they are read).
         if curved and open_stroke:
@@ -7420,6 +7424,105 @@ def _absorb_labels(
     return True
 
 
+LABEL_PASSES = 3  # tick labels, then the axis title beyond them, then a title beyond that
+# The typical gap between the words of a row of tick or category labels, in font sizes:
+# the words of running text are a quarter of a font size apart, half in a justified line.
+LABEL_SPREAD = 0.8
+LABEL_SPREAD_MIN = 0.4  # ... and no gap of such a row is narrower than this
+LABEL_SHORT = 25  # characters: a short label (an axis title, a quantity, a category)
+# An axis title is centred on its axis: its middle within this share of the drawing's side
+# of the drawing's own middle.
+LABEL_CENTRED = 0.15
+LABEL_QUANTITY_GLYPHS = 12  # a quantity set half over a drawing ("N = 49 N") is this short
+
+
+def _spread_row(row: _Row) -> bool:
+    """A row of two or more words set far apart (median gap LABEL_SPREAD font sizes or
+    more, none under LABEL_SPREAD_MIN): the tick or category labels along an axis
+    ("2000 2005 2010 2015 2020"), never a line of prose. Two long category names may
+    stand closer than the rest, so the typical gap decides."""
+    gaps = []
+    last = None
+    space = False
+    for c in row.chars:
+        if c.blank:
+            space = True
+            continue
+        if last is not None and (space or c.x0 - last.x1 > 0.3 * row.size):
+            gaps.append(c.x0 - last.x1)  # between two words: a space, or a clear gap
+        last = c
+        space = False
+    return (
+        bool(gaps)
+        and statistics.median(gaps) >= LABEL_SPREAD * row.size
+        and min(gaps) >= LABEL_SPREAD_MIN * row.size
+    )
+
+
+def _absorb_outer_labels(figure: _Figure, drawing: BBox, rows: list[_Row], ctx: _Context) -> None:
+    """The labels of a vector drawing (`drawing`: its paths' box) beyond the ones
+    `_absorb_labels` took. Those join within 0.6 of a font size of the drawing, once, but
+    tick and category labels stand 6 to 13 pt off a chart's axes, and the axis title
+    stands a line beyond them: they stayed in the reading flow as stray paragraphs and
+    equations, and the picture cut for the figure step from the figure's box had no axis
+    values or category names, so its values were estimated (F-399, accuracy round 2,
+    2026-11-11). Looked for from the box as it grows, LABEL_PASSES times at most. A row
+    joins when it is
+    - a row of spread-out short words (`_spread_row`: tick or category labels) within
+      0.6 of its font size of the box, or
+    - a short row (LABEL_SHORT characters at most) within one font size of the box that is
+      vertical (a rotated axis title) or centred on the drawing (LABEL_CENTRED), and is no
+      line of the page's running text (`_running_text`), or
+    - a short quantity (LABEL_QUANTITY_GLYPHS glyphs of maths at most) set partly over the
+      drawing ("N = 49 N" beside a force arrow).
+    A caption, a line of code, a row larger than body text and display maths clear of the
+    drawing never join. The figure's box grows to what joined, so its crop holds them."""
+    dx0, dy0, dx1, dy1 = drawing
+    running: set[int] | None = None  # the lines of the page's paragraphs, found when needed
+    for _ in range(LABEL_PASSES):
+        x0, y0, x1, y1 = figure.bbox
+        added = []
+        for row in rows:
+            if row.absorbed or CAPTION.match(row.clean):
+                continue
+            if row.size > 1.05 * ctx.body or (row.code and len(row.ink) >= CODE_MIN_GLYPHS):
+                continue
+            rx0, ry0, rx1, ry1 = row.bbox
+            beside_y = min(ry1, y1) - max(ry0, y0) >= 0.5 * (ry1 - ry0)
+            beside_x = min(rx1, x1) - max(rx0, x0) >= 0.5 * (rx1 - rx0)
+            gap_x = max(rx0 - x1, x0 - rx1) if beside_y else math.inf  # to its left or right
+            gap_y = max(ry0 - y1, y0 - ry1) if beside_x else math.inf  # over or under it
+            if min(gap_x, gap_y) > row.size:
+                continue
+            if row.kind == "math" and len(row.ink) > 3:
+                over = min(rx1, dx1) > max(rx0, dx0) and min(ry1, dy1) > max(ry0, dy0)
+                if over and len(row.ink) <= LABEL_QUANTITY_GLYPHS:
+                    added.append(row)
+                continue
+            if _spread_row(row):
+                if min(gap_x, gap_y) <= 0.6 * row.size:
+                    added.append(row)
+                continue
+            if len(row.clean) > LABEL_SHORT:
+                continue
+            if running is None:  # a short line of a paragraph beside the drawing stays prose
+                running = _running_text([r for r in rows if not r.absorbed], ctx)
+            if id(row) in running:
+                continue
+            if gap_y <= row.size:  # over or under: centred across the drawing
+                mid, low, high = (rx0 + rx1) / 2, dx0, dx1
+            else:  # to one side: centred along its height
+                mid, low, high = (ry0 + ry1) / 2, dy0, dy1
+            if row.vertical or abs(mid - (low + high) / 2) <= LABEL_CENTRED * (high - low):
+                added.append(row)
+        if not added:
+            return
+        for row in added:
+            row.absorbed = True
+            figure.labels.append(row)
+        figure.bbox = _union([figure.bbox, *(r.bbox for r in added)])
+
+
 def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
     """Ids of rows that are not labels: lines of a paragraph (a prose line that the next
     or previous prose line continues) and title-sized lines of several words: at least
@@ -8899,9 +9002,15 @@ def _page_blocks(
     for row in restored:
         _classify_row(row)
     rows = [*rows, *restored]
+    drawings = {id(f): f.bbox for f in figures}  # each figure's own box, before its labels
     figures = [f for f in figures if _absorb_labels(f, rows, ctx, page.parent)]
     _take_labels(restored, figures, rows)
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
+    # Once every figure has the labels at its edges, a drawing's farther ones (tick and
+    # category labels, axis titles): the figure's box, and so its crop, grows to them.
+    for figure in figures:
+        if figure.paths and not figure.equation:
+            _absorb_outer_labels(figure, drawings[id(figure)], rows, ctx)
     text_rows = [r for r in rows if not r.absorbed]
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
     if page_math is not None:
@@ -8977,6 +9086,15 @@ def _page_blocks(
     # margin counts too.
     held = [b.bbox for b in blocks if b.kind == Kind.FIGURE]
     loose = _loose_strokes(strokes, held, (page_rect.width, page_rect.height), margins=True)
+    # A glyph drawn as a filled outline in a line of typed text (an italic variable, the
+    # digits of a quantity) is no pen stroke: a small drawing for the figure step, not
+    # "handwriting, not converted" (F-364).
+    glyphs = _glyph_outlines(loose, paths, rows) if loose else []
+    if glyphs:
+        loose = [s for s in loose if s not in glyphs]
+        for box in page_type.stroke_regions(glyphs):
+            reasons = [f"vector drawing ({GLYPH_OUTLINE})"]
+            blocks.append(_Block(Kind.FIGURE, box, reasons=reasons))
     if len(loose) >= LOOSE_INK_STROKES or marks:
         ink = [*ink, *page_type.stroke_regions([*loose, *marks])]
     blocks.extend(_ink_blocks(ink, page_rect))
@@ -9209,15 +9327,17 @@ def _leftover_drawings(
     the covered characters' origins: a box or a black highlight hiding a line). The rest
     is grouped (LEFTOVER_REACH) and each group kept when at least LEFTOVER_MIN_PT on its
     longer side or of page_type.VECTOR_MIN_PATHS marks in different places: pen marks
-    (most of their paths are the page type's pen strokes, or every path is an open
-    stroked line or curve: a tick, a cross, a signature) are returned as handwriting
-    boxes (never sent to the figure model); any other drawing becomes a FIGURE block for
-    the model. Since 2026-10-13 (the drawings sweep) some straight drawings count too:
-    bonds between atom groups (`_bond_ends`: a structural formula's h/v bonds, which the
-    row of its letters holds), boxes joined by lines across their sides (`_connected`: a
-    one-line circuit of resistor boxes and wires), and dots round a letter that reach out
-    of its line (`_dots_out_of_line`: a Lewis structure's electrons); the drawing's box
-    takes in the atom groups its bonds join."""
+    (half their paths or more are the page type's pen strokes, or every path is a hand
+    mark over typed text, `_pen_mark_over_text`) are returned as handwriting boxes (never
+    sent to the figure model); any other drawing, open strokes with no pen evidence
+    included (a skeletal structure's bonds, a tick drawn as three points), becomes a
+    FIGURE block for the model (WS6.10, 2026-11-11). Since 2026-10-13 (the drawings
+    sweep) some straight drawings count too: bonds between atom groups (`_bond_ends`: a
+    structural formula's h/v bonds, which the row of its letters holds), boxes joined by
+    lines across their sides (`_connected`: a one-line circuit of resistor boxes and
+    wires), and dots round a letter that reach out of its line (`_dots_out_of_line`: a
+    Lewis structure's electrons); the drawing's box takes in the atom groups its bonds
+    join."""
     pad = UNREAD_PAD
     grown = [(b.bbox[0] - pad, b.bbox[1] - pad, b.bbox[2] + pad, b.bbox[3] + pad) for b in blocks]
     keep: list[tuple[BBox, list[_Path]]] = []
@@ -9272,11 +9392,14 @@ def _leftover_drawings(
         box = _union([box, *atoms])  # a formula's bonds and the atom groups they join
         if any(_centre_inside((x, y, x, y), box) for x, y in covers):
             continue  # a shape painted over hidden text: its cover, not a drawing
+        # Handwriting only with pen evidence: half its paths or more are the page type's pen
+        # strokes, or it is a hand mark over typed text. Open strokes alone are no evidence:
+        # the single straight lines of a skeletal structure, meeting at their ends or
+        # running parallel, are open strokes, and were cut out as "handwriting, not
+        # converted" on typeset exams (F-400, accuracy round 2, 2026-11-11).
         pen = sum(p.source in ink_sources for p in members)
-        if curved and (
-            2 * pen >= len(members) or all(p.open_stroke or id(p) in hand for p in members)
-        ):
-            marks.append(box)  # a ruler's straight lines are machine-drawn: a figure
+        if curved and (2 * pen >= len(members) or all(id(p) in hand for p in members)):
+            marks.append(box)
         else:
             reasons = [f"vector drawing ({len(members)} paths)"]
             figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
@@ -10172,6 +10295,48 @@ def _unread_ink(
     return len(_loose_strokes(kind.ink.stroke_boxes, boxes, size, margins=False)) >= (
         page_type.INK_MIXED_STROKES
     )
+
+
+GLYPH_OUTLINE = "glyph outline in a line of text"  # the reason `_glyph_outlines` gives
+GLYPH_LINE_SLACK = 0.1  # of the line's height: how far a glyph outline may reach out of it
+GLYPH_FILL_SLACK = 1.0  # pt: the fill that paints a stroke holds its box within this
+
+
+def _glyph_outlines(
+    strokes: Sequence[BBox], paths: Sequence[_Path], rows: Sequence[_Row]
+) -> list[BBox]:
+    """The pen strokes (the page type's, `strokes`) that are glyphs drawn as filled
+    outlines inside a line of typed text: within the line's height (GLYPH_LINE_SLACK of it
+    over at most), with typed glyphs of the line on both sides, and painted by a fill with
+    no stroke that lies within the line too. Outline maths (an italic variable, the digits
+    of an inline quantity) passed the stroke tests and was cut out as "handwriting, not
+    converted" (F-364, r16: 14 such regions 13 to 35 pt wide). A pen stroke is stroked, or
+    reaches out of the line, or stands where no typed text is (an answer on a blank)."""
+    index = _RowIndex([r for r in rows if not r.vertical])
+    fills = [p for p in paths if p.fill_only]
+    slack = GLYPH_FILL_SLACK
+
+    def in_line(box: BBox, row: _Row) -> bool:
+        reach = GLYPH_LINE_SLACK * (row.y1 - row.y0)
+        return row.y0 - reach <= box[1] and box[3] <= row.y1 + reach
+
+    found = []
+    for box in strokes:
+        x0, y0, x1, y1 = box
+        for row in index.near(y0, y1):
+            if not (in_line(box, row) and row.x0 < x0 and x1 < row.x1):
+                continue
+            if any(
+                in_line(p.bbox, row)
+                and p.bbox[0] - slack <= x0
+                and p.bbox[1] - slack <= y0
+                and x1 <= p.bbox[2] + slack
+                and y1 <= p.bbox[3] + slack
+                for p in fills
+            ):
+                found.append(box)
+                break
+    return found
 
 
 def _loose_strokes(

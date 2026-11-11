@@ -205,11 +205,17 @@ def test_a_step_plot_drawn_in_separate_lines_is_a_figure(little_text):
 
 
 @pytest.mark.parametrize(
-    "marks",
-    ["tick", "ticks and cross", "straight strokes", "mixed pen widths", "one stroke",
-     "two strokes over text", "signature"],
+    ("marks", "pen"),
+    [("tick", False), ("ticks and cross", False), ("straight strokes", False),
+     ("mixed pen widths", True), ("one stroke", True), ("two strokes over text", True),
+     ("signature", False), ("glyph outline in a line of text", False)],
 )  # fmt: skip
-def test_hand_marks_on_a_typed_page_are_cut_out_as_handwriting(marks):
+def test_marks_on_a_typed_page_are_kept_and_named_handwriting_only_with_pen_evidence(marks, pen):
+    # Every mark ends in an element. Only marks the page type takes for pen strokes are
+    # cut out as handwriting ("not converted"); a tick of three points, straight strokes
+    # and a stroke too long for the stroke tests have no pen evidence and go to the
+    # figure step as drawings, and a filled outline set inside a line of typed text is a
+    # glyph drawn as a path (WS6.10: F-364's outline maths, F-400's bond lines).
     doc = pymupdf.open()
     page = _page(doc)
     _title(page, "Quiz 1, question 2")
@@ -243,6 +249,16 @@ def test_hand_marks_on_a_typed_page_are_cut_out_as_handwriting(marks):
         boxes = _hand(page, 20, 300, 1, seed=1)
     elif marks == "two strokes over text":
         boxes = _hand(page, 200, 118, 2, seed=2)
+    elif marks == "glyph outline in a line of text":
+        # Two letters drawn as filled outlines at x-height between the typed words of one
+        # line: the page type takes them for pen strokes.
+        y = end + 24
+        page.insert_text((72, y), "The force on the cart is F = m", fontsize=11)
+        writer = Writer(page, 4, "ribbon", INK_BLACK, width=1.0)
+        after = writer.word("an", 219, y, 7.0, 0.15)
+        writer.commit()
+        page.insert_text((after + 3, y), "for the whole run.", fontsize=11)
+        boxes = writer.word_boxes
     else:  # one stroke, too long for the stroke tests, under the text
         shape = page.new_shape()
         y = end + 20
@@ -254,8 +270,7 @@ def test_hand_marks_on_a_typed_page_are_cut_out_as_handwriting(marks):
     out = layout.analyze(doc.tobytes())
     assert out.page_types[0].kind == "born_digital"
     assert out.kept_pages == {}
-    regions = _regions(out)
-    assert regions, "the marks became no handwriting region"
+    assert bool(_regions(out)) == pen
     for box in boxes:
         assert _held(out, 0, box, kinds=(Kind.FIGURE,))
     assert "It has a direction" in _text(out)  # the typed text is read whole
