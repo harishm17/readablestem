@@ -1,5 +1,6 @@
 {
  "set": "layout-dev-1",
+ "side": "development",
  "note": "Development set. 267 pages of 60 documents: 28 arXiv papers (units from the HTML ar5iv makes of the LaTeX source with LaTeXML), 10 OpenStax books (units from the archive XHTML of the pinned version) and 22 files made with LaTeX from a written unit list. Built in the second measuring round of November 2026 and rebuilt value for value by gold/layout_gold.py. Half of it was scored once as a sealed half; its failing pages were then used as cases, so every document here is development.",
  "documents": [
   {
@@ -542,5 +543,11 @@
    "pdf_sha256": "c4024f74de371042ef9c29f4f66fb15732a645c039e6cfbb6048b62715046c44",
    "gold_sha256": "ba84b2def9ce2788efd10b219096845e369955db63d10d9fb54b0efb6ec6a62f"
   }
- ]
+ ],
+ "passed": {
+  "papers": [
+   "arXiv 2403.06345",
+   "arXiv 2403.06879"
+  ]
+ }
 }

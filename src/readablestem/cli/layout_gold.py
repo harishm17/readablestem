@@ -66,12 +66,90 @@ def _cmd_register(args: argparse.Namespace) -> int:
         return _error(f"{registry} exists; a registered set changes only with --replace")
     if not _outside_project(root):
         return _error(f"{root} is inside the repository; a set's files stay outside it")
-    listed = layout_gold.registry_of(root, args.set, args.note)
+    listed = layout_gold.registry_of(root, args.set, args.note, args.side)
     if not listed["documents"]:
         return _error(f"no gold under {root}")
     registry.parent.mkdir(parents=True, exist_ok=True)
     registry.write_text(json.dumps(listed, indent=1) + "\n", encoding="utf-8")
     print(f"wrote {registry}: {len(listed['documents'])} documents")
+    return 0
+
+
+def _work(args: argparse.Namespace) -> Path:
+    return args.work or cache_dir("layout-gold-work", args.set)
+
+
+def _cmd_draw_papers(args: argparse.Namespace) -> int:
+    from readablestem.cli.main import project_root
+    from readablestem.gold import layout_sources
+
+    root = set_root(args.set, args.root)
+    if not _outside_project(root):
+        return _error(f"{root} is inside the repository; a set's files stay outside it")
+    if not args.pool.is_file():
+        return _error(f"no pool at {args.pool} (the candidates of `gold/arxiv_corpus.py`)")
+    work = _work(args)
+    candidates = json.loads(args.pool.read_text(encoding="utf-8"))["candidates"]
+    used = layout_sources.used_papers(project_root(), cache_dir()) - {
+        path.name for path in (work / "papers").glob("*")
+    }
+    print(f"{len(candidates)} candidates, {len(used)} papers used before", flush=True)
+    walk = layout_sources.draw_papers(
+        candidates,
+        args.seed,
+        root,
+        work,
+        used=used,
+        per_family=args.per_family,
+        visits=args.visits,
+        log=lambda line: print(line, flush=True),
+    )
+    pages = sum(row["pages"] for row in walk["taken"])
+    print(f"{len(walk['taken'])} papers taken, {pages} pages; {len(walk['passed'])} passed over")
+    return 0
+
+
+def _cmd_draw_books(args: argparse.Namespace) -> int:
+    from readablestem.gold import layout_sources
+
+    root = set_root(args.set, args.root)
+    if not _outside_project(root):
+        return _error(f"{root} is inside the repository; a set's files stay outside it")
+    walk = layout_sources.draw_books(
+        args.seed, root, _work(args), count=args.count, log=lambda line: print(line, flush=True)
+    )
+    pages = sum(row["pages"] for row in walk["taken"])
+    print(f"{len(walk['taken'])} books taken, {pages} pages; {len(walk['passed'])} passed over")
+    return 0
+
+
+def _cmd_draw_course(args: argparse.Namespace) -> int:
+    from readablestem.cli.main import project_root
+    from readablestem.gold import course_corpus, layout_sources
+
+    root = set_root(args.set, args.root)
+    if not _outside_project(root):
+        return _error(f"{root} is inside the repository; a set's files stay outside it")
+    if not args.pool.is_file():
+        return _error(f"no pool at {args.pool} (the repositories of `gold/course_corpus.py`)")
+    if not args.sources.is_dir():
+        return _error(f"no downloaded repositories at {args.sources}")
+    pool = json.loads(args.pool.read_text(encoding="utf-8"))["repos"]
+    used = layout_sources.used_repos(project_root())
+    print(f"{len(pool)} repositories, {len(used)} used before", flush=True)
+    walk = layout_sources.draw_course(
+        [course_corpus.Repo(**repo) for repo in pool],
+        args.seed,
+        root,
+        _work(args),
+        args.sources,
+        used=used,
+        count=args.count,
+        visits=args.visits,
+        log=lambda line: print(line, flush=True),
+    )
+    pages = sum(row["pages"] for row in walk["taken"])
+    print(f"{len(walk['taken'])} documents taken, {pages} pages; {len(walk['passed'])} passed over")
     return 0
 
 
@@ -118,7 +196,48 @@ def register(gold: argparse._SubParsersAction) -> None:
     new.add_argument("--registry", type=Path, help="default: data/gold/layout/<set>.json")
     new.add_argument("--note", required=True, help="how the set was made and what it is for")
     new.add_argument("--replace", action="store_true")
+    new.add_argument(
+        "--side",
+        choices=layout_gold.SIDES,
+        default="development",
+        help="held-out: no page of the set is opened while the reader is being worked on",
+    )
     new.set_defaults(func=_cmd_register)
+
+    def add_draw(p: argparse.ArgumentParser) -> None:
+        add_set(p)
+        p.add_argument("--seed", required=True, help="fixes the order the candidates are tried")
+        p.add_argument("--work", type=Path, help="downloads and the walk's record (the cache)")
+
+    papers = parser.add_parser(
+        "draw-papers",
+        help="add arXiv papers to a set: a seeded walk, LaTeXML in the sandbox, no model",
+    )
+    add_draw(papers)
+    papers.add_argument("--pool", type=Path, required=True, help="pool.json of licensed papers")
+    papers.add_argument("--per-family", type=int, default=4, help="papers per class family")
+    papers.add_argument("--visits", type=int, default=200, help="papers tried at most")
+    papers.set_defaults(func=_cmd_draw_papers)
+
+    books = parser.add_parser(
+        "draw-books", help="add CC BY OpenStax books to a set: a seeded walk, no model"
+    )
+    add_draw(books)
+    books.add_argument("--count", type=int, default=8, help="books taken at most")
+    books.set_defaults(func=_cmd_draw_books)
+
+    course = parser.add_parser(
+        "draw-course",
+        help="add course handouts written in LaTeX to a set: a seeded walk, no model",
+    )
+    add_draw(course)
+    course.add_argument("--pool", type=Path, required=True, help="the pool of repositories")
+    course.add_argument(
+        "--sources", type=Path, required=True, help="the repositories as downloaded"
+    )
+    course.add_argument("--count", type=int, default=15, help="documents taken at most")
+    course.add_argument("--visits", type=int, default=120, help="repositories tried at most")
+    course.set_defaults(func=_cmd_draw_course)
 
     sample = parser.add_parser(
         "sample", help="draw 1 page in 10 per kind and write its picture and a sheet to fill"

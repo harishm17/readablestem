@@ -42,10 +42,12 @@ import statistics
 import unicodedata
 from collections.abc import Collection, Iterable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import lxml.html
 import pymupdf
+
+if TYPE_CHECKING:
+    import lxml.html
 
 TOK = re.compile(r"[^\W\d_]+|\d+")
 # A token of a block that is not a word of its source unit. `eval/order.py` skips it.
@@ -75,6 +77,14 @@ def unit_tokens(text: str) -> list[str | None]:
             out.append(None)
         out.extend(tok(chunk))
     return out
+
+
+def _parse(html: str) -> lxml.html.HtmlElement:
+    """lxml is a development dependency and the image does not carry it, so it is loaded
+    here and not with the module: the command line imports this module at its start."""
+    import lxml.html
+
+    return lxml.html.fromstring(html)
 
 
 def _classes(node: lxml.html.HtmlElement) -> set[str]:
@@ -149,9 +159,12 @@ def _ltx_text(element: lxml.html.HtmlElement, notes: list | None = None) -> str:
     return " ".join("".join(parts).split())
 
 
+_XML_DECLARATION = re.compile(r"^\s*<\?xml[^>]*\?>")
+
+
 def units_latexml(html: str) -> list[Unit]:
-    """The units of a paper, from the HTML LaTeXML makes of its source."""
-    document = lxml.html.fromstring(html)
+    """The units of a paper, from the HTML (or XHTML) LaTeXML makes of its source."""
+    document = _parse(_XML_DECLARATION.sub("", html, count=1))
     articles = document.xpath("//article")
     root = articles[0] if articles else document
     units: list[Unit] = []
@@ -274,7 +287,7 @@ def _os_text(element: lxml.html.HtmlElement) -> str:
 
 def units_openstax(xhtml: str, section: str) -> list[Unit]:
     """The units of one OpenStax section, from the archive's XHTML."""
-    document = lxml.html.fromstring(xhtml)
+    document = _parse(xhtml)
     units: list[Unit] = []
 
     def add(role: str, text: str, **more: Any) -> None:
@@ -926,6 +939,7 @@ def overlay(page: pymupdf.Page, gold: dict[str, Any], path: Path, dpi: int = 80)
 
 MIN_BLOCKS = 3  # a page needs this many blocks whose order is scored
 PAPER_COVERAGE = 0.75  # of a paper page's prose lines, the share the source accounts for
+LATEX_KINDS = ("paper", "course")  # gold from LaTeXML's HTML: the coverage rule applies
 BOOK_COVERAGE = 0.8
 INDEX_LINE_COVERAGE = 0.6
 SECTION_PAGES, CHAPTER_END_PAGES = 3, 4
@@ -938,10 +952,17 @@ def _page_gold(ix: Index, page: pymupdf.Page, *, floats_ordered: bool = False) -
 
 
 def paper_gold(
-    doc_id: str, pdf: pymupdf.Document, html: str, *, source: str, category: str
+    doc_id: str,
+    pdf: pymupdf.Document,
+    html: str,
+    *,
+    source: str,
+    category: str,
+    kind: str = "paper",
 ) -> dict[str, Any]:
     """Gold for a paper: pages 1, 2 and 3 and the two pages from the middle, each kept when
-    it has three blocks or more."""
+    it has three blocks or more. A course handout written in LaTeX is built the same way
+    (`kind="course"`)."""
     ix = Index(units_latexml(html))
     count = pdf.page_count
     wanted = sorted({1, 2, 3, count // 2 + 1, count // 2 + 2} & set(range(1, count + 1)))
@@ -952,7 +973,7 @@ def paper_gold(
             continue
         gold["page"] = number
         pages.append(gold)
-    return {"id": doc_id, "kind": "paper", "source": source, "cat": category, "pages": pages}
+    return {"id": doc_id, "kind": kind, "source": source, "cat": category, "pages": pages}
 
 
 def textbook_gold(
@@ -1094,13 +1115,13 @@ def ordered_blocks(page: dict[str, Any]) -> list[dict[str, Any]]:
 
 def keep_pages(gold: dict[str, Any]) -> dict[str, Any] | None:
     """The page rules, fixed before any reader was scored: a page needs three or more blocks
-    whose order is scored, and a paper's page needs the source to account for three quarters
-    of its prose lines. `None` when no page is left."""
+    whose order is scored, and a page of a paper or a course handout needs the source to
+    account for three quarters of its prose lines. `None` when no page is left."""
     pages = []
     for page in gold["pages"]:
         if len(ordered_blocks(page)) < MIN_BLOCKS:
             continue
-        if gold["kind"] == "paper" and (page.get("coverage") or 0) < PAPER_COVERAGE:
+        if gold["kind"] in LATEX_KINDS and (page.get("coverage") or 0) < PAPER_COVERAGE:
             continue
         pages.append(page)
     return {**gold, "pages": pages} if pages else None
@@ -1125,9 +1146,16 @@ def documents(root: Path) -> Iterator[tuple[str, Path, dict[str, Any]]]:
         yield gold["id"], root / "files" / f"{gold['id']}.pdf", gold
 
 
-def registry_of(root: Path, name: str, note: str) -> dict[str, Any]:
-    """What the repository keeps about a set: ids, kinds, sources, counts and hashes. No
-    text of any document."""
+PASSED_FILE = "passed.json"  # in a set folder: sources its builders visited and did not take
+SIDES = ("development", "held-out")
+
+
+def registry_of(root: Path, name: str, note: str, side: str = "development") -> dict[str, Any]:
+    """What the repository keeps about a set: its side of the split, ids, kinds, sources,
+    counts and hashes, and the sources that were visited and not taken. No text of any
+    document."""
+    if side not in SIDES:
+        raise ValueError(f"a set is one of {SIDES}, not {side!r}")
     rows = []
     for doc_id, pdf, gold in documents(root):
         rows.append(
@@ -1141,7 +1169,9 @@ def registry_of(root: Path, name: str, note: str) -> dict[str, Any]:
                 "gold_sha256": sha256(canonical(gold)),
             }
         )
-    return {"set": name, "note": note, "documents": rows}
+    passed_file = root / PASSED_FILE
+    passed = json.loads(passed_file.read_text(encoding="utf-8")) if passed_file.is_file() else {}
+    return {"set": name, "side": side, "note": note, "documents": rows, "passed": passed}
 
 
 def verify_set(root: Path, registry: dict[str, Any]) -> list[str]:
