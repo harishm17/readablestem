@@ -2576,6 +2576,37 @@ uv run python tests/workflows/builders/record.py list      # the 71 built files 
 uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or network" for the rest
 ```
 
+## Reading order (`eval/order.py`)
+
+`src/readablestem/eval/order.py` scores what a listener hears on a page against the gold
+blocks of "The test corpus". It takes the output as a list of elements in reading order,
+made from a layout dump or from the student HTML, and never looks at boxes, so the layout
+step, the finished HTML and any other reader are scored the same way. Its counts per page:
+
+| Count | Meaning |
+|---|---|
+| found | at least half of a gold block's words are on the page |
+| flow | the block's word 4-grams that appear unbroken in the page's word stream |
+| broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |
+| neighbours in order | consecutive gold blocks whose places in the stream are in gold order |
+| cross-join | an element holding text of two gold blocks that are not neighbours |
+| leaked | text that must not be read (a running header, a page number) that is in the output |
+| clean page | no broken block, every neighbouring pair in order, no cross-join, half the blocks found |
+| right page | clean, and no margin stamp read inside text, no index entries joined, numbered blanks in order |
+
+The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
+swapped pair fails the page.
+
+The scorer is the research scorer (version 4) moved into the package. Before it was
+committed it was run next to the research script on every stored output of the layout
+studies: 26 runs, 2,133 page rows, every count and every listed fault identical. On the
+layout output of the main branch as stored on 2026-11-10, both give 59 clean pages of 78
+(30 of 41 on public files, 29 of 37 on files made here) and 6 of 13 on the edge files.
+Those numbers describe that stored output, read from a layout dump; they were not measured
+under the production profile and are not the registered baseline, which the order eval
+records when it lands. The first scorer (version 2) was not moved: its element-level counts
+are still reported by this one (`pairs`, `stitched`, `split`, `lost`).
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%

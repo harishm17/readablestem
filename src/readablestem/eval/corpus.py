@@ -56,6 +56,8 @@ KINDS = ("public", "committed", "builder")
 RANGES = "page-ranges"
 TEXT = "text"
 MIN_RUN = 4
+# Block fields that carry no words of the page, so they are stored as they are.
+TEXT_FREE = frozenset({"role", "coarse", "float", "entry", "unit"})
 USER_AGENT = "Mozilla/5.0 (corpus-fetch)"
 BUSY_WAITS = (5, 20, 60)  # seconds to wait after each "too many requests"
 
@@ -426,11 +428,15 @@ def encode_gold(gold: dict, pdf: bytes) -> dict:
     pages = []
     with pymupdf.open(stream=pdf, filetype="pdf") as doc:
         for page in gold["pages"]:
+            if unknown := set(page) - {"page", "blocks"}:
+                raise CorpusError(f"page field {sorted(unknown)} may hold text; encode it first")
             stream = page_stream(doc[page["page"] - 1])
             near, blocks = 0, []
             for block in page["blocks"]:
+                if unknown := set(block) - {"text", "start"} - TEXT_FREE:
+                    raise CorpusError(f"block field {sorted(unknown)} may hold text")
                 stored, near = encode_block(clean(block["text"]), stream, near)
-                extra = {k: v for k, v in block.items() if k not in ("text", "start")}
+                extra = {k: v for k, v in block.items() if k in TEXT_FREE}
                 blocks.append({**extra, **stored})
             pages.append(
                 {
