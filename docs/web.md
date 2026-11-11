@@ -660,6 +660,20 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions.
+- **Nothing left out unsaid** (SW42.4). A picture outside a float (centered, in a sentence, in a
+  list item, in a table cell) is a figure of its own straight after the block that holds it; a
+  picture in a cell makes its table a required decision (`source.read` / `source_table_picture`),
+  since the cell reads as empty. A float reads its tables or pictures, the first with the
+  caption, then everything else in it in order (the words beside a picture, a note under a
+  table, subfigures); a `\captionof` caption goes to the picture just before it. `\intertext`
+  is a paragraph between the equations, and `\date` is a line of its own. A formula LaTeX could
+  not read that a table, a heading or a caption shows as LaTeX code makes that item a required
+  decision (`source.read` / `source_formula_unread`). After the walk the reader counts what no
+  rule read and no entry of its skip list (`ltx_reader.SKIP`, each entry with its reason)
+  covers: `SourceReport.unread_words`, `unread_pictures` and the first 12 words. Either above 0
+  adds the required notice `source_unread`, whose line on the job page gives the counts and the
+  first words, and the job's outcome ("Finished, with parts not converted") replaces
+  "Everything was converted".
 - **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
   read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
   frame is a heading (its title) and its content: sections are the top level, frames sit one level
@@ -704,11 +718,16 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   log (`out/latexml.out`, `out/post.out`), which `source.report.parse` reads into
   `DocumentResult.source_report` with the error nodes the reader found (`SourceReport`). A loss
   outside a formula stops the job (`source.report.stop`): `source_missing_file` (an `\input` or
-  `\include` that is not in the upload), `source_syntax_error` (an unclosed brace or environment,
-  with its file and line), `source_unsupported_class` / `source_unsupported_package` (no binding,
+  `\include` that is not in the upload, or a `\bibliography` whose `.bib` is not: the one error of
+  `latexmlpost` that stops a job), `source_syntax_error` (an unclosed brace or environment,
+  with its file and line; or a `^`, `_`, `&` or `#` in running text, named with what to write
+  instead), `source_unsupported_class` / `source_unsupported_package` (no binding,
   and the document used what it defines; a `.sty` in the upload is not read either; a class read
-  as an article is never named as the cause) or
-  `source_undefined`. The job page names the files and commands from `Job.error_detail` (at most
+  as an article is never named as the cause; a package with no binding whose command is the
+  log's first error is the cause even when a syntax error follows, as an mhchem charge does) or
+  `source_undefined`. A command in a formula is left to the decision of the item that shows it
+  only when that item holds one (`SourceMark.decided`); one in a description or the authors
+  stops the job. The job page names the files and commands from `Job.error_detail` (at most
   20, nullable JSON, migration `3c9a4e7d1b62`): document content, so never logged, cleared on
   "Try again" and deleted with the job. A command LaTeX did not know inside a formula, and a
   picture that is missing or of a kind not read, is a required decision on the review list with a

@@ -26,7 +26,12 @@ def convert(name: str, extra: dict[str, bytes | str] | None = None, client=None)
         )
     else:
         blob = envelope.wrap("tex", f"{name}.tex", None, text.encode())
-    return convert_source(blob, settings=get_settings(), client=client or FakeVisionClient()).result
+    client = client or FakeVisionClient()
+    result = convert_source(blob, settings=get_settings(), client=client).result
+    # every fixture is read whole: nothing the reader's skip list does not name is left out
+    report = result.source_report
+    assert report is not None and (report.unread_words, report.unread_pictures) == (0, 0)
+    return result
 
 
 def by_status(result: DocumentResult, kind: Kind) -> dict[Status, int]:
@@ -176,6 +181,171 @@ def test_the_report_names_what_latexml_said(name, tmp_path):
         )
     assert result.source_report is not None
     assert (result.source_report.unread_words, result.source_report.unread_pictures) == (0, 0)
+
+
+# The constructs of the reader probe (SW42.4): (preamble, body), each body with a marker word.
+CONSTRUCTS: dict[str, tuple[str, str]] = {
+    "plain": ("", "A plain ZQplain paragraph."),
+    "center": ("", "\\begin{center}Centered ZQcenter words.\\end{center}"),
+    "minipage": ("", "\\begin{minipage}{5cm}Boxed ZQminipage words.\\end{minipage}"),
+    "fbox": ("", "Then \\fbox{framed ZQfbox words} here."),
+    "parbox": ("", "\\parbox{4cm}{Parbox ZQparbox words.}"),
+    "marginpar": ("", "Body text.\\marginpar{Margin ZQmarginpar note.}"),
+    "footnote": ("", "Body\\footnote{Foot ZQfootnote note.} text."),
+    "quote": ("", "\\begin{quote}Quoted ZQquote words.\\end{quote}"),
+    "verse": ("", "\\begin{verse}Verse ZQverse line\\\\second line\\end{verse}"),
+    "abstract": ("", "\\begin{abstract}Abstract ZQabstract words.\\end{abstract}"),
+    "paragraphhead": ("", "\\paragraph{Head ZQparagraphhead} then text."),
+    "description": (
+        "",
+        "\\begin{description}\\item[Term ZQdescription] meaning.\\end{description}",
+    ),
+    "nested_list": (
+        "",
+        "\\begin{enumerate}\\item One\\begin{itemize}\\item Inner ZQnestedlist item"
+        "\\end{itemize}\\end{enumerate}",
+    ),
+    "item_two_pars": (
+        "",
+        "\\begin{itemize}\\item First.\n\nSecond ZQitemtwopars par.\\end{itemize}",
+    ),
+    "item_display": (
+        "",
+        "\\begin{itemize}\\item Solve \\[x^2 = 4\\] then ZQitemdisplay.\\end{itemize}",
+    ),
+    "tabbing": ("", "\\begin{tabbing}Name \\= Value\\\\ ZQtabbing \\> 4\\end{tabbing}"),
+    "table_env": (
+        "",
+        "\\begin{table}\\caption{Cap ZQtableenvcap}\\begin{tabular}{ll}a & ZQtableenv\\\\"
+        "\\end{tabular}\\end{table}",
+    ),
+    "table_note": (
+        "",
+        "\\begin{table}\\begin{tabular}{ll}a & b\\\\\\end{tabular}\n\nNote ZQtablenote under"
+        " the table.\\end{table}",
+    ),
+    "figure_text": (
+        "",
+        "\\begin{figure}Words ZQfiguretext inside a figure.\\caption{Cap}\\end{figure}",
+    ),
+    "multicol": (
+        "\\usepackage{multicol}",
+        "\\begin{multicols}{2}Two ZQmulticol columns.\\end{multicols}",
+    ),
+    "href": ("\\usepackage{hyperref}", "See \\href{https://example.org}{the ZQhref page}."),
+    "textcolor": ("\\usepackage{xcolor}", "A \\textcolor{red}{red ZQtextcolor word}."),
+    "theorem": (
+        "\\newtheorem{thm}{Theorem}",
+        "\\begin{thm}[Name ZQtheoremname]Statement ZQtheorem here.\\end{thm}",
+    ),
+    "proof": ("\\usepackage{amsthm}", "\\begin{proof}Proof ZQproof words.\\end{proof}"),
+    "verbatim": ("", "\\begin{verbatim}\ncode ZQverbatim line\n\\end{verbatim}"),
+    "equation_text": (
+        "\\usepackage{amsmath}",
+        "\\begin{equation}x = 1 \\text{ for ZQequationtext}\\end{equation}",
+    ),
+    "cases_text": (
+        "\\usepackage{amsmath}",
+        "\\[f(x)=\\begin{cases}1 & \\text{if ZQcasestext}\\\\0 & \\text{else}\\end{cases}\\]",
+    ),
+    "intertext": (
+        "\\usepackage{amsmath}",
+        "\\begin{align}a&=b\\\\ \\intertext{Between ZQintertext rows}c&=d\\end{align}",
+    ),
+    "tag": ("\\usepackage{amsmath}", "\\begin{equation}a=b\\tag{ZQtag}\\end{equation}"),
+    "appendix": ("", "\\appendix\\section{Extra ZQappendix}Appendix text."),
+    "thanks": ("", ""),  # the title page, in `construct`
+    "toc": ("", ""),
+    "subfigure": (
+        "\\usepackage{graphicx}\\usepackage{subcaption}",
+        "\\begin{figure}\\begin{subfigure}{3cm}\\includegraphics{s1.png}\\caption{Left "
+        "ZQsubfigure}\\end{subfigure}\\begin{subfigure}{3cm}\\includegraphics{s2.png}"
+        "\\caption{Right}\\end{subfigure}\\caption{Both}\\end{figure}",
+    ),
+    "wrapfigure": (
+        "\\usepackage{graphicx}\\usepackage{wrapfig}",
+        "\\begin{wrapfigure}{r}{3cm}\\includegraphics{w1.png}\\caption{Wrapped ZQwrapfigure}"
+        "\\end{wrapfigure}Text beside.",
+    ),
+    "longtable": (
+        "\\usepackage{longtable}",
+        "\\begin{longtable}{ll}\\caption{Long ZQlongtablecap}\\\\ a & ZQlongtable\\\\"
+        "\\end{longtable}",
+    ),
+    "tabular_par": ("", "\\begin{tabular}{lp{3cm}}a & Cell ZQtabularpar words\\\\\\end{tabular}"),
+    "nested_tabular": (
+        "",
+        "\\begin{tabular}{ll}a & \\begin{tabular}{l}inner ZQnestedtabular\\end{tabular}\\\\"
+        "\\end{tabular}",
+    ),
+    # its label is drawn: it is in the figure's picture, not in the text
+    "picture_env": ("", "\\begin{picture}(50,20)\\put(5,5){Label}\\end{picture}"),
+    "centered_picture": (
+        "\\usepackage{graphicx}",
+        "\\begin{center}\\includegraphics{c1.png}\\end{center}",
+    ),
+    "inline_picture": (
+        "\\usepackage{graphicx}",
+        "Press \\includegraphics[height=1em]{i1.png} to go.",
+    ),
+    "item_picture": (
+        "\\usepackage{graphicx}",
+        "\\begin{itemize}\\item See \\includegraphics{l1.png}\\end{itemize}",
+    ),
+    "cell_picture": (
+        "\\usepackage{graphicx}",
+        "\\begin{tabular}{ll}a & \\includegraphics{t1.png}\\\\\\end{tabular}",
+    ),
+    "caption_of": (
+        "\\usepackage{graphicx}\\usepackage{caption}",
+        "\\begin{center}\\includegraphics{k1.png}\\captionof{figure}{Loose ZQcaptionof}"
+        "\\end{center}",
+    ),
+    "heading_math": ("", "\\section{About $x^2$ ZQheadingmath}Text."),
+    "title_only": ("", ""),
+}
+
+
+def construct(name: str) -> str:
+    preamble, body = CONSTRUCTS[name]
+    head = f"\\documentclass{{article}}\n{preamble}\n"
+    if name == "thanks":
+        return (
+            head + "\\title{T\\thanks{Thanks ZQthanks}}\\author{A. Writer ZQauthor}\\date{Fall "
+            "ZQdate}\\begin{document}\\maketitle Text.\\end{document}\n"
+        )
+    if name == "toc":
+        return (
+            head + "\\begin{document}\\tableofcontents\\section{First ZQtoc}Text.\\end{document}\n"
+        )
+    if name == "title_only":
+        return (
+            head + "\\title{Title ZQtitleonly}\\begin{document}\\maketitle Text.\\end{document}\n"
+        )
+    return head + "\\begin{document}\n\\section{S}Lead.\n\n" + body + "\n\\end{document}\n"
+
+
+@pytest.mark.parametrize("name", list(CONSTRUCTS))
+def test_every_construct_is_read_or_said(name):
+    """Whatever the source holds is in the result, or the job says it is not (SW42.4): each
+    marker word is in the result or there is a required notice, and each picture asked for is
+    a figure (a `picture` drawing is one)."""
+    import json
+    import re
+
+    text = construct(name)
+    pictures = re.findall(r"\\includegraphics(?:\[[^]]*\])?\{([^}]+)\}", text)
+    files = {f: png_bytes(colour=(40 + 20 * i, 30, 30)) for i, f in enumerate(pictures)}
+    if files:
+        blob = envelope.wrap("zip", "probe.zip", "main.tex", make_zip({"main.tex": text, **files}))
+    else:
+        blob = envelope.wrap("tex", "probe.tex", None, text.encode())
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    everything = json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
+    lost = [m for m in sorted(set(re.findall(r"ZQ[a-z]+", text))) if m not in everything]
+    assert not lost or any(n.review == "required" for n in result.notices)
+    asked = len(pictures) + text.count("\\begin{picture}")
+    assert sum(1 for e in result.elements if e.kind is Kind.FIGURE) == asked
 
 
 # ------------------------------------------------------------ classes and packages (WS18.1)

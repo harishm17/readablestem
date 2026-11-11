@@ -223,7 +223,14 @@ log = logging.getLogger(__name__)
 # (`DocumentResult.source_report`, `source.report`), and a source that loses content outside a
 # formula stops with a code that names the cause. PDFs are unchanged. Results from 0.5.9 load
 # unchanged and are not judged again.
-PIPELINE_VERSION = "0.5.10"
+# 0.5.11 (2026-11-11): the LaTeX source reader leaves nothing out unsaid (`source.ltx_reader`):
+# a picture outside a float is a figure after its block, a float's other words are read,
+# `\intertext` and `\date` are paragraphs, a formula LaTeX could not read in a table, heading
+# or caption makes that item a required decision, and what no rule reads is counted
+# (`SourceReport.unread_words`, `unread_pictures`) and said (`source_unread`). The stop rule
+# names a missing bibliography and a special character in the text. Source jobs gain figures
+# and decisions; PDFs are unchanged. Results from 0.5.10 load unchanged.
+PIPELINE_VERSION = "0.5.11"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased: the LaTeX reader leaves nothing out unsaid (branch feat/latex-reader-drops)
+
+- A picture outside a float (centered, in a sentence, in a list item, in a table cell) was
+  dropped with nothing said. It is now a figure straight after the block that holds it, through
+  the figure step; a picture in a cell makes its table a required decision, since the cell
+  reads as empty. A picture inside a sentence follows the sentence until Element v2 (WS16).
+- A float reads its tables or pictures and then everything else in it: the words beside a
+  picture, a note under a table, every tabular of a table float. A `\captionof` caption goes to
+  the picture before it. `\intertext` is a paragraph between the equations; `\date` is a line.
+- A formula LaTeX could not read that a table, a heading or a caption shows as LaTeX code makes
+  that item a required decision, with a sentence naming the command. The same command in a
+  description or the authors, where no item can hold a decision, stops the job.
+- The reader counts what no rule read and no entry of its skip list covers (`SourceReport`
+  `unread_words`, `unread_pictures`, the first 12 words). Either above 0 is the required notice
+  `source_unread`, and the job page says "Finished, with parts not converted" in place of
+  "Everything was converted". The 45 constructs of the reader probe and every fixture read with
+  nothing left out.
+- The stop rule: a `\bibliography` whose `.bib` is not in the upload stops as
+  `source_missing_file` naming `refs.bib`; a package with no binding whose command is the log's
+  first error is named as the cause even when a syntax error follows (an mhchem charge in the
+  text); a `^`, `_`, `&` or `#` in running text stops as `source_syntax_error` with a sentence
+  that names the character and what to write instead (`&` and `#` stopped as `source_failed`).
+- Pipeline 0.5.11.
+
 ## Unreleased: LaTeX classes and packages, read or refused (branch feat/latex-class-support)
 
 - A LaTeX source in the `exam` class is refused at upload (`source_unsupported_class`): LaTeXML

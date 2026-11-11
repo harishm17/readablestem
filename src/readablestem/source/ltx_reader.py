@@ -93,7 +93,7 @@ _LEVEL = re.compile(r"^h([1-6])$")
 # What a step of a frame does not show (`\\pause`, `\\only`, `\\visible`).
 HIDDEN = frozenset({"ltx_covered", "ltx_invisible"})
 # What the reader leaves out on purpose, by tag or class, and why. Every other text and
-# picture in LaTeXML's body is read by a rule or counted as not read (`_Reader.unread`).
+# picture in LaTeXML's body is read by a rule or counted as not read (`_count_unread`).
 SKIP: dict[str, str] = {
     "head": "the page's head: LaTeXML's title and links, not the document",
     "script": "code in the page, never shown",
@@ -202,7 +202,7 @@ class _Reader:
         self.errors = 0
         self.marked: dict[int, str | None] = {}  # id of an error node -> its element's id
         self.pending: list[Node] = []  # error nodes met before their element was made
-        # What the rules read, for the count of what they did not (`unread`): nodes whose own
+        # What the rules read, for the count of what they did not (`_count_unread`): nodes whose
         # text and children's tails were written, nodes taken whole (a picture, a table read
         # inside a float), steps of a frame left out (`SKIP["earlier step"]`), and the pictures
         # met in running text that wait for their block's element (`_flush_pictures`).
@@ -900,8 +900,10 @@ class _Reader:
             # `\captionof` after a picture: a float that is only a caption, the picture's own
             previous.caption = caption
             holders.append(previous)
-        if not holders and not nested:
-            holders.append(self._picture_element(None, caption))  # a figure with no picture
+        if not holders and not nested and not _float_words(node, captions):
+            # a float with nothing in it but its caption (a drawing LaTeX could not make): a
+            # figure with no picture. One with words of its own is read as those words.
+            holders.append(self._picture_element(None, caption))
         if holders:
             # an error in the caption, or one in the float's text that is not a formula, is
             # the float's own (`_mark` keeps the first tie)
@@ -916,7 +918,7 @@ class _Reader:
             if child not in captions:
                 self.walk(child, depth + 1)
         if not holders and caption:
-            # subfigures with no picture of the float's own: its caption follows them
+            # subfigures, or words, with no picture of the float's own: its caption follows
             self._new(Kind.PARAGRAPH, text=caption)
             self.chars += len(caption)
 
@@ -1062,6 +1064,21 @@ def _visible_blocks(node: Node) -> set[str]:
 
     visit(node, 0)
     return found
+
+
+def _float_words(node: Node, captions: list[Node]) -> bool:
+    """Whether a float holds words of its own: text or a formula outside its captions and
+    outside the error nodes LaTeX left for what it could not read."""
+    left_out = {id(n) for c in captions for n in c.iter()}
+    left_out |= {id(n) for e in node.iter() if "ltx_ERROR" in _classes(e) for n in e.iter()}
+    for item in node.iter():
+        if id(item) in left_out or _skipped(item):
+            continue
+        if _local(item.tag) == "math" or (item.text or "").strip():
+            return True
+        if item is not node and (item.tail or "").strip():
+            return True
+    return False
 
 
 def _is_figure(node: Node) -> bool:

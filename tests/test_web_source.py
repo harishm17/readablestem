@@ -340,8 +340,12 @@ def test_a_source_that_loses_content_never_ends_as_converted(name, tmp_path, cap
             assert row.shown in (job.html or "")
             kinds = [e["kind"] for e in job.result_json["elements"]]
             assert kinds.count("figure") == row.figures
-            if row.decision is not None:
+            if row.decision is not None:  # the item that shows it waits for the instructor
                 assert "Everything was converted" not in page
+                codes = [
+                    c.get("code") for f in job.result_json["fixes"] for c in f.get("checks") or []
+                ]
+                assert row.decision in codes
             return
         assert job.status == JobStatus.FAILED and job.error_code == row.code
         assert job.result_json is None  # nothing a student could be given
@@ -381,6 +385,8 @@ class TestRealConversion:
         assert f'href="/jobs/{job_id}/review"' not in review.text
         assert f"/jobs/{job_id}/review?page=" not in review.text
         result = DocumentResult.model_validate(env.job(job_id).result_json)
+        report = result.source_report  # the fixture is read whole (SW42.4)
+        assert report is not None and (report.unread_words, report.unread_pictures) == (0, 0)
         formula = next(f for f in result.fixes if f.kind is Kind.EQUATION and f.pending)
         table = next(f for f in result.fixes if f.kind is Kind.TABLE)
         to_item = env.browser.get(f"/jobs/{job_id}/review?item={formula.element_id}")
