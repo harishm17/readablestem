@@ -3203,10 +3203,12 @@ changed with nothing saying why. The stop now writes the fact (`page_type` with
 `time_limit` for each such page, and `ink_strokes` when the strokes were not read), and the
 test passes with an empty `KNOWN` list. Since plan WS14.9 (2026-11-11) the budget is a count
 of work for each page (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`) and the clock only a
-guard against a hang (`INK_GUARD_S`, 60 s a page), so at a quarter of the speed that upload
-keeps the page's handwriting and gives the same document. The table search's time limit was not reached by any corpus upload at
-a quarter of the speed; it is listed in the clock table and gets its own fact with the
-table work.
+guard against a hang (`INK_GUARD_S`, 60 s a page), so which pages are read for handwriting
+no longer depends on how fast the machine is. Measured again that day, that upload kept its
+page at a quarter of the speed under the old budget too, so the loss itself was not
+reproduced; what the test shows is that a clock ten times faster or slower gives the same
+document. The table search's time limit was not reached by any corpus upload at a quarter of
+the speed; it is listed in the clock table and gets its own fact with the table work.
 
 Not covered: a document long enough to reach the limits by its size. The corpus's longest
 upload is short of that, so a 100-page math-heavy document converted under several CPU
