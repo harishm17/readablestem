@@ -178,6 +178,8 @@ snapshot before the change (from an old `src/` as above) and one after.
 |---|---|
 | `src/readablestem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
 | `src/readablestem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
+| `src/readablestem/gold/layout_gold.py` | reading-order gold from a document's source (LaTeXML HTML, OpenStax XHTML, a written unit list), the page rules, a set's registry and the sample a person checks (see docs/eval.md) |
+| `src/readablestem/eval/split.py` | development and held-out by document, and `eval bar`: only a held-out score under the production profile meets a bar |
 | `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/readablestem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |

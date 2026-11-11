@@ -1586,7 +1586,7 @@ there). What it does not do:
   worth keeping (`pipeline.run.reusable`: not `model_*`, `budget_*`, `internal_error` or
   `crop_error` failures, which a new try could change) is stored in `step_records` under a
   key made from the element, its picture, its nearby text, the conversion options, every
-  behaviour setting of the production profile and a digest of the conversion code and its
+  behavior setting of the production profile and a digest of the conversion code and its
   prompts (`pipeline.run.step_key`, `code_identity`). A later conversion of the same job
   takes those answers instead of calling the model, so a retry spends only on what was
   missing; the cost and calls of the steps given back are taken off the new result's totals

@@ -2632,7 +2632,7 @@ uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or net
 ### Recording and replay
 
 The workflow tests (`tests/workflows`, `pytest -m workflow`) upload each corpus file to the
-real app, with production's behaviour settings (`ops/production.profile.toml`), and convert
+real app, with production's behavior settings (`ops/production.profile.toml`), and convert
 it from recorded model answers. Nothing is sent to a model. A conversion that asks a
 question the recording does not hold fails its test with the step and what changed since
 the recording (a prompt, a model, a picture), so a change to what is sent to a model shows
@@ -2695,10 +2695,10 @@ step, the finished HTML and any other reader are scored the same way. Its counts
 | found | at least half of a gold block's words are on the page |
 | flow | the block's word 4-grams that appear unbroken in the page's word stream |
 | broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |
-| neighbours in order | consecutive gold blocks whose places in the stream are in gold order |
-| cross-join | an element holding text of two gold blocks that are not neighbours |
+| neighbors in order | consecutive gold blocks whose places in the stream are in gold order |
+| cross-join | an element holding text of two gold blocks that are not neighbors |
 | leaked | text that must not be read (a running header, a page number) that is in the output |
-| clean page | no broken block, every neighbouring pair in order, no cross-join, half the blocks found |
+| clean page | no broken block, every neighboring pair in order, no cross-join, half the blocks found |
 | right page | clean, and no margin stamp read inside text, no index entries joined, numbered blanks in order |
 
 The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
@@ -2713,6 +2713,55 @@ Those numbers describe that stored output, read from a layout dump; they were no
 under the production profile and are not the registered baseline, which the order eval
 records when it lands. The first scorer (version 2) was not moved: its element-level counts
 are still reported by this one (`pairs`, `stitched`, `split`, `lost`).
+
+### Gold built from sources (`gold/layout_gold.py`)
+
+Hand labeling cannot supply held-out pages in number: the 78 hand-labeled pages of the
+corpus have all been used to build readers. So reading-order gold is also built from a
+document's source, with no model. The source gives the units (headings, paragraphs, list
+items, captions, footnotes) in order: the HTML LaTeXML makes from a paper's LaTeX, the
+archive XHTML of an OpenStax section, or the unit list written next to a file made here.
+Every text line of a PDF page is matched to the unit that holds its words. A gold block is
+the run of lines of one unit in one column of one page, so a paragraph cut by a page or a
+column is two blocks, and a cut anywhere else is a reader's error. The caption of a float is
+marked `float` (whole and unjoined is scored, its place is not), a footnote goes to the end
+of its page, and a token that is not a word of the source (the glyphs of an inline formula)
+is masked for the scorer.
+
+Pages are chosen by rules that look only at the gold's own coverage, fixed before any
+reader was scored: a paper gives pages 1 to 3 and two from its middle; a textbook gives the
+first three well-covered pages of two section groups, four chapter-end pages and one index
+page; a page needs three blocks whose order is scored, and a paper's page needs the source to
+account for 0.75 of its prose lines.
+
+A set is a folder outside the repository (`files/<id>.pdf` and `gold/<id>.json`, by default
+under `~/.cache/readablestem/layout-gold/<set>/`). The repository keeps the set's registry,
+`data/gold/layout/<set>.json`: ids, sources, counts and SHA-256 hashes, and no text.
+
+```bash
+uv run readablestem gold layout verify --set layout-dev-1
+uv run readablestem gold layout sample --set layout-dev-1 --seed check-1 --out ~/layout-check
+uv run readablestem gold layout agreement ~/layout-check/sheet.jsonl
+```
+
+`sample` draws 1 page in 10 of each kind by a seeded hash and writes each page's picture
+with the gold blocks drawn and numbered, and `sheet.jsonl` with one row per block. A person
+sets `ok` on each row: true when the block is one whole unit of the page, has the right
+role and stands in its place. `agreement` reads the sheet: a kind whose checked blocks are
+right in fewer than 95 of 100, or whose sheet is not filled, is not used as gold until its
+matcher is fixed.
+
+| Set | Documents | Pages | Blocks | Use |
+|---|---|---|---|---|
+| `layout-dev-1` | 28 arXiv papers, 10 OpenStax books, 22 files made here | 267 | 4,460 | development |
+
+`layout-dev-1` was built in the second measuring round of November 2026 by research scripts,
+and `layout_gold.py` rebuilds all of it value for value from the kept sources. Half of it
+was scored once as a sealed half and its failing pages were then used as cases, so all of it
+is development now. No held-out set exists yet, so no reading-order bar can be met
+(`eval bar`). Not built yet: the fetchers with LaTeXML run in the repository's sandbox (the
+papers of this set took their HTML from ar5iv), course LaTeX and Word files as sources, and
+the held-out set drawn from other documents.
 
 ## What the numbers do not show
 
