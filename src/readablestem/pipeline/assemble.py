@@ -432,7 +432,8 @@ def equation_alt(element: Element) -> str:
     PDF and not checked, so a student hears what the PDF says and how much to trust it;
     without usable text, "Equation (2.4), not converted" (the equation's number) or
     "Equation not converted". The text is whitespace-normalised and nothing else: nothing
-    is written that the PDF does not hold. Text that is empty, has no letter or digit, or
+    is written that the PDF does not hold. Text that is empty, has no letter or digit, holds
+    a character that is not text (a symbol font's glyph with no letter, `output_chars`), or
     is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
     exponents or several lines in the region, the marker says the text may run them
     together (EQUATION_FLAT_ALT_SUFFIX).
@@ -440,7 +441,8 @@ def equation_alt(element: Element) -> str:
     number = equation_number(element.equation_label)
     named = f"Equation ({number})" if number else "Equation"
     text = " ".join(_ALT_CONTROL.sub(" ", element.text or "").split())
-    if text and len(text) <= EQUATION_ALT_MAX_CHARS and any(c.isalnum() for c in text):
+    usable = any(c.isalnum() for c in text) and not output_chars.count(text)
+    if text and len(text) <= EQUATION_ALT_MAX_CHARS and usable:
         lead = f"{named}: " if number else ""
         flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
         return f"{lead}{text}{EQUATION_FLAT_ALT_SUFFIX if flat else EQUATION_TEXT_ALT_SUFFIX}"
