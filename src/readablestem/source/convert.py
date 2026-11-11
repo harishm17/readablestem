@@ -193,10 +193,10 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
     return document.read_bytes()
 
 
-def _stop_if_lost(report: SourceReport) -> None:
+def _stop_if_lost(report: SourceReport, *, beamer: bool) -> None:
     """Stop the job when the source would lose content outside a formula
     (`source.report.stop`). Logs the counts, never a name."""
-    found = source_report.stop(report)
+    found = source_report.stop(report, beamer=beamer)
     log.info(
         "source report: stop=%s %s", found[0] if found else None, source_report.summary(report)
     )
@@ -272,7 +272,9 @@ def _convert(
             xhtml = run_latexml(project, main, out, beamer=beamer)
         except SourceFailed as failed:  # what LaTeXML said names the cause, when it can
             if failed.code == "source_failed":
-                _stop_if_lost(source_report.parse(out, project=project, loaded=loaded))
+                _stop_if_lost(
+                    source_report.parse(out, project=project, loaded=loaded), beamer=beamer
+                )
             raise
         # LaTeXML's messages, read now: the folder holding them goes with this block.
         report = source_report.parse(out, project=project, loaded=loaded)
@@ -281,11 +283,11 @@ def _convert(
             graphics = ltx_reader.graphics_of(xml.read_bytes()) if xml.is_file() else {}
             reading = ltx_reader.read(xhtml, project, graphics, beamer=beamer)
         except ltx_reader.ReadError:
-            _stop_if_lost(report)
+            _stop_if_lost(report, beamer=beamer)
             raise SourceFailed("source_unreadable") from None
     report = source_report.with_marks(report, reading.marks, reading.error_nodes)
     report.figures = list(reading.figures)
-    _stop_if_lost(report)
+    _stop_if_lost(report, beamer=beamer)
     return _finish(
         reading,
         started=started,

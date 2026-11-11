@@ -212,11 +212,22 @@ def _detail(
     return {"items": kept, "more": max(0, total - len(kept)), **names}
 
 
-def stop(report: SourceReport) -> tuple[str, dict[str, object]] | None:
+def _beamer_binding(problem: SourceProblem) -> bool:
+    """A complaint LaTeXML's Beamer binding makes about its own output on an ordinary deck,
+    with nothing lost: the document shape (`malformed`: a title page, or a list with
+    `\\pause`, inside a frame) and its internal frame macro (`\\end{beamer@frame}`, a name
+    no deck writes). The decks in tests/fixtures/source/beamer convert whole with them."""
+    return problem.category == "malformed" or "beamer@" in problem.name
+
+
+def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, object]] | None:
     """The stop code for a report and its details (names from the source, for the job page
     only), or None when the source converts. Only errors of the `latexml` step stop a job:
-    `latexmlpost` checks the result's shape, and its complaints follow from those errors."""
-    errors = [p for p in report.problems if p.step == "latexml"]
+    `latexmlpost` checks the result's shape, and its complaints follow from those errors. On
+    a Beamer deck the binding's own complaints do not stop it (`_beamer_binding`)."""
+    errors = [
+        p for p in report.problems if p.step == "latexml" and not (beamer and _beamer_binding(p))
+    ]
     in_formula = {m.name for m in report.marks if m.in_formula}
     if found := [p for p in errors if p.category == "missing_file"]:
         return "source_missing_file", _detail([_item(p) for p in found])
