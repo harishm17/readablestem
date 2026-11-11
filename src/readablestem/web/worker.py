@@ -620,10 +620,6 @@ class Worker:
             Job.attempts == claim.attempt,
         )
 
-    def owns(self, claim: Claim) -> bool:
-        with session_scope(self.factory) as session:
-            return session.scalar(select(Job.id).where(*self._owned(claim))) is not None
-
     def extend_lease(self, claim: Claim, *, pages_done: int | None = None) -> bool:
         """Push the lease forward, recording progress. False once this worker no longer
         owns the job."""
@@ -1534,18 +1530,3 @@ class Worker:
         if self._thread is not None:
             self._thread.join(timeout=timeout)
         log_event(logger, "worker_stopped")
-
-
-def process_next_job(
-    settings: Settings,
-    factory: sessionmaker[Session],
-    *,
-    converter: Converter,
-    client_factory: ClientFactory,
-    guard: SpendGuard | None = None,
-) -> str | None:
-    """Process one queued job synchronously (tests, scripts). Returns its id or None."""
-    worker = Worker(
-        settings, factory, converter=converter, client_factory=client_factory, guard=guard
-    )
-    return worker.run_once()

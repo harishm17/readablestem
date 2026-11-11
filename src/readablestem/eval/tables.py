@@ -1166,19 +1166,6 @@ def sha256_files(paths: Iterable[Path], root: Path) -> str:
     return digest.hexdigest()
 
 
-def gold_table_from_record(record: dict, *, doc: str, style: str, page: int) -> GoldTable:
-    """A gold record (OpenStax or authored) as a `GoldTable` of one printed document."""
-    return GoldTable(
-        id=record["id"],
-        doc=doc,
-        style=style,
-        page=page,
-        cells=cells_from_html(record["html"]),
-        is_layout=bool(record.get("is_layout")),
-        cluster=record.get("cluster") or record["id"],
-    )
-
-
 def load_jsonl(path: Path) -> list[dict]:
     lines = path.read_text(encoding="utf-8").splitlines()
     return [json.loads(line) for line in lines if line.strip()]

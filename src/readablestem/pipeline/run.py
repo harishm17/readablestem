@@ -1160,12 +1160,9 @@ class _Run:
         for future in list(self.futures):
             future.cancel()
         for future, element in list(self.futures.items()):
-            if future.cancelled():
-                continue
-            try:
-                done = future.result()
-            except BaseException:  # the failed step itself, or a worker that died
-                continue
+            if future.cancelled() or future.exception() is not None:
+                continue  # not run, or the failed step itself, or a worker that died
+            done = future.result()
             key = self.keys.get(element.id)
             if key and reusable(done.fix):
                 self.cache.store(element, key, done.fix)

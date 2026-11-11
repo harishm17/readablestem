@@ -280,11 +280,6 @@ def restore_page(result: DocumentResult, page: int) -> StructureChange:
     )
 
 
-def omitted_counts(result: DocumentResult) -> Counter[int]:
-    """Elements held back per omitted page (a count for the page's note)."""
-    return Counter({o.page: len(o.elements) for o in result.omitted})
-
-
 # --------------------------------------------------------------------------- text (T3-5)
 
 MAX_TEXT_CHARS = 6000

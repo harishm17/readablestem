@@ -263,16 +263,6 @@ class Breakdown:
     page_groups: int = 0
 
     @property
-    def grouped_reason(self) -> str:
-        """Why the waiting items make fewer decisions than there are items."""
-        reasons = []
-        if self.heading_groups:
-            reasons.append("repeated headings are decided together")
-        if self.page_groups:
-            reasons.append("pages kept as images for the same reason are decided together")
-        return "; ".join(reasons)
-
-    @property
     def as_image_sentence(self) -> str:
         """ "2 pages are shown as images of the original." ("" when none)."""
         if not self.as_image:

@@ -88,11 +88,6 @@ def _int(value: str | None) -> int | None:
     return int(value) if value is not None and value.isdigit() else None
 
 
-def source_allowed(ctx_status: SandboxStatus, enabled: bool) -> bool:
-    """A source feature is in effect when it is switched on and the probe passed."""
-    return enabled and ctx_status.allows_source()
-
-
 # ---------------------------------------------------------------------------- the probe
 
 

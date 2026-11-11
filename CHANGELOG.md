@@ -31,6 +31,13 @@ measured and replayed against.
   kind and by step and seconds a page by kind and stage, from a measured replay of the
   corpus under the production profile. The Sonnet cache-read price was double the published
   rate and is corrected.
+- **No unused code, no error without a trace.** 26 functions and classes nothing called,
+  an unused template and a limit nothing read are gone, and CI now fails for a new one
+  (`scripts/dead_code.py`). A broad handler that only passes or continues fails the linter
+  (ruff S110, S112); the five that did now count, log or return. When the conversion's
+  child cannot read what the worker sent it, it says so: the job fails as
+  `conversion_unavailable` (our side, "Try again" offered) with `conversion_child_link_failed`
+  in the log, where before it looked like a crash on the person's PDF.
 - **The quality ledger** (`readablestem eval ledger`): one table over the evals' kept
   records, led by the whole-document rows (silent errors per 100 pages, documents with no
   silent error, required decisions a page, false flags per true flag). Every figure is

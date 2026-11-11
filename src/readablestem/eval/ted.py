@@ -127,15 +127,6 @@ def tree_edit_distance(a: Node, b: Node) -> int:
     return int(_distance(a, b, _unit_relabel))
 
 
-def weighted_edit_distance(a: Node, b: Node, relabel: Relabel) -> float:
-    """Tree edit distance with unit deletes and inserts and `relabel` for relabels.
-
-    `relabel(x, y)` must be 0 for equal nodes and at most 1 (more would make a relabel
-    worse than a delete plus an insert, which the algorithm then takes instead).
-    """
-    return _distance(a, b, relabel)
-
-
 def teds(a: Node, b: Node, relabel: Relabel | None = None) -> float:
     """Tree-edit-distance similarity: 1 - TED / max(|a|, |b|), clamped to [0, 1].
 

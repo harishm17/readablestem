@@ -114,7 +114,7 @@ def simulate(part: str, rs: str) -> None:
         ("main", "outside scripts only"),
         ("script", "in scripts only"),
     ):
-        pairs = base = new = up = down = n_gold = 0
+        pairs = base = new = up = down = n_gold = left_out = 0
         for line in (
             (ROOT / "runs" / part / rs / "items.jsonl").read_text(encoding="utf-8").splitlines()
         ):
@@ -130,6 +130,7 @@ def simulate(part: str, rs: str) -> None:
                     before = eq.score_mathml(convert(latex), reference).exact_lenient
                     after = eq.score_mathml(convert(rewrite(latex, mode)), reference).exact_lenient
                 except Exception:
+                    left_out += 1
                     continue
                 pairs += 1
                 base += before
@@ -138,7 +139,8 @@ def simulate(part: str, rs: str) -> None:
                 down += before and not after
         print(
             f"{part} {rs}: {label}: {pairs} aligned equations with \\text, exact {base} -> {new} "
-            f"(+{up} -{down}), net {100 * (up - down) / n_gold:+.2f} points of {n_gold}"
+            f"(+{up} -{down}), net {100 * (up - down) / n_gold:+.2f} points of {n_gold}; "
+            f"{left_out} did not convert and are left out"
         )
 
 

@@ -580,22 +580,6 @@ def load_gold(entry: Entry, pdf: bytes | None = None) -> dict:
     return out
 
 
-def dump_manifest(labels: dict, entries: list[dict]) -> str:
-    """The manifest's text: one field a line, so a changed hash is a one-line diff."""
-    lines = ["{", ' "labels": {']
-    for n, (name, how) in enumerate(labels.items()):
-        comma = "," if n + 1 < len(labels) else ""
-        lines.append(f"  {json.dumps(name)}: {json.dumps(how, ensure_ascii=False)}{comma}")
-    lines.extend([" },", ' "entries": ['])
-    for n, entry in enumerate(entries):
-        fields = [
-            f"   {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}" for k, v in entry.items()
-        ]
-        lines.append("  {\n" + ",\n".join(fields) + "\n  }" + ("," if n + 1 < len(entries) else ""))
-    lines.extend([" ]", "}", ""])
-    return "\n".join(lines)
-
-
 def dump_gold(gold: dict) -> str:
     """A gold file's text: one block a line, so a changed label is a one-line diff."""
     lines = ["{", f' "id": {json.dumps(gold["id"])},']

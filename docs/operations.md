@@ -538,6 +538,8 @@ hangs instead of failing, and the job ends as `timeout`. What to look for:
 | `job_failed error_code=conversion_crashed`, preceded by `conversion_child_died signal=6` (abort), `11` (segfault) or `exit_code=N` | MuPDF or another native library killed the child. That file will do it again: nothing to retry (the job page does not offer "Try again"). Keep the document id; reproduce with `readablestem convert` on a copy only if the owner agrees |
 | `error_code=conversion_oom` (after `conversion_child_retry` when it was `signal=9`) | The child ran out of memory (its cap), or was SIGKILLed from outside twice. Raise `CONVERSION_MEMORY_MB` only if documents that should fit are failing; a single large file is better split |
 | `error_code=conversion_unavailable`, `conversion_child_unavailable` (ERROR, with `error_type` or `exit_code`), `conversion_child_check_failed` at start | The child itself cannot run (an import, a library, the table model file at `TABLE_MODEL_DIR`), not the PDF. Every job fails this way until it is fixed; the job page offers "Try again". Check the image and the volume, then redeploy |
+| `error_code=conversion_unavailable` with `conversion_child_link_failed` (ERROR, `error_type`) | The child could not read a message this process sent it (`error_type` is the exception's class, for example `UnpicklingError`): the two processes disagree, which is the deployment's fault and not the PDF's. The job page offers "Try again". If it repeats, the worker and the child are running different code: redeploy |
+| `conversion_child_read_failed` (WARNING, `error_type`, `errno`) | The socket to the child failed while this process was reading it. `errno=104` (connection reset) next to `conversion_child_died` is a child that ended before it had read its input; the line after it says how the job ended |
 | `conversion_child_retry` | The child was killed by a SIGKILL this process did not send; the conversion was run once more. `cgroup_oom_kills` on `conversion_child_died` says whether the kernel's OOM killer did it (cgroup v2). Frequent ones mean the service is short of memory: raise its allowance, not `CONVERSION_MEMORY_MB` |
 | `conversion_child_frame_refused` | The child's result was over 128 MB: the job fails `conversion_crashed` |
 | `conversion_child_timeout` | The converter's own backstop fired (the worker's limit normally does first: `job_timeout`, `error_code=timeout`). `conversion_child_died signal=24` is the CPU limit |
@@ -814,7 +816,7 @@ Nothing it prints is document content.
 
 | Job | What it checks |
 |---|---|
-| `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, and an import of every module |
+| `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `scripts/dead_code.py` (no function, class, method or property of the package without a caller), and an import of every module |
 | `pytest` (shards) | `pytest -n auto --shard i/4` (offline, parallel; Postgres tests use the embedded server on 3.12). 3.12 always; 3.14 in full on main, nightly and dependency or workflow changes, otherwise one smoke shard. Rules and sharding: [development.md](development.md), "CI" |
 | `shard-coverage` | Every collected test ran in exactly one shard |
 | `ci-passed` | Fails if any other job failed or was cancelled; the one check to require in branch protection |

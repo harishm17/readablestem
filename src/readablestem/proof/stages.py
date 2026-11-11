@@ -38,7 +38,7 @@ from readablestem.proof.bundle import Bundle, BundleWriter, pdf_name
 from readablestem.proof.errors import ProofError
 from readablestem.proof.goldinfo import SectionFacts
 from readablestem.proof.registry import ProofSet
-from readablestem.proof.report import STATUS_WORDS, Section, StageResult, Table, bullets
+from readablestem.proof.report import Section, StageResult, bullets
 from readablestem.proof.runner import ArmResults
 
 PARSERS_DIR = Path("proof") / "parsers"
@@ -331,14 +331,3 @@ def active_stages() -> list[Stage]:
     """The default stages with any registered replacements, in the report's order."""
     merged = {**default_stages(), **STAGES}
     return list(merged.values())
-
-
-def stage_table(results: dict[str, StageResult], stages: list[Stage]) -> Table:
-    rows = [
-        [
-            s.title,
-            STATUS_WORDS.get(results[s.name].status, "?") if s.name in results else "not run",
-        ]
-        for s in stages
-    ]
-    return Table("Parts of this proof", ["Part", "Status"], rows)

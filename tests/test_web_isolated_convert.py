@@ -555,6 +555,50 @@ def test_a_startup_error_frame_is_unavailable_and_logs_only_the_type(caplog):
     assert line.levelno == logging.ERROR and fields["error_type"] == "ModuleNotFoundError"
 
 
+def unreadable_for_the_child(monkeypatch):
+    monkeypatch.setattr(_Conversion, "_send_init", lambda self, init: self._send([b"no", b""]))
+
+
+def unreadable_for_the_parent(monkeypatch):
+    def reset(sock, **_):
+        raise ConnectionResetError(104, "/srv/uploads/a-name-from-the-pdf")
+
+    monkeypatch.setattr(isolated_convert.protocol, "read_frame", reset)
+
+
+@pytest.mark.parametrize(
+    ("break_the_link", "code", "event", "error_type"),
+    [  # the child could not read us: our side, worth another try; we could not read it: a crash
+        (
+            unreadable_for_the_child,
+            "conversion_unavailable",
+            "conversion_child_link_failed",
+            "UnpicklingError",
+        ),
+        (
+            unreadable_for_the_parent,
+            "conversion_crashed",
+            "conversion_child_read_failed",
+            "ConnectionResetError",
+        ),
+    ],
+)
+def test_a_link_that_fails_ends_the_call_and_is_logged_once_by_type_and_never_by_text(
+    monkeypatch, caplog, break_the_link, code, event, error_type
+):
+    caplog.set_level(logging.INFO)
+    break_the_link(monkeypatch)
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    with pytest.raises(isolated_convert.ConversionFailed) as caught:
+        convert_isolated(LECTURE_NOTES.read_bytes(), settings=settings, client=client)
+    assert error_code_for(caught.value) == code
+    (line,) = [r for r in caplog.records if r.getMessage() == event]
+    fields = next(v for v in vars(line).values() if isinstance(v, dict) and "error_type" in v)
+    assert fields["error_type"] == error_type
+    assert "a-name-from-the-pdf" not in json.dumps(fields) + line.getMessage()
+
+
 def test_the_self_check_starts_a_child_and_reports_when_it_cannot(monkeypatch, caplog):
     caplog.set_level(logging.INFO)
     assert isolated_convert.self_check() is True

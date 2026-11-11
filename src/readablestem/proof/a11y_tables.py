@@ -15,7 +15,7 @@ the document task, and heading F1. Everything else is secondary and descriptive.
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -613,7 +613,3 @@ def failures_section(arm: ArmResults) -> Section:
         ],
         level=3,
     )
-
-
-def status_counter(items: list[dict[str, Any]]) -> Counter[str]:
-    return Counter(str(i.get("status")) for i in items)

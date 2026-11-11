@@ -111,8 +111,3 @@ def cached_html(
     if etag in wanted or "*" in wanted:
         return Response(status_code=304, headers=sent, background=background)
     return HTMLResponse(body, headers=sent, background=background)
-
-
-def clear_hashes() -> None:
-    """Forget the hashes read so far (tests)."""
-    _seen.clear()

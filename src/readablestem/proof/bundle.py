@@ -108,9 +108,6 @@ class Bundle:
     def path(self, rel: str) -> Path:
         return self.root / rel
 
-    def answers_path(self, task: str, repeat: int) -> Path:
-        return self.path(f"answers/{run_stem(task, repeat)}.jsonl")
-
     def report_path(self, task: str, repeat: int) -> Path:
         return self.path(f"reports/{run_stem(task, repeat)}.json")
 

@@ -91,11 +91,7 @@ def test_opening_it_twice_gives_the_same_document_and_each_person_has_their_own(
 
 
 def test_it_uses_no_pages_no_spend_and_takes_no_place_from_the_caps(web):
-    from readablestem.web.intake import (
-        MAX_ACTIVE_JOBS_PER_USER,
-        MAX_LIVE_JOBS_PER_USER,
-        live_job_count,
-    )
+    from readablestem.web.intake import live_job_count
 
     # The day's pages are used up, and the day's spend too: the sample still opens.
     web.settings.per_user_daily_page_quota = 1
@@ -117,7 +113,6 @@ def test_it_uses_no_pages_no_spend_and_takes_no_place_from_the_caps(web):
     with session_scope(web.ctx.factory) as session:
         user_id = session.scalar(select(Job.user_id).where(Job.id == job_id))
         assert live_job_count(session, user_id, utcnow()) == 1  # only the uploaded file
-    assert MAX_ACTIVE_JOBS_PER_USER == 10 and MAX_LIVE_JOBS_PER_USER == 40
 
 
 def test_it_is_not_counted_in_the_usage_numbers(web):

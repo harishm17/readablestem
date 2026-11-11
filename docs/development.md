@@ -20,9 +20,9 @@ printed pages read differently.
 | `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
 | Workflow suite | `uv run pytest -m workflow -n auto --dist loadfile -rs`: the corpus's files through the real app, from recorded model answers, at no cost (docs/eval.md, "Recording and replay"). Needs `make table-model` and `uv run python -m readablestem.eval.corpus check --fetch` once |
-| `make lint` | `ruff check` + `ruff format --check` |
+| `make lint` | `ruff check` + `ruff format --check` + `scripts/dead_code.py` (a function, class, method or property of the package that nothing calls) |
 | `make fmt` | Format and auto-fix |
-| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
+| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, the unused-code check, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make table-model` | Download the SLANet-plus table-structure model (7.5 MB, SHA-256 checked) into `~/.cache/readablestem/models` (or `TABLE_MODEL_DIR`); without it tables use PyMuPDF's grid |
 | `make fuzz-tables` | Upgrade check before any PyMuPDF bump: byte mutants of the repository's fixtures through the probe and the table detector (`pytest -m slow`; a few minutes; docs/tables.md) |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |

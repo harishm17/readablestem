@@ -175,6 +175,9 @@ use = "the linter and formatter"
 [python.ty]
 use = "the type checker"
 
+[python.vulture]
+use = "finds functions and classes nothing calls (scripts/dead_code.py)"
+
 [python.pgserver]
 use = "an embedded PostgreSQL for local tests"
 

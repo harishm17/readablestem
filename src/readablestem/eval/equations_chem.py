@@ -146,10 +146,6 @@ def chem_of(source: str | ET.Element) -> list[str]:
     return _drop_unowned_brackets(_ungroup_single_atoms(joined))
 
 
-def chem_of_latex(latex: str) -> list[str]:
-    return chem_of(latex_to_mathml(latex))
-
-
 @dataclass
 class ChemScore:
     exact: bool

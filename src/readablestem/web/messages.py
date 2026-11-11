@@ -433,8 +433,7 @@ REASON_MESSAGES: dict[str, str] = {
 # DocumentResult.notices: one sentence per notice code for the job page's list ("Not
 # handled in this file" and "Worth checking"; core.types.Notice). Kept apart from the
 # check and fix-reason tables because a notice is not a review decision. Every code in
-# core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py). The wording
-# is a placeholder until the builder that emits each code writes its own sentence.
+# core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py).
 NOTICE_MESSAGES: dict[str, str] = {
     "table_not_rebuilt": "A table is kept as an image of the original, so screen readers "
     "cannot read its cells.",

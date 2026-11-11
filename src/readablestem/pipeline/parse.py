@@ -210,13 +210,3 @@ def render_region(
     with pymupdf.open(path) as doc:
         pixmap = doc[page].get_pixmap(clip=pymupdf.Rect(bbox), dpi=dpi)
         return pixmap.tobytes("png")
-
-
-def transcribe_equation(png: bytes) -> str:
-    """Placeholder from the skeleton; the vision step is `pipeline.equation_step.transcribe`.
-
-    Kept so an old caller fails loudly instead of silently getting nothing. Never send
-    private-inputs/ pages to a provider that trains on inputs or keeps them, and keep
-    tracing off for those runs.
-    """
-    raise NotImplementedError("use pipeline.equation_step.transcribe (see module docstring)")

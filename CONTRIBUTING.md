@@ -56,7 +56,14 @@ is.
   `MODEL_CONCURRENCY` low for small runs, and record answers once with `--answers` so
   reruns replay for free.
 - **Style.** ruff with line length 100, type hints that pass `ty check src`, and docstrings
-  that say why. A new runtime dependency needs a note in the pull request, and its license
+  that say why.
+- **No error without a trace.** A handler that catches broadly does something with the
+  failure: it returns the answer that stands for it, counts it, logs its type (never its
+  text, which may quote a document), or raises. `except: pass` and `except: continue` on a
+  broad handler fail the linter (ruff S110, S112).
+- **No code without a caller.** `scripts/dead_code.py` (in `make lint` and CI) fails for a
+  function, class, method or property of the package that nothing calls. Delete it; its
+  history is in git. A new runtime dependency needs a note in the pull request, and its license
   has to fit `THIRD_PARTY_NOTICES.md`.
 
 ## Commits and pull requests
