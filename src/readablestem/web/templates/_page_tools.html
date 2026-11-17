@@ -1,3 +1,4 @@
+{% from "components/forms.html" import form with context %}
 {# The page tools (T3-5, T3-16), under the optional checks on the review screen: change the
    words of a paragraph or a heading, make a line a heading, add a picture or an equation
    the tool missed, leave the page out of the student file (and put it back). Included by
@@ -6,7 +7,7 @@
    or a link, so it all works without JavaScript; each form carries the review version its
    page was drawn at, so one from an out-of-date tab is refused, not applied. #}
 {% macro tool_fields() -%}
-<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}">
+<input type="hidden" name="version" value="{{ result_version }}">
 {%- endmacro %}
 {% macro tool_error(message, id) %}
 {% if message %}<p class="error-message" id="{{ id }}"><span class="visually-hidden">Error: </span>{{ message }}</p>{% endif %}
@@ -15,10 +16,10 @@
   <summary id="page-tools-summary">Change page {{ tools.number }}</summary>
   {% if tools.omitted %}
   <p>Page {{ tools.number }} is left out of the student file and of this review. Nothing was deleted.</p>
-  <form method="post" action="/jobs/{{ job.id }}/pages/{{ tools.number }}/restore" class="inline-form">
+  {% call form("review.restore_page", "/jobs/" ~ job.id ~ "/pages/" ~ tools.number ~ "/restore", {"class": "inline-form"}) %}
     {{ tool_fields() }}
     <button type="submit" class="button-secondary" data-role="restore-page">Put page {{ tools.number }} back</button>
-  </form>
+  {% endcall %}
   {% else %}
 
   <section class="tool-section" id="page-tools-edit" aria-labelledby="edit-title" tabindex="-1">
@@ -39,7 +40,7 @@
     {% set eid = ed.element_id %}
     <div class="tool-editor" role="group" aria-labelledby="editor-title-{{ eid }}">
       <h4 id="editor-title-{{ eid }}">{{ ed.label }}</h4>
-      <form method="post" action="/jobs/{{ job.id }}/edit/{{ eid }}" class="decide-form">
+      {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ eid, {"class": "decide-form"}) %}
         {{ tool_fields() }}<input type="hidden" name="action" value="text">
         <div class="field{% if ed.errors.get('text') %} field-error{% endif %}">
           <label for="text-{{ eid }}">Words of this {{ "heading" if ed.heading_level else ed.label|lower }}</label>
@@ -49,9 +50,9 @@
                     aria-describedby="text-hint-{{ eid }}{% if ed.errors.get('text') %} text-error-{{ eid }}{% endif %}"{% if ed.errors.get('text') %} aria-invalid="true"{% endif %}>{{ ed.text }}</textarea>
         </div>
         <button type="submit" class="button" data-role="save-text">Save the words<span class="visually-hidden"> of this {{ ed.label|lower }}</span></button>
-      </form>
+      {% endcall %}
       {% if ed.can_make_heading %}
-      <form method="post" action="/jobs/{{ job.id }}/edit/{{ eid }}" class="decide-form heading-make">
+      {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ eid, {"class": "decide-form heading-make"}) %}
         {{ tool_fields() }}<input type="hidden" name="action" value="heading">
         <div class="field field-inline{% if ed.errors.get('level') %} field-error{% endif %}">
           <label for="level-{{ eid }}">Make this a heading, at level</label>
@@ -64,7 +65,7 @@
             <button type="submit" class="button-secondary" data-role="make-heading">Make it a heading<span class="visually-hidden">: {{ ed.label|lower }}</span></button>
           </div>
         </div>
-      </form>
+      {% endcall %}
       {% elif ed.why_not %}
       <p class="hint">{{ ed.why_not }}</p>
       {% elif ed.heading_level %}
@@ -82,7 +83,7 @@
       <img class="region-image" src="{{ add.preview_url }}" alt="The part of page {{ tools.number }} you chose, cut out.">
       <figcaption>The part of page {{ tools.number }} you chose.</figcaption>
     </figure>
-    <form method="post" action="/jobs/{{ job.id }}/pages/{{ tools.number }}/add" class="decide-form">
+    {% call form("review.add_region", "/jobs/" ~ job.id ~ "/pages/" ~ tools.number ~ "/add", {"class": "decide-form"}) %}
       {{ tool_fields() }}
       <input type="hidden" name="kind" value="{{ add.kind }}">
       {% for edge in ("left", "top", "right", "bottom") %}<input type="hidden" name="{{ edge }}" value="{{ add.values.get(edge, '') }}">{% endfor %}
@@ -102,7 +103,7 @@
         <button type="submit" class="button" data-role="add-region"{% if add.kind == "equation" %} aria-describedby="add-note-{{ tools.number }}"{% endif %}>{{ "Add the picture" if add.kind == "picture" else "Read it as an equation" }}</button>
         <a href="{{ add.change_href }}">Change the region</a>
       </div>
-    </form>
+    {% endcall %}
     {% else %}
     <form method="get" action="/jobs/{{ job.id }}/review" class="decide-form add-region-form">
       <input type="hidden" name="page" value="{{ tools.number }}"><input type="hidden" name="tools" value="1">
@@ -138,10 +139,10 @@
     {% if tools.only_page %}
     <p>This is the only page left in the file, so it stays.</p>
     {% else %}
-    <form method="post" action="/jobs/{{ job.id }}/pages/{{ tools.number }}/omit" class="inline-form">
+    {% call form("review.omit_page", "/jobs/" ~ job.id ~ "/pages/" ~ tools.number ~ "/omit", {"class": "inline-form"}) %}
       {{ tool_fields() }}
       <button type="submit" class="button-secondary" data-role="omit-page" aria-describedby="omit-hint">Leave page {{ tools.number }} out</button>
-    </form>
+    {% endcall %}
     {% endif %}
   </section>
   {% endif %}

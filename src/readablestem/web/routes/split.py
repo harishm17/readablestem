@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any
 from urllib.parse import quote, urlencode
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
 from pydantic import TypeAdapter
@@ -71,14 +71,15 @@ from readablestem.web.compare import (
 from readablestem.web.db import Blob, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
+    CsrfFailed,
     CurrentUser,
     PageError,
     UserDep,
+    csrf_valid,
     current_user,
     get_ctx,
     pop_flash,
     render,
-    require_csrf,
 )
 from readablestem.web.edit_check import EditCheck, check_equation_edit
 from readablestem.web.logsafe import log_event
@@ -1513,17 +1514,26 @@ def _problems(n: int) -> str:
     return "The problem is listed below." if n == 1 else f"The {n} problems are listed below."
 
 
-@router.post("/jobs/{job_id}/review/{element_id}/check", dependencies=[Depends(require_csrf)])
+@router.post("/jobs/{job_id}/review/{element_id}/check")
 def live_check(
-    request: Request, job_id: str, element_id: str, latex: Annotated[str, Form()] = ""
+    request: Request,
+    job_id: str,
+    element_id: str,
+    latex: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
 ) -> Response:
     """The checks Save edit would run, on the LaTeX being typed (htmx, debounced): an HTML
     fragment, nothing stored and nothing logged but the request line. Signed out (the
     session ended in another tab), it answers 204 and changes nothing on the page, so
-    the background request never takes the reviewer away from what they are typing."""
+    the background request never takes the reviewer away from what they are typing.
+    The session is looked at first: a signed-out session has a new CSRF token or none,
+    so checking the token first answered 403 and put an error into the page (F-088).
+    Signed in, a wrong token is refused as on every other POST."""
     user = current_user(request)
     if user is None:
         return Response(status_code=204)
+    if not csrf_valid(request, csrf_token):
+        raise CsrfFailed()
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
     _, result, _ = _load(request, job_id, user)

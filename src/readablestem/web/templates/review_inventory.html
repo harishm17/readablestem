@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# The Symbols screen (routes/inventory.py, web/inventory.py): every letter and symbol read in
    the handwritten equations, grouped with the ones that look alike, one form per symbol that
    changes it everywhere. A plain form: it works without JavaScript, and the places a symbol
@@ -15,10 +16,10 @@
 <div class="decision-notice symbols-notice">
   <div class="notice" role="status" tabindex="-1" autofocus><p>{{ notice }}</p></div>
   {% if undo %}
-  <form method="post" action="/jobs/{{ job.id }}/undo" class="undo-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="symbols"><input type="hidden" name="version" value="{{ result_version }}">
+  {% call form("review.undo", "/jobs/" ~ job.id ~ "/undo", {"class": "undo-form"}) %}
+    <input type="hidden" name="view" value="symbols"><input type="hidden" name="version" value="{{ result_version }}">
     <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> the change to the symbols</span></button>
-  </form>
+  {% endcall %}
   {% endif %}
 </div>
 {% endif %}
@@ -78,8 +79,8 @@
   {% endif %}
   {% for row in family.rows %}
   {% set rid = row.element_id %}
-  <form method="post" action="/jobs/{{ job.id }}/symbols" class="symbol-form" data-name="{{ row.name }}" data-total="{{ row.times }}" data-changeable="{{ row.changeable }}">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="symbol" value="{{ row.key }}">
+  {% call form("review.symbols", "/jobs/" ~ job.id ~ "/symbols", {"class": "symbol-form", "data-name": row.name, "data-total": row.times, "data-changeable": row.changeable}) %}
+    <input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="symbol" value="{{ row.key }}">
     <h3 id="{{ rid }}-title"><span class="symbol-glyph" aria-hidden="true">{{ row.glyph }}</span> {{ row.name[0]|upper }}{{ row.name[1:] }}</h3>
     <p class="symbol-count">Read {{ row.times }} {{ "time" if row.times == 1 else "times" }}, in {{ row.equations }} {{ "equation" if row.equations == 1 else "equations" }}.{% if row.changeable < row.times %} {{ row.times - row.changeable }} in decided equations stay.{% endif %}</p>
     {% if family.members and row.changeable %}
@@ -107,7 +108,7 @@
       {{ places_list(row, False) }}
     </details>
     {% endif %}
-  </form>
+  {% endcall %}
   {% endfor %}
 </section>
 {% endfor %}

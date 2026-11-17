@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# One course (routes/courses.py), in three parts that are kept apart: its notation (the
    symbols, the starter set when there are none, what its documents suggest, adding one), its
    documents (and adding ones already converted), and the course's settings (rename, delete). #}
@@ -44,8 +45,7 @@
   {% endif %}
 
   {% if starter %}
-  <form method="post" action="/courses/{{ course.id }}/starter" class="starter-form" aria-labelledby="starter-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.starter", "/courses/" ~ course.id ~ "/starter", {"class": "starter-form", "aria-labelledby": "starter-heading"}) %}
     <h3 id="starter-heading">Start from common symbols</h3>
     <p class="hint" id="starter-hint">Check the ones your course uses. Edit any row.</p>
     <ul class="starter-list" aria-describedby="starter-hint">
@@ -67,14 +67,13 @@
       {% endfor %}
     </ul>
     <button type="submit" class="button">Add the checked symbols</button>
-  </form>
+  {% endcall %}
   {% endif %}
 
   {% include "_notation_suggestions.html" %}
 
   <h3 id="add-heading">Add a symbol</h3>
-  <form method="post" action="/courses/{{ course.id }}/entries" novalidate aria-labelledby="add-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.add_entry", "/courses/" ~ course.id ~ "/entries", {"novalidate": true, "aria-labelledby": "add-heading"}) %}
     <div class="field{% if field_errors.get('symbol') %} field-error{% endif %}">
       <label for="symbol">Symbol</label>
       <p class="hint" id="symbol-hint">For example “bold d” or “\mathbf{d}”.</p>
@@ -95,7 +94,7 @@
       <input type="text" id="note" name="note" maxlength="200" autocomplete="off" value="{{ values.get('note', '') }}"{{ described("note") }}>
     </div>
     <button type="submit" class="button">Add symbol</button>
-  </form>
+  {% endcall %}
 </section>
 
 <section aria-labelledby="course-documents-heading" id="course-documents">
@@ -114,8 +113,7 @@
   <details class="attach-documents" id="attach-documents">
     <summary>Add converted documents ({{ attachable|length }})</summary>
     <p>Lists the document here and shows this notation on its review screen. It is not converted again: to read the PDF with this notation, upload it again for this course.</p>
-    <form method="post" action="/courses/{{ course.id }}/documents">
-      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% call form("course.attach", "/courses/" ~ course.id ~ "/documents") %}
       <fieldset class="field">
         <legend>Documents in no course</legend>
         <ul class="plain-list">
@@ -128,29 +126,27 @@
         </ul>
       </fieldset>
       <button type="submit" class="button-secondary">Add the checked documents</button>
-    </form>
+    {% endcall %}
   </details>
   {% endif %}
 </section>
 
 <section aria-labelledby="settings-heading" class="course-settings">
   <h2 id="settings-heading">Rename or delete</h2>
-  <form method="post" action="/courses/{{ course.id }}/rename" novalidate aria-label="Rename the course">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.rename", "/courses/" ~ course.id ~ "/rename", {"novalidate": true, "aria-label": "Rename the course"}) %}
     <div class="field{% if field_errors.get('rename') %} field-error{% endif %}">
       <label for="rename">Course name</label>
       {{ error_line("rename") }}
       <input type="text" id="rename" name="name" maxlength="200" autocomplete="off" value="{{ rename_value }}"{{ described("rename", hint=False) if field_errors.get("rename") else "" }}>
     </div>
     <button type="submit" class="button-secondary">Rename</button>
-  </form>
+  {% endcall %}
   <h3 id="delete-heading">Delete</h3>
   <p>Documents keep their results.</p>
   {# Posts without confirm=yes: the next page asks before anything is deleted. #}
-  <form method="post" action="/courses/{{ course.id }}/delete" aria-labelledby="delete-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.delete_ask", "/courses/" ~ course.id ~ "/delete", {"aria-labelledby": "delete-heading"}) %}
     <button type="submit" class="button-danger-outline">Delete course</button>
-  </form>
+  {% endcall %}
 </section>
 <p><a href="/courses">All your courses</a></p>
 {% endblock %}

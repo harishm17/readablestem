@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# T3-3: a file over the page or size limit is kept for a while and the person chooses which
    pages to convert, in parts that each fit (web/routes/parts.py, web/ranges.py). Every part
    becomes its own document. The parts are built with two page fields and "Add part" (script,
@@ -30,8 +31,7 @@
 <p id="parts-left-out">Up to {{ max_parts }} parts at a time: {{ "page" if left_out_count == 1 else "pages" }}
   {{ left_out_label }} {{ "is" if left_out_count == 1 else "are" }} left for the next round.</p>
 {% endif %}
-<form method="post" action="/uploads/{{ pending.id }}" novalidate class="upload-form parts-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("upload.parts", "/uploads/" ~ pending.id, {"novalidate": true, "class": "upload-form parts-form"}) %}
   {% set parts_error = field_errors.get("parts") %}
   <section aria-labelledby="parts-heading" class="parts-section">
     <h2 id="parts-heading">Parts</h2>
@@ -69,7 +69,7 @@
     <p class="hint" id="shrink-hint">{% if heavy %}Checked because this file is large. {% endif %}Pictures above {{ shrink_from }} dpi are saved at {{ shrink_to }}; text is unchanged.</p>
   </div>
   <button type="submit" class="button">Convert these parts</button>
-</form>
+{% endcall %}
 {% else %}
 <p>All pages have been sent. <a href="/app">Go to My documents</a></p>
 {% endif %}

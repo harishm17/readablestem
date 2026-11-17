@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Confirm deleting the account (routes/account.py): download what to keep, what goes, what
    stays, then the button. #}
 {% block title %}Delete your account?{% endblock %}
@@ -26,11 +27,10 @@
 <p>Signing in again makes a new, empty account with new-account limits ({{ open_page_quota }} pages a day).{% if is_admin %} It has no admin rights.{% endif %}</p>
 {% endif %}
 <div class="confirm-actions">
-  <form method="post" action="/account/delete" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("account.delete", "/account/delete", {"class": "inline-form"}) %}
     <input type="hidden" name="confirm" value="yes">
     <button type="submit" class="button-danger">Delete my account</button>
-  </form>
+  {% endcall %}
   <a class="button-secondary" href="/account">No, keep it</a>
 </div>
 {% endblock %}

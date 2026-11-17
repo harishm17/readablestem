@@ -3,8 +3,8 @@
 Two tabs drawn at the same review version that decide at the same moment must not both
 be applied: the job row is locked first (`job_access(lock=True)`, SELECT ... FOR UPDATE),
 so the version check and the count (`web.review.bump_result_version`) are one step. One
-decision is applied, every other one is refused with a 409, and the version counts one
-write.
+decision is applied, the same decision from the other tabs is answered "Already saved",
+every other one is refused with a 409, and the version counts one write.
 
 Run with: uv run pytest -m postgres tests/test_web_review_ux_postgres.py
 """
@@ -68,7 +68,9 @@ def test_decisions_sent_at_once_from_one_page_are_applied_once(pg_url, tmp_path)
         for thread in threads:
             thread.join(timeout=60)
         assert not errors, errors
-        assert sorted(codes) == [303] + [409] * (THREADS - 1), codes
+        # The winner's action from the other tabs is already the item's decision: "Already
+        # saved" (303, nothing written, SW43); the other action is refused.
+        assert sorted(codes) == [303] * (THREADS // 2) + [409] * (THREADS // 2), codes
         assert env.job(job_id).result_version == 1
         with session_scope(env.ctx.factory) as session:
             assert session.scalar(select(func.count()).select_from(ReviewEdit)) == 1

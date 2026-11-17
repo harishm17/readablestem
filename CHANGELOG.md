@@ -167,6 +167,29 @@
 - Both this branch and `fix/about-in-main-and-job-summary` raised `RENDER_VERSION` from 4 to 5
   for different changes; with both merged it is 6, so a stored page made at 4 or at either 5 is
   made again once on its next open.
+## Unreleased: one submit rule, larger touch targets, a quiet live check (branch feat/one-submit-rule)
+
+- SW43, stage 1: the review, create and convert forms (31 form keys, 72 forms) are answered
+  once however often they are sent. Each carries a request token minted when it is drawn
+  (`form(key)` in `templates/components/forms.html`); the handler (`@submit_once`,
+  `web/forms.py`) stores the outcome in the new table `request_tokens` (migration
+  `8b3d5f0e2a71`) in the action's own transaction, and the same token again gets that outcome
+  and runs nothing, also when the two requests arrive together. Another person's token
+  replays nothing. A POST without a token works as before. The rows go at sign-out, with the
+  account, and after 7 days; they hold a random token, the form and the outcome, no content.
+- A repeat with a new token for something already done answers as the first click did:
+  "Already saved" for a review decision the item has, the course for an Add course of a name
+  you have, a notice for a symbol the course has with that meaning, success for a share
+  already removed, a document already waiting after Try again, and a link already made.
+- While a form is on its way the pressed button says so ("Saving…"), is marked busy and
+  `aria-disabled`, a polite live region says the same, and a second click sends nothing
+  (`static/app.js`); the upload form's own guard now uses it. `controls.css` has pressed and
+  busy looks, with forced-colors and reduced-motion rules.
+- SW17 (F-288): `--target-min` (24px) and `--target-touch` (44px) in `tokens.css`; with a
+  coarse pointer the page chips, the Previous and Next page links and every `.link-button`
+  are at least 44 by 44 CSS px.
+- WS8.15 (F-088): the live LaTeX check answers a signed-out session with 204 and an empty
+  body before it checks the CSRF token; signed in, a wrong token is still refused with 403.
 
 ## Unreleased: what is sent to a model, from one list (branch feat/sent-material)
 

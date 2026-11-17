@@ -1,0 +1,24 @@
+{#- The one submit rule (SW43, web/forms.py). Import with context: the form writes the
+    page's CSRF token.
+
+    form(key, action, attrs): a POST form of the registry's form `key` (`web.forms.FORMS`;
+    an unknown key fails the render). It writes the CSRF token, a request token minted for
+    this drawing of the form, and the busy label `static/app.js` shows while the request is
+    on its way. `attrs` are the form's other attributes. `token_in_action`: the handler reads
+    the body itself (the upload), so the token also goes in the action's query string.
+
+    submit_button(label, busy, ...): a submit button whose busy label is `busy`, a key of
+    the registry (`web.forms.BUSY_LABELS`, or a form key). Buttons not drawn by it take
+    their form's busy label. SW10's button macro takes this one over. -#}
+{% macro form(key, action, attrs={}, token_in_action=false) -%}
+{%- set row = form_row(key) -%}
+{%- set token = mint_request_token() -%}
+<form method="post" action="{{ action }}{% if token_in_action %}{{ '&' if '?' in action else '?' }}{{ request_token_field }}={{ token }}{% endif %}"{{ attrs|xmlattr }} data-submit-once="{{ key }}" data-busy-label="{{ row.busy_label }}">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="{{ request_token_field }}" value="{{ token }}">
+{{- caller() }}
+</form>
+{%- endmacro %}
+
+{% macro submit_button(label, busy, name="", value="", class="", attrs={}) -%}
+<button type="submit"{% if name %} name="{{ name }}" value="{{ value }}"{% endif %}{% if class %} class="{{ class }}"{% endif %}{{ attrs|xmlattr }} data-busy-label="{{ busy_label(busy) }}">{{ label }}{% if caller is defined %}{{ caller() }}{% endif %}</button>
+{%- endmacro %}

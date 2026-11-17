@@ -31,7 +31,16 @@ from readablestem.ops.retention import erase_user
 from readablestem.web import access, documents, tombstones
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, User, session_scope, utcnow
-from readablestem.web.deps import CurrentUser, UserDep, flash, get_ctx, render, require_csrf
+from readablestem.web.deps import (
+    CurrentUser,
+    UserDep,
+    flash,
+    get_ctx,
+    render,
+    require_csrf,
+    require_user,
+)
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import next_day_start, pages_left, rereads_used
 from readablestem.web.recipients import recipients
@@ -130,12 +139,14 @@ def confirm_delete(request: Request, user: UserDep) -> Response:
 
 
 @router.post("/account/delete", dependencies=[Depends(require_csrf)])
-async def delete_account(
-    request: Request, user: UserDep, confirm: Annotated[str, Form()] = ""
-) -> Response:
+@submit_once("account.delete")
+async def delete_account(request: Request, confirm: Annotated[str, Form()] = "") -> Response:
     """Delete only with `confirm=yes`; any other POST gets the confirmation page first.
     Erasing an account cannot be undone, so it is confirmed (WCAG 3.3.4), and it works
-    without JavaScript."""
+    without JavaScript. The person is looked up here, after `submit_once`, not as a route
+    dependency: a second click arrives signed out and gets the "deleted" notice again
+    (`web.forms`) instead of the sign-in page."""
+    user = await run_in_threadpool(require_user, request)
     if confirm != "yes":
         return await run_in_threadpool(_confirm_page, request, user)
     return await run_in_threadpool(_delete_now, request, user)

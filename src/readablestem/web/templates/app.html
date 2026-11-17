@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}{{ documents.page_title }}{% endblock %}
 {% block content %}
@@ -66,10 +67,9 @@
   {% if sample_job %}
   <p><a class="button-secondary" href="/jobs/{{ sample_job }}">Open your sample document</a></p>
   {% else %}
-  <form method="post" action="/sample" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("upload.sample", "/sample", {"class": "inline-form"}) %}
     <button type="submit" class="button">Open the sample document</button>
-  </form>
+  {% endcall %}
   {% endif %}
 </section>
 {% endif %}

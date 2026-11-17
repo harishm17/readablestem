@@ -225,8 +225,10 @@ def test_the_upload_form_refuses_a_wrong_file_before_sending_it(site, browser):
     assert page.locator("#upload-status").inner_text() == (
         "Uploading notes.pdf. Keep this tab open."
     )
-    button = page.get_by_role("button", name="Upload and convert")
+    # The one submit rule (SW43): the pressed button says it is busy and sends nothing more.
+    button = page.get_by_role("button", name="Uploading…")
     assert button.get_attribute("aria-disabled") == "true"
+    assert button.get_attribute("aria-busy") == "true"
     context.close()
 
 

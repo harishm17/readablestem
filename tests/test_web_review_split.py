@@ -123,6 +123,48 @@ def test_a_style_the_pdf_text_cannot_show_is_not_called_a_difference(tmp_path):
 # --------------------------------------------------------------------------- deciding
 
 
+def test_a_decision_sent_twice_is_saved_once(split):
+    """The one submit rule (SW43): the same request token again gets the first answer and
+    saves nothing; a new token for the decision the item has now gets "Already saved"; a
+    form without a token is checked as before."""
+    from readablestem.web.db import RequestToken
+
+    page = panel(screen(split, "?item=p1-e2"))
+    sent = re.search(r'name="request_token" value="([^"]+)"', page)
+    assert sent, "the decision form carries a request token"
+    first = post(split, "p1-e2", action="accept", version="0", request_token=sent.group(1))
+    again = post(split, "p1-e2", action="accept", version="0", request_token=sent.group(1))
+    assert first.status_code == again.status_code == 303
+    assert again.headers["location"] == first.headers["location"]
+    job = split.job(split.job_id)
+    assert job.result_version == 1
+    with session_scope(split.ctx.factory) as session:
+        assert len(session.scalars(select(ReviewEdit)).all()) == 1
+        (row,) = session.scalars(select(RequestToken)).all()
+        assert row.route == "review.decide"
+        assert set(row.outcome) == {"status", "location", "notices"}  # no content
+    # No token, drawn at the old version: the item has that decision, by this reviewer.
+    fresh = post(split, "p1-e2", action="accept", version="0")
+    assert fresh.status_code == 303
+    assert "Already saved" in text_of(split.browser.get(fresh.headers["location"]).text)
+    # No token, another decision from the old page: refused as before.
+    assert post(split, "p1-e2", action="reject", version="0").status_code == 409
+    assert split.job(split.job_id).result_version == 1
+
+
+def test_the_live_check_answers_a_signed_out_session_quietly(split):
+    """F-088: signed out in another tab, the session's CSRF token is gone with it; the
+    check answers 204 and an empty body, not a 403 dropped into the page."""
+    path = f"/jobs/{split.job_id}/review/p1-e2/check"
+    csrf = token(split.browser, f"/jobs/{split.job_id}/review")
+    assert split.browser.post(path, data={"csrf_token": csrf, "latex": "x"}).status_code == 200
+    forged = split.browser.post(path, data={"csrf_token": "forged", "latex": "x"})
+    assert forged.status_code == 403
+    split.browser.post("/logout", data={"csrf_token": csrf})
+    gone = split.browser.post(path, data={"csrf_token": csrf, "latex": "x"})
+    assert (gone.status_code, gone.text) == (204, "")
+
+
 def test_a_decided_group_can_be_decided_again_for_all_its_headings(split):
     assert post(split, GROUP, action="reject").status_code == 303
     assert {f.status.value for f in stored(split).fixes if f.group_key == GROUP} == {"rejected"}

@@ -29,6 +29,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
 from readablestem.web.shares import OWNER
@@ -124,6 +125,7 @@ def share_page(request: Request, job_id: str, user: UserDep) -> Response:
 
 
 @router.post("/jobs/{job_id}/share", dependencies=[Depends(require_csrf)])
+@submit_once("share.add")
 def add_share(
     request: Request,
     job_id: str,
@@ -163,6 +165,7 @@ def add_share(
 
 
 @router.post("/jobs/{job_id}/share/{share_id}/revoke", dependencies=[Depends(require_csrf)])
+@submit_once("share.revoke")
 def revoke_share(request: Request, job_id: str, share_id: str, user: UserDep) -> Response:
     """Take a person's access away. It stops on their next request."""
     ctx = get_ctx(request)
@@ -170,8 +173,9 @@ def revoke_share(request: Request, job_id: str, share_id: str, user: UserDep) ->
         job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id
         removed = shares.revoke(session, owned_id, share_id)
-    if not removed:
-        raise PageError(404, *NOT_FOUND)
-    log_event(logger, "share_revoked", job_id=owned_id)
+    if removed:
+        log_event(logger, "share_revoked", job_id=owned_id)
+    # Not there (often a second click on Remove): the access is gone either way, so the
+    # answer is the one the first click got (SW43, "already in that state").
     flash(request, "Access removed. They cannot open this document any more.", undo=False)
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)

@@ -21,6 +21,7 @@ from fastapi.responses import RedirectResponse, Response
 
 from readablestem.web import inventory
 from readablestem.web.deps import UserDep, flash, pop_flash, render, require_csrf
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import ReviewInvalid, ReviewStale
 from readablestem.web.routes.edits import write_review
@@ -92,6 +93,7 @@ def symbols_page(request: Request, job_id: str, user: UserDep, view: str = "") -
 
 
 @router.post("/jobs/{job_id}/symbols", dependencies=[Depends(require_csrf)])
+@submit_once("review.symbols")
 def relabel(
     request: Request,
     job_id: str,

@@ -44,6 +44,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.intake import (
     QuotaRefused,
     TooManyJobs,
@@ -342,6 +343,7 @@ def _remember(ctx: AppContext, upload_id: str, sent: set[int]) -> None:
 
 
 @router.post("/uploads/{upload_id}", dependencies=[limited("upload"), Depends(require_csrf)])
+@submit_once("upload.parts")
 async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     enforce(request, "upload_user", user.id)

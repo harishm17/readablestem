@@ -30,6 +30,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.health import ops_report
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import signups_today
@@ -44,6 +45,8 @@ USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 # of accounts: the page lists the newest and says so, and the "Block by email" form reaches
 # any account, listed or not.
 PEOPLE_ROWS = 300
+# A second Link for a link already made (SW43).
+LINK_EXISTS = "That address was already linked to this instructor. Nothing was changed."
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
 
 
@@ -197,6 +200,7 @@ def admin_health(request: Request, user: AdminDep) -> Response:
 
 
 @router.post("/admin/allowlist", dependencies=[Depends(require_csrf)])
+@submit_once("admin.allow")
 def allow(
     request: Request,
     user: AdminDep,
@@ -229,6 +233,7 @@ def allow(
 
 
 @router.post("/admin/allowlist/remove", dependencies=[Depends(require_csrf)])
+@submit_once("admin.remove")
 def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     normalised = normalise_email(email)
     if normalised == user.email:
@@ -260,6 +265,7 @@ def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Re
 
 
 @router.post("/admin/users/block", dependencies=[Depends(require_csrf)])
+@submit_once("admin.block")
 def block(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     """Stop an account: signed out everywhere, its queued and running jobs stopped, and its
     sign-ins refused (in either sign-up mode) until it is unblocked."""
@@ -267,12 +273,14 @@ def block(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") 
 
 
 @router.post("/admin/users/unblock", dependencies=[Depends(require_csrf)])
+@submit_once("admin.unblock")
 def unblock(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     """Let a blocked account sign in again, with the tier it had."""
     return _block(request, user, email, blocked=False)
 
 
 @router.post("/admin/linked-emails", dependencies=[Depends(require_csrf)])
+@submit_once("admin.link")
 def link_email(
     request: Request,
     user: AdminDep,
@@ -290,6 +298,11 @@ def link_email(
                 linked_emails.link(session, owner, linked)
         except linked_emails.LinkRefused as refused:
             message = refused.message
+            if refused.code == "already_linked" and _linked_to(request, linked, owner):
+                # This very link is there already (often a second click): nothing to fix
+                # (SW43, "identical repeat").
+                flash(request, LINK_EXISTS, undo=False)
+                return RedirectResponse("/admin", status_code=303)
     if message:
         context = admin_context(request) | {
             "errors": [{"field_id": "link-other", "message": message}],
@@ -303,7 +316,15 @@ def link_email(
     return RedirectResponse("/admin", status_code=303)
 
 
+def _linked_to(request: Request, linked: str, owner: str) -> bool:
+    """`linked` is linked to the instructor `owner` already."""
+    with session_scope(get_ctx(request).factory) as session:
+        user = session.scalar(select(User).where(User.email == owner))
+        return user is not None and linked in linked_emails.linked_to(session, user.id)
+
+
 @router.post("/admin/linked-emails/remove", dependencies=[Depends(require_csrf)])
+@submit_once("admin.unlink")
 def unlink_email(request: Request, user: AdminDep, other: Annotated[str, Form()] = "") -> Response:
     linked = normalise_email(other)
     if linked is not None:

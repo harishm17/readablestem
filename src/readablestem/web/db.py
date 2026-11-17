@@ -605,6 +605,34 @@ class LoginLink(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class RequestToken(Base):
+    """One submitted form, so a repeat of it is answered with what the first one got
+    (`web.forms`, the one submit rule). `token` is the random value the form was drawn
+    with; `route` the form's key in `web.forms.FORMS`; `outcome` the answer: the status,
+    the redirect target and the one-time notices (content-free, like every notice), NULL
+    while the request that wrote the row is still finishing. No document content.
+
+    Deleted when the person's session ends (sign-out, blocked, removed), with the account,
+    and by the hourly purge once older than a session can live. The one row without a user
+    is the account deletion's own: it stays until that browser's session would have lapsed,
+    so a second click on "Delete my account" lands on the "deleted" notice."""
+
+    __tablename__ = "request_tokens"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token: Mapped[str] = mapped_column(String(64))
+    route: Mapped[str] = mapped_column(String(64))
+    outcome: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+    __table_args__ = (UniqueConstraint("user_id", "token", name="uq_request_token_user_token"),)
+
+
 # --------------------------------------------------------------------------- engine
 
 

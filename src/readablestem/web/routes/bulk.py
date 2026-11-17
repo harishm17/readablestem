@@ -20,6 +20,7 @@ from fastapi.responses import RedirectResponse, Response
 
 from readablestem.web import bulk_accept, queue
 from readablestem.web.deps import PageError, UserDep, flash, render, require_csrf
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import (
     ReviewInvalid,
@@ -102,6 +103,7 @@ def confirm_page(
 
 
 @router.post("/jobs/{job_id}/accept/{slug}", dependencies=[Depends(require_csrf)])
+@submit_once("review.accept_kind")
 def accept(
     request: Request,
     job_id: str,

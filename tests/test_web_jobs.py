@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -72,6 +73,23 @@ def test_upload_queues_a_job_with_the_pdf_and_24_hour_retention(web):
     with session_scope(web.ctx.factory) as session:
         blob = session.scalar(select(Blob).where(Blob.job_id == job.id))
         assert blob is not None and blob.kind == "upload" and blob.content == pdf
+
+
+def test_an_upload_sent_twice_with_its_request_token_makes_one_document(web):
+    """The one submit rule (SW43): the upload form's token rides in its action (the
+    handler reads the body itself); sent again, the first answer comes back and nothing
+    is uploaded twice."""
+
+    action = re.search(r'action="(/jobs\?request_token=[^"]+)"', web.browser.get("/app").text)
+    assert action, "the upload form carries a request token"
+    pdf = {"pdf": ("notes.pdf", make_pdf(2), "application/pdf")}
+    sent = [
+        web.browser.post(action.group(1), data={"csrf_token": token(web.browser)}, files=pdf)
+        for _ in range(2)
+    ]
+    assert [r.status_code for r in sent] == [303, 303]
+    assert sent[0].headers["location"] == sent[1].headers["location"]
+    assert count(web, Job) == 1
 
 
 def test_sharing_with_the_developer_keeps_the_job_for_30_days(web):

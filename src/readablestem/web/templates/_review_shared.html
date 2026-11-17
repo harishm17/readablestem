@@ -7,11 +7,11 @@
    JavaScript. #}
 {% from "_hear.html" import hear_button %}
 
-{# Every decision form: the CSRF token, the view to come back to, and the review version the
-   page was drawn at (a form from an out-of-date tab is refused, not applied). `flt` is the
+{# Every decision form (the `form` macro writes the CSRF and request tokens): the view to
+   come back to, and the review version the page was drawn at (a form from an out-of-date tab is refused, not applied). `flt` is the
    list view's decision filter, kept through the decision. #}
 {% macro hidden_fields(view="split", flt="") -%}
-<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ result_version }}">{% if flt %}<input type="hidden" name="flt" value="{{ flt }}">{% endif %}
+<input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ result_version }}">{% if flt %}<input type="hidden" name="flt" value="{{ flt }}">{% endif %}
 {%- endmacro %}
 
 {% macro error_line(item, prefix) %}

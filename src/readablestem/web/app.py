@@ -42,7 +42,7 @@ from readablestem.observability.logging import configure_logging, request_loggin
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
 from readablestem.pipeline import checked_words
-from readablestem.web import analytics, dev_only, output, seo
+from readablestem.web import analytics, dev_only, forms, output, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -207,6 +207,12 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
 
     env.globals["refused_classes"] = ", ".join(sorted(SUPPORT.classes.refused))  # ty: ignore[invalid-assignment]
     env.globals["refused_packages"] = ", ".join(sorted(SUPPORT.packages.refused))  # ty: ignore[invalid-assignment]
+    # The one submit rule (SW43): the `form(key)` macro looks its key up, mints a request
+    # token per drawn form and writes the busy label (`web.forms`).
+    env.globals["form_row"] = forms.form_row  # ty: ignore[invalid-assignment]
+    env.globals["mint_request_token"] = forms.mint_token  # ty: ignore[invalid-assignment]
+    env.globals["busy_label"] = forms.busy_label  # ty: ignore[invalid-assignment]
+    env.globals["request_token_field"] = forms.REQUEST_TOKEN_FIELD  # ty: ignore[invalid-assignment]
     return Jinja2Templates(env=env)
 
 
@@ -419,6 +425,7 @@ def create_app(
     check_web_secrets(settings)
     engine = make_engine(settings.database_url)
     factory = make_sessionmaker(engine)
+    forms.install(factory)  # a form's request token rides on its action's commit (SW43)
     ctx = AppContext(
         settings=settings,
         engine=engine,

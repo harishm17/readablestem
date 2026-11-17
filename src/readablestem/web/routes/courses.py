@@ -39,6 +39,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access
 from readablestem.web.shares import OWNER, REVIEW
@@ -47,6 +48,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 Field = Annotated[str, Form()]
+
+# A second Add for something already there (SW43): the page it would have led to, and this.
+COURSE_EXISTS = "You already have a course with this name, so nothing new was added. Here it is."
+ENTRY_EXISTS = "This course already has {what} with that meaning, so nothing new was added."
 
 
 def _require_feature(request: Request) -> None:
@@ -100,6 +105,7 @@ def courses_page(request: Request, user: UserDep) -> Response:
 
 
 @router.post("/courses", dependencies=[Depends(require_csrf)])
+@submit_once("course.create")
 def create_course(request: Request, user: UserDep, name: Field = "") -> Response:
     _require_feature(request)
     try:
@@ -107,6 +113,13 @@ def create_course(request: Request, user: UserDep, name: Field = "") -> Response
             course = notation.create_course(session, user.id, name)
             course_id = course.id
     except notation.NotationInvalid as exc:
+        with session_scope(get_ctx(request).factory) as session:
+            existing = notation.course_named(session, user.id, name)
+        if existing is not None:
+            # The course is there already (often a second click): open it, as the first
+            # click did, and say nothing new was added (SW43, "identical repeat").
+            flash(request, COURSE_EXISTS, undo=False)
+            return RedirectResponse(f"/courses/{existing}", status_code=303)
         extra = _errors(exc) | {"values": exc.values or {"name": name}}
         return _courses_page(request, user, extra, status=422)
     log_event(logger, "course_created", course_id=course_id)
@@ -184,6 +197,7 @@ def course_page(request: Request, course_id: str, user: UserDep) -> Response:
 
 
 @router.post("/courses/{course_id}/rename", dependencies=[Depends(require_csrf)])
+@submit_once("course.rename")
 def rename_course(request: Request, course_id: str, user: UserDep, name: Field = "") -> Response:
     _require_feature(request)
     try:
@@ -213,6 +227,7 @@ def confirm_delete(request: Request, course_id: str, user: UserDep) -> Response:
 
 
 @router.post("/courses/{course_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("course.delete_ask")
 def delete_course(request: Request, course_id: str, user: UserDep, confirm: Field = "") -> Response:
     """Delete only with `confirm=yes`; the "Delete course" button gets the question
     first. The documents converted for the course keep their results."""
@@ -230,6 +245,7 @@ def delete_course(request: Request, course_id: str, user: UserDep, confirm: Fiel
 
 
 @router.post("/courses/{course_id}/entries", dependencies=[Depends(require_csrf)])
+@submit_once("course.add_entry")
 def add_entry(
     request: Request,
     course_id: str,
@@ -244,6 +260,11 @@ def add_entry(
         with session_scope(get_ctx(request).factory) as session:
             course = _course(session, course_id, user)
             owned_id = course.id  # redirects are built from the owned row, not the request
+            if notation.same_entry(course, entry) is not None:
+                # The same symbol with the same meaning and note (often a second click):
+                # nothing to add, and no error to fix (SW43, "identical repeat").
+                flash(request, ENTRY_EXISTS.format(what=describe(entry.canonical)), undo=False)
+                return RedirectResponse(f"/courses/{owned_id}", status_code=303)
             notation.add_entry(session, course, entry)
     except notation.NotationInvalid as exc:
         extra = _errors(exc) | {"values": exc.values}
@@ -324,6 +345,7 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
 
 
 @router.post("/courses/{course_id}/suggestions", dependencies=[Depends(require_csrf)])
+@submit_once("course.suggestions")
 def add_suggestions(
     request: Request,
     course_id: str,
@@ -379,6 +401,7 @@ def add_suggestions(
 
 
 @router.post("/courses/{course_id}/starter", dependencies=[Depends(require_csrf)])
+@submit_once("course.starter")
 def add_starter(
     request: Request,
     course_id: str,
@@ -426,6 +449,7 @@ def add_starter(
 
 
 @router.post("/courses/{course_id}/documents", dependencies=[Depends(require_csrf)])
+@submit_once("course.attach")
 def add_documents(
     request: Request,
     course_id: str,
@@ -467,6 +491,7 @@ def _stored_element_id(job: Job, wanted: str) -> str | None:
 
 
 @router.post("/courses/{course_id}/remember", dependencies=[Depends(require_csrf)])
+@submit_once("course.remember")
 def remember(
     request: Request,
     course_id: str,

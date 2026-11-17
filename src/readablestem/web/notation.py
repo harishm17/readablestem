@@ -260,6 +260,29 @@ def rename_course(session: Session, course: Course, name: str) -> None:
     course.name = name
 
 
+def course_named(session: Session, user_id: str, name: str) -> str | None:
+    """The id of the owner's course with this name (as `create_course` compares names), if
+    any: a second click on Add course finds the course the first one made (SW43)."""
+    try:
+        name = clean_name(name)
+    except NotationInvalid:
+        return None
+    return session.scalar(
+        select(Course.id)
+        .where(Course.user_id == user_id, func.lower(Course.name) == name.lower())
+        .limit(1)
+    )
+
+
+def same_entry(course: Course, entry: EntryInput) -> CourseNotation | None:
+    """The course's entry that says exactly what `entry` says (symbol, meaning and note):
+    a second click on Add made it already (SW43)."""
+    row = _existing(course, entry.canonical)
+    if row is None or (row.meaning, row.note or "") != (entry.meaning, entry.note or ""):
+        return None
+    return row
+
+
 def _refuse_same_name(
     session: Session, user_id: str, name: str, *, field_id: str, other_than: str | None = None
 ) -> None:

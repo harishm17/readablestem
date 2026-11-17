@@ -94,12 +94,14 @@ def walk(browser, site, job: str, page, check) -> None:
     check(page, "notice with undo")
     page.locator("#decided-summary").click()
     check(page, "your decisions")
-    # A second tab drawn now; the first one decides; the second one is out of date.
+    # A second tab drawn now; the first one decides; the second one, out of date, decides
+    # otherwise (the same decision again would be "Already saved", SW43).
     other = page.context.new_page()
     other.goto(f"{url}?item=p1-e6")
     page.get_by_role("button", name="Accept figure 1").click()
     page.wait_for_url(f"{url}?item={GROUP}")
-    other.get_by_role("button", name="Accept figure 1").click()
+    other.get_by_label("Alt text for figure 1").fill("A car drives along a road from a house.")
+    other.get_by_role("button", name="Save and accept (figure 1)").click()
     other.locator(".stale-notice").wait_for()
     check(other, "stale write refused")
     other.close()

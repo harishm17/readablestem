@@ -86,6 +86,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are documented here)
     MAX_ACTIVE_JOBS_PER_USER,
     MAX_LIVE_JOBS_PER_USER,
@@ -763,6 +764,7 @@ def form_values(fields: Mapping[str, str]) -> dict[str, Any]:
 
 
 @router.post("/jobs", dependencies=[limited("upload")])
+@submit_once("upload.create", from_form=False)
 async def create_job(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
     enforce(request, "upload_user", user.id)  # before anything is read or any process starts
@@ -1665,12 +1667,12 @@ def set_language(
 
 # --------------------------------------------------------------------------- try again
 
+RETRY_ALREADY = "This document is already waiting or being converted. Nothing was changed."
 RETRY_REFUSED = {
     "not_stopped": (
         409,
         "Nothing to try again",
-        "This document is not stopped: it is still waiting or being converted, or it has "
-        "finished completely. Nothing was changed.",
+        "This document is not stopped: it has finished completely. Nothing was changed.",
     ),
     "too_many_active": (
         429,
@@ -1682,6 +1684,7 @@ RETRY_REFUSED = {
 
 
 @router.post("/jobs/{job_id}/retry", dependencies=[limited("retry"), Depends(require_csrf)])
+@submit_once("job.retry")
 def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Try again" on a stopped or partly converted document (T3-1, `web.retry`): the same
     job goes back in the queue. Nothing is counted against the daily pages (this is not an
@@ -1712,6 +1715,8 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             )
         except retry_rules.RetryRefused as exc:
             refused, tries = exc.code, job.retries or 0
+            if refused == "not_stopped" and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                refused = "already_queued"
         else:
             retention.restart_clock(job, ctx.settings)
             tries = job.retries or 0
@@ -1723,6 +1728,11 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             "new document. Nothing was changed.",
             context={"job_id": job_id},
         )
+    if refused == "already_queued":
+        # Waiting or converting is what Try again asks for (often a second click): the
+        # job page, as the first click got (SW43, "already in that state").
+        flash(request, RETRY_ALREADY, undo=False)
+        return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
     if refused:
         status, title, message = RETRY_REFUSED[refused]
         raise PageError(status, title, message, context={"job_id": job_id})

@@ -50,6 +50,7 @@ from readablestem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
+from readablestem.web import forms
 from readablestem.web.database import insert_ignore
 from readablestem.web.db import (
     AuthIdentity,
@@ -65,6 +66,7 @@ from readablestem.web.db import (
     LoginLink,
     PendingUpload,
     QuotaDay,
+    RequestToken,
     ReviewEdit,
     StepRecord,
     UploadResult,
@@ -85,6 +87,7 @@ class PurgeStats:
     pending_deleted: int = 0  # large files waiting for their pages to be chosen (T3-3)
     results_deleted: int = 0  # answers to uploads of several files, past their hour (T3-4)
     tombstones_deleted: int = 0  # deleted-account records of earlier days (web.tombstones)
+    tokens_deleted: int = 0  # request tokens older than a session lives (web.forms)
 
 
 def purge_expired(
@@ -113,6 +116,7 @@ def purge_expired(
         stats.pending_deleted = purge_pending(session, now)
         stats.results_deleted = purge_upload_results(session, now)
         stats.tombstones_deleted = purge_tombstones(session, now)
+        stats.tokens_deleted = forms.purge(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -123,6 +127,7 @@ def purge_expired(
         pending_deleted=stats.pending_deleted,
         results_deleted=stats.results_deleted,
         tombstones_deleted=stats.tombstones_deleted,
+        tokens_deleted=stats.tokens_deleted,
     )
     return stats
 
@@ -308,6 +313,7 @@ def erase_user(
     session.execute(delete(LinkedEmail).where(LinkedEmail.user_id == user_id))
     session.execute(delete(LoginLink).where(LoginLink.user_id == user_id))
     session.execute(delete(QuotaDay).where(QuotaDay.user_id == user_id))
+    session.execute(delete(RequestToken).where(RequestToken.user_id == user_id))
     session.execute(delete(User).where(User.id == user_id))
     record_erasure(session, user_id, now)
     return stats

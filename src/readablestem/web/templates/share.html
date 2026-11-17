@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Who can open one document (routes/sharing.py, web/shares.py). Owner only. Plain forms: no
    script is needed. Nothing is emailed; the owner copies the address and sends it. The page
    leads with the three steps; the exact-address rule and what only the owner can do are under
@@ -12,8 +13,7 @@
 
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add a person</h2>
-  <form method="post" action="/jobs/{{ job_id }}/share" novalidate>
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("share.add", "/jobs/" ~ job_id ~ "/share", {"novalidate": true}) %}
     <div class="field{% if email_error %} field-error{% endif %}">
       <label for="share-email">Their email address</label>
       <p class="hint" id="share-email-hint">The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.</p>
@@ -41,7 +41,7 @@
       <button type="submit" class="button">Share</button>
       {% if retain_until %}<p class="hint share-expiry-note">Access ends {{ retain_until|utc }}, or when you remove them.</p>{% endif %}
     </div>
-  </form>
+  {% endcall %}
 </section>
 
 <section aria-labelledby="people-heading">
@@ -52,16 +52,14 @@
     <li>
       <p class="share-person"><strong>{{ row.email }}</strong>: {{ role_words[row.role] }}</p>
       <div class="share-actions">
-      <form method="post" action="/jobs/{{ job_id }}/share" class="inline-form">
-        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      {% call form("share.add", "/jobs/" ~ job_id ~ "/share", {"class": "inline-form"}) %}
         <input type="hidden" name="email" value="{{ row.email }}">
         <input type="hidden" name="role" value="{{ 'review' if row.role == 'view' else 'view' }}">
         <button type="submit" class="button-secondary">Change {{ row.email }} to {{ role_words['review' if row.role == 'view' else 'view']|lower }}</button>
-      </form>
-      <form method="post" action="/jobs/{{ job_id }}/share/{{ row.id }}/revoke" class="inline-form">
-        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      {% endcall %}
+      {% call form("share.revoke", "/jobs/" ~ job_id ~ "/share/" ~ row.id ~ "/revoke", {"class": "inline-form"}) %}
         <button type="submit" class="button-danger">Remove {{ row.email }}</button>
-      </form>
+      {% endcall %}
       </div>
     </li>
     {% endfor %}

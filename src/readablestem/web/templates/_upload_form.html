@@ -1,3 +1,4 @@
+{% from "components/forms.html" import form with context %}
 {# The upload section of My documents (app.html): the file and its submit button together, the
    options as two short groups that each say their current setting in one line and open to
    change it (ux2-lane-a). `form_values`: what the person had set when a refusal sent the form
@@ -33,10 +34,9 @@
     {% if sample_job %}
     <a class="sample-link" href="/jobs/{{ sample_job }}">Practice on the sample</a>
     {% else %}
-    <form method="post" action="/sample" class="inline-form sample-link">
-      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% call form("upload.sample", "/sample", {"class": "inline-form sample-link"}) %}
       <button type="submit" class="link-button">Practice on the sample</button>
-    </form>
+    {% endcall %}
     {% endif %}
     {% endif %}
   </div>
@@ -60,8 +60,7 @@
   </div>
   {% else %}
   {% set pdf_error = field_errors.get("pdf") %}
-  <form method="post" action="/jobs" enctype="multipart/form-data" novalidate class="upload-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("upload.create", "/jobs", {"enctype": "multipart/form-data", "novalidate": true, "class": "upload-form"}, token_in_action=true) %}
     {% if revising %}<input type="hidden" name="revises" value="{{ revising.id }}">{% endif %}
     <div class="field file-field{% if pdf_error %} field-error{% endif %}">
       <label for="pdf">{% if revising %}File{% else %}Files{% endif %}</label>
@@ -198,6 +197,6 @@
       <p id="upload-status" class="upload-status" role="status"></p>
     </div>
     <p class="hint vendor-line" id="vendor-line">{% include "_vendor_line.html" %}</p>
-  </form>
+  {% endcall %}
   {% endif %}
 </section>
