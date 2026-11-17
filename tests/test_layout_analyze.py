@@ -379,6 +379,46 @@ def test_running_headers_footers_and_page_numbers_are_dropped():
     assert [e.id for e in layout.elements[:3]] == ["p1-e0", "p1-e1", "p2-e0"]
 
 
+TOPICS = ["motion", "force", "energy", "momentum", "gravity", "waves", "heat", "light"]
+
+
+def book_pages(count: int) -> bytes:
+    """Running heads as a book sets them: the left page's holds its number and the chapter,
+    the right page's the section and its number, and the chapter changes part way through.
+    Every page also has a body line close under the head, a number in the footer, and the
+    headings "Solution" and "Example" in the same place."""
+    doc = pymupdf.open()
+    for number in range(1, count + 1):
+        page = doc.new_page(width=612, height=792)
+        chapter = 1 if number <= count // 2 else 2
+        if number % 2:
+            page.insert_text((72, 62), f"{number}   Chapter {chapter} Motion", fontsize=8)
+        else:
+            page.insert_text((330, 62), f"{chapter}.{number} Section {number} title", fontsize=8)
+        write(page, 72, 82, [f"This page opens with {TOPICS[number - 1]}, under its head."])
+        page.insert_text((72, 300), "Solution", fontsize=12, fontname="hebo")
+        write(page, 72, 320, [f"Worked answer {number}."])
+        page.insert_text((72, 400), "Example", fontsize=12, fontname="hebo")
+        write(page, 72, 420, [f"Worked example {number}."])
+        page.insert_text((300, 760), str(number), fontsize=8)
+    return doc.tobytes()
+
+
+def test_alternating_running_heads_whose_text_changes_are_dropped_and_repeated_headings_stay():
+    layout = analyze(book_pages(8))
+    assert texts(layout.elements) == [
+        line
+        for number in range(1, 9)
+        for line in (
+            f"This page opens with {TOPICS[number - 1]}, under its head.",
+            "Solution",
+            f"Worked answer {number}.",
+            "Example",
+            f"Worked example {number}.",
+        )
+    ]
+
+
 def test_margin_repetition_is_judged_on_neighbouring_pages_when_one_page_is_analysed():
     layout = analyze(running_pages(4), pages=[2])
     assert texts(layout.elements) == [
