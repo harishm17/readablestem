@@ -7,8 +7,9 @@
   was kept in the body, because only its exact text was looked for. `layout._margin_filter`
   now also finds a small line that sits at the same place (height within 2 pt, size within
   0.5 pt) on at least half of the left pages, or of the right pages, and drops it whatever
-  its words. The band is 10% of the page (it was 7%; `tables.TOP_BAND` follows). A repeated
-  heading such as "Solution" or "Example" is as big as the body, so it stays; a bare number
+  its words. The place is searched in the top and bottom 10% of the page
+  (`MARGIN_PLACE_BAND`); an exact repeat is still searched in 7%, so a body line that
+  repeats word for word at 8% stays. A repeated heading such as "Solution" or "Example" is as big as the body, so it stays; a bare number
   that shares a line with a kept line (a table cell) stays. On the 10 OpenStax development
   excerpts, pages with a running head in the output went from 195 of 199 to 15.
 - Source facts: the bold letters of a page are read once for all of its equations, not once

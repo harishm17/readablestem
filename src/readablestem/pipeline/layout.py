@@ -5,10 +5,10 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
 1. Characters come from PyMuPDF's raw text dictionary with accurate glyph boxes, so the
    numerator and denominator rows of a fraction do not overlap. All geometry is turned
    into display coordinates (the page's /Rotate applied), the space `crop` clips in.
-2. Decoration is dropped: running headers/footers (text in the top/bottom 10 % of the
+2. Decoration is dropped: running headers/footers (text in the top/bottom 7 % of the
    page that repeats on at least half of the pages, digits normalised, unless it is
-   larger or bolder than body text and changes from page to page; and a small line
-   that sits at the same place on at least half of the left (or right) pages whatever
+   larger or bolder than body text and changes from page to page; and a small line in the
+   top/bottom 10 % at the same place on at least half of the left (or right) pages, whatever
    its words, so a head whose text changes with the section goes too), bare page numbers,
    images and drawings repeated in those bands (logos), and watermarks (diagonal text in
    a large font, or rotated text repeated at the same place).
@@ -141,7 +141,8 @@ MAX_HEADING_CHARS = 200
 MAX_HEADING_ROWS = 3
 MAX_BOLD_HEADING_CHARS = 120
 MAX_BOLD_HEADING_ROWS = 2
-MARGIN_BAND = 0.10  # top/bottom share of the page searched for running headers/footers
+MARGIN_BAND = 0.07  # top/bottom share of the page searched for running headers/footers
+MARGIN_PLACE_BAND = 0.10  # ... and for a head found by its place (`_MarginFilter.places`)
 MARGIN_PLACE_PT = 2.0  # rows of the same side's pages this near in height are in one place
 MARGIN_SIZE_PT = 0.5  # ... and this near in font size are of one size
 MARGIN_REFERENCE_PAGES = 24  # pages sampled to decide what repeats
@@ -2482,11 +2483,11 @@ def _norm_margin(text: str) -> str:
     return re.sub(r"\d+", "#", " ".join(text.lower().split()))
 
 
-def _box_zone(box: BBox, height: float) -> str | None:
+def _box_zone(box: BBox, height: float, band: float = MARGIN_BAND) -> str | None:
     centre = (box[1] + box[3]) / 2
-    if centre <= height * MARGIN_BAND:
+    if centre <= height * band:
         return "top"
-    if centre >= height * (1 - MARGIN_BAND):
+    if centre >= height * (1 - band):
         return "bottom"
     return None
 
@@ -2581,7 +2582,7 @@ class _MarginFilter:
         repeat (`places`)? Rows that look like headings or body text never are."""
         if row.vertical or not self.places or self.prominent(row) or not self.apart(row):
             return False
-        zone = _margin_zone(row, height)
+        zone = _box_zone(row.bbox, height, MARGIN_PLACE_BAND)
         centre = (row.y0 + row.y1) / 2
         return zone is not None and any(
             z == zone
@@ -2710,13 +2711,15 @@ def _margin_filter(
                 if row.vertical:
                     seen.add(("rotated", _rotated_key(row)))
                     continue
+                place_zone = _box_zone(row.bbox, height, MARGIN_PLACE_BAND)
+                if place_zone:
+                    band_rows.append((number, place_zone, (row.y0 + row.y1) / 2, row.size, row))
                 zone = _margin_zone(row, height)
                 if zone is None:
                     for c in row.ink:
                         sizes[round(c.size * 2) / 2] += 1
                     families[row.family] += len(row.ink)
                     continue
-                band_rows.append((number, zone, (row.y0 + row.y1) / 2, row.size, row))
                 key = (zone, _norm_margin(row.clean))
                 seen.add(("text", key))
                 texts.setdefault(key, set()).add(row.clean)

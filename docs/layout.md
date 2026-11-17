@@ -77,7 +77,7 @@ Element conventions:
    line and cannot be told apart. Ligatures are expanded. Codes of symbol and TeX fonts are
    read as what the font draws (`pipeline/font_codes.py`, "Font code tables" below).
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
-   bottom 10 % of the page is dropped when its text, lower-cased with digits replaced by
+   bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
    two), unless it stands out and changes: a line at least 1.15 x body size, or bold and
    within 0.5 pt of the body size or larger, whose exact text differs between pages
@@ -85,7 +85,8 @@ Element conventions:
    content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size.
    A running head whose words change with the section (a textbook's chapter title on the
    right pages and the section title on the left ones, with the page number beside it) is
-   found by its place instead: a line of the band that sits at the same height (within 2 pt)
+   found by its place instead, in the top or bottom 10 % of the page (textbook heads sit
+   lower than the 7 % of an exact repeat): a line that sits at the same height (within 2 pt)
    and size (within 0.5 pt) on at least half of the left pages, or of the right pages (and at
    least two), and is apart from the body (smaller than it by 0.5 pt, italic, or another font
    family) goes, whatever its words. A repeated heading (`Solution`, `Example`) is bold
