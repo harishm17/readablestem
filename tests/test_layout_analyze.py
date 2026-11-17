@@ -8,6 +8,8 @@ errors) and asserts the exact elements that come out.
 from __future__ import annotations
 
 import logging
+import unicodedata
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -554,3 +556,13 @@ def test_codes_are_read_as_what_their_font_draws(font, row, differences, word):
     rows = ["Plain text on the first line.", row, "Plain text on the last line."]
     text = " ".join(e.text or "" for e in analyze(font_page(font, rows, differences)).elements)
     assert word in text
+
+
+def test_tex_extension_font_glyphs_are_read_by_the_names_the_font_gives_them():
+    # calculus_notes.pdf (TeX, CMEX10): a display sum, an integral and the built-up brace of a
+    # cases. The font has no table to Unicode, so the text layer gives U+FFFD for the signs and
+    # private-use codes for the brace's pieces; the file names every glyph.
+    data = Path(__file__).parent.joinpath("fixtures/layout/latex/calculus_notes.pdf").read_bytes()
+    text = " ".join(e.text or "" for e in analyze(data).elements)
+    assert "\u2211" in text and "\u222b" in text and "\u23a7 \u23a8" in text
+    assert not [c for c in text if c == "\ufffd" or unicodedata.category(c) == "Co"]
