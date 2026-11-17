@@ -13,6 +13,20 @@
   title paragraph stay in Python: pandoc drops those elements before a filter sees them, and
   its file title and the title paragraph come from one field.
 
+## Unreleased: polls and job routes stop reading the stored result (PF5)
+
+- F-279, F-283, F-496, F-497: a job's row was read whole, so every status poll, every download
+  check and every job route parsed the stored result and page (2.6 MB of JSON and 1.5 MB of
+  HTML on the large stored job we measure with), even to say "converting". `jobs.result_json`
+  and `jobs.html` are now deferred columns, loaded only by the route that reads them. A new
+  column, `jobs.html_version` (migration `7b1d3e9a4c28`, nullable, filled on first sight for
+  rows from before it), holds the render version of the stored page, so "is there a page" and
+  "is it from an older renderer" no longer need the page; the draft gate reads the stored
+  `jobs.open_decisions`. The state and summary of a job that is not finished no longer read its
+  result. A finished job's page and poll still read the result, which its state is made from.
+  Tests that hand a job row out of its session load the large columns with it
+  (`db.LARGE_COLUMNS`).
+
 ## Unreleased: HEAD on downloads takes nothing (branch fix/about-in-main-and-job-summary, WS11.16)
 
 - F-138: a HEAD request to a download or export was served as a GET, so it built the file,

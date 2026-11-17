@@ -48,7 +48,7 @@ def _page(
 ) -> Response:
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, VIEW)
-        title = documents.display_title((job.result_json or {}).get("title"), job.filename)
+        title = documents.display_title(documents.stored_title(job), job.filename)
         already = events.answered(session, user.id, job.id)
     errors = errors or []
     context: dict[str, Any] = {

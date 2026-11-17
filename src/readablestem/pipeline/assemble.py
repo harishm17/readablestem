@@ -12,7 +12,7 @@ What the output looks like and why is in docs/output.md. In short:
 - Anything not converted (ABSTAINED, FAILED, REJECTED, or MathML the sanitiser refused)
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
-- A short note for students at the end of `<main>` ("About this version", a labelled
+- A short note for students at the end of `<main>` ("About this version", a labeled
   `<section>`; inside `<main>` so every reader of the page, pandoc among them, gets it from
   the same markup): what the file is, the statement of what was reviewed and converted
   (`pipeline.checked`: who reviewed how many of the parts the tool flagged and on which day,

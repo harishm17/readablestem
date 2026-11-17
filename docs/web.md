@@ -1112,6 +1112,21 @@ but the tab title follows it ("My documents (4 of 6 finished)"). Without JavaScr
 lines instead of a table row wider than the screen (the table keeps explicit ARIA roles,
 since some browsers drop a table's semantics when its display changes).
 
+The job page's own polls (`/jobs/{id}/status` and `/jobs/{id}/progress`, every 3 s while a job
+waits or converts) read no stored result either. `jobs.result_json` and `jobs.html` are the two
+large columns (megabytes for a long document) and are deferred on the model (`web/db.py`):
+reading a job loads neither, and the first use of one loads it, inside the session (one more
+query). A detached row cannot load them, so a route reads what it needs before its session
+closes, and a query that needs them for every row it returns, or a row handed out of its
+session, loads them with the row (`db.LARGE_COLUMNS`). Two more columns stand in for them:
+`jobs.html_version` (the render version written in the page's head, set whenever `html` is
+assigned; NULL for no page, or for a row from before the column, which `Job.has_html` fills in
+the first time it looks) answers "is there a page" and "was it made by an older renderer"
+(`routes.jobs.current_html`, `require_done`, `output.export_state`), and `jobs.open_decisions`
+(above) answers the draft gate. Only a finished job's state and summary read its result
+(`states.Facts.of`, `views.job_view`): a job that is waiting, converting or stopped has none to
+read, even a retried one that still holds its earlier result.
+
 Downloads are named after the title plus the start of the job id
 (`problem-set-2-kinematics-3f9a2b.html`), so two versions of a handout never overwrite
 each other (UX review MF24).

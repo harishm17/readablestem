@@ -1045,7 +1045,7 @@ section of the document's outline.
 
 ## The note for students ("About this version")
 
-The file ends with a short note for the people who read it, a labelled `<section>` at the
+The file ends with a short note for the people who read it, a labeled `<section>` at the
 end of `<main>` (`id="about-conversion"`, MF7 of the UX review). It is inside `<main>` so every
 output made from the page gets it from the same markup: pandoc reads only what is inside
 `<main>`. It is a region landmark named "About this version", not a heading, so the outline is

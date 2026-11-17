@@ -73,7 +73,7 @@ def _source(
         state = output.check(request, job, role_of(session, job, user), file_type)
         if is_head(request):  # the headers need the title only, not a re-render
             title = documents.display_title(
-                (job.result_json or {}).get("title"), job.filename, job.title_override
+                documents.stored_title(job), job.filename, job.title_override
             )
             return "", title, state
         job = current_html(ctx, session, job)

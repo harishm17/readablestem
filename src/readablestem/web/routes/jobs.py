@@ -660,7 +660,7 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
         ):
             return {}
         title = documents.display_title(
-            (job.result_json or {}).get("title"), job.filename, job.title_override
+            documents.stored_title(job), job.filename, job.title_override
         )
         return {
             "revises": {"id": job.id, "title": title, "filename": job.filename},
@@ -1791,7 +1791,7 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
         state = output.check(request, job, role_of(session, job, user), "html")
         if is_head(request):  # the headers need the name only, not a re-render
             title = documents.display_title(
-                (job.result_json or {}).get("title"), job.filename, job.title_override
+                documents.stored_title(job), job.filename, job.title_override
             )
             name = output.file_name(download_filename(title, job.id), state)
             return head_reply("text/html; charset=utf-8", name)
@@ -2015,7 +2015,7 @@ def _canvas_source(
         role = role_of(session, job, user)
         state = output.check(request, job, role, file_type, course=number or "")
         if is_head(request):  # the headers need the title only, not a re-render
-            title = documents.display_title((job.result_json or {}).get("title"), job.filename)
+            title = documents.display_title(documents.stored_title(job), job.filename)
             return "", title, job.id, state
         job = current_html(ctx, session, job)
         result = job.result_json or {}
