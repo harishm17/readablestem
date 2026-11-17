@@ -256,11 +256,6 @@ class State:
         return self.group == WORK
 
     @property
-    def decisions_sentence(self) -> str:
-        """The sentence about open decisions: only a job that needs them says it (F-314)."""
-        return self.message if self.key == "needs_decisions" else ""
-
-    @property
     def retry(self) -> Step | None:
         """The "Try again" or "Convert the missing parts" form, if this state offers one."""
         steps = [*self.steps, *(g.action for g in self.gaps if g.action is not None)]

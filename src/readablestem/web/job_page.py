@@ -260,16 +260,6 @@ class Breakdown:
     # the page cannot say everything was converted.
     unanalysed_pages: int = 0
 
-    @property
-    def grouped_reason(self) -> str:
-        """Why the waiting items make fewer decisions than there are items."""
-        reasons = []
-        if self.heading_groups:
-            reasons.append("repeated headings are decided together")
-        if self.page_groups:
-            reasons.append("pages kept as images for the same reason are decided together")
-        return "; ".join(reasons)
-
 
 def shown_as_image(fix: Fix) -> bool:
     """The original is kept as an image in the HTML file (T1-3). Not a heading: "Make bold

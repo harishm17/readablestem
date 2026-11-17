@@ -178,11 +178,6 @@ class CheckedSummary:
     def all_found_converted(self) -> bool:
         return not self.pictures and not self.left_out and not self.unread
 
-    @property
-    def checks_passed(self) -> bool:
-        """Structure checks ran and none failed. Not known is not passed."""
-        return bool(self.checks_run) and not self.checks_failed
-
     # ----- the rules
 
     @property
