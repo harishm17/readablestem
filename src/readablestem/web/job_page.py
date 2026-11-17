@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import unicodedata
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any, Literal
@@ -255,6 +256,9 @@ class Breakdown:
     # handwriting) kept as images for one reason.
     heading_groups: int = 0
     page_groups: int = 0
+    # Pages read for their text whose drawings were not analysed (`drawings_not_analysed`):
+    # the page cannot say everything was converted.
+    unanalysed_pages: int = 0
 
     @property
     def grouped_reason(self) -> str:
@@ -279,7 +283,9 @@ def shown_as_image(fix: Fix) -> bool:
     )
 
 
-def breakdown(fixes: list[Fix]) -> Breakdown:
+def breakdown(fixes: list[Fix], notices: Iterable[Notice] = ()) -> Breakdown:
+    """Where each of `fixes` is; with the result's `notices`, the pages whose drawings were
+    not analysed as well."""
     waiting = [f for f in fixes if f.pending]
     decided = [f for f in fixes if not f.pending and f.decided_by_reviewer]
     accepted = [f for f in fixes if not f.pending and not f.decided_by_reviewer]
@@ -297,6 +303,7 @@ def breakdown(fixes: list[Fix]) -> Breakdown:
         as_image_kinds=dict(Counter(word_kind(f) for f in images)),
         heading_groups=sum(f.kind is Kind.HEADING for f in grouped),
         page_groups=sum(word_kind(f) in ("page", "handwriting") for f in grouped),
+        unanalysed_pages=len({n.page for n in notices if n.code == "drawings_not_analysed"}),
     )
 
 
@@ -984,7 +991,7 @@ def found_sentence(result: DocumentResult) -> str:
 def page_data(result: DocumentResult, last_decision: date | None) -> PageData:
     from readablestem.web import queue
 
-    counts = breakdown(result.fixes)
+    counts = breakdown(result.fixes, result.notices)
     summary = checked.of_result(result, reviewed_on=last_decision)
     notices = notice_lists(result)
     first = queue.first_open(queue.decisions(result))

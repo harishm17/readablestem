@@ -568,6 +568,43 @@ or models than the code under test, so a prompt change cannot pass on an old com
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
+### Development and held-out, and the two bars (`eval/split.py`, `eval bar`)
+
+A bar set on the pages a fix was built on says nothing about the next document, and a score
+under settings production does not run is a score for another product. So, for every eval
+added from November 2026 on:
+
+1. The set is split into development and held-out by document, never by page:
+   `split.split(seed, {document id: sha256 of the file})`. A document's side depends only on
+   the seed and its id, so a new document moves no other.
+2. Thresholds, prompts, worked examples and rules are tuned on the development side only.
+   The held-out side is read only by the scorer, and `Split.verify` checks its hash (ids and
+   file hashes) against the registered one before a run.
+3. Each eval has two bars. The release bar is the first held-out measurement under the
+   production profile (`ops/production.profile.toml`): a release may not be worse. The goal
+   bar is the figure the fix is built toward.
+4. A held-out set that was used to choose between designs is spent. Its documents are passed
+   as `spent` and are development from then on; new ones are drawn.
+
+A report says four things about its run: `split.name` and `split.set_sha256`
+(`Split.stamp`), `profile.sha256` and `pipeline_version`.
+
+```bash
+uv run readablestem eval bar report.json --measure order.clean --at-least 0.9
+uv run readablestem eval bar report.json --measure errors_per_100 --at-most 3 --kind goal
+```
+
+| Output starts with | Exit | When |
+|---|---|---|
+| `bar met` | 0 | held-out documents, production profile, the number meets the bar |
+| `bar not met` | 1 | held-out documents, production profile, the number does not |
+| `development score` | 2 | scored on development documents, or not under the production profile |
+| `refused` | 2 | the report lacks one of the four, or has no number at `metrics.<measure>` |
+
+The older reports (`eval pipeline`, the 15 registered sections of `gold/heldout.py`) record
+their profile and pipeline version but no split, so `eval bar` refuses them: their bars are
+the ones `eval gate` checks.
+
 ## Report format
 
 `eval pipeline` writes one JSON report per task (default `data/eval/latest-<task>.json`):
@@ -750,15 +787,28 @@ describe them, not the committed files. The OpenAI path has no committed baselin
 
 Recorded answers, replays and batches (`--answers`, `--batch`; development sets only). A live
 run is paid for once. `--answers FILE` keeps every model answer in a JSON-lines file keyed by
-everything the model is given (step, model, prompt version, instructions, the images by what
-they show, the text, the token limit, the thinking effort the client will send, and whether
-the untrusted-text notice rides in the system block). A request already in the file is
+the question as it is sent (`models/question.py`): step, model, prompt version, the
+instructions as sent, the images by what they show, the nearby text as sent (so the fence
+around it and the number of characters kept are part of it), the token limit, the image
+detail, the thinking effort the client will send, whether a refusal may go to the fallback
+model, and the format the answer is read in. Nothing about the release is in the key: a new
+pipeline version that sends the same question finds the same answer, and an edited prompt,
+answer format or context limit asks again. A request already in the file is
 answered from it, with the recorded tokens and cost, at no charge; any other goes to the model
 and is appended. So one baseline recording serves every experiment that asks the same
 thing, and an experiment pays only for requests that differ from the baseline's.
 `--answers-offline` turns a miss into a refusal instead of a call (a replay that cannot spend),
 and `--every N` takes every Nth equation or figure instead of the first few. `--answers` is
 refused for the held-out set and the sealed check part.
+Each row also holds the parts of its question (`"q"`), so a miss is reported with its reason:
+the report's `answers_file.answers_file_missed_because` counts misses by what differs from the nearest
+recorded question ("prompt equation-5 recorded, equation-6 asked", "nearby text changed",
+"no answer recorded for this picture"). A file recorded before 2026-11-11 is keyed by an
+older list (no answer format, no context limit). `--answers-rekey` moves it: a request found
+only under the older key is answered from that row, and the row is appended under the new key
+with its parts (`answers_file.answers_file_rekeyed` counts them). Run it once, with the code and settings
+the file was recorded with, then drop the flag; a request that changed since the recording is
+a miss either way.
 The Claude second check (shadow by default) asks the model as well; from 2026-10-14 its
 answers are kept in the same file (the report's `answers_file.second_check`), so a replay and
 `--answers-offline` spend nothing on it. The baselines of "Baselines and the gate" were
@@ -2517,6 +2567,653 @@ without cost. The public demo and the site examples were written again from a ne
 conversions ($0.2744 in all) was discarded because the table-structure model was not found on
 the machine, which changed the layout of 2.1; it is not used.
 
+## The test corpus
+
+The workflow tests and the layout evals read one set of files, listed in
+`tests/workflows/corpus/corpus.json` and read through `src/readablestem/eval/corpus.py`.
+As of 2026-11-11 it has 72 entries; 47 of them have reading-order labels (91 pages).
+
+**Where a file may come from.** Every entry is one of three kinds.
+
+- `public` (30 entries): a file on MIT OpenCourseWare (25), arXiv or Wikimedia Commons. The
+  manifest pins the URL, the SHA-256, the size, the license and who to credit. The file is
+  fetched into `.cache/corpus/` (not committed) and the tests use a page range cut from it.
+  A download whose hash differs is refused and never reaches the cache.
+- `committed` (31 entries): a file in the corpus folder. 29 were made for this repository
+  and sit next to the HTML, LaTeX, Markdown or Word source they were printed from; each is
+  at most 200,000 bytes. The other 2 are ten-page cuts of OpenStax textbooks, kept because
+  the publisher's download URLs stopped serving the bytes that were measured.
+- `builder` (11 entries): a file made on demand by a builder in `tests/workflows/builders/`.
+  The builders make 71 files in all; 68 give the same bytes on every run, and their hashes
+  are in `builders/recorded.json`. The 3 encrypted ones cannot, and are checked by what
+  they contain.
+
+**Rules.**
+
+1. No file from an instructor's course, and nothing from the private audit corpus, is
+   committed, fetched or named. A manifest line that holds a path on one machine, or a URL
+   outside the allowed sites, fails to load.
+2. Someone else's file is committed only when its license is CC BY 4.0, CC0 or public
+   domain, with the attribution in the manifest and in the corpus README, and only up to
+   5,000,000 bytes. CC BY-NC-SA files (MIT OpenCourseWare) are fetched, never committed.
+   A model's recorded answer about such a file repeats what the file says (its equations,
+   its tables, a page read from a scan), so those answers are kept out of the repository
+   too ("Recording and replay" below).
+3. A URL is pinned to one version. arXiv entries name the version (`v1`, `v4`).
+4. Only files listed here, or files a builder makes, are sent to a model.
+
+**Gold labels.** A gold file gives, for each page, the blocks in reading order, each with a
+role (heading, body, list, table, caption, footnote, aside, form, figure, or dropped for
+text that must not be read, such as a running header). For files made here the block text is
+stored. For anyone else's file no text is stored: a block is a list of character ranges into
+the page's words (PyMuPDF's words in file order, NFKC-normalized, joined with nothing
+between), the lengths of its tokens, and the SHA-256 of its text. `load_gold` rebuilds the
+text from the file and checks every hash, so a different file, or a PyMuPDF that reads the
+page differently, fails loudly instead of scoring against the wrong text. Where the labeled
+text is not among the page's words (chart axis labels and some mathematical glyphs), the
+characters are stored as written: 390 characters over 682 blocks.
+
+The public-page labels were made on 2026-11-10 from candidate blocks produced by poppler's
+`pdftotext -bbox-layout`, which is independent of this project's layout step; order and
+roles were set by reading each rendered page, in one pass, with four blocks corrected in
+review. They were not labeled twice by independent readers. Labels for files made here
+come from the source each file was printed from. The manifest's `labels` table records the
+method and date for every gold file.
+
+**Commands.**
+
+```bash
+uv run python -m readablestem.eval.corpus check            # committed and built files, no network
+uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 30 public files by hash
+uv run python tests/workflows/builders/record.py list      # the 71 built files and what each shows
+uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or network" for the rest
+```
+
+### Recording and replay
+
+The workflow tests (`tests/workflows`, `pytest -m workflow`) upload each corpus file to the
+real app, with production's behavior settings (`ops/production.profile.toml`), and convert
+it from recorded model answers. Nothing is sent to a model. A conversion that asks a
+question the recording does not hold fails its test with the step and what changed since
+the recording (a prompt, a model, a picture), so a change to what is sent to a model shows
+up as a named miss and never as a silent call.
+
+**Two files.** The recording is split by the license of the file an answer was read from:
+
+| File | Holds | As of 2026-11-11 |
+|---|---|---|
+| `tests/workflows/corpus/answers.jsonl.gz` (committed) | answers read from files made here, and from CC BY 4.0, CC0 and public-domain files | 270 answers |
+| `.cache/corpus/answers.jsonl.gz` (not committed; `$CORPUS_CACHE` moves the folder) | answers read from the 25 CC BY-NC-SA files | 1,303 answers |
+
+An answer a committable file and a kept-out file both read goes to the second file. Where
+the second file is absent, as in CI, a test that converts a CC BY-NC-SA file is skipped and
+says why; the five workflows built first (typed notes, dense solutions, slides, a chemistry
+exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only where
+that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
+replay pays nothing.
+
+**Answers still owed.** Ten files ask for 126 answers that were never recorded (pictures
+that changed since the first recording, and files added after it). `harness.OWED` lists
+them with the count for each, and the replay test fails if a file misses more or fewer than
+its count. Their conversions still finish: a part with no answer is left for the reviewer,
+as when a model is unavailable.
+
+**Refreshing.** `scripts/corpus_refresh.py` runs the same tests against a working copy of
+the recording and writes back what they read; an answer no test read is dropped.
+
+```bash
+uv run python scripts/corpus_refresh.py --check                # replay; write nothing
+uv run python scripts/corpus_refresh.py                        # replay; drop unread answers
+uv run python scripts/corpus_refresh.py --from OLD.jsonl       # move an older recording to today's keys
+uv run python scripts/corpus_refresh.py --live --max-usd 0.50  # pay for what is missing
+```
+
+Only `--live` can spend, and it needs `--max-usd`: the most the run may pay for answers the
+recording lacks, refused above $1.00. The limit is enforced where a real request is made
+(`MODEL_ANSWERS_LIVE_USD`, `eval/answers.py`), because the app's daily cap counts replayed
+costs as well. Past the limit a missing answer is refused and stays missing. The script
+prints what was read, what was missing and why, and what was paid.
+
+The answers were recorded with the table-structure model present (`make table-model`), as
+in the deployed image. Without it tables are read another way, the questions differ, and
+the tests say so instead of running.
+
+**Marking an open finding.** A workflow test that a known, unfixed finding makes false is
+marked `@harness.finding("F-nnn")`. The mark is a strict expected failure: when the fix
+lands the test passes, the run fails, and the same change removes the mark. A finding
+cannot be fixed by accident and stay marked open. The audit's register ends at F-558; a
+finding met while the plan is built takes the next number.
+
+### The hostile-input set (`tests/workflows/hostile_set.py`)
+
+Files made to hurt the app, each from a builder (`tests/workflows/builders/hostile.py` and
+`hostile_sources.py`), and for each the one way it must end: refused at upload with a named
+code, kept for choosing its pages, or queued and ended `done` or `failed` with a named code.
+`tests/workflows/test_wf49_hostile_input.py` uploads each file under production's size
+limits while a second person uploads a two-page syllabus behind it, and checks four things:
+
+| Check | What must hold |
+|---|---|
+| ends | the file ends as its case states |
+| bound | the upload request and the job together take no more than the case's time (30 s for a job, 10 s for a refusal), and no process holds more than 600 MB |
+| next | the second person's file is converted, from the recording alone, no later than the hostile job's bound plus 15 s |
+| planted | a string the builder planted where it could run (a script, a link that runs its target, an open action) is in no page or download and no log line; planted markup is only ever text; no page or download has a handler attribute or a link that runs its target |
+
+The queue is run by a worker in a process of its own, stopped after twice the bound, so a
+file that hangs the worker or ends it fails its case and not the run. A LaTeX source runs
+once under bubblewrap and once under Landlock, where the machine can start each.
+
+As of 2026-11-11 the set has 36 files: 6 on the size of pages and pictures, 3 on page
+count, 8 on the structure of the PDF, 5 on content that must stay data, 8 zips and 6 LaTeX
+sources. All 36 end as stated. The one that did not, a page whose content inflates to 256 MB
+from a 260 KB file (F-559), was taken and read for 7 s in the upload request and 24 s by the
+worker; the content budget (docs/security.md) now refuses it at upload in under a second.
+
+Owed:
+
+- **That a model was not steered.** Three files carry text that tells a model what to
+  write. The check reads the model's answers, and none is recorded for them (two a file).
+  One recording under a cap of $0.25 pays for them; until then the set shows only that
+  their output is safe.
+- **Cases for readers the app does not have yet.** A second PDF text extractor, readers
+  for Word, PowerPoint and notebook files, a structure checker and a TeX compile step each
+  add their cases in the change that adds the reader (docs/dependencies.md names the test
+  for each).
+- **One slice of waiting.** With one worker the second person waits for the whole hostile
+  job. When the queue has slots the `next` check becomes one page slice.
+
+## Reading order (`eval/order.py`)
+
+`src/readablestem/eval/order.py` scores what a listener hears on a page against the gold
+blocks of "The test corpus". It takes the output as a list of elements in reading order,
+made from a layout dump or from the student HTML, and never looks at boxes, so the layout
+step, the finished HTML and any other reader are scored the same way. Its counts per page:
+
+| Count | Meaning |
+|---|---|
+| found | at least half of a gold block's words are on the page |
+| flow | the block's word 4-grams that appear unbroken in the page's word stream |
+| broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |
+| neighbors in order | consecutive gold blocks whose places in the stream are in gold order |
+| cross-join | an element holding text of two gold blocks that are not neighbors |
+| leaked | text that must not be read (a running header, a page number) that is in the output |
+| clean page | no broken block, every neighboring pair in order, no cross-join, half the blocks found |
+| right page | clean, and no margin stamp read inside text, no index entries joined, numbered blanks in order |
+
+The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
+swapped pair fails the page.
+
+The scorer is the research scorer (version 4) moved into the package. Before it was
+committed it was run next to the research script on every stored output of the layout
+studies: 26 runs, 2,133 page rows, every count and every listed fault identical. On the
+layout output of the main branch as stored on 2026-11-10, both give 59 clean pages of 78
+(30 of 41 on public files, 29 of 37 on files made here) and 6 of 13 on the edge files.
+Those numbers describe that stored output, read from a layout dump; they were not measured
+under the production profile and are not the registered baseline, which the order eval
+records when it lands. The first scorer (version 2) was not moved: its element-level counts
+are still reported by this one (`pairs`, `stitched`, `split`, `lost`).
+
+### Gold built from sources (`gold/layout_gold.py`)
+
+Hand labeling cannot supply held-out pages in number: the 78 hand-labeled pages of the
+corpus have all been used to build readers. So reading-order gold is also built from a
+document's source, with no model. The source gives the units (headings, paragraphs, list
+items, captions, footnotes) in order: the HTML LaTeXML makes from a paper's LaTeX, the
+archive XHTML of an OpenStax section, or the unit list written next to a file made here.
+Every text line of a PDF page is matched to the unit that holds its words. A gold block is
+the run of lines of one unit in one column of one page, so a paragraph cut by a page or a
+column is two blocks, and a cut anywhere else is a reader's error. The caption of a float is
+marked `float` (whole and unjoined is scored, its place is not), a footnote goes to the end
+of its page, and a token that is not a word of the source (the glyphs of an inline formula)
+is masked for the scorer.
+
+Pages are chosen by rules that look only at the gold's own coverage, fixed before any
+reader was scored: a paper gives pages 1 to 3 and two from its middle; a textbook gives the
+first three well-covered pages of two section groups, four chapter-end pages and one index
+page; a page needs three blocks whose order is scored, and a paper's page needs the source to
+account for 0.75 of its prose lines.
+
+A set is a folder outside the repository (`files/<id>.pdf` and `gold/<id>.json`, by default
+under `~/.cache/readablestem/layout-gold/<set>/`). The repository keeps the set's registry,
+`data/gold/layout/<set>.json`: ids, sources, counts and SHA-256 hashes, and no text.
+
+```bash
+uv run readablestem gold layout verify --set layout-dev-1
+uv run readablestem gold layout sample --set layout-dev-1 --seed check-1 --out ~/layout-check
+uv run readablestem gold layout agreement ~/layout-check/sheet.jsonl
+```
+
+`sample` draws 1 page in 10 of each kind by a seeded hash and writes each page's picture
+with the gold blocks drawn and numbered, and `sheet.jsonl` with one row per block. A person
+sets `ok` on each row: true when the block is one whole unit of the page, has the right
+role and stands in its place. `agreement` reads the sheet: a kind whose checked blocks are
+right in fewer than 95 of 100, or whose sheet is not filled, is not used as gold until its
+matcher is fixed.
+
+| Set | Documents | Pages | Blocks | Use |
+|---|---|---|---|---|
+| `layout-dev-1` | 28 arXiv papers, 10 OpenStax books, 22 files made here | 267 | 4,460 | development |
+| `layout-heldout-1` | 28 arXiv papers, 8 OpenStax books, 15 course handouts | 256 | 3,811 | held-out |
+
+`layout-dev-1` was built in the second measuring round of November 2026 by research scripts,
+and `layout_gold.py` rebuilds all of it value for value from the kept sources. Half of it
+was scored once as a sealed half and its failing pages were then used as cases, so all of it
+is development now.
+
+`layout-heldout-1` was drawn on November 11, 2026 from documents that are in no other set,
+by three commands that fetch, build and choose with no model and no person in the loop:
+
+```bash
+uv run readablestem gold layout draw-papers --set layout-heldout-1 --seed SEED --pool pool.json
+uv run readablestem gold layout draw-books --set layout-heldout-1 --seed SEED
+uv run readablestem gold layout draw-course --set layout-heldout-1 --seed SEED
+uv run readablestem gold layout register --set layout-heldout-1 --side held-out --note "..."
+```
+
+- `draw-papers` walks a pool of openly licensed arXiv papers in an order the seed fixes,
+  takes four per class family (article, revtex, AMS, IEEE, conference, journal,
+  other), downloads the source, and runs LaTeXML and the PDF build in the repository's
+  sandbox (`gold/safe_tex.py`): a downloaded source is a stranger's program. 28 papers were
+  taken and 123 passed over, by rule: their family was full, the source did not build, or no
+  page met the coverage rule.
+- `draw-books` walks the CC BY OpenStax books that are in no other set (8 taken, 6 passed
+  over), and `draw-course` walks handouts and notes written in LaTeX in public repositories
+  under MIT or CC BY-SA licenses (15 taken, 49 passed over).
+- The seed is `layout-heldout-1-2026-11-11`. The registry lists every document taken, with
+  its source and license, and names every one passed over.
+
+The rebuilt fetch path was compared with the research set on the papers both can build: 91
+of 110 pages and 1,045 of 1,070 blocks are identical. The papers of `layout-dev-1` took
+their HTML from ar5iv, which runs another LaTeXML version; the differences are blocks that
+version cuts differently.
+
+No page of the held-out set was opened while it was built, and none is while the reader is
+worked on: `eval bar` reads its scores, and a failing page is not looked at. What it still
+lacks, and what a reading-order bar met on it therefore does not cover yet:
+
+- Word-made documents (at least 20 pages) and hand-labeled pages (at least 20): neither
+  source can be built by a rule, so both wait for a person.
+- The hand check: `sample` and `agreement` on 1 page in 10 of each kind, by someone other
+  than whoever changes the reader. Until it is done, a kind's gold is unchecked.
+- Three of the eight books are not science or mathematics (government, psychology,
+  economics): the walk takes books in seeded order and does not choose by subject. Their
+  pages count as textbook layout, not as mathematics.
+
+## What a page costs, how long it takes and what it asks (`eval cost`, `eval speed`, `eval burden`)
+
+The three commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
+Every upload of the corpus (`corpus.UPLOADS`: each file once, and again with the boxes a
+person would tick for it) is converted the way the worker converts a job: production's
+behavior settings (`ops/production.profile.toml`), the job's own caps, the conversion in a
+process of its own, and the recorded answers in front of the model client. Nothing is sent
+and nothing is spent. The database and the web app are not part of it.
+
+Each upload is measured in a fresh process, one at a time by default, so its highest memory
+use and its start-up are its own and no cache carries over. What is kept for an upload is
+content-free: its pages and the kind of each, its step facts (operations.md, "Step facts and
+the step report"), dollars, wall and CPU seconds, peak memory, and each decision it asks of
+a reviewer (page, kind and reason codes).
+
+**A page has one kind**, the first of these that fits, so that the kinds add up to the run:
+
+| Kind | A page that |
+|---|---|
+| `scan` | is scanned or handwritten: read from its picture when the upload asked for that, kept as a picture when it did not |
+| `source` | is a unit of a document read from its LaTeX source |
+| `slide` | has the shape of a slide |
+| `dense_math` | has 9 equations or more |
+| `table`, then `figure` | has one |
+| `typical` | is none of these |
+
+```bash
+uv run readablestem eval cost --out data/eval/cost-corpus.json
+uv run readablestem eval speed --runs 2 --cores 2/3 --out speed.json --against data/eval/speed-corpus.json
+uv run readablestem eval cost --only s15_charts_figures      # one file
+uv run readablestem eval speed --records kept.json           # keep what was measured
+uv run readablestem eval cost --from kept.json               # report on it again, measure nothing
+uv run readablestem eval burden --out burden.json --against data/eval/burden-corpus.json
+```
+
+The reports record the four things `eval bar` asks for, with the commit and the machine,
+and hold their figures under `metrics`, so `eval bar` can read one
+(`--measure kinds.dense_math.usd_page.p95`). The corpus is a development set: it was chosen
+to cover kinds of document, and the readers were built while looking at it. So no
+report can meet a bar or carry a public claim, and each says "Proof owed" in its header. A
+replay of held-out whole documents needs a recording that does not exist yet.
+
+### `eval cost`
+
+A request to a model is a step fact with the page it was about. A page's dollars are the
+dollars of its requests, plus an even share of any request about the whole document, so the
+pages of a document add up to the document. The report prints:
+
+- a document's dollars a page (its cost divided by its pages), over the documents;
+- dollars of one page by page kind, at the median and the 95th percentile, with the mean;
+- dollars by step, over the pages the step ran on, and its mean over every page;
+- the mean of each step on each kind of page;
+- the steps of the accuracy round that are not built (page audit, text check, line-strip
+  check, table read, figure checker, structure read, cheap first read of a scan): what the
+  run spent on each, which is 0 until it runs, and the estimate for one unit with what it
+  rests on;
+- the two figures the public pages are built from (`TYPICAL_PAGE_USD` and `DENSE_PAGE_USD`
+  in `ops/limits.py`) beside what this run measured, and how many pages a day's open pool
+  pays for with and without the checks.
+
+An upload whose recording lacks an answer it asks for is left out and named: a refused
+request costs nothing, so its pages would look cheaper than they are.
+
+First run (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages, $4.85 in the recording; `data/eval/cost-corpus.json`). Ten uploads are left out for
+the 126 answers still owed ("Recording and replay").
+
+| Page kind | Pages | Documents | Median | p95 | Mean |
+|---|---|---|---|---|---|
+| `scan` | 25 | 10 | $0.0295 | $0.0569 | $0.0246 |
+| `slide` | 45 | 3 | $0.0000 | $0.0202 | $0.0053 |
+| `dense_math` | 30 | 10 | $0.0716 | $0.1365 | $0.0676 |
+| `table` | 24 | 17 | $0.0059 | $0.0486 | $0.0152 |
+| `figure` | 60 | 19 | $0.0174 | $0.0450 | $0.0220 |
+| `typical` | 131 | 43 | $0.0000 | $0.0091 | $0.0022 |
+
+| Step | Requests | Pages it ran on | Median of such a page | p95 | Mean over every page | Total |
+|---|---|---|---|---|---|---|
+| `equation` | 1,314 | 87 | $0.0065 | $0.1119 | $0.0070 | $2.21 |
+| `figure` | 260 | 92 | $0.0157 | $0.0510 | $0.0058 | $1.81 |
+| `image_page` | 14 | 13 | $0.0364 | $0.0707 | $0.0016 | $0.49 |
+| `table` | 44 | 28 | $0.0021 | $0.0486 | $0.0011 | $0.34 |
+
+What the first run shows:
+
+- **Most pages cost nothing.** A page of text alone sends nothing to a model, so the median
+  `typical` page is $0. The money is in the pages with equations (46% of it on 87 pages),
+  figures and tables. "What a typical page costs" has meant a document's cost divided by
+  its pages: $0.0055 at the median document here, $0.043 at the 95th percentile and $0.012
+  on average.
+- **The kept figures stay.** `TYPICAL_PAGE_USD` is $0.0145 and `DENSE_PAGE_USD` is $0.034
+  to $0.092, the audit's measurements. This run's dense pages are $0.072 at the median and
+  $0.137 at the 95th percentile, above the kept range's top; that is a development set
+  with one 14-page solution set in it, so the range is not changed from it, and the
+  held-out replay decides.
+- Every dollar of every job is on a step fact: the difference between a result's dollars
+  and its facts' dollars is 0 for all 73 uploads.
+
+### `eval speed`
+
+A replay waits on no model, so its seconds are the local work. The report prints:
+
+- seconds a page by page kind, at the median and the 95th percentile. The conversion does
+  not time each page yet, so a page is given its document's seconds divided by its pages:
+  exact for a document of one kind, blurred for a mixed one;
+- seconds a page by stage (`layout`, `image_pages`, `steps`, `assemble`, `checks`), over the
+  documents that have the stage, with the stage's mean over every page and its share;
+- start-up apart, as seconds of a job: starting the conversion process and loading its code
+  takes the same time for 1 page and for 40;
+- wall and CPU seconds apart, and the most memory held by the conversion process and by the
+  process that called it;
+- what the models took when the answers were recorded, per step, apart from all of the
+  above.
+
+`--runs N` replays the corpus N times and counts each upload's fastest run: a slow run is
+the machine, a fast one cannot be. `--cores A/B` pins run 1 to CPU list A and run 2 to B.
+Where two runs of the same code differ by more than the allowance at a kind's median, the
+report says the machine was too busy to judge.
+
+**The bar** (`--against RECORD`): no page kind is slower than in the earlier record by more
+than a tenth (`--allowance`, 1.0 for a shared runner) at the median or at the 95th
+percentile. Two records are compared only when they name the same CPU model and core count.
+
+| Exit | When |
+|---|---|
+| 0 | the bar is met, or no record was given |
+| 1 | a page kind is slower than allowed; the lines name each |
+| 2 | not judged: another machine class, or the machine was too busy |
+
+First measurement (2026-11-11, pipeline 0.5.10, production profile, all 73 uploads, 338
+pages, the faster of two runs on cores 2 and 3 of an AMD Ryzen 7 5800H). No speed record is
+kept from it: other work ran on the machine, the two runs differ by more than the allowance
+on `dense_math`, and the report says so ("the machine was too busy to judge"). The figures
+show the scale and where the time goes; the record `--against` compares with is made on a
+quiet machine and kept as `data/eval/speed-corpus.json`.
+
+| | Median | p95 |
+|---|---|---|
+| Wall seconds a page, start-up apart | 0.71 | 2.57 |
+| CPU seconds a page, start-up included | 1.63 | 3.73 |
+| Start-up of a job (seconds) | 2.00 | 2.04 |
+
+| Page kind | Pages | Documents | Median s | p95 s |
+|---|---|---|---|---|
+| `scan` | 25 | 10 | 0.77 | 4.06 |
+| `slide` | 45 | 3 | 0.20 | 0.55 |
+| `dense_math` | 34 | 13 | 0.84 | 1.70 |
+| `table` | 29 | 22 | 1.00 | 1.61 |
+| `figure` | 64 | 20 | 0.69 | 1.39 |
+| `typical` | 141 | 49 | 0.52 | 1.21 |
+
+Layout is 66% of the local time (0.48 s a page at the median), the steps' own work 24%,
+assembly 7% and the checks 1%. The models are not waited for in a replay; when the answers
+were recorded a request took 1.4 s at the median for an equation, 2.6 s for a figure, 3.2 s
+for a table and 8.9 s for a page read as a picture. The conversion process held at most
+515 MB and the process that called it 424 MB.
+
+### `eval burden`
+
+How many decisions a page asks of the person who reviews it, before anyone has reviewed.
+
+**One definition.** A decision is what the review screen counts: a fix the pipeline marked
+`required`, with a group of repeated headings (or of pages kept as pictures for one reason)
+as one decision. `core/triage.py` holds it (`units`, `required_decisions`, and `decisions`,
+which returns the same decisions as rows: page, kind, reason codes, members). The review
+screen, the documents list, the review record, the weekly report, the command line's
+summary and this report all count through it. Building the report found two counters that
+did not: `triage.review_load` and the weekly report's review-load table counted only
+equations, figures, headings and tables, so the paragraphs of a page read from its picture
+(6 decisions in this corpus) were on the review screen and in neither. Both now count every
+kind of fix.
+
+A decision is on the page of its first member. The report prints:
+
+- decisions a page over the whole set, and a document's decisions a page at the median and
+  the 95th percentile over documents (what one instructor meets);
+- decisions of one page by page kind, at the median and the 95th percentile, with the share
+  of pages that ask nothing;
+- decisions by what is decided (equation, figure, heading, table, paragraph);
+- decisions by why they were asked, each with its rate per 100 pages. The reason codes are
+  `triage.tier_reasons`: a failed check's code, the fix's own reason, a repeated heading,
+  or `below_accept` when only the confidence held it back. A decision with two reasons is
+  counted under both;
+- the documents that ask the most a page.
+
+An upload whose recording lacks an answer it asks for is left out and named: an unanswered
+request fails its element, and that decision would be the recording's, not the
+conversion's. A record kept before decisions were measured is "not measured", not a
+document that asks nothing.
+
+**The bar** (`--against RECORD`): the whole set and every page kind with at least 10 pages
+ask for no more decisions a page than in the earlier record (`--allowance`, 0 by default).
+Two records are compared only when they are of the same documents and measured the same
+number of uploads.
+
+| Exit | When |
+|---|---|
+| 0 | the bar is met, or no record was given |
+| 1 | the set or a page kind asks for more than before; the lines name each |
+| 2 | not judged: other documents, or a different number of uploads measured |
+
+**Fewer is not better by itself.** A change that stops asking about something wrong lowers
+this figure and raises the errors nobody is told about. The bar is read with the counts of
+silent errors (the lane evals and the page audit), never alone.
+
+Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
+report leaves out, for the same 126 answers.
+
+| | |
+|---|---|
+| Required decisions | 567 |
+| Decisions a page, whole set | 1.80 |
+| A document's decisions a page | 0.29 at the median, 7.44 at p95, 10.21 at the most |
+| A page's decisions | 0 at the median, 9 at p95, 25 at the most |
+| Pages that ask nothing | 56% |
+
+| Page kind | Pages | Documents | Decisions | A page | Median page | p95 | Most |
+|---|---|---|---|---|---|---|---|
+| `dense_math` | 30 | 10 | 314 | 10.47 | 9 | 25 | 25 |
+| `figure` | 60 | 19 | 105 | 1.75 | 1 | 7 | 13 |
+| `scan` | 25 | 10 | 28 | 1.12 | 1 | 4 | 9 |
+| `slide` | 45 | 3 | 13 | 0.29 | 0 | 2 | 5 |
+| `table` | 24 | 17 | 12 | 0.50 | 0 | 1 | 2 |
+| `typical` | 131 | 43 | 95 | 0.73 | 0 | 5 | 8 |
+
+| What is decided | Decisions |
+|---|---|
+| equation | 384 |
+| figure | 122 |
+| heading | 44 |
+| table | 11 |
+| paragraph (a page read from its picture) | 6 |
+
+| Why it was asked (the ten most frequent of 37 codes) | Decisions | Per 100 pages |
+|---|---|---|
+| `below_accept` | 154 | 48.9 |
+| `symbol_mismatch` | 143 | 45.4 |
+| `sign_mismatch` | 52 | 16.5 |
+| `glyph_style_mismatch` | 51 | 16.2 |
+| `low_confidence` | 41 | 13.0 |
+| `heading.weak_evidence` | 38 | 12.1 |
+| `heading.sentence_like` | 28 | 8.9 |
+| `style_cosmetic` | 26 | 8.2 |
+| `long_description_unsure` | 22 | 7.0 |
+| `text_layer_mismatch` | 19 | 6.0 |
+
+What the baseline shows:
+
+- **The load is equations.** 384 of the 567 decisions are equations, and the 30 dense
+  math pages (a tenth of the pages) ask for 314 of them: 10.5 a page, 25 on the worst. One
+  14-page solution set asks for 143. More than half of all pages ask nothing.
+- **Two reasons are half of it.** `below_accept` (the reading passed every check and its
+  confidence stayed under the accept bar) and `symbol_mismatch` (a symbol of the text
+  layer is not in the reading) are on 297 decisions. Whether those flags find errors is
+  what the equation measurements answer; this report only says where the questions are.
+- A document's 0.29 at the median against 1.80 for the set says the same thing from the
+  other side: most documents ask little and a few ask most of it.
+
+Two documents carry goals of their own, set before this report existed, and both are in the
+table of documents the report prints: the notes chapter `w_notes_6042_ch2` asks 3.36 a page
+today against a goal of 1.0 or fewer, and the solution set `w_solutions_1802` asks 10.21
+against 4.0 or fewer. Neither is met. They are development documents, so meeting them here
+proves nothing by itself; the release bar is judged on a held-out replay, which does not
+exist yet.
+
+What none of the reports has yet:
+
+- A replay of held-out whole documents (the recording is not made), and so a bar or a
+  public figure.
+- Seconds of one page. They come with the per-page trace of the conversion; until then a
+  kind's seconds are those of the documents its pages are in.
+- A long document. The longest corpus file has 39 pages; the 100-page math-heavy document
+  the audit timed is not in the corpus.
+- A LaTeX source, a Word or a PowerPoint file: the corpus has none whose answers are
+  recorded, so the `source` kind has no row.
+- How long a background (batch) check takes to come back: no batch answer is recorded.
+
+## The page audit in shadow (`eval page-audit`)
+
+The page audit (steps.md, "Page audit") compares one page of the output with the page it
+came from. This command runs it over a set and writes its verdicts. "In shadow" means that
+nothing reads them: no output, stored result or decision changes. It is how the audit's
+flags are measured before any of them is acted on.
+
+```bash
+uv run readablestem eval page-audit --corpus --fake            # no model: every page "not audited"
+uv run readablestem eval page-audit --corpus --provider anthropic --max-usd 3.00 --batch
+uv run readablestem eval page-audit --corpus --answers kept.jsonl --answers-offline   # replay, $0
+uv run readablestem eval page-audit --gold-dir <a layout gold set's folder> --provider anthropic --max-usd 1.00
+uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendered
+```
+
+- **`--corpus`**: each corpus upload converted under the production profile from its
+  recorded answers, as `eval cost` converts it. An upload this machine cannot replay is
+  listed under `skipped` with its reason.
+- **`--gold-dir DIR`**: the files of a layout gold set (`DIR/files/<id>.pdf`), each
+  converted with no model, so what is audited is the layout and the reading order. The
+  report goes in that folder (`DIR/page-audit.json`), so a held-out set's rows stay with
+  the set and outside the repository.
+- **`--rendered`** also sends the picture of the page's output (needs the browser group).
+- **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
+  nothing is sent and a page whose answer is not in the file is not audited. `--batch`
+  sends what the file cannot answer as Message Batches at half price.
+- A live run needs `--provider anthropic` and a `--max-usd` cap, and keeps its recording
+  like every other live run ("Runs keep their recordings").
+
+Exit code 0: every page has a verdict. 1: the spend cap ended the run, and the pages after
+it are `not_audited` with `cap_reached`. 2: the run could not start.
+
+The report (default `data/eval/latest-page-audit.json`) holds codes, ids, boxes, counts and
+dollars, and no text of any document: the model, effort and prompt version; `verdicts`
+(pass, flagged, not audited); `answered_by` (the model, or a test by code);
+`not_audited_by_reason`; `findings` by code and severity; `requests`, `cost_usd` and
+`usd_per_asked_page`; `stopped`; `skipped`; and one row a page with its verdict, findings,
+reason and the key of the question asked.
+
+One run's verdicts are not a measurement of the audit. Its bars (how many marked faults it
+flags, how many clean pages it flags, and the share of verdicts that differ between two
+runs of one input) are judged on pages whose faults a person marked. No live run is
+recorded yet: the first shadow recording of the corpus waits for the owner's approval of
+its cap.
+
+## The same file gives the same document on any machine
+
+A score or a replay means something only if a result does not depend on the machine that
+made it. The rule (`core.types.NotFinished`, tests/test_determinism.py):
+
+- A budget counts work: candidates tried, cells tested, pixels read. That is the same on
+  every machine.
+- A limit on time, memory or money may only stop a step. It never quietly changes what a
+  page contains.
+- A step that stops says so with a "not finished" fact: `{step, page, reason, done, of}`,
+  with no document text (operations.md, "Step facts and the step report").
+
+Three tests hold the rule:
+
+1. **Every clock is named.** The test finds each read of a clock in `pipeline/` and
+   `source/` and compares the list with a table in the test file that says what each is for:
+   a timing field, a cache's expiry, a limit that ends the conversion with a code, a limit
+   whose step writes the fact. A new read fails the test until it is added to the table,
+   which is when to ask whether it can change a document.
+2. **A planted step.** A conversion with a step planted in it that leaves a page out once
+   its clock has passed a second is compared with the same conversion at full speed. The
+   comparison names the earliest part of the result that differs, and passes only when the
+   step wrote the fact.
+3. **The corpus, twice** (`-m workflow`). Every corpus upload is replayed as it is and
+   again held back to a quarter of the time (`eval.measure.run(..., share=0.25)`: the
+   conversion and everything it started are stopped and continued ten times a second, so
+   every clock they read runs four times as fast against their work). The two results are
+   hashed part by part with the fields of seconds left out (`measure.parts`: page types,
+   elements, the fixes of each kind, the HTML, the rest). An upload may differ only if a
+   step of the slower run wrote a "not finished" fact the quicker one lacks, or if it is
+   in the test's `KNOWN` list with the plan item that ends its difference.
+
+What the corpus run found (2026-11-11, 73 uploads). The first run failed on one upload, a
+handwritten lecture converted with its image pages read. The ink analysis has 10 seconds
+of wall-clock time for a document (`page_type.INK_BUDGET_S`) and takes 5.4 of them on that
+file at full speed. At a quarter of the speed the time ran out, one page was typed without
+its ink and so was not seen as handwriting, and its page type, elements, fixes and HTML all
+changed with nothing saying why. The stop now writes the fact (`page_type` with
+`time_limit` for each such page, and `ink_strokes` when the strokes were not read), and the
+test passes with an empty `KNOWN` list. Since plan WS14.9 (2026-11-11) the budget is a count
+of work for each page (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`) and the clock only a
+guard against a hang (`INK_GUARD_S`, 60 s a page), so which pages are read for handwriting
+no longer depends on how fast the machine is. Measured again that day, that upload kept its
+page at a quarter of the speed under the old budget too, so the loss itself was not
+reproduced; what the test shows is that a clock ten times faster or slower gives the same
+document. The table search's time limit was not reached by any corpus upload at a quarter of
+the speed; it is listed in the clock table and gets its own fact with the table work.
+
+Not covered: a document long enough to reach the limits by its size. The corpus's longest
+upload is short of that, so a 100-page math-heavy document converted under several CPU
+limits is still owed.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -2568,6 +3265,10 @@ the machine, which changed the layout of 2.1; it is not used.
 | `src/readablestem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
 | `src/readablestem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
+| `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
+| `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
+| `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
+| `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |
 | `scripts/dev_chem_classes.py` | the outcome classes of a chemistry run, what harms a listener, `--speech` |
 | `src/readablestem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |

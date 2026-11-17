@@ -97,9 +97,16 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
-from readablestem.core.types import ConversionOutput, DocumentResult, ProgressEvent
+from readablestem.core.types import (
+    ConversionOutput,
+    DocumentResult,
+    ProgressEvent,
+    StageFact,
+    StepFacts,
+)
 from readablestem.ops import limits
-from readablestem.web import access, carry_edits, events
+from readablestem.pipeline import step_facts as pipeline_step_facts
+from readablestem.web import access, carry_edits, events, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
@@ -207,7 +214,8 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
 
     With MODEL_ANSWERS_FILE (dev and test only) the real client sits behind the file of
     recorded answers: a recorded request is answered from it at no cost, any other is asked
-    and appended (or, with MODEL_ANSWERS_OFFLINE, refused). Conversions and review-screen
+    and appended (or, with MODEL_ANSWERS_OFFLINE or past MODEL_ANSWERS_LIVE_USD, refused).
+    Conversions and review-screen
     re-reads both come through here, so both are recorded.
     """
     from readablestem import models
@@ -219,7 +227,13 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
     from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
     offline = settings.model_answers_offline
-    cached = CachedClient(None if offline else client, settings.model_answers_file, settings)
+    cached = CachedClient(
+        None if offline else client,
+        settings.model_answers_file,
+        settings,
+        rekey=settings.model_answers_rekey,
+        live_limit_usd=settings.model_answers_live_usd,
+    )
     keep_second_check_answers(client, cached, offline=offline)
     return cached
 
@@ -401,6 +415,11 @@ class _Attempt:
     cancelled: threading.Event = field(default_factory=threading.Event)
     # The finished steps kept for this job (T3-1); None for a converter that takes none.
     step_cache: DbStepCache | None = None
+    # When the attempt began and when its conversion ended (`time.monotonic`), and the
+    # step facts stored with its result (`Worker._facts`).
+    began: float | None = None
+    converted: float | None = None
+    facts: StepFacts | None = None
 
 
 @dataclass
@@ -1002,6 +1021,7 @@ class Worker:
         limit_s = self.time_limit_s(page_count)
         thread, run = self._start_conversion(attempt, pdf, limit_s)
         finished = self._wait(attempt, thread, limit_s)
+        attempt.began, attempt.converted = started, time.monotonic()
         if not finished and not attempt.cancelled.is_set():
             return self._time_out(attempt, thread, limit_s)
         if attempt.cancelled.is_set():  # deleted, purged or requeued: nothing to record
@@ -1072,6 +1092,8 @@ class Worker:
             cost_usd=round(result.stats.cost_usd, 6),
             seconds=round(seconds, 2),
         )
+        if attempt.facts is not None:
+            step_facts.log_job(job_id, result.stats.pages, attempt.facts)
         reading = result.image_pages.second_reader if result.image_pages is not None else None
         if reading is not None:
             # The conversion child's own logs do not reach the operator: its counts come back
@@ -1094,6 +1116,30 @@ class Worker:
                 cost_usd=reading.cost_usd,
             )
         return JobStatus.DONE
+
+    def _facts(self, attempt: _Attempt, job: Job, output: ConversionOutput) -> StepFacts | None:
+        """The conversion's step facts with the worker's own stages around them, or None
+        for a conversion that measured nothing (a stand-in converter).
+
+        `queue_wait` is the time from the upload to the first claim; a later try has none,
+        because the row does not say when it was asked for. `start_up` is what the
+        conversion call took outside the conversion's own stages: starting its process,
+        loading it, and passing the file in and the result back. `store` is from the end
+        of the conversion to this write."""
+        if output.facts is None:
+            return None
+        before: list[StageFact] = []
+        if attempt.claim.attempt == 1 and job.started_at is not None:
+            waited = (as_utc(job.started_at) - as_utc(job.created_at)).total_seconds()
+            before.append(StageFact(stage="queue_wait", seconds=round(max(0.0, waited), 4)))
+        after: list[StageFact] = []
+        if attempt.began is not None and attempt.converted is not None:
+            before.append(
+                pipeline_step_facts.start_up(output.facts, attempt.converted - attempt.began)
+            )
+            stored = time.monotonic() - attempt.converted
+            after.append(StageFact(stage="store", seconds=round(stored, 4)))
+        return output.facts.model_copy(update={"stages": [*before, *output.facts.stages, *after]})
 
     def _write_result_retrying(self, attempt: _Attempt, output: ConversionOutput) -> bool:
         try:
@@ -1153,6 +1199,9 @@ class Worker:
             job.pages_done = job.page_count
             job.status = JobStatus.DONE
             job.error_code = code
+            attempt.facts = self._facts(attempt, job, output)
+            if attempt.facts is not None:
+                step_facts.keep(session, job.id, attempt.facts)
             job.finished_at = self.clock()
             job.lease_until = None
             # Finished steps are only kept for a result that "Try again" can still improve.

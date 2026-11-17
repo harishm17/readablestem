@@ -1,0 +1,553 @@
+{
+ "set": "layout-dev-1",
+ "side": "development",
+ "note": "Development set. 267 pages of 60 documents: 28 arXiv papers (units from the HTML ar5iv makes of the LaTeX source with LaTeXML), 10 OpenStax books (units from the archive XHTML of the pinned version) and 22 files made with LaTeX from a written unit list. Built in the second measuring round of November 2026 and rebuilt value for value by gold/layout_gold.py. Half of it was scored once as a sealed half; its failing pages were then used as cases, so every document here is development.",
+ "documents": [
+  {
+   "id": "ax_astrophga_240306369",
+   "kind": "paper",
+   "source": "arXiv 2403.06369",
+   "pages": 4,
+   "blocks": 30,
+   "pdf_sha256": "24b6628aaebe390f5aa2277e1a4b58465e864090430c0f860f8c97d0e5350854",
+   "gold_sha256": "18893a7b158acb5c64c2ca9444e3fbf57f4152db1a14e095f46fcc9384bc4f83"
+  },
+  {
+   "id": "ax_astrophga_240306409",
+   "kind": "paper",
+   "source": "arXiv 2403.06409",
+   "pages": 4,
+   "blocks": 47,
+   "pdf_sha256": "c9461bfbcada0874990378f320f4ffc8c0a2c17383bb56c7fca6bd4d8fc304db",
+   "gold_sha256": "2ea9573154ae0b2f87018d6a00fd34c7225e9abfe4e616614b762e95a65709bd"
+  },
+  {
+   "id": "ax_condmatmtrlsci_240306379",
+   "kind": "paper",
+   "source": "arXiv 2403.06379",
+   "pages": 5,
+   "blocks": 38,
+   "pdf_sha256": "98080cb5c9aa71f104f55527145e500c4a27de8c098630702224ed5ac7184176",
+   "gold_sha256": "b283537aac51825b8fa9695226f3132a944f8fbc20613ccbdd8fd9079c9bafd4"
+  },
+  {
+   "id": "ax_condmatmtrlsci_240306389",
+   "kind": "paper",
+   "source": "arXiv 2403.06389",
+   "pages": 4,
+   "blocks": 29,
+   "pdf_sha256": "0e08beb0791c88bc6a5bb83ca2fe950511e1fb0e358c7cc9c631702d10163010",
+   "gold_sha256": "fa0908fdd1467dc1e503e095e14b64e61254821c43d89c65f06aaab290f1fd5c"
+  },
+  {
+   "id": "ax_cscl_240306350",
+   "kind": "paper",
+   "source": "arXiv 2403.06350",
+   "pages": 4,
+   "blocks": 31,
+   "pdf_sha256": "5e72778957a0269a890b3e9e6407a21fbea87c5c9f34a5dd53248a81807c7956",
+   "gold_sha256": "0bd5fb2af997295f04a911a556661c059ba3b694d708b1e88e3b4fbfb16c49f8"
+  },
+  {
+   "id": "ax_cscl_240306355",
+   "kind": "paper",
+   "source": "arXiv 2403.06355",
+   "pages": 5,
+   "blocks": 74,
+   "pdf_sha256": "29767402454abcfae2376210a3fe08c06029ec7a14ae28e023bbcfec53f56253",
+   "gold_sha256": "361ce644a675e0547410cf1bdcafed8152fd02f9f6d24d792f390fae5612a9f6"
+  },
+  {
+   "id": "ax_cscv_240306351",
+   "kind": "paper",
+   "source": "arXiv 2403.06351",
+   "pages": 4,
+   "blocks": 55,
+   "pdf_sha256": "6f307a70805e582a11be96ef7c2f69b6d15c2239abf4c093144702089dd5145f",
+   "gold_sha256": "743d8c6e97367ced171b7dc17352503398ccefaa5ab2f061124689fcff269900"
+  },
+  {
+   "id": "ax_cscv_240306361",
+   "kind": "paper",
+   "source": "arXiv 2403.06361",
+   "pages": 4,
+   "blocks": 33,
+   "pdf_sha256": "98720951de896f483af03e01915fd28522796662f7cb47f645ab215b3a479c6f",
+   "gold_sha256": "81daadff7976796d070c9948ed85dddf19ec68dd39ceb5a91d9594468c50a070"
+  },
+  {
+   "id": "ax_cslg_240306366",
+   "kind": "paper",
+   "source": "arXiv 2403.06366",
+   "pages": 4,
+   "blocks": 84,
+   "pdf_sha256": "fd6e841a68d90fc6ccff9b96d1be6d620fde0df5b0b6848216766ed8fd0fd384",
+   "gold_sha256": "1caa6d2334a7f43963d47902a56fd9f71f4d8b4a37ebed392e837c7c3c594eef"
+  },
+  {
+   "id": "ax_cslg_240306367",
+   "kind": "paper",
+   "source": "arXiv 2403.06367",
+   "pages": 5,
+   "blocks": 80,
+   "pdf_sha256": "b9b830541ca66c0ac1f4421ad806a90c539e15fbc912e28cb0e64fe9a17973c7",
+   "gold_sha256": "4e6565fd47f47f6aeb5cfd8adbe79812a37a9098ecf378d7952b0336b0e22588"
+  },
+  {
+   "id": "ax_csro_240306420",
+   "kind": "paper",
+   "source": "arXiv 2403.06420",
+   "pages": 3,
+   "blocks": 42,
+   "pdf_sha256": "3c1095367b7b3d54b3838109f520b6dd9fc179ac53e6afdbc51f77448a77d105",
+   "gold_sha256": "503019f2011eb6ffc0e27c4e02da3cd192c305e4bdaac0db53dd6f9f6e907eff"
+  },
+  {
+   "id": "ax_csro_240306533",
+   "kind": "paper",
+   "source": "arXiv 2403.06533",
+   "pages": 5,
+   "blocks": 71,
+   "pdf_sha256": "17eb5b2c1f8e89525bab82e30154ff79550de1c8e6d53cfe3d1dd0d2e699b090",
+   "gold_sha256": "92b68f0c1c0766b5eef4708f3f4b6343c33693512ece5c1b0e9b95bd2987a18e"
+  },
+  {
+   "id": "ax_econem_240306657",
+   "kind": "paper",
+   "source": "arXiv 2403.06657",
+   "pages": 4,
+   "blocks": 16,
+   "pdf_sha256": "670b9be19384fe2a57ac2658c5763dd7ba739011897e002f3d1b3d197a749927",
+   "gold_sha256": "ff9a52ff769cd92c0f94afdd55c36f7432d625f0c84656efd31856a2769281cd"
+  },
+  {
+   "id": "ax_eesssp_240306423",
+   "kind": "paper",
+   "source": "arXiv 2403.06423",
+   "pages": 5,
+   "blocks": 68,
+   "pdf_sha256": "7da51d556739f2154b677e35e5af1f0b4ac6ce10a2f2e6a7ac8a4dc54e1a2c82",
+   "gold_sha256": "b1c93f5b062ee52377f0e5a48c1b7659b28647ff2398f17f44674621b9bfeb6b"
+  },
+  {
+   "id": "ax_eesssp_240306460",
+   "kind": "paper",
+   "source": "arXiv 2403.06460",
+   "pages": 5,
+   "blocks": 78,
+   "pdf_sha256": "6f7bdc94040320b0044bc67c9282a0282021dba3148203d81eda5b42e7a87385",
+   "gold_sha256": "bfe002e30941144f38050ae657c11eb60de6572101b3eecb408340146d3e8220"
+  },
+  {
+   "id": "ax_hepth_240306509",
+   "kind": "paper",
+   "source": "arXiv 2403.06509",
+   "pages": 4,
+   "blocks": 42,
+   "pdf_sha256": "7e590e7a30d4b5d4536b4593073156085f1d05cf123d6c4aef9ec46a4ece9d91",
+   "gold_sha256": "eb740eb7eb1c394060226df17f682733dca756b63d03d8b764a46b99a822ea5d"
+  },
+  {
+   "id": "ax_hepth_240306652",
+   "kind": "paper",
+   "source": "arXiv 2403.06652",
+   "pages": 5,
+   "blocks": 35,
+   "pdf_sha256": "89908ca31f444c3a606dbd064fb42296522d78784203c6a673e0e6f7f4695668",
+   "gold_sha256": "1718da2b96a2282008ca7365ec7115feea28d98f5c40c68f743644fd4ed78187"
+  },
+  {
+   "id": "ax_mathap_240306449",
+   "kind": "paper",
+   "source": "arXiv 2403.06449",
+   "pages": 4,
+   "blocks": 25,
+   "pdf_sha256": "991b25974114f8facfb78cab89fdcd8ece9d5c244b31717361d072adc6ee7278",
+   "gold_sha256": "95ea9ca1ec930846d1bfb314d78b3e13b4a9c6a77e75f42b8fa9fc2548246ea4"
+  },
+  {
+   "id": "ax_mathap_240306464",
+   "kind": "paper",
+   "source": "arXiv 2403.06464",
+   "pages": 5,
+   "blocks": 36,
+   "pdf_sha256": "639be4c6165e43ea754011231e2c881352494d494085671a51bb55dcebae0f90",
+   "gold_sha256": "d4c7f0079f2a5bc346847f3db9867268450dcd20a6badc5237328244c9114b28"
+  },
+  {
+   "id": "ax_mathco_240306383",
+   "kind": "paper",
+   "source": "arXiv 2403.06383",
+   "pages": 5,
+   "blocks": 49,
+   "pdf_sha256": "c6a198389b8f6eb234bff3ed50624b355e7e863dad869651fe36efaec7ba2b26",
+   "gold_sha256": "40e518322ba06a0928cb480d2840c15cd8a3e84495b441d107b4abaa8e18f53e"
+  },
+  {
+   "id": "ax_mathco_240306468",
+   "kind": "paper",
+   "source": "arXiv 2403.06468",
+   "pages": 4,
+   "blocks": 33,
+   "pdf_sha256": "44a7648dc6a8f087e810a23b535b6e55e5a9979dcfd0816f64252dace9c0f60c",
+   "gold_sha256": "3fd4304ce6d99a36e997947e600d9629ceffb9da894f5da840dbef3e95f9076a"
+  },
+  {
+   "id": "ax_physicsoptics_240306439",
+   "kind": "paper",
+   "source": "arXiv 2403.06439",
+   "pages": 3,
+   "blocks": 17,
+   "pdf_sha256": "13c7d23d17710b9a3ae538a0110ae709e572b408608188a16d6aaad2a58341d3",
+   "gold_sha256": "30446f6bd2eb619c33d7f2f612faea8b86bef464c0e7e6da97e6a032dd71ebd3"
+  },
+  {
+   "id": "ax_qbionc_240306496",
+   "kind": "paper",
+   "source": "arXiv 2403.06496",
+   "pages": 4,
+   "blocks": 27,
+   "pdf_sha256": "c72638930bd586d6b0eeac2d66586cbd99e47d142e7defc81f3c507b42a6abfa",
+   "gold_sha256": "1d676fe5e44c795018d54cb12d5b3af81d1ca98a1e2a2a18b4996ea9a97e5333"
+  },
+  {
+   "id": "ax_qbionc_240307089",
+   "kind": "paper",
+   "source": "arXiv 2403.07089",
+   "pages": 5,
+   "blocks": 65,
+   "pdf_sha256": "ef49dddc08a01d358513a1b0efc2c1727b2f14e5cb054be141185c3f9a12fcf5",
+   "gold_sha256": "eb47c705b6a0dc3f89b57f74ee3b86d58ae86865e6be37ea0d7fa815932c0e47"
+  },
+  {
+   "id": "ax_quantph_240306377",
+   "kind": "paper",
+   "source": "arXiv 2403.06377",
+   "pages": 5,
+   "blocks": 48,
+   "pdf_sha256": "4fe5f7e3fe7d7cacd1dbdeb21043b611e881d8584b4893361c5d6752b21b9836",
+   "gold_sha256": "b568d601fca7e10136a468b6d3f094e13afd5a5a329134779cd4d3cf845b65c9"
+  },
+  {
+   "id": "ax_quantph_240306391",
+   "kind": "paper",
+   "source": "arXiv 2403.06391",
+   "pages": 3,
+   "blocks": 20,
+   "pdf_sha256": "dc9a30de75269e38666b559ff930e70cb6e2b4624a5f559d9e110f3f00e8b9a9",
+   "gold_sha256": "f459cb4e1ec9de92d641744d3a9fa4d29255283552d30a0cb4a798ccadc10b2d"
+  },
+  {
+   "id": "ax_statme_240307124",
+   "kind": "paper",
+   "source": "arXiv 2403.07124",
+   "pages": 2,
+   "blocks": 10,
+   "pdf_sha256": "0edb3097d509969f480a21dd8b24ec7431952a1d0db4c4982658bcafd5f9f8d5",
+   "gold_sha256": "00357d7119271889dfad24be9d7ca7781ddb9c8fca507e1114a7dfbda25b98c2"
+  },
+  {
+   "id": "ax_statme_240307158",
+   "kind": "paper",
+   "source": "arXiv 2403.07158",
+   "pages": 5,
+   "blocks": 36,
+   "pdf_sha256": "2dd2becc649a40a1413334dbe1bee1e0301a0f09f1201f7dbd053eb29845ed79",
+   "gold_sha256": "d2b21cf4d8970c64c1c663079a2f7bb26783717f6c7873b4f8ad394f6f3a5050"
+  },
+  {
+   "id": "os_algebra_and_trigonometry_2e",
+   "kind": "textbook",
+   "source": "OpenStax algebra-and-trigonometry-2e 789b540",
+   "pages": 11,
+   "blocks": 172,
+   "pdf_sha256": "ec503abd05d8bd5deb86f7f9d13b3bdf69d60dda9872ac8b1e61f5b4bea0ec21",
+   "gold_sha256": "ecb4f4d6872555fb0623f6c0b382dd989b77f624dbbd0b16639fce3551b63d15"
+  },
+  {
+   "id": "os_astronomy_2e",
+   "kind": "textbook",
+   "source": "OpenStax astronomy-2e dff6acf",
+   "pages": 11,
+   "blocks": 234,
+   "pdf_sha256": "8972f29e1ff066e681fe9354d3840553b2868f1e57f127d0f66f4ce3b3f1a053",
+   "gold_sha256": "5eb18cae77359a5943945620c452ee465a24e3ea40c649351a774c9fb8d76b04"
+  },
+  {
+   "id": "os_calculus_volume_1",
+   "kind": "textbook",
+   "source": "OpenStax calculus-volume-1 8dbc2ce",
+   "pages": 11,
+   "blocks": 261,
+   "pdf_sha256": "930a1d07250c3637132067a2959e7bce7da0129b72543ab341e731dd9d187eb2",
+   "gold_sha256": "5d18cfafe1aa85073beff54e57f7e70d44e3139e5f4d29ec46860db74827a63e"
+  },
+  {
+   "id": "os_concepts_biology",
+   "kind": "textbook",
+   "source": "OpenStax concepts-biology 63f8b6f",
+   "pages": 10,
+   "blocks": 251,
+   "pdf_sha256": "13ad9c31c6e0d94431edc652e1a3aec5c0064e2d7d6b358076d9808e873a297d",
+   "gold_sha256": "fad54ff8da65f3ff441a4dff8dcd5cabe263adce45ad8730fac3fef6b8b24633"
+  },
+  {
+   "id": "os_contemporary_mathematics",
+   "kind": "textbook",
+   "source": "OpenStax contemporary-mathematics 6458acc",
+   "pages": 11,
+   "blocks": 255,
+   "pdf_sha256": "faf79b24d897259a6ea0e9898c854d9617936926885900cda4c53eeef1610c5e",
+   "gold_sha256": "fbd4fe9ad8f6de8b72799bb4c0ed83ffdf31e8324d7c4a8261467a08e7f8beb7"
+  },
+  {
+   "id": "os_introduction_computer_science",
+   "kind": "textbook",
+   "source": "OpenStax introduction-computer-science 8440644",
+   "pages": 11,
+   "blocks": 286,
+   "pdf_sha256": "c61c3583c30de5a66d2a4f4e72a860091c3c9610be2c799106bf38b13716c8c6",
+   "gold_sha256": "59c022eb74e26b1838932c762e8462f4ede185a75b3d9945875b5994b3f74f87"
+  },
+  {
+   "id": "os_introductory_statistics_2e",
+   "kind": "textbook",
+   "source": "OpenStax introductory-statistics-2e 1f6a358",
+   "pages": 11,
+   "blocks": 251,
+   "pdf_sha256": "72a4fa2072e790ca94f7d8e5ddcc8810ff087a048d5c4717ec6838f8e30244b0",
+   "gold_sha256": "5d5c70a4006d1c803262726ed0944f495ab89c7eec8b61b16377378eb0905fd9"
+  },
+  {
+   "id": "os_organic_chemistry",
+   "kind": "textbook",
+   "source": "OpenStax organic-chemistry 8917713",
+   "pages": 10,
+   "blocks": 206,
+   "pdf_sha256": "2e9b306de59fdc1bad3c8c5fd00f20db3c42a212e3a1d1dfa84cb4f056ac3dd5",
+   "gold_sha256": "2d604a056b11d9e67a8ad921104f1d7c870f04b988a404b88a54b5129f6c4ccb"
+  },
+  {
+   "id": "os_principles_data_science",
+   "kind": "textbook",
+   "source": "OpenStax principles-data-science 6551843",
+   "pages": 11,
+   "blocks": 275,
+   "pdf_sha256": "4af55026d80c866b7a5cc25acd2094c03ac70158f5553510ba309346864aa40e",
+   "gold_sha256": "9ded5584637520599f164d5dc976ec94729a4be029b1348a8fc5c17324f1fc2b"
+  },
+  {
+   "id": "os_university_physics_volume_2",
+   "kind": "textbook",
+   "source": "OpenStax university-physics-volume-2 d0ed34a",
+   "pages": 11,
+   "blocks": 272,
+   "pdf_sha256": "c45b4c6a5dabbb0244030cb9499068f0b372418a84ae1ab248074baaf3da678b",
+   "gold_sha256": "cd3ebf394c5ec50de1103d16285263c4472677a966193057cd443d0ca82ce7b5"
+  },
+  {
+   "id": "sm_answers_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 3,
+   "pdf_sha256": "e47c80b166ace51e62264531b063d54c8749693af307916fd5fd218e1885eb2f",
+   "gold_sha256": "19629f5fbcdc83f23e752c78c81125f8ab19bd69792869d6411f49ca1f7f89c7"
+  },
+  {
+   "id": "sm_answers_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 3,
+   "pdf_sha256": "0956cc978059a471204d5ac0b475f6b5c6264b580253b2b4f26c5f89714cfad4",
+   "gold_sha256": "0a50c3e42ffc4f9e0ef9924b6b253ac5bb47100e0ff35bc2bfc0377f624ff70e"
+  },
+  {
+   "id": "sm_exam_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 21,
+   "pdf_sha256": "e6e92256bcb8c2578d4312a9502dfeab34af6e77ae7798e9e73528180747f3b4",
+   "gold_sha256": "eb76e61cd4d8fc07287cddef000bd6ebef59bb9452033343c33f918ae31e8657"
+  },
+  {
+   "id": "sm_exam_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 24,
+   "pdf_sha256": "f5f88021e5eeaea0ba0b9130c6e827de77e339fd30c705773efa1ec41fe8a15a",
+   "gold_sha256": "97ff8827b544a9eee518524a7e543165ec85dd30b3a5067e8decc63ca37209b0"
+  },
+  {
+   "id": "sm_figlabel_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 17,
+   "pdf_sha256": "a914abda57be1fc354999b1b923a07a5811eea00b339ff95f875fc67d20473c8",
+   "gold_sha256": "31eced1177c36b8a8d39e9d556b5696c9b185458fbd364946c570f4e0baf8e12"
+  },
+  {
+   "id": "sm_figlabel_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 3,
+   "blocks": 19,
+   "pdf_sha256": "98b6fba7c53c0556ac3ee3374990dcc315bd3e150699e247b32e82e667990875",
+   "gold_sha256": "103f8274a31a7a35cc132ace5b008e9d172c349b24aca59879d99b4067869d00"
+  },
+  {
+   "id": "sm_glossary_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 47,
+   "pdf_sha256": "9f1c1aa2e306359063e1a880e66036ddc948fcf28477349cbd6472faa7f4b702",
+   "gold_sha256": "3991412ae83706e75a9c8424c2f291a534634b4ee763f257187afc0d3529d31c"
+  },
+  {
+   "id": "sm_glossary_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 25,
+   "pdf_sha256": "48855de0d4829fe8787e136cea1341ce35746ecfc68b718a9b35f3c05d70492b",
+   "gold_sha256": "b37256bd2b51b5141636dc784321f6ffc58bc4adb5ff1b46e4bbe8b991855645"
+  },
+  {
+   "id": "sm_handout_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 16,
+   "pdf_sha256": "8c9a1fb2d8b1bbf0d3fc71248597fc34dd19b7ee26f57ca83c4fb8da371b5a5f",
+   "gold_sha256": "fb6571d7cacecfd4f63d6f730a6eb353c04c7dea575ec4e1e7e216b4f1fb0a56"
+  },
+  {
+   "id": "sm_handout_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 16,
+   "pdf_sha256": "8906a3dd4c128dc0aed853f3360ad7df0043df0ed3950072a8855b991eadc994",
+   "gold_sha256": "7e31b95bd3566365ac490455231453e15359e3538c23ff5c08d8eac6f5782a87"
+  },
+  {
+   "id": "sm_index_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 154,
+   "pdf_sha256": "f34e8a03137a6ca1cf6646aac844b114fc45d85d7ccfa57a200c77e14234d7e6",
+   "gold_sha256": "b7b9e8119a054a37f1a4b8d854a57721ad3f5a7c479f85fab2f2e5b4864c03c3"
+  },
+  {
+   "id": "sm_index_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 260,
+   "pdf_sha256": "0f76b4aa11cbdb6f5a288d8f3af7a963dabbbb9ba472c19605db7537e8b3e0a9",
+   "gold_sha256": "1291dea55c2418261fa0984ee05545a7d1c1d4e7f9bb3ee644bc2ffb5cbc3cd7"
+  },
+  {
+   "id": "sm_lineno_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 10,
+   "pdf_sha256": "9425ea6ef494dfb858d3cd0423b73b880f43d1178806cb86ca4ec07d6328285c",
+   "gold_sha256": "db23fdf70f71a2bfaa4b0cc4f48434738b42068b66d11a332cfe5a9994e02946"
+  },
+  {
+   "id": "sm_lineno_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 14,
+   "pdf_sha256": "7205eaf2a866f9de600c15775a3972c54b49db09cf77af62e5f0ae49052fbe86",
+   "gold_sha256": "3be9c482c4e89dca60318317056ac5fa6161cd0881a245ef9a321cba15738fc5"
+  },
+  {
+   "id": "sm_newsletter_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 15,
+   "pdf_sha256": "524a6f84f8b2b26f5762e3d1fb3ef7d788cf43886f08e10fdae158edd4194a7c",
+   "gold_sha256": "c263f0efde4f676bcc1117f12557c3366798eaaf798c700c1103ba67f51399c3"
+  },
+  {
+   "id": "sm_newsletter_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 17,
+   "pdf_sha256": "5dcc554ce6ca971938732ec15b6a9d3334054b9f8eb052e962f5091f32b57496",
+   "gold_sha256": "291ac959fc9ea21f872d8b99405197ee746b7e50ca3e4347a250fb5ca16e4237"
+  },
+  {
+   "id": "sm_slides_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 5,
+   "blocks": 23,
+   "pdf_sha256": "ccf3c3d3a77b43f7204672a0e295588becc88ae4dd14bed7433097cb483f9bd2",
+   "gold_sha256": "276dcbc4371b79acce2974c91940df410a1c88b39297802406a53e4f2299ca29"
+  },
+  {
+   "id": "sm_slides_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 5,
+   "blocks": 27,
+   "pdf_sha256": "40512d6e2333385eafeac52a4b10facf9f8342a2cff907fdd736658d958c61f0",
+   "gold_sha256": "24151b1aa578c1ec7b3cf74e9a83ae52982acfa3a6bd639cc6421e7bbe9ea01c"
+  },
+  {
+   "id": "sm_stamp_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 13,
+   "pdf_sha256": "b5745a76833885b05423206b8330ed57457a3b2341e9c86966ef2c1b48548ea6",
+   "gold_sha256": "8262a65046c35d33d58f62a015631e6b18d787ccfd61d835b498f192bfc7ef5a"
+  },
+  {
+   "id": "sm_stamp_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 12,
+   "pdf_sha256": "9c990c41dd580e9309c7bf7fc1af1aaaf0084c765891756a6129fcb1a2beb38d",
+   "gold_sha256": "a45a3272581a5d3162dd1ff5a0fd35667e93a52bfd4bd7e95da7cd18ed0e881d"
+  },
+  {
+   "id": "sm_tablecap_a",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 1,
+   "blocks": 21,
+   "pdf_sha256": "6668a0ea6b1304ab36520a374e2c4241439487f881b4df0e102d092cd8a8243a",
+   "gold_sha256": "f8e2342ffc9a9b6d0053368ac5eb40633175adc7078f1a02580073cae9bda5ae"
+  },
+  {
+   "id": "sm_tablecap_b",
+   "kind": "selfmade",
+   "source": "gen_docs.py",
+   "pages": 2,
+   "blocks": 21,
+   "pdf_sha256": "c4024f74de371042ef9c29f4f66fb15732a645c039e6cfbb6048b62715046c44",
+   "gold_sha256": "ba84b2def9ce2788efd10b219096845e369955db63d10d9fb54b0efb6ec6a62f"
+  }
+ ],
+ "passed": {
+  "papers": [
+   "arXiv 2403.06345",
+   "arXiv 2403.06879"
+  ]
+ }
+}

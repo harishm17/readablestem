@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded
@@ -53,7 +53,7 @@ from readablestem.core.types import (
     SecondReaderSummary,
     Status,
 )
-from readablestem.models.math_readers.base import MathReader, ReadRequest
+from readablestem.models.math_readers.base import MathReader, ReaderCall, ReadRequest
 from readablestem.observability.logging import log_fields
 from readablestem.pipeline import equation_step, math_canonical, reading_alternatives
 from readablestem.pipeline.math_canonical import Kind as Sameness
@@ -89,8 +89,13 @@ class Summary:
     with_choices: int = 0
     unavailable: int = 0
     over_budget: int = 0
+    # Reads not started because the time for them had run out (they are in `unavailable`
+    # too): what the conversion's "not finished" fact is made from.
+    out_of_time: int = 0
     seconds: float = 0.0
     cost_usd: float = 0.0
+    # Each read made, with the page of its equation (`pipeline.step_facts`).
+    calls: list[tuple[int, ReaderCall]] = field(default_factory=list)
 
     def record(self) -> SecondReaderSummary:
         return SecondReaderSummary(
@@ -185,8 +190,11 @@ def reconcile(
     deadline = started + (settings.image_pages_second_reader_time_s if share_s is None else share_s)
     worst_s = float(getattr(reader, "max_read_s", None) or settings.model_timeout_s)
     stopped: str | None = None  # why no more reads are made: BUDGET or UNAVAILABLE
+    timed_out = False
 
     def skip(why: str) -> None:
+        if timed_out:
+            summary.out_of_time += 1
         if why == BUDGET:
             summary.over_budget += 1
         else:
@@ -195,7 +203,7 @@ def reconcile(
     for element, fix, crop in _candidates(elements, fixes, crops):
         summary.considered += 1
         if stopped is None and clock() + worst_s > deadline:
-            stopped = UNAVAILABLE
+            stopped, timed_out = UNAVAILABLE, True
         if stopped is not None:
             skip(stopped)
             continue
@@ -219,6 +227,7 @@ def reconcile(
             skip(UNAVAILABLE)
             continue
         summary.cost_usd += result.call.cost_usd
+        summary.calls.append((element.page, result.call))
         if not result.candidates:
             skip(UNAVAILABLE)
             continue

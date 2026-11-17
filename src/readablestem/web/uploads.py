@@ -37,6 +37,7 @@ import threading
 import unicodedata
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
@@ -45,6 +46,9 @@ from starlette.requests import Request
 from readablestem.core.childenv import child_env
 from readablestem.web import office_convert
 from readablestem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
+
+if TYPE_CHECKING:
+    from readablestem.pipeline.page_type import ImagePageCount
 
 # Room for the multipart boundaries and the small text fields around the file itself.
 FORM_OVERHEAD_BYTES = 64 * 1024
@@ -67,6 +71,7 @@ REJECTION_STATUS = {
     "too_many_pages": 422,
     "page_too_large": 422,
     "image_too_large": 422,
+    "content_too_large": 422,
     "scanned": 422,
     "scanned_ocr": 422,
     "handwritten": 422,
@@ -270,10 +275,11 @@ def inspect_pdf_detail(
     max_pages: int,
     timeout_s: float = INSPECT_TIMEOUT_S,
     allow_image_pages: bool = False,
-) -> tuple[int, int]:
+) -> tuple[int, ImagePageCount]:
     """`(pages, image_pages)`: `inspect_pdf_isolated` and, when `allow_image_pages` (the person
     asked for scanned and handwritten pages to be converted), how many pages the probe found
-    scanned or handwritten (0 without the request)."""
+    scanned or handwritten, "at least" when some page's drawings were not analysed
+    (`page_type.ImagePageCount`; none without the request)."""
     if not data:
         raise UploadRejected("empty")
     if not looks_like_pdf(data):
@@ -299,8 +305,13 @@ def inspect_pdf_detail(
     if not isinstance(answer, dict):
         raise UploadRejected("unreadable")
     if answer.get("ok") is True and isinstance(answer.get("pages"), int):
-        found = answer.get("image_pages")
-        return answer["pages"], found if isinstance(found, int) and found >= 0 else 0
+        from readablestem.pipeline.page_type import ImagePageCount
+
+        found, unsure = answer.get("image_pages"), answer.get("image_pages_unanalysed")
+        return answer["pages"], ImagePageCount(
+            found if isinstance(found, int) and found >= 0 else 0,
+            unsure if isinstance(unsure, int) and unsure >= 0 else 0,
+        )
     code = answer.get("code")
     pages = answer.get("pages")
     raise UploadRejected(

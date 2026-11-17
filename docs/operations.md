@@ -47,8 +47,9 @@ Each job gets `retain_until` when it is uploaded: `RETENTION_HOURS` (24) later, 
 the instructor checked "Keep for 7 days" (or has it as their default on the Account page,
 `users.keep_week_default`), or `OPT_IN_RETENTION_DAYS` (30) when they opted in. The hourly purge deletes every
 job past that time together with everything derived from the document: the uploaded PDF,
-the crops, the result JSON, the HTML, the filename and the review edits. It deletes the
-child rows itself and does not rely on the database cascade alone.
+the crops, the result JSON, the HTML, the filename, the review edits and the step facts
+("Step facts and the step report"). It deletes the child rows itself and does not rely on
+the database cascade alone.
 
 Every deletion goes through `ops.retention.delete_jobs(session, job_ids)`: the hourly
 purge, and the web app's "delete now" (`POST /jobs/{job_id}/delete` must call
@@ -151,6 +152,85 @@ deleted-document page uses them to tell an owner what happened), but not for eve
 The upload fingerprint in `uploaded` events is keyed with `SESSION_SECRET`: rotating the
 secret makes the next upload of a file look new (a missed `reuploaded`, nothing else).
 `/admin` shows the counts per day and per pseudonymous person.
+
+### Step facts and the step report
+
+When a job ends `done`, the worker keeps what it took of the models and of the clock
+(`web/step_facts.py`), in the transaction that stores the result:
+
+- `job_calls` has one row for each request the job sent to a model: the step, the page,
+  the model, the tokens (input, input read from the provider's prompt cache, input written
+  to it, output, reasoning), the dollars, the seconds the request took, which try it was,
+  whether the fallback model answered and how it ended. The second check of an answer and
+  the second reading of an image page are rows with `counted` false: they cost money and
+  are not in `jobs.model_calls`.
+- `job_stages` has the wall seconds of each stage of the job, in order: `queue_wait`,
+  `start_up`, the stages of the conversion (`layout`, `page_math`, `page_witness`,
+  `image_pages`, `steps`, `second_readings`, `assemble`, `checks`; a LaTeX source has
+  `source` in place of the first four) and `store`.
+- `job_not_finished` has one row for each step that stopped before it had done all of its
+  work: the step, the page (empty for a step over the whole document), a reason code and
+  how many units of its work were done out of how many there were. The reasons are
+  `work_budget` (it did the count of work it is allowed, the same on every machine),
+  `time_limit` (a clock stopped it, so another machine may have got further),
+  `memory_limit` and `cap_reached` (the job's limit on dollars or on model calls). Written
+  today: `equation`, `table` and `figure` when the job's limit stopped the steps (elements
+  done of elements); `image_page`, one row for each page the limit kept from being read;
+  `second_reader`, when its time ran out (`time_limit`) or its own dollar share was spent
+  (`cap_reached`), with the equations read of those it could have read; `page_type`, one
+  row for each page that was typed without its ink because its ink analysis stopped
+  (`work_budget` when a count of work ran out, the same on every machine; `time_limit` when
+  the clock guard against a hang fired; such a page may be handwriting that was not seen as
+  handwriting); `ink_strokes`, one row for each handwritten page whose strokes were not read
+  for its pictures, for the same two reasons.
+  `web.step_facts.not_finished(session, job_id)` is the one place a page or a count reads
+  them, and each is also a `job_not_finished` log line.
+
+All three hold codes, counts, seconds and dollars only: no text of the document, no file
+name and no user id. They are replaced when the job is converted again and deleted with the
+job. A job that failed keeps none.
+
+There are two kinds of seconds, and they do not add up to each other:
+
+- **Stage seconds** divide the job's wall time, from the worker taking it to the result
+  being stored. They add up to that time. `queue_wait` is the wait before it and is outside
+  the sum. `start_up` is the part of the conversion call that is outside the conversion's
+  own stages: starting the conversion process, loading its code, and passing the file in
+  and the result out.
+- **Call seconds** are how long each request to a model took. The `steps` stage sends
+  several requests at once, so the call seconds of a job add up to more than its `steps`
+  stage. When answers come from a recording (the workflow tests), the call seconds are
+  the ones the recording was made with, and the stage seconds are those of the replay.
+
+The rows are the calls of the conversion that was stored. An answer reused from an earlier
+try of the same job (`step_records`) keeps the figures of the request that made it. Money
+spent by a try that did not finish and whose answers were not reused is on `jobs.cost_usd`
+only, so the settled dollars can be more than the steps' dollars, and the report prints
+the difference.
+
+`readablestem ops step-report` prints the report (`ops/step_report.py`) over the jobs
+finished in the last 7 days (`--days N`), the newest `--last N` of them, or the jobs named
+with `--job ID` (repeatable); `--json` gives the same figures as JSON. The sample document
+is never counted. It prints:
+
+- by step and model: calls, failed calls, calls a page, input, cached input and output
+  tokens a page, the share of input read from the prompt cache, the p50 and p95 seconds
+  of one call, the p99 dollars of one call and the dollars a page;
+- by stage: the p50 and p95 seconds of a job and of a page, and the stage's share of the
+  wall time of the jobs that have it;
+- in all: dollars and calls beside what the job rows settled, the cache share, and the p50
+  and p95 seconds a page.
+
+A percentile is the nearest rank, so with few jobs the p95 is the largest value. A page is
+a page of a job (`jobs.page_count`), whether or not the step ran on it. The admin page
+shows the totals for the newest 50 documents of the last 7 days under "Model work of
+recent documents".
+
+The same facts go to the log when the job is stored: one `job_steps` line for each step
+and model (`calls`, `failed`, `input_tokens`, `cached_input_tokens`, `output_tokens`,
+`cache_read`, `call_s_p50`, `call_s_p95`, `cost_usd`), one `job_stages` line with
+`pages` and a `<stage>_s` field for each stage, and one `job_not_finished` line for each
+step that stopped early (`step`, `page`, `reason`, `done`, `of`).
 
 ## Error aggregates
 
@@ -271,6 +351,7 @@ Useful filters for the service's **Logs** panel or `railway logs --service web -
 | Anything wrong? | `@severity:WARNING OR @severity:ERROR` |
 | Server errors | `@message:request AND @status:>=500` |
 | Slow pages | `@message:request AND @latency_ms:>5000` |
+| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished` (add `AND @job_id:...` for one job) |
 | Hourly cleanup (cron service) | `@message:aggregate_done OR @message:purge_done OR @message:aggregate_failed OR @message:aggregate_on_delete_failed` |
 | Tracing problems | `@message:tracing_disabled OR @message:trace_failed` |
 | Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `@message:upload_rejected AND (@code:handwritten OR @code:handwritten_no_text OR @code:scanned OR @code:scanned_ocr)` |

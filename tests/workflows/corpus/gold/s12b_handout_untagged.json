@@ -1,0 +1,25 @@
+{
+ "id": "s12b_handout_untagged",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "BIO 150 Submission Guide"},
+   {"role": "heading", "text": "How to Submit Assignments"},
+   {"role": "body", "text": "This handout explains how to turn in work for BIO 150. Late work policies are in the syllabus."},
+   {"role": "heading", "text": "Steps"},
+   {"role": "list", "text": "Open the course site and sign in with your campus account."},
+   {"role": "list", "text": "Choose Assignments from the left menu."},
+   {"role": "list", "text": "Select the assignment named in the table below."},
+   {"role": "list", "text": "Upload a single PDF and press Submit."},
+   {"role": "list", "text": "Check that the confirmation page shows a time stamp."},
+   {"role": "heading", "text": "Assignment Windows"},
+   {"role": "table", "text": "Assignment Opens Closes Lab 1 report Sep 1 Sep 8 Problem set 1 Sep 8 Sep 22 Project proposal Sep 22 Oct 6 Midterm take-home Oct 6 Oct 8"},
+   {"role": "heading", "text": "If Something Goes Wrong"},
+   {"role": "list", "text": "If the upload fails, try a different browser before emailing the instructor."},
+   {"role": "list", "text": "Keep a copy of your file and a screenshot of any error message."},
+   {"role": "list", "text": "Email the teaching assistant before the deadline with the file attached."},
+   {"role": "body", "text": "Questions about this process can go to the teaching assistants during office hours."},
+   {"role": "dropped", "text": "Page 1 of 1"}
+  ]}
+ ]
+}

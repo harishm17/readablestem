@@ -19,8 +19,10 @@ data ("<document_text>...</document_text>") after a fixed notice that it is untr
 
 from __future__ import annotations
 
+import re
 import threading
 import time
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Final, Protocol, TypeVar
@@ -159,3 +161,59 @@ def fence_untrusted(text: str, limit: int = 2000, *, notice: bool = True) -> str
         cleaned = cleaned[:limit] + " [truncated]"
     fenced = f"<document_text>\n{cleaned}\n</document_text>"
     return f"{UNTRUSTED_NOTICE}\n{fenced}" if notice else fenced
+
+
+# Our fence tag's name, in any case, with whitespace, "_" or "-" (or nothing) between words.
+_FENCE_NAME: Final = re.compile(r"document[\s_\-]*text", re.IGNORECASE)
+# `fence_untrusted` keeps 2,000 characters. Defanging a few times that much bounds the work on
+# a huge context while leaving enough text once tag names are removed.
+_CONTEXT_SCAN_CHARS: Final = 8000
+
+
+def defang_context(text: str) -> str:
+    """Document text with every spelling of the fence tag's name removed.
+
+    `fence_untrusted` deletes the exact tags once, so '</document_te</document_text>xt>'
+    rebuilds a closing tag, and '</DOCUMENT_TEXT>' or '</document_text >' pass untouched. A
+    model can read any of them as the end of the fence and the text after it as
+    instructions. Removing the tag *name* in any case and spacing, after dropping invisible
+    format characters (zero-width spaces, Unicode tag characters) that could hide inside it,
+    and repeating until nothing changes, leaves no way to spell either tag whatever brackets
+    or entities surround it. Only the start of a long text is scanned: the fence keeps 2,000
+    characters anyway.
+    """
+    text = text[:_CONTEXT_SCAN_CHARS]
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    while True:
+        cleaned = _FENCE_NAME.sub("", text)
+        if cleaned == text:
+            return cleaned
+        text = cleaned
+
+
+def sent_context(
+    text: str | None, limit: int | None = None, *, notice_in_system: bool = False
+) -> str | None:
+    """The exact document text of a request's user message, or None when there is none: the
+    text defanged and fenced, with the fixed notice in front unless the system block carries
+    it (`sent_system`). `limit`: characters kept (default: the fence's own). Every client
+    sends this text and `models.question` hashes it, so the key of a recorded answer changes
+    when the fence does."""
+    if not text:
+        return None
+    cleaned = defang_context(text)
+    if limit is None:
+        return fence_untrusted(cleaned, notice=not notice_in_system)
+    return fence_untrusted(cleaned, limit, notice=not notice_in_system)
+
+
+def fenced_context(text: str | None, limit: int | None = None) -> str | None:
+    """`sent_context` with the notice in the user message (the OpenAI clients)."""
+    return sent_context(text, limit)
+
+
+def sent_system(instructions: str, *, notice_in_system: bool = False) -> str:
+    """The exact system text of a request: the instructions, and the untrusted-text notice
+    after them when the system block carries it. It is then on every request, with document
+    text or without, so the cached prefix is the same for both."""
+    return f"{instructions}\n\n{UNTRUSTED_NOTICE}" if notice_in_system else instructions

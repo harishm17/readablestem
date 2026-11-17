@@ -21,7 +21,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
-from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Fix, Kind, Status
+from readablestem.core.types import KEPT_ORIGINAL_STATUSES, DocumentResult, Fix, Kind, Status
 
 # Reason for a required fix with no failed check and no Fix.reason: the model's own
 # confidence stayed below the auto-accept bar (after escalation, for equations).
@@ -55,6 +55,30 @@ def units(fixes: Iterable[Fix]) -> list[list[Fix]]:
 def required_decisions(fixes: Iterable[Fix]) -> int:
     """Decisions the pipeline asked for (its tiers, whatever a reviewer did since)."""
     return len(units(f for f in fixes if f.review == "required"))
+
+
+@dataclass(frozen=True)
+class Decision:
+    """One decision the pipeline asked for: where it is, what it is about and why."""
+
+    page: int | None  # 0-based, the page of its first member; None when no element holds it
+    kind: str
+    reasons: tuple[str, ...]  # `tier_reasons` of its members, sorted, no repeats
+    members: int = 1  # the fixes decided together (more than 1: a heading group)
+
+
+def decisions(result: DocumentResult) -> list[Decision]:
+    """The decisions `required_decisions` counts for a document, one row each, in order."""
+    page_of = {element.id: element.page for element in result.elements}
+    return [
+        Decision(
+            page=page_of.get(unit[0].element_id),
+            kind=unit[0].kind.value,
+            reasons=tuple(sorted({code for fix in unit for code in tier_reasons(fix)})),
+            members=len(unit),
+        )
+        for unit in units(fix for fix in result.fixes if fix.review == "required")
+    ]
 
 
 def open_decisions(fixes: Iterable[Fix]) -> int:
@@ -132,14 +156,15 @@ class ReviewLoad:
     required_fixes: int = 0
     optional: int = 0
     none: int = 0
-    # Per kind ("equation", "figure", "heading") and per reason code.
+    # Per kind (a fix's `Kind`: "equation", "figure", "heading", "table", and "paragraph"
+    # for a page read from its picture) and per reason code.
     required_by_kind: Counter[str] = field(default_factory=Counter)  # decisions
     optional_by_kind: Counter[str] = field(default_factory=Counter)
     required_by_reason: Counter[str] = field(default_factory=Counter)  # fixes
     optional_by_reason: Counter[str] = field(default_factory=Counter)
     # What people did since, per decision (`ACTIONS`), over every fix that can wait for a
-    # person, of any kind (the text of a page read from its image too, which the tier counts
-    # above leave out). Not in `as_dict`: the eval reports what the pipeline asked for.
+    # person, of any kind (as the tier counts above are). Not in `as_dict`: the eval reports
+    # what the pipeline asked for.
     actions: Counter[str] = field(default_factory=Counter)
 
     @property
@@ -186,19 +211,15 @@ class ReviewLoad:
         }
 
 
-REVIEWABLE_KINDS = frozenset({Kind.EQUATION, Kind.FIGURE, Kind.HEADING, Kind.TABLE})
-
-
 def review_load(fixes: Sequence[Fix]) -> ReviewLoad:
-    """The pipeline's tiers for these fixes (equations, figures, headings and tables), and
-    what people did since (`ReviewLoad.actions`, every kind)."""
+    """The pipeline's tiers for these fixes, whatever their kind: its `required_decisions`
+    is `required_decisions(fixes)`, the number the review screen counts. And what people did
+    since (`ReviewLoad.actions`)."""
     load = ReviewLoad()
-    reviewable = [f for f in fixes if f.kind in REVIEWABLE_KINDS]
-    required = [f for f in reviewable if f.review == "required"]
-    for unit in units(required):
+    for unit in units(f for f in fixes if f.review == "required"):
         load.required_decisions += 1
         load.required_by_kind[unit[0].kind.value] += 1
-    for fix in reviewable:
+    for fix in fixes:
         if fix.review == "required":
             load.required_fixes += 1
             load.required_by_reason.update(tier_reasons(fix))

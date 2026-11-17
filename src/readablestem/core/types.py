@@ -141,7 +141,15 @@ class Check(BaseModel):
 
 
 Step = Literal[
-    "equation", "figure", "judge", "table", "check", "page_math", "page_witness", "image_page"
+    "equation",
+    "figure",
+    "judge",
+    "table",
+    "check",
+    "page_math",
+    "page_witness",
+    "image_page",
+    "page_audit",
 ]
 
 Outcome = Literal[
@@ -869,6 +877,9 @@ NOTICE_CODES = frozenset(
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
+        # The page's drawings were not checked for handwriting: over a count of work, or the
+        # clock guard fired (`page_type.InkBudget`, plan WS14.9). Its typed text was read.
+        "drawings_not_analysed",
         # Review edits (T3-16): a page the reviewer left out of the student file.
         "page_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
@@ -968,6 +979,10 @@ class PageType(BaseModel):
     ink_pen_share: float = Field(default=0.0, ge=0.0, le=1.0)
     ink_size_twins: float = Field(default=0.0, ge=0.0, le=1.0)
     annot_strokes: int = Field(default=0, ge=0)
+    # Why the ink was not analysed, beside the reason "ink_not_analysed": "work" (a count of
+    # work ran out, the same on every machine) or "time" (the clock guard fired). None when
+    # it was analysed, and in a record stored before this was kept.
+    ink_cause: str | None = Field(default=None, exclude_if=lambda v: v is None)
     producer: str = "other"  # a coarse family of the producing software, a hint only
     classifier_version: str = "page-type-v5.1"
 
@@ -1252,11 +1267,74 @@ class DocumentResult(BaseModel):
         return next((f for f in self.fixes if f.element_id == element_id), None)
 
 
+class CallFact(BaseModel):
+    """One request a conversion sent to a model, with the page it was about. Content-free:
+    codes, counts, seconds and dollars (`pipeline.step_facts`)."""
+
+    # A `ModelCall.step`, or "second_check" (a `Verification`) or "second_reader".
+    step: str
+    page: int | None = None  # 0-based; None for a request about the whole document
+    model: str = ""
+    # Whether it is in the job's call count. A second check or second reading is not: only
+    # its dollars count toward the job's limits.
+    counted: bool = True
+    input_tokens: int = 0  # the whole prompt, cached and cache-written tokens included
+    cached_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost_usd: float = 0.0
+    seconds: float = 0.0
+    attempt: int = 1
+    is_fallback: bool = False
+    outcome: str = "ok"
+
+
+class StageFact(BaseModel):
+    """The wall time of one stage of a job. The stages of a job do not overlap."""
+
+    stage: str
+    seconds: float
+
+
+# Why a step stopped before it had done all of its work (`NotFinished.reason`):
+# - "work_budget": it had done the count of work it is allowed (the same on every machine);
+# - "time_limit": a clock stopped it, so another machine may have got further;
+# - "memory_limit": it would have held more memory than it may;
+# - "cap_reached": the job's own limit on dollars or on model calls was reached.
+NotFinishedReason = Literal["work_budget", "time_limit", "memory_limit", "cap_reached"]
+
+
+class NotFinished(BaseModel):
+    """A step that stopped before it had done all of its work. Content-free: the step's name,
+    a page number, a code and two counts.
+
+    A limit may stop a step; it may not quietly change what a document contains. So every
+    step that stops early says so here, and a difference between two conversions of one file
+    is allowed only where the slower one holds such a fact (tests/test_determinism.py)."""
+
+    step: str
+    page: int | None = None  # 0-based; None for a step over the whole document
+    reason: NotFinishedReason
+    done: int = 0  # units of the step's work that were done (elements, pages, reads)
+    of: int = 0  # units there were to do
+
+
+class StepFacts(BaseModel):
+    """What a conversion measured of itself (`pipeline.step_facts`). Content-free."""
+
+    calls: list[CallFact] = Field(default_factory=list)
+    stages: list[StageFact] = Field(default_factory=list)
+    not_finished: list[NotFinished] = Field(default_factory=list)
+
+
 class ConversionOutput(BaseModel):
-    """Return value of `pipeline.run.convert_pdf`: the result plus element crops (PNG)."""
+    """Return value of `pipeline.run.convert_pdf`: the result plus element crops (PNG), and
+    the conversion's own measurements when it made any."""
 
     result: DocumentResult
     crops: dict[str, bytes] = Field(default_factory=dict)  # element_id -> PNG bytes
+    facts: StepFacts | None = None
 
 
 # --------------------------------------------------------------------------- notation

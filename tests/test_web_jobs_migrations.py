@@ -29,6 +29,7 @@ HTML_VERSION = "7b1d3e9a4c28"
 HTML_VERSION_COLUMNS = {"html_version"}
 OUTCOMES = "c2f4a8d61e57"
 REQUEST_TOKENS = "8b3d5f0e2a71"  # SW43: one row per submitted form
+STEP_FACTS = "8b1d5f3a9e04"
 
 # (revision, the one before it, columns it adds to jobs, tables it adds)
 CHAIN = [
@@ -38,6 +39,7 @@ CHAIN = [
     (SAMPLE, PARTS, SAMPLE_COLUMNS, set()),
     (HTML_VERSION, OUTCOMES, HTML_VERSION_COLUMNS, set()),
     (REQUEST_TOKENS, HTML_VERSION, set(), {"request_tokens"}),
+    (STEP_FACTS, REQUEST_TOKENS, set(), {"job_calls", "job_stages", "job_not_finished"}),
 ]
 
 

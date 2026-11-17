@@ -1,0 +1,61 @@
+{
+ "id": "r01_syllabus_16851",
+ "encoding": "page-ranges",
+ "pages": [
+  {"page": 1, "stream_sha256": "3ebd7406e23c1c0d8567b3266a752a78159dc53f7257ccabbb10b7d8f8fa9060", "blocks": [
+   {"role": "dropped", "runs": [[0, 14]], "tokens": [6, 8], "sha256": "2680500f0a268c071abaf51a3338a0ea3f523ef70d77f88d5ec4303d1f744327"},
+   {"role": "dropped", "runs": [[14, 42]], "tokens": [9, 11, 4, 4], "sha256": "6157bf1263132f90c999867404322920c09f87f867cfb9f1087cac987d261888"},
+   {"role": "heading", "runs": [[42, 50]], "tokens": [1, 7], "sha256": "23b3ae3d7cfad5a4b11bb3ec7633c30eaeebf7f52d3d6b3babb873b58cc82991"},
+   {"role": "heading", "runs": [[50, 76]], "tokens": [9, 11, 6], "sha256": "d82c96d648f3ee90d3efdb95cfffcf48c4fdc75a644e6d5125fecd5195b2fa2a"},
+   {"role": "body", "runs": [[76, 148]], "tokens": [10, 2, 11, 3, 12, 13, 9, 2, 10], "sha256": "5514da55534bd824330d745720a38997791781fc996aa1d38f7e68d2c1bfc21c"},
+   {"role": "body", "runs": [[148, 156]], "tokens": [4, 4], "sha256": "b121f92f65b205105140fb21f4e1b2ce0353c731a099ede5475310e8cb6ab13b"},
+   {"role": "body", "runs": [[156, 188]], "tokens": [13, 7, 2, 2, 8], "sha256": "baa2d9c1be60ce5f644f57e7fdbb255141fa98b347bb70bbedd851781aaee3ab"},
+   {"role": "body", "runs": [[188, 238]], "tokens": [28, 9, 5, 2, 6], "sha256": "96b152fddf7f2b0a155ba2b29571cb839064992b4a39dd81da6399f7bb95eeae"},
+   {"role": "body", "runs": [[238, 278]], "tokens": [28, 4, 2, 6], "sha256": "7283f6ee985647b11ca5cc0bedc9a69522bb6cc71295612bb618cc2c8fc5f5f4"},
+   {"role": "dropped", "runs": [[278, 312]], "tokens": [13, 9, 2, 10], "sha256": "18dd08a7f9b24af7f155784dafd75e4fcb9b96e83ade847a66f065df732fc6c9"},
+   {"role": "dropped", "runs": [[312, 313]], "tokens": [1], "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"},
+   {"role": "dropped", "runs": [[313, 345]], "tokens": [4, 2, 11, 3, 12], "sha256": "f7be2c2b803ef0d9106dc5fc5790e1a29487c03a74dc60354e0a3d8d1f1a1a71"}
+  ]},
+  {"page": 2, "stream_sha256": "0d07622ab11e9f215e8e4a448952d4cd9af82a6a1b684f9a3b0e27205d95cfc1", "blocks": [
+   {"role": "dropped", "runs": [[0, 14]], "tokens": [6, 8], "sha256": "2680500f0a268c071abaf51a3338a0ea3f523ef70d77f88d5ec4303d1f744327"},
+   {"role": "dropped", "runs": [[14, 42]], "tokens": [9, 11, 4, 4], "sha256": "6157bf1263132f90c999867404322920c09f87f867cfb9f1087cac987d261888"},
+   {"role": "heading", "runs": [[42, 57]], "tokens": [5, 2, 8], "sha256": "a9360e0212a4d173581c91da68494d022ee55871188be00acf863d2ed0cf7a6a"},
+   {"role": "list", "runs": [[57, 161]], "tokens": [3, 7, 12, 9, 11, 62], "sha256": "595f0a13bde653415bcb086b3b31c4adaf270cdbe3e2bd96c062ff7a0531da8c"},
+   {"role": "list", "runs": [[161, 262]], "tokens": [3, 6, 8, 84], "sha256": "c9c71fc4e875269b868cb3c880930bab8505ec4e3afa09974c2e901e36d74006"},
+   {"role": "list", "runs": [[262, 387]], "tokens": [3, 122], "sha256": "a712e9a30833509ee4215e9cc7ea71edf1d2413727488cd916ac443edad4f335"},
+   {"role": "list", "runs": [[387, 493]], "tokens": [3, 7, 3, 8, 85], "sha256": "9d5be0efe5326f420c411d0373f5a81004380567eb37b807413a2ef8612bded9"},
+   {"role": "list", "runs": [[493, 617]], "tokens": [3, 121], "sha256": "3a0f988243e242940483a4620899ea0594b2628fc75648d5e0468e3ecb9058f6"},
+   {"role": "list", "runs": [[617, 729]], "tokens": [3, 7, 4, 98], "sha256": "64e7808e841fa68e39526260df517db08083e11721c8e39eef82c88198292541"},
+   {"role": "list", "runs": [[729, 833]], "tokens": [3, 6, 11, 84], "sha256": "4e9b1d15a8579a0a23cf51a6b9d21597a4a9f93b8a207766f0e6001db87b8c51"},
+   {"role": "list", "runs": [[833, 961]], "tokens": [3, 9, 116], "sha256": "5cdc910d5b47b1d8afc661ba8a8a2f2faa814a42ae10fb466eb4098c978d29f4"},
+   {"role": "list", "runs": [[961, 1081]], "tokens": [3, 14, 103], "sha256": "7d0cde44dff0c71b1199bcebad1bfe789353728e6b59e1287c9ac17f034959ab"},
+   {"role": "list", "runs": [[1081, 1192]], "tokens": [3, 5, 103], "sha256": "b6fbdddbb596e4b515b04ab4afca9824ec7e52b11e4acf2e61b779dae0bdee9c"},
+   {"role": "list", "runs": [[1192, 1319]], "tokens": [3, 7, 117], "sha256": "ee4ef8e9b8328210ebf42a6481303209400d09f0297430519211b5b93e9874fd"},
+   {"role": "list", "runs": [[1319, 1445]], "tokens": [3, 9, 114], "sha256": "b9e495748ab6ab24b1b2a4ecfb618192039264e9846ac0079a1039923c9daa02"},
+   {"role": "list", "runs": [[1445, 1559]], "tokens": [3, 111], "sha256": "a85c58a96f1a374a0af33b4d773b19cf1783c52c226c59e4bc6f08964649b6c7"},
+   {"role": "list", "runs": [[1559, 1669]], "tokens": [3, 9, 4, 94], "sha256": "592e7cd6377b98caf2a4f5ed2a2f75b7e00820279d5f8fb71498918ef89543ca"},
+   {"role": "list", "runs": [[1669, 1771]], "tokens": [3, 9, 6, 8, 76], "sha256": "7d93fd64b6ec4db14b47b528bea4c071e20140cfea8efb075cdd89a3450f33cc"},
+   {"role": "dropped", "runs": [[1771, 1805]], "tokens": [13, 9, 2, 10], "sha256": "18dd08a7f9b24af7f155784dafd75e4fcb9b96e83ade847a66f065df732fc6c9"},
+   {"role": "dropped", "runs": [[1805, 1806]], "tokens": [1], "sha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"},
+   {"role": "dropped", "runs": [[1806, 1838]], "tokens": [4, 2, 11, 3, 12], "sha256": "f7be2c2b803ef0d9106dc5fc5790e1a29487c03a74dc60354e0a3d8d1f1a1a71"}
+  ]},
+  {"page": 3, "stream_sha256": "858dca16ea6045087efb88a80953698dce74ab8f94ad3042ae83697455f033e2", "blocks": [
+   {"role": "dropped", "runs": [[0, 14]], "tokens": [6, 8], "sha256": "2680500f0a268c071abaf51a3338a0ea3f523ef70d77f88d5ec4303d1f744327"},
+   {"role": "dropped", "runs": [[14, 42]], "tokens": [9, 11, 4, 4], "sha256": "6157bf1263132f90c999867404322920c09f87f867cfb9f1087cac987d261888"},
+   {"role": "heading", "runs": [[42, 90]], "tokens": [3, 7, 12, 6, 9, 11], "sha256": "b4e512eaaa31f2934fb720c33605b2c7881674c84dffa529d69223cc8892362f"},
+   {"role": "body", "runs": [[90, 673]], "tokens": [3, 7, 2, 4, 6, 2, 9, 11, 2, 2, 7, 3, 7, 4, 2, 12, 2, 3, 6, 2, 9, 11, 2, 4, 5, 5, 9, 9, 3, 11, 9, 2, 4, 7, 3, 8, 10, 9, 2, 11, 5, 11, 7, 4, 3, 7, 3, 8, 9, 8, 3, 8, 12, 6, 11, 2, 4, 13, 2, 4, 4, 7, 3, 12, 3, 10, 4, 6, 9, 7, 9, 6, 7, 3, 3, 5, 12, 2, 4, 7, 8, 2, 1, 7, 6, 4, 8, 8, 2, 9, 3, 9, 9, 2, 5, 11, 7], "sha256": "5a8cd540f5245f210bcac9f3e966b3a814be86c2bfa2a85454bbc48a39699de4"},
+   {"role": "body", "runs": [[673, 885]], "tokens": [2, 3, 3, 2, 4, 6, 3, 7, 4, 4, 1, 11, 13, 2, 3, 7, 11, 9, 6, 3, 4, 2, 4, 2, 8, 3, 6, 2, 9, 7, 9, 12, 2, 3, 11, 3, 4, 2, 3, 6, 6], "sha256": "438e58ada1d280b7a118bed9d3229ad8a4327b91a84ae26bd01538eff2604042"},
+   {"role": "body", "runs": [[885, 1195]], "tokens": [2, 4, 3, 6, 1, 9, 2, 4, 8, 3, 5, 2, 2, 2, 13, 2, 10, 3, 5, 14, 7, 2, 5, 1, 10, 4, 5, 5, 8, 10, 5, 6, 12, 6, 9, 8, 2, 5, 8, 3, 4, 3, 3, 6, 3, 5, 9, 2, 4, 5, 2, 8, 11, 7, 2, 3, 6, 6], "sha256": "d57beafd0737779c25c50548944767909071d6acae9ac8a21561f4ca7a3f3adc"},
+   {"role": "body", "runs": [[1195, 1405]], "tokens": [2, 5, 8, 3, 1, 9, 6, 3, 7, 8, 2, 7, 1, 7, 3, 3, 9, 12, 5, 8, 3, 6, 7, 4, 7, 9, 8, 3, 9, 3, 10, 4, 5, 9, 2, 12], "sha256": "ceedefb42a43dd2429d1bbe7ece78b3d02b9f6d7c0664564ff0d349fd47a41ff"},
+   {"role": "body", "runs": [[1405, 1611]], "tokens": [4, 2, 3, 8, 2, 4, 6, 3, 7, 4, 4, 9, 2, 8, 10, 11, 5, 3, 7, 6, 2, 3, 5, 2, 8, 2, 2, 5, 4, 3, 4, 10, 2, 3, 11, 4, 5, 4, 3, 5, 11], "sha256": "0780e430ba009aef379a910c6c4c46043f295caa534c5e7dcc56a32bfd30374f"},
+   {"role": "body", "runs": [[1611, 1807]], "tokens": [4, 6, 3, 7, 2, 3, 6, 2, 3, 3, 2, 5, 5, 9, 11, 2, 5, 2, 9, 3, 2, 3, 11, 3, 5, 3, 11, 5, 2, 2, 7, 3, 7, 3, 13, 7, 3, 14], "sha256": "40b593bb7ecdcddc96ad217e5f0cb8594a360fb58c36b8b05b9de9c18dd7066f"},
+   {"role": "heading", "runs": [[1807, 1834]], "tokens": [3, 6, 8, 10], "sha256": "193c9c4182768361fa3be41bf3bc1f66c4a100591d0942a18bd2876960ddde05"},
+   {"role": "body", "runs": [[1834, 1896]], "tokens": [2, 3, 3, 2, 3, 6, 3, 7, 4, 4, 12, 3, 7, 3], "sha256": "b674faf4f8860056eff28ab4871360d2b751c4d8fd61bf32ad2952c991a888b3"},
+   {"role": "list", "runs": [[1896, 1942]], "tokens": [2, 10, 3, 8, 2, 10, 11], "sha256": "f0d6c4137000b29b6dcbbe688f27ad2a9527d1b5c886cf977646929246d97f9b"},
+   {"role": "list", "runs": [[1942, 2006]], "tokens": [2, 5, 7, 9, 7, 3, 5, 2, 10, 7, 7], "sha256": "a31c461261eeb2c439a359c1473970cc20bba970cb47c92de3d1ff220ca4b4fc"},
+   {"role": "dropped", "runs": [[2006, 2040]], "tokens": [13, 9, 2, 10], "sha256": "18dd08a7f9b24af7f155784dafd75e4fcb9b96e83ade847a66f065df732fc6c9"},
+   {"role": "dropped", "runs": [[2040, 2041]], "tokens": [1], "sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"},
+   {"role": "dropped", "runs": [[2041, 2073]], "tokens": [4, 2, 11, 3, 12], "sha256": "f7be2c2b803ef0d9106dc5fc5790e1a29487c03a74dc60354e0a3d8d1f1a1a71"}
+  ]}
+ ]
+}

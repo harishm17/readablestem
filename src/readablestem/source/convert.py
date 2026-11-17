@@ -47,7 +47,7 @@ from readablestem.core.types import (
     SourceReport,
 )
 from readablestem.models.base import VisionClient
-from readablestem.pipeline import assemble, decoration, html_checks
+from readablestem.pipeline import assemble, decoration, html_checks, step_facts
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline import run as pipeline
@@ -268,6 +268,8 @@ def _convert(
 
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    watch = step_facts.Stopwatch()
+    watch.stage("source")  # LaTeXML in its sandbox, then reading what it wrote
     pipeline._send(stage_progress, "layout")
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
@@ -301,6 +303,7 @@ def _convert(
     return _finish(
         reading,
         started=started,
+        watch=watch,
         settings=settings,
         client=client,
         progress=progress,
@@ -321,6 +324,7 @@ def _finish(
     reading: ltx_reader.Reading,
     *,
     started: float,
+    watch: step_facts.Stopwatch,
     settings: Settings,
     client: VisionClient,
     progress: pipeline.ProgressFn | None,
@@ -367,6 +371,7 @@ def _finish(
         observer=call_observer,
         images=dict(reading.images),
     )
+    watch.stage("steps")
     try:
         run.start_stages(elements)
         run.process_page(0, elements)
@@ -379,6 +384,7 @@ def _finish(
             run.fixes[element_id] = ltx_reader.needs_decision(
                 run.fixes[element_id], ltx_reader.FORMULA_UNREAD
             )
+    watch.stage("assemble")
     ordered = pipeline._ordered_fixes(elements, run.fixes)
     pipeline._send(stage_progress, "assemble")
     html = assemble.render_html(
@@ -394,7 +400,14 @@ def _finish(
         unread=(reading.unread_words, reading.unread_pictures),
     )
     pipeline._send(stage_progress, "checks")
+    watch.stage("checks")
     checks = html_checks.static_checks(html)
+    # A source has no pages: every request is about the document.
+    facts = step_facts.gathered(
+        (fact for fix in ordered for fact in step_facts.of_fix(fix, None)),
+        watch,
+        step_facts.capped(ordered),
+    )
     wall_ms = round((time.perf_counter() - started) * 1000)
     stats = pipeline._stats(page_list, elements, ordered, run.page_ms, wall_ms)
     derived = [
@@ -427,4 +440,4 @@ def _finish(
         stats.model_calls,
         stats.cost_usd,
     )
-    return pipeline.PipelineOutput(result=result, crops=run.crops, checks=checks)
+    return pipeline.PipelineOutput(result=result, crops=run.crops, checks=checks, facts=facts)

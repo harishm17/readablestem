@@ -1,0 +1,282 @@
+# What people decide about a dependency. `scripts/dependency_record.py` joins this file with
+# uv.lock, the Dockerfile and each package's own metadata, and writes docs/dependencies.md.
+# The version of anything and the license of a Python package are never typed here: they are
+# read. The check (tests/test_dependency_record.py) fails for a locked package with no row, a
+# license that is neither permissive nor accepted below, a dependency we name directly with no
+# `use`, a package that reads a stranger's bytes with no `runs_in` or no `hostile` cases, and
+# a system package with neither a version in the Dockerfile nor a `follows` rule here.
+
+[licenses]
+# Permissive licenses. A package under one of these needs no entry under [accepted].
+allowed = [
+    "0BSD", "Apache-2.0", "BSD", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "ISC", "MIT",
+    "MIT-0", "MIT-CMU", "OFL-1.1", "PSF-2.0", "Unlicense", "Zlib",
+]
+
+[licenses.names]
+# How a package's metadata spells a license that the list above names. "BSD" stands for the
+# classifier "BSD License", which does not say which BSD text; every BSD text is permissive.
+"MIT License" = "MIT"
+"Apache Software License" = "Apache-2.0"
+"Apache 2.0" = "Apache-2.0"
+"BSD License" = "BSD"
+"3-Clause BSD License" = "BSD-3-Clause"
+"PSFL" = "PSF-2.0"
+"Python Software Foundation License" = "PSF-2.0"
+
+# ------------------------------------------------------------------------------- accepted
+# A license outside the permissive list, with the reason it is accepted. `license` is the
+# package's own statement, word for word: when a new version states another license, the
+# entry stops matching and the check fails until a person has read the new terms.
+
+[accepted.pymupdf]
+license = "Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License"
+why = "ADR 0003 (docs/decisions/0003-pdf-library-agpl.md): used under AGPL-3.0; the hosted app offers its complete source through the link in every page footer"
+
+[accepted.pymupdf-layout]
+license = "Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License"
+why = "ADR 0003 and its amendment of 2026-10-09: the same terms as PyMuPDF, for table proposals only"
+
+[accepted.psycopg]
+license = "LGPL-3.0-only"
+why = "used unmodified as a library installed from the index; LGPL-3.0 lets anyone replace it with another build (THIRD_PARTY_NOTICES.md)"
+
+[accepted.psycopg-binary]
+license = "LGPL-3.0-only"
+why = "the prebuilt psycopg, under the same terms and used the same way"
+
+[accepted.certifi]
+license = "MPL-2.0"
+why = "a file of root certificates, used unmodified; MPL-2.0 asks only that changes to its own files be published"
+
+[accepted.pgserver]
+license = "not stated"
+why = "its metadata states no license; a development tool only (an embedded PostgreSQL for local tests), never in the image and never distributed with this project"
+
+# ---------------------------------------------------------------------------------- python
+# One entry for every package pyproject.toml names. `reads` says what bytes of a stranger
+# the package is given; with it come `runs_in` (the process that holds the limits) and
+# `hostile` (the tests that feed it hostile input).
+
+[python.alembic]
+use = "database migrations (migrations/)"
+
+[python.anthropic]
+use = "the client for the Claude models (models/anthropic_client.py)"
+reads = "a model's reply"
+runs_in = "the worker, under the spend guard; a reply is parsed by our own validators before it is used"
+hostile = ["tests/test_steps_validate.py"]
+
+[python.authlib]
+use = "sign-in with an identity provider (web/auth.py)"
+
+[python.defusedxml]
+use = "every XML parse of the app: MathML, LaTeXML's output, export checks"
+reads = "XML made from an upload (LaTeXML's output) and MathML a model returned"
+runs_in = "the worker and the conversion child; entity expansion and external entities are refused by the library"
+hostile = ["tests/test_steps_validate.py", "tests/test_source_escapes.py"]
+
+[python.fastapi]
+use = "the web app's routes"
+reads = "every request"
+runs_in = "the web process"
+hostile = ["tests/test_audit_fuzz.py"]
+
+[python.httpx]
+use = "outgoing HTTP: model transports, the table model download at build, corpus fetchers of the eval tools"
+
+[python.itsdangerous]
+use = "signed session cookies and tokens (web/app.py)"
+
+[python.jinja2]
+use = "the site's templates; autoescape is on"
+
+[python.latex2mathml]
+use = "LaTeX to MathML for equations (pipeline/validate.py)"
+reads = "LaTeX a model returned"
+runs_in = "the worker, after the LaTeX allowlist and its limit of 2,000 characters"
+hostile = ["tests/test_steps_validate.py"]
+
+[python.markupsafe]
+use = "escaping of text placed into HTML"
+
+[python.numpy]
+use = "image arrays for the table models; required by py3langid"
+
+[python.onnxruntime]
+use = "runs the layout models, SLANet-plus and the optional local math reader on the CPU"
+reads = "page pictures of an upload, as arrays; the model files are ours, checked by SHA-256"
+runs_in = "the conversion child, under its memory and time limits"
+hostile = ["tests/test_audit_uploads.py"]
+
+[python.openai]
+use = "the client for OpenAI models (models/openai_client.py)"
+reads = "a model's reply"
+runs_in = "the worker, under the spend guard; a reply is parsed by our own validators before it is used"
+hostile = ["tests/test_steps_validate.py"]
+
+[python.pillow]
+use = "page and figure pictures: decode, crop, encode"
+reads = "pictures inside an upload"
+runs_in = "the conversion child; the pixel count of a picture is bounded before it is decoded"
+hostile = ["tests/test_audit_uploads.py"]
+
+[python.psycopg]
+use = "the PostgreSQL driver of the hosted app"
+
+[python.py3langid]
+use = "the language of a document and of passages in another language (pipeline/language.py)"
+reads = "text of an upload"
+runs_in = "the worker; it reads plain text only"
+hostile = ["tests/test_text_language.py"]
+
+[python.pydantic]
+use = "the data model of results and of model replies"
+
+[python.pydantic-settings]
+use = "settings from the environment"
+
+[python.pymupdf]
+use = "reads PDFs: text, pictures, structure; renders pages"
+reads = "every uploaded PDF"
+runs_in = "the conversion child: a separate process with memory, time and file-size limits, so a file that crashes, hangs or balloons the parser costs that child and nothing else"
+hostile = ["tests/test_audit_uploads.py", "tests/workflows/test_wf49_hostile_input.py"]
+
+[python.pymupdf-layout]
+use = "table proposals only (pipeline/tables.py); ruled out for reading order and as a witness"
+reads = "pages of an uploaded PDF"
+runs_in = "the conversion child, behind the probe that guards the table step"
+hostile = ["tests/test_audit_uploads.py", "tests/test_tables_fuzz.py"]
+
+[python.python-multipart]
+use = "parses upload forms for the web app"
+reads = "the body of every upload request"
+runs_in = "the web process, behind the size limits that hold before anything is parsed"
+hostile = ["tests/test_audit_uploads.py", "tests/test_audit_fuzz.py"]
+
+[python.sqlalchemy]
+use = "the database layer"
+
+[python.structlog]
+use = "structured logs with content-free fields"
+
+[python.uvicorn]
+use = "the web server"
+
+[python.langfuse]
+use = "optional tracing, off by default; inputs are masked when it is on"
+
+[python.pytest]
+use = "the test runner"
+
+[python.ruff]
+use = "the linter and formatter"
+
+[python.ty]
+use = "the type checker"
+
+[python.pgserver]
+use = "an embedded PostgreSQL for local tests"
+
+[python.pytest-xdist]
+use = "runs tests in parallel"
+
+[python.pytest-timeout]
+use = "a time limit for each test"
+
+[python.python-docx]
+use = "the tests open the Word export with it; never in the image"
+
+[python.playwright]
+use = "headless Chromium for the axe scans, the browser tests and equation rendering in the evals"
+
+# ---------------------------------------------------------------------------------- system
+# Everything the Dockerfile installs that is not in uv.lock. A Debian package's license is
+# typed here from its copyright file, since no metadata of ours holds it. `run_only` marks a
+# program that is only ever started as a child process and never linked, the one case in
+# which a copyleft license is allowed; `license_ok` gives the reason for any other license
+# that is not on the list. `follows` is the rule for a package with no version in the
+# Dockerfile.
+
+[system.pandoc]
+use = "writes the Word download from the finished HTML (pipeline/export_docx.py)"
+license = "GPL-2.0-or-later"
+run_only = true
+reads = "HTML this app wrote"
+runs_in = "a child process with a time limit"
+hostile = ["tests/test_export_docx.py"]
+
+[system.latexml]
+use = "converts uploaded LaTeX and Beamer source to XML and HTML (source/latexml.py); pulls in TeX Live's base, ImageMagick and Perl"
+license = "public domain (a work of NIST); TeX Live's base is LPPL-1.3c and other free licenses; ImageMagick's own license"
+run_only = true
+reads = "every uploaded LaTeX project"
+runs_in = "bubblewrap with no network, a read-only system and prlimit limits (core/sandbox.py); ImageMagick's policy allows PNG, JPEG and GIF only"
+hostile = ["tests/test_source_escapes.py", "tests/test_sandbox.py", "tests/test_archive_intake.py", "tests/workflows/test_wf49_hostile_input.py"]
+
+[system.bubblewrap]
+use = "the sandbox LaTeXML and TeX run in"
+license = "LGPL-2.0-or-later"
+run_only = true
+follows = "Debian's security updates for trixie: this is the sandbox itself, and a fixed version would hold a security fix back; the build prints what was installed"
+
+[system.util-linux]
+use = "prlimit, which sets the limits of a sandboxed child"
+license = "GPL-2.0-or-later and others"
+run_only = true
+follows = "Debian's security updates for trixie; part of the base system"
+
+[system.tini]
+use = "pid 1 of the container: forwards signals and reaps what a killed sandbox leaves behind"
+license = "MIT"
+follows = "Debian's security updates for trixie; the build prints its version"
+
+[system.libreoffice-writer-nogui]
+use = "Word uploads to a tagged PDF, headless, in a limited child (web/office_convert.py)"
+license = "MPL-2.0 and others"
+run_only = true
+follows = "Debian's security updates for trixie: LibreOffice reads strangers' files and gets security fixes often, so a fixed version would be out of date within weeks"
+reads = "every uploaded Word file"
+runs_in = "a child process with memory, time and output limits and its own empty profile"
+hostile = ["tests/test_office_convert.py"]
+
+[system.libreoffice-impress-nogui]
+use = "PowerPoint uploads to a tagged PDF, the same way"
+license = "MPL-2.0 and others"
+run_only = true
+follows = "Debian's security updates for trixie, as for Writer"
+reads = "every uploaded PowerPoint file"
+runs_in = "a child process with memory, time and output limits and its own empty profile"
+hostile = ["tests/test_office_convert.py"]
+
+[system.fonts-crosextra-carlito]
+use = "a font with the metrics of Calibri, so Word files keep their line breaks"
+license = "OFL-1.1"
+follows = "Debian trixie; a font file, with no code that runs"
+
+[system.fonts-crosextra-caladea]
+use = "a font with the metrics of Cambria"
+license = "Apache-2.0"
+follows = "Debian trixie; a font file, with no code that runs"
+
+[system.fonts-liberation2]
+use = "fonts with the metrics of Arial, Times New Roman and Courier New"
+license = "OFL-1.1"
+follows = "Debian trixie; a font file, with no code that runs"
+
+[system.onnx]
+use = "checks the optional local math reader's model files at build (math-reader stage); not in the runtime image"
+license = "Apache-2.0"
+
+[system.onnxruntime]
+use = "the same stage; the version the lock pins"
+license = "MIT"
+
+[system."ghcr.io/astral-sh/uv"]
+use = "the installer of the build stage; not in the runtime image"
+license = "Apache-2.0 OR MIT"
+
+[system.python]
+use = "the base image of every stage: Debian trixie (slim) with CPython 3.12"
+license = "PSF-2.0 (CPython); Debian's packages under their own free licenses"
+license_ok = "an operating system image: its programs are run, and the one part our code is loaded into is CPython"

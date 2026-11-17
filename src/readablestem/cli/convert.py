@@ -226,7 +226,9 @@ def _fix_table(output: ConversionOutput) -> list[str]:
         return ["  (no headings, equations, figures or tables found)"]
     width = max(len(s.value) for s in statuses) + 2
     lines = ["  " + f"{'kind':<10}" + "".join(f"{s.value:>{width}}" for s in statuses)]
-    for kind in (Kind.HEADING, Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
+    first = (Kind.HEADING, Kind.EQUATION, Kind.FIGURE, Kind.TABLE)
+    others = sorted({f.kind for f in fixes} - set(first), key=lambda kind: kind.value)
+    for kind in (*first, *others):
         row = [sum(1 for f in fixes if f.kind is kind and f.status is s) for s in statuses]
         if any(row):
             lines.append("  " + f"{kind.value:<10}" + "".join(f"{n:>{width}}" for n in row))

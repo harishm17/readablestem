@@ -57,7 +57,7 @@ import re
 import statistics
 import time
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -213,14 +213,28 @@ VECTOR_MIN_PATHS = 3
 # share of the page across; shorter or joined horizontal and vertical lines are marks.
 RULE_MIN_SHARE = 0.5
 
-# Time budget (C1.6). The ink analysis is pure Python and dense pages are slow (up to
-# 0.9 s a page measured; 30 dense pages took 34 s on one core). A document gets
-# INK_BUDGET_S of it, and a page with more than INK_MAX_ITEMS path items is not analysed
-# at all. A page not analysed says so (reason "ink_not_analysed"); with drawings and no
-# visible text at all, it is kept as a page image with a decision (`kept_reason`),
-# never answered "unreadable".
-INK_BUDGET_S = 10.0
+# Work budget (C1.6, plan WS14.9). The ink analysis is pure Python and dense pages are slow
+# (the densest corpus page, 117,162 path items, takes about 1.6 s). Each page is bounded by
+# counts of work, which are the same on every machine, so what a page holds never depends on
+# the machine or on how long the pages before it took: a page with more than INK_MAX_ITEMS
+# path items, or whose paths the analysis cuts into more than INK_MAX_SEGMENTS pieces, is not
+# analysed (cause INK_WORK). Measured on the corpus (2026-11-11, 329 pages): at most 117,162
+# items and 207,522 pieces on a page, so the limits leave 1.7 and 2.4 times that. A clock stays
+# only as a guard against a hang, INK_GUARD_S a page, about 40 times the slowest corpus page
+# (cause INK_TIME). A page not analysed says so (reason "ink_not_analysed" and its cause);
+# with drawings and no visible text at all, it is kept as a page image with a decision
+# (`kept_reason`), never answered "unreadable".
 INK_MAX_ITEMS = 200_000
+INK_MAX_SEGMENTS = 500_000
+INK_GUARD_S = 60.0
+INK_WORK = "work"
+INK_TIME = "time"
+# The upload probe (`document_refusal`, `image_page_count`) runs in a child that is killed
+# after 30 s (`web.uploads.INSPECT_TIMEOUT_S`), so the whole document has an allowance of path
+# items as well (the corpus's largest, a handwritten upload, has 386,717 on the pages that
+# are not clearly typed), and the guard is one deadline for the document.
+PROBE_MAX_ITEMS = 1_000_000
+PROBE_GUARD_S = 20.0
 # The page cap (docs/layout.md "Time budget"). Every analysis step after the drawings are
 # extracted costs time and memory for each path (a page of 86,000 strokes took 5 to 9 s
 # and 50 MB of Python objects in layout alone, 30 such pages 4 minutes and 1.8 GB), so a
@@ -321,7 +335,8 @@ class TextStats:
 
 @dataclass
 class InkStats:
-    analysed: bool = True  # False: over the time budget or the item cap
+    analysed: bool = True  # False: over a count of work, or the clock guard fired
+    cause: str = ""  # ... why: INK_WORK or INK_TIME (`InkBudget`)
     over_cap: bool = False  # too many drawings to read at all (`too_complex`)
     paths: int = 0  # visible drawings
     marks: int = 0  # ... that are not only straight lines (a paper template's rules)
@@ -382,19 +397,81 @@ class PageTypeResult:
             ink_pen_share=round(self.ink.pen_share, 3),
             ink_size_twins=round(self.ink.size_twins, 3),
             annot_strokes=self.ink.annot_strokes,
+            ink_cause=None if self.ink.analysed else self.ink.cause or INK_WORK,
             producer=self.producer,
             classifier_version=CLASSIFIER_VERSION,
         )
 
 
-class InkBudget:
-    """How long the ink analysis may still run for one document (C1.6)."""
+class InkOverrun(Exception):
+    """The ink analysis of a page stopped: `cause` is INK_WORK (a count ran out) or INK_TIME
+    (the clock guard fired)."""
 
-    def __init__(self, seconds: float = INK_BUDGET_S) -> None:
-        self.deadline = time.monotonic() + seconds
+    def __init__(self, cause: str) -> None:
+        super().__init__(cause)
+        self.cause = cause
+
+
+class InkBudget:
+    """What the ink analysis may spend (C1.6, plan WS14.9). Counted in work, per page: at most
+    INK_MAX_SEGMENTS pieces of path (`cut`), with INK_MAX_ITEMS checked by the callers. A
+    clock is only a guard against a hang: `seconds` (INK_GUARD_S unless given) from the start
+    of each page (`page`), or with `per_page` False one deadline for everything (the upload
+    probe). `items` is an allowance of path items for the whole document (`take`; None, the
+    conversion's case, for none). `ran_out` says the guard fired, so something was left
+    unread; whoever made the budget says so in the conversion's facts
+    (`core.types.NotFinished`), because a slower machine reaches it and a faster one does not."""
+
+    def __init__(
+        self,
+        seconds: float | None = None,
+        *,
+        per_page: bool = True,
+        items: int | None = None,
+        segments: int | None = None,
+    ) -> None:
+        self.seconds = INK_GUARD_S if seconds is None else seconds
+        self.per_page = per_page
+        self.items_left = items
+        self.segments = INK_MAX_SEGMENTS if segments is None else segments
+        self.ran_out = False
+        self._cut = 0
+        self._deadline = time.monotonic() + self.seconds
+
+    def page(self) -> None:
+        """A page starts: nothing of it is cut yet, and with a guard per page its clock
+        starts again."""
+        self._cut = 0
+        if self.per_page:
+            self._deadline = time.monotonic() + self.seconds
+
+    def take(self, items: int) -> bool:
+        """Spend `items` path items of the document's allowance; False when they do not fit,
+        and then nothing is left for the pages after it either."""
+        if self.items_left is None:
+            return True
+        if items > self.items_left:
+            self.items_left = 0
+            return False
+        self.items_left -= items
+        return True
+
+    def cut(self, pieces: int) -> None:
+        """Count `pieces` of path the analysis made; over the page's allowance it stops."""
+        self._cut += pieces
+        if self._cut > self.segments:
+            raise InkOverrun(INK_WORK)
 
     def left(self) -> bool:
-        return time.monotonic() < self.deadline
+        if time.monotonic() < self._deadline:
+            return True
+        self.ran_out = True
+        return False
+
+    def check(self) -> None:
+        """Stop the analysis when the guard has fired."""
+        if not self.left():
+            raise InkOverrun(INK_TIME)
 
 
 # ---------------------------------------------------------------------------- geometry
@@ -1224,12 +1301,13 @@ def ink_stats(
     seen: Sequence[tuple[bool, bool]] | None = None,
 ) -> InkStats:
     """Handwriting evidence from the drawings layout extracted. Counts the visible paths
-    always; the stroke analysis only within the budget and the item cap. `seen` is
-    `paint_visibility` of these drawings when the caller has it already."""
+    always; the stroke analysis only within the item cap and the `budget` (`InkBudget`: a
+    count of path pieces, the document's allowance of items when it has one, and the clock
+    guard). `seen` is `paint_visibility` of these drawings when the caller has it already."""
     stats = InkStats()
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
     if too_complex(drawings):  # nothing below is worth its time on such a page
-        stats.analysed, stats.over_cap = False, True
+        stats.analysed, stats.over_cap, stats.cause = False, True, INK_WORK
         stats.paths = stats.marks = len(drawings)  # unknown: not blank, not refused
         stats.items = sum(len(d.get("items") or ()) for d in drawings)
         return stats
@@ -1247,12 +1325,31 @@ def ink_stats(
             stats.marks += 1
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_INK]) or []:
         stats.annot_strokes += len(annot.vertices or [])
-    if stats.items > INK_MAX_ITEMS or (budget is not None and stats.paths and not budget.left()):
-        stats.analysed = False
+    if stats.items > INK_MAX_ITEMS:
+        stats.analysed, stats.cause = False, INK_WORK
         return stats
     if not stats.paths:
         return stats
-    cands = _ink_candidates(page, drawings, seen)
+    if budget is not None:
+        budget.page()
+        if not budget.take(stats.items):
+            stats.analysed, stats.cause = False, INK_WORK
+            return stats
+    try:
+        if budget is not None:
+            budget.check()
+        cands = _ink_candidates(page, drawings, seen, budget)
+        if budget is not None:
+            budget.check()
+    except InkOverrun as stop:
+        return InkStats(
+            analysed=False,
+            cause=stop.cause,
+            paths=stats.paths,
+            marks=stats.marks,
+            items=stats.items,
+            annot_strokes=stats.annot_strokes,
+        )
     return _summarise(page, stats, cands)
 
 
@@ -1260,9 +1357,11 @@ def _ink_candidates(
     page: pymupdf.Page,
     drawings: Sequence[dict[str, Any]],
     seen: Sequence[tuple[bool, bool]] | None = None,
+    budget: InkBudget | None = None,
 ) -> list[_Candidate]:
     """Every subpath that could be a pen stroke. /Ink annotation appearances are in the
-    drawings already (MuPDF traces them), so they are not added again."""
+    drawings already (MuPDF traces them), so they are not added again. The pieces each path
+    is cut into are counted against the `budget` (`InkOverrun` when it is spent)."""
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
     display = _Display(page)
     cands: list[_Candidate] = []
@@ -1298,6 +1397,8 @@ def _ink_candidates(
     if seen is None:
         seen = paint_visibility(drawings, image_boxes(page)[0])
     for index, d in enumerate(drawings):
+        if budget is not None and not index & 255:
+            budget.check()
         filled, stroked = seen[index]
         if not (filled or stroked):
             continue
@@ -1307,6 +1408,8 @@ def _ink_candidates(
         if rect[2] - rect[0] < STROKE_MIN_SIDE and rect[3] - rect[1] < STROKE_MIN_SIDE and filled:
             for sub in _subpaths(d.get("items") or []):  # a dot is a sample of a stroke still
                 pts = _flatten(sub)[0]
+                if budget is not None:
+                    budget.cut(len(pts))
                 prim = _sample_prim(pts, d, index, page, tones) if filled else None
                 if prim is None:
                     other()
@@ -1317,6 +1420,8 @@ def _ink_candidates(
         width = float(d.get("width") or 0.0)
         for sub in _subpaths(d.get("items") or []):
             pts, curves, lines = _flatten(sub)
+            if budget is not None:
+                budget.cut(len(pts))
             if not pts:
                 if not filled:
                     flush()
@@ -1715,9 +1820,9 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     """The Fix reason when this app keeps the whole page as its image (nothing on it is
     converted), else None. There is no handwriting or scan conversion: handwritten and
     scanned pages are kept as images, and so is a page with drawings and less than a line
-    of visible text whose ink could not be analysed in time (C1.6: a page of notes with a
-    typed title, after the budget ran out, may be handwriting; its title is kept in the
-    page image). Works on a classifier result and on the stored record alike."""
+    of visible text whose ink was not analysed (C1.6: a page of notes with a typed title,
+    over a count of work or stopped by the clock guard, may be handwriting; its title is
+    kept in the page image). Works on a classifier result and on the stored record alike."""
     if page.kind in HANDWRITTEN_KINDS:
         return HANDWRITTEN_PAGE
     if page.kind == "scan_no_text" and _visible_chars(page):
@@ -1736,6 +1841,17 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     ):
         return UNREAD_PAGE
     return None
+
+
+def ink_stops(pages: Mapping[int, PageTypeResult]) -> dict[int, str]:
+    """The pages whose ink was not analysed, each with its cause (INK_WORK: a count ran out,
+    the same on every machine; INK_TIME: the clock guard fired), in page order. Such a page
+    is typed without its ink."""
+    return {
+        number: page.ink.cause or INK_WORK
+        for number, page in sorted(pages.items())
+        if not page.ink.analysed
+    }
 
 
 def reads_image(page: PageTypeResult | PageType) -> bool:
@@ -1902,10 +2018,24 @@ def _text_misses_picture(text: TextStats, coverage: float) -> bool:
     )
 
 
-def document_refusal(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -> str | None:
+def _probe_budget(budget_s: float) -> InkBudget:
+    """The upload probe's budget: the document's allowance of path items, and one deadline
+    for the whole document as the guard."""
+    return InkBudget(budget_s, per_page=False, items=PROBE_MAX_ITEMS)
+
+
+def _probe_ink(page: pymupdf.Page, budget: InkBudget) -> InkStats:
+    if not budget.left():  # the guard: not even the drawings are read
+        return InkStats(analysed=False, cause=INK_TIME, paths=1, marks=1)  # unknown
+    return ink_stats(page, page.get_cdrawings(), budget)
+
+
+def document_refusal(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> str | None:
     """`refusal_code` for a whole open document (the upload probe). Reads the text of
     each page first and stops at the first clearly typed page, so only documents with
-    no such page pay for the drawings and the ink analysis (within `budget_s`)."""
+    no such page pay for the drawings and the ink analysis (within `PROBE_MAX_ITEMS` path
+    items, and `budget_s` as the guard). A page whose ink was not analysed is never refused:
+    the conversion keeps it as an image with a decision."""
     texts: list[tuple[int, pymupdf.Page, TextStats, float]] = []
     for number in range(doc.page_count):
         page = doc[number]
@@ -1915,25 +2045,45 @@ def document_refusal(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
         if clearly_convertible(stats, coverage):
             return None
         texts.append((number, page, stats, coverage))
-    budget = InkBudget(budget_s)
+    budget = _probe_budget(budget_s)
     hint = producer_hint(doc)
-    records = []
-    for number, page, stats, coverage in texts:
-        drawings = page.get_cdrawings() if budget.left() else None
-        if drawings is None:
-            ink = InkStats(analysed=False, paths=1, marks=1)  # unknown: never refused
-        else:
-            ink = ink_stats(page, drawings, budget)
-        records.append(decide(stats, ink, coverage, hint).to_record(number))
+    records = [
+        decide(stats, _probe_ink(page, budget), coverage, hint).to_record(number)
+        for number, page, stats, coverage in texts
+    ]
     return refusal_code(records)
 
 
-def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -> int:
+@dataclass(frozen=True)
+class ImagePageCount:
+    """How many pages are scanned or handwritten (`image_page_count`): `found`, and
+    `unanalysed` pages whose ink was not analysed, any of which may be one more."""
+
+    found: int = 0
+    unanalysed: int = 0
+
+    @property
+    def at_least(self) -> bool:
+        return self.unanalysed > 0
+
+    @property
+    def possible(self) -> bool:
+        """The document may have such a page: one was found, or one could not be told."""
+        return self.found > 0 or self.unanalysed > 0
+
+    @property
+    def words(self) -> str:
+        """The count as a sentence says it: "3", or "at least 3"."""
+        return f"at least {self.found}" if self.at_least else str(self.found)
+
+
+def image_page_count(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> ImagePageCount:
     """How many pages of an open document are scanned or handwritten, the pages the image
     page pass reads (ADR 0007: `kept_reason` "scanned_page" or "handwritten_page"). Typed
     pages are told from their text alone, so only a page that is not clearly typed pays for the
-    drawings and the ink analysis, within `budget_s` (a page not analysed in time is not counted:
-    the conversion keeps such a page as an image, never reads it)."""
+    drawings and the ink analysis, within `PROBE_MAX_ITEMS` path items and `budget_s` as the
+    guard. A page whose ink was not analysed, and that its text and pictures do not already
+    make a scan, is counted apart (`ImagePageCount.unanalysed`): the count is then "at least"."""
     candidates: list[tuple[int, pymupdf.Page, TextStats, float]] = []
     for number in range(doc.page_count):
         page = doc[number]
@@ -1943,15 +2093,15 @@ def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
         if not clearly_convertible(stats, coverage):
             candidates.append((number, page, stats, coverage))
     if not candidates:
-        return 0
-    budget = InkBudget(budget_s)
+        return ImagePageCount()
+    budget = _probe_budget(budget_s)
     hint = producer_hint(doc)
-    found = 0
+    found = unanalysed = 0
     for number, page, stats, coverage in candidates:
-        drawings = page.get_cdrawings() if budget.left() else None
-        if drawings is None:
-            continue
-        ink = ink_stats(page, drawings, budget)
+        ink = _probe_ink(page, budget)
         record = decide(stats, ink, coverage, hint).to_record(number)
-        found += reads_image(record)
-    return found
+        if reads_image(record):
+            found += 1
+        elif not ink.analysed:
+            unanalysed += 1
+    return ImagePageCount(found, unanalysed)

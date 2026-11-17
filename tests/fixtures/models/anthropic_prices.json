@@ -1,0 +1,18 @@
+{
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "read": "2026-11-11",
+  "unit": "USD per 1M tokens, first-party API, standard tier; cache_write is the 5-minute lifetime",
+  "models": {
+    "claude-fable-5-2": {"input": 8.00, "output": 40.00, "cache_read": 0.20, "cache_write": 10.00},
+    "claude-opus-5-5": {"input": 4.00, "output": 20.00, "cache_read": 0.20, "cache_write": 5.00},
+    "claude-sonnet-5-5": {"input": 2.00, "output": 10.00, "cache_read": 0.10, "cache_write": 2.50},
+    "claude-haiku-5-5": {
+      "input": 0.10,
+      "output": 0.50,
+      "cache_read": 0.01,
+      "cache_write": 0.125,
+      "above_prompt_tokens": 100000,
+      "above": {"input": 0.50, "output": 2.50, "cache_read": 0.05, "cache_write": 0.625}
+    }
+  }
+}

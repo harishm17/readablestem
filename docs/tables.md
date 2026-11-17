@@ -74,7 +74,8 @@ the largest that got through the detector at all):
   beyond that from `DETECTOR_EXCESS_S` (60 s) for the whole document, and when it is used
   up the document's remaining pages get no proposals (one content-free warning). A
   document within the budget reads exactly as it would without one; one over it depends
-  on the machine's speed from there on, as the ink analysis does (`INK_BUDGET_S`).
+  on the machine's speed from there on (plan WS5.14; the ink analysis's budget is counted
+  in work since WS14.9).
 
 The detector's time depends on what is drawn on the page, not on its tables, and is
 nearly all inside PyMuPDF: a lecture slide with 202 pen-stroke paths (11,000 curve items)

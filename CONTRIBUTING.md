@@ -28,6 +28,14 @@ is.
 - **Test behavior, not code.** CLAUDE.md, "What tests to write here", says which tests
   earn a place. In short: a bug fix gets one regression test, and copy, markup, constants,
   private helpers and permutations of the same path do not get tests.
+- **Workflow tests** (`tests/workflows`, marked `workflow`) follow a person through the
+  app on a corpus file. One file per workflow, `test_wfNN_<name>.py`; one test per thing
+  the person gets, named for it (`test_the_student_file_has_one_top_heading`). A test reads
+  what the person gets through a parser (the student HTML, a page of the app), never by
+  searching raw HTML. It converts only files of the corpus manifest, from recorded
+  answers. A test that an open finding makes false is marked `@harness.finding("F-nnn")`,
+  which fails the run once the finding is fixed until the mark is removed.
+  `tests/workflows/test_suite_rules.py` checks the names, the files and the marks.
 - **Only inputs that can be published.** Test and example documents must be your own work
   (contributed under MIT) or OpenStax material from books published under CC BY, with
   attribution.

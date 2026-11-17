@@ -21,6 +21,7 @@ from readablestem.cli import convert, eval_cli, ops, serve
 from readablestem.cli import devset as devset_cli_reg
 from readablestem.cli import export as export_cli
 from readablestem.cli import heldout as heldout_cli
+from readablestem.cli import layout_gold as layout_gold_cli
 from readablestem.cli import proof as proof_cli
 
 GOLD_DIR = Path("data/gold")
@@ -392,6 +393,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.set_defaults(func=_cmd_gold_verify)
 
     devset_cli_reg.register(gold)
+    layout_gold_cli.register(gold)
 
     manifest = gold.add_parser("manifest", help="rebuild manifest.json and ATTRIBUTION.md")
     manifest.add_argument("--out", type=Path, help="gold dir (default: <project>/data/gold)")

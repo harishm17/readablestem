@@ -1,0 +1,34 @@
+{
+ "id": "a6_two_up",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Introductory Biology Chapter 3"},
+   {"role": "heading", "text": "Section 1"},
+   {"role": "body", "text": "Paragraph 1 begins here. This sentence 1a explains one idea about cell biology in plain words. Sentence 1b continues the same idea with a second clause, so a reader can follow it. Sentence 1c ends paragraph 1."},
+   {"role": "body", "text": "Paragraph 2 begins here. This sentence 2a explains one idea about cell biology in plain words. Sentence 2b continues the same idea with a second clause, so a reader can follow it. Sentence 2c ends paragraph 2."},
+   {"role": "body", "text": "Paragraph 3 begins here. This sentence 3a explains one idea about cell biology in plain words. Sentence 3b continues the same idea with a second clause, so a reader can follow it. Sentence 3c ends paragraph 3."},
+   {"role": "dropped", "text": "41"},
+   {"role": "dropped", "text": "Introductory Biology Chapter 3"},
+   {"role": "heading", "text": "Section 2"},
+   {"role": "body", "text": "Paragraph 11 begins here. This sentence 11a explains one idea about cell biology in plain words. Sentence 11b continues the same idea with a second clause, so a reader can follow it. Sentence 11c ends paragraph 11."},
+   {"role": "body", "text": "Paragraph 12 begins here. This sentence 12a explains one idea about cell biology in plain words. Sentence 12b continues the same idea with a second clause, so a reader can follow it. Sentence 12c ends paragraph 12."},
+   {"role": "body", "text": "Paragraph 13 begins here. This sentence 13a explains one idea about cell biology in plain words. Sentence 13b continues the same idea with a second clause, so a reader can follow it. Sentence 13c ends paragraph 13."},
+   {"role": "dropped", "text": "42"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Introductory Biology Chapter 3"},
+   {"role": "heading", "text": "Section 3"},
+   {"role": "body", "text": "Paragraph 21 begins here. This sentence 21a explains one idea about cell biology in plain words. Sentence 21b continues the same idea with a second clause, so a reader can follow it. Sentence 21c ends paragraph 21."},
+   {"role": "body", "text": "Paragraph 22 begins here. This sentence 22a explains one idea about cell biology in plain words. Sentence 22b continues the same idea with a second clause, so a reader can follow it. Sentence 22c ends paragraph 22."},
+   {"role": "body", "text": "Paragraph 23 begins here. This sentence 23a explains one idea about cell biology in plain words. Sentence 23b continues the same idea with a second clause, so a reader can follow it. Sentence 23c ends paragraph 23."},
+   {"role": "dropped", "text": "43"},
+   {"role": "dropped", "text": "Introductory Biology Chapter 3"},
+   {"role": "heading", "text": "Section 4"},
+   {"role": "body", "text": "Paragraph 31 begins here. This sentence 31a explains one idea about cell biology in plain words. Sentence 31b continues the same idea with a second clause, so a reader can follow it. Sentence 31c ends paragraph 31."},
+   {"role": "body", "text": "Paragraph 32 begins here. This sentence 32a explains one idea about cell biology in plain words. Sentence 32b continues the same idea with a second clause, so a reader can follow it. Sentence 32c ends paragraph 32."},
+   {"role": "body", "text": "Paragraph 33 begins here. This sentence 33a explains one idea about cell biology in plain words. Sentence 33b continues the same idea with a second clause, so a reader can follow it. Sentence 33c ends paragraph 33."},
+   {"role": "dropped", "text": "44"}
+  ]}
+ ]
+}

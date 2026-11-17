@@ -388,7 +388,7 @@ def build(
         for f in held.fixes:
             fixes.setdefault(f.element_id, f)
     labels = item_labels(result)
-    counts = job_page.breakdown(result.fixes)
+    counts = job_page.breakdown(result.fixes, result.notices)
     summary = checked.of_result(result)
     decisions = []
     ordered = sorted(edits, key=lambda e: (as_utc(e.created_at) or e.created_at, e.id))

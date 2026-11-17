@@ -525,6 +525,19 @@ def gaps_of(job: Facts, left: int, viewer: str = "owner") -> list[Gap]:
     return out
 
 
+def _unanalysed_pages(result: Mapping[str, Any] | None) -> int:
+    """Pages of a stored result whose drawings were not analysed (a notice each)."""
+    notices = (result or {}).get("notices") or []
+    return len({n.get("page") for n in notices if n.get("code") == "drawings_not_analysed"})
+
+
+def _unanalysed_message(pages: int) -> str:
+    return (
+        f"The drawings on {checked_words.plural(pages, 'page')} were not analyzed, so check the "
+        "notices before you share it."
+    )
+
+
 def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
     gaps = gaps_of(job, left, viewer)
     review_ok = viewer in ("owner", "review")
@@ -542,6 +555,10 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
     steps = (download, share) if viewer == "owner" else (download,)
     summary = counts.summary
     if summary is not None and summary.ready_to_share:
+        if pages := _unanalysed_pages(job.result_json):
+            # The ink analysis ran out of work on these pages (`drawings_not_analysed`): the
+            # page cannot say everything was converted.
+            return _make("ready_remains", _unanalysed_message(pages), steps)
         return _make("ready", checked_words.READY_ALL, steps)
     # Not known to be whole (no summary), or a part is a picture, a page is left out or a
     # structure check failed: "Ready", and what remains, never "Ready to share".

@@ -45,6 +45,24 @@
   {% endif %}
 </section>
 
+<section aria-labelledby="steps-heading">
+  <h2 id="steps-heading">Model work of recent documents</h2>
+  <p>From the newest {{ step_jobs }} documents finished in the last {{ step_days }} days. The
+    whole table, by step and by stage: <code>readablestem ops step-report</code>.</p>
+  {% if steps.jobs %}
+  <dl class="summary-list">
+    <div><dt>Documents and pages</dt><dd>{{ steps.jobs }} and {{ steps.pages }}</dd></div>
+    <div><dt>Input read from the prompt cache</dt><dd>{% if steps.cache_read is not none %}{{ "%.0f"|format(100 * steps.cache_read) }}%{% else %}No model input{% endif %}</dd></div>
+    <div><dt>Seconds a page, for half of the documents</dt><dd>{% if steps.s_per_page_p50 is not none %}{{ "%.1f"|format(steps.s_per_page_p50) }}{% else %}Not timed{% endif %}</dd></div>
+    <div><dt>Seconds a page, for 95 in 100</dt><dd>{% if steps.s_per_page_p95 is not none %}{{ "%.1f"|format(steps.s_per_page_p95) }}{% else %}Not timed{% endif %}</dd></div>
+    <div><dt>Model calls a page</dt><dd>{{ "%.1f"|format(steps.calls_per_page) }}</dd></div>
+    <div><dt>Dollars a page</dt><dd>{{ steps.usd_per_page|usd }}</dd></div>
+  </dl>
+  {% else %}
+  <p>No document measured yet.</p>
+  {% endif %}
+</section>
+
 <section aria-labelledby="signup-heading">
   <h2 id="signup-heading">Sign-up</h2>
   <p>{% if signup.open %}Open: anyone with a verified Google account (or an allowed Microsoft

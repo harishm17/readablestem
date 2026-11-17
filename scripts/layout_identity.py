@@ -21,9 +21,9 @@ dev-v2/check-*`) and `proof/` are never read. `--extra DIR` adds the PDFs under 
 `LAYOUT_DISPLAY_GROUPING=true` in the environment runs the snapshot with the display-grouping
 rules on (off by default, as in production).
 
-The ink analysis of a document has a time budget (`page_type.INK_BUDGET_S`), so a PDF of
-very dense pages can read differently on a loaded machine: take both snapshots on a quiet
-machine, or look at such a PDF by hand.
+The ink analysis is bounded per page by counts of work (`page_type.InkBudget`), the same on
+any machine; its clock is only a guard against a hang. The table search still has a time
+budget (`tables.DetectorBudget`), so take both snapshots on a quiet machine.
 """
 
 from __future__ import annotations

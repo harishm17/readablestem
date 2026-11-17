@@ -47,7 +47,9 @@ Untrusted input: MuPDF is C code parsing bytes from the internet, and some damag
 make it abort the whole process (a glibc double free while rendering). Before a page is
 extracted or rendered in this process, `analyze` and `crop` have a child process do the
 same once (`_probe_pages`); a child that dies or hangs makes the file
-`LayoutError("unreadable")`.
+`LayoutError("unreadable")`. Before that, `analyze` counts how far the selected pages'
+drawing instructions inflate and refuses them over the content budget
+(`core.content_budget`, `LayoutError("content_too_large")`), since every step parses them.
 MuPDF's own error and warning printing is switched off: it quotes content-stream tokens
 and resource names from the PDF, which must not reach the logs.
 
@@ -82,6 +84,7 @@ from typing import Any, Literal, cast
 import pymupdf
 
 from readablestem.config import ConfigError
+from readablestem.core import content_budget
 from readablestem.core import images as pixel_budget
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.childenv import child_env
@@ -449,6 +452,8 @@ class LayoutError(ValueError):
         # "unreadable" | "encrypted" | "too_many_pages" | "no_pages" | "page_out_of_range"
         # | "too_complex" (a page needs more time or memory to read than a conversion has)
         # | "image_too_large" (decoding its pictures took longer than a job may spend)
+        # | "content_too_large" (a page's drawing instructions inflate past the content
+        # budget, `core.content_budget`: the upload probe refuses these first)
         self.code = code
 
 
@@ -516,7 +521,8 @@ class Layout:
     lang: str = "en"  # PDF /Lang if present, else "en"
     # Layout facts the job page lists ("Not handled in this file", review "none"): a
     # block of program code, a footnote (`_layout_notices`), hidden text left out
-    # (`_hidden_text_notices`). Codes, ids and counts only.
+    # (`_hidden_text_notices`), drawings not analysed (`_ink_notices`). Codes, ids and
+    # counts only.
     notices: list[Notice] = field(default_factory=list)
     # Per analysed page, what it is (`pipeline.page_type`; `to_record` gives the stored,
     # content-free form).
@@ -561,7 +567,9 @@ def analyze(
         try:
             doc = _open(pdf_bytes)
             try:
+                _check_content(lambda: content_budget.check_objects(doc))  # before the page tree
                 selected = _select_pages(doc.page_count, pages, max_pages)
+                _check_content(lambda: content_budget.check(doc, selected))
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
                 return _analyze_document(doc, selected, page_math, display_grouping)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
@@ -881,7 +889,7 @@ def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int
 
 def page_ink(pdf_bytes: bytes, page: int, *, budget: Any = None) -> tuple[Any, BBox]:
     """The pen strokes of a page (`ink_strokes.PageInk`) and the page's box in points, read
-    within the document's ink `budget` (`page_type.InkBudget`). Same document cache and lock as
+    within the ink `budget` (`page_type.InkBudget`). Same document cache and lock as
     `crop`."""
     from readablestem.pipeline import ink_strokes
 
@@ -1240,6 +1248,18 @@ def _open(pdf_bytes: bytes) -> pymupdf.Document:
         doc.close()
         raise LayoutError("encrypted", "the PDF needs a password to open")
     return doc
+
+
+def _check_content(check: Callable[[], None]) -> None:
+    """Run a check of the content budget (`core.content_budget`) and refuse the document
+    when it is over: the object streams before the page tree is read, the selected pages
+    before any step parses them (each step parses all of their content again). Every PDF
+    converted comes here (the worker, `readablestem convert`, the evals), whether or not it
+    passed the upload probe."""
+    try:
+        check()
+    except content_budget.ContentTooLarge as exc:
+        raise LayoutError("content_too_large", str(exc)) from None
 
 
 def _select_pages(page_count: int, pages: list[int] | None, max_pages: int | None) -> list[int]:
@@ -10776,7 +10796,7 @@ def _analyze_document(
         page_sizes=[p.size for p in pages],
         title=title,
         lang=_document_lang(doc),
-        notices=notices + _hidden_text_notices(types, kept),
+        notices=notices + _hidden_text_notices(types, kept) + _ink_notices(types, kept),
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
     )
@@ -11084,6 +11104,20 @@ def _edge_band(path: _Path, page_rect: pymupdf.Rect) -> bool:
     return (touches_y and y1 - y0 <= FRAME_EDGE_BAND * h) or (
         touches_x and x1 - x0 <= FRAME_EDGE_BAND * w
     )
+
+
+NOT_ANALYSED = "drawings_not_analysed"
+
+
+def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str]) -> list[Notice]:
+    """A page read for its text whose drawings were not analysed (`page_type.InkBudget`: a
+    count of work ran out, or the clock guard fired) may hold handwriting nobody looked for:
+    "Worth checking". A page kept whole as its image has a notice and a decision of its own."""
+    return [
+        Notice(code=NOT_ANALYSED, page=number, review="optional")
+        for number, kind in sorted(types.items())
+        if not kind.ink.analysed and number not in kept
+    ]
 
 
 def _hidden_text_notices(

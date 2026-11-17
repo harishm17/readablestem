@@ -8,9 +8,17 @@ as the step ends, and when the same job is converted again it gives those back, 
 again" asks the model only for what is missing and spends only on that.
 
 A record is used only under the key it was made with (`pipeline.run.step_key`): the same
-element, picture, nearby text, options and models. A document that changed, a different
-course notation or another model finds nothing and asks again. Failures a new try could
-change (the service did not answer, a budget ran out) are never stored (`run.reusable`).
+element, picture, nearby text, options, behaviour settings and conversion code. A document
+that changed, a different course notation, another model or a new release finds nothing and
+asks again. Failures a new try could change (the service did not answer, a budget ran out)
+are never stored (`run.reusable`).
+
+The passes that ask about a whole page (page math, the page witness, pages read from a
+picture) have no element to hang a fix on. Each of their answers is kept as it came, in a
+record whose slot is `ANSWER_SLOT` plus the start of the question's key
+(`models.question.question_key`), and given back to the same question on the next try. The
+key is the question and nothing else, so the answer is read again by whatever code the next
+try runs. Only what was stored before this try began is given back.
 
 The cache never fails a conversion: a read or write that raises is logged by type and
 counts as a miss. Nothing here is logged with content. Records are document-derived and
@@ -26,11 +34,19 @@ from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from readablestem.core.types import Element, Fix
+from readablestem.core.types import Element, Fix, ModelCall
 from readablestem.web.db import StepRecord, session_scope
 from readablestem.web.logsafe import log_event, log_exception
 
 logger = logging.getLogger(__name__)
+
+# The slot (`StepRecord.element_id`) of a page-level answer: this, then the first
+# characters of its key. No element id starts with it.
+ANSWER_SLOT = "q:"
+
+
+def _slot(key: str) -> str:
+    return ANSWER_SLOT + key[:62]
 
 
 class DbStepCache:
@@ -105,6 +121,43 @@ class DbStepCache:
             return
         with self._lock:
             self._records()[element.id] = (key, payload)
+
+    def answer(self, key: str) -> dict | None:
+        with self._lock:
+            found = self._records().get(_slot(key))
+        if found is None or found[0] != key:
+            return None
+        row = found[1]
+        try:
+            call = ModelCall.model_validate(row["call"])
+        except (KeyError, TypeError, ValidationError):  # written by another release
+            return None
+        with self._lock:
+            self.reused += 1
+            self.reused_usd += call.cost_usd
+            self.reused_calls += 1
+        return row
+
+    def keep(self, key: str, row: dict) -> None:
+        # (Not added to what `answer` reads: a request this run repeats is asked again.)
+        slot = _slot(key)
+        try:
+            with session_scope(self._factory) as session:
+                session.execute(
+                    delete(StepRecord).where(
+                        StepRecord.job_id == self._job_id, StepRecord.element_id == slot
+                    )
+                )
+                session.add(
+                    StepRecord(
+                        job_id=self._job_id,
+                        element_id=slot,
+                        input_key=key,
+                        fix_json=_without_nul(row),
+                    )
+                )
+        except Exception as exc:  # the job may have been deleted meanwhile; never fatal
+            log_exception(logger, "step_cache_write_failed", exc, job_id=self._job_id)
 
     def log_reuse(self) -> None:
         if self.reused:

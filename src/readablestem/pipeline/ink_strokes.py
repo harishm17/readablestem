@@ -41,8 +41,10 @@ import pymupdf
 
 from readablestem.pipeline.page_type import (
     INK_MAX_ITEMS,
+    INK_WORK,
     PAGE_MAX_PATHS,
     InkBudget,
+    InkOverrun,
 )
 
 BBox = tuple[float, float, float, float]
@@ -50,8 +52,9 @@ Point = tuple[float, float]
 
 # ---------------------------------------------------------------------------- limits
 
-# The caps and the time budget are the page-type analysis's (one definition): a page with
-# more drawings or path items, or an analysis that outruns the budget, is not read.
+# The caps and the budget are the page-type analysis's (one definition, `InkBudget`): a page
+# with more drawings, path items or pieces of path than they allow is not read, and neither is
+# one whose analysis the clock guard stops.
 MAX_STROKES = 20_000  # strokes before grouping; more is not handwriting (or is hostile)
 GRID_MAX_CELLS = 256  # a box over more grid cells than this is compared with every other
 GRID_MAX_BIG = 2000  # ... and a page with more such boxes than this is not grouped
@@ -170,6 +173,7 @@ class PageInk:
     regions: list[InkRegion] = field(default_factory=list)  # reading order
     dropped: dict[str, int] = field(default_factory=dict)  # furniture removed, by reason
     analysed: bool = True  # False: the page was over the caps and nothing was read
+    cause: str = ""  # ... why: `page_type.INK_WORK` (a count) or `INK_TIME` (the clock guard)
 
 
 # ---------------------------------------------------------------------------- reading
@@ -192,14 +196,9 @@ class Prim:
     outline_ok: bool = False  # short: can be read as a thin outline
 
 
-class InkOverrun(Exception):
-    """The time budget or a cap ran out: the page is not read (`extract_ink` says so with
-    `analysed` False; `group_regions` called alone raises this)."""
-
-
 def _tick(budget: InkBudget | None) -> None:
-    if budget is not None and not budget.left():
-        raise InkOverrun
+    if budget is not None:
+        budget.check()
 
 
 def extract_ink(
@@ -212,17 +211,19 @@ def extract_ink(
     max_strokes: int = MAX_STROKES,
 ) -> PageInk:
     """Strokes, regions and what was dropped for one page. `drawings` is
-    `page.get_cdrawings()` when the caller has it already. `budget` is the document's
-    ink-analysis budget (a fresh `InkBudget` when not given), checked in every phase and
-    loop; over a cap or the budget the result is empty with `analysed` False."""
+    `page.get_cdrawings()` when the caller has it already. `budget` is the ink-analysis
+    budget (`InkBudget`, a fresh one when not given: it is counted per page, so a fresh one
+    reads a page as the conversion did), checked in every phase and loop; over a cap or the
+    budget the result is empty with `analysed` False and its `cause`."""
     if budget is None:
         budget = InkBudget()
     if drawings is None:
         drawings = page.get_cdrawings()
     result = PageInk()
     if len(drawings) > max_paths or sum(len(d.get("items") or ()) for d in drawings) > max_items:
-        result.analysed = False
+        result.analysed, result.cause = False, INK_WORK
         return result
+    budget.page()
     try:
         dropped: Counter[str] = Counter()
         prims = _primitives(page, drawings, dropped, budget)
@@ -230,13 +231,13 @@ def extract_ink(
         strokes = _strokes(prims, dropped, budget)
         strokes = _on_page(strokes, page.rect, dropped)
         if len(strokes) > max_strokes:
-            raise InkOverrun
+            raise InkOverrun(INK_WORK)
         result.dropped = dict(dropped)
         result.strokes = [s for s in strokes if not s.highlight]
         result.highlights = [s for s in strokes if s.highlight]
         result.regions = group_regions(result.strokes, budget=budget, frame=tuple(page.rect))
-    except InkOverrun:
-        return PageInk(analysed=False)
+    except InkOverrun as stop:
+        return PageInk(analysed=False, cause=stop.cause)
     return result
 
 
@@ -407,6 +408,8 @@ def _primitives(
         dashed = d.get("dashes") not in (None, "", "[] 0", "[] 0.0")
         width = float(d.get("width") or 0.0)
         for pts, closed in _subpaths(d.get("items") or ()):
+            if budget is not None:
+                budget.cut(len(pts))
             if rotated:
                 pts = [(p.x, p.y) for p in (pymupdf.Point(q) * m for q in pts)]
             pts = _dedupe(pts)
@@ -765,7 +768,7 @@ def _union_near(
         if not i & 1023:
             _tick(budget)
     if any(len(v) > GRID_MAX_CELL for v in grid.values()) or len(big) > GRID_MAX_BIG:
-        raise InkOverrun
+        raise InkOverrun(INK_WORK)
     big_set = set(big)
     work = 0
     for i, (x0, y0, x1, y1) in enumerate(boxes):

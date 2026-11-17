@@ -19,6 +19,7 @@ printed pages read differently.
 | EPUB validators | `tests/test_export_epub_validators.py` skips unless EPUBCheck and DAISY Ace are installed: set `EPUBCHECK_JAR` (needs Java; `JAVA` if not on PATH) and `ACE` (for example `npx -y @daisy/ace`). CI runs them in `epub.yml` |
 | `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
+| Workflow suite | `uv run pytest -m workflow -n auto --dist loadfile -rs`: the corpus's files through the real app, from recorded model answers, at no cost (docs/eval.md, "Recording and replay"). Needs `make table-model` and `uv run python -m readablestem.eval.corpus check --fetch` once |
 | `make lint` | `ruff check` + `ruff format --check` |
 | `make fmt` | Format and auto-fix |
 | `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
@@ -87,6 +88,7 @@ UTC) and by hand. Jobs, by check name:
 | `pytest (Python 3.12, shard i/6)`, `(Python 3.14, ...)` | The offline suite, in six shards |
 | `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
 | `pytest -m browser (Playwright Chromium, shard i/4)` | Browser tests, four shards of three xdist workers each |
+| `workflow suite (replay of the recorded answers)` | `pytest -m workflow`: corpus files converted by the real app from recorded answers. Tests that need answers kept out of the repository are skipped and listed |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
 
 The other jobs (`postgres`, `docker`, `latex source`, `make proof` (on main, the nightly run, and pull requests that touch `proof/`, `PROOF.md`, `data/`, the Makefile, `src/readablestem/proof` or `cli`, or the dependency and CI files), `make site`, `pip-audit`,
@@ -176,6 +178,12 @@ snapshot before the change (from an old `src/` as above) and one after.
 |---|---|
 | `src/readablestem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
 | `src/readablestem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
+| `src/readablestem/gold/layout_gold.py` | reading-order gold from a document's source (LaTeXML HTML, OpenStax XHTML, a written unit list), the page rules, a set's registry and the sample a person checks (see docs/eval.md) |
+| `src/readablestem/gold/layout_sources.py` | fetches the sources of a reading-order gold set and picks its documents by seeded rules with no model: arXiv papers and course handouts through LaTeXML in the sandbox, CC BY OpenStax books by position (see docs/eval.md) |
+| `src/readablestem/eval/split.py` | development and held-out by document, and `eval bar`: only a held-out score under the production profile meets a bar |
+| `src/readablestem/eval/measure.py` | a measured replay of the test corpus under the production profile: each upload converted as a job is, in its own process (page kinds, step facts, dollars, seconds, memory) |
+| `src/readablestem/eval/cost.py` | `eval cost`: dollars a page by page kind and by step, the steps not built yet with their estimates, the open pool's reach |
+| `src/readablestem/eval/speed.py` | `eval speed`: seconds a page by page kind and by stage, start-up, memory, and the bar against an earlier record |
 | `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/readablestem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
@@ -257,6 +265,16 @@ step) needs to account for this.
   `--set heldout` command refuses a path inside the repository, `--fake`, and gold that
   is not the registered gold.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.
+- Every dependency has a row in docs/dependencies.md, which `scripts/dependency_record.py
+  --write` makes from `uv.lock`, the `Dockerfile`, each package's own metadata and
+  `data/dependency_facts.toml`. Run it after either file changes. The test suite fails for
+  a locked package with no row, a license that is neither permissive nor accepted in the
+  facts file with a reason, a package that reads a stranger's bytes and names no limits or no
+  hostile-input tests, and a system package with neither a version in the `Dockerfile` nor
+  a stated rule. A new dependency gets its facts before its first use.
+- The command line starts with the packages of the image alone: a development package
+  (lxml, python-docx, pytest) is imported inside the function that needs it, never at the top
+  of a module the command line loads.
 
 
 ## The student file in three browsers

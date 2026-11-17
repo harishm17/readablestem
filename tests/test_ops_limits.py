@@ -80,3 +80,11 @@ def test_launch_check_lists_a_refusal_and_the_warnings(capsys):
     )
     good = settings(**{**PROD, "model_provider": "anthropic"})
     assert not any("spend limits" in i for i in launch.launch_blockers(settings=good))
+
+
+def test_a_source_kind_keeps_the_pdf_page_limit_until_it_has_been_measured():
+    s = settings(max_pages_per_job=100)
+    # Measured on 3 files: the largest that finished inside its limits had 40 units.
+    records = {"latex": (40, 3)}
+    assert limits.source_kind_limit("latex", s, records) == 40
+    assert limits.source_kind_limit("pptx", s, records) == 100

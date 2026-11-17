@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 
 from readablestem.web.db import ErrorAggregate
 
-# Every reviewable kind (`core.triage.REVIEWABLE_KINDS`; a test keeps them in step), in
-# the order the review screen groups them.
+# The four steps that have a section of their own below, in the order the review screen
+# groups them. The review load is not limited to them: it counts every kind of fix.
 STEPS = ("equation", "figure", "table", "heading")
 TOP = 10
 
@@ -64,17 +64,21 @@ def _per_page(n: int, pages: int) -> str:
 
 
 def _review_load(counts: dict[tuple[str, str], int], pages: int) -> list[tuple[str, str]]:
-    """Required decisions (a heading group counts once) and optional notes, per page."""
-    decisions = {s: counts.get((s, "decisions:required"), 0) for s in STEPS}
-    optional = {s: counts.get((s, "tier:optional"), 0) for s in STEPS}
+    """Required decisions (a heading group counts once) and optional notes, per page, of
+    every kind of fix the counts hold: the four steps first, then any other (a page read
+    from its picture is a `paragraph` fix)."""
+    found = {s for (s, c) in counts if c in ("decisions:required", "tier:optional")}
+    kinds = [*STEPS, *sorted(found - set(STEPS) - {"job"})]
+    decisions = {s: counts.get((s, "decisions:required"), 0) for s in kinds}
+    optional = {s: counts.get((s, "tier:optional"), 0) for s in kinds}
     if not any(decisions.values()) and not any(optional.values()):
         return []
     rows = [
         ("required decisions", _per_page(sum(decisions.values()), pages)),
         ("optional notes", _per_page(sum(optional.values()), pages)),
     ]
-    rows += [(f"  {s}: required", str(decisions[s])) for s in STEPS if decisions[s]]
-    rows += [(f"  {s}: optional", str(optional[s])) for s in STEPS if optional[s]]
+    rows += [(f"  {s}: required", str(decisions[s])) for s in kinds if decisions[s]]
+    rows += [(f"  {s}: optional", str(optional[s])) for s in kinds if optional[s]]
     return rows
 
 

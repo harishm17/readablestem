@@ -35,6 +35,22 @@ if TYPE_CHECKING:
 # page costs $0.0030-0.0047 and a dense held-out page about $0.014; on OpenAI $0.0037.
 PLANNING_USD_PER_PAGE = 0.015
 
+# The two figures the sentences about cost on the public pages are built from: what a
+# typical page costs at the median, and the range of a page dense with equations. They are
+# outputs of `readablestem eval cost` on a replay of held-out whole documents, and until
+# such a recording exists they are the audit's measurements of November 2026 (its register,
+# F-165 and the dense-page rows). `eval cost` prints them beside what it measured, and they
+# are changed here and nowhere else.
+TYPICAL_PAGE_USD = 0.0145
+DENSE_PAGE_USD = (0.034, 0.092)
+
+# The most units (pages, slides, cells: the unit its reader counts in) of a file that is
+# read from its source, for each kind of source: the largest file of the kind whose reader
+# finished inside its sandbox limits and its time budget at the 95th percentile on the
+# held-out files of that kind, with how many files that was measured on. A kind without a
+# row has not been measured and keeps the PDF page limit (`source_kind_limit`).
+SOURCE_KIND_LIMITS: dict[str, tuple[int, int]] = {}  # kind -> (limit, files measured)
+
 # A job cap this many times a full-size normal document is no longer "stops a runaway".
 RUNAWAY_FACTOR = 25
 
@@ -46,6 +62,15 @@ class Finding:
 
     def __str__(self) -> str:
         return f"{self.severity}: {self.text}"
+
+
+def source_kind_limit(
+    kind: str, settings: Settings, records: dict[str, tuple[int, int]] | None = None
+) -> int:
+    """The most units of a `kind` source one job may hold: the measured limit of the kind,
+    or the PDF page limit for a kind that has no measurement."""
+    measured = (SOURCE_KIND_LIMITS if records is None else records).get(kind)
+    return settings.max_pages_per_job if measured is None else measured[0]
 
 
 def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) -> float:

@@ -172,6 +172,11 @@ def test_decisions_count_a_heading_group_once():
     result = triage_output().result
     assert triage.open_decisions(result.fixes) == 2  # the equation and the group
     assert triage.required_decisions(result.fixes) == 2
+    # The same two as rows: each on the page of its first member, with why it was asked.
+    assert [(d.page, d.kind, d.reasons, d.members) for d in triage.decisions(result)] == [
+        (0, "heading", ("heading.repeated_label", "heading.weak_evidence"), 3),
+        (1, "equation", ("style_mismatch",), 1),
+    ]
     load = triage.review_load(result.fixes)
     assert (load.required_decisions, load.required_fixes, load.optional, load.none) == (2, 4, 2, 2)
     assert dict(load.required_by_kind) == {"equation": 1, "heading": 1}

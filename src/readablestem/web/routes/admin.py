@@ -11,15 +11,15 @@ person (the start of their random id), never next to an email.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import case, func, select
 
-from readablestem.ops import profile
-from readablestem.web import access, events, linked_emails, states
+from readablestem.ops import profile, step_report
+from readablestem.web import access, events, linked_emails, states, step_facts
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import ErrorAggregate, Job, QuotaDay, User, session_scope
@@ -48,6 +48,9 @@ PEOPLE_ROWS = 300
 # A second Link for a link already made (SW43).
 LINK_EXISTS = "That address was already linked to this instructor. Nothing was changed."
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
+# "Model work of recent documents": the newest documents finished in this many days.
+STEP_DAYS = 7
+STEP_JOBS = 50
 
 
 def admin_context(request: Request) -> dict[str, Any]:
@@ -149,6 +152,12 @@ def admin_context(request: Request) -> dict[str, Any]:
         ).all()
         # Usage events (web/events.py): counts per day and per pseudonymous person.
         usage = events.usage(session, days=USAGE_DAYS)
+        # What recent documents took of the models and the clock (`ops.step_report`).
+        steps = step_report.report(
+            step_facts.measured(
+                session, since=datetime.now(UTC) - timedelta(days=STEP_DAYS), last=STEP_JOBS
+            )
+        )
     shipped = profile.load()
     return {
         # The production profile (ops/profile.py): names only, never a value.
@@ -169,6 +178,9 @@ def admin_context(request: Request) -> dict[str, Any]:
         "spend": ctx.guard.snapshot(),
         "spend_people": spend_people,
         "spend_people_rows": SPEND_PEOPLE_ROWS,
+        "steps": steps,
+        "step_days": STEP_DAYS,
+        "step_jobs": STEP_JOBS,
         "queue": queue,
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,

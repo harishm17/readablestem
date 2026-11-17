@@ -15,13 +15,19 @@ Besides counting pages it refuses, before any quota is spent:
 - pages larger than `MAX_PAGE_SIDE_PT` on a side ("page_too_large"). MuPDF accepts page
   boxes far beyond the PDF limit, and the conversion's crash probe renders whole pages:
   an 18000 pt page needs about 1 GB there, more than the instance has.
+- a page, or a document, whose drawing instructions inflate past the content budget
+  (`core.content_budget`, "content_too_large"): every step that reads a page parses all of
+  them again, and a 260 KB file can inflate to 256 MB. They are counted before anything
+  parses a page, through decoders that stop at the budget; the object streams are counted
+  the same way before the page count is read, since reading it loads them.
 - PDFs with nothing to convert (`pipeline.page_type.document_refusal`): every page
   handwritten ("handwritten", or "handwritten_no_text" without a hidden recognition
   layer), a scanned image ("scanned", or "scanned_ocr" with a hidden OCR layer), or
   blank ("no_content"). Text nobody sees never counts as text. The text of every page
   is read first and the check stops at the first typed page, so only such documents
-  pay for the drawings and the handwriting analysis, which has a time budget
-  (`page_type.INK_BUDGET_S`): a page not analysed in time never refuses the upload.
+  pay for the drawings and the handwriting analysis, which has a budget counted in work
+  (`page_type.PROBE_MAX_ITEMS` path items for the document) and a clock only as a guard
+  (`page_type.PROBE_GUARD_S`): a page not analysed never refuses the upload.
   With `image_pages` after the page limit (`python -m readablestem.web.pdf_probe MAX_PAGES
   image_pages`, `FEATURE_IMAGE_PAGES` on) a document of scanned or handwritten pages is
   accepted: the conversion reads them from an image of the page (ADR 0007).
@@ -65,10 +71,13 @@ import sys
 import unicodedata
 from typing import TYPE_CHECKING
 
+from readablestem.core import content_budget
 from readablestem.core.images import MAX_UPLOAD_IMAGE_PIXELS
 
 if TYPE_CHECKING:
     import pymupdf
+
+    from readablestem.pipeline.page_type import ImagePageCount
 
 PDF_MAGIC = b"%PDF-"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -109,11 +118,14 @@ def probe(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> in
     return inspect(data, max_pages=max_pages, allow_image_pages=allow_image_pages)[0]
 
 
-def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> tuple[int, int]:
+def inspect(
+    data: bytes, *, max_pages: int, allow_image_pages: bool = False
+) -> tuple[int, ImagePageCount]:
     """`(pages, image_pages)` or raise ProbeRejected. `image_pages` is how many pages are
-    scanned or handwritten (`page_type.image_page_count`), counted only with
-    `allow_image_pages` (the person asked for them to be converted: a document with none
-    is not refused, the request just does not apply); 0 otherwise."""
+    scanned or handwritten (`page_type.image_page_count`, "at least" when some page's
+    drawings were not analysed), counted only with `allow_image_pages` (the person asked for
+    them to be converted: a document with none is not refused, the request just does not
+    apply); none otherwise."""
     if not data:
         raise ProbeRejected("empty")
     if not looks_like_pdf(data):
@@ -131,6 +143,12 @@ def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> 
         # password (permissions) open fine and are accepted.
         if doc.needs_pass:
             raise ProbeRejected("encrypted")
+        try:  # before the page count: counting the pages loads the object streams
+            content_budget.check_objects(doc)
+        except content_budget.ContentTooLarge:
+            raise ProbeRejected("content_too_large") from None
+        except Exception:  # a cross-reference table MuPDF cannot read
+            raise ProbeRejected("unreadable") from None
         pages = doc.page_count
         if pages == 0:
             # A file cut short (a download that did not finish) opens only after MuPDF
@@ -139,21 +157,23 @@ def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> 
         if pages > max_pages:
             raise ProbeRejected("too_many_pages", pages=pages)
         _check_pages(doc, allow_image_pages=allow_image_pages)
-        image_pages = _image_pages(doc) if allow_image_pages else 0
+        image_pages = _image_pages(doc, counted=allow_image_pages)
     finally:
         doc.close()
     return pages, image_pages
 
 
-def _image_pages(doc: pymupdf.Document) -> int:
-    """The scanned and handwritten pages of an open document; 0 when MuPDF cannot say (the
+def _image_pages(doc: pymupdf.Document, *, counted: bool) -> ImagePageCount:
+    """The scanned and handwritten pages of an open document; none when MuPDF cannot say (the
     conversion would fail such a page as well, and says so)."""
-    from readablestem.pipeline.page_type import image_page_count
+    from readablestem.pipeline.page_type import ImagePageCount, image_page_count
 
+    if not counted:
+        return ImagePageCount()
     try:
         return image_page_count(doc)
     except Exception:
-        return 0
+        return ImagePageCount()
 
 
 def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
@@ -167,7 +187,8 @@ def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
 
 
 def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
-    """Refuse oversized pages and documents with nothing to convert (module docstring)."""
+    """Refuse oversized pages, too much content and documents with nothing to convert
+    (module docstring)."""
     from readablestem.pipeline.page_type import document_refusal
 
     try:
@@ -177,6 +198,10 @@ def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> N
                 raise ProbeRejected("page_too_large")
             if _largest_image_pixels(doc, number) > MAX_UPLOAD_IMAGE_PIXELS:
                 raise ProbeRejected("image_too_large")
+        try:  # before the text is read: reading it parses every content stream
+            content_budget.check(doc)
+        except content_budget.ContentTooLarge:
+            raise ProbeRejected("content_too_large") from None
         reason = document_refusal(doc)
     except ProbeRejected:
         raise
@@ -541,7 +566,8 @@ def main(argv: list[str] | None = None) -> int:
         pages, image_pages = inspect(data, max_pages=max_pages, allow_image_pages=images)
         answer: dict[str, object] = {"ok": True, "pages": pages}
         if images:
-            answer["image_pages"] = image_pages
+            answer["image_pages"] = image_pages.found
+            answer["image_pages_unanalysed"] = image_pages.unanalysed
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
         if exc.pages is not None:

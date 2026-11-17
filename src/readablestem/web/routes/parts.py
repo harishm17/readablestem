@@ -246,8 +246,9 @@ def _start_parts(
                 pages, found = inspect_pdf_detail(
                     cut, max_pages=s.max_pages_per_job, allow_image_pages=True
                 )
+                may_have = found.possible
             else:
-                pages, found = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job), 0
+                pages, may_have = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job), False
             filename = part_filename(name, part.label)
             job_id = store_job(
                 ctx.factory,
@@ -259,7 +260,7 @@ def _start_parts(
                 mode,
                 course_id=course,
                 exam=exam,
-                image_pages=asked_images and found > 0,
+                image_pages=asked_images and may_have,
                 part_group=upload_id,
                 part_label=part.label,
             )

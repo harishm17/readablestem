@@ -1,0 +1,33 @@
+{
+ "id": "s11_layout_change",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Soil Carbon Study"},
+   {"role": "heading", "text": "Cover Crops and Soil Carbon: A Three-Year Plot Study (Part 1)"},
+   {"role": "body", "text": "Abstract. We measured soil carbon on plots under three management practices and found that cover cropping raised carbon storage by 24 percent after three years, relative to conventional tillage."},
+   {"role": "heading", "text": "Methods and Results"},
+   {"role": "body", "text": "Soil carbon is the largest terrestrial store of carbon, holding roughly three times as much as the atmosphere. Small changes in how land is used can therefore release or capture large amounts of carbon dioxide."},
+   {"role": "body", "text": "We compared three management practices on adjacent plots: conventional tillage, reduced tillage and cover cropping. Each plot was sampled at five depths in spring and again in autumn, and carbon was measured by dry combustion."},
+   {"role": "body", "text": "Differences among the practices were small in the first year. By the third year, cover-cropped plots held significantly more carbon in the top fifteen centimeters than the conventionally tilled plots."},
+   {"role": "table", "text": "Table 1. Mean soil carbon in the top 15 cm (kg per square meter) Practice Year 1 Year 2 Year 3 Conventional tillage 4.1 4.1 4.0 Reduced tillage 4.2 4.4 4.6 Cover cropping 4.1 4.6 5.1"},
+   {"role": "caption", "text": "Table 1. Mean soil carbon in the top 15 cm (kg per square meter)"},
+   {"role": "heading", "text": "Discussion"},
+   {"role": "body", "text": "These results agree with earlier studies from temperate regions, but the effect we measured is larger than most. We suspect that the high clay content of our soils helps protect new organic matter from decay. The study has limits. Three years is a short time for soil carbon, plots were small, and we did not measure deeper layers where carbon changes slowly. Longer records are needed before these practices can be recommended for carbon credits."},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Soil Carbon Study"},
+   {"role": "body", "text": "Summary. We measured soil carbon on plots under three management practices and found that cover cropping raised carbon storage by 24 percent after three years, relative to conventional tillage."},
+   {"role": "heading", "text": "Methods and Results"},
+   {"role": "body", "text": "Soil carbon is the largest terrestrial store of carbon, holding roughly three times as much as the atmosphere. Small changes in how land is used can therefore release or capture large amounts of carbon dioxide."},
+   {"role": "body", "text": "We compared three management practices on adjacent plots: conventional tillage, reduced tillage and cover cropping. Each plot was sampled at five depths in spring and again in autumn, and carbon was measured by dry combustion."},
+   {"role": "body", "text": "Differences among the practices were small in the first year. By the third year, cover-cropped plots held significantly more carbon in the top fifteen centimeters than the conventionally tilled plots."},
+   {"role": "table", "text": "Table 1. Mean soil carbon in the top 15 cm (kg per square meter) Practice Year 1 Year 2 Year 3 Conventional tillage 4.1 4.1 4.0 Reduced tillage 4.2 4.4 4.6 Cover cropping 4.1 4.6 5.1"},
+   {"role": "caption", "text": "Table 1. Mean soil carbon in the top 15 cm (kg per square meter)"},
+   {"role": "heading", "text": "Discussion"},
+   {"role": "body", "text": "These results agree with earlier studies from temperate regions, but the effect we measured is larger than most. We suspect that the high clay content of our soils helps protect new organic matter from decay. The study has limits. Three years is a short time for soil carbon, plots were small, and we did not measure deeper layers where carbon changes slowly. Longer records are needed before these practices can be recommended for carbon credits."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

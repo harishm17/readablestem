@@ -1,0 +1,753 @@
+{
+ "split": {
+  "name": "development",
+  "seed": "corpus",
+  "set_sha256": "5dd6cabd1e55eef6af6f5885208c22d4b0b5d539b215384cfe0a64379ee44dd2",
+  "documents": 72
+ },
+ "profile": {
+  "name": "production",
+  "sha256": "7105f7677355033b8f0960be13b53782087a782b3d3689d4553417e4fd65c112",
+  "confirmed": false,
+  "differs": [],
+  "counted_off": [
+   "FEATURE_LATEX_SOURCE",
+   "OFFICE_INPUT_ENABLED"
+  ]
+ },
+ "pipeline_version": "0.5.10",
+ "commit": "4313a0ef474fb0cca67ad9b60f75de25392cf363",
+ "machine": {
+  "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+  "cores": 16
+ },
+ "metrics": {
+  "uploads": {
+   "measured": 63,
+   "answers_missing": {
+    "d1_scripts": 14,
+    "e1_mc_columns": 6,
+    "e2_solutions_rubric": 6,
+    "e3_calendar": 2,
+    "f1_notation": 50,
+    "f2_figures": 30,
+    "f4_matrices": 12,
+    "ar3_sideways90": 2,
+    "ar4_sideways270": 2,
+    "w_lecture_5111": 2
+   },
+   "not_measured": []
+  },
+  "pages": 315,
+  "usd": 4.854462,
+  "usd_page_of_a_document": {
+   "p50": 0.005494,
+   "p95": 0.043174,
+   "mean": 0.012163
+  },
+  "kinds": {
+   "scan": {
+    "pages": 25,
+    "documents": 10,
+    "usd": 0.61431,
+    "usd_page": {
+     "p50": 0.029473,
+     "p95": 0.056948,
+     "mean": 0.024572
+    },
+    "steps": {
+     "equation": 0.000195,
+     "figure": 0.004838,
+     "image_page": 0.019539
+    }
+   },
+   "slide": {
+    "pages": 45,
+    "documents": 3,
+    "usd": 0.236452,
+    "usd_page": {
+     "p50": 0,
+     "p95": 0.020185,
+     "mean": 0.005254
+    },
+    "steps": {
+     "equation": 0.000777,
+     "figure": 0.004461,
+     "table": 1.7e-05
+    }
+   },
+   "dense_math": {
+    "pages": 30,
+    "documents": 10,
+    "usd": 2.027278,
+    "usd_page": {
+     "p50": 0.071568,
+     "p95": 0.136528,
+     "mean": 0.067576
+    },
+    "steps": {
+     "equation": 0.058112,
+     "figure": 0.008863,
+     "table": 0.000601
+    }
+   },
+   "table": {
+    "pages": 24,
+    "documents": 17,
+    "usd": 0.365483,
+    "usd_page": {
+     "p50": 0.005895,
+     "p95": 0.048619,
+     "mean": 0.015228
+    },
+    "steps": {
+     "equation": 1.9e-05,
+     "figure": 0.001728,
+     "table": 0.013481
+    }
+   },
+   "figure": {
+    "pages": 60,
+    "documents": 19,
+    "usd": 1.318153,
+    "usd_page": {
+     "p50": 0.017384,
+     "p95": 0.044979,
+     "mean": 0.021969
+    },
+    "steps": {
+     "equation": 0.002236,
+     "figure": 0.019733
+    }
+   },
+   "typical": {
+    "pages": 131,
+    "documents": 43,
+    "usd": 0.292786,
+    "usd_page": {
+     "p50": 0,
+     "p95": 0.009079,
+     "mean": 0.002235
+    },
+    "steps": {
+     "equation": 0.002235
+    }
+   }
+  },
+  "steps": {
+   "equation": {
+    "models": [
+     "claude-haiku-5-5",
+     "claude-opus-5-5"
+    ],
+    "calls": 1314,
+    "pages": 87,
+    "usd": 2.210607,
+    "usd_page_all": 0.007018,
+    "usd_page": {
+     "p50": 0.006499,
+     "p95": 0.111923,
+     "mean": 0.025409
+    }
+   },
+   "figure": {
+    "models": [
+     "claude-haiku-5-5",
+     "claude-opus-5-5"
+    ],
+    "calls": 260,
+    "pages": 92,
+    "usd": 1.813046,
+    "usd_page_all": 0.005756,
+    "usd_page": {
+     "p50": 0.015665,
+     "p95": 0.050957,
+     "mean": 0.019707
+    }
+   },
+   "image_page": {
+    "models": [
+     "claude-opus-5-5"
+    ],
+    "calls": 14,
+    "pages": 13,
+    "usd": 0.488474,
+    "usd_page_all": 0.001551,
+    "usd_page": {
+     "p50": 0.036433,
+     "p95": 0.070729,
+     "mean": 0.037575
+    }
+   },
+   "table": {
+    "models": [
+     "claude-haiku-5-5",
+     "claude-opus-5-5"
+    ],
+    "calls": 44,
+    "pages": 28,
+    "usd": 0.342336,
+    "usd_page_all": 0.001087,
+    "usd_page": {
+     "p50": 0.002054,
+     "p95": 0.048619,
+     "mean": 0.012226
+    }
+   }
+  },
+  "added": [
+   {
+    "step": "page_audit",
+    "name": "page audit",
+    "unit": "page",
+    "estimate_usd": [
+     0.0054,
+     0.01
+    ],
+    "basis": "measured: $0.0054 in batch on 112 pages, $0.010 live on 37 calls",
+    "calls": 0,
+    "spent_usd": 0
+   },
+   {
+    "step": "text_check",
+    "name": "text check",
+    "unit": "page",
+    "estimate_usd": [
+     0.0,
+     0.0
+    ],
+    "basis": "measured: local, 5 ms a page",
+    "calls": 0,
+    "spent_usd": 0
+   },
+   {
+    "step": "line_strip_check",
+    "name": "line-strip check with a second read of flagged equations",
+    "unit": "page dense with equations",
+    "estimate_usd": [
+     0.018,
+     0.018
+    ],
+    "basis": "estimated from measured rates",
+    "calls": 0,
+    "spent_usd": 0
+   },
+   {
+    "step": "table_read",
+    "name": "table read",
+    "unit": "table",
+    "estimate_usd": [
+     0.05,
+     0.05
+    ],
+    "basis": "measured at list price on 59 held-out tables; about $0.006 a page on papers",
+    "calls": 0,
+    "spent_usd": 0
+   },
+   {
+    "step": "figure_check",
+    "name": "figure checker",
+    "unit": "figure",
+    "estimate_usd": null,
+    "basis": "not measured",
+    "calls": 0,
+    "spent_usd": 0
+   },
+   {
+    "step": "structure_read",
+    "name": "drawn chemical structure read",
+    "unit": "structure",
+    "estimate_usd": [
+     0.0088,
+     0.0088
+    ],
+    "basis": "measured on 112 drawings",
+    "calls": 0,
+    "spent_usd": 0
+   },
+   {
+    "step": "scan_cheap_read",
+    "name": "cheap first read of a scanned page",
+    "unit": "scanned page",
+    "estimate_usd": [
+     0.0008,
+     0.0008
+    ],
+    "basis": "measured in the second round",
+    "calls": 0,
+    "spent_usd": 0
+   }
+  ],
+  "documents": [
+   {
+    "upload": "r01_syllabus_16851",
+    "pages": 7,
+    "usd": 0.048302,
+    "calls": 5,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r02_syllabus_21l704",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r03_syllabus_21l708",
+    "pages": 4,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r04_grading_5310",
+    "pages": 4,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r05_labmanual_5310_lab1",
+    "pages": 8,
+    "usd": 0.168512,
+    "calls": 64,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r06_labsafety_5310",
+    "pages": 5,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r07_labnotebook_5310",
+    "pages": 3,
+    "usd": 0.019986,
+    "calls": 4,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r08_labhandout_2996",
+    "pages": 1,
+    "usd": 0.010572,
+    "calls": 1,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r09_handout_14451",
+    "pages": 5,
+    "usd": 0.154576,
+    "calls": 9,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r10_handout_4241",
+    "pages": 3,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r11_recitation_2003sc",
+    "pages": 6,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r12_exam_900sc",
+    "pages": 6,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r13_exam_3044",
+    "pages": 4,
+    "usd": 0.068726,
+    "calls": 14,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r14_exam_513",
+    "pages": 3,
+    "usd": 0.131496,
+    "calls": 26,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r15_openstax_chem_ch3",
+    "pages": 10,
+    "usd": 0.156363,
+    "calls": 65,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r16_openstax_physics_ch4_end",
+    "pages": 10,
+    "usd": 0.150987,
+    "calls": 32,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r17_arxiv_ligo",
+    "pages": 8,
+    "usd": 0.206749,
+    "calls": 71,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r18_arxiv_opt",
+    "pages": 6,
+    "usd": 0.108641,
+    "calls": 48,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r19_poster_codesign",
+    "pages": 1,
+    "usd": 0.043047,
+    "calls": 4,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r20_newsletter_drp",
+    "pages": 6,
+    "usd": 0.032962,
+    "calls": 5,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "r21_infographic_orcid",
+    "pages": 1,
+    "usd": 0.050957,
+    "calls": 11,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "d2_language_passages",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "d3_arabic_doc",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "d4_chinese_doc",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "f3_music",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s01_newsletter_3col",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s02_syllabus_sidebar",
+    "pages": 2,
+    "usd": 0.064929,
+    "calls": 5,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s03_lab_callouts",
+    "pages": 2,
+    "usd": 0.000573,
+    "calls": 2,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s04_worksheet",
+    "pages": 2,
+    "usd": 0.012363,
+    "calls": 2,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "s06_landscape_table",
+    "pages": 2,
+    "usd": 0.007949,
+    "calls": 2,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s07_glossary",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s08_bibliography",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s09_index",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s10_slides_boxes",
+    "pages": 6,
+    "usd": 0.061786,
+    "calls": 6,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s11_layout_change",
+    "pages": 2,
+    "usd": 0.0009,
+    "calls": 2,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s12a_handout_tagged",
+    "pages": 1,
+    "usd": 0.000482,
+    "calls": 1,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s12b_handout_untagged",
+    "pages": 1,
+    "usd": 0.000482,
+    "calls": 1,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s13_textbook_margin",
+    "pages": 2,
+    "usd": 0.002004,
+    "calls": 2,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "s14_toc_outline",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s15_charts_figures",
+    "pages": 2,
+    "usd": 0.054547,
+    "calls": 3,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "s16_calendar_grid",
+    "pages": 1,
+    "usd": 0.043174,
+    "calls": 2,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "s17_word_syllabus",
+    "pages": 2,
+    "usd": 0.028141,
+    "calls": 2,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "s18_exam_twocol",
+    "pages": 3,
+    "usd": 0.040214,
+    "calls": 5,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "a3_sideways_norotate",
+    "pages": 3,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "a3b_sideways_270",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "a6_two_up",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "a8_handout_3up",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "a9_handout_6up",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "b3_stamp",
+    "pages": 3,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "b4_line_numbers",
+    "pages": 2,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "b6_margin_identifier",
+    "pages": 1,
+    "usd": 0.0,
+    "calls": 0,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "s05_form_acroform",
+    "pages": 1,
+    "usd": 0.01991,
+    "calls": 1,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_notes_6042_ch2",
+    "pages": 14,
+    "usd": 0.203138,
+    "calls": 96,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_solutions_1802",
+    "pages": 14,
+    "usd": 1.283939,
+    "calls": 644,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_exam_5111",
+    "pages": 9,
+    "usd": 0.310319,
+    "calls": 141,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "w_exam_5111+exam",
+    "pages": 9,
+    "usd": 0.315128,
+    "calls": 141,
+    "not_in_steps": -0.0
+   },
+   {
+    "upload": "w_pset_801",
+    "pages": 8,
+    "usd": 0.100034,
+    "calls": 74,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_slides_60001_lec10",
+    "pages": 39,
+    "usd": 0.246102,
+    "calls": 67,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_slides_60001_lec1",
+    "pages": 35,
+    "usd": 0.114498,
+    "calls": 15,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_lecture_560",
+    "pages": 5,
+    "usd": 0.043331,
+    "calls": 40,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_handwritten_6006+image_pages",
+    "pages": 4,
+    "usd": 0.070729,
+    "calls": 1,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_scan_slides+image_pages",
+    "pages": 6,
+    "usd": 0.210227,
+    "calls": 7,
+    "not_in_steps": 0.0
+   },
+   {
+    "upload": "w_mixed_slides+image_pages",
+    "pages": 12,
+    "usd": 0.267687,
+    "calls": 11,
+    "not_in_steps": 0.0
+   }
+  ],
+  "constants": {
+   "typical_page_usd": {
+    "kept": 0.0145,
+    "this_run_p50": 0.005494
+   },
+   "dense_page_usd": {
+    "kept": [
+     0.034,
+     0.092
+    ],
+    "this_run_p50_p95": [
+     0.071568,
+     0.136528
+    ]
+   }
+  },
+  "reach": {
+   "open_pool_usd": 4.0,
+   "typical_today": 275,
+   "typical_with_page_audit": [
+    163,
+    201
+   ],
+   "dense_with_every_check": [
+    33,
+    69
+   ]
+  }
+ }
+}

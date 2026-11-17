@@ -1003,6 +1003,70 @@ test checks that its folding, conversion and speech helpers agree with theirs. T
 `scripts/rw_spoken.py` imports `speakable_latex` and `repair_converter_gaps` from it (docs/eval-realworld.md,
 "The spoken-equal scorer"); `compare` does not use them.
 
+## Page audit (`pipeline/page_audit.py`; runs in shadow only)
+
+Every step above looks at one element. Nothing compares a whole page of the output with
+the page it came from, so a page that lost a column, doubled a paragraph or mixed two
+columns has no decision on it. The page audit asks one model, once a page, whether a
+listener would be misled, and stores the answer as codes and places. It flags and never
+changes a page. In this release nothing reads its verdicts: it runs only from
+`readablestem eval page-audit` on public and generated sets (eval.md, "The page audit in
+shadow").
+
+**What one request carries**, and nothing else (no other page, no file name, no account
+data):
+
+1. a picture of the page at 110 dpi;
+2. the page's output as a listing, in `context_text` (fenced as document text, never in the
+   instructions): a `<page_info>` line, the elements in reading order, one a line as
+   `<id> (<kind>): <text>` with the id as stored in the result (`p3-e7`), and where it
+   applies a `<joined_from_previous_page>` note;
+3. with `--rendered`, a picture of the page's output as a browser draws it, 800 pixels
+   wide (`eval.render.ChromiumRenderer.part_png`).
+
+**The listing's rules.** Each was measured as a cause of false flags before it was a rule:
+
+| Rule | Why |
+|---|---|
+| A table's text is shown once, in its table (caption, then cells in row order) | shown again as loose text it read as a duplicate |
+| A list item shows its marker | without it a list read as paragraphs |
+| A long element is shortened with "[N words not repeated here]" between its head (two thirds of the limit) and its tail; the limits are 300 words of body text, 200 of a table, 60 of a figure's labels | an ellipsis reads as missing text |
+| A paragraph that runs over a page break is marked "[continues on the next page: the last N words, from "...", are printed there]", and the next page's listing quotes those words in `<joined_from_previous_page>` | joined text read as extra on one page and missing on the next |
+| A display formula is its text or "[formula]"; a picture is "[picture]" with its labels and caption | the audit judges where they are read, not their notation |
+| A listing over 30,000 characters is not sent | cut, it would show the model a page with text missing |
+
+The words past a page break are found by code: the longest tail of the element (at least
+four word triples) that starts at a triple printed on the next page and not on this one,
+with at most 15% of its triples on this page and at least 70% on the next.
+
+**The reply** (`Reply`, strict): at most six findings, each `{code, severity, elements,
+box, text_fault}` with no free text. `code` is one of `page_missing`, `page_extra`,
+`page_order`, `page_structure`, `page_wrong`, `page_duplicated`; `severity` is `high` or
+`low`; `elements` are ids from the listing; `box` is four fractions of the page picture;
+`text_fault` (for `page_wrong`) is `garbled`, `doubled`, `missing`, `order` or
+`run_together`, and `none` for every other code.
+
+**The verdict** (`PageVerdict`, one a page):
+
+| Verdict | When |
+|---|---|
+| `pass` | the model answered and no finding is of high severity; or, by code, the page is blank |
+| `flagged` | a finding of high severity; or, by code and without a request, the page has ink and the output has no element for it (`page_missing`) |
+| `not_audited` | everything else, with a reason: the request's outcome (`refused`, `invalid_output`, `timeout`, `api_error`), `unknown_element` (an id that is not on the page), `bad_box`, `cap_reached` (the run's spend cap), `over_page_ceiling`, `listing_too_long` |
+
+An answer that cannot be used is never a pass. The verdict keeps the key of the question
+asked (`models.question`: pictures, listing, prompt, model, effort, reply format), so it
+is tied to the exact input it was given, and two runs of one input can be compared.
+
+**Model and money.** `PAGE_AUDIT_MODEL` (default `claude-sonnet-5-5`) at low effort
+(`ANTHROPIC_EFFORT_PAGE_AUDIT` overrides), `PAGE_AUDIT_MAX_OUTPUT_TOKENS` 1,500. Before a
+request is sent its worst case is priced (the whole input at the full price and the whole
+output limit): over `PAGE_AUDIT_MAX_USD_PER_PAGE` (default $0.10) the page is
+`over_page_ceiling` and costs nothing. The ceiling is far above a page's real cost (about
+a cent) because the worst case of one request is $0.05 to $0.09: the output limit, which
+thinking can fill, dominates it. Every request goes through the run's spend guard; when
+the guard refuses, the run stops and the pages left are `cap_reached`.
+
 ## Privacy
 
 `Check.code`, `Fix.reason` and `ModelCall.outcome` are category codes. Exception

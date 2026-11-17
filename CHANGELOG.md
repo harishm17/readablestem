@@ -280,6 +280,96 @@
 - My documents groups "Needs you" (decisions, then stopped documents with "Try again"),
   "Working" and "Ready". The heading over the job page's actions names the task ("Review",
   "Download") instead of repeating the state.
+## Unreleased: no clock decides what a page contains (branch fix/ink-work-budget)
+
+- **The ink analysis is bounded per page by counts of work** (plan WS14.9). It used to have
+  10 seconds of wall-clock time for a whole document, so a slower or busier machine could
+  type a page without its ink, and a handwritten page then read as typed. Now each page has
+  its own allowance: at most 200,000 path items and 500,000 pieces of flattened path
+  (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`), the same on every machine; the corpus's
+  largest page has 117,162 and 207,522. A clock stays only as a guard against a hang,
+  60 seconds a page (`INK_GUARD_S`), about 40 times the slowest corpus page.
+- **A page whose drawings were not analyzed says so and why.** Its stored page type keeps
+  the cause (`ink_cause`: `work` or `time`; older results load without it), the job writes
+  a "not finished" fact per page (`work_budget` for a count, `time_limit` for the guard, for
+  both `page_type` and `ink_strokes`), a page read for its text gets the notice
+  `drawings_not_analysed` under "Worth checking", and the job page no longer says
+  "Everything was converted" for it.
+- **The upload probe's count of scanned and handwritten pages can say "at least N".** The
+  probe has a document allowance of 1,000,000 path items (`PROBE_MAX_ITEMS`) and a 20 s
+  guard (`PROBE_GUARD_S`) inside its 30 s child; a page past either is counted as possibly
+  handwritten, so a request to read such pages still applies.
+
+## Unreleased: the measuring ground (branch feat/stage0-ground)
+
+Nothing here changes what a converted document contains. It is what later changes are
+measured and replayed against.
+
+- **Test corpus and recorded answers.** A manifest of files made for the tests or fetched by
+  hash, each converted through the app from recorded model answers, keyed by the question as
+  sent. A replay sends nothing and costs nothing. The workflow suite (`-m workflow`) runs the
+  audit's workflows on it, and a hostile-input set states for each of 36 files how its
+  conversion must end.
+- **Gold and evals.** Reading-order gold built from a document's source; a layout gold set
+  drawn by seeded rules, and a held-out set of 51 documents no page of which was opened.
+  Evals split by document, and only a held-out score can meet a bar.
+- **Step facts.** Every model request and every stage of a job is kept as a content-free
+  fact (`job_calls`, `job_stages`), with `readablestem ops step-report` and totals on the
+  admin page.
+- **"Not finished" facts.** A step that stops before it has done all of its work says so:
+  `{step, page, reason, done, of}` in the table `job_not_finished`, a log line, and one
+  reader (`web.step_facts.not_finished`). Written by the steps the job's limit stops, the
+  image pages it keeps from being read, the second reader's time and dollar share, and the
+  ink analysis when its time runs out.
+- **The same file gives the same document on any machine** (tests/test_determinism.py).
+  Every read of a clock in `pipeline/` and `source/` is named in a table; the corpus is
+  replayed at full speed and held back to a quarter of the time, and an upload may differ
+  only if a step said it stopped. The first run found one: a handwritten upload lost a
+  page's handwriting when the ink analysis's 10 seconds ran out with nothing recorded. The
+  stop is now recorded. The clock itself is not yet replaced by a count of work.
+- **Cost and speed of a page** (`readablestem eval cost`, `eval speed`): dollars a page by
+  kind and by step and seconds a page by kind and stage, from a measured replay of the
+  corpus under the production profile. The Sonnet cache-read price was double the published
+  rate and is corrected.
+- **What a page asks of a reviewer** (`readablestem eval burden`): required decisions a
+  page by page kind, by what is decided and by why it was asked, from the same measured
+  replay, with a bar against an earlier record (no page kind asks for more). The count is
+  the review screen's own (`core.triage.decisions`). Baseline on the corpus: 1.80 a page
+  over 315 pages, 10.5 on dense math pages, and 56% of pages ask nothing.
+- **Fixed: two counters left out a page's paragraphs.** The command line's "decisions
+  needed" summary, the eval's review load and the weekly report's review-load table
+  counted only equations, figures, headings and tables. A page read from its picture asks
+  about its paragraphs too, and the review screen counted those. Every counter now counts
+  every kind of fix.
+- **The page audit, in shadow** (`pipeline/page_audit.py`, `readablestem eval page-audit`):
+  one request a page that sets the page's picture beside its converted text and answers
+  with fault codes, element ids and boxes, never text. A page is a pass, flagged, or not
+  audited with a reason; an answer that cannot be used is never a pass. It has a per-page
+  ceiling and runs under the run's spend cap. Nothing reads its verdicts yet, no job runs
+  it, and no live run has been recorded.
+- **Dependency record** (docs/dependencies.md): versions, licenses and rules, checked by the
+  suite.
+- The production profile lists the page audit's three behavior settings at their code
+  defaults, so its hash changes with no change to what production runs.
+
+## Unreleased: the content budget (branch fix/content-size-budget, WS26.9, F-559)
+
+- A PDF whose page's drawing instructions inflate past 32 MiB, or whose document's past
+  128 MiB, is refused at upload with `content_too_large` (422, "too large to read"), before
+  any quota is spent. The count runs through MuPDF's own decoders and stops at the budget:
+  content streams and arrays of them, the forms, tiling patterns, Type3 glyphs and annotation
+  appearances they draw, every filter and chain MuPDF applies, owner-password files; the
+  object streams are counted before the page tree is read. The hostile set's `stream-bomb.pdf`
+  (260 KB, one page of 256 MB) is refused in 0.36 s; it took 6.8 s of the upload request and
+  24 s of the worker.
+- `layout.analyze` makes the same check before any step reads a page, so a queued job,
+  `readablestem convert` and the evals stop with `content_too_large` too, and a PDF figure of
+  a LaTeX project over the budget is left without a picture. The budgets come from the
+  development corpus (largest page 3.0 MiB, largest document 9.9 MiB, 2026-11-11).
+- Workflow tests: `harness.ReplaySite.convert` uploads a corpus file before it skips one whose
+  recorded answers are kept out of the repository, so every file present passes the upload's
+  checks.
+
 ## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
 
 - Every review write records a content-free `decision_outcome` event beside `decision_made`:

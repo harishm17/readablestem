@@ -251,9 +251,70 @@ jobs:
 
   # One name for branch protection to require instead of each job above: it fails when any
   # job that ran failed or was cancelled, and passes when the rest were skipped by design.
+  # The workflow suite (tests/workflows, `-m workflow`): the corpus's files uploaded to the
+  # real app and converted from the recorded model answers, at no cost. Nothing here can
+  # reach a model: the answers client is offline, and no key is set.
+  #
+  # Answers recorded from CC BY-NC-SA files (MIT OpenCourseWare) are kept out of the
+  # repository with the files themselves, so the tests that convert those files are
+  # skipped here and run where the second answers file is (docs/eval.md, "Recording and
+  # replay"). `-rs` prints each skip with its reason.
+  workflows:
+    name: workflow suite (replay of the recorded answers)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked)
+        run: uv sync --locked --all-extras
+      # The answers were recorded with the SLANet-plus table-structure model present, as in
+      # the deployed image. Without it tables use PyMuPDF's grid, the questions differ and
+      # the replay stops on answers it does not hold. The key names the pinned checksum.
+      - name: Cache the table-structure model
+        id: table-model-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/readablestem/models
+          key: table-model-slanet-plus-d57a942af6a2f57d6a4a0372573c696a2379bf5857c45e2ac69993f3b334514b
+      - name: Fetch the table-structure model (checksum-verified)
+        if: steps.table-model-cache.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3 4; do
+            make table-model && exit 0
+            echo "fetch attempt $attempt failed; retrying"; sleep $((attempt * 15))
+          done
+          exit 1
+      # The public files of the corpus, fetched once per manifest and checked by SHA-256.
+      - name: Cache the corpus's public files
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/corpus
+          key: corpus-${{ hashFiles('tests/workflows/corpus/corpus.json') }}
+      - name: Fetch the corpus's public files (each checked against its hash)
+        run: uv run python -m readablestem.eval.corpus check --fetch
+      # The hostile-input workflow runs LaTeX sources in the real sandbox (as the `latex
+      # source` job does): with the variable below a missing LaTeXML or bubblewrap fails it.
+      - name: Install LaTeXML and bubblewrap, allow user namespaces
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends latexml bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          latexml --VERSION | head -n 1
+      - name: Pytest (workflow-marked tests only)
+        # Exit code 5 (no tests collected) fails the job.
+        env:
+          READABLESTEM_REQUIRE_SANDBOX_TESTS: "1"
+        run: uv run pytest -m workflow -n auto --dist loadfile --durations=15 -rs
+
   ci-passed:
     name: CI passed
-    needs: [changes, static, pytest, shard-coverage, proof-replay, site, postgres, browser, dependency-audit, docker, eval-gate, secret-scan, latex-source]
+    needs: [changes, static, pytest, shard-coverage, proof-replay, site, postgres, browser, dependency-audit, docker, eval-gate, secret-scan, latex-source, workflows]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
