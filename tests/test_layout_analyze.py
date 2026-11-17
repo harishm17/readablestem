@@ -385,8 +385,10 @@ TOPICS = ["motion", "force", "energy", "momentum", "gravity", "waves", "heat", "
 def book_pages(count: int) -> bytes:
     """Running heads as a book sets them: the left page's holds its number and the chapter,
     the right page's the section and its number, and the chapter changes part way through.
-    Every page also has a body line close under the head, a number in the footer, and the
-    headings "Solution" and "Example" in the same place."""
+    Every page also has a body line close under the head, a number in the footer, the
+    headings "Solution" and "Example" in the same place, and at its foot a note in small type
+    whose words change (a footnote, a slide's source line): at one height on every page like
+    a running foot, but part of the page."""
     doc = pymupdf.open()
     for number in range(1, count + 1):
         page = doc.new_page(width=612, height=792)
@@ -400,6 +402,7 @@ def book_pages(count: int) -> bytes:
         write(page, 72, 320, [f"Worked answer {number}."])
         page.insert_text((72, 400), "Example", fontsize=12, fontname="hebo")
         write(page, 72, 420, [f"Worked example {number}."])
+        page.insert_text((72, 735), f"Source: lecture notes on {TOPICS[number - 1]}.", fontsize=8)
         page.insert_text((300, 760), str(number), fontsize=8)
     return doc.tobytes()
 
@@ -415,6 +418,7 @@ def test_alternating_running_heads_whose_text_changes_are_dropped_and_repeated_h
             f"Worked answer {number}.",
             "Example",
             f"Worked example {number}.",
+            f"Source: lecture notes on {TOPICS[number - 1]}.",
         )
     ]
 

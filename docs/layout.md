@@ -89,7 +89,15 @@ Element conventions:
    lower than the 7 % of an exact repeat): a line that sits at the same height (within 2 pt)
    and size (within 0.5 pt) on at least half of the left pages, or of the right pages (and at
    least two), and is apart from the body (smaller than it by 0.5 pt, italic, or another font
-   family) goes, whatever its words. A repeated heading (`Solution`, `Example`) is bold
+   family) goes when the line is a head's or a foot's by more than its place: a whole
+   number on it goes up by the pages between, from one page of the place to the next, on
+   half of those steps (the page number; an excerpt joined from parts of a book jumps at
+   each join), or the same words with letters in them stand at the place on two pages. The
+   place alone would also take the last line of a footnote, a one-line footnote or a slide's
+   source line, which sit at one height in small type on page after page. So a row less
+   than 0.6 of its height from a kept row next to it towards the middle of the page stays
+   (it goes on from the text), and a row that opens with a character at most 0.85 of its
+   size (a note's mark) is never a head. A repeated heading (`Solution`, `Example`) is bold
    and as big as the body or bigger, so it is not apart from it and stays; a first line of
    the body in the band stays too. A bare page number that shares a line with a line that
    stays (a table cell) is not dropped, and a number set at heading size is a chapter

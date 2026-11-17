@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import bisect
 import hashlib
+import itertools
 import logging
 import math
 import re
@@ -145,6 +146,8 @@ MARGIN_BAND = 0.07  # top/bottom share of the page searched for running headers/
 MARGIN_PLACE_BAND = 0.10  # ... and for a head found by its place (`_MarginFilter.places`)
 MARGIN_PLACE_PT = 2.0  # rows of the same side's pages this near in height are in one place
 MARGIN_SIZE_PT = 0.5  # ... and this near in font size are of one size
+MARGIN_ATTACHED = 0.6  # x row height: a row this near the text inward of it goes on from it
+NOTE_MARK_RATIO = 0.85  # x row size: a first character this small is a note's mark
 MARGIN_REFERENCE_PAGES = 24  # pages sampled to decide what repeats
 MIN_GUTTER = 8.0  # narrowest white gap between two text columns
 MAX_GUTTER_CROSSINGS = 24  # lines that may cross a gutter (centred titles, captions)
@@ -2528,8 +2531,11 @@ class _MarginFilter:
     pages, so the same words rarely repeat on half of all the pages. Text that is not body
     text (smaller than it, italic, or in another typeface) is also dropped when a row of the
     same size stands at the same height on half of the pages on its side of the book (odd or
-    even), whatever its words: `places`. Such a row is dropped for good, not given back as a
-    figure's label.
+    even) and the line is a head's or a foot's by more than its place: it carries the running
+    page number, or its words stand there on another page (`places`). The place alone is not
+    enough: the last line of a footnote, a short footnote, the source line of a slide all
+    stand at one height in small type on page after page. Such a row is dropped for good,
+    not given back as a figure's label.
     """
 
     repeated: set[tuple[str, str]]  # (zone, normalised text)
@@ -2538,9 +2544,8 @@ class _MarginFilter:
     figures: set[tuple[str, tuple[int, int, int, int]]]  # (zone, box) of band figures
     body: float
     body_family: str = ""
-    # (zone, page parity, height, size) of the rows that repeat at one place on the pages of
-    # one side, whatever their words.
-    places: list[tuple[str, int, float, float]] = field(default_factory=list)
+    # Where rows repeat at one place on the pages of one side (`_repeated_places`).
+    places: list[_Place] = field(default_factory=list)
     # (zone, box) of every drawing and image in the band that repeats: a logo however
     # small, a decorative line. Anything else in the band (a note in the margin) counts.
     marks: set[tuple[str, tuple[int, int, int, int]]] = field(default_factory=set)
@@ -2578,18 +2583,27 @@ class _MarginFilter:
         )
 
     def at_place(self, row: _Row, height: float, number: int) -> bool:
-        """Is this row of page `number` (0-based) at a place where rows of that side's pages
-        repeat (`places`)? Rows that look like headings or body text never are."""
-        if row.vertical or not self.places or self.prominent(row) or not self.apart(row):
+        """Is this row of page `number` (0-based) a head or foot by its place (`places`): at
+        a place where rows of that side's pages repeat, on a line that carries the page number
+        or with words that stand there on another page? Rows that look like headings, body
+        text or the start of a note never are."""
+        if not self.places or not self.furniture_look(row):
             return False
         zone = _box_zone(row.bbox, height, MARGIN_PLACE_BAND)
-        centre = (row.y0 + row.y1) / 2
         return zone is not None and any(
-            z == zone
-            and parity == number % 2
-            and abs(y - centre) <= MARGIN_PLACE_PT
-            and abs(size - row.size) <= MARGIN_SIZE_PT
-            for z, parity, y, size in self.places
+            place.holds(zone, number, row)
+            and (place.numbered or _norm_margin(row.clean) in place.texts)
+            for place in self.places
+        )
+
+    def furniture_look(self, row: _Row) -> bool:
+        """Could the row be a running head or foot: level, not set as a heading or as body
+        text, and not opening with a raised mark (a footnote)?"""
+        return (
+            not row.vertical
+            and not self.prominent(row)
+            and self.apart(row)
+            and not _opens_with_mark(row)
         )
 
     def numbering(self, row: _Row, height: float) -> bool:
@@ -2756,39 +2770,78 @@ def _margin_filter(
     return result
 
 
+@dataclass(frozen=True)
+class _Place:
+    """A height in a band where rows of one size stand on the pages of one side."""
+
+    zone: str
+    parity: int
+    y: float
+    size: float
+    numbered: bool = False  # its line carries the running page number
+    texts: frozenset[str] = frozenset()  # words (`_norm_margin`) that stand there on 2+ pages
+
+    def holds(self, zone: str, number: int, row: _Row) -> bool:
+        return (
+            zone == self.zone
+            and number % 2 == self.parity
+            and abs((row.y0 + row.y1) / 2 - self.y) <= MARGIN_PLACE_PT
+            and abs(row.size - self.size) <= MARGIN_SIZE_PT
+        )
+
+
+_WHOLE_NUMBER = re.compile(r"(?<![\w.])\d+(?!\w|\.\d)")
+
+
+def _opens_with_mark(row: _Row) -> bool:
+    """The row opens with a character set smaller than the rest (a footnote's mark)."""
+    ink = row.ink
+    return len(ink) > 1 and ink[0].size <= NOTE_MARK_RATIO * row.size
+
+
 def _repeated_places(
     band_rows: Sequence[tuple[int, str, float, float, _Row]],
     margins: _MarginFilter,
     on_side: Counter[int],
-) -> list[tuple[str, int, float, float]]:
-    """The places in a band where rows that are not body text stand on at least half of the
-    reference pages of one side (odd or even) and at least two: the head of a left page and
-    the head of a right page are different places, and their words do not matter."""
+) -> list[_Place]:
+    """The places in a band where rows that could be a head or foot stand on at least half
+    of the reference pages of one side (odd or even) and at least two, and where the line is
+    one by more than that: a number on it counts up with the pages (the page number), or
+    the same words (with letters in them) stand there on two pages. The head of
+    a left page and the head of a right page are different places."""
     candidates = [
-        (number, zone, y, size)
-        for number, zone, y, size, row in band_rows
-        if not row.vertical and not margins.prominent(row) and margins.apart(row)
+        (number, zone, row) for number, zone, _, _, row in band_rows if margins.furniture_look(row)
     ]
-    places: list[tuple[str, int, float, float]] = []
-    for number, zone, y, size in candidates:
-        parity = number % 2
-        if any(
-            (zone, parity) == (z, p)
-            and abs(y - py) <= MARGIN_PLACE_PT
-            and abs(size - ps) <= MARGIN_SIZE_PT
-            for z, p, py, ps in places
-        ):
+    places: list[_Place] = []
+    for number, zone, row in candidates:
+        if any(place.holds(zone, number, row) for place in places):
             continue
-        pages = {
-            n
-            for n, z, py, ps in candidates
-            if z == zone
-            and n % 2 == parity
-            and abs(py - y) <= MARGIN_PLACE_PT
-            and abs(ps - size) <= MARGIN_SIZE_PT
+        here = _Place(zone, number % 2, (row.y0 + row.y1) / 2, row.size)
+        rows: dict[int, list[_Row]] = {}
+        for n, z, other in candidates:
+            if here.holds(z, n, other):
+                rows.setdefault(n, []).append(other)
+        if len(rows) < max(2, -(-on_side[here.parity] // 2)):
+            continue
+        # A page number goes up by the pages between: from one page of the place to the
+        # next, on half of those steps (an excerpt put together from parts of a book jumps
+        # at each join, so one offset for the whole file is too much to ask).
+        numbers = {
+            n: {int(v) for r in on_page for v in _WHOLE_NUMBER.findall(r.clean)}
+            for n, on_page in sorted(rows.items())
         }
-        if len(pages) >= max(2, -(-on_side[parity] // 2)):
-            places.append((zone, parity, y, size))
+        steps = list(itertools.pairwise(numbers))
+        counting = sum(any(v + m - n in numbers[m] for v in numbers[n]) for n, m in steps)
+        numbered = counting >= max(1, -(-len(steps) // 2))
+        seen = Counter(
+            text
+            for on_page in rows.values()
+            for text in {_norm_margin(r.clean) for r in on_page}
+            if sum(c.isalpha() for c in text) >= 3
+        )
+        texts = frozenset(text for text, n in seen.items() if n >= 2)
+        if numbered or texts:
+            places.append(replace(here, numbered=numbered, texts=texts))
     return places
 
 
@@ -9304,6 +9357,7 @@ def _prepare_rows(
     number = cast(int, page.number)
     gone = {id(f) for f in frags if margins.drops(f, height)}
     placed = {id(f) for f in frags if id(f) not in gone and margins.at_place(f, height, number)}
+    placed -= _attached(frags, placed, gone, height)
     out = gone | placed
     standing = [f for f in frags if id(f) not in out]
     for frag in frags:
@@ -9592,6 +9646,33 @@ def _take_labels(
 
 def _is_number_row(row: _Row) -> bool:
     return not row.vertical and _is_page_number(row.clean)
+
+
+def _attached(frags: Sequence[_Row], placed: set[int], gone: set[int], height: float) -> set[int]:
+    """The rows at a head's or foot's place (`_MarginFilter.at_place`) that go on from the
+    page's text: the row next to them towards the middle of the page is less than
+    `MARGIN_ATTACHED` of a line away and stays on the page. A running head or foot stands
+    clear of the text block; the last line of a footnote, or of a table in small type, at the
+    foot of a page with narrow margins sits at the same height on every page and does not.
+    Worked from the middle of the page outwards, so every line of such a note is kept."""
+    rows = [f for f in frags if not f.vertical and id(f) not in gone]
+    kept: set[int] = set()
+    middle = height / 2
+    for row in sorted(
+        (f for f in rows if id(f) in placed), key=lambda f: abs((f.y0 + f.y1) / 2 - middle)
+    ):
+        top = (row.y0 + row.y1) / 2 < middle
+        for other in rows:
+            if other is row or (id(other) in placed and id(other) not in kept):
+                continue
+            gap = other.y0 - row.y1 if top else row.y0 - other.y1
+            x0, _, x1, _ = other.bbox
+            if -0.5 * row.height <= gap <= MARGIN_ATTACHED * row.height and min(
+                x1, row.bbox[2]
+            ) > max(x0, row.bbox[0]):
+                kept.add(id(row))
+                break
+    return kept
 
 
 def _shares_line(row: _Row, others: Sequence[_Row]) -> bool:

@@ -6,14 +6,18 @@
   the chapter title on one side, the section title on the other, a page number beside it)
   was kept in the body, because only its exact text was looked for. `layout._margin_filter`
   now also finds a small line that sits at the same place (height within 2 pt, size within
-  0.5 pt) on at least half of the left pages, or of the right pages, and drops it whatever
-  its words. The place is searched in the top and bottom 10% of the page
+  0.5 pt) on at least half of the left pages, or of the right pages, and drops it when the
+  line is a head's or a foot's by more than its place: a number on it counts up with the
+  pages, or its words stand there on another page. The place alone is not enough: the last
+  line of a footnote, a one-line footnote and a slide's source line stand at one height in
+  small type on page after page, and they stay (so does a row that goes on from the text
+  next to it, and a row that opens with a raised mark). The place is searched in the top and bottom 10% of the page
   (`MARGIN_PLACE_BAND`); an exact repeat is still searched in 7%, so a body line that
   repeats word for word at 8% stays. A repeated heading such as "Solution" or "Example" is as big as the body, so it stays; a bare number
   that shares a line with a kept line (a table cell) stays. On the 10 OpenStax development
   excerpts, pages with a running head in the output went from 195 of 199 to 15.
 - Source facts: the bold letters of a page are read once for all of its equations, not once
-  per equation (`source_facts._bold_letters`); counts are unchanged.
+  per equation (`source_facts._bold_letters`); a letter is counted in the box its centre is in.
 - Start-up: importing `pipeline.run` no longer loads the `anthropic` and `openai` SDKs (the
   HTTP math reader shares the retry constants through `models.base`), which is most of what a
   conversion process spent before its first page. The worker looks for a job as soon as one
