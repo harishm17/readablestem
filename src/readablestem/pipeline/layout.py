@@ -9298,7 +9298,7 @@ def _prepare_rows(
     height = page.rect.height
     kept: list[_Row] = []
     dropped: list[_Row] = []
-    number = page.number
+    number = cast(int, page.number)
     gone = {id(f) for f in frags if margins.drops(f, height)}
     placed = {id(f) for f in frags if id(f) not in gone and margins.at_place(f, height, number)}
     out = gone | placed
