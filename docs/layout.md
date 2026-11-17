@@ -74,8 +74,10 @@ Element conventions:
    is off.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
-   line and cannot be told apart. Ligatures are expanded. Codes of symbol and TeX fonts are
-   read as what the font draws (`pipeline/font_codes.py`, "Font code tables" below).
+   line and cannot be told apart. Ligatures are expanded. A glyph the file's own table does
+   not decode is read by the name the font gives it (`pipeline/glyph_names.py`, "Glyph names"
+   below), then, for a font with no usable table, as what the font draws
+   (`pipeline/font_codes.py`, "Font code tables" below); one that stays undecoded is a gap mark.
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
@@ -741,6 +743,28 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   among its characters (`_spread_ligatures`) wherever layout reads characters from the PDF: the
   rows (so tables, whose cells come from them), `line_glyphs` and `page_glyphs`. Text running down
   the page is shared along y; other angles are left as MuPDF has them.
+- **Glyph names** (`pipeline/glyph_names.py`, `data/glyph-names.tsv`; every file). The text layer
+  decodes a glyph through the font's table to Unicode, or through its name when Adobe's list has
+  it. TeX's extension fonts (CMEX10, CMEX9, txex, LMMathExtension10) have neither for their sum and
+  integral signs, radicals, big brackets and the pieces of built-up ones, so MuPDF gives U+FFFD or
+  one of Adobe's private-use codes. The file still names each glyph inside the embedded font
+  program. `_text_blocks` runs a ladder over the page's raw text: (1) the file's own table
+  (MuPDF); (2) `glyph_names.recover`: the glyph's name, read with MuPDF (`fz_get_glyph_name`,
+  through PyMuPDF, so no font parser is added), looked up in one table kept as data (Adobe's glyph
+  list plus TeX's names; a sized variant such as `summationdisplay` is its base character, a
+  built-up piece the Unicode piece character: `⎧ ⎨ ⎩ ⎪ ⎮ ⎯ ⏐`); (3) `font_codes.remap`, by font
+  name; (4) `glyph_names.mark_gaps`: a glyph still undecoded becomes `output_chars.GAP` (U+2BD1), not
+  U+FFFD and not dropped. A raw character says how it was read in `"how"`: `"name"`, `"font"` or
+  `"gap"` (no key: the file's own table). Nothing reads the key yet; it is there to tell a
+  recovered character from a decoded one. A raw character becomes a glyph by font and origin
+  (`page.get_texttrace()` lists the glyph ids MuPDF drew), and by the character the text layer gave
+  it, because TeX draws an overlay (the slash of `\l`) at the origin of the letter it crosses; a
+  glyph two names would fit is left alone. A glyph's name is read once per font and page, and only
+  on a page that holds an undecoded glyph. The gap mark is not a private-use character: the output
+  filter (`output_chars.NOT_TEXT`) turns it into "[unreadable character]" on the student page, the
+  lint (`html_checks`) fails on it as it does on U+FFFD, and the sign check reads it as an
+  unnamed glyph that may be any sign (`signs._unnamed`). To rebuild the table:
+  `scripts/make_glyph_names.py` (sources and licences: `pipeline/data/README.md`).
 - **Font code tables** (`pipeline/font_codes.py`, `FONT_CODE_TABLES`, on; every file). A font with
   no usable ToUnicode gives its codes as control characters, private-use code points or plain
   letters that are not what is printed. `_text_blocks` rewrites them, before rows, markers, math
@@ -756,9 +780,8 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   fonts with no table: TeX's ligatures, dashes and quotes at control codes (OT1 or T1, told by the
   font's own codes), a spacing accent printed over a letter becomes the accented letter ("Ren´e"),
   and an unreadable glyph that starts two or more lines of a page, set off from the text by a gap
-  and nowhere inside a line, is a bullet. A code with no row stays as it was. Left out: the
-  big-bracket pieces U+F8EB to U+F8F8 (`_OPENING_BRACES`, `signs._NO_SIGN` read them by code
-  point), Wingdings 2 and 3, Webdings, ZapfDingbats, MSAM, the MathTime families, and MSBM, whose
+  and nowhere inside a line, is a bullet. A code with no row stays as it was (and is a gap
+  mark by the end of `_text_blocks`). Left out: Wingdings 2 and 3, Webdings, ZapfDingbats, MSAM, the MathTime families, and MSBM, whose
   double-struck letters `_Char.styled` already gives equation text (`_LETTER_STYLE_FONTS`). With the setting
   off, only U+F0B7 and U+F0A7 are mapped (to `•` and `▪`), whatever the font.
 
@@ -836,7 +859,9 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the
   math into the `<figcaption>`; the equation step reads them as any inline equation. Table captions
-  are not cut this way (the table step owns them).
+  are not cut this way (the table step owns them): a table caption is joined as a cell is, with its
+  raised and lowered glyphs marked (`tables._line_text`, "CP³" stays "CP³" in the layout output and
+  in the HTML).
 - **Bold italic.** `CMMIB`, newtx's `bmi`, Nimbus `MediItal` and `BoldItalic` fonts give bold-italic code
   points in the equation's text layer (`_Char.styled`), so the equation step can tell `\boldsymbol{x}` from
   `\mathbf{x}` (docs/steps.md "Letter-style check").

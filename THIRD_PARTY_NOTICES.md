@@ -22,6 +22,7 @@ this table. This is a plain statement of scope, not legal advice.
 | `proof/selection/` (the selection code, its inputs and outputs, and the license table; the section lists and counts are OpenStax metadata) | MIT for the code and logs; CC BY 4.0 (OpenStax) for what is read from OpenStax | `proof/REGISTERED.md` |
 | Vendored files under `src/readablestem/pipeline/vendor/` and `src/readablestem/web/static/vendor/` | Their own (table below) | The license files beside them |
 | The English word list `src/readablestem/pipeline/data/words-en.txt.gz` (63,849 lower-case words) | SCOWL's permissive notice (Kevin Atkinson; the Moby parts are public domain) | `src/readablestem/pipeline/data/README.md` (source, filter, SHA-256 and the full notice) |
+| The glyph-name table `src/readablestem/pipeline/data/glyph-names.tsv` (5,433 names), generated from TeX Live's `glyphtounicode.tex` (pdfTeX: Adobe's glyph list, BSD-3-Clause, and TeX's names) and `glyphtounicode-cmex.tex` (latex-lab) | LPPL-1.3c for the latex-lab file; GPL as TeX Live lists the pdftex package; **not settled, for the owner to decide** | `src/readablestem/pipeline/data/README.md` (sources, SHA-256, filter, rebuild) |
 
 All OpenStax material used in this repository is from books that OpenStax publishes under
 CC BY 4.0. The license of each book was read from OpenStax's CMS and archive on the dates in

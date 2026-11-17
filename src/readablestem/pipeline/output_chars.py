@@ -20,8 +20,11 @@ The rule applies to every file a student gets, where students read:
   and a hit there, which cannot have come from the page, stops that file from being
   offered as finished.
 
-The text-health check and the font code tables that remove most of these characters at
-the source are the conversion's; this module only keeps them out of the outputs.
+The text layer's gap mark `GAP` (a glyph the file does not name, `glyph_names.mark_gaps`) is
+one of them, so a glyph the conversion could not read comes out as `UNREADABLE` and fails the
+static checks as U+FFFD does; it is not private use. The text-health check, the glyph names
+and the font code tables that remove most of these characters at the source are the
+conversion's; this module only keeps them out of the outputs.
 Content-free: callers learn a count, never the text around a character.
 """
 

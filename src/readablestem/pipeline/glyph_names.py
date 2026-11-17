@@ -89,18 +89,26 @@ def _glyph_names(doc: pymupdf.Document, xref: int) -> Callable[[int], str] | Non
     try:
         buffer = doc.extract_font(xref)[3]
         font = pymupdf.Font(fontbuffer=buffer) if buffer else None
-    except (RuntimeError, ValueError):
+    except (RuntimeError, ValueError, pymupdf.mupdf.FzErrorBase):  # "object is not a stream"
         return None
     if font is None:
         return None
-    return lambda gid: pymupdf.mupdf.fz_get_glyph_name2(font.this, gid)
+
+    def name(gid: int) -> str:
+        try:
+            return pymupdf.mupdf.fz_get_glyph_name2(font.this, gid)
+        except pymupdf.mupdf.FzErrorBase:
+            return ""
+
+    return name
 
 
 def recover(page: pymupdf.Page, blocks: list[dict[str, Any]]) -> None:
     """Step 2 of the ladder: give each undecoded glyph of `blocks` (the page's raw text, in
     place) the character its glyph name stands for."""
     missing = _missing(blocks)
-    if not missing:
+    doc = page.parent
+    if not missing or doc is None:
         return
     # A glyph is found by font and origin, and by the character the text layer gave it: TeX
     # draws an overlay (the slash of \l) at the origin of the letter it crosses.
@@ -116,11 +124,7 @@ def recover(page: pymupdf.Page, blocks: list[dict[str, Any]]) -> None:
         x, y = char["origin"]
         if font not in lookups:
             # MuPDF cuts a font's name short in the text layer ("LMMathExtension10-Regula")
-            fonts = (
-                _glyph_names(page.parent, xref)
-                for base, xref in page_fonts
-                if base.startswith(font)
-            )
+            fonts = (_glyph_names(doc, xref) for base, xref in page_fonts if base.startswith(font))
             lookups[font] = [lookup for lookup in fonts if lookup]
         found = {
             lookup(gid)

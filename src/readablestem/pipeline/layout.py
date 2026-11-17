@@ -5728,10 +5728,10 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
 
 # Signs that continue the line above when a maths line starts with them ("= 250 m/s" under
 # "v = ...", "+ c" under a long sum).
-# A system's opening brace: the glyph, or the pieces TeX builds a tall one from (CMEX): the
-# Unicode piece characters `glyph_names` reads from the font, or Adobe's private-use codes
-# where the file has no font program to name them.
-_OPENING_BRACES = frozenset("{\u23a7\u23a8\u23a9\u23aa\uf8f1\uf8f2\uf8f3\uf8f4")
+# A system's opening brace: the glyph, or the pieces TeX builds a tall one from (CMEX), the
+# Unicode piece characters `glyph_names` reads from the font. Adobe's private-use codes for the
+# pieces never reach here: a glyph still undecoded is a gap mark (`glyph_names.mark_gaps`).
+_OPENING_BRACES = frozenset("{\u23a7\u23a8\u23a9\u23aa")
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
 TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table

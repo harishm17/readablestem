@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: characters by glyph name, and a table caption keeps its raised marks (branch fix/characters-by-glyph-name, SW56 steps 2 and 7)
+
+- A glyph the file's own table does not decode is read by the name the font gives it. TeX's
+  extension fonts (CMEX10, CMEX9, txex, LMMathExtension10) have no table for their sum and
+  integral signs, radicals, big brackets and the pieces of built-up ones, so the text layer
+  gave U+FFFD or one of Adobe's private-use codes ("�ab f'(x)", "det A = ����"). The name is
+  read from the embedded font program with MuPDF, through PyMuPDF (no new dependency), and
+  looked up in `pipeline/data/glyph-names.tsv`, Adobe's glyph list plus TeX's names, generated
+  by `scripts/make_glyph_names.py` from the two public TeX files (sources, licences and hashes
+  in `pipeline/data/README.md`). A sized variant is its base character; a built-up piece is
+  the Unicode piece character. The ladder is the file's own table, the name, the font table
+  (`font_codes`), then a gap. A raw character says which in `"how"` (`"name"`, `"font"`,
+  `"gap"`).
+- A glyph still undecoded is `output_chars.GAP` (U+2BD1), not U+FFFD and not dropped. It is
+  not private use. The output filter and the lint treat it as they do U+FFFD (the page says
+  "[unreadable character]"); the sign check and the glyph reconciler read it as an unnamed
+  glyph. U+FFFD still fails the lint. The private-use brace pieces are no longer in
+  `_OPENING_BRACES`: no glyph reaches it as one.
+- A table caption is joined as a cell is: its raised and lowered glyphs stay raised and
+  lowered ("CP³", not "CP3"), in the layout output and in the HTML. A repeated header on the
+  next page is found with the same marks.
+
 ## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
 
 - F-509: text struck through on the page was read as live text ("October 3 October 10"
