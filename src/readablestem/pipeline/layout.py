@@ -5,9 +5,11 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
 1. Characters come from PyMuPDF's raw text dictionary with accurate glyph boxes, so the
    numerator and denominator rows of a fraction do not overlap. All geometry is turned
    into display coordinates (the page's /Rotate applied), the space `crop` clips in.
-2. Decoration is dropped: running headers/footers (text in the top/bottom 7 % of the
+2. Decoration is dropped: running headers/footers (text in the top/bottom 10 % of the
    page that repeats on at least half of the pages, digits normalised, unless it is
-   larger or bolder than body text and changes from page to page), bare page numbers,
+   larger or bolder than body text and changes from page to page; and a small line
+   that sits at the same place on at least half of the left (or right) pages whatever
+   its words, so a head whose text changes with the section goes too), bare page numbers,
    images and drawings repeated in those bands (logos), and watermarks (diagonal text in
    a large font, or rotated text repeated at the same place).
 3. Columns: a vertical white gap in the x-coverage of narrow lines splits a page into

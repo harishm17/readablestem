@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased: running heads by place, and a faster start (branch fix/running-heads-and-startup)
+
+- SW5 rule 3: a running head or foot whose words change with the section (textbook heads:
+  the chapter title on one side, the section title on the other, a page number beside it)
+  was kept in the body, because only its exact text was looked for. `layout._margin_filter`
+  now also finds a small line that sits at the same place (height within 2 pt, size within
+  0.5 pt) on at least half of the left pages, or of the right pages, and drops it whatever
+  its words. The band is 10% of the page (it was 7%; `tables.TOP_BAND` follows). A repeated
+  heading such as "Solution" or "Example" is as big as the body, so it stays; a bare number
+  that shares a line with a kept line (a table cell) stays. On the 10 OpenStax development
+  excerpts, pages with a running head in the output went from 195 of 199 to 15.
+- Source facts: the bold letters of a page are read once for all of its equations, not once
+  per equation (`source_facts._bold_letters`); counts are unchanged.
+- Start-up: importing `pipeline.run` no longer loads the `anthropic` and `openai` SDKs (the
+  HTTP math reader shares the retry constants through `models.base`), which is most of what a
+  conversion process spent before its first page. The worker looks for a job as soon as one
+  is queued by an upload, a source upload or a new part (`Worker.wake`), not at the next poll.
+
 ## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
 
 - F-509: text struck through on the page was read as live text ("October 3 October 10"

@@ -77,11 +77,22 @@ Element conventions:
    line and cannot be told apart. Ligatures are expanded. Codes of symbol and TeX fonts are
    read as what the font draws (`pipeline/font_codes.py`, "Font code tables" below).
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
-   bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
+   bottom 10 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
-   two), unless it stands out and changes: a line at least 1.15 x body size or bold whose
-   exact text differs between pages (`Problem 3 (15 points)` at the top of each page) is
-   content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size. The
+   two), unless it stands out and changes: a line at least 1.15 x body size, or bold and
+   within 0.5 pt of the body size or larger, whose exact text differs between pages
+   (`Problem 3 (15 points)` at the top of each page) is
+   content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size.
+   A running head whose words change with the section (a textbook's chapter title on the
+   right pages and the section title on the left ones, with the page number beside it) is
+   found by its place instead: a line of the band that sits at the same height (within 2 pt)
+   and size (within 0.5 pt) on at least half of the left pages, or of the right pages (and at
+   least two), and is apart from the body (smaller than it by 0.5 pt, italic, or another font
+   family) goes, whatever its words. A repeated heading (`Solution`, `Example`) is bold
+   and as big as the body or bigger, so it is not apart from it and stays; a first line of
+   the body in the band stays too. A bare page number that shares a line with a line that
+   stays (a table cell) is not dropped, and a number set at heading size is a chapter
+   number, not a page number. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
