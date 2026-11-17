@@ -107,7 +107,8 @@ def test_a_chosen_title_is_escaped():
 
 
 def footer(html: str) -> str:
-    return html[html.index("<footer") :]
+    """The student note, which holds the contact line (inside `<main>`, after the content)."""
+    return html[html.index('<section id="about-conversion"') :]
 
 
 def test_an_email_contact_line_is_a_mailto_link_in_the_footer():

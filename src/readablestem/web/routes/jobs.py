@@ -500,7 +500,7 @@ def expired(job: Job, now: datetime | None = None) -> bool:
 
 
 def require_done(job: Job) -> None:
-    if job.status != JobStatus.DONE or (job.html is None and not job.html_stale):
+    if job.status != JobStatus.DONE or not (job.html_stale or job.has_html):
         raise PageError(
             409,
             "Not ready yet",
@@ -513,7 +513,7 @@ def _out_of_date(job: Job) -> bool:
     """A review write marked the file out of date, or an older renderer made it."""
     if job.html_stale:
         return True
-    return job.html is not None and assemble.render_version(job.html) < assemble.RENDER_VERSION
+    return job.has_html and (job.html_version or 0) < assemble.RENDER_VERSION
 
 
 def current_html(ctx: AppContext, session: Session, job: Job) -> Job:

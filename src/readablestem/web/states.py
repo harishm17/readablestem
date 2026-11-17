@@ -298,7 +298,9 @@ class Facts:
             status=str(job.status),
             error_code=job.error_code,
             error_detail=job.error_detail,
-            result_json=job.result_json,
+            # Only a finished job's state reads its result (`gaps_of`): a poll of one that is
+            # waiting, converting or stopped does not load it.
+            result_json=job.result_json if job.status == JobStatus.DONE else None,
             progress=job.progress_json,
             retries=job.retries or 0,
             attempts=job.attempts or 0,

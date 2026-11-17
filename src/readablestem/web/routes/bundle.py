@@ -82,7 +82,7 @@ def _zip_response(
         held_back = 0
         for job_id in ids:
             job = session.get(Job, job_id)
-            if job is None or (job.html is None and not job.html_stale):
+            if job is None or not (job.html_stale or job.has_html):
                 continue
             if output.export_state(job).key != output.READY:  # a draft stays out (SW21)
                 held_back += 1

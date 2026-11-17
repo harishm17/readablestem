@@ -40,7 +40,7 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline.assemble import RENDER_META, RENDER_VERSION
 from readablestem.web.app import create_app
 from readablestem.web.auth import set_allowed
-from readablestem.web.db import Job, session_scope
+from readablestem.web.db import LARGE_COLUMNS, Job, session_scope
 from readablestem.web.email_senders import LoginEmail, register_sender
 from readablestem.web.worker import Worker
 
@@ -318,7 +318,7 @@ class WebEnv:
 
     def job(self, job_id: str) -> Job:
         with session_scope(self.ctx.factory) as session:
-            job = session.get(Job, job_id)
+            job = session.get(Job, job_id, options=LARGE_COLUMNS)
             assert job is not None
             return job
 
