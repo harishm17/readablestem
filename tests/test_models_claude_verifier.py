@@ -40,6 +40,7 @@ CHANGED = '{"verdict": "meaning_changing", "difference": "exponent"}'
 def make_settings(**kw) -> Settings:
     kw.setdefault("model_provider", "anthropic")
     kw.setdefault("anthropic_api_key", "sk-ant-test")
+    kw.setdefault("claude_second_check", "shadow")  # these tests are about the check itself
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
 
 

@@ -29,6 +29,7 @@ def settings(**kw) -> Settings:
     kw.setdefault("env", "dev")
     kw.setdefault("model_provider", "anthropic")
     kw.setdefault("anthropic_api_key", "sk-ant-test")
+    kw.setdefault("claude_second_check", "shadow")
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
 
 

@@ -349,7 +349,7 @@ flowchart LR
   L --> E[Equations: crop, LaTeX, checks against the text layer, MathML, speech text]
   L --> F[Figures: classify, short alt text, checks]
   E & F --> R[Router: cheap model for simple inline equations, main model otherwise, escalation on doubt]
-  R --> M[Anthropic Claude API: claude-haiku-5-5 and claude-opus-5-5; second check on claude-sonnet-5-5, recorded only by default]
+  R --> M[Anthropic Claude API: claude-haiku-5-5 and claude-opus-5-5; second check on claude-sonnet-5-5, off by default]
   H & E & F --> A[Assemble one HTML file and a report]
   A --> C[Static and axe-core checks]
   A --> V[Review screen: accept, edit or reject]

@@ -225,7 +225,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
         # Checks the key before any work, not on the first call. The OpenAI client carries
         # the second automated check on the same budget, as in the app
         # (DECISIONS_FIGURE_VERIFY, DECISIONS_EQUATION_SHADOW turn it off); the Claude
-        # client carries the Claude check (CLAUDE_SECOND_CHECK, shadow by default).
+        # client carries the Claude check (CLAUDE_SECOND_CHECK, off by default).
         client = make_live_client(settings, budget)
     except ConfigError as exc:
         return str(exc)

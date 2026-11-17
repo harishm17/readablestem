@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
+
+- WS2.8 (g), footnotes: a file that names its footnotes is read from the file. hyperref writes a
+  destination `Hfootnote.N` about 2 pt above each footnote's line and a link to it from the mark;
+  `pipeline.named_links.read` is the one place that reads destinations and links from PyMuPDF
+  (SW52 can reuse it). The line a destination points at starts a footnote and the link's glyphs
+  are its mark. In such a file a block it does not name is not made a footnote by place and
+  size (the line numbers of a code listing in small type were 40 footnotes in one file), a
+  footnote set in a mono font (a URL) is a footnote and not a code block, and a file that
+  names none behaves as before. On the 13 development files that state footnotes (94 stated):
+  found 59 before, 87 after.
+- WS2.8 (d): a raised note number is set off from the word it touches at the glyph, where the
+  row is cut (`layout._mark_notes`, `SET_OFF_FLAG`), not by repairing the string afterwards:
+  "2Feehly" is "2 Feehly", the mark in the text is the note's link or a separate mark when no
+  note is found, and a raised digit that ends a heading is a note mark, not one of its words.
+- The document task's equation scorer reads the output as the student's file states it
+  (`pipeline_eval.document_page_item`): the maths cells of rebuilt tables, and cells of text
+  with raised or lowered characters, are equations of the page (`with_table_maths`; the old
+  second reading `table_maths_reading` is the one reading now), and maths written as text with
+  raised or lowered characters (`Element.script_runs`, `x²`, `^(..)`) is read as `<msup>` and
+  `<msub>`, not as character order (`equations_v2.read_scripts`, `mathml_of_text`). The
+  primary scorer's rules are unchanged. Scores of recorded document runs from before this are
+  not comparable with new ones.
+- WS10.5: `claude_second_check` is `off` by default (it was `shadow`): the check changed no
+  output and was about 16% of the spend. `.railway/railway.ts` still declares the setting, so
+  production can turn it on for a measured run. Docs and tests that assumed `shadow` set it.
+
 ## Unreleased: running heads by place, and a faster start (branch fix/running-heads-and-startup)
 
 - SW5 rule 3: a running head or foot whose words change with the section (textbook heads:
