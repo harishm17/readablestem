@@ -45,7 +45,9 @@ def _table() -> dict[str, str]:
     text = resources.files("readablestem.pipeline").joinpath("data/glyph-names.tsv").read_text()
     return {
         name: chr(int(code, 16))
-        for name, code in (row.split("\t") for row in text.split("\n") if row)
+        for name, code in (
+            row.split("\t") for row in text.split("\n") if row and not row.startswith("#")
+        )
     }
 
 

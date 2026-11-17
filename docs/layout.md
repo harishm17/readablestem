@@ -750,8 +750,8 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   one of Adobe's private-use codes. The file still names each glyph inside the embedded font
   program. `_text_blocks` runs a ladder over the page's raw text: (1) the file's own table
   (MuPDF); (2) `glyph_names.recover`: the glyph's name, read with MuPDF (`fz_get_glyph_name`,
-  through PyMuPDF, so no font parser is added), looked up in one table kept as data (Adobe's glyph
-  list plus TeX's names; a sized variant such as `summationdisplay` is its base character, a
+  through PyMuPDF, so no font parser is added), looked up in one table kept as data (the names of
+  TeX's extension fonts; a sized variant such as `summationdisplay` is its base character, a
   built-up piece the Unicode piece character: `⎧ ⎨ ⎩ ⎪ ⎮ ⎯ ⏐`); (3) `font_codes.remap`, by font
   name; (4) `glyph_names.mark_gaps`: a glyph still undecoded becomes `output_chars.GAP` (U+2BD1), not
   U+FFFD and not dropped. A raw character says how it was read in `"how"`: `"name"`, `"font"` or
@@ -764,7 +764,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   filter (`output_chars.NOT_TEXT`) turns it into "[unreadable character]" on the student page, the
   lint (`html_checks`) fails on it as it does on U+FFFD, and the sign check reads it as an
   unnamed glyph that may be any sign (`signs._unnamed`). To rebuild the table:
-  `scripts/make_glyph_names.py` (sources and licenses: `pipeline/data/README.md`).
+  `scripts/make_glyph_names.py` (source and license: `pipeline/data/README.md`).
 - **Font code tables** (`pipeline/font_codes.py`, `FONT_CODE_TABLES`, on; every file). A font with
   no usable ToUnicode gives its codes as control characters, private-use code points or plain
   letters that are not what is printed. `_text_blocks` rewrites them, before rows, markers, math

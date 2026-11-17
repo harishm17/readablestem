@@ -298,6 +298,9 @@ def test_two_column_handout_equations_matrices_and_numbers():
     assert "\U0001d6da" in (cross.text or "")  # bold omega (\bm, CMMIB)
     assert "1 2" in (matrix.text or "") and "3 4" in (matrix.text or "")
     assert all(n in plain(system.text) for n in "213135")
+    # both rows of the system's matrix: the second lies inside the box of the first row's
+    # tall bracket, and was left beside the equation as a paragraph of its own
+    assert "2 1 1 3" in (system.text or "")
     assert "proj" in (projection.text or "") and "fraction bar" in projection.reasons
     for equation in equations:
         number = number_rect("linear_algebra_twocol", equation)

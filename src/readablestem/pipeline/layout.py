@@ -5688,9 +5688,13 @@ STRAY_BRACE_REACH = 2.0
 
 def _math_neighbours(row: _Row, other: _Row) -> bool:
     """Does fragment `row` belong with maths row `other`? Vertically adjacent and
-    overlapping in x, or an equation number beside it (`_number_beside`), or an opening brace
-    level with `other` and a little to its left (the brace of a system, `_stray_brace_cut`)."""
+    overlapping in x, or inside its box (the second row of a matrix, beside the tall bracket
+    the first row starts with), or an equation number beside it (`_number_beside`), or an
+    opening brace level with `other` and a little to its left (the brace of a system,
+    `_stray_brace_cut`)."""
     size = max(row.size, other.size)
+    if other.x0 <= (row.x0 + row.x1) / 2 <= other.x1 and other.y0 <= row.y0 and row.y1 <= other.y1:
+        return True
     if (
         row.ink
         and all(c.c in _OPENING_BRACES for c in row.ink)
