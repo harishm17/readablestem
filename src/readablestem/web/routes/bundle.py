@@ -36,9 +36,11 @@ from readablestem.web.routes.jobs import (
     content_disposition,
     current_html,
     download_filename,
+    head_reply,
     slug,
 )
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.seo import is_head
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -60,6 +62,10 @@ def _zip_response(
     file_type: str = "html",
     job_ids: list[str] | None = None,
 ) -> Response:
+    if is_head(request):
+        # The zip's name and type; whether anything is ready is known only by going through
+        # the documents, which a HEAD does not do (nothing is built, restarted or recorded).
+        return head_reply("application/zip", zip_name(label, file_type))
     ctx = get_ctx(request)
     now = utcnow()
     cap = bundle.limit(file_type)

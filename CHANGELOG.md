@@ -13,6 +13,19 @@
   title paragraph stay in Python: pandoc drops those elements before a filter sees them, and
   its file title and the title paragraph come from one field.
 
+## Unreleased: HEAD on downloads takes nothing (branch fix/about-in-main-and-job-summary, WS11.16)
+
+- F-138: a HEAD request to a download or export was served as a GET, so it built the file,
+  restarted the deletion clock and counted as a download. It now gets the GET's status and
+  content headers (type, file name, content security policy) and no body, after the same access
+  and draft checks, and builds, restarts and records nothing. The routes: the HTML, Canvas,
+  Common Cartridge, Word and EPUB downloads, "Combine parts", "Download all", the course zip and
+  the batch zip. A HEAD has no Content-Length, and the zips answer 200 without going through
+  the documents, so a HEAD cannot tell that a GET would find nothing ready (a 409).
+- F-137: `docs/security.md` said the Canvas, Cartridge, Word and EPUB downloads are for the
+  owner only; the code lets a person the document is shared with, even as a viewer, take them
+  (through the same draft gate). The docs now say what the code does.
+
 ## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
 
 - F-509: text struck through on the page was read as live text ("October 3 October 10"
