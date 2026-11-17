@@ -258,14 +258,16 @@ def test_a_stale_worker_cannot_overwrite_a_requeued_job(env):
 
 
 def test_worker_thread_runs_in_the_app_lifespan(tmp_path):
-    env = WebEnv(tmp_path, run_worker=True, worker_poll_s=0.05)
+    # The poll is far longer than the wait below: only an upload that wakes the worker gets
+    # the job converted in time.
+    env = WebEnv(tmp_path, run_worker=True, worker_poll_s=30)
     with env.running() as client:
         worker = env.ctx.worker
         assert worker is not None and worker._thread is not None and worker._thread.is_alive()
         env.allow(ALICE)
         login(client, ALICE)
         job_id = upload(client, make_pdf(1)).headers["location"].rsplit("/", 1)[-1]
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 15
         while env.job(job_id).status != "done" and time.monotonic() < deadline:
             time.sleep(0.05)
         assert env.job(job_id).status == "done"
