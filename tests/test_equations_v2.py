@@ -9,7 +9,16 @@ from pathlib import Path
 
 import pytest
 
-from readablestem.core.types import Element, Kind
+from readablestem.core.types import (
+    Element,
+    Fix,
+    Kind,
+    ScriptRun,
+    Status,
+    TableCell,
+    TableFix,
+    TableGrid,
+)
 from readablestem.eval import equations_v2 as v2
 from readablestem.eval import pipeline_eval as pe
 from readablestem.eval.equations import latex_to_mathml, score_latex
@@ -235,3 +244,40 @@ def test_a_merged_prediction_is_credited_for_every_gold_equation_it_covers():
     assert item["stream_credited"]["merged"] == [gold[0]["id"], gold[1]["id"]]
     secondary = pe.document_metrics([item])["secondary_stream_v2"]
     assert secondary["end_to_end_exact_with_credit"] == 1.0 and secondary["credited_merged"] == 2
+
+
+def test_maths_the_output_states_as_text_with_raised_characters_is_read_as_scripts():
+    """A gold equation the pipeline wrote as text (raised digits in an element, `x²` in a table
+    cell) is found and right: it is scored as the scripts the output states, not as the order
+    of its characters, and a table's cells are equations of the page like any other."""
+    water = equation(
+        "p-1",
+        0,
+        '<math display="inline"><msub><mi>H</mi><mn>2</mn></msub><mi>O</mi></math>',
+        "inline",
+    )
+    area = equation(
+        "p-1", 1, '<math display="inline"><msup><mi>x</mi><mn>2</mn></msup></math>', "inline"
+    )
+    wrong = equation(
+        "p-1", 2, '<math display="inline"><msup><mi>y</mi><mn>3</mn></msup></math>', "inline"
+    )
+    text = element(0, "H2O", "inline").model_copy(
+        update={"script_runs": [ScriptRun(start=1, end=2, kind="sub")]}
+    )
+    table = Element(id="p1-t0", kind=Kind.TABLE, page=0, bbox=(0, 0, 1, 1), order=1)
+    cells = [TableCell(row=0, col=0, text="x²"), TableCell(row=0, col=1, text="y² and words")]
+    grid = TableGrid(rows=1, cols=2, cells=cells)
+    fixes = {
+        "p1-t0": Fix(
+            element_id="p1-t0", kind=Kind.TABLE, status=Status.ACCEPTED, confidence=0.9,
+            table=TableFix(grid=grid),
+        )
+    }  # fmt: skip
+    item = pe.document_page_item("p", [water, area, wrong], [text, table], fixes, [], [])
+    exact = {p["gold_id"]: (p["exact_lenient"], p["exact_stream_v2"]) for p in item["pairs"]}
+    assert exact[water["id"]] == (True, True) and exact[area["id"]] == (True, True)
+    assert wrong["id"] not in exact or exact[wrong["id"]] == (False, False)
+    assert v2.stream_of("<math><mi>CO₂</mi></math>") == v2.stream_of(
+        "<math><mi>C</mi><msub><mi>O</mi><mn>2</mn></msub></math>"
+    )

@@ -244,6 +244,30 @@ stay wrong are real differences: a subscript the answer key sets bold
 (`\mathbf{v}_{\text{avg}}` against a bold `avg`), and a comma the model copied from the
 text layer.
 
+**The document task reads the output as the student's file states it.** Two things the
+equation scorer used to leave out, which made correct output count as "not found" or "wrong"
+(`pipeline_eval.document_page_item`, `with_table_maths`, `read_mathml`):
+
+- *Table cells.* A rebuilt table is one TABLE element, but its cells hold formulas, and the
+  output HTML a student reads has them inside the table. Every math cell (validated MathML),
+  and every cell of text that states math with raised or lowered characters (`x²`,
+  `10^(-3)`), is an inline equation of the page that the scorer aligns to the gold. This used
+  to be a second reading kept beside the registered one (`table_maths_reading`, read by
+  `flag_features.read_items`); it is the one reading now, and items recorded before this change
+  keep the old key, which `read_items` still merges.
+- *Math written as text with raised or lowered characters.* An equation element the pipeline
+  left as text (`Element.script_runs`: `H₂O`, `cm³`) and a text token with Unicode
+  superscript or subscript characters or a `^(...)` run are read as scripts, `<msub>` or
+  `<msup>` of the atom before the run, as the gold writes them (`equations_v2.read_scripts`,
+  `mathml_of_text`), not as the order of their characters. The primary scorer's rules are
+  unchanged; an element with no proposal whose text states scripts is scored from that
+  reading by every scorer, and one with no raised or lowered characters is still "no proposal".
+
+No numbers in this document change with it: the stored outputs and the answer key of the
+374-equation set this was found on are not in the repository or the corpus cache, so the
+before and after counts have to be taken by running `eval pipeline` (a replay of stored answers
+costs nothing) on that set.
+
 ### headings
 
 For each gold page: print to PDF, `layout.analyze`, `heading_step.heading_fixes`. A
@@ -809,7 +833,7 @@ only under the older key is answered from that row, and the row is appended unde
 with its parts (`answers_file.answers_file_rekeyed` counts them). Run it once, with the code and settings
 the file was recorded with, then drop the flag; a request that changed since the recording is
 a miss either way.
-The Claude second check (shadow by default) asks the model as well; from 2026-10-14 its
+The Claude second check (off by default since WS10.5; `CLAUDE_SECOND_CHECK=shadow` turns it on) asks the model as well; from 2026-10-14 its
 answers are kept in the same file (the report's `answers_file.second_check`), so a replay and
 `--answers-offline` spend nothing on it. The baselines of "Baselines and the gate" were
 recorded before that, so their check answers are not in `.local/answers-baseline.jsonl`: the

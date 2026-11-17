@@ -71,6 +71,7 @@ from readablestem.core.types import (
     Fix,
     Kind,
     ModelCall,
+    ScriptRun,
     Status,
 )
 from readablestem.eval import equations_chem as chem_score
@@ -1362,15 +1363,22 @@ def document_page_item(
     variable with an operator; typically maths the source wrote as text, so the gold has
     no MathML for it), or "other" (a bare quantity, a lone symbol, anything else). A
     gold equation is "split" when two or more predictions are pieces of it.
+
+    The page is read as the output states it: the maths cells of its tables are equations
+    (`with_table_maths`), and an equation the pipeline wrote as text with raised or lowered
+    characters (`Element.script_runs`, a cell's `x²`) is read as the scripts it states
+    (`read_mathml`), not as the order of its characters.
     """
+    elements, fixes = with_table_maths(elements, fixes)
     predicted = sorted((e for e in elements if e.kind == Kind.EQUATION), key=lambda e: e.order)
     gold_sigs = [math_signature(g["mathml"]) for g in gold]
     pred_sigs = []
     for element in predicted:
-        fix = fixes.get(element.id)
-        proposal = fix.equation if fix is not None else None
         pred_sigs.append(
-            (math_signature(proposal.mathml if proposal else None), text_signature(element.text))
+            (
+                math_signature(read_mathml(element, fixes.get(element.id))),
+                text_signature(element.text),
+            )
         )
 
     def score(gold_sig: str, pred: tuple[str, str]) -> float:
@@ -1382,24 +1390,25 @@ def document_page_item(
         element = predicted[pi]
         fix = fixes.get(element.id)
         proposal = fix.equation if fix is not None else None
+        read = read_mathml(element, fix)
         result = (
-            score_mathml(proposal.mathml, gold[gi]["mathml"])
-            if proposal is not None
+            score_mathml(read, gold[gi]["mathml"])
+            if read is not None
             else _missing_score(gold[gi]["mathml"])
         )
         stream = (
-            v2.score_stream(proposal.mathml, gold[gi]["mathml"])
-            if proposal is not None
+            v2.score_stream(read, gold[gi]["mathml"])
+            if read is not None
             else v2.missing_stream(gold[gi]["mathml"])
         )
         symbols = (
-            sym.score_symbols(proposal.mathml, gold[gi]["mathml"])
-            if proposal is not None
+            sym.score_symbols(read, gold[gi]["mathml"])
+            if read is not None
             else sym.missing_symbols(gold[gi]["mathml"])
         )
         chem = (
-            chem_score.score_chem(proposal.mathml, gold[gi]["mathml"])
-            if proposal is not None
+            chem_score.score_chem(read, gold[gi]["mathml"])
+            if read is not None
             else chem_score.missing_chem(gold[gi]["mathml"])
         )
         matched.append(
@@ -1421,7 +1430,7 @@ def document_page_item(
                 "chem_similarity": chem.similarity,
                 "silent_harm": chem_score.is_chemistry_id(gold[gi]["id"])
                 and chem_score.silent_harm(
-                    proposal.mathml if proposal is not None else None,
+                    read,
                     gold[gi]["mathml"],
                     fix.review if fix is not None else None,
                 ),
@@ -1433,7 +1442,7 @@ def document_page_item(
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
-                "pred_mathml": proposal.mathml if proposal is not None else None,
+                "pred_mathml": read,
                 **_shadow_pair(fix),
             }
         )
@@ -1497,16 +1506,28 @@ def document_page_item(
     }
 
 
-def _stream(
-    fix: Fix | None, stream_of: Callable[[str], list[str]] = v2.stream_of
-) -> list[str] | None:
-    """The stream (`eval.equations_v2`, or the symbols of `eval.equations_symbols`) of a
-    fix's proposed MathML; None without one."""
+def read_mathml(element: Element, fix: Fix | None) -> str | None:
+    """The MathML an equation element's output states: the fix's proposal, or, for an
+    element the pipeline left as text, the scripts of that text (a run of raised or lowered
+    characters is `<msup>`/`<msub>` of the atom before it: `eval.equations_v2`). None when
+    it states none."""
     proposal = fix.equation if fix is not None else None
-    if proposal is None:
+    if proposal is not None:
+        return proposal.mathml
+    runs = [(r.start, r.end, r.kind) for r in element.script_runs]
+    return v2.mathml_of_text(element.text or "", runs)
+
+
+def _stream(
+    element: Element, fix: Fix | None, stream_of: Callable[[str], list[str]] = v2.stream_of
+) -> list[str] | None:
+    """The stream (`eval.equations_v2`, or the symbols of `eval.equations_symbols`) of what
+    an element's output states as maths (`read_mathml`); None when it states none."""
+    read = read_mathml(element, fix)
+    if read is None:
         return None
     try:
-        return stream_of(proposal.mathml)
+        return stream_of(read)
     except MathMLError:
         return None
 
@@ -1536,14 +1557,14 @@ def _stream_credits(
             [pi for pi, host in pieces.items() if host == gi]
             + ([by_gold[gi]] if gi in by_gold else [])
         )
-        streams = [_stream(fixes.get(predicted[pi].id), stream_of) for pi in indices]
+        streams = [_stream(predicted[pi], fixes.get(predicted[pi].id), stream_of) for pi in indices]
         if all(st is not None for st in streams) and v2.credit_split(
             [st for st in streams if st is not None], gold_streams[gi]
         ):
             split.append(gold[gi]["id"])
     merged: list[str] = []
     for gi, pi, _ in pairs:
-        stream = _stream(fixes.get(predicted[pi].id), stream_of)
+        stream = _stream(predicted[pi], fixes.get(predicted[pi].id), stream_of)
         if stream is None or gold[gi]["id"] in exact:
             continue
         # The alignment may have paired the prediction with any of the gold equations it
@@ -1993,7 +2014,9 @@ def with_table_maths(
     the table step rebuilt is one TABLE element whose cells hold MathML, so the formulas in its
     cells are not equations to the scorer, while a reader of the output HTML (and the chatbots'
     HTML is read that way) finds them. This is that reading for ReadableSTEM: each cell with
-    validated MathML is one inline equation, asked about when its table is."""
+    validated MathML is one inline equation, asked about when its table is, and so is each cell
+    of text that states maths with raised or lowered characters (`x²`, `10^(-3)`), as the
+    scripts it states."""
     ordered = sorted(elements, key=lambda e: e.order)
     out: list[Element] = []
     extra: dict[str, Fix] = {}
@@ -2004,7 +2027,27 @@ def with_table_maths(
         if element.kind is not Kind.TABLE or fix is None or fix.table is None:
             continue
         k = 0
-        for cell in (c for c in fix.table.grid.cells if c.latex and c.mathml):
+        for cell in fix.table.grid.cells:
+            if not (cell.latex and cell.mathml):
+                plain, spans = v2.read_scripts(cell.text)
+                if spans and spans[0][0] > 0:
+                    shift += 1
+                    new_id = f"{element.id}-m{k}"
+                    k += 1
+                    out.append(
+                        Element(
+                            id=new_id,
+                            kind=Kind.EQUATION,
+                            page=element.page,
+                            bbox=cell.bbox or element.bbox,
+                            order=element.order + shift,
+                            text=plain,
+                            script_runs=[ScriptRun(start=a, end=b, kind=t) for a, b, t in spans],
+                            display="inline",
+                            parent_id=element.id,
+                        )
+                    )
+                continue
             for latex, mathml, text in _cell_formulas(cell):
                 shift += 1
                 new_id = f"{element.id}-m{k}"
@@ -2057,19 +2100,6 @@ def _cell_formulas(cell: Any) -> list[tuple[str, str, str | None]]:
     return found
 
 
-_TABLE_READING_KEYS = (
-    "n_pred",
-    "pairs",
-    "missed_gold_ids",
-    "matched",
-    "unmatched",
-    "unmatched_by_reason",
-    "split_gold_ids",
-    "symbols_credited",
-    "stream_credited",
-)
-
-
 def _document_section(
     cfg: EvalConfig, page: list[dict], pdf: bytes
 ) -> tuple[dict | None, str | None]:
@@ -2103,18 +2133,6 @@ def _document_section(
     )
     for pair in item["pairs"]:
         pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
-    if any(
-        f.table is not None and any(c.mathml for c in f.table.grid.cells) for f in fixes.values()
-    ):
-        # The same page read as an HTML reader does: the maths cells of its tables count as
-        # equations (`with_table_maths`). Kept beside the registered reading, not instead of it.
-        elements_c, fixes_c = with_table_maths(result.elements, fixes)
-        reading = document_page_item(
-            _page_id(page), _of_kind(page, "equation"), elements_c, fixes_c, [], []
-        )
-        for pair in reading["pairs"]:
-            pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
-        item["table_maths_reading"] = {k: reading[k] for k in _TABLE_READING_KEYS if k in reading}
     item["review"] = load_counts(result.fixes)
     item["figures"] = document_figures(result)
     headings = predicted_headings(result.fixes)
