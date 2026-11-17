@@ -397,6 +397,10 @@ class _AttemptBudget(JobBudget):
 class Claim:
     job_id: str
     attempt: int
+    # When the claim was asked for (`time.monotonic`), the same moment as the job's
+    # `started_at`: the job's stages are counted from here, so the claim's own write is
+    # inside `start_up`.
+    began: float | None = None
 
 
 @dataclass
@@ -560,6 +564,7 @@ class Worker:
         least recently, then oldest), or None.
 
         Only jobs whose owner is still on the allowlist are taken."""
+        began = time.monotonic()
         now = now or self.clock()
         claimed = {
             "status": JobStatus.RUNNING,
@@ -597,7 +602,7 @@ class Worker:
                 if won == 1:
                     attempt = session.scalar(select(Job.attempts).where(Job.id == job_id))
                     log_event(logger, "job_claimed", job_id=job_id, attempt=attempt)
-                    return Claim(job_id=job_id, attempt=int(attempt or 1))
+                    return Claim(job_id=job_id, attempt=int(attempt or 1), began=began)
         return None
 
     def budget_closed(self) -> bool:
@@ -971,7 +976,7 @@ class Worker:
     def process(self, claim: Claim) -> str:
         """Convert one claimed job and store the outcome. Returns the final status
         ("done", "failed") or "discarded" when the job stopped being ours meanwhile."""
-        started = time.monotonic()
+        started = claim.began if claim.began is not None else time.monotonic()
         with session_scope(self.factory) as session:
             job = session.execute(
                 select(
@@ -1118,9 +1123,10 @@ class Worker:
         for a conversion that measured nothing (a stand-in converter).
 
         `queue_wait` is the time from the upload to the first claim; a later try has none,
-        because the row does not say when it was asked for. `start_up` is what the
-        conversion call took outside the conversion's own stages: starting its process,
-        loading it, and passing the file in and the result back. `store` is from the end
+        because the row does not say when it was asked for. `start_up` is the time from
+        the claim to the end of the conversion call outside the conversion's own stages:
+        the claim's write, starting the process, loading it, and passing the file in and
+        the result back. `store` is from the end
         of the conversion to this write."""
         if output.facts is None:
             return None
