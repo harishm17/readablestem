@@ -463,6 +463,8 @@ class Worker:
         # ones included): what one more concurrent step may need.
         self._largest_usd = limits.largest_reservation_usd(settings)
         self._stop = threading.Event()
+        # Set by an upload (`wake`) or by `stop`: ends the idle wait between two polls.
+        self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._current: _Attempt | None = None
         self._paused = False
@@ -1401,7 +1403,8 @@ class Worker:
                 log_exception(logger, "worker_loop_error", exc)
                 ran = None
             if ran is None:
-                self._stop.wait(self.settings.worker_poll_s)
+                self._wake.wait(self.settings.worker_poll_s)
+                self._wake.clear()
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -1432,6 +1435,10 @@ class Worker:
                 target=tables.preload, name="readablestem-preload", daemon=True
             ).start()
 
+    def wake(self) -> None:
+        """A job was queued: look for it now instead of at the next poll (`worker_poll_s`)."""
+        self._wake.set()
+
     @property
     def alive(self) -> bool:
         """The worker thread is running and has not been told to stop."""
@@ -1458,6 +1465,7 @@ class Worker:
         if self._shutdown_thread is not None:
             return
         self._stop.set()
+        self._wake.set()
         self._shutdown_thread = threading.Thread(
             target=self.stop, kwargs={"timeout": timeout}, name="readablestem-shutdown", daemon=True
         )
@@ -1468,6 +1476,7 @@ class Worker:
         lease ended now, so another instance requeues it at once instead of after the
         lease runs out."""
         self._stop.set()
+        self._wake.set()
         attempt = self._current
         if attempt is not None:
             self._cancel(attempt, "shutdown")

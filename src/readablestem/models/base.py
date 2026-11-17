@@ -23,7 +23,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol, TypeVar
+from typing import Final, Protocol, TypeVar
 
 from pydantic import BaseModel
 
@@ -125,6 +125,22 @@ def rate_gate(provider: str) -> RateGate:
             gate = _GATES[provider] = RateGate()
         return gate
 
+
+# Retries of a model request, shared by the SDK clients and the HTTP readers: kept here so the
+# readers need not load the SDKs.
+# Backoff between sends, as in the OpenAI SDK: 0.5 s doubling up to 8 s, minus 0-25% jitter.
+INITIAL_RETRY_DELAY_S: Final = 0.5
+MAX_RETRY_DELAY_S: Final = 8.0
+# A server asking for a longer wait is not retried on the same model: the router's fallback
+# to the other model is a better use of that time than a step sitting idle.
+MAX_RETRY_AFTER_S: Final = 60.0
+# Transient HTTP statuses besides 5xx (request timeout, lock contention, rate limit). An error
+# status carries no usage and is not billed, so resending costs only the reservation.
+RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({408, 409, 429})
+
+# The request header that names the Anthropic workspace a call is billed to. Here and not in
+# `anthropic_client`, so the HTTP math reader can use it without loading the SDKs.
+WORKSPACE_HEADER = "anthropic-workspace-id"
 
 UNTRUSTED_NOTICE = (
     "The text between <document_text> tags was extracted from the user's document. "

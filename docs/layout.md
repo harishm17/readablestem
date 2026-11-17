@@ -79,9 +79,29 @@ Element conventions:
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
-   two), unless it stands out and changes: a line at least 1.15 x body size or bold whose
-   exact text differs between pages (`Problem 3 (15 points)` at the top of each page) is
-   content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size. The
+   two), unless it stands out and changes: a line at least 1.15 x body size, or bold and
+   within 0.5 pt of the body size or larger, whose exact text differs between pages
+   (`Problem 3 (15 points)` at the top of each page) is
+   content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size.
+   A running head whose words change with the section (a textbook's chapter title on the
+   right pages and the section title on the left ones, with the page number beside it) is
+   found by its place instead, in the top or bottom 10 % of the page (textbook heads sit
+   lower than the 7 % of an exact repeat): a line that sits at the same height (within 2 pt)
+   and size (within 0.5 pt) on at least half of the left pages, or of the right pages (and at
+   least two), and is apart from the body (smaller than it by 0.5 pt, italic, or another font
+   family) goes when the line is a head's or a foot's by more than its place: a whole
+   number on it goes up by the pages between, from one page of the place to the next, on
+   half of those steps (the page number; an excerpt joined from parts of a book jumps at
+   each join), or the same words with letters in them stand at the place on two pages. The
+   place alone would also take the last line of a footnote, a one-line footnote or a slide's
+   source line, which sit at one height in small type on page after page. So a row less
+   than 0.6 of its height from a kept row next to it towards the middle of the page stays
+   (it goes on from the text), and a row that opens with a character at most 0.85 of its
+   size (a note's mark) is never a head. A repeated heading (`Solution`, `Example`) is bold
+   and as big as the body or bigger, so it is not apart from it and stays; a first line of
+   the body in the band stays too. A bare page number that shares a line with a line that
+   stays (a table cell) is not dropped, and a number set at heading size is a chapter
+   number, not a page number. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
