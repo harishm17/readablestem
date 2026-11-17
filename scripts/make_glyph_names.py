@@ -11,8 +11,9 @@ a control code says nothing and is left out. `BY_HAND` adds the names the file l
 a character and replaces the ones it gives a combining mark.
 
 pdfTeX's larger `glyphtounicode.tex` is not read: TeX Live lists its package and the list it
-is generated from (lcdf-typetools) under the GPL, and on 3,491 pages of development files it
-named one glyph this table did not (`lscript`, now in `BY_HAND`).
+is generated from (lcdf-typetools) under the GPL, and on 2,482 pages of development files it
+named four glyphs this table did not (`lscript`, the unsized angle brackets and
+`negationslash`, now in `BY_HAND`).
 `pipeline/data/README.md` has the source, the license, the changes and the input's SHA-256.
 """
 
@@ -29,7 +30,8 @@ OUT = Path(__file__).resolve().parent.parent / "src/readablestem/pipeline/data/g
 # Names written here, not read from the file. The pieces of built-up signs: the file gives the
 # vertical extensions of tall bars, arrows and radicals an overlay mark that would stick to the
 # character before it, and has no row for the integral and arrow extensions; Unicode has a
-# character for each. `lscript` is the script l of TeX's math italic fonts.
+# character for each. The rest are names of TeX's symbol and italic fonts that the development
+# files use and the file does not list.
 BY_HAND = {
     "integralex": "\u23ae",  # integral extension
     "arrowhorizex": "\u23af",  # horizontal line extension
@@ -38,6 +40,11 @@ BY_HAND = {
     "vextenddouble": "\u2016",  # double vertical line
     "arrowvertexdbl": "\u2016",
     "lscript": "\u2113",  # script small l
+    "angbracketleft": "\u27e8",  # the unsized angle brackets (the file has the sized ones)
+    "angbracketright": "\u27e9",
+    "negationslash": "\u0338",  # the slash of \not, which layout joins to its relation
+    "colonequal": "\u2254",  # txfonts
+    "nequal": "\u2260",
 }
 ROW = re.compile(r"\\pdfglyphtounicode\{([^}]+)\}\{([0-9A-Fa-f ]+)\}")
 # The notice the LPPL asks a changed copy to carry; `glyph_names._table` skips these lines.

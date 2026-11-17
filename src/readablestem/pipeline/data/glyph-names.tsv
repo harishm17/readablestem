@@ -6,10 +6,12 @@
 # Changes: only rows that stand for one character are kept, sized-variant selectors are
 # dropped, and the rows listed in README.md beside this file are added or replaced by hand.
 # The authors of the original file do not support this one.
+angbracketleft	27E8
 angbracketleftBig	27E8
 angbracketleftBigg	27E8
 angbracketleftbig	27E8
 angbracketleftbigg	27E8
+angbracketright	27E9
 angbracketrightBig	27E9
 angbracketrightBigg	27E9
 angbracketrightbig	27E9
@@ -74,6 +76,7 @@ circlemultiplydisplay	2A02
 circlemultiplytext	2A02
 circleplusdisplay	2A01
 circleplustext	2A01
+colonequal	2254
 contintegraldisplay	222E
 contintegraltext	222E
 coproductdisplay	2210
@@ -100,6 +103,8 @@ logicalordisplay	22C1
 logicalortext	22C1
 lscript	2113
 mapsto	21A6
+negationslash	0338
+nequal	2260
 parenleftBig	0028
 parenleftBigg	0028
 parenleftbig	0028
