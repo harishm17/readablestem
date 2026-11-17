@@ -237,25 +237,23 @@ def _pictures(page) -> int:
     )
 
 
-def _bold_letter_zones(page) -> list[tuple[float, float, float, float]]:
-    """Where a bold font draws a letter on the page, read once for all the page's equations:
-    one box per letter, widened by its font size. A glyph can reach a little past its advance
-    box, and MuPDF's clip tests the glyph, so a box that touches none of these zones has no
-    bold letter in it. Most boxes touch none."""
-    zones = []
+def _bold_letters(page) -> list[tuple[float, float, float, float, float]]:
+    """Where a bold font draws a plain letter on the page, read once for all the page's
+    equations: one (x0, y0, x1, y1, font size) per letter."""
+    letters = []
     for block in page.get_text("rawdict")["blocks"]:
         for line in block.get("lines", ()):
             for span in line.get("spans", ()):
                 if not _bold_span(span):
                     continue
                 em = float(span.get("size", 0.0))
-                zones += [
-                    (x0 - em, y0 - em, x1 + em, y1 + em)
+                letters += [
+                    (x0, y0, x1, y1, em)
                     for ch in span.get("chars", ())
                     if _plain_letter(ch)
                     for x0, y0, x1, y1 in (ch["bbox"],)
                 ]
-    return zones
+    return letters
 
 
 def _bold_span(span) -> bool:
@@ -268,18 +266,27 @@ def _plain_letter(ch) -> bool:
 
 
 def _bold_plain_letters(
-    page, element: Element, zones: list[tuple[float, float, float, float]]
+    page, element: Element, letters: list[tuple[float, float, float, float, float]]
 ) -> int:
     """Letters inside the equation's box that a bold font draws but the text layer
-    stores as plain characters. `zones`: `_bold_letter_zones` of the page; the box is read
-    (clipped, which is MuPDF's own test of what lies in it) only when it touches one."""
+    stores as plain characters. `letters`: `_bold_letters` of the page, so the page is read
+    once for all its equations. A letter whose box lies inside the equation's box is in it, and
+    one more than its font size away is not (a glyph can reach a little past its advance box,
+    and MuPDF's clip tests the glyph). Only when a letter lies between, the box is read
+    clipped, which is MuPDF's own test of what lies in it."""
     rect = pymupdf.Rect(element.bbox)
     if page.rotation % 360:
         rect = rect * page.derotation_matrix  # element boxes are in the displayed frame
-    if not any(
-        rect.x0 < x1 and rect.x1 > x0 and rect.y0 < y1 and rect.y1 > y0 for x0, y0, x1, y1 in zones
-    ):
-        return 0
+    inside = 0
+    for x0, y0, x1, y1, em in letters:
+        if rect.x0 <= x0 and x1 <= rect.x1 and rect.y0 <= y0 and y1 <= rect.y1:
+            inside += 1
+        elif rect.x0 < x1 + em and rect.x1 > x0 - em and rect.y0 < y1 + em and rect.y1 > y0 - em:
+            return _bold_plain_letters_clipped(page, rect)
+    return inside
+
+
+def _bold_plain_letters_clipped(page, rect: pymupdf.Rect) -> int:
     count = 0
     for block in page.get_text("rawdict", clip=rect)["blocks"]:
         for line in block.get("lines", ()):
@@ -319,8 +326,8 @@ def _from_pdf(
                 # Link annotations of any kind, counted as the text pass counts them.
                 links += text_pass.link_count(doc, [number])
                 if equations_here := by_page.get(number):
-                    zones = _bold_letter_zones(page)  # one read of the page for all of them
-                    bold += sum(_bold_plain_letters(page, e, zones) for e in equations_here)
+                    letters = _bold_letters(page)  # one read of the page for all of them
+                    bold += sum(_bold_plain_letters(page, e, letters) for e in equations_here)
             except Exception as exc:  # one unreadable page leaves the others counted
                 log.warning("source facts: a page could not be read: %s", type(exc).__name__)
         update |= {"images": images, "links": links, "bold_maths_letters": bold}
