@@ -8601,10 +8601,14 @@ def _line_break(before: str, after: str) -> tuple[str, str]:
     so does "well-" + "known": a compound is told from a broken word by the word list
     (`hyphens.keeps_hyphen`: kept when both pieces are words and the joined word is not,
     or when the piece before the hyphen is a single letter, as in "x-" + "ray"). A soft
-    hyphen always disappears. Anything else is joined with a space.
+    hyphen always disappears. A break inside one token (a date, an address, a compound
+    joined by a non-breaking hyphen) keeps the token whole (`hyphens.joins_inside_token`).
+    Anything else is joined with a space.
     """
     if before.endswith("\u00ad"):
         return before[:-1], ""
+    if hyphens.joins_inside_token(before, after):
+        return before, ""
     if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
         if after[:1].islower() and not hyphens.keeps_hyphen(
             before, after, _COMPOUNDS, _WHOLE_WORDS

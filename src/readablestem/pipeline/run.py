@@ -239,7 +239,9 @@ log = logging.getLogger(__name__)
 # table, heading or caption makes that item a required decision, and what no rule reads is
 # counted (`SourceReport.unread_words`, `unread_pictures`) and said (`source_unread`). The stop
 # rule names a missing bibliography and a special character in the text, so source jobs gain
-# figures and decisions. Results from 0.5.10 load unchanged.
+# figures and decisions. A date, an address or a compound broken at a line end keeps its token
+# whole (`hyphens.joins_inside_token`): no space inside "(2012-08-17)" or "project/memspectrum/".
+# Results from 0.5.10 load unchanged.
 PIPELINE_VERSION = "0.5.11"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)

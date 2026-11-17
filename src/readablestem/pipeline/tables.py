@@ -73,7 +73,7 @@ from readablestem.core.types import (
     TableGrid,
     grid_problems,
 )
-from readablestem.pipeline import table_model
+from readablestem.pipeline import hyphens, table_model
 
 if TYPE_CHECKING:
     import numpy as np
@@ -2473,7 +2473,10 @@ def _cell_text(words: list[_Word]) -> str:
     last_line = None
     for word in words:
         if out:
-            if last_line is not None and word.line != last_line and out.endswith("-"):
+            new_line = last_line is not None and word.line != last_line
+            if new_line and hyphens.joins_inside_token(out, word.text):
+                pass  # a date, an address or a compound broken at the line end stays whole
+            elif new_line and out.endswith("-"):
                 out = out[:-1] if word.text[:1].islower() and out[-2:-1].isalpha() else out
             else:
                 out += " "
@@ -3574,6 +3577,8 @@ def _goes_on(start: str, rest: str) -> bool:
 
 
 def _joined_text(start: str, rest: str) -> str:
+    if hyphens.joins_inside_token(start, rest):
+        return start + rest
     if start.endswith("-") and start[-2:-1].isalpha() and rest[:1].islower():
         return start[:-1] + rest
     return f"{start} {rest}"

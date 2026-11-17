@@ -260,6 +260,40 @@ def test_worked_example_plain_italic_maths_is_inline():
     assert first.reasons == second.reasons == ["italic variable with operator"]
 
 
+# ---------------------------------------------------------------- lines broken inside a token
+
+NOTO_SANS = Path("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf")
+
+
+@pytest.mark.skipif(not NOTO_SANS.exists(), reason="needs Noto Sans for the non-breaking hyphen")
+def test_a_date_an_address_and_a_compound_broken_at_line_ends_join_without_a_space():
+    """A break that falls inside one token leaves it whole; a sentence end, a plain
+    compound and a broken word join as they always did."""
+    lines = [
+        "The logger is easy\u2011",  # a non-breaking hyphen, as Word writes one
+        "to-use. It started on (2012-08-",
+        "17) and keeps files at project/",
+        "memspectrum/ for review. Read www.example.",
+        "org for more. The old run ended here.",
+        "The velocity was well-",
+        "known and the veloc-",
+        "ity stayed small. See www.example.org/data.",
+        "The result is in the table.",
+    ]
+    doc = pymupdf.open()
+    page = doc.new_page(width=420, height=300)
+    page.insert_font(fontname="noto", fontfile=str(NOTO_SANS))
+    for i, line in enumerate(lines):
+        page.insert_text((40, 60 + 14 * i), line, fontsize=10, fontname="noto")
+    [paragraph] = [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.PARAGRAPH]
+    assert paragraph.text == (
+        "The logger is easy\u2011to-use. It started on (2012-08-17) and keeps files at "
+        "project/memspectrum/ for review. Read www.example.org for more. The old run ended "
+        "here. The velocity was well-known and the velocity stayed small. See "
+        "www.example.org/data. The result is in the table."
+    )
+
+
 # ---------------------------------------------------------------- the files themselves
 
 
