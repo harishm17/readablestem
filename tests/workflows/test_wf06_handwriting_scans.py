@@ -57,8 +57,13 @@ def test_every_handwritten_page_is_read(site: harness.ReplaySite, handwritten: s
     assert [alt for alt in pictures if "not converted" in alt] == []
 
 
-@harness.finding("F-255")
-def test_the_title_slide_is_read_once(student: lxml.html.HtmlElement) -> None:
+# Fixed for the deck of scanned slides; the deck with every second slide scanned is still
+# marked (and cannot be converted from its recording until the answers are made again).
+@pytest.mark.parametrize("name", ["scanned", pytest.param("mixed", marks=harness.finding("F-255"))])
+def test_the_title_slide_is_read_once(
+    request: pytest.FixtureRequest, site: harness.ReplaySite, name: str
+) -> None:
+    student = site.student_file(request.getfixturevalue(name))
     headings = Counter(harness.words(h) for h in student.xpath("//h1|//h2|//h3"))
     (top,) = student.xpath("//h1")
     assert headings[harness.words(top)] == 1

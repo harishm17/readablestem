@@ -102,8 +102,8 @@ def test_every_equation_has_words_for_a_screen_reader(student: lxml.html.HtmlEle
 
 def test_the_student_file_says_it_has_not_been_checked(student: lxml.html.HtmlElement) -> None:
     # No decision has been made, so the file may not tell a student that anyone checked it.
-    about = harness.words(student.xpath("//footer")[0])
-    assert "not been checked by your instructor" in about
+    (about,) = student.xpath('//main//section[@id="about-conversion"]')
+    assert "has not been reviewed by a person" in harness.words(about)
 
 
 def test_listen_speaks_what_is_raised_and_lowered(site: harness.ReplaySite, notes: str) -> None:
