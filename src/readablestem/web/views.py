@@ -24,7 +24,7 @@ from readablestem.pipeline import checked
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import fair_queue, job_page, states, titles
+from readablestem.web import documents, fair_queue, job_page, states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
@@ -720,7 +720,7 @@ def job_view(
         page=page,
         title=titles.effective_title(
             job.title_override,
-            (job.result_json or {}).get("title") if job.status == JobStatus.DONE else None,
+            documents.stored_title(job) if done else None,
             job.filename,
         ),
         title_override=job.title_override,

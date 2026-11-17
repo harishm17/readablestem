@@ -1527,7 +1527,12 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     """The list of steps with their counts, polled by htmx outside the status box's live
     region (so a screen reader is not told every element). 204 while unchanged; once the
     job has finished, an empty fragment that stops polling."""
-    job = load_job_status(request, job_id, user)
+    # The steps need the job's status and progress only: no state, summary or page, so a
+    # poll (even of a job that has finished) reads neither the result nor the file.
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        row = job_access(session, job_id, user, VIEW)
+        job = job_view(session, row, role=shares.role_of(session, row, user) or VIEW)
     if v and v == job.progress_version:
         return Response(status_code=204)
     return render(request, "_job_progress.html", {"job": job})
