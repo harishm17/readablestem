@@ -44,6 +44,21 @@ the layout time on lecture notes and problem sets (`scripts/bench_runtime.py con
 the test). `layout.TABLE_PREFILTER`
 turns it off (for that comparison).
 
+What a tighter test can and cannot do (measured 2026-11-17 on a 100-page maths document:
+the test passed 81 pages, the detector found tables on 8). Counting a rule only when it is
+long does not bring the count down, and no length of rule is safe to count by. `judge` asks
+a row rule only for half the width of its box and a box can hold two short cells, so it has
+no minimum length to borrow; the one absolute number is a column rule's (2.2 lines), which
+cuts 81 passes to 80. A guessed limit (four times the text size, a quarter of the narrowest
+rule of any table the repository keeps) cuts it to 79 and leaves the same tables on every
+repository PDF, but it is not a bound `judge` states. The reason is that 69 of the 73 pages
+passed with no table pass on aligned gaps alone (three lines with a gap at one x position):
+on the document's pages the lines that share a gap are the two text columns of a page (30
+pages), the space round a relation sign in a display equation or an equation number (13 and
+12), and a list marker over its text (12). `judge` drops those only for boxes it makes
+itself (`_text_block_dropped`), not for a box the detector proposes, so the test cannot
+leave them out and still promise that it only skips pages `find` would return nothing on.
+
 Three more rules keep a page of pen strokes from costing minutes. They change what the
 detector would have found only on such pages (in the fixtures, the development set, the
 table sets and the 332 research PDFs of handwriting, no output changed; the largest page
