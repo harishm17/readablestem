@@ -260,7 +260,7 @@ def remap(blocks: list[dict[str, Any]]) -> None:
             code = ord(c) if len(c) == 1 else -1
             row = _mapped(table, c) if table else None
             if row is not None:
-                new.append(dict(char, c=row))
+                new.append(dict(char, c=row, how="font"))
                 changed = True
             elif 0x0B <= code <= 0x1F and code in tex and table is None:
                 before = chars[index - 1]["c"] if index else " "

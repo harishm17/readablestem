@@ -93,6 +93,7 @@ from typing import Any
 import defusedxml.ElementTree as DET
 
 from readablestem.core.mathchars import STYLE_GROUPS, char_variant
+from readablestem.pipeline.output_chars import GAP
 
 MINUS = "minus"
 PLUS = "plus"
@@ -264,10 +265,10 @@ def _unnamed(ch: str) -> bool:
     """A glyph the PDF could not name (private use or the replacement character) that may
     be any sign: not one of the pieces and letters of `_NO_SIGN` or `_ARROW_EXTENDERS`.
     U+FFFD stays any sign: Tectonic writes brace pieces there, but newtx writes \\cong and
-    vector accents there too."""
+    vector accents there too. So does the text layer's gap mark, a glyph the file does not name."""
     if ch in _NO_SIGN or ch in _ARROW_EXTENDERS:
         return False
-    return ch == "\N{REPLACEMENT CHARACTER}" or unicodedata.category(ch) == "Co"
+    return ch in ("\N{REPLACEMENT CHARACTER}", GAP) or unicodedata.category(ch) == "Co"
 
 
 # KaTeX's \not glyph (`\@not` in its symbol table, font KaTeX_Main), laid over a relation.
@@ -410,7 +411,7 @@ def _overlaid(text: str, index: int, cls: str) -> bool:
     if cls in OPERATIONS:
         return False
     beside = text[max(index - 1, 0) : index] + text[index + 1 : index + 2]
-    return any(_unnamed(ch) and ch != "\N{REPLACEMENT CHARACTER}" for ch in beside)
+    return any(_unnamed(ch) and ch not in ("\N{REPLACEMENT CHARACTER}", GAP) for ch in beside)
 
 
 def _models_bar(text: str, index: int, cls: str) -> bool:

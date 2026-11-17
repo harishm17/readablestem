@@ -590,8 +590,9 @@ def equation(layout: Layout, text: str) -> Element:
     return found[0]
 
 
-# calculus_notes: sgn(x) as a cases brace, which pdfTeX writes as five CMEX pieces.
-SGN = "\uf8f1 \uf8f21 x > 0 \uf8f4 sgn(x) = 0 x = 0 \uf8f4 \uf8f3 −1 x < 0"
+# calculus_notes: sgn(x) as a cases brace, which pdfTeX writes as five CMEX pieces (the
+# Unicode brace pieces, read from the glyph names in the font program).
+SGN = "\u23a7 \u23a81 x > 0 \u23aa sgn(x) = 0 x = 0 \u23aa \u23a9 −1 x < 0"
 SGN_RIGHT = (
     r"\operatorname{sgn}(x) = \begin{cases} 1 & x > 0 \\ 0 & x = 0 \\ -1 & x < 0 \end{cases}"
 )

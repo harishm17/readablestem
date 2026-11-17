@@ -34,6 +34,7 @@ import defusedxml.ElementTree as DET
 
 from readablestem.core.types import Check
 from readablestem.pipeline import glyph_math
+from readablestem.pipeline.output_chars import GAP
 from readablestem.pipeline.text_layer_compare import Glyph, mathml_bag, symbol_bag
 from readablestem.pipeline.validate import LatexConversionError, safe_latex_to_mathml
 
@@ -72,9 +73,11 @@ def script_font(font: str) -> bool:
 
 
 def _unnamed(text: str) -> bool:
-    """A glyph the PDF cannot name: the replacement character, private use, an unmapped cid."""
+    """A glyph the PDF cannot name: the replacement character, the text layer's gap mark,
+    private use, an unmapped cid."""
     return (
         "\N{REPLACEMENT CHARACTER}" in text
+        or GAP in text
         or "(cid:" in text
         or any(0xE000 <= ord(c) <= 0xF8FF for c in text)
     )
