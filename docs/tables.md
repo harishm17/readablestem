@@ -44,7 +44,7 @@ the layout time on lecture notes and problem sets (`scripts/bench_runtime.py con
 the test). `layout.TABLE_PREFILTER`
 turns it off (for that comparison).
 
-What a tighter test can and cannot do (measured 2026-11-17 on a 100-page maths document:
+What a tighter test can and cannot do (measured 2026-11-17 on a 100-page math document:
 the test passed 81 pages, the detector found tables on 8). Counting a rule only when it is
 long does not bring the count down, and no length of rule is safe to count by. `judge` asks
 a row rule only for half the width of its box and a box can hold two short cells, so it has
