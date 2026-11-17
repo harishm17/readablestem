@@ -2814,7 +2814,12 @@ way: the page carries the render version in its head (`<meta name="readablestem-
 `pipeline.assemble.RENDER_VERSION`, raised with any change to the sheet, the markup, the
 student words or the speech rules), and `current_html` makes a stored page with none or an
 older one again from the stored result, once, so a fix reaches documents converted before
-it. The stored elements and decisions are not touched. A failed check
+it. The stored elements and decisions are not touched, with one exception: a figure stored
+as decoration without evidence (a result from before WS6.4) becomes the required decision
+it would be today (`decoration.settle`, docs/output.md "Decoration"), since its page now
+says "Figure not described". Accepting a decorative figure, or saving one with
+"Decorative" checked, stores the reviewer as its evidence (`FigureFix.decoration` `person`).
+A failed check
 re-shows the page (422) with the reviewer's input as typed and an error summary linked to
 the field; nothing is saved.
 

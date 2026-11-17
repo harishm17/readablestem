@@ -132,6 +132,7 @@ from readablestem.models.pricing import UnknownModelError
 from readablestem.observability.tracing import NoopTracer, Tracer
 from readablestem.pipeline import (
     assemble,
+    decoration,
     equation_scale,
     equation_step,
     figure_step,
@@ -241,7 +242,11 @@ log = logging.getLogger(__name__)
 # rule names a missing bibliography and a special character in the text, so source jobs gain
 # figures and decisions. A date, an address or a compound broken at a line end keeps its token
 # whole (`hyphens.joins_inside_token`): no space inside "(2012-08-17)" or "project/memspectrum/".
-# Results from 0.5.10 load unchanged.
+# A figure is written with empty alt text only as decoration with evidence
+# (`decoration.settle`, WS6.4, the same wave): one the model calls decorative with no repeat,
+# rule shape or person behind it is a required decision, and one whose reading failed is
+# decoration when the evidence says so, so the review load moves. Results from 0.5.10 load
+# unchanged; their page is made again (`assemble.RENDER_VERSION` 6).
 PIPELINE_VERSION = "0.5.11"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
@@ -1890,6 +1895,8 @@ def _convert(
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         elements, run.fixes = table_math.settle(elements, run.fixes)
+        # No empty alt text on content (WS6.4): decoration only with evidence, after every step.
+        decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)
         ordered = _ordered_fixes(elements, run.fixes)
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]

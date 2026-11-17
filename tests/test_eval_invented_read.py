@@ -72,7 +72,7 @@ def test_placeholder_alt_texts_are_not_figure_descriptions():
     out = read.read_html(
         html(
             "<img src='a.png' alt='Equation not converted'>"
-            "<img src='b.png' alt='Figure without a description'>"
+            "<img src='b.png' alt='Figure not described'>"
             "<img src='c.png' alt='Page 3: handwritten notes, not converted to text.'>"
             "<img src='d.png' alt='A graph of speed against time.'><img src='e.png' alt=''>"
         )

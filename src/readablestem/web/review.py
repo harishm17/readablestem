@@ -603,6 +603,11 @@ def apply_review(
         fix.described = None  # converted now: a description of the image is not used
     # A reviewer's Accept is not the pipeline's automatic one; an open table is undecided.
     fix.reviewed = status not in PENDING
+    if fix.reviewed and status is not Status.REJECTED and fix.figure and fix.figure.decorative:
+        # A person decided it is decoration: the evidence for its empty alt text (WS6.4).
+        from readablestem.pipeline import decoration
+
+        fix.figure = fix.figure.model_copy(update={"decoration": decoration.PERSON})
     _recount(result)
     after = snapshot(fix)
     if overridden:
@@ -1832,8 +1837,16 @@ def rerender_html(
     `math_alttext` is the app's `Settings.mathml_alttext`, the setting the first render used
     (T2-24): the file made again must read like the first one (None: the process settings).
     """
-    from readablestem.pipeline import assemble, checked, html_checks
+    from readablestem.pipeline import assemble, checked, decoration, html_checks
 
+    # Empty alt text only for decoration with evidence (WS6.4), also for a result stored
+    # before the rule: a figure its page writes as "Figure not described" waits for its
+    # decision. A person's decision is never changed; a settled result is left as it is.
+    first: dict[str, Fix] = {}
+    for fix in result.fixes:
+        first.setdefault(fix.element_id, fix)
+    if decoration.settle(result.elements, first, crops, kept=assemble.KEPT_IMAGE_WORDS):
+        _recount(result)
     # The instructor's choices are passed only when there are any, so a file made without
     # them is made exactly as before.
     chosen: dict[str, Any] = {}

@@ -234,7 +234,8 @@ def test_an_empty_title_goes_back_to_the_pdfs(titled):
     post(titled, "/title", title="Calculus")
     post(titled, "/title", title="")
     assert stored_job(titled).title_override is None
-    assert title_field(page(titled)) == "Derivatives"
+    # Back to the title students hear without one: the page's own (SW6c: its one H1).
+    assert title_field(page(titled)) == html_title(stored_job(titled).html) != "Calculus"
 
 
 def test_a_title_that_is_too_long_is_refused_with_what_was_typed(titled):

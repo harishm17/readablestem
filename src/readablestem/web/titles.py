@@ -71,11 +71,6 @@ def clean_contact(raw: str) -> str:
     raise Invalid(CONTACT_BAD)
 
 
-def suggested(result_title: str | None, heading_texts: list[str]) -> str:
-    """The title the file would have without the instructor's choice."""
-    return assemble.suggested_title(result_title, heading_texts)
-
-
 def effective_title(override: str | None, result_title: object, filename: str) -> str:
     """What a list or a heading calls the document: the instructor's title, else the PDF's
     title without its section number, else the file name. It names the Word, EPUB, Canvas and

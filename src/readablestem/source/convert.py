@@ -47,7 +47,7 @@ from readablestem.core.types import (
     SourceReport,
 )
 from readablestem.models.base import VisionClient
-from readablestem.pipeline import assemble, html_checks
+from readablestem.pipeline import assemble, decoration, html_checks
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline import run as pipeline
@@ -373,6 +373,7 @@ def _finish(
         run.collect(block=True)
     finally:
         run.pool.shutdown(wait=True, cancel_futures=True)
+    decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)  # WS6.4
     for element_id in reading.unread_formulas:  # a figure step's fix holds the decision too
         if element_id in run.fixes:
             run.fixes[element_id] = ltx_reader.needs_decision(

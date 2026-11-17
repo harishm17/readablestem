@@ -69,6 +69,7 @@ def body(elements: list[Element], fixes: list[Fix] | None = None) -> str:
     main = html.split("<main>", 1)[1].split("</main>", 1)[0]
     main = re.sub(r'<section id="checked-notice".*?</section>', "", main, flags=re.S)  # SW7
     main = re.sub(r'<section id="about-conversion".*?</section>', "", main, flags=re.S)
+    main = main.replace("<h1>T</h1>", "", 1)  # the title, the page's one H1 (SW6c)
     return "".join(line.strip() for line in main.splitlines())
 
 

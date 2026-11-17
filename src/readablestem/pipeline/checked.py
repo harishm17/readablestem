@@ -67,7 +67,7 @@ from readablestem.core.types import (
     Fix,
     Kind,
 )
-from readablestem.pipeline import assemble_tables
+from readablestem.pipeline import assemble_tables, decoration
 from readablestem.pipeline.notices import KEPT_IMAGE_CODES
 
 # Kinds of a part shown as a picture, as `checked_words.KIND_WORDS` names them: a page (or
@@ -237,7 +237,14 @@ def converted(
                 continue  # the original of a page converted from its image, shown beside it
             counts["figures"] += 1
             proposal = fix.figure if fix is not None else None
-            if _kept(fix) or proposal is None or not (proposal.decorative or proposal.alt.strip()):
+            unproven = proposal is not None and proposal.decorative
+            unproven = unproven and not decoration.is_decoration(element, fix)
+            if (
+                _kept(fix)
+                or proposal is None
+                or not (proposal.decorative or proposal.alt.strip())
+                or unproven
+            ):
                 kind = word_kind(fix) if fix is not None else "figure"
                 if IMAGE_PAGE_OMISSION_REASON in element.reasons:
                     kind = "paragraph"  # writing on a converted page that was left out

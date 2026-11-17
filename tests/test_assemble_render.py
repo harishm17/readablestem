@@ -115,7 +115,7 @@ def test_document_skeleton(sample_html):
         '<html lang="en">',
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        "<title>Speed and Velocity</title>",
+        "<title>2.2 Speed and Velocity</title>",  # the H1's text (SW6c)
         "<style>",
         ABOUT_WORDING,
     ):
