@@ -110,7 +110,17 @@ MEASURE = """() => ({
 })"""
 
 
-def in_chromium(html: str, script: str, *, keys: list[str] | None = None, until: str | None = None):
+def in_chromium(
+    html: str,
+    script: str,
+    *,
+    focus: str | None = None,
+    keys: list[str] | None = None,
+    until: str | None = None,
+):
+    """`script`'s result before and after the keyboard. `focus` is a JavaScript condition:
+    Tab is pressed until it holds (the skip link and the notice's link come first, and how
+    many links the page opens with is not what these tests are about)."""
     sync_api = pytest.importorskip("playwright.sync_api")
     with sync_api.sync_playwright() as playwright:
         try:
@@ -121,6 +131,13 @@ def in_chromium(html: str, script: str, *, keys: list[str] | None = None, until:
             page = browser.new_page(viewport={"width": 320, "height": 640})
             page.set_content(html)
             before = page.evaluate(script)
+            for _ in range(8 if focus else 0):
+                page.keyboard.press("Tab")
+                if page.evaluate(focus):
+                    break
+            else:
+                if focus:
+                    raise AssertionError(f"Tab never reached: {focus}")
             for key in keys or []:
                 page.keyboard.press(key)
             if until:  # keyboard scrolling is smooth, so it ends a little later
@@ -151,8 +168,12 @@ def test_the_keyboard_reaches_and_scrolls_a_wide_equation():
                        document.getElementById('p1-e0').scrollLeft]"""
     scrolled = "document.getElementById('p1-e0').scrollLeft > 0"
     before, after = in_chromium(
-        html, script, keys=["Tab", "Tab", "ArrowRight"], until=scrolled
-    )  # skip link, then the box
+        html,
+        script,
+        focus="document.activeElement.id === 'p1-e0'",
+        keys=["ArrowRight"],
+        until=scrolled,
+    )
     assert before == ["", 0]
     assert after[0] == "p1-e0" and after[1] > 0
 
@@ -182,9 +203,13 @@ def test_a_wide_inline_equation_scrolls_in_its_box_and_the_page_does_not():
               overflows: box.scrollWidth > box.clientWidth + 1,
               active: document.activeElement.className};
     }"""
-    before, after = in_chromium(paragraph_with([SHORT, long_sum()]), script, keys=["Tab", "Tab"])
+    before, after = in_chromium(
+        paragraph_with([SHORT, long_sum()]),
+        script,
+        focus="document.activeElement.className === 'equation-scroll'",
+    )
     assert before["page"][0] <= before["page"][1] and before["overflows"]
-    assert after["active"] == "equation-scroll"  # the first tab stop after the skip link
+    assert after["active"] == "equation-scroll"  # the keyboard reaches the wide one
 
 
 @pytest.mark.browser

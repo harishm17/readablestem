@@ -278,12 +278,30 @@ def _make_fixtures_module():
     return module
 
 
+def _fonts(pdf: Path) -> set[str]:
+    """The fonts a PDF embeds, without the subset prefix Chromium adds."""
+    with pymupdf.open(pdf) as doc:
+        return {font[3].split("+")[-1] for page in doc for font in page.get_fonts() if font[3]}
+
+
 @pytest.mark.browser
 def test_regenerated_fixtures_give_the_same_structure(tmp_path):
-    """Re-print the HTML with Chromium; fonts may move text, the structure must not."""
+    """Re-print the HTML with Chromium; fonts may move text, the structure must not.
+
+    Which fonts Chromium prints with depends on what the machine has installed (Latin Modern
+    Math from TeX Live comes ahead of Noto Sans Math for MathML, and the generic serif
+    differs), and a PDF set in other fonts is a different input, not a changed converter:
+    the same source printed on this machine and on the one that made the committed files
+    differs in which words count as maths. So the comparison runs where the print used the
+    committed fonts, and says so where it did not.
+    """
     pytest.importorskip("playwright")
     written = _make_fixtures_module().build(tmp_path)
     assert sorted(p.name for p in written) == sorted(f"{n}.pdf" for n in NAMES)
+    printed = set().union(*(_fonts(tmp_path / f"{n}.pdf") for n in NAMES))
+    committed = set().union(*(_fonts(FIXTURES / f"{n}.pdf") for n in NAMES))
+    if printed != committed:
+        pytest.skip(f"this machine prints with other fonts: {sorted(printed ^ committed)}")
     for name in NAMES:
         fresh = analyze((tmp_path / f"{name}.pdf").read_bytes())
         committed = load(name)

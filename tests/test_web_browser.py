@@ -218,7 +218,10 @@ def test_status_updates_live_with_htmx_then_shows_results(site, browser):
     assert "3 decisions need you" in page.locator("#job-status").inner_text()
     assert page.locator("#job-status").get_by_role("link", name="Start the review").is_visible()
     assert page.locator("#results-heading").count() == 0
-    assert page.title() == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
+    # The tab title follows the finished state (the state table's label), then the document.
+    title = page.title()
+    assert title.endswith(": SECRET-HEADING Kinematics | ReadableSTEM")
+    assert not title.startswith(("Waiting", "Converting", "Restarting"))
     link.click()
     page.wait_for_selector("#results-heading")
     context.close()

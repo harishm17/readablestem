@@ -61,6 +61,23 @@
 - F-137: `docs/security.md` said the Canvas, Cartridge, Word and EPUB downloads are for the
   owner only; the code lets a person the document is shared with, even as a viewer, take them
   (through the same draft gate). The docs now say what the code does.
+## Unreleased: the browser suite passes again, and what the table page test cannot do (branch fix/table-gate-and-browser-suite)
+
+- Four keyboard tests (wide equations, the described figure, the wide table) pressed Tab twice
+  and expected the content; the notice that opens a page nobody has reviewed puts its own
+  link first. They press Tab until the target has focus. The narrow table is still not a tab
+  stop, and a wide table or equation still scrolls in its own focusable box with the page
+  not scrolling sideways.
+- Two tests expected "Converted" in the tab title of a finished job; the title is the state
+  table's label (`web/states.py`) followed by the document name, as the status box sets it.
+- The one-page summary for accessibility offices ran 110 pt onto a second Letter page (50 pt on
+  A4) after its table gained a row per kind of material sent to a model. Its print margins,
+  type size and spacing are tighter: one page on both, with room to spare.
+- The regenerated-fixtures test prints with the machine's fonts, which differ (TeX Live's Latin
+  Modern Math is picked ahead of Noto Sans Math), and it fails the same way on main. It skips,
+  naming the fonts, when the print does not use the committed PDFs' fonts.
+- docs/tables.md records why the table page test cannot be made tighter by the length of a
+  rule (see "Which pages are looked at"); the test itself is unchanged.
 
 ## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
 

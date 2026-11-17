@@ -312,9 +312,10 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
             page = browser.new_page(viewport={"width": 320, "height": 640})
             page.set_content(html)
             facts = page.evaluate(MEASURE)
-            page.keyboard.press("Tab")  # the skip link is the first tab stop
-            page.keyboard.press("Tab")
-            focused = page.evaluate("() => document.activeElement.id")
+            stops = []  # what Tab visits: the skip link, the notice's link, then the content
+            for _ in range(6):
+                page.keyboard.press("Tab")
+                stops.append(page.evaluate("() => document.activeElement.id"))
         finally:
             browser.close()
     scroll_width, client_width = facts["page"]
@@ -323,7 +324,7 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
         {"id": "p1-e1", "overflows": False, "focusable": False},
         {"id": "p1-e2", "overflows": True, "focusable": True},
     ]
-    assert focused == "p1-e2"  # the only tab stop
+    assert "p1-e2" in stops and "p1-e1" not in stops  # only the wide table is a tab stop
 
 
 @pytest.mark.parametrize(
