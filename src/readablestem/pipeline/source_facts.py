@@ -237,18 +237,17 @@ def _pictures(page) -> int:
     )
 
 
-def _bold_letters(page) -> list[tuple[float, float, float, float, float]]:
+def _bold_letters(page) -> list[tuple[float, float]]:
     """Where a bold font draws a plain letter on the page, read once for all the page's
-    equations: one (x0, y0, x1, y1, font size) per letter."""
+    equations: the centre (x, y) of each letter."""
     letters = []
     for block in page.get_text("rawdict")["blocks"]:
         for line in block.get("lines", ()):
             for span in line.get("spans", ()):
                 if not _bold_span(span):
                     continue
-                em = float(span.get("size", 0.0))
                 letters += [
-                    (x0, y0, x1, y1, em)
+                    ((x0 + x1) / 2, (y0 + y1) / 2)
                     for ch in span.get("chars", ())
                     if _plain_letter(ch)
                     for x0, y0, x1, y1 in (ch["bbox"],)
@@ -265,35 +264,15 @@ def _plain_letter(ch) -> bool:
     return ch.get("c", "").isascii() and ch.get("c", "").isalpha()
 
 
-def _bold_plain_letters(
-    page, element: Element, letters: list[tuple[float, float, float, float, float]]
-) -> int:
-    """Letters inside the equation's box that a bold font draws but the text layer
-    stores as plain characters. `letters`: `_bold_letters` of the page, so the page is read
-    once for all its equations. A letter whose box lies inside the equation's box is in it, and
-    one more than its font size away is not (a glyph can reach a little past its advance box,
-    and MuPDF's clip tests the glyph). Only when a letter lies between, the box is read
-    clipped, which is MuPDF's own test of what lies in it."""
+def _bold_plain_letters(page, element: Element, letters: list[tuple[float, float]]) -> int:
+    """Letters in the equation's box that a bold font draws but the text layer stores as
+    plain characters. `letters`: `_bold_letters` of the page, so the page is read once for
+    all its equations (a clipped read per equation extracted the page again each time: 25 of
+    136 s on a 100-page maths document). A letter is in the box its centre is in."""
     rect = pymupdf.Rect(element.bbox)
     if page.rotation % 360:
         rect = rect * page.derotation_matrix  # element boxes are in the displayed frame
-    inside = 0
-    for x0, y0, x1, y1, em in letters:
-        if rect.x0 <= x0 and x1 <= rect.x1 and rect.y0 <= y0 and y1 <= rect.y1:
-            inside += 1
-        elif rect.x0 < x1 + em and rect.x1 > x0 - em and rect.y0 < y1 + em and rect.y1 > y0 - em:
-            return _bold_plain_letters_clipped(page, rect)
-    return inside
-
-
-def _bold_plain_letters_clipped(page, rect: pymupdf.Rect) -> int:
-    count = 0
-    for block in page.get_text("rawdict", clip=rect)["blocks"]:
-        for line in block.get("lines", ()):
-            for span in line.get("spans", ()):
-                if _bold_span(span):
-                    count += sum(1 for ch in span.get("chars", ()) if _plain_letter(ch))
-    return count
+    return sum(1 for x, y in letters if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1)
 
 
 def _from_pdf(
