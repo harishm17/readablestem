@@ -438,17 +438,18 @@ def test_inline_equation_without_its_marker_is_rendered_at_its_own_position():
 
 
 def about(html: str) -> str:
-    start = html.index('<footer id="about-conversion"')
-    return html[start : html.index("</footer>", start)]
+    start = html.index('<section id="about-conversion"')
+    return html[start : html.index("</section>", start)]
 
 
-def test_the_student_note_comes_after_main_and_speaks_to_students(sample_html):
+def test_the_student_note_ends_main_and_speaks_to_students(sample_html):
     """The note is for the people who read the file (MF7 of the UX review): what it is,
     how much of it a person reviewed and what is a picture (SW7: with their counts, so it
     never says more than was done), who to tell. No review screen's words."""
     note = about(sample_html)
-    assert sample_html.index("</main>") < sample_html.index('<footer id="about-conversion"')
-    # Its title labels the footer region; it is not a heading in the outline (T3-13).
+    assert sample_html.index('<section id="about-conversion"') < sample_html.index("</main>")
+    assert sample_html.count("About this version</p>") == 1
+    # Its title labels the region; it is not a heading in the outline (T3-13).
     assert f'<p id="about-conversion-title" class="about-title">{ABOUT_TITLE}</p>' in note
     assert 'aria-labelledby="about-conversion-title"' in note and "<h" not in note
     assert ABOUT_WORDING in note and CONTACT in note

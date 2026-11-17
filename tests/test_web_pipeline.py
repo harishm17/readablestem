@@ -92,7 +92,7 @@ def without(html: str, *parts: str) -> str:
 
 
 def about(html: str) -> str:
-    match = re.search(r'<footer id="about-conversion".*?</footer>', html, flags=re.S)
+    match = re.search(r'<section id="about-conversion".*?</section>', html, flags=re.S)
     assert match
     return match.group(0)
 
