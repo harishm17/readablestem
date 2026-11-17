@@ -314,9 +314,11 @@ def test_the_keyboard_opens_the_description_and_reaches_the_table_at_320_px():
         try:
             page = browser.new_page(viewport={"width": 320, "height": 640})
             page.set_content(described_page())
-            page.keyboard.press("Tab")  # the skip link is the first tab stop
-            page.keyboard.press("Tab")
-            focused = page.evaluate("() => document.activeElement.tagName")
+            for _ in range(8):  # the skip link and the notice's link come first
+                page.keyboard.press("Tab")
+                focused = page.evaluate("() => document.activeElement.tagName")
+                if focused == "SUMMARY":
+                    break
             page.keyboard.press("Enter")
             is_open = page.evaluate("() => document.querySelector('details').open")
             page.keyboard.press("Tab")

@@ -232,7 +232,10 @@ def test_the_steps_update_without_touching_the_live_region(site, browser, jobs):
     site.converter.output = card_output()  # 3 decisions open
     finish(site, job_id)
     page.locator("#job-status").get_by_role("link", name="Start the review").wait_for(timeout=15000)
-    assert page.title() == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
+    # The tab title follows the finished state (the state table's label), then the document.
+    title = page.title()
+    assert title.endswith(": SECRET-HEADING Kinematics | ReadableSTEM")
+    assert not title.startswith(("Waiting", "Converting", "Restarting"))
     assert page.locator("#job-progress li").count() == 0
     context.close()
 
