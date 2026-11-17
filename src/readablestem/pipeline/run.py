@@ -255,7 +255,10 @@ log = logging.getLogger(__name__)
 # A figure is written with empty alt text only as decoration with evidence
 # (`decoration.settle`, WS6.4, the same wave): one the model calls decorative with no repeat,
 # rule shape or person behind it is a required decision, and one whose reading failed is
-# decoration when the evidence says so, so the review load moves. Results from 0.5.10 load
+# decoration when the evidence says so, so the review load moves. A glyph the file's own table
+# does not decode is read by the name its font gives it (`glyph_names`, the same wave), and a
+# row of numbers inside a maths row's box joins that equation, so the text of equations and of
+# the paragraphs around them changes on TeX pages. Results from 0.5.10 load
 # unchanged; their page is made again (`assemble.RENDER_VERSION` 6).
 PIPELINE_VERSION = "0.5.11"
 
