@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: the About note inside `<main>`, one Word filter (branch fix/about-in-main-and-job-summary, WS22.1)
+
+- The student note "About this version" is written inside `<main>` (a labelled `<section>`, a
+  region landmark, still no heading), so Word, EPUB, Canvas and Listen's transcript get it from
+  the same markup, not from one patch each. `RENDER_VERSION` is 5: a stored page is made again
+  once with the note in its new place. The page's outline, skip link and in-page link to the
+  note are as before; the axe scans are clean in both colour schemes.
+- The Word export's text changes made inside pandoc (page markers, the skip link, a figure
+  with no picture) are one Lua filter, `pipeline/data/export_docx.lua`. The Word text of the
+  stored fixtures is unchanged. The `<main>` unwrap, the long-description line and the
+  title paragraph stay in Python: pandoc drops those elements before a filter sees them, and
+  its file title and the title paragraph come from one field.
+
 ## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
 
 - F-509: text struck through on the page was read as live text ("October 3 October 10"

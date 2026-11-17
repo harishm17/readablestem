@@ -13,13 +13,15 @@ What this module does around pandoc:
 - **Before.** The same sanitiser as the EPUB (`export_epub._sanitise`): scripts, frames,
   forms, remote pictures and `javascript:` links go, so pandoc is only given a document that
   names nothing outside itself and cannot fetch anything (it has no sandbox mode on the
-  distribution build, which reads its default styles from disk). The page-break markers are
-  taken out (a Word document has its own pages). A long description (`<details>`) becomes
-  its heading line in bold and its paragraphs, in place after the figure. `<main>` is
-  unwrapped: when a page has one, pandoc reads only what is inside it, which would leave out
-  a draft's banner and the student note "About this version" (a `<footer>` after `<main>`).
-  The skip link goes. A WebP picture
+  distribution build, which reads its default styles from disk). A long description
+  (`<details>`) becomes its heading line in bold and its paragraphs, in place after the
+  figure. `<main>` is unwrapped: when a page has one, pandoc reads only what is inside it,
+  which would leave out the Contents and a draft's banner (the student note "About this
+  version" is inside `<main>`, so every output made from the page has it). A WebP picture
   becomes a PNG (Word cannot show WebP). The language and the title are set explicitly.
+- **In pandoc.** One Lua filter (`data/export_docx.lua`, passed with `--lua-filter`) takes out
+  the page-break markers (a Word document has its own pages) and the skip link, and writes a
+  figure with no picture as paragraphs.
 - **The child.** A separate process in its own session with a minimal environment
   (`core.childenv`: no keys, no database URL), a private temporary directory, CPU, file-size
   and heap limits, and a time limit (60 s); killed with its group when it overruns. A
@@ -66,6 +68,7 @@ from readablestem.pipeline.export_canvas import _DATA_URI, _find, _Node, _parse,
 from readablestem.pipeline.export_epub import _HEADING, _LANGUAGE, _sanitise, _text
 
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+FILTER = Path(__file__).parent / "data" / "export_docx.lua"  # pandoc's text changes (below)
 TIMEOUT_S = 60.0
 CPU_SECONDS = 90
 MAX_DOCX_BYTES = 300 * 1024 * 1024
@@ -163,6 +166,8 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
             "html",
             "-t",
             "docx",
+            "--lua-filter",
+            str(FILTER),
             "-M",
             f"lang={lang}",
             "-o",
@@ -232,20 +237,17 @@ def _replace(node: _Node, replacement: list[_Node | str]) -> None:
 
 
 def _prepare(root: _Node) -> None:
-    """Page markers out; a long description's `<details>` as a bold line and paragraphs;
-    `<main>` unwrapped, because pandoc's HTML reader reads only what is inside `<main>` when
-    there is one (3.7.0.2), and the draft banner before it and the student note "About this
-    version" after it must be in the file; the skip link, which only a web page needs, out."""
+    """The two changes only the page's own markup can carry (pandoc drops the elements): a long
+    description's `<details>` as a bold line and paragraphs, and `<main>` unwrapped. Pandoc's
+    HTML reader reads only what is inside `<main>` when there is one (3.7.0.2); the Contents
+    and a draft's banner stand before it and are in the file. (The note "About this version"
+    is inside `<main>`.) The page markers, the skip link and a figure with no picture are
+    changed on pandoc's side, in `data/export_docx.lua`."""
     for node in list(root.walk()):
         if node.parent is None:
             continue
-        marker = node.tag == "hr" and "doc-pagebreak" in node.attrs.get("role", "").split()
-        if marker or (node.tag == "div" and "pagebreak" in node.classes()):
-            _replace(node, [])
-        elif node.tag == "main":
+        if node.tag == "main":
             _replace(node, list(node.children))
-        elif "skip-link" in node.classes():  # a web page's link past its contents
-            _replace(node, [])
         elif node.tag == "summary":
             strong = _Node("strong", {}, list(node.children))
             for child in strong.children:
@@ -256,20 +258,6 @@ def _prepare(root: _Node) -> None:
             _replace(node, [paragraph])
         elif node.tag == "details":
             _replace(node, list(node.children))
-        elif node.tag == "figure" and not _is_picture_figure(node):
-            # Without a picture pandoc writes a figure as a one-cell table, a layout table
-            # for a screen reader: the words stay, as paragraphs.
-            _replace(node, [_caption_paragraph(c) for c in node.children])
-
-
-def _is_picture_figure(figure: _Node) -> bool:
-    return any(isinstance(c, _Node) and c.tag == "img" for c in figure.children)
-
-
-def _caption_paragraph(child: _Node | str) -> _Node | str:
-    if isinstance(child, _Node) and child.tag == "figcaption":
-        child.tag = "p"
-    return child
 
 
 def _normal(text: str) -> str:

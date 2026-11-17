@@ -14,10 +14,10 @@ What the output looks like and why is in docs/output.md. In short:
   with a border *and* a text label, never by colour alone.
 - A short note for students at the end of `<main>` ("About this version", a labelled
   `<section>`; inside `<main>` so every reader of the page, pandoc among them, gets it from
-  the same markup): what the file is, the statement of what was reviewed and converted (`pipeline.checked`: who
-  reviewed how many of the parts the tool flagged and on which day, how many parts are
-  pictures, which pages were left out), and to tell the instructor about anything hard to
-  read. When nobody reviewed it, or a part is a picture or left out, the same statement
+  the same markup): what the file is, the statement of what was reviewed and converted
+  (`pipeline.checked`: who reviewed how many of the parts the tool flagged and on which day,
+  how many parts are pictures, which pages were left out), and to tell the instructor about
+  anything hard to read. When nobody reviewed it, or a part is a picture or left out, the same statement
   opens `<main>` too, with a link to each place (`_checked_notice`). An optional `notice`
   at the top (e.g. "offline test run": placeholders, not conversions).
 
