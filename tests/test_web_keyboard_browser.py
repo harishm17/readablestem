@@ -322,7 +322,9 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     tab_to(page, "Upload and convert")
     page.keyboard.press("Enter")
     state = focus_summary(page)
-    assert state["id"] == "pdf" and page.url == f"{site.base}/jobs", state
+    # The page is the one POST /jobs answers; the upload form puts its request token in the
+    # action's query string (web/forms.py), so the query is not part of what is compared.
+    assert state["id"] == "pdf" and page.url.split("?", 1)[0] == f"{site.base}/jobs", state
     assert page.get_attribute("#pdf", "aria-invalid") == "true"
     # Now a real one: the chooser by keyboard, the button by keyboard, the job page after it.
     tab_to(page, "^Files?$", shift=True)
