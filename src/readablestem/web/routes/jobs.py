@@ -1075,6 +1075,7 @@ def _place_files(
                 )
             )
             continue
+        ctx.wake_worker()
         log_event(
             logger,
             "job_created",
@@ -1224,6 +1225,7 @@ def _place_source(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
             retry_after="3600",
         )  # fmt: skip
+    ctx.wake_worker()
     log_event(
         logger, "job_created", job_id=job_id, pages=info.pages, source=info.kind,
         opt_in=mode == "dev", retention=mode, files=files,

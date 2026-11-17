@@ -34,7 +34,13 @@ from typing import Protocol
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import Outcome
-from readablestem.models.base import rate_gate
+from readablestem.models.base import (
+    INITIAL_RETRY_DELAY_S,
+    MAX_RETRY_AFTER_S,
+    MAX_RETRY_DELAY_S,
+    RETRYABLE_STATUSES,
+    rate_gate,
+)
 from readablestem.models.math_readers.base import (
     Candidate,
     ReaderCall,
@@ -46,12 +52,6 @@ from readablestem.models.math_readers.transport import (
     HttpxTransport,
     Transport,
     TransportError,
-)
-from readablestem.models.openai_client import (
-    INITIAL_RETRY_DELAY_S,
-    MAX_RETRY_AFTER_S,
-    MAX_RETRY_DELAY_S,
-    RETRYABLE_STATUSES,
 )
 from readablestem.observability.logging import log_fields
 

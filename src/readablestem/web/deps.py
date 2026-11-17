@@ -77,6 +77,11 @@ class AppContext:
         """LaTeX source (.tex, a project zip) is taken: the flag is on and the sandbox passed."""
         return self.settings.feature_latex_source and self.sandbox.allows_source()
 
+    def wake_worker(self) -> None:
+        """A job was queued: the worker looks for it now, not at its next poll."""
+        if self.worker is not None:
+            self.worker.wake()
+
     def accepted_types(self, *, revision: bool = False) -> office_convert.AcceptedTypes:
         """What this installation takes, worded once (`office_convert.accepted_types`).
         `revision`: a revised version takes no LaTeX source."""

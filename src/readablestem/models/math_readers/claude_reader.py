@@ -25,7 +25,7 @@ import json
 from typing import Any
 
 from readablestem.config import Settings
-from readablestem.models.anthropic_client import WORKSPACE_HEADER
+from readablestem.models.base import WORKSPACE_HEADER
 from readablestem.models.math_readers import prompt
 from readablestem.models.math_readers.base import ReadRequest
 from readablestem.models.math_readers.engine import (

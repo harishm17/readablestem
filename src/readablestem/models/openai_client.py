@@ -75,7 +75,16 @@ from pydantic import ValidationError
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import ModelCall, Outcome
-from readablestem.models.base import T, VisionRequest, fence_untrusted, rate_gate
+from readablestem.models.base import (  # (the retry constants live there, for the HTTP readers)
+    INITIAL_RETRY_DELAY_S,
+    MAX_RETRY_AFTER_S,
+    MAX_RETRY_DELAY_S,
+    RETRYABLE_STATUSES,
+    T,
+    VisionRequest,
+    fence_untrusted,
+    rate_gate,
+)
 from readablestem.models.pricing import cost_usd, estimate_max_cost_usd
 from readablestem.observability.logging import log_fields
 
@@ -97,15 +106,6 @@ _SAFE_CODE: Final = re.compile(r"[a-z0-9_.\-]{1,64}")
 
 SAFETY_IDENTIFIER_MAX_CHARS: Final = 64
 
-# Backoff between sends, as in the OpenAI SDK: 0.5 s doubling up to 8 s, minus 0-25% jitter.
-INITIAL_RETRY_DELAY_S: Final = 0.5
-MAX_RETRY_DELAY_S: Final = 8.0
-# A server asking for a longer wait is not retried on the same model: the router's fallback
-# to the other model is a better use of that time than a step sitting idle.
-MAX_RETRY_AFTER_S: Final = 60.0
-# Transient HTTP statuses besides 5xx (request timeout, lock contention, rate limit). An error
-# status carries no usage and is not billed, so resending costs only the reservation.
-RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({408, 409, 429})
 
 # Transport errors raised before the request reached the provider (the same class names in
 # httpx and httpx2). Any other broken connection may have happened after OpenAI received

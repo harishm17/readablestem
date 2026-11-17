@@ -9296,15 +9296,18 @@ def _prepare_rows(
     height = page.rect.height
     kept: list[_Row] = []
     dropped: list[_Row] = []
-    gone = [margins.drops(frag, height) for frag in frags]
-    placed = [not g and margins.at_place(frag, height, page.number) for g, frag in zip(gone, frags)]
-    standing = [f for f, g, p in zip(frags, gone, placed, strict=True) if not g and not p]
-    for frag, is_gone, is_placed in zip(frags, gone, placed, strict=True):
-        if is_gone and _is_number_row(frag) and _shares_line(frag, standing):
-            is_gone = False  # a cell of a table, not a page number: it has a line mate
-        if is_gone:
+    number = page.number
+    gone = {id(f) for f in frags if margins.drops(f, height)}
+    placed = {id(f) for f in frags if id(f) not in gone and margins.at_place(f, height, number)}
+    out = gone | placed
+    standing = [f for f in frags if id(f) not in out]
+    for frag in frags:
+        if id(frag) in gone and _is_number_row(frag) and _shares_line(frag, standing):
+            gone.discard(id(frag))  # a cell of a table, not a page number: it has a line mate
+    for frag in frags:
+        if id(frag) in gone:
             dropped.append(frag)
-        elif not is_placed:
+        elif id(frag) not in placed:
             kept.append(frag)
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]

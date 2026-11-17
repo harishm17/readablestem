@@ -319,6 +319,7 @@ def _start_parts(
             )
             out.status, out.retry_after = 429, "3600"
             break
+        ctx.wake_worker()
         out.started.append({"id": job_id, "label": part.label})
         sent.update(part.pages)
         events.record_upload(ctx.factory, s, user_id=user.id, job_id=job_id, data=cut, pages=pages)

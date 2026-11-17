@@ -69,7 +69,14 @@ from pydantic import ValidationError
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import ModelCall, Outcome
-from readablestem.models.base import UNTRUSTED_NOTICE, T, VisionRequest, fence_untrusted, rate_gate
+from readablestem.models.base import (
+    UNTRUSTED_NOTICE,
+    WORKSPACE_HEADER,
+    T,
+    VisionRequest,
+    fence_untrusted,
+    rate_gate,
+)
 from readablestem.models.openai_client import (
     _NOT_SENT_ERRORS,
     IMAGE_DETAILS,
@@ -95,7 +102,6 @@ from readablestem.observability.logging import log_fields
 
 log = logging.getLogger(__name__)
 
-WORKSPACE_HEADER: Final = "anthropic-workspace-id"
 # The models that accept the server-side refusal fallback. claude-haiku-5-5 has none (a
 # `fallbacks` list is a 400 there).
 FALLBACK_MODELS: Final[frozenset[str]] = frozenset({"claude-opus-5-5", "claude-sonnet-5-5"})
