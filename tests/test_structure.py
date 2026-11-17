@@ -239,6 +239,53 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
     assert layout_module._footnote_links([twice, note], marks)[0].links == []
 
 
+def named_footnote_pdf() -> bytes:
+    """A page whose file names its footnote the way hyperref does (a destination `Hfootnote.2`
+    above the note's line, a link to it from the mark), with a numbered line in small type low
+    on the page that no destination points at, and a mark touching the word after it."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 85), "A sentence long enough to make a paragraph.", fontsize=BODY)
+    page.insert_text(
+        (72, 100), "The pressure matters a great deal here.", fontsize=BODY, fontname="helv"
+    )
+    width = pymupdf.get_text_length(
+        "The pressure matters a great deal here.", fontname="helv", fontsize=BODY
+    )
+    page.insert_text((72 + width, 95), "2", fontsize=7, fontname="helv")
+    page.insert_text((72 + width + 4.5, 100), "Next we measure it.", fontsize=BODY, fontname="helv")
+    page.draw_line((72, 700), (200, 700))
+    page.insert_text((72, 715), "1 A line number in small type.", fontsize=8)
+    page.insert_text((72, 735), "2 Pressure is measured in pascals.", fontsize=8)
+    names = doc.get_new_xref()
+    doc.update_object(names, f"<< /Names [(Hfootnote.2) [{page.xref} 0 R /XYZ 72 66 null]] >>")
+    tree = doc.get_new_xref()
+    doc.update_object(tree, f"<< /Dests {names} 0 R >>")
+    doc.xref_set_key(doc.pdf_catalog(), "Names", f"{tree} 0 R")
+    annot = doc.get_new_xref()
+    x0, x1 = 72 + width, 72 + width + 4.5
+    doc.update_object(
+        annot,
+        f"<< /Type /Annot /Subtype /Link /Rect [{x0} {792 - 102} {x1} {792 - 88}] "
+        "/Border [0 0 0] /A << /S /GoTo /D (Hfootnote.2) >> >>",
+    )
+    doc.xref_set_key(page.xref, "Annots", f"[{annot} 0 R]")
+    return doc.tobytes()
+
+
+def test_a_file_that_names_its_footnotes_decides_which_blocks_are_footnotes():
+    layout = analyze(named_footnote_pdf())
+    by_id = {e.id: e for e in layout.elements}
+    notes = [by_id[n.element_id] for n in layout.notices if n.code == "footnote"]
+    # the destination's line is the footnote; the numbered small line next to it is not one
+    assert [n.text for n in notes] == ["2 Pressure is measured in pascals."]
+    body = layout.elements[0]
+    (link,) = body.links
+    assert (link.kind, link.target_id) == ("internal", notes[0].id)
+    # the raised mark is set off from the word it touches, not read as part of it
+    assert "here.2 Next we" in (body.text or "")
+
+
 # ------------------------------------------------------------------------- contents
 
 
