@@ -377,15 +377,6 @@ def _tree(mathml: str) -> str | None:
         return None
 
 
-def tree_equal(a: str, b: str, *, display: bool = False) -> bool:
-    """Do two readings have one normalised tree (`exact_lenient`)? Unreadable is not equal."""
-    ma, mb = _convert(a, display), _convert(b, display)
-    if ma is None or mb is None:
-        return False
-    ta, tb = _tree(ma), _tree(mb)
-    return ta is not None and ta == tb
-
-
 # ------------------------------------------------------------------- comparison
 
 

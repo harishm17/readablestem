@@ -2726,8 +2726,9 @@ Owed:
 
 `src/readablestem/eval/order.py` scores what a listener hears on a page against the gold
 blocks of "The test corpus". It takes the output as a list of elements in reading order,
-made from a layout dump or from the student HTML, and never looks at boxes, so the layout
-step, the finished HTML and any other reader are scored the same way. Its counts per page:
+made from a layout dump, from a conversion's element list or from the student HTML, and
+never looks at boxes, so the layout step, the finished HTML and any other reader are scored
+the same way. Its counts per page:
 
 | Count | Meaning |
 |---|---|
@@ -2739,9 +2740,37 @@ step, the finished HTML and any other reader are scored the same way. Its counts
 | leaked | text that must not be read (a running header, a page number) that is in the output |
 | clean page | no broken block, every neighboring pair in order, no cross-join, half the blocks found |
 | right page | clean, and no margin stamp read inside text, no index entries joined, numbered blanks in order |
+| stray | a text element none of whose words any gold block accounts for |
+| furniture | a stray element that is the page's furniture: the words of a block that must not be read, or of a line printed in the page's margins (a running head, a page number, a stamp) |
+| cut | an unbroken block of 6 or more words heard in two or more elements |
+| merged | neighboring gold blocks heard in one element; `heading merged` is the part where one of the two is a heading |
+| caption wrong | a caption heard with, or nearest to, another picture or table than its own |
+| faultless page | a right page with none of the five |
 
 The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
-swapped pair fails the page.
+swapped pair fails the page. A right page can still read a running head aloud, cut a
+paragraph in two, run two list items together or put a caption on the wrong picture, which
+is what the last six rows count, so pages right is never reported alone. Two kinds of gold
+are judged differently where they must be. Gold built from a source does not hold every
+word of the page (a table's cells, a formula's line), so there a faultless page is one with
+no furniture read, in place of no stray text. Gold labeled by hand may hold two paragraphs
+in one block, so there only a cut inside a sentence is counted, and a block that ends inside
+a sentence is not merged with the one after it.
+
+None of the counts sees a formula missing from a sentence or from a line of its own. The
+gold marks the tokens of a block that are not source words, but such a token is also a
+drawing's label or another column's word on the same line, so it does not say where a
+formula stands. The equations eval and the page audit count that.
+
+**How the student page is heard.** `elements_from_html` reads the page as a screen reader
+does, cut at the page markers: a block element is one element, a formula's letters and
+digits stand side by side as the page prints them ("CH3", not "C H 3"), and the picture of
+an equation that was not converted is heard as the PDF's own text of it, which is its alt
+text. Text hidden from a voice is not heard. The writer's own words (a note that an equation
+was not converted, a label, the title it puts above a document that has no first-level
+heading) are not counted as text of any page. In a conversion's element list
+(`elements_from_result`) a table is heard as the grid that is written, row by row, and not
+as the words the file has in its region.
 
 The scorer is the research scorer (version 4) moved into the package. Before it was
 committed it was run next to the research script on every stored output of the layout
@@ -2749,9 +2778,11 @@ studies: 26 runs, 2,133 page rows, every count and every listed fault identical.
 layout output of the main branch as stored on 2026-11-10, both give 59 clean pages of 78
 (30 of 41 on public files, 29 of 37 on files made here) and 6 of 13 on the edge files.
 Those numbers describe that stored output, read from a layout dump; they were not measured
-under the production profile and are not the registered baseline, which the order eval
-records when it lands. The first scorer (version 2) was not moved: its element-level counts
-are still reported by this one (`pairs`, `stitched`, `split`, `lost`).
+under the production profile and are not the registered baseline, which `eval order`
+records (below). Version 5 added the five further counts and `faultless`; for the same
+elements its other counts are those of version 4. The first scorer (version 2) was not
+moved: its element-level counts are still reported by this one (`pairs`, `stitched`,
+`split`, `lost`).
 
 ### Gold built from sources (`gold/layout_gold.py`)
 
@@ -2839,9 +2870,107 @@ lacks, and what a reading-order bar met on it therefore does not cover yet:
   economics): the walk takes books in seeded order and does not choose by subject. Their
   pages count as textbook layout, not as mathematics.
 
-## What a page costs, how long it takes and what it asks (`eval cost`, `eval speed`, `eval burden`)
+### `eval order`
 
-The three commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
+Whether each gold page is read in the order it was written, and what else is wrong on a page
+that is.
+
+```bash
+uv run readablestem eval order --out data/eval/order-corpus.json
+uv run readablestem eval order --out order.json --against data/eval/order-corpus.json
+uv run readablestem eval order --set layout-dev-1 --out data/eval/order-layout-dev-1.json
+```
+
+**On the corpus** the command is made from the measured replay of the next section: every
+corpus file with gold is converted as the worker converts a job, under the production
+profile, with the recorded answers in place of the provider. It spends nothing. Two things
+are scored against the same gold:
+
+- the **student page**: the HTML a student is given, read as a listener hears it. This is
+  the product, and the headline is of it;
+- the **element list**: what the pipeline holds before any file is written. Where the two
+  differ, writing the page changed what is heard.
+
+The groups are the manifest's (`labels.group`): `real` pages of published documents,
+labeled by hand; `self-made` pages built from a source that carries each block's role;
+`edge` pages generated to hold one hard case each. A figure "of 78" is of the real and the
+self-made pages together. A file whose recording does not hold every answer its conversion
+asks for is reported apart and left out of every total: an element whose answer is missing
+fails, which is the recording's doing and not the reader's.
+
+**The bar.** With `--against`, no page that was right in the earlier record is not right
+now; a page that became right is named too. Two records are compared only when they are of
+the same documents and were scored by the same version of the scorer, and every page scored
+then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a page was made
+wrong; 2: the two records cannot be compared, or nothing could be measured. The record
+keeps counts per page and no word of any document.
+
+**The baseline** (`data/eval/order-corpus.json`, 44 files measured
+whole, 88 gold pages, pipeline 0.5.10,
+production profile `62b4f1678d36`,
+no step stopped early). A count is given as its pages and, in brackets, its places.
+
+| | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|
+| real, student page | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
+| self-made, student page | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
+| real and self-made, student page | 78 | 58 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 43 | 17 |
+| edge, student page | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
+| real, element list | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
+| self-made, element list | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
+| real and self-made, element list | 78 | 58 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 43 | 17 |
+| edge, element list | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
+
+Read with care:
+
+- 58 of 78 pages are right in the student page and in the element list, and 33 are
+  faultless. 12 of the 78 read a running head, a page number
+  or a stamp aloud, 16 cut a block and
+  13 run blocks together.
+- Two labels were corrected on November 11, and the figures above are scored with them. A
+  lab manual's first page had a block whose label read a Greek letter as the file's text
+  layer has it, a Latin one; with the printed letter the student page is right there (57
+  before, 58 now). On that page the answer written for an inline formula still ends with
+  the word that follows the formula in the sentence, so the page says that word twice: one
+  fault alone does not break the block, and the two together did. The glossary's second
+  page had a heading and two continued pieces on the wrong side of the page break in its
+  labels; with them in place, what is left wrong on that page is the reader's: a short
+  two-column page is read across the gutter.
+- The layout dumps of November 10 gave 59 of 78 for the same reader. The one page more was
+  a matching exercise that is written as a table and read row by row: a dump holds the words
+  of the table's region, in the order of the two lists, and the page a student gets does not.
+- 3 files (`ar3_sideways90`, `ar4_sideways270`, `e1_mc_columns`; 10
+  answers missing, 3 gold pages, none right) are
+  apart until they are recorded again, so the edge group is
+  10 pages and not 13.
+- This is a development set: every page of it has been read while the reader was built.
+  These figures guard against going backward and meet no release bar.
+
+**On a layout gold set** (`--set NAME`, the registry `data/gold/layout/NAME.json` and the
+set's folder) each file is converted as a job converts it, under production's behavior
+settings, with no model: an equation, a picture and a table keep what the file gives, which
+is what the reading order is made of. The folder must be the registered one
+(`gold layout verify`), and the groups are the registry's kinds of document. A held-out set
+is scored only with `--for-release`: once, for a release, and never while the reader is
+being changed. Its record keeps totals and names no page, `--records`, `--from` and
+`--against` are refused for it, and a failing page is not looked at.
+
+`layout-dev-1` (60 documents, 267 pages;
+`data/eval/order-layout-dev-1.json`), the student page:
+
+| | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|
+| paper | 119 | 73 | 34 | 38 (39) | 42 (52) | 46 (102) | 0 of 0 | 32 | 17 |
+| selfmade | 40 | 18 | 9 | 4 (8) | 6 (32) | 14 (39) | 0 of 5 | 17 | 12 |
+| textbook | 108 | 58 | 2 | 103 (143) | 44 (123) | 8 (31) | 0 of 0 | 49 | 6 |
+| all | 267 | 149 | 45 | 145 (190) | 92 (207) | 68 (172) | 0 of 5 | 98 | 35 |
+
+The element list reads 150 of 267 of these pages right.
+`layout-heldout-1` has not been scored.
+
+## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
+
+The four commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
 Every upload of the corpus (`corpus.UPLOADS`: each file once, and again with the boxes a
 person would tick for it) is converted the way the worker converts a job: production's
 behavior settings (`ops/production.profile.toml`), the job's own caps, the conversion in a
@@ -2872,6 +3001,7 @@ uv run readablestem eval cost --only s15_charts_figures      # one file
 uv run readablestem eval speed --records kept.json           # keep what was measured
 uv run readablestem eval cost --from kept.json               # report on it again, measure nothing
 uv run readablestem eval burden --out burden.json --against data/eval/burden-corpus.json
+uv run readablestem eval outputs --out outputs.json         # builds and reads every file
 ```
 
 The reports record the four things `eval bar` asks for, with the commit and the machine,
@@ -2880,6 +3010,14 @@ and hold their figures under `metrics`, so `eval bar` can read one
 to cover kinds of document, and the readers were built while looking at it. So no
 report can meet a bar or carry a public claim, and each says "Proof owed" in its header. A
 replay of held-out whole documents needs a recording that does not exist yet.
+
+A report also lists the steps that stopped before they were done (`not_finished` in the
+record: the upload, the step, the page and the reason, from the step facts) and names them
+in its header. A step stopped at a time limit gives another result on a busier machine: one
+corpus run made while four test suites ran lost a handwritten page to the 10-second clock
+of the page-type step, and its counts differed from the run before it. A baseline is a run
+in which no step stopped at a time limit. When nothing could be measured, each command says
+so and exits with 2.
 
 ### `eval cost`
 
@@ -3105,6 +3243,141 @@ against 4.0 or fewer. Neither is met. They are development documents, so meeting
 proves nothing by itself; the release bar is judged on a held-out replay, which does not
 exist yet.
 
+### `eval outputs`
+
+Every other eval stops at the element list or at the markup of the student page. This one
+opens the files a student is given and counts what is wrong in them.
+
+**What is read.** From each converted upload the command builds the student page, the Word
+file, the EPUB, the two Canvas files (the page for a Canvas Page and the file for Canvas
+Files), the Common Cartridge and the Listen transcript, through the code the downloads use,
+and reads each one back from its bytes into one inventory (`pipeline/output_audit.py`):
+the blocks of words in reading order, the equations and whether each has a spoken form, the
+pictures and their alt text, the tables with their header cells, the links inside the file
+and whether each lands, the notes and the language. Words a reader hears and does not see
+(`alt`, `aria-label`, `alttext`, text for screen readers only) are read as what they are.
+
+**What is compared.** An export is right when it says what the page says, so each export is
+compared with the page it was made from. The page is compared with the stored result: every
+element has a place, in the stored order, and every open decision and kept picture is
+marked. Whether the words inside a place are the right words is the business of the lane
+evals and the page audit, and is not counted here.
+
+A count is one wrong place: a kind, the output, the page and the element id, and none of
+the document's words. Each place is counted once.
+
+| Kind | A place where |
+|---|---|
+| `out_char` | a character is not text (private use, a replacement character, a control) |
+| `out_text_lost` | words of the page are in no place of the output |
+| `out_text_twice` | words that are once on the page are twice in the output |
+| `out_order` | a block is in another order than on the page |
+| `out_math_fallback` | an equation is not an equation in the output, or has no spoken form |
+| `out_link_dead` | a link inside the file leads nowhere in it |
+| `out_alt_missing` | a picture that is not decoration has no alt text |
+| `out_table_header` | a table has no header cell where the page's has one |
+| `out_heading` | a heading is empty or skips a level, or the title is said twice |
+| `out_lang` | the file states no language, or another than the document's |
+| `out_note_lost` | a note of the page is not in the output |
+| `out_hole` | a sentence has a gap: a space before its full stop or comma, "the -x" |
+| `out_notice_missing` | an open decision or a kept picture has no note at its place |
+
+**What an output leaves out on purpose** is a written list (`output_audit.ABSENT_BY_DESIGN`),
+and nothing else may be missing: Word has no skip link and no visible page labels, the EPUB
+has neither and builds its own contents list, the Canvas page has no skip link, and the
+transcript says neither the page labels nor the title of the contents list.
+
+**What a format cannot hold is not asked of it.** Each limit is one rule:
+
+- A Word table can mark a row as a header and nothing else. A header column of the page is
+  not asked of the Word file.
+- Each format numbers a note's mark in its own way, so the mark's digits are not compared.
+  A Word footnote with no words is a mark that leads nowhere, and is a dead link.
+- A voice adds the word "link" before a link's name and reads a table row by row, so the
+  transcript's words are compared by their letters. The Listen page reads the first 8 rows
+  of a table and says how many more there are; the audit reads the transcript with every
+  row, so every row's words are checked.
+- The transcript closes the space before a full stop, and says a paragraph that is only a
+  formula in words. A gap is therefore judged where the page has it, and counted for the
+  transcript when the transcript says that sentence.
+- A formula in a table cell is written once for a voice and once for the eyes. It is one
+  thing: a file that shows both is counted as words twice.
+- A picture is decoration only where the page says so; an export is held to the page's
+  count of them.
+- MathML counts as a spoken form.
+
+**It measures the page before anyone has reviewed it.** The replay converts and nobody
+decides anything, so every proposal that waits for a required decision is open. A page that
+shows such a proposal with no mark at its place is counted under `out_notice_missing`. That
+is the largest figure below, and it is a count of the draft, which cannot leave as a
+finished file while a decision is open. It is counted because a draft can be downloaded
+after a confirm, and its reader has only the banner at the top to go by.
+
+**Known false positive.** `out_hole` also fires where the source itself writes a space
+before a colon or a full stop (a slide that sets "O(1) :"). Five of the places below are
+of that kind.
+
+```bash
+uv run readablestem eval outputs --out data/eval/outputs-corpus.json
+uv run readablestem eval outputs --only r18_arxiv_opt        # one file
+uv run readablestem eval outputs --from kept.json            # report on a kept replay
+```
+
+It spends nothing and gates nothing. Exit code 0: measured; 2: nothing could be measured.
+An upload whose recording lacks an answer is reported apart, as in the other reports.
+
+Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; `data/eval/outputs-corpus.json`). Every output of every upload could be built.
+
+| Kind | Page | Word | EPUB | Canvas file | Canvas page | Cartridge | Transcript | Documents |
+|---|---|---|---|---|---|---|---|---|
+| `out_char` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_text_lost` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_text_twice` | 0 | 9 | 0 | 0 | 0 | 0 | 0 | 4 |
+| `out_order` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_math_fallback` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_link_dead` | 0 | 74 | 0 | 0 | 0 | 0 | 0 | 8 |
+| `out_alt_missing` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_table_header` | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
+| `out_heading` | 13 | 14 | 13 | 13 | 13 | 13 | 13 | 14 |
+| `out_lang` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_note_lost` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_hole` | 43 | 43 | 43 | 43 | 43 | 43 | 43 | 6 |
+| `out_notice_missing` | 519 | 0 | 0 | 0 | 0 | 0 | 0 | 33 |
+
+What the figures are, checked place by place on 29 of the uploads:
+
+- **`out_notice_missing`, 519 on the page.** Proposals that wait for a required
+  decision and are shown with no mark (on the 29 uploads: 419 of 428; the other 9 are
+  formulas inside table cells, where a kept or open formula has no mark of its own and the
+  table has none). Every picture kept as the original with a place of its own is marked.
+  The exports copy the page, so the same places are unmarked in each; they are counted once,
+  on the page.
+- **`out_hole`, 43 in each written output.** Sentences that lost an inline formula
+  ("is denoted ."), stray punctuation left as a paragraph of its own, and a mis-decoded
+  ellipsis; five are the false positive above. The transcript says every one of these
+  sentences.
+- **`out_link_dead`, 74 in Word.** pandoc keeps an id on a heading and drops it on a
+  paragraph, so most links inside a Word file have no target. 13 of them are footnotes:
+  every note's mark becomes a Word footnote with no words, the note's text stays a
+  paragraph of the body, and its "Back to the text" link leads nowhere.
+- **`out_heading`, 13 in every output.** The page opens with the document title as
+  its `h1`, and the first heading of the document says the same words. In Word the title
+  paragraph is dropped when the two are equal; where they differ only in case it is not,
+  which is the one more in Word.
+- **`out_text_twice`, 9 in Word.** The words written for a voice beside a formula
+  in a table cell are ordinary text in Word, next to the formula.
+- **`out_table_header`, 1 on the page.** A table with no header cell and an open decision
+  on it.
+- Zero everywhere: a character that is not text, words lost, order, an equation with no
+  spoken form, a picture with no alt text, the language, a lost note.
+
+None of these is fixed here. The Word defects belong to the Word export's rebuild, the
+unmarked proposals to the page's notes, and the title to the one-`h1` rule; the counts are
+their baseline, and the release bar is 0 for `out_char`, `out_text_lost`, `out_link_dead`,
+`out_alt_missing` and `out_notice_missing`. They are development figures: the bar is judged
+on a held-out replay, which does not exist yet.
+
 What none of the reports has yet:
 
 - A replay of held-out whole documents (the recording is not made), and so a bar or a
@@ -3162,6 +3435,108 @@ runs of one input) are judged on pages whose faults a person marked. No live run
 recorded yet: the first shadow recording of the corpus waits for the owner's approval of
 its cap.
 
+## The quality ledger (`eval ledger`)
+
+Each eval above reports its own lane on its own set. The ledger
+(`src/readablestem/eval/ledger.py`) is one list of rows over all of them, led by the rows
+that say what a student meets: how often a whole course document reaches them with an error
+nobody was asked about. It measures nothing and spends nothing. It reads the records the
+evals keep in `data/eval` (`order-*.json`, `burden-*.json`, `outputs-*.json` and
+`whole-*.json`), and for every row and every record that feeds the row it prints the counts,
+the figure, a bound and a label.
+
+```bash
+uv run readablestem eval ledger --out data/eval/ledger.json
+uv run readablestem eval ledger --for-release          # the check a release runs
+uv run readablestem eval ledger --register-bars        # after the first held-out run
+```
+
+**The labels.**
+
+| Label | What it says |
+|---|---|
+| held-out | scored on held-out documents, under the production profile, by this release |
+| development score | scored on documents the readers were built on, or under settings that are not the production profile; it guards against going backward and meets no bar |
+| earlier release | the record was made by another pipeline version, or under another profile, than the code that prints the ledger; it says nothing of this release, so the evals are run again for every release |
+| not measured: proof owed | no record feeds the row; the report says what proof is owed |
+
+**The bound.** A count from a sample allows more than it shows: no error in 237 formulas
+still allows about 1.3 in 100. Every figure is printed with a one-sided 95% bound on the
+side that matters (the upper one where lower is better): exact for a share
+(Clopper-Pearson) and for a rate of events (Poisson), an order statistic for a median. The
+bound treats pages as independent. Errors come in clusters by document, so the true bound
+is wider, and the rows that count documents are the ones to read for that.
+
+**The two bars.** The goal bar is the figure a lane is built toward, written with the row.
+It is met only when the bound is inside it, not when the figure is. A goal of none is met by
+a count of none, and the line still prints what that count allows. The release bar is the
+figure of the first held-out run, kept in `data/eval/ledger-bars.json` with the set it was
+measured on. `--register-bars` writes the bars that are missing; a bar is replaced only by
+naming its row (`--replace-bar ROW`), and a figure from a run in which a step stopped early
+is no baseline and is not written. A release may not be worse than its release bar, held as
+measured, with no bound. Only a held-out line is held against either bar.
+
+Exit code 0: no held-out line is worse than its release bar. 1: one is, or, with
+`--for-release`, a row that has a release bar has no held-out figure of this release on the
+bar's set. 2: refused. A record that does not say its split, its set's hash, the profile's
+hash and the pipeline version is not read around: the run stops and names the file.
+
+**The whole-document record** (`whole-<set>.json`) is what the top rows are made of. Its
+`metrics` hold one row a document, with no name: `pages`, `silent_errors` (anything wrong in
+the student file that carried no required decision), `doubt_false` and `doubt_true` (doubt
+flags: a check or a reader disagreed, and the flag turned out false or true) and
+`rule_required` (decisions a rule asks for whatever the readers say, by rule). Beside them,
+`rule_owners` (who shows on held-out pages what a rule catches) and `hand_sample` (the pages
+that passed every check and were read by hand, and how many had a fault). False flags per
+true flag is over doubt flags only. A rule-required decision is printed on its rule's line,
+with the rule's owner, and in no ratio. The record is written by the run that audits
+held-out whole documents and samples the pages it passed. That run needs a recording that
+does not exist yet, so no such record is kept and the top rows are not measured.
+
+**The file** (`--out`) holds, per release and row, the figures, their labels, the counts
+and both bars, and no word of any document. Its lanes are named as the outcome events name
+theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_outcome`
+event's, so the admin page can set production's numbers of the same release (false flags
+per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
+
+**Today** (`data/eval/ledger.json`, release `0.5.10+62b4f1678d36`). No row has a held-out
+figure and no release bar is registered: every line below is a development score.
+
+| Row | Set | Figure | Counts | 95% bound | Label | Goal bar |
+|---|---|---|---|---|---|---|
+| Required decisions a page, the median document | corpus | 0.29 | 63 documents | 0.60 | development score | at most 1.00 |
+| Pages not read right in the student page, by the scorer | corpus | 27.3 per 100 | 24 of 88 pages | 36.2 per 100 | development score | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 44.2 per 100 | 118 of 267 pages | 49.4 per 100 | development score | - |
+| Documents with every gold page right | corpus | 56.8% | 25 of 44 documents | 43.3% | development score | - |
+| Documents with every gold page right | layout-dev-1 | 13.3% | 8 of 60 documents | 6.8% | development score | - |
+| Pages that read a running head, a page number or a stamp aloud | corpus | 17.0 per 100 | 15 of 88 pages | 25.0 per 100 | development score | at most 2.0 per 100 |
+| Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 54.3 per 100 | 145 of 267 pages | 59.5 per 100 | development score | at most 2.0 per 100 |
+| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | development score | - |
+| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | development score | - |
+| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | development score | none |
+
+Read with care:
+
+- "Required decisions a page" is the median over documents of a document's decisions a
+  page, as production counts it. Its bound is an order statistic of
+  63 documents of a set chosen to cover kinds of
+  document, not sampled from what people upload.
+- The corpus line of the page rows counts every gold page measured whole
+  (88, the edge pages with the others); `eval order`'s
+  "of 78" leaves the edge pages out.
+- Every gold page is right in 25 of 44 corpus documents and in
+  8 of 60 documents of `layout-dev-1`. A document's gold pages are
+  the ones labeled, which in a layout set is a sample of its pages.
+- The output rows count places, and one fault can be many places: most of the HTML file's
+  are proposals still open that the page does not mark (`eval outputs`, above).
+
+Not measured, with the proof each is owed printed by the command: silent errors, documents with no silent error, false flags per true flag, doubt flags only, pages that passed every check and had a fault, read by hand, flags of the page check, and verdicts that change between two runs of one input, formulas whose meaning is wrong, with no flag, boxes that hold the whole formula, formulas inside tables read wrong, private-use or U+FFFD characters on a page with no flag, pages with a text error and no flag, words changed on a print page, wrong tables shown with no decision, wrong stated values on vector charts, drawn structures wrong with no question; and the rule-required decisions by rule.
+
 ## The same file gives the same document on any machine
 
 A score or a replay means something only if a result does not depend on the machine that
@@ -3172,7 +3547,8 @@ made it. The rule (`core.types.NotFinished`, tests/test_determinism.py):
 - A limit on time, memory or money may only stop a step. It never quietly changes what a
   page contains.
 - A step that stops says so with a "not finished" fact: `{step, page, reason, done, of}`,
-  with no document text (operations.md, "Step facts and the step report").
+  with no document text (operations.md, "Step facts and the step report"). Every report made
+  from a measured replay lists these facts in its record and names the steps in its header.
 
 Three tests hold the rule:
 
@@ -3267,6 +3643,12 @@ limits is still owed.
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
 | `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
 | `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
+| `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
+| `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
+| `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
+| `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
+| `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |
+| `data/eval/ledger.json`, `data/eval/ledger-bars.json` | the last ledger, and the release bars once a held-out run has been registered (none yet) |
 | `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |

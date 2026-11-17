@@ -20,9 +20,9 @@ printed pages read differently.
 | `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
 | Workflow suite | `uv run pytest -m workflow -n auto --dist loadfile -rs`: the corpus's files through the real app, from recorded model answers, at no cost (docs/eval.md, "Recording and replay"). Needs `make table-model` and `uv run python -m readablestem.eval.corpus check --fetch` once |
-| `make lint` | `ruff check` + `ruff format --check` |
+| `make lint` | `ruff check` + `ruff format --check` + `scripts/dead_code.py` (a function, class, method or property of the package that nothing calls) |
 | `make fmt` | Format and auto-fix |
-| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
+| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, the unused-code check, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make table-model` | Download the SLANet-plus table-structure model (7.5 MB, SHA-256 checked) into `~/.cache/readablestem/models` (or `TABLE_MODEL_DIR`); without it tables use PyMuPDF's grid |
 | `make fuzz-tables` | Upgrade check before any PyMuPDF bump: byte mutants of the repository's fixtures through the probe and the table detector (`pytest -m slow`; a few minutes; docs/tables.md) |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
@@ -86,7 +86,7 @@ UTC) and by hand. Jobs, by check name:
 | `plan (what runs on Python 3.14)` | Builds the pytest matrix (below) |
 | `ruff + ty (Python 3.12)`, `(Python 3.14)` | ruff, ty and an import of every module; both Pythons on every run |
 | `pytest (Python 3.12, shard i/6)`, `(Python 3.14, ...)` | The offline suite, in six shards |
-| `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
+| `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two, or if a route of the app gave no test its own answer |
 | `pytest -m browser (Playwright Chromium, shard i/4)` | Browser tests, four shards of three xdist workers each |
 | `workflow suite (replay of the recorded answers)` | `pytest -m workflow`: corpus files converted by the real app from recorded answers. Tests that need answers kept out of the repository are skipped and listed |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
@@ -111,7 +111,16 @@ A file is never split, so module-scoped servers and browsers start once. A new f
 entry: it gets the default weight and lands in exactly one shard. Each shard writes a report
 with `--shard-report`, and `scripts/check_shards.py` (job `every test ran in exactly one
 shard`) fails if the shards collected different tests, or a collected test ran in none or in
-two. Refresh the durations now and then so the shards stay level (about 10 minutes with 16
+two.
+
+The same reports say which routes of the app the tests reached (`tests/_routes.py` notes
+every request that goes through the app while the tests run). The job fails for a route that
+no test requests, and for one whose tests only ever get a refusal (a redirect to sign-in, a
+403, a 404): such a route has no test of what it does. A new route therefore needs one test
+that gets its answer. `uv run pytest --route-coverage` judges a whole local run the same way
+(`make ci-local` passes it); it means nothing on part of the suite.
+
+Refresh the durations now and then so the shards stay level (about 10 minutes with 16
 cores):
 
 ```

@@ -177,7 +177,10 @@ def error_from_wire(wire: ErrorWire) -> Exception:
 
 class Link:
     """The child's end: sends requests, and a reader thread hands each answer to the thread
-    that asked. If the parent goes away the child exits at once."""
+    that asked. If the parent goes away the child exits at once. If the parent sends a frame
+    that cannot be read (too large, not a message), the child says so with an `error` frame
+    of kind `link` and exits with `EXIT_BROKEN`: that is a fault of the pair, and it must not
+    look like the parent going away."""
 
     def __init__(self, sock: socket.socket) -> None:
         self._sock = sock
@@ -206,8 +209,12 @@ class Link:
                 if waiter is not None:
                     waiter[1].append(message)
                     waiter[0].set()
-        except Exception:
-            pass
+        except OSError:
+            pass  # the socket went with the parent: the same as the end of the stream
+        except Exception as exc:  # a frame this process cannot read: its type, never its text
+            with contextlib.suppress(OSError):
+                self.send({"op": "error", "kind": "link", "type": type(exc).__name__})
+            os._exit(EXIT_BROKEN)
         os._exit(EXIT_PARENT_GONE)
 
     def wait_for_init(self) -> dict[str, Any]:

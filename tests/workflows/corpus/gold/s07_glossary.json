@@ -34,13 +34,15 @@
    {"role": "list", "text": "Population. A group of individuals of the same species living in the same area."},
    {"role": "list", "text": "Producer. An organism that makes its own food, usually by photosynthesis."},
    {"role": "heading", "text": "S"},
-   {"role": "list", "text": "Succession. The gradual change in the species of a community over time after a disturbance."},
-   {"role": "heading", "text": "T"},
+   {"role": "list", "text": "Succession. The gradual change in the species of a community over time after a"},
    {"role": "dropped", "text": "Page 1 of 2"}
   ]},
   {"page": 2, "blocks": [
    {"role": "dropped", "text": "Introduction to Environmental Systems"},
-   {"role": "list", "text": "Trophic level. A feeding position in a food chain, such as producer or primary consumer."},
+   {"role": "list", "text": "disturbance."},
+   {"role": "heading", "text": "T"},
+   {"role": "list", "unit": "trophic-level", "text": "Trophic level. A feeding position in a food chain, such as producer or primary"},
+   {"role": "list", "unit": "trophic-level", "text": "consumer."},
    {"role": "heading", "text": "W"},
    {"role": "list", "text": "Watershed. The land area that drains into a particular river, lake or ocean."},
    {"role": "dropped", "text": "Page 2 of 2"}

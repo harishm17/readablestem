@@ -101,8 +101,8 @@
   <h2 id="course-documents-heading">Documents in this course</h2>
   {% if documents.rows %}
   {% include "_documents.html" %}
-  {% if ready_documents %}
-  <p><a id="download-all" href="/courses/{{ course.id }}/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
+  {% if ready_documents >= 2 %}{# one ready document is downloaded from its own page #}
+  <p><a id="download-all" href="/courses/{{ course.id }}/download">Download all {{ ready_documents }} ready documents (zip)</a></p>
   {% set download_all_url = "/courses/" ~ course.id ~ "/download" %}{% include "_download_all_formats.html" %}
   {% endif %}
   {% else %}

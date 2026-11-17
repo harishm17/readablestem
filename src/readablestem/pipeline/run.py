@@ -157,6 +157,7 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    shadow,
     step_facts,
     table_math,
     table_step,
@@ -1192,12 +1193,9 @@ class _Run:
         for future in list(self.futures):
             future.cancel()
         for future, element in list(self.futures.items()):
-            if future.cancelled():
-                continue
-            try:
-                done = future.result()
-            except BaseException:  # the failed step itself, or a worker that died
-                continue
+            if future.cancelled() or future.exception() is not None:
+                continue  # not run, or the failed step itself, or a worker that died
+            done = future.result()
             key = self.keys.get(element.id)
             if key and reusable(done.fix):
                 self.cache.store(element, key, done.fix)
@@ -1843,6 +1841,9 @@ def _convert(
     # time, and every request to a model with its page.
     watch = step_facts.Stopwatch()
     measured: list[CallFact] = []
+    # The steps run in shadow (`pipeline.shadow`): a step that is given this runs beside
+    # the conversion and can change nothing of it.
+    shadowed = shadow.Shadow()
     # Pages a layout run typed without their ink, and handwritten pages whose strokes were
     # not read, each with its cause: a count of work ran out, or the clock guard fired
     # (`page_type.InkBudget`).
@@ -2084,7 +2085,9 @@ def _convert(
             )
         stops += step_facts.ink_stopped(step_facts.PAGE_TYPE, ink_late)
         stops += step_facts.ink_stopped(step_facts.INK_STROKES, strokes_late)
-        facts = step_facts.gathered(measured, watch, stops + step_facts.capped(ordered))
+        facts = step_facts.gathered(
+            measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
+        )
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
         if page_math_summary is not None:

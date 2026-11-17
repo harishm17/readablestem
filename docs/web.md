@@ -1742,7 +1742,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `access_removed` | The owner was removed from the allowlist |
   | `timeout` | The conversion ran past its time limit (or, in its child, its CPU limit) |
   | `conversion_crashed` | The conversion's child process died of a signal or exited without an answer (MuPDF aborting, a segfault). Failed at once, not retried; not offered "Try again" |
-  | `conversion_unavailable` | The conversion's child could not start (an import failed, a library or the table model file is missing; exit status 1 or 72, or a "startup" error from it). The service's fault, not the PDF's: logged at ERROR (`conversion_child_unavailable`, type only); offered "Try again"; a self-check at worker start (`conversion_child_check_ok` or `_failed`) says so early |
+  | `conversion_unavailable` | The conversion's child could not start (an import failed, a library or the table model file is missing; exit status 1 or 72, or a "startup" error from it), or could not read a message the worker sent it (a "link" error, logged as `conversion_child_link_failed`). The service's fault, not the PDF's: logged at ERROR (`conversion_child_unavailable`, type only); offered "Try again"; a self-check at worker start (`conversion_child_check_ok` or `_failed`) says so early |
   | `conversion_oom` | The conversion's child ran out of memory (`MemoryError` under its address-space cap), or killed by SIGKILL that this process did not send (the kernel's OOM killer, with other work on the host using the memory): that is run once more before the job fails, so a job is not blamed on its PDF for another request's memory. Failed at once; not offered "Try again" |
   | `store_failed` | The result could not be written to the database |
   | `lease_expired` | The job was interrupted 3 times (since it was last tried again) |
@@ -1901,8 +1901,7 @@ is `convert_isolated`, which has `convert_pdf`'s signature.
   once per process, from a file shipped in the repository) and what the review screen cuts
   through `web/page_images.py`, which already uses the probe's child.
 
-`Worker.run_once()` and `process_next_job(...)` process one job synchronously, for tests
-and scripts.
+`Worker.run_once()` processes one job synchronously, for tests and scripts.
 
 ## The job page
 

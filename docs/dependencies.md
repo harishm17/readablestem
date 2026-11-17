@@ -44,7 +44,7 @@ and never linked may carry another license.
 
 ## Python packages (`uv.lock`)
 
-94 packages. "Where" is the first of: the image, the image's tracing
+95 packages. "Where" is the first of: the image, the image's tracing
 extra, the development tools, the browser checks.
 
 | Package | Version | License, as the package states it | Where | Why it is here |
@@ -140,6 +140,7 @@ extra, the development tools, the browser checks.
 | `urllib3` | 2.8.0 | MIT | image (tracing) | needed by requests |
 | `uvicorn` | 0.54.0 | BSD-3-Clause | image | the web server |
 | `uvloop` | 0.23.0 | MIT License | image | needed by uvicorn |
+| `vulture` | 2.16 | MIT License | development | finds functions and classes nothing calls (scripts/dead_code.py) |
 | `watchfiles` | 1.3.0 | MIT | image | needed by uvicorn |
 | `websockets` | 17.2 | BSD-3-Clause | image | needed by uvicorn |
 | `wrapt` | 2.5.0 | BSD-2-Clause | image (tracing) | needed by langfuse |

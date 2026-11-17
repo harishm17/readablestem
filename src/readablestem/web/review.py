@@ -1111,12 +1111,6 @@ def heading_places(result: DocumentResult) -> dict[str, HeadingPlace]:
     return places
 
 
-def heading_moved(fix: Fix, places: Mapping[str, HeadingPlace]) -> bool:
-    """The output writes this heading fix at another level than the one stored."""
-    place = places.get(fix.element_id)
-    return fix.kind is Kind.HEADING and place is not None and place.moved
-
-
 def heading_levels_that_fit(result: DocumentResult, element_id: str) -> list[int]:
     """Levels the output keeps as they are for this heading: always 1 to n (n is at
     least 1; the first heading may take any level)."""

@@ -74,7 +74,7 @@ DENSE_MATH = 9
 _SCAN_PAGE = ("scan_no_text", "scan_ocr", "handwritten", "handwritten_ocr")
 # The largest corpus file is 39 pages and under 8 MB, and a replay spends nothing: the limits
 # on size and on a day's spending are not what is measured.
-ROOM = {
+ROOM: dict[str, Any] = {
     "max_pages_per_job": 60,
     "max_source_pages": 60,
     "max_upload_mb": 25,
@@ -124,13 +124,24 @@ class Converted:
     # (0-based, None when no element holds it), kind, reasons and members. None in a record
     # made before this was kept, which is not the same as a document that asks nothing.
     decisions: list[dict[str, Any]] | None = None
+    # The audit of the files built from the result (`eval.outputs.audit_document`): each
+    # wrong place, what each output held and the outputs that could not be built. None
+    # when the replay was not asked to build them.
+    outputs: dict[str, Any] | None = None
+    # The reading-order counts of each gold page (`eval.order.score_document`, without the
+    # `detail`, which holds the document's words), under `elements` for what the pipeline
+    # holds and under `html` for the page a student is given. None when the file has no
+    # gold, and in a record made before this was kept.
+    order: dict[str, list[dict[str, Any]]] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Converted:
-        return cls(**(raw | {"facts": StepFacts.model_validate(raw.get("facts") or {})}))
+        fields: dict[str, Any] = dict(raw)
+        fields["facts"] = StepFacts.model_validate(raw.get("facts") or {})
+        return cls(**fields)
 
 
 def every_upload() -> list[Upload]:
@@ -305,7 +316,7 @@ def _job(upload: Upload, settings: Settings) -> _Job | str:
 def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult] | str:
     """One upload's file and the document a job makes of it (converted as `convert`
     converts it, without the measuring), or the code of why there is none."""
-    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+    from readablestem.web.isolated_convert import convert_isolated
 
     job = _job(upload, settings)
     if isinstance(job, str):
@@ -318,14 +329,59 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
             options=job.options,
             concurrency=settings.model_concurrency,
         )
-    except ConversionFailed as exc:
-        return str(exc.code)
+    except Exception as exc:
+        from readablestem.web.worker import error_code_for
+
+        # A file the reader refuses or cannot finish ends as a job's does: with its code.
+        return error_code_for(exc)
     return job.pdf, output.result
 
 
-def convert(upload: Upload, settings: Settings) -> Converted:
-    """Convert one upload in a conversion process, as a job is converted, and measure it."""
-    from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+def order_rows(entry_id: str, pdf: bytes, result: DocumentResult) -> dict[str, list] | None:
+    """The reading-order counts of a corpus file's gold pages against a conversion of it
+    (`order_of`), or None when the file has no gold."""
+    entry = corpus.load_manifest()[entry_id]
+    if not entry.gold:
+        return None
+    return order_of(corpus.load_gold(entry, pdf), pdf, result)
+
+
+def order_of(gold: dict[str, Any], pdf: bytes, result: DocumentResult) -> dict[str, list]:
+    """The reading-order counts of each gold page (`eval.order.score_document`) against a
+    conversion of its file: under `elements` for what the pipeline holds and under `html`
+    for the page a student is given. The `detail` of a row holds the document's words and
+    is left out. Each gold page is given the lines printed in its margins, so that a
+    running head that is read is counted as furniture."""
+    import pymupdf
+
+    from readablestem.eval import order
+    from readablestem.gold import layout_gold
+
+    with pymupdf.open(stream=pdf, filetype="pdf") as opened:
+        pages = [
+            page | {"margins": layout_gold.margin_lines(opened[page["page"] - 1])}
+            for page in gold["pages"]
+        ]
+    gold = gold | {"pages": pages}
+    heard = {
+        "elements": order.elements_from_result(result.elements),
+        "html": order.elements_from_html(result.html),
+    }
+    return {
+        source: [
+            {key: value for key, value in row.items() if key != "detail"}
+            for row in order.score_document(gold, pages)
+        ]
+        for source, pages in heard.items()
+    }
+
+
+def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Converted:
+    """Convert one upload in a conversion process, as a job is converted, and measure it.
+    `outputs`: also build every file a student is given and audit it (`eval.outputs`).
+    That, and the reading-order counts of a file with gold (`order_rows`), come after the
+    measuring, so the seconds and the memory are the conversion's alone."""
+    from readablestem.web.isolated_convert import convert_isolated
 
     job = _job(upload, settings)
     if isinstance(job, str):
@@ -342,14 +398,24 @@ def convert(upload: Upload, settings: Settings) -> Converted:
             options=options,
             concurrency=settings.model_concurrency,
         )
-    except ConversionFailed as exc:
-        return Converted(upload.name, pages=page_count, error=str(exc.code))
+    except Exception as exc:
+        from readablestem.web.worker import error_code_for
+
+        return Converted(upload.name, pages=page_count, error=error_code_for(exc))
     wall_s = time.monotonic() - started
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
     readers = [client, getattr(client, "second_check", None)]
     facts = output.facts or StepFacts()
     facts = facts.model_copy(update={"stages": [step_facts.start_up(facts, wall_s), *facts.stages]})
     result = output.result
+    peak_mb = round(after.ru_maxrss / 1024, 1)
+    own_cpu_s = round(time.process_time() - own_before, 4)
+    own_peak_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
+    audit = None
+    if outputs:
+        from readablestem.eval.outputs import audit_document
+
+        audit = audit_document(result)
     return Converted(
         upload.name,
         pages=result.stats.pages,
@@ -363,12 +429,14 @@ def convert(upload: Upload, settings: Settings) -> Converted:
             after.ru_utime + after.ru_stime - before.ru_utime - before.ru_stime,
             4,
         ),
-        own_cpu_s=round(time.process_time() - own_before, 4),
+        own_cpu_s=own_cpu_s,
         # Linux counts both in KB.
-        peak_mb=round(after.ru_maxrss / 1024, 1),
-        own_peak_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
+        peak_mb=peak_mb,
+        own_peak_mb=own_peak_mb,
         parts=parts(result),
         decisions=[asdict(decision) for decision in triage.decisions(result)],
+        outputs=audit,
+        order=order_rows(upload.entry, pdf, result),
     )
 
 
@@ -428,7 +496,7 @@ def _tell(pids: Iterable[int], what: signal.Signals) -> None:
             os.kill(pid, what)
 
 
-def _held_back(process: subprocess.Popen[bytes], share: float) -> int | None:
+def _held_back(process: subprocess.Popen[Any], share: float) -> int | None:
     """Wait for `process` while it and everything it started run for only `share` of the
     time: they are stopped and continued ten times a second. To every clock the conversion
     reads, that is a machine with that share of this one to give. Returns the exit status,
@@ -457,13 +525,19 @@ def _held_back(process: subprocess.Popen[bytes], share: float) -> int | None:
 
 
 def _in_a_process(
-    upload: Upload, answers: Path, folder: Path, cores: str | None, share: float | None
+    upload: Upload,
+    answers: Path,
+    folder: Path,
+    cores: str | None,
+    share: float | None,
+    outputs: bool = False,
 ) -> Converted:
     out = folder / f"{upload.name}.json"
     command = [sys.executable, "-m", "readablestem.eval.measure", upload.entry]
     command += ["--answers", str(answers), "--out", str(out)]
     command += ["--image-pages"] if upload.image_pages else []
     command += ["--exam"] if upload.exam else []
+    command += ["--outputs"] if outputs else []
     if cores:
         command = ["taskset", "--cpu-list", cores, *command]
     quiet: Any = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
@@ -490,10 +564,12 @@ def run(
     cores: str | None = None,
     share: float | None = None,
     said: Callable[[Converted], None] | None = None,
+    outputs: bool = False,
 ) -> list[Converted]:
     """Measure each upload in a process of its own, `at_once` of them at a time (1 for
     seconds that mean anything), pinned to the CPU list `cores` when given. `said` is
-    called as each one ends.
+    called as each one ends. `outputs`: each process also builds and audits the files a
+    student is given (`convert`).
 
     `share` (0.25 for a quarter) holds each conversion back to that share of the time, as
     a much slower machine would: its seconds then mean nothing, and its result must be the
@@ -503,13 +579,23 @@ def run(
         answers = answers_file(folder)
 
         def one(upload: Upload) -> Converted:
-            done = _in_a_process(upload, answers, folder, cores, share)
+            done = _in_a_process(upload, answers, folder, cores, share, outputs)
             if said is not None:
                 said(done)
             return done
 
         with ThreadPoolExecutor(max_workers=max(1, at_once)) as pool:
             return list(pool.map(one, uploads))
+
+
+def table(head: Sequence[object], rows: Sequence[Sequence[object]]) -> list[str]:
+    """Rows as lines of text, each column as wide as its widest cell."""
+    cells = [[str(cell) for cell in row] for row in (head, *rows)]
+    widths = [max(len(row[i]) for row in cells) for i in range(len(head))]
+    return [
+        "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
+        for row in cells
+    ]
 
 
 def machine() -> dict[str, Any]:
@@ -527,11 +613,16 @@ def machine() -> dict[str, Any]:
 
 
 def record(
-    measured: Iterable[Converted], settings: Settings, metrics: dict[str, Any]
+    measured: Iterable[Converted],
+    settings: Settings,
+    metrics: dict[str, Any],
+    *,
+    of_set: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A report of a measured replay: what it says about itself, then its figures under
-    `metrics`, the shape `readablestem eval bar` reads."""
-    return stamps(measured, settings) | {"metrics": metrics}
+    `metrics`, the shape `readablestem eval bar` reads. `of_set`: the `set` and the `split`
+    of a run that is not of the corpus."""
+    return stamps(measured, settings, of_set=of_set) | {"metrics": metrics}
 
 
 def header(record: dict[str, Any]) -> list[str]:
@@ -541,11 +632,26 @@ def header(record: dict[str, Any]) -> list[str]:
 
     chosen = record.get("split") or {}
     lines = [
-        f"Set: the corpus, a {chosen.get('name')} set of {chosen.get('documents')} documents "
+        f"Set: {record.get('set') or 'the corpus'}, a {chosen.get('name')} set of "
+        f"{chosen.get('documents')} documents "
         f"({str(chosen.get('set_sha256'))[:12]}). Pipeline {record.get('pipeline_version')}, "
         f"commit {record.get('commit')}.",
         profile.stamp_line(record.get("profile")),
     ]
+    stops = record.get("not_finished") or []
+    if stops:
+        clock = sum(stop["reason"] == "time_limit" for stop in stops)
+        places = "; ".join(
+            f"{stop['upload']} {stop['step']}"
+            + (f" page {stop['page'] + 1}" if stop["page"] is not None else "")
+            + f" ({stop['reason']})"
+            for stop in stops
+        )
+        lines.append(
+            f"Stopped early: {len(stops)} steps, {clock} of them at a time limit, where the "
+            f"result depends on how busy the machine was: {places}. A baseline is a run "
+            "with no step stopped at a time limit."
+        )
     if chosen.get("name") != split.HELD_OUT:
         lines.append(
             "Proof owed: a replay of held-out whole documents. No such recording exists, so "
@@ -554,25 +660,37 @@ def header(record: dict[str, Any]) -> list[str]:
     return lines
 
 
-def stamps(measured: Iterable[Converted], settings: Settings) -> dict[str, Any]:
+def stamps(
+    measured: Iterable[Converted], settings: Settings, *, of_set: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """What a report of a measured replay says about itself (`eval.split`): the documents and
-    their side, the settings, and the code."""
+    their side, the settings, the code, and the steps that stopped before they were done
+    (a step stopped by a clock gives another result on a busier machine). `of_set`: the
+    `set` and the `split` of a run that is not of the corpus."""
     from readablestem.eval import run_record, split
     from readablestem.ops import profile
     from readablestem.pipeline.run import PIPELINE_VERSION
 
-    manifest = corpus.load_manifest()
-    names = sorted({done.upload.split("+")[0] for done in measured})
-    hashes = {name: manifest[name].sha256 or manifest[name].builder for name in names}
-    # Every corpus file has been read while the readers were built.
-    chosen = split.Split(seed="corpus", development=tuple(names), held_out=(), hashes=hashes)
+    measured = list(measured)
+    if of_set is None:
+        manifest = corpus.load_manifest()
+        names = sorted({done.upload.split("+")[0] for done in measured})
+        hashes = {name: manifest[name].sha256 or manifest[name].builder for name in names}
+        # Every corpus file has been read while the readers were built.
+        chosen = split.Split(seed="corpus", development=tuple(names), held_out=(), hashes=hashes)
+        of_set = {"split": chosen.stamp(split.DEVELOPMENT)}
     sha, dirty = run_record.source_state(corpus.REPO)
     return {
-        "split": chosen.stamp(split.DEVELOPMENT),
+        **of_set,
         "profile": profile.stamp(settings),
         "pipeline_version": PIPELINE_VERSION,
         "commit": sha + ("+changes" if dirty else ""),
         "machine": machine(),
+        "not_finished": [
+            {"upload": done.upload, "step": stop.step, "page": stop.page, "reason": stop.reason}
+            for done in sorted(measured, key=lambda done: done.upload)
+            for stop in done.facts.not_finished
+        ],
     }
 
 
@@ -584,9 +702,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--exam", action="store_true")
     parser.add_argument("--answers", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--outputs", action="store_true")
     args = parser.parse_args(argv)
     upload = Upload(args.entry, image_pages=args.image_pages, exam=args.exam)
-    done = convert(upload, replay_settings(args.answers))
+    done = convert(upload, replay_settings(args.answers), outputs=args.outputs)
     args.out.write_text(json.dumps(done.as_dict()), encoding="utf-8")
     return 0
 

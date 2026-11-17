@@ -65,6 +65,21 @@ Line = dict[str, Any]
 Assigned = list[tuple[int, float] | None]
 
 
+def margin_lines(page: pymupdf.Page) -> list[str]:
+    """The lines printed in a page's top and bottom margins, and the lines set at an angle
+    at one of its edges: where running heads, page numbers and stamps stand. (A line set at
+    an angle inside the page is a drawing's label.) `eval/order.py` counts an element that
+    reads one of them and holds no word of a gold block."""
+    lines, stamps, (width, height) = pdf_lines(page)
+
+    def at_an_edge(box: tuple[float, float, float, float]) -> bool:
+        across = box[2] < 0.07 * width or box[0] > 0.93 * width
+        return across or box[3] < 0.07 * height or box[1] > 0.94 * height
+
+    in_bands = [line["text"] for line in lines if line.get("zone")]
+    return in_bands + [stamp["text"] for stamp in stamps if at_an_edge(stamp["box"])]
+
+
 def tok(text: str | None) -> list[str]:
     return TOK.findall(unicodedata.normalize("NFKC", text or "").lower())
 
@@ -582,7 +597,7 @@ def match_page(ix: Index, lines: list[Line], allow: Collection[int] | None = Non
         return ix.units[u]["role"] == "heading"
 
     def row_span(lj: int) -> tuple[float, float]:
-        u = asg[lj][0]  # type: ignore[index]
+        u = asg[lj][0]  # ty: ignore[not-subscriptable]
         o = lines[lj]["box"]
         ends, starts = [], []
         for lk, a in enumerate(asg):
@@ -622,7 +637,7 @@ def match_page(ix: Index, lines: list[Line], allow: Collection[int] | None = Non
             wordy = [x for x in t if len(x) >= 2]
             best: tuple[float, int, float] | None = None
             for lj, side in near:
-                u, p = asg[lj]  # type: ignore[misc]
+                u, p = asg[lj]  # ty: ignore[not-iterable]
                 if u in ix.noattach:
                     continue
                 nj = len(lines[lj]["toks"])
@@ -649,12 +664,12 @@ def match_page(ix: Index, lines: list[Line], allow: Collection[int] | None = Non
                         best = (score, u, pos)
             if best is None and not wordy:
                 # A fragment of symbols: only between lines of one unit.
-                units_near = {asg[lj][0] for lj, _ in near}  # type: ignore[index]
+                units_near = {asg[lj][0] for lj, _ in near}  # ty: ignore[not-subscriptable]
                 sides = {side for _, side in near}
                 if len(units_near) == 1 and len(sides) >= 2 and not (units_near & ix.noattach):
                     lj = near[0][0]
                     ref = [
-                        asg[j][1] + len(lines[j]["toks"])  # type: ignore[index]
+                        asg[j][1] + len(lines[j]["toks"])  # ty: ignore[not-subscriptable]
                         for j, side in near
                         if side in ("above", "row")
                     ]
@@ -664,15 +679,15 @@ def match_page(ix: Index, lines: list[Line], allow: Collection[int] | None = Non
             if best is None and li in tied:
                 # The first pass found two or more units with these words: the one next to a
                 # neighbour's unit in the source.
-                neighbours = [asg[lj][0] for lj, side in near if side != "row"]  # type: ignore[index]
+                neighbours = [asg[lj][0] for lj, side in near if side != "row"]  # ty: ignore[not-subscriptable]
                 pick = [(u, p) for u, p in tied[li] if any(abs(x - u) <= 3 for x in neighbours)]
                 if len(pick) == 1:
                     best = (1.0, pick[0][0], pick[0][1])
             if best is None:
                 # A whole short heading: the candidate just before a neighbour's unit.
                 candidates = [u for u in _short_candidates(ix, t, allow) if lone(u)]
-                below = [asg[lj][0] for lj, side in near if side == "below"]  # type: ignore[index]
-                above = [asg[lj][0] for lj, side in near if side == "above"]  # type: ignore[index]
+                below = [asg[lj][0] for lj, side in near if side == "below"]  # ty: ignore[not-subscriptable]
+                above = [asg[lj][0] for lj, side in near if side == "above"]  # ty: ignore[not-subscriptable]
                 chosen = [
                     u
                     for u in candidates
@@ -855,7 +870,7 @@ def gold_page(
                 continue
             # A second piece of a heading unit is a title's note, set elsewhere.
             extra_heading = unit["role"] == "heading" and n > 0
-            pos = statistics.median(asg[i][1] for i in seq)  # type: ignore[index]
+            pos = statistics.median(asg[i][1] for i in seq)  # ty: ignore[not-subscriptable]
             role = unit["role"]
             if role == "heading" and len(ix.words(u)) > 30:
                 # A title's note (thanks, funding) that the source keeps in the title.
@@ -1088,7 +1103,7 @@ def generated_gold(
                 u for u, unit in enumerate(units) if unit.get("option") and ix.words(u) == core
             ]
             if options:
-                before = next((asg[k][0] for k in range(li - 1, -1, -1) if asg[k] is not None), 0)  # type: ignore[index]
+                before = next((asg[k][0] for k in range(li - 1, -1, -1) if asg[k] is not None), 0)  # ty: ignore[not-subscriptable]
                 later = [u for u in options if u > before] or options
                 asg[li] = (min(later, key=lambda u: abs(u - before)), 0)
         gold = gold_page(ix, lines, stamps, size, asg)

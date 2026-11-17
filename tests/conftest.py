@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import _routes
 import _sharding
 from readablestem.models import base
 from readablestem.web import provider_health
@@ -33,6 +34,11 @@ def pytest_addoption(parser):
     group.addoption("--shard", metavar="INDEX/TOTAL", help="run only this shard, e.g. 2/4")
     group.addoption("--shard-report", metavar="FILE", help="write what this run collected and ran")
     group.addoption("--shard-record", metavar="FILE", help="write per-test durations after the run")
+    group.addoption(
+        "--route-coverage",
+        action="store_true",
+        help="fail the run for a route of the app no test got an answer from (a whole run only)",
+    )
 
 
 def _is_worker(config) -> bool:
@@ -56,8 +62,18 @@ def pytest_collection_modifyitems(config, items):
 
 
 def pytest_configure(config):
+    _routes.install()  # in every process that runs tests (tests/_routes.py)
     if not _is_worker(config):
         config.pluginmanager.register(_Recorder(config), "shard-recorder")
+
+
+def pytest_sessionfinish(session):
+    if _is_worker(session.config):  # an xdist worker hands what it saw to the controller
+        session.config.workeroutput["routes"] = {
+            "known": sorted(_routes.KNOWN),
+            "requested": sorted(_routes.REQUESTED),
+            "answered": sorted(_routes.ANSWERED),
+        }
 
 
 class _Recorder:
@@ -75,8 +91,32 @@ class _Recorder:
         if report.when == "call" or (report.when == "setup" and report.outcome != "passed"):
             self.ran.add(report.nodeid)
 
+    def pytest_testnodedown(self, node, error):
+        seen = getattr(node, "workeroutput", {}).get("routes")
+        if seen:
+            _routes.KNOWN.update(seen["known"])
+            _routes.REQUESTED.update(seen["requested"])
+            _routes.ANSWERED.update(seen["answered"])
+
+    def _untested_routes(self) -> list[str]:
+        return _routes.untested(_routes.KNOWN, _routes.REQUESTED, _routes.ANSWERED)
+
+    def pytest_terminal_summary(self, terminalreporter):
+        if self.config.getoption("--route-coverage"):
+            missing = self._untested_routes()
+            for line in missing:
+                terminalreporter.write_line(line, red=True)
+            if not missing:
+                terminalreporter.write_line(
+                    f"routes: {len(_routes.KNOWN)}, each gave a test its own answer"
+                )
+
+    @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session):
         config = self.config
+        missing = self._untested_routes()
+        if config.getoption("--route-coverage") and session.exitstatus == 0 and missing:
+            session.exitstatus = 1
         record = config.getoption("--shard-record")
         if record:
             slow = {
@@ -99,6 +139,12 @@ class _Recorder:
                         "shard": config.getoption("--shard"),
                         "collected": collected,
                         "ran": sorted(self.ran),
+                        "routes": {
+                            "known": sorted(_routes.KNOWN),
+                            "requested": sorted(_routes.REQUESTED),
+                            "answered": sorted(_routes.ANSWERED),
+                            "allowed": sorted(_routes.ALLOWED),
+                        },
                     }
                 )
             )

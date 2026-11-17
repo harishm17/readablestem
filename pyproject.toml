@@ -59,6 +59,7 @@ dev = [
     "pytest-xdist>=3.8.0",
     "pytest-timeout>=2.4.0",
     "python-docx>=1.2.0",
+    "vulture>=2.16",
 ]
 # Headless Chromium: axe-core checks on generated HTML, and rendering gold equations to
 # images for the end-to-end eval. Install browsers with: uv run playwright install chromium
@@ -86,6 +87,11 @@ select = [
     "SIM", # simplify
     "RUF", # ruff-specific
     "T20", # no print() in library code (debug prints once reached main); CLIs and tools are exempt below
+    # An error that leaves no trace: `except: pass` and `except: continue` on a broad handler.
+    # A broad handler must do something with the failure: return the answer that stands for
+    # it, count it, log its type, or raise.
+    "S110",
+    "S112",
 ]
 # Maths text legitimately uses these (U+2212 minus sign, U+2032 prime, U+0394 Delta).
 allowed-confusables = ["\u2212", "\u2032", "\u0394"]

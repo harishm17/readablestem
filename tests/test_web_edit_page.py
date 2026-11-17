@@ -285,6 +285,9 @@ def add_post(env, kind: str, number: int = 1, **fields):
 
 
 def test_a_picture_is_added_with_its_alt_text(edits):
+    # The region is shown as it would be cut, before anything is added.
+    preview = edits.browser.get(f"/jobs/{edits.job_id}/pages/1/region.png", params=BOX)
+    assert preview.status_code == 200 and preview.content.startswith(b"\x89PNG")
     response = add_post(edits, "picture", alt="A sketch of a cart on a ramp.")
     assert response.status_code == 303
     assert "item=p1-x1" in response.headers["location"]

@@ -968,10 +968,3 @@ def with_provider(
         if cheap_model:
             values["cheap_model"] = cheap_model
     return Settings(**values)
-
-
-def local_dir() -> Path:
-    """Git-ignored working directory for local databases and scratch output."""
-    path = Path(".local")
-    path.mkdir(exist_ok=True)
-    return path

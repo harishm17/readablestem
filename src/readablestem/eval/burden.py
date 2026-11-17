@@ -70,8 +70,8 @@ def page_counts(done: Converted) -> list[int]:
 
 def _spread(values: Sequence[float]) -> dict[str, float]:
     return {
-        "p50": round(percentile(values, 0.50), 4),
-        "p95": round(percentile(values, 0.95), 4),
+        "p50": round(percentile(values, 0.50), 4) if values else 0.0,
+        "p95": round(percentile(values, 0.95), 4) if values else 0.0,
         "mean": round(sum(values) / len(values), 4) if values else 0.0,
         "max": round(max(values), 4) if values else 0.0,
     }
@@ -94,7 +94,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
     items: Counter[str] = Counter()
     reasons: Counter[str] = Counter()
     every_page: list[int] = []
-    rows = []
+    rows: list[dict[str, Any]] = []
     for done in counted:
         counts = page_counts(done)
         every_page += counts
@@ -193,14 +193,6 @@ def judge(now: dict[str, Any], before: dict[str, Any], *, allowance: float = ALL
     return Verdict(True, more=more)
 
 
-def _table(head: Sequence[str], rows: Sequence[Sequence[Any]]) -> list[str]:
-    widths = [max(len(str(row[i])) for row in (head, *rows)) for i in range(len(head))]
-    return [
-        "  ".join(str(cell).ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
-        for row in (head, *rows)
-    ]
-
-
 def _n(value: float) -> str:
     return f"{value:.2f}"
 
@@ -234,7 +226,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         "",
         "by page kind (decisions of one page):",
     ]
-    lines += _table(
+    lines += measure.table(
         ("kind", "pages", "documents", "decisions", "a page", "median", "p95", "most"),
         [
             (
@@ -251,9 +243,9 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         ],
     )
     lines += ["", "by what is decided:"]
-    lines += _table(("item", "decisions"), list(made["items"].items()))
+    lines += measure.table(("item", "decisions"), list(made["items"].items()))
     lines += ["", "by why it was asked (a decision with two reasons is under both):"]
-    lines += _table(
+    lines += measure.table(
         ("reason", "decisions", "per 100 pages"),
         [
             (code, row["decisions"], f"{row['per_100_pages']:.1f}")
@@ -261,7 +253,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         ],
     )
     lines += ["", f"the {worst} documents that ask the most a page:"]
-    lines += _table(
+    lines += measure.table(
         ("upload", "pages", "decisions", "a page"),
         [
             (row["upload"], row["pages"], row["decisions"], _n(row["per_page"]))

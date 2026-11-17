@@ -64,8 +64,8 @@ def fastest(runs: Sequence[Sequence[Converted]]) -> list[Converted]:
 
 def _spread(values: Sequence[float]) -> dict[str, float]:
     return {
-        "p50": round(percentile(values, 0.50), 4),
-        "p95": round(percentile(values, 0.95), 4),
+        "p50": round(percentile(values, 0.50), 4) if values else 0.0,
+        "p95": round(percentile(values, 0.95), 4) if values else 0.0,
     }
 
 
@@ -114,7 +114,7 @@ def report(runs: Sequence[Sequence[Converted]], *, allowance: float = ALLOWANCE)
     stage_total: dict[str, float] = defaultdict(float)
     order: list[str] = []
     call_s: dict[str, list[float]] = defaultdict(list)
-    rows = []
+    rows: list[dict[str, Any]] = []
     for done in measured:
         for fact in done.facts.stages:
             if fact.stage not in order:
@@ -245,14 +245,6 @@ def _s(value: float) -> str:
     return f"{value:.3f}"
 
 
-def _table(head: Sequence[str], rows: Sequence[Sequence[Any]]) -> list[str]:
-    widths = [max(len(str(row[i])) for row in (head, *rows)) for i in range(len(head))]
-    return [
-        "  ".join(str(cell).ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
-        for row in (head, *rows)
-    ]
-
-
 def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
     """A speed record as the lines `readablestem eval speed` prints."""
     made = record["metrics"]
@@ -286,7 +278,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
         "",
         "by page kind (a page has its document's seconds a page):",
     ]
-    lines += _table(
+    lines += measure.table(
         ("kind", "pages", "documents", "median", "p95"),
         [
             (
@@ -300,7 +292,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
         ],
     )
     lines += ["", "by stage (seconds a page of a document that has the stage):"]
-    lines += _table(
+    lines += measure.table(
         ("stage", "documents", "median", "p95", "mean over every page", "share of local time"),
         [
             (
@@ -319,7 +311,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
         "what the models took when the answers were recorded (seconds a request; "
         f"{made['totals']['recorded_model_s']:.0f} s in all, several sent at once):",
     ]
-    lines += _table(
+    lines += measure.table(
         ("step", "requests", "median", "p95"),
         [
             (step, row["calls"], f"{row['s']['p50']:.2f}", f"{row['s']['p95']:.2f}")

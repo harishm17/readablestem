@@ -346,8 +346,9 @@ def test_a_course_zip_can_be_epub_files(web):
     only = open_zip(response)
     assert len(only.namelist()) == 2 and only.namelist()[0].endswith(".epub")
     assert "physics-1-epub-documents.zip" in response.headers["content-disposition"]
-    page = web.alice.get(f"/courses/{course}").text
-    assert f"/courses/{course}/download?format=epub" in page
+    # Offered where two documents are ready (the list), not for the course's one.
+    assert "/app/download?format=epub" in web.alice.get("/app").text
+    assert f"/courses/{course}/download" not in web.alice.get(f"/courses/{course}").text
     assert web.alice.get(f"/courses/{course}/download?format=zip").status_code == 400
     # someone else's course is still a 404, in every file type
     assert web.bob.get(f"/courses/{course}/download?format=epub").status_code == 404

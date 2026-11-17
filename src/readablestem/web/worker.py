@@ -622,10 +622,6 @@ class Worker:
             Job.attempts == claim.attempt,
         )
 
-    def owns(self, claim: Claim) -> bool:
-        with session_scope(self.factory) as session:
-            return session.scalar(select(Job.id).where(*self._owned(claim))) is not None
-
     def extend_lease(self, claim: Claim, *, pages_done: int | None = None) -> bool:
         """Push the lease forward, recording progress. False once this worker no longer
         owns the job."""
@@ -1129,8 +1125,9 @@ class Worker:
         if output.facts is None:
             return None
         before: list[StageFact] = []
-        if attempt.claim.attempt == 1 and job.started_at is not None:
-            waited = (as_utc(job.started_at) - as_utc(job.created_at)).total_seconds()
+        started, created = as_utc(job.started_at), as_utc(job.created_at)
+        if attempt.claim.attempt == 1 and started is not None and created is not None:
+            waited = (started - created).total_seconds()
             before.append(StageFact(stage="queue_wait", seconds=round(max(0.0, waited), 4)))
         after: list[StageFact] = []
         if attempt.began is not None and attempt.converted is not None:
@@ -1542,18 +1539,3 @@ class Worker:
         if self._thread is not None:
             self._thread.join(timeout=timeout)
         log_event(logger, "worker_stopped")
-
-
-def process_next_job(
-    settings: Settings,
-    factory: sessionmaker[Session],
-    *,
-    converter: Converter,
-    client_factory: ClientFactory,
-    guard: SpendGuard | None = None,
-) -> str | None:
-    """Process one queued job synchronously (tests, scripts). Returns its id or None."""
-    worker = Worker(
-        settings, factory, converter=converter, client_factory=client_factory, guard=guard
-    )
-    return worker.run_once()

@@ -1320,12 +1320,24 @@ class NotFinished(BaseModel):
     of: int = 0  # units there were to do
 
 
+class ShadowFact(BaseModel):
+    """What a step run in shadow said next to the answer the conversion kept
+    (`pipeline.shadow`). Content-free: it holds neither answer, only whether they were the
+    same, and the type of the exception when the step failed."""
+
+    step: str
+    page: int | None = None  # 0-based; None for a step over the whole document
+    outcome: Literal["same", "differs", "failed"]
+    error: str = ""  # the exception's class name when the outcome is "failed"
+
+
 class StepFacts(BaseModel):
     """What a conversion measured of itself (`pipeline.step_facts`). Content-free."""
 
     calls: list[CallFact] = Field(default_factory=list)
     stages: list[StageFact] = Field(default_factory=list)
     not_finished: list[NotFinished] = Field(default_factory=list)
+    shadow: list[ShadowFact] = Field(default_factory=list)
 
 
 class ConversionOutput(BaseModel):

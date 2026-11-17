@@ -88,7 +88,6 @@ from readablestem.web.deps import (
 )
 from readablestem.web.forms import submit_once
 from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are documented here)
-    MAX_ACTIVE_JOBS_PER_USER,
     MAX_LIVE_JOBS_PER_USER,
     QuotaRefused,
     TooManyJobs,

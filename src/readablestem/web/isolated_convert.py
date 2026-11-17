@@ -31,6 +31,8 @@ Outcomes, mapped to `Job.error_code` by `web.worker.error_code_for`:
   the kernel's OOM killer sends): `ConversionOom`, "conversion_oom";
 - it runs past `limit_s` (the worker's own limit cancels it first; this is for other callers)
   or the CPU limit: `ConversionTimeout`, "timeout";
+- it cannot start, or cannot read a message this process sent it (it says which, by the
+  exception's type): `ConversionUnavailable`, "conversion_unavailable", the service's fault;
 - the worker cancels the attempt (deleted, taken over, shutting down): the child is killed
   within `POLL_S` and `BudgetExceeded("cancelled")` is raised.
 
@@ -192,8 +194,9 @@ class ConversionExternalKill(ConversionOom):
 
 
 class ConversionUnavailable(ConversionFailed):
-    """The child could not start (an import failed, a library or the model file is missing):
-    the service's fault, not the PDF's. Worth trying again once it is fixed."""
+    """The child could not start (an import failed, a library or the model file is missing),
+    or could not read what this process sent it: the service's fault, not the PDF's. Worth
+    trying again once it is fixed."""
 
     code = "conversion_unavailable"
 
@@ -451,8 +454,14 @@ class _Conversion:
                 self.frames.put((parts, sum(len(p) for p in parts)))
         except ValueError:  # a frame over the limit, or one that is not a frame
             self.refused = True
-        except OSError:
-            pass
+        except OSError as exc:  # the socket failed under the reader: the end, and why
+            log_event(
+                logger,
+                "conversion_child_read_failed",
+                logging.WARNING,
+                error_type=type(exc).__name__,
+                errno=exc.errno or 0,
+            )
         self.frames.put(_EOF)
 
     def _admit(self, size: int) -> bool:
@@ -843,8 +852,11 @@ class _Conversion:
             return failure
         if kind == "oom":
             return ConversionOom("the child ran out of memory")
-        if kind == "startup":
+        if kind in ("startup", "link"):
             name = "".join(c for c in str(header.get("type", "")) if c.isalnum())[:60]
+            if kind == "link":  # it could not read a frame of ours: this pair, not the PDF
+                log_event(logger, "conversion_child_link_failed", logging.ERROR, error_type=name)
+                return ConversionUnavailable("the child could not read what it was sent")
             log_event(logger, "conversion_child_unavailable", logging.ERROR, error_type=name)
             return ConversionUnavailable("the child could not start")
         return RuntimeError(f"the conversion failed in its child ({header.get('type')})")

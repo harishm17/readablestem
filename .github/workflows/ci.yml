@@ -123,6 +123,9 @@ jobs:
         run: uv run ruff format --check .
       - name: Type check
         run: uv run ty check src
+      # A function, class, method or property of the package that nothing calls.
+      - name: Unused code
+        run: uv run python scripts/dead_code.py
       # Catches a module that 3.14 refuses to compile or import, whatever the tests touch.
       - name: Import every module of the package
         run: |
@@ -202,7 +205,7 @@ jobs:
       - name: Python 3.12
         run: |
           mkdir r312 && cp reports/*/shard-3.12-*.json r312/
-          python3 scripts/check_shards.py r312 "$SHARDS"
+          python3 scripts/check_shards.py r312 "$SHARDS" --routes
       - name: Browser tests
         run: |
           mkdir rbrowser && cp reports/*/shard-browser-*.json rbrowser/

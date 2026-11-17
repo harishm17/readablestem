@@ -149,14 +149,14 @@ def _inflated_length(mu, pdf, number: int, limit: int) -> int:
     except Exception:  # not a stream after all, or no filter MuPDF can open: nothing to read
         return 0
     got = 0
-    try:
-        while got < limit:
+    while got < limit:
+        try:
             step = mu.fz_skip(stream, min(_CHUNK, limit - got))
-            if step <= 0:
-                break
-            got += step
-    except Exception:  # broken data: the interpreter stops reading at the same place
-        pass
+        except Exception:  # broken data: the interpreter stops reading at the same place
+            break
+        if step <= 0:
+            break
+        got += step
     return got
 
 

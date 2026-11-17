@@ -17,6 +17,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from sqlalchemy.orm import Session
 from readablestem.core.types import CallFact, NotFinished, StageFact, StepFacts
 from readablestem.ops import step_report
 from readablestem.ops.step_report import Measured
+from readablestem.pipeline import shadow
 from readablestem.web.db import Job, JobCall, JobNotFinished, JobStage, JobStatus
 from readablestem.web.logsafe import log_event
 
@@ -137,8 +139,12 @@ def measured(
 
 
 def log_job(job_id: str, pages: int, facts: StepFacts) -> None:
-    """The job's facts as log lines: one `job_steps` line for each step and model, and one
-    `job_stages` line with the seconds of each stage."""
+    """The job's facts as log lines: one `job_steps` line for each step and model, one
+    `job_not_finished` line for each step that stopped early, one `job_shadow` line for
+    each step run in shadow, and one `job_stages` line with the seconds of each stage.
+
+    What the shadow steps said is logged and not kept in the database: it is read over many
+    jobs, from the log, and a job's own rows have no use for it."""
     made = step_report.report([Measured(pages=pages, facts=facts)])
     for row in made.steps:
         log_event(
@@ -168,10 +174,7 @@ def log_job(job_id: str, pages: int, facts: StepFacts) -> None:
             done=stop.done,
             of=stop.of,
         )
-    log_event(
-        logger,
-        "job_stages",
-        job_id=job_id,
-        pages=pages,
-        **{f"{fact.stage}_s": round(fact.seconds, 2) for fact in facts.stages},
-    )
+    for step, said in shadow.agreement(facts.shadow).items():
+        log_event(logger, "job_shadow", job_id=job_id, step=step, **said)
+    seconds: dict[str, Any] = {f"{fact.stage}_s": round(fact.seconds, 2) for fact in facts.stages}
+    log_event(logger, "job_stages", job_id=job_id, pages=pages, **seconds)

@@ -17,7 +17,10 @@ words of a scanned page), so it goes where its file may go: `answers.jsonl.gz` i
 folder holds the answers read from files that may be committed, and `KEPT_OUT`, in the
 cache beside the fetched files, holds the rest. `scripts/corpus_refresh.py` rebuilds both.
 
-Reading-order labels ("gold") sit in `gold/`, one file per entry. For committed and builder
+Reading-order labels ("gold") sit in `gold/`, one file per entry. The manifest's `labels`
+table says how each kind of labels was made, which `group` of pages they are (`real`,
+`self-made` or `edge`: `eval order` reports by it) and whether the blocks were drawn
+`by_hand`. For committed and builder
 entries the labels hold the text of each block. For public entries they hold no text: each
 block is a list of character ranges into the page's own words, so the text exists only once
 the file has been fetched, and a hash per block proves it was rebuilt exactly.
@@ -563,30 +566,18 @@ def load_gold(entry: Entry, pdf: bytes | None = None) -> dict:
     """An entry's reading-order labels as `{"id", "pages": [{"page", "blocks": [...]}]}`.
 
     Each block has `role` and `text`. Pass the entry's document when it is already in hand;
-    otherwise a public entry's file is fetched to rebuild the text.
+    otherwise a public entry's file is fetched to rebuild the text. `by_hand` is set when
+    the labeling method says the blocks were drawn by hand and not taken from a source.
     """
     if not entry.gold:
         raise CorpusError(f"{entry.id} has no gold")
     gold = json.loads((CORPUS / entry.gold).read_text(encoding="utf-8"))
-    if gold.get("encoding") != RANGES:
-        return {"id": gold["id"], "pages": gold["pages"]}
-    return decode_gold(gold, document(entry) if pdf is None else pdf)
-
-
-def dump_manifest(labels: dict, entries: list[dict]) -> str:
-    """The manifest's text: one field a line, so a changed hash is a one-line diff."""
-    lines = ["{", ' "labels": {']
-    for n, (name, how) in enumerate(labels.items()):
-        comma = "," if n + 1 < len(labels) else ""
-        lines.append(f"  {json.dumps(name)}: {json.dumps(how, ensure_ascii=False)}{comma}")
-    lines.extend([" },", ' "entries": ['])
-    for n, entry in enumerate(entries):
-        fields = [
-            f"   {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}" for k, v in entry.items()
-        ]
-        lines.append("  {\n" + ",\n".join(fields) + "\n  }" + ("," if n + 1 < len(entries) else ""))
-    lines.extend([" ]", "}", ""])
-    return "\n".join(lines)
+    out = {"id": gold["id"], "pages": gold["pages"]}
+    if gold.get("encoding") == RANGES:
+        out = decode_gold(gold, document(entry) if pdf is None else pdf)
+    if (entry.labels or {}).get("by_hand"):
+        out["by_hand"] = True
+    return out
 
 
 def dump_gold(gold: dict) -> str:

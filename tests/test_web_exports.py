@@ -278,6 +278,8 @@ def test_a_document_with_decisions_open_offers_neither(web):  # noqa: F811
 
 def test_download_all_without_pandoc_has_no_word_zip(web, monkeypatch):  # noqa: F811
     ready_job(web)
+    assert "/app/download" not in web.browser.get("/app").text  # one document is not "all"
+    ready_job(web)
     monkeypatch.setattr(export_docx, "available", lambda *a, **k: False)
     response = web.browser.get("/app/download?format=docx")
     assert response.status_code == 503 and "not available here" in response.text

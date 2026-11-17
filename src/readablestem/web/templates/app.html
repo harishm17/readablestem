@@ -24,8 +24,8 @@
   {% if documents.unfinished %}
   <p class="hint">This list updates by itself. <a href="/app">Refresh the list</a></p>
   {% endif %}
-  {% if ready_documents %}
-  <p><a id="download-all" href="/app/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
+  {% if ready_documents >= 2 %}{# one ready document is downloaded from its own page #}
+  <p><a id="download-all" href="/app/download">Download all {{ ready_documents }} ready documents (zip)</a></p>
   {% set download_all_url = "/app/download" %}{% include "_download_all_formats.html" %}
   {% endif %}
 </section>

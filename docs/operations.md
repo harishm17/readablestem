@@ -232,6 +232,12 @@ and model (`calls`, `failed`, `input_tokens`, `cached_input_tokens`, `output_tok
 `pages` and a `<stage>_s` field for each stage, and one `job_not_finished` line for each
 step that stopped early (`step`, `page`, `reason`, `done`, `of`).
 
+A step that runs in shadow (docs/steps.md, "Running a new step in shadow") adds one
+`job_shadow` line a job: its `step`, and how often it said the `same` as the answer the
+conversion kept, how often it `differs`, and how often it `failed`. These counts are in
+the log only, not in a table: they are read over many jobs. A step with many `failed` is
+broken or out of money; it has changed no document.
+
 ## Error aggregates
 
 `error_aggregates` has one row per (UTC day, step, category) with a count. The day is the
@@ -351,7 +357,7 @@ Useful filters for the service's **Logs** panel or `railway logs --service web -
 | Anything wrong? | `@severity:WARNING OR @severity:ERROR` |
 | Server errors | `@message:request AND @status:>=500` |
 | Slow pages | `@message:request AND @latency_ms:>5000` |
-| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished` (add `AND @job_id:...` for one job) |
+| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished OR @message:job_shadow` (add `AND @job_id:...` for one job) |
 | Hourly cleanup (cron service) | `@message:aggregate_done OR @message:purge_done OR @message:aggregate_failed OR @message:aggregate_on_delete_failed` |
 | Tracing problems | `@message:tracing_disabled OR @message:trace_failed` |
 | Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `@message:upload_rejected AND (@code:handwritten OR @code:handwritten_no_text OR @code:scanned OR @code:scanned_ocr)` |
@@ -539,6 +545,8 @@ hangs instead of failing, and the job ends as `timeout`. What to look for:
 | `job_failed error_code=conversion_crashed`, preceded by `conversion_child_died signal=6` (abort), `11` (segfault) or `exit_code=N` | MuPDF or another native library killed the child. That file will do it again: nothing to retry (the job page does not offer "Try again"). Keep the document id; reproduce with `readablestem convert` on a copy only if the owner agrees |
 | `error_code=conversion_oom` (after `conversion_child_retry` when it was `signal=9`) | The child ran out of memory (its cap), or was SIGKILLed from outside twice. Raise `CONVERSION_MEMORY_MB` only if documents that should fit are failing; a single large file is better split |
 | `error_code=conversion_unavailable`, `conversion_child_unavailable` (ERROR, with `error_type` or `exit_code`), `conversion_child_check_failed` at start | The child itself cannot run (an import, a library, the table model file at `TABLE_MODEL_DIR`), not the PDF. Every job fails this way until it is fixed; the job page offers "Try again". Check the image and the volume, then redeploy |
+| `error_code=conversion_unavailable` with `conversion_child_link_failed` (ERROR, `error_type`) | The child could not read a message this process sent it (`error_type` is the exception's class, for example `UnpicklingError`): the two processes disagree, which is the deployment's fault and not the PDF's. The job page offers "Try again". If it repeats, the worker and the child are running different code: redeploy |
+| `conversion_child_read_failed` (WARNING, `error_type`, `errno`) | The socket to the child failed while this process was reading it. `errno=104` (connection reset) next to `conversion_child_died` is a child that ended before it had read its input; the line after it says how the job ended |
 | `conversion_child_retry` | The child was killed by a SIGKILL this process did not send; the conversion was run once more. `cgroup_oom_kills` on `conversion_child_died` says whether the kernel's OOM killer did it (cgroup v2). Frequent ones mean the service is short of memory: raise its allowance, not `CONVERSION_MEMORY_MB` |
 | `conversion_child_frame_refused` | The child's result was over 128 MB: the job fails `conversion_crashed` |
 | `conversion_child_timeout` | The converter's own backstop fired (the worker's limit normally does first: `job_timeout`, `error_code=timeout`). `conversion_child_died signal=24` is the CPU limit |
@@ -815,9 +823,9 @@ Nothing it prints is document content.
 
 | Job | What it checks |
 |---|---|
-| `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, and an import of every module |
+| `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `scripts/dead_code.py` (no function, class, method or property of the package without a caller), and an import of every module |
 | `pytest` (shards) | `pytest -n auto --shard i/4` (offline, parallel; Postgres tests use the embedded server on 3.12). 3.12 always; 3.14 in full on main, nightly and dependency or workflow changes, otherwise one smoke shard. Rules and sharding: [development.md](development.md), "CI" |
-| `shard-coverage` | Every collected test ran in exactly one shard |
+| `shard-coverage` | Every collected test ran in exactly one shard, and every route of the app gave some test its own answer (not only a refusal) |
 | `ci-passed` | Fails if any other job failed or was cancelled; the one check to require in branch protection |
 | `postgres` | `alembic upgrade head` and `alembic check` (models match migrations), then `pytest -m postgres`, against a Postgres 18 service container (the major the backup image uses). Zero collected tests fails the job |
 | `browser` | `pytest -m browser -n 3 --dist loadfile --shard i/2` (two jobs) with Playwright Chromium (axe-core checks); the browsers and axe-core are cached; zero collected tests fails the job |

@@ -316,6 +316,10 @@ measured and replayed against.
 - **Step facts.** Every model request and every stage of a job is kept as a content-free
   fact (`job_calls`, `job_stages`), with `readablestem ops step-report` and totals on the
   admin page.
+- **Shadow steps** (`pipeline/shadow.py`). One way to run a new check or reader beside the
+  conversion: it returns nothing, any failure of it is counted and goes no further, and
+  what is kept is `same`, `differs` or `failed` by step and page (the `job_shadow` log
+  line). No step uses it yet.
 - **"Not finished" facts.** A step that stops before it has done all of its work says so:
   `{step, page, reason, done, of}` in the table `job_not_finished`, a log line, and one
   reader (`web.step_facts.not_finished`). Written by the steps the job's limit stops, the
@@ -331,11 +335,55 @@ measured and replayed against.
   kind and by step and seconds a page by kind and stage, from a measured replay of the
   corpus under the production profile. The Sonnet cache-read price was double the published
   rate and is corrected.
+- **No unused code, no error without a trace.** 26 functions and classes nothing called,
+  an unused template and a limit nothing read are gone, and CI now fails for a new one
+  (`scripts/dead_code.py`). A broad handler that only passes or continues fails the linter
+  (ruff S110, S112); the five that did now count, log or return. When the conversion's
+  child cannot read what the worker sent it, it says so: the job fails as
+  `conversion_unavailable` (our side, "Try again" offered) with `conversion_child_link_failed`
+  in the log, where before it looked like a crash on the person's PDF.
+- **Every route has a test of what it does.** The test run notes each request that
+  reaches the app, and CI fails for a route no test requests or whose tests only get
+  refusals (`scripts/check_shards.py --routes`, `pytest --route-coverage`). The first run
+  found one: the region preview picture, now checked.
+- **"Download all" needs two.** The documents list and a course page offered "Download all
+  1 ready document"; the line now appears from two ready documents up.
+- **The quality ledger** (`readablestem eval ledger`): one table over the evals' kept
+  records, led by the whole-document rows (silent errors per 100 pages, documents with no
+  silent error, required decisions a page, false flags per true flag). Every figure is
+  printed with its counts, a one-sided 95% bound and a label (held-out, development score,
+  earlier release, or not measured with the proof owed). A goal is met only when the bound
+  is inside it, a held-out figure worse than its release bar fails the run, and a record
+  without its stamps is refused. No row has a held-out figure yet.
+- **Reading order** (`readablestem eval order`): the gold pages of the corpus are scored in
+  the page a student is given and in the element list, from the measured replay, with a bar
+  that no page that was right is made wrong. The scorer (version 5) counts what a right page
+  can still have wrong: furniture read aloud, a block cut, blocks run together, a caption on
+  the wrong picture. Baseline: 58 of 78 pages right in the student page and
+  33 faultless. `--set` scores a layout gold set with no model
+  (149 of 267 on `layout-dev-1`); a held-out set is scored
+  only with `--for-release` and its record names no page.
 - **What a page asks of a reviewer** (`readablestem eval burden`): required decisions a
   page by page kind, by what is decided and by why it was asked, from the same measured
   replay, with a bar against an earlier record (no page kind asks for more). The count is
   the review screen's own (`core.triage.decisions`). Baseline on the corpus: 1.80 a page
   over 315 pages, 10.5 on dense math pages, and 56% of pages ask nothing.
+- **A replay report names the steps that stopped early.** A step stopped by a clock gives
+  another result on a busier machine, and a report made from such a run did not say so. The
+  record of `eval cost`, `eval speed`, `eval burden` and `eval outputs` now lists every step
+  that did not finish, and the printed header names them. Fixed with it: `eval cost`, `eval
+  speed` and `eval burden` ended with a traceback when no upload could be measured; they now
+  say so and exit with 2.
+- **Every file a student is given, read back and counted** (`readablestem eval
+  outputs`, `pipeline/output_audit.py`): the student page, the Word file, the EPUB, the
+  two Canvas files, the Cartridge and the Listen transcript are built from a replay of
+  the corpus, read from their bytes and compared, the exports with the page and the
+  page with the stored result. 13 kinds of wrong place are counted, each with its page
+  and element and none of the document's words. It gates nothing yet. The first run
+  found three defects of the Word export that were in no list: every note's mark is a
+  footnote with no words, the words written for a voice beside a formula in a table
+  cell are shown next to it, and the title is said twice when the first heading differs
+  from it only in case.
 - **Fixed: two counters left out a page's paragraphs.** The command line's "decisions
   needed" summary, the eval's review load and the weekly report's review-load table
   counted only equations, figures, headings and tables. A page read from its picture asks
