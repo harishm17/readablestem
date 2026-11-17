@@ -47,6 +47,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     sessionmaker,
+    undefer,
 )
 
 
@@ -122,8 +123,13 @@ class Job(Base):
     error_detail: Mapped[dict | None] = mapped_column(JSON)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     model_calls: Mapped[int] = mapped_column(Integer, default=0)
-    result_json: Mapped[dict | None] = mapped_column(JSON)  # DocumentResult without html
-    html: Mapped[str | None] = mapped_column(Text)
+    # The two large columns (a long document's result is megabytes of JSON, its page as much
+    # HTML) are deferred: reading the row does not load them, the first use of one does (one
+    # more query, inside the session). A route that polls or lists a job reads the summary
+    # columns below instead. Read them before the session closes, or load them with the row
+    # (`sqlalchemy.orm.undefer`): a detached row cannot fetch them.
+    result_json: Mapped[dict | None] = mapped_column(JSON, deferred=True)  # without html
+    html: Mapped[str | None] = mapped_column(Text, deferred=True)
     aggregated: Mapped[bool] = mapped_column(Boolean, default=False)  # counted in aggregates
     # The course whose notation the conversion used; a deleted course leaves the job.
     # Named, so the migration can drop it again (SQLite rebuilds the table to do so).
@@ -169,6 +175,11 @@ class Job(Base):
     # list fills in on first sight (`web.documents`). Document-derived: deleted with the job.
     open_decisions: Mapped[int | None] = mapped_column(Integer)
     result_title: Mapped[str | None] = mapped_column(Text)
+    # The render version written in `html`'s head (`pipeline.assemble.render_version`), set
+    # whenever `html` is assigned (`_keep_html_version`), so "is the page made by an older
+    # renderer" and "has a page been made" are answered without loading it. NULL: no page,
+    # or a row from before the column, which `has_html` fills in on first sight.
+    html_version: Mapped[int | None] = mapped_column(Integer)
     # A review write changes `result_json` at once and the HTML file only when somebody
     # asks for it (download, view, the job page), so a run of review clicks costs one
     # render, not one each (`web.routes.jobs.current_html`). True: `html` and the checks in
@@ -195,6 +206,17 @@ class Job(Base):
         back_populates="job", cascade="all, delete-orphan", passive_deletes=True
     )
 
+    @property
+    def has_html(self) -> bool:
+        """A page has been made. Answered from `html_version`; a row from before that column
+        is read once and its version stored (the set event)."""
+        if self.html_version is not None:
+            return True
+        if self.html is None:
+            return False
+        self.html = self.html
+        return True
+
 
 @event.listens_for(Job.result_json, "set")
 def _keep_list_facts(target: Job, value: object, _old: object, _initiator: object) -> None:
@@ -202,6 +224,14 @@ def _keep_list_facts(target: Job, value: object, _old: object, _initiator: objec
     from readablestem.web import documents
 
     target.open_decisions, target.result_title = documents.list_facts(value)
+
+
+@event.listens_for(Job.html, "set")
+def _keep_html_version(target: Job, value: object, _old: object, _initiator: object) -> None:
+    """Whenever the page is stored, store its render version next to it."""
+    from readablestem.pipeline.assemble import render_version
+
+    target.html_version = render_version(value) if isinstance(value, str) else None
 
 
 class Blob(Base):
@@ -625,3 +655,8 @@ def session_scope(factory: sessionmaker[Session]) -> Generator[Session]:
         raise
     finally:
         session.close()
+
+
+# For a query that reads the large columns of every row it returns, or a row handed out of its
+# session: `session.get(Job, id, options=LARGE_COLUMNS)`, `select(Job).options(*LARGE_COLUMNS)`.
+LARGE_COLUMNS = (undefer(Job.result_json), undefer(Job.html))

@@ -12,13 +12,14 @@ What the output looks like and why is in docs/output.md. In short:
 - Anything not converted (ABSTAINED, FAILED, REJECTED, or MathML the sanitiser refused)
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
-- A short note for students after `<main>` ("About this version", a `<footer>`): what
-  the file is, the statement of what was reviewed and converted (`pipeline.checked`: who
-  reviewed how many of the parts the tool flagged and on which day, how many parts are
-  pictures, which pages were left out), and to tell the instructor about anything hard to
-  read. When nobody reviewed it, or a part is a picture or left out, the same statement
-  opens `<main>` too, with a link to each place (`_checked_notice`). An optional `notice`
-  at the top (e.g. "offline test run": placeholders, not conversions).
+- A short note for students at the end of `<main>` ("About this version", a labeled
+  `<section>`; inside `<main>` so every reader of the page, pandoc among them, gets it from
+  the same markup): what the file is, the statement of what was reviewed and converted
+  (`pipeline.checked`: who reviewed how many of the parts the tool flagged and on which day,
+  how many parts are pictures, which pages were left out), and to tell the instructor about
+  anything hard to read. When nobody reviewed it, or a part is a picture or left out, the
+  same statement opens `<main>` too, with a link to each place (`_checked_notice`). An
+  optional `notice` at the top (e.g. "offline test run": placeholders, not conversions).
 
 Security: all document and model text is
 escaped with `html.escape`. MathML is never pasted as a string: `sanitize_mathml` parses
@@ -98,7 +99,7 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # (`RENDER_META`), and the web app makes a stored page again from its stored result when
 # the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
 # documents converted before it, not only new ones and ones somebody edits again.
-RENDER_VERSION = 4  # 4: the statement of what was reviewed and converted (SW7)
+RENDER_VERSION = 5  # 5: the note "About this version" inside `<main>`; 4: the statement (SW7)
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -1353,7 +1354,7 @@ def _about_section(
     contact: str | None = None,
     image_pages: list[int] | None = None,
 ) -> str:
-    """The note for students at the end of the file (MF7 of the UX review): what this
+    """The note for students at the end of `<main>` (MF7 of the UX review): what this
     is, the statement of what was reviewed and converted (`checked_words.statement`), which
     pages are only pictures, who to tell about problems. It speaks to the people who read
     the file, with no review vocabulary ("needs review", "rejected"). `kept_pages`: 0-based
@@ -1376,18 +1377,18 @@ def _about_section(
     if source_note and source_note.strip():
         lines.append(f"<p>{_escape(source_note)}</p>")
     return (
-        f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
+        f'<section id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
         f'<p id="{ABOUT_TITLE_ID}" class="about-title">{ABOUT_TITLE}</p>\n'
         + "\n".join(lines)
-        + "\n</footer>"
+        + "\n</section>"
     )
 
 
 def _checked_notice(summary: checked.CheckedSummary, places: Collection[str]) -> str:
     """The statement again, first in `<main>`, when nobody reviewed the page or a part is a
     picture or left out (SW7), so the note at the end is not the only notice. A region named
-    by its own title (not the footer's, so a list of landmarks tells the two apart), with no
+    by its own title (not the note's, so a list of landmarks tells the two apart), with no
     live role, so it is read once, where it stands. Its links go to the note at the end, to
     each picture (numbered, up to `NOTICE_MAX_LINKS`) and to the pages left out. `places` are
     the ids the page holds, so no link points nowhere."""
@@ -1528,9 +1529,7 @@ figcaption { margin-top: 0.5em; }
 .flag-note { margin: 0.75em 0 0; }
 .flag-label { font-weight: 700; }
 .original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
-  border-top: 2px solid #1b1b1b; }
-@media (min-width: 44rem) { .about { margin: 0 auto; } }
+.about { margin: 2.5rem 0 0; padding: 0.5em 0 0; border-top: 2px solid #1b1b1b; }
 .about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 .skip-link { display: inline-block; margin: 0.5rem; padding: 0.5em 1em; background: #ffffff;
@@ -1695,7 +1694,7 @@ def render_html(
     `title_set`: `title` is the one the instructor chose (T1-7): used as typed, and written
     as the top-level heading too when the body has none. Otherwise the title is
     `suggested_title` of the PDF's. `contact`: the instructor's contact line for the note
-    after `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
+    at the end of `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
     `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
     here, and the student note says so. `page_labels`: the printed label of each 0-based page
@@ -1810,8 +1809,8 @@ def render_html(
             *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
             *([_authored_in_english(top, lang)] if top else []),
             *(_authored_in_english(part, lang) for part in body),
-            "</main>",
             _authored_in_english(about, lang),
+            "</main>",
             "</body>",
             "</html>",
             "",

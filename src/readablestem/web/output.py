@@ -89,13 +89,17 @@ class DraftConfirm(Exception):
 def open_required(job: Job) -> int:
     """The decisions still open that make a file a draft: the summary's own count
     (`pipeline.checked.open_required`), read through `documents.open_decisions`."""
+    if job.open_decisions is None:  # a row from before the column: read once, stored
+        job.result_json = job.result_json
+    if job.open_decisions is not None:
+        return job.open_decisions
     return documents.open_decisions((job.result_json or {}).get("fixes"))
 
 
 def export_state(job: Job) -> ExportState:
     """What may leave for this job: `ready`, `draft` (with the open count) or `not
     available`. Who is asking is the route's question (`check`): this is the document's."""
-    if job.status != JobStatus.DONE or (job.html is None and not job.html_stale):
+    if job.status != JobStatus.DONE or not (job.html_stale or job.has_html):
         return ExportState(NOT_AVAILABLE)
     still_open = open_required(job)
     return ExportState(DRAFT, still_open) if still_open else ExportState(READY)

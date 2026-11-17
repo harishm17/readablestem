@@ -195,6 +195,15 @@ def display_title(title: object, filename: str, override: str | None = None) -> 
     return titles.effective_title(override, title, filename)
 
 
+def stored_title(job: Job) -> str | None:
+    """The title in the job's stored result, read from `jobs.result_title` so a route that
+    needs only the title does not load the result. A finished job from before that column is
+    read once and the column filled (the set event, as for the list)."""
+    if job.result_title is None and job.status == JobStatus.DONE:
+        job.result_json = job.result_json
+    return job.result_title or None
+
+
 def _fixes(fixes: object) -> list[Fix]:
     """A stored result's fixes; none when this version cannot read them."""
     if not isinstance(fixes, list):

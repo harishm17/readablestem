@@ -302,14 +302,14 @@ def statement_of(web, job_id: str) -> dict[str, object]:
     """What each surface says about the job: the student page (its notice and its note),
     the job page, the EPUB's accessibility metadata and the record's CSV."""
     student = web.browser.get(f"/jobs/{job_id}/view").text
-    note = student[student.index('<footer id="about-conversion"') :]
+    note = student[student.index('<section id="about-conversion"') :]
     notice = re.search(r'<section id="checked-notice".*?</section>', student, flags=re.S)
     job = web.browser.get(f"/jobs/{job_id}").text
     epub = zipfile.ZipFile(io.BytesIO(web.browser.get(f"/jobs/{job_id}/download.epub").content))
     package = unescape(epub.read("EPUB/package.opf").decode())
     rows = csv.reader(io.StringIO(web.browser.get(f"/jobs/{job_id}/record.csv").text))
     return {
-        "note": page_text(note[: note.index("</footer>")]),
+        "note": page_text(note[: note.index("</section>")]),
         "notice": page_text(notice.group(0)) if notice else "",
         "state": title(job).split(":")[0],
         "job": page_text(job),

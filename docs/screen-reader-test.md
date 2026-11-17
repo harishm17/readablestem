@@ -54,7 +54,7 @@ write what you heard in Notes. "Row" points to the results table below.
 |---|---|---|---|
 | 1 | Load the page. VO+A for 20 seconds, then stop. | The title first. Text reads in order, without skipped pieces. | R1, R17 |
 | 2 | Rotor, Headings. | One level 1 heading ("2.3 Position vs. Time Graphs" on the demo), then level 2 headings in a sensible order, none skipped. "Teacher Support" repeats on the demo; that is expected. | R2 |
-| 3 | Rotor, Landmarks. | At least Main and the footer ("About this version"). The demo also has the "About this demo" box. | R2 |
+| 3 | Rotor, Landmarks. | At least Main and the region "About this version" (inside Main). The demo also has the "About this demo" box. | R2 |
 | 4 | Reload, press Tab once. | "Skip to main content, link", visible on screen. Press Return: VoiceOver lands at the start of the main text, not back at the top. | R3 |
 | 5 | Rotor, Landmarks. | A navigation named "Contents". Go into it: the links are the headings, nested, and each goes to its heading. | R4 |
 | 6 | VO+Cmd+H to a heading, then VO+Right through a paragraph. | Text reads as text; a link says "link" and reads its own words ("Figure 2.12"), not "click here". | R5 |

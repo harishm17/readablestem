@@ -23,8 +23,8 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <main>
   <p class="notice readablestem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
+  <section id="about-conversion" ...>About this version (the note for students)</section>
 </main>
-<footer id="about-conversion" ...>About this version (the note for students)</footer>
 </body>
 </html>
 ```
@@ -190,12 +190,16 @@ our own would be a second MathML reader to keep right.
 - **Before pandoc.** The same sanitiser as the EPUB (`export_epub._sanitise`): scripts, frames,
   forms, remote pictures (they become their alt text), `javascript:` links and event handlers
   go, so pandoc is given only a document that names nothing outside itself. (Pandoc's own
-  `--sandbox` cannot be used: the distribution build reads its default styles from disk.) Page
-  markers (`role="doc-pagebreak"` and their visible label) are left out; a Word document has
-  its own pages. A figure's long description (`<details class="figure-description">`) becomes
-  its summary line in bold and its paragraphs, after the figure. A figure with no picture is
-  written as paragraphs: pandoc would make it a one-cell table. A WebP picture is written as a
-  PNG. The page's language and title are passed on.
+  `--sandbox` cannot be used: the distribution build reads its default styles from disk.) A
+  figure's long description (`<details class="figure-description">`) becomes its summary line
+  in bold and its paragraphs, after the figure. `<main>` is unwrapped, so the Contents and a
+  draft's banner, which stand before it, are in the file; the note "About this version" is
+  inside `<main>`. A WebP picture is written as a PNG. The page's language and title are
+  passed on.
+- **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
+  (`div.pagebreak`: `role="doc-pagebreak"` and their visible label) and the skip link are left
+  out, and a figure with no picture is written as paragraphs (pandoc would make it a one-cell
+  table). A Word document has its own pages and its own navigation.
 - **The child.** Its own process group, an environment of `PATH`, `LANG` and the like only
   (`core.childenv`: no keys, no database URL), a private temporary directory removed
   afterwards, 90 s of CPU, a file-size cap, 256 open files, a 2 GB heap (`+RTS -M2g`), and 60 s
@@ -1041,8 +1045,11 @@ section of the document's outline.
 
 ## The note for students ("About this version")
 
-The file ends with a short note for the people who read it, in a `<footer>` after
-`</main>` (`id="about-conversion"`, MF7 of the UX review). Its sentences are the summary's
+The file ends with a short note for the people who read it, a labeled `<section>` at the
+end of `<main>` (`id="about-conversion"`, MF7 of the UX review). It is inside `<main>` so every
+output made from the page gets it from the same markup: pandoc reads only what is inside
+`<main>`. It is a region landmark named "About this version", not a heading, so the outline is
+unchanged. Its sentences are the summary's
 (`pipeline.checked`, docs/web.md "What was checked"), made by `pipeline/checked_words.py`,
 so it says no more than was done. It has no review screen's words ("needs review",
 "rejected"). In order:

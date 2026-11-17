@@ -98,6 +98,7 @@ from readablestem.web.logsafe import log_event
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
 from readablestem.web.uploads import (
     INSPECT_TIMEOUT_S,
@@ -499,7 +500,7 @@ def expired(job: Job, now: datetime | None = None) -> bool:
 
 
 def require_done(job: Job) -> None:
-    if job.status != JobStatus.DONE or (job.html is None and not job.html_stale):
+    if job.status != JobStatus.DONE or not (job.html_stale or job.has_html):
         raise PageError(
             409,
             "Not ready yet",
@@ -512,7 +513,7 @@ def _out_of_date(job: Job) -> bool:
     """A review write marked the file out of date, or an older renderer made it."""
     if job.html_stale:
         return True
-    return job.html is not None and assemble.render_version(job.html) < assemble.RENDER_VERSION
+    return job.has_html and (job.html_version or 0) < assemble.RENDER_VERSION
 
 
 def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
@@ -659,7 +660,7 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
         ):
             return {}
         title = documents.display_title(
-            (job.result_json or {}).get("title"), job.filename, job.title_override
+            documents.stored_title(job), job.filename, job.title_override
         )
         return {
             "revises": {"id": job.id, "title": title, "filename": job.filename},
@@ -1528,7 +1529,12 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     """The list of steps with their counts, polled by htmx outside the status box's live
     region (so a screen reader is not told every element). 204 while unchanged; once the
     job has finished, an empty fragment that stops polling."""
-    job = load_job_status(request, job_id, user)
+    # The steps need the job's status and progress only: no state, summary or page, so a
+    # poll (even of a job that has finished) reads neither the result nor the file.
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        row = job_access(session, job_id, user, VIEW)
+        job = job_view(session, row, role=shares.role_of(session, row, user) or VIEW)
     if v and v == job.progress_version:
         return Response(status_code=204)
     return render(request, "_job_progress.html", {"job": job})
@@ -1766,12 +1772,36 @@ def content_disposition(filename: str) -> str:
     return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 
+def head_reply(media_type: str, disposition_name: str) -> Response:
+    """The answer to a HEAD request for a download: the status and content headers the GET
+    would send and no body (the middleware, `web.seo`, removes it), without a Content-Length,
+    which only the built file knows. Nothing is built, the deletion clock is not restarted and
+    no download is recorded: a link checker asking what a link is does not take the file. It
+    comes after the same access and draft checks as the GET, so those answer as they do for
+    a GET (a missing document is a 404, one still converting a 409)."""
+    response = Response(
+        media_type=media_type,
+        headers={
+            "Content-Disposition": content_disposition(disposition_name),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+    del response.headers["content-length"]
+    return response
+
+
 @router.get("/jobs/{job_id}/download")
 def download(request: Request, job_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         state = output.check(request, job, role_of(session, job, user), "html")
+        if is_head(request):  # the headers need the name only, not a re-render
+            title = documents.display_title(
+                documents.stored_title(job), job.filename, job.title_override
+            )
+            name = output.file_name(download_filename(title, job.id), state)
+            return head_reply("text/html; charset=utf-8", name)
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
@@ -1813,8 +1843,11 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             context={"job_id": job_id},
         )
     ctx = get_ctx(request)
-    export, title, job_ref, state = _canvas_export(request, user, job_id, "canvas", number)
+    html, title, job_ref, state = _canvas_source(request, user, job_id, "canvas", number)
     name = canvas_filename(title, job_ref)
+    if is_head(request):
+        return head_reply("application/zip", output.file_name(name, state))
+    export = _canvas_export(html, title, job_ref, number)
     events.record_download(
         ctx.factory,
         ctx.settings,
@@ -1844,8 +1877,11 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     which Canvas, Blackboard, Moodle and D2L import. A GET like the other downloads, for the
     owner only."""
     ctx = get_ctx(request)
-    export, title, job_ref, state = _canvas_export(request, user, job_id, "cartridge", None)
+    html, title, job_ref, state = _canvas_source(request, user, job_id, "cartridge", None)
     name = cartridge_filename(title, job_ref)
+    if is_head(request):
+        return head_reply("application/zip", output.file_name(name, state))
+    export = _canvas_export(html, title, job_ref, None)
     events.record_download(
         ctx.factory,
         ctx.settings,
@@ -1890,6 +1926,15 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
                 "have. A part you deleted, or one that has not finished or still has a "
                 "decision to make, cannot be joined.",
                 context={"job_id": job.id},
+            )
+        if is_head(request):  # the name and type only: nothing joined, no clock restarted
+            head_name = download_filename(
+                f"{combine_rules.title_of(kept[0].job)} combined", job.part_group or job.id
+            )
+            if file_type == "html":
+                return head_reply("text/html; charset=utf-8", head_name)
+            return head_reply(
+                exports.media_type(file_type), head_name.removesuffix(".html") + "." + file_type
             )
         try:
             html, title = combine_rules.combined_html(
@@ -1965,25 +2010,36 @@ def export_failed_words(version: str, code: str) -> str:
     )
 
 
-def _canvas_export(
+def _canvas_source(
     request: Request, user: CurrentUser, job_id: str, file_type: str, number: str | None
-) -> tuple[export_canvas.CanvasExport, str, str, output.ExportState]:
-    """The finished document, exported for Canvas (done, up to date, through the draft gate
-    `output.check`; a draft carries its banner). A picture the export cannot hold is a 409
-    page, and the HTML file stays available."""
+) -> tuple[str, str, str, output.ExportState]:
+    """(html, title, job id, state) of the finished document for a Canvas download: done, up
+    to date, through the draft gate `output.check` (a draft carries its banner). The deletion
+    clock restarts, except for a HEAD, which only asks (`head_reply`)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         role = role_of(session, job, user)
         state = output.check(request, job, role, file_type, course=number or "")
+        if is_head(request):  # the headers need the title only, not a re-render
+            title = documents.display_title(documents.stored_title(job), job.filename)
+            return "", title, job.id, state
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename)
         html, job_ref = output.marked(job.html or "", state), job.id
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
+    return html, title, job_ref, state
+
+
+def _canvas_export(
+    html: str, title: str, job_ref: str, number: str | None
+) -> export_canvas.CanvasExport:
+    """The document's HTML exported for Canvas. A picture the export cannot hold is a 409
+    page, and the HTML file stays available."""
     try:
-        export = export_canvas.export_canvas(
+        return export_canvas.export_canvas(
             html,
             title=title,
             folder=export_canvas.folder_name(title, job_ref),
@@ -1997,7 +2053,6 @@ def _canvas_export(
             export_failed_words("Canvas version", exc.code),
             context={"job_id": job_ref},
         ) from None
-    return export, title, job_ref, state
 
 
 @router.get("/jobs/{job_id}/view")

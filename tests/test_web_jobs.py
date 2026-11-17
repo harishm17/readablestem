@@ -6,7 +6,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from starlette.requests import Request
 
 from fixtures.web.support import (
@@ -289,6 +289,30 @@ def test_status_poll_after_the_session_ends_sends_the_page_to_sign_in(web):
     response = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
     assert response.status_code == 401
     assert response.headers["hx-redirect"] == "/login"  # not a sign-in page swapped in
+
+
+@pytest.mark.parametrize("poll", ["status", "progress"])
+def test_a_poll_of_a_job_still_converting_does_not_read_its_stored_result(web, poll):
+    """A retried job is converting again but still holds its earlier result and page, which
+    are megabytes for a long document. A poll runs every few seconds and needs neither."""
+    job_id = finished_job(web)
+    with session_scope(web.ctx.factory) as session:
+        session.get(Job, job_id).status = "running"
+    read: list[str] = []
+
+    def spy(conn, cursor, statement, parameters, context, executemany):
+        head = statement.split(" FROM ")[0]
+        if "jobs.result_json" in head or "jobs.html," in head or head.endswith("jobs.html"):
+            read.append(statement)
+
+    engine = web.ctx.factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        response = web.browser.get(f"/jobs/{job_id}/{poll}")
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+    assert response.status_code == 200
+    assert read == []
 
 
 def test_status_poll_for_a_deleted_job_reloads_the_page(web):

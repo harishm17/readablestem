@@ -386,11 +386,21 @@ def json_ld_tag(data: dict[str, Any]) -> Markup:
 # --------------------------------------------------------------------------- middleware
 
 
+HEAD_REQUEST = "readablestem.head"  # scope key: the request was a HEAD, served as a GET
+
+
+def is_head(request: Any) -> bool:
+    """The request was a HEAD (the middleware below hands routes a GET). A route with an
+    effect, a download, answers it with its headers and none of the effect."""
+    return bool(request.scope.get(HEAD_REQUEST))
+
+
 class CrawlerRequestsMiddleware:
     """Requests the way crawlers and link checkers make them.
 
     - HEAD is answered as GET without the body (FastAPI routes take GET only, so HEAD was a
-      405 on every page).
+      405 on every page). The scope says it was a HEAD (`is_head`), so a download can leave
+      out what a GET does: build the file, restart the deletion clock, record a download.
     - The www host is sent (301) to the canonical host from BASE_URL, and a path with a
       trailing slash to the same path without it, so each page has one address. The
       showcase keeps its slashes: its folders are pages.
@@ -425,7 +435,7 @@ class CrawlerRequestsMiddleware:
                 message = {**message, "body": b""}
             await send(message)
 
-        await self.app({**scope, "method": "GET"}, receive, send_without_body)
+        await self.app({**scope, "method": "GET", HEAD_REQUEST: True}, receive, send_without_body)
 
     def _redirect_target(self, scope: Scope) -> str | None:
         path: str = scope["path"]

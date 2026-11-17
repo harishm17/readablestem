@@ -91,6 +91,32 @@ def test_the_download_restarts_the_deletion_clock(web, kind, media):  # noqa: F8
     assert timedelta(hours=23, minutes=55) < left <= timedelta(hours=24)
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "download",
+        "download/canvas",
+        "download/cartridge",
+        pytest.param("download.docx", marks=needs_pandoc),
+        "download.epub",
+    ],
+)
+def test_a_head_request_gets_the_headers_of_the_get_and_takes_nothing(web, path):  # noqa: F811
+    """A link checker or a browser asking what a link is: the GET's status and content
+    headers, no body, and no effect (no clock restart, no download recorded)."""
+    job_id = ready_job(web)
+    set_job(web, job_id, retain_until=utcnow() + timedelta(hours=2))
+    kept_until = web.job(job_id).retain_until
+    head = web.browser.head(f"/jobs/{job_id}/{path}")
+    assert web.job(job_id).retain_until == kept_until
+    assert formats_of(web, job_id) == []
+    get = fetch(web.browser, f"/jobs/{job_id}/{path}")
+    assert head.status_code == get.status_code == 200
+    assert head.content == b""
+    for name in ("content-type", "content-disposition", "content-security-policy"):
+        assert head.headers[name] == get.headers[name], name
+
+
 # --------------------------------------------------------------------------- drafts
 
 BANNER = re.compile(r"^Draft: \d+ decisions? (is|are) still open\. Not for students\.")

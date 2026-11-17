@@ -269,7 +269,8 @@ def test_a_title_is_escaped_in_the_page_and_the_file(titled):
 
 
 def footer_of(html: str) -> str:
-    return html[html.index("<footer") :]
+    """The student note, which holds the contact line (inside `<main>`, after the content)."""
+    return html[html.index('<section id="about-conversion"') :]
 
 
 def test_the_contact_line_goes_in_the_student_footer(ux):

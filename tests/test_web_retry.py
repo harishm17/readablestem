@@ -40,7 +40,7 @@ from readablestem.pipeline import run as pipeline_run
 from readablestem.web import provider_health, retry, states
 from readablestem.web.app import create_app
 from readablestem.web.auth import set_allowed
-from readablestem.web.db import Job, QuotaDay, StepRecord, session_scope
+from readablestem.web.db import LARGE_COLUMNS, Job, QuotaDay, StepRecord, session_scope
 from readablestem.web.worker import Worker
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "worked_example.pdf"
@@ -101,7 +101,7 @@ class Site:
 
     def job(self, job_id: str) -> Job:
         with session_scope(self.ctx.factory) as session:
-            job = session.get(Job, job_id)
+            job = session.get(Job, job_id, options=LARGE_COLUMNS)
             assert job is not None
             session.expunge(job)
             return job

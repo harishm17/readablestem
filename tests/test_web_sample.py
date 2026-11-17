@@ -30,6 +30,7 @@ from readablestem.ops.aggregate import aggregate_finished
 from readablestem.ops.retention import purge_expired
 from readablestem.web import sample
 from readablestem.web.db import (
+    LARGE_COLUMNS,
     Blob,
     ErrorAggregate,
     Event,
@@ -73,7 +74,7 @@ def table_count(env, model) -> int:
 
 def get_job(env, job_id: str) -> Job:
     with session_scope(env.ctx.factory) as session:
-        job = session.get(Job, job_id)
+        job = session.get(Job, job_id, options=LARGE_COLUMNS)
         assert job is not None
         session.expunge(job)
         return job

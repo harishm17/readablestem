@@ -35,10 +35,12 @@ from readablestem.web.routes.jobs import (
     current_html,
     download_filename,
     export_failed_words,
+    head_reply,
     job_access,
     role_of,
 )
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.seo import is_head
 from readablestem.web.shares import VIEW
 
 logger = logging.getLogger(__name__)
@@ -63,11 +65,17 @@ def _source(
 ) -> tuple[str, str, output.ExportState]:
     """(html, title, export state) of the finished document, up to date and through the draft
     gate (`output.check`; a draft's HTML carries its banner, so the file made from it does
-    too); the deletion clock restarts, as for the HTML download."""
+    too); the deletion clock restarts, as for the HTML download. For a HEAD the html is empty
+    and the clock stays (`routes.jobs.head_reply`)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         state = output.check(request, job, role_of(session, job, user), file_type)
+        if is_head(request):  # the headers need the title only, not a re-render
+            title = documents.display_title(
+                documents.stored_title(job), job.filename, job.title_override
+            )
+            return "", title, state
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
@@ -124,6 +132,8 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             context={"job_id": job_id},
         )
     html, title, state = _source(request, job_id, user, "docx")
+    if is_head(request):
+        return head_reply(export_docx.DOCX_MEDIA_TYPE, _filename(title, job_id, ".docx", state))
     try:
         data = make_file("docx", html, title)
     except Busy:
@@ -158,6 +168,8 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
 def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
     """The document as an EPUB 3 publication with MathML (pipeline/export_epub.py)."""
     html, title, state = _source(request, job_id, user, "epub")
+    if is_head(request):
+        return head_reply(EPUB_MEDIA_TYPE, _filename(title, job_id, ".epub", state))
     try:
         data = make_file("epub", html, title)
     except export_epub.CanvasExportError as exc:  # EpubExportError is one

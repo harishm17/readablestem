@@ -31,7 +31,7 @@ from readablestem.models import make_vision_client
 from readablestem.ops.aggregate import aggregate_finished
 from readablestem.pipeline.html_checks import static_checks
 from readablestem.web.app import create_app
-from readablestem.web.db import Blob, ErrorAggregate, Job, session_scope
+from readablestem.web.db import LARGE_COLUMNS, Blob, ErrorAggregate, Job, session_scope
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "worked_example.pdf"
 
@@ -46,7 +46,7 @@ class Site:
 
     def job(self, job_id: str) -> Job:
         with session_scope(self.ctx.factory) as session:
-            job = session.get(Job, job_id)
+            job = session.get(Job, job_id, options=LARGE_COLUMNS)
             assert job is not None
             return job
 
@@ -92,7 +92,7 @@ def without(html: str, *parts: str) -> str:
 
 
 def about(html: str) -> str:
-    match = re.search(r'<footer id="about-conversion".*?</footer>', html, flags=re.S)
+    match = re.search(r'<section id="about-conversion".*?</section>', html, flags=re.S)
     assert match
     return match.group(0)
 

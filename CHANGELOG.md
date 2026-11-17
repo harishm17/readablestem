@@ -22,6 +22,45 @@
   HTTP math reader shares the retry constants through `models.base`), which is most of what a
   conversion process spent before its first page. The worker looks for a job as soon as one
   is queued by an upload, a source upload or a new part (`Worker.wake`), not at the next poll.
+## Unreleased: the About note inside `<main>`, one Word filter (branch fix/about-in-main-and-job-summary, WS22.1)
+
+- The student note "About this version" is written inside `<main>` (a labelled `<section>`, a
+  region landmark, still no heading), so Word, EPUB, Canvas and Listen's transcript get it from
+  the same markup, not from one patch each. `RENDER_VERSION` is 5: a stored page is made again
+  once with the note in its new place. The page's outline, skip link and in-page link to the
+  note are as before; the axe scans are clean in both colour schemes.
+- The Word export's text changes made inside pandoc (page markers, the skip link, a figure
+  with no picture) are one Lua filter, `pipeline/data/export_docx.lua`. The Word text of the
+  stored fixtures is unchanged. The `<main>` unwrap, the long-description line and the
+  title paragraph stay in Python: pandoc drops those elements before a filter sees them, and
+  its file title and the title paragraph come from one field.
+
+## Unreleased: polls and job routes stop reading the stored result (PF5)
+
+- F-279, F-283, F-496, F-497: a job's row was read whole, so every status poll, every download
+  check and every job route parsed the stored result and page (2.6 MB of JSON and 1.5 MB of
+  HTML on the large stored job we measure with), even to say "converting". `jobs.result_json`
+  and `jobs.html` are now deferred columns, loaded only by the route that reads them. A new
+  column, `jobs.html_version` (migration `7b1d3e9a4c28`, nullable, filled on first sight for
+  rows from before it), holds the render version of the stored page, so "is there a page" and
+  "is it from an older renderer" no longer need the page; the draft gate reads the stored
+  `jobs.open_decisions`. The state and summary of a job that is not finished no longer read its
+  result. A finished job's page and poll still read the result, which its state is made from.
+  Tests that hand a job row out of its session load the large columns with it
+  (`db.LARGE_COLUMNS`).
+
+## Unreleased: HEAD on downloads takes nothing (branch fix/about-in-main-and-job-summary, WS11.16)
+
+- F-138: a HEAD request to a download or export was served as a GET, so it built the file,
+  restarted the deletion clock and counted as a download. It now gets the GET's status and
+  content headers (type, file name, content security policy) and no body, after the same access
+  and draft checks, and builds, restarts and records nothing. The routes: the HTML, Canvas,
+  Common Cartridge, Word and EPUB downloads, "Combine parts", "Download all", the course zip and
+  the batch zip. A HEAD has no Content-Length, and the zips answer 200 without going through
+  the documents, so a HEAD cannot tell that a GET would find nothing ready (a 409).
+- F-137: `docs/security.md` said the Canvas, Cartridge, Word and EPUB downloads are for the
+  owner only; the code lets a person the document is shared with, even as a viewer, take them
+  (through the same draft gate). The docs now say what the code does.
 
 ## Unreleased: struck text kept as struck (branch feat/run-list, WS16.1 and SW51a)
 

@@ -27,8 +27,10 @@ import pytest
 
 import readablestem.cli.main as cli
 from readablestem.pipeline import export_docx as ed
-from readablestem.pipeline.assemble import ABOUT_TITLE
-from readablestem.pipeline.export_canvas import _parse
+from readablestem.pipeline import export_epub as ee
+from readablestem.pipeline.assemble import ABOUT_TITLE, CONTACT
+from readablestem.pipeline.export_canvas import _parse, export_canvas
+from readablestem.web import listen
 from test_export_canvas import DATA_URI, source_html, source_ids
 
 pytestmark = pytest.mark.skipif(not ed.available(), reason="pandoc is not installed")
@@ -97,18 +99,34 @@ def test_every_equation_is_a_native_equation(made):
     assert len(equations) == count(html, "math") == export.equations
 
 
-def test_the_note_about_this_version_is_in_the_file():
-    """The student note is a `<footer>`, which pandoc drops with its text (F-127)."""
-    html = source_html("demo")
-    about = re.search(r'<footer id="about-conversion".*?</footer>', html, re.S)
+@pytest.mark.parametrize("fixture", ["golden/sample", "golden/stored_demo_0_2_0"])
+def test_the_note_about_this_version_is_in_every_output_once(fixture):
+    """One page, one note: the Word file, the EPUB, the Canvas page and Listen's transcript
+    each carry the note's facts, said once (pandoc reads only `<main>`, F-127)."""
+    html = source_html(fixture)
+    about = re.search(r'<section id="about-conversion".*?</section>', html, re.S)
     assert about is not None
     lines = [
         " ".join(unescape(re.sub(r"<[^>]+>", "", p)).split())
         for p in re.findall(r"<p\b[^>]*>(.*?)</p>", about.group(0), re.S)
     ]
-    words = [" ".join(p.text.split()) for p in open_docx(ed.export_docx(html).data).paragraphs]
     assert lines[0] == ABOUT_TITLE and len(lines) >= 3
-    assert all(line in words for line in lines)
+    word = open_docx(ed.export_docx(html).data)
+    canvas = export_canvas(html, title="Doc", folder="doc-3f9a2b", course_number="12345")
+    texts = {
+        "word": [" ".join(p.text.split()) for p in word.paragraphs],
+        "epub": plain(ee.export_epub(html).content),
+        "canvas": plain(canvas.page_html or ""),
+        "listen": [item.text for item in listen.build_transcript(html, {})],
+    }
+    for name, text in texts.items():
+        joined = " ".join(text) if isinstance(text, list) else text
+        assert all(line in joined for line in lines[1:]), name
+        assert joined.count(CONTACT) == 1, name
+
+
+def plain(markup: str) -> str:
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", markup)).split())
 
 
 def test_headings_are_word_heading_styles(made):

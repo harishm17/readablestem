@@ -24,7 +24,7 @@ from readablestem.pipeline import checked
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import fair_queue, job_page, states, titles
+from readablestem.web import documents, fair_queue, job_page, states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
@@ -690,7 +690,10 @@ def job_view(
         result = DocumentResult.model_validate(job.result_json)
         page = job_page.page_data(result, last_decision(session, job))
         carried = carry_view(job, result)
-    summary = summarise(job.result_json) if with_summary or with_page else None
+    # Only a finished job has a summary (the job page shows it for no other); a poll of one
+    # that is waiting or converting does not load its result.
+    done = job.status == JobStatus.DONE
+    summary = summarise(job.result_json) if (with_summary or with_page) and done else None
     view = JobView(
         id=job.id,
         filename=job.filename,
@@ -717,7 +720,7 @@ def job_view(
         page=page,
         title=titles.effective_title(
             job.title_override,
-            (job.result_json or {}).get("title") if job.status == JobStatus.DONE else None,
+            documents.stored_title(job) if done else None,
             job.filename,
         ),
         title_override=job.title_override,
@@ -736,7 +739,6 @@ def job_view(
     if with_page:
         # Counts are read only for a finished job: a stopped or waiting job may still hold an
         # earlier result, and its decisions are not open while it is not finished (F-314).
-        done = job.status == JobStatus.DONE
         counts = states.counts_of(summary.checked if summary and done else None)
         line = (
             job_page.queue_sentence(ahead, yours, wait_s) if job.status == JobStatus.QUEUED else ""
