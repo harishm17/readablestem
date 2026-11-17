@@ -8,7 +8,7 @@
   gave U+FFFD or one of Adobe's private-use codes ("�ab f'(x)", "det A = ����"). The name is
   read from the embedded font program with MuPDF, through PyMuPDF (no new dependency), and
   looked up in `pipeline/data/glyph-names.tsv`, Adobe's glyph list plus TeX's names, generated
-  by `scripts/make_glyph_names.py` from the two public TeX files (sources, licences and hashes
+  by `scripts/make_glyph_names.py` from the two public TeX files (sources, licenses and hashes
   in `pipeline/data/README.md`). A sized variant is its base character; a built-up piece is
   the Unicode piece character. The ladder is the file's own table, the name, the font table
   (`font_codes`), then a gap. A raw character says which in `"how"` (`"name"`, `"font"`,

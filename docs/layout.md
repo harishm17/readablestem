@@ -764,7 +764,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   filter (`output_chars.NOT_TEXT`) turns it into "[unreadable character]" on the student page, the
   lint (`html_checks`) fails on it as it does on U+FFFD, and the sign check reads it as an
   unnamed glyph that may be any sign (`signs._unnamed`). To rebuild the table:
-  `scripts/make_glyph_names.py` (sources and licences: `pipeline/data/README.md`).
+  `scripts/make_glyph_names.py` (sources and licenses: `pipeline/data/README.md`).
 - **Font code tables** (`pipeline/font_codes.py`, `FONT_CODE_TABLES`, on; every file). A font with
   no usable ToUnicode gives its codes as control characters, private-use code points or plain
   letters that are not what is printed. `_text_blocks` rewrites them, before rows, markers, math

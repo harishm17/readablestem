@@ -10,7 +10,7 @@ only when the name stands for one real character: a variation selector (U+FE00 t
 which TeX uses to mark a sized variant, is dropped (`summationdisplay` is the sum sign), and
 a name that stands for a private-use code point or a control code says nothing and is left
 out, except the pieces in `UNICODE_PIECES`, which replace what the files give.
-`pipeline/data/README.md` has the source, the licences and the SHA-256 of each input.
+`pipeline/data/README.md` has the source, the licenses and the SHA-256 of each input.
 """
 
 from __future__ import annotations
