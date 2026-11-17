@@ -76,3 +76,16 @@ def test_a_page_has_its_own_requests_and_a_share_of_the_documents():
     assert by_kind == pytest.approx({"dense_math": 0.05, "figure": 0.03, "typical": 0.01})
     assert made["kinds"]["figure"]["steps"] == pytest.approx({"figure": 0.02, "outline": 0.01})
     assert made["usd"] == pytest.approx(0.09)
+
+
+@pytest.mark.parametrize(
+    "runs", [[[Converted(ENTRY, pages=2, kinds=["typical"] * 2, missed=2)]], []]
+)
+def test_a_replay_in_which_no_file_was_measured_ends_with_a_message(tmp_path, capsys, runs):
+    # Every file left out for missing answers, or no run at all: a message and exit 2.
+    records = tmp_path / "records.json"
+    records.write_text(json.dumps({"runs": [[done.as_dict() for done in run] for run in runs]}))
+
+    assert main(["eval", "cost", "--from", str(records)]) == 2
+
+    assert "error:" in capsys.readouterr().err

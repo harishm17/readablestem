@@ -929,6 +929,8 @@ def _measured(
             made = [[measure.Converted.from_dict(row) for row in run] for run in kept["runs"]]
         except (ValueError, KeyError, TypeError) as exc:
             return _error(f"cannot read {args.records_from}: {exc}")
+        if not made:
+            return _error(f"{args.records_from}: no run in it")
         known = {upload.name for upload in measure.every_upload()}
         unknown = sorted({done.upload for run in made for done in run} - known)
         if unknown:
