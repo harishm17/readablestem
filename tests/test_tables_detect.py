@@ -19,6 +19,7 @@ import pytest
 
 from readablestem.core.types import Kind, TableCell, TableGrid, grid_problems
 from readablestem.pipeline import layout, table_model, tables
+from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.layout import LayoutError, analyze, release
 from readablestem.pipeline.tables import Proposal, Slot
 
@@ -365,11 +366,13 @@ def captioned_page(page: pymupdf.Page) -> None:
     write(page, 72, 450, "Then work out the period of each trial.")
 
 
-def test_raised_glyphs_stay_exponents_in_the_cells():
+def test_raised_glyphs_stay_exponents_in_the_cells_and_the_caption():
     # Text layers flatten scripts: 10^5 would read "105" and 10^-18 "10-18". The grid read
-    # from the PDF keeps them raised.
+    # from the PDF keeps them raised, and so does the caption ("CP^3" is not "CP3").
     def fill(page):
-        write(page, 100, 140, "Table 1. Orders of magnitude")
+        caption = "Table 1. Orders of magnitude for CP"
+        write(page, 100, 140, caption)
+        write(page, 100 + pymupdf.get_text_length(caption, fontsize=BODY) + 0.5, 136, "3", size=7.0)
         grid_table(
             page, [["Quantity", "Value", "Unit"], ["Pressure", "", "Pa"], ["Quark", "", "m"]]
         )
@@ -383,6 +386,12 @@ def test_raised_glyphs_stay_exponents_in_the_cells():
     texts = {(c.row, c.col): c.text for c in table.table.cells}
     assert (texts[(1, 1)], texts[(2, 1)]) == ("1.01\u00d710\u2075", "10\u207b\u00b9\u2078")
     assert texts[(1, 2)] == "Pa"
+    assert table.caption == "Table 1. Orders of magnitude for CP\u00b3"
+    pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 60, 20), False)
+    html = render_html(
+        title="T", lang="en", elements=[table], fixes=[], crops={table.id: pixmap.tobytes("png")}
+    )
+    assert "CP\u00b3</figcaption>" in html
 
 
 def test_a_table_at_the_top_of_the_next_page_with_the_same_columns_is_marked_continued():

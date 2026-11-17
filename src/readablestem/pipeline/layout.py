@@ -106,6 +106,7 @@ from readablestem.pipeline import (
     equation_images,
     font_codes,
     glyph_math,
+    glyph_names,
     glyph_reconcile,
     hyphens,
     outline,
@@ -1712,7 +1713,9 @@ def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
     place layout reads characters from the PDF goes through here (rows, line glyphs, the
     text pass's glyphs), so no path sees the zero-width boxes ligatures come out with."""
     blocks = page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]
+    glyph_names.recover(page, blocks)
     font_codes.remap(blocks)
+    glyph_names.mark_gaps(blocks)
     for block in blocks:
         if block.get("type") == 0:
             for line in block["lines"]:
@@ -5855,9 +5858,13 @@ STRAY_BRACE_REACH = 2.0
 
 def _math_neighbours(row: _Row, other: _Row) -> bool:
     """Does fragment `row` belong with maths row `other`? Vertically adjacent and
-    overlapping in x, or an equation number beside it (`_number_beside`), or an opening brace
-    level with `other` and a little to its left (the brace of a system, `_stray_brace_cut`)."""
+    overlapping in x, or inside its box (the second row of a matrix, beside the tall bracket
+    the first row starts with), or an equation number beside it (`_number_beside`), or an
+    opening brace level with `other` and a little to its left (the brace of a system,
+    `_stray_brace_cut`)."""
     size = max(row.size, other.size)
+    if other.x0 <= (row.x0 + row.x1) / 2 <= other.x1 and other.y0 <= row.y0 and row.y1 <= other.y1:
+        return True
     if (
         row.ink
         and all(c.c in _OPENING_BRACES for c in row.ink)
@@ -5895,8 +5902,10 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
 
 # Signs that continue the line above when a maths line starts with them ("= 250 m/s" under
 # "v = ...", "+ c" under a long sum).
-# A system's opening brace: the glyph, or the pieces TeX builds a tall one from (CMEX).
-_OPENING_BRACES = frozenset("{\uf8f1\uf8f2\uf8f3\uf8f4")
+# A system's opening brace: the glyph, or the pieces TeX builds a tall one from (CMEX), the
+# Unicode piece characters `glyph_names` reads from the font. Adobe's private-use codes for the
+# pieces never reach here: a glyph still undecoded is a gap mark (`glyph_names.mark_gaps`).
+_OPENING_BRACES = frozenset("{\u23a7\u23a8\u23a9\u23aa")
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
 TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table

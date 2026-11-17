@@ -20,8 +20,11 @@ The rule applies to every file a student gets, where students read:
   and a hit there, which cannot have come from the page, stops that file from being
   offered as finished.
 
-The text-health check and the font code tables that remove most of these characters at
-the source are the conversion's; this module only keeps them out of the outputs.
+The text layer's gap mark `GAP` (a glyph the file does not name, `glyph_names.mark_gaps`) is
+one of them, so a glyph the conversion could not read comes out as `UNREADABLE` and fails the
+static checks as U+FFFD does; it is not private use. The text-health check, the glyph names
+and the font code tables that remove most of these characters at the source are the
+conversion's; this module only keeps them out of the outputs.
 Content-free: callers learn a count, never the text around a character.
 """
 
@@ -33,6 +36,11 @@ import zipfile
 
 # What students meet in place of a character that is not text (a student-facing string).
 UNREADABLE = "[unreadable character]"
+# The text layer's mark for a glyph the file does not name (`glyph_names`): not U+FFFD, which is
+# what MuPDF gives for any failure, and not private use, which is a character of someone's
+# font. Rows, maths detection and the checks see one glyph that is known to be unread. Like
+# U+FFFD it never reaches an output: `NOT_TEXT` has it, so the page writes `UNREADABLE`.
+GAP = "⯑"
 
 _RANGES = [
     "\x00-\x08",  # C0 controls (tab, line feed and carriage return are text)
@@ -45,6 +53,7 @@ _RANGES = [
     "\ue000-\uf8ff",  # private use
     "\ufdd0-\ufdef",  # noncharacters
     "\ufffd\ufffe\uffff",  # the replacement character, noncharacters
+    GAP,  # the text layer's mark for a glyph the file does not name
     *(f"{chr(plane << 16 | 0xFFFE)}{chr(plane << 16 | 0xFFFF)}" for plane in range(1, 15)),
     "\U000f0000-\U0010ffff",  # planes 15 and 16: private use and their noncharacters
 ]

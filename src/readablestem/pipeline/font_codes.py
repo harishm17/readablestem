@@ -19,9 +19,11 @@ markers, maths detection and every output see the mapped character:
 - an unreadable glyph that starts two or more lines of the page and is followed by text:
   a bullet.
 
-Nothing here guesses at a glyph's shape. A code with no row stays as it was, for the text
-checks to report. With `FONT_CODE_TABLES` off (`configure(False)`), only the two private-use
-bullets the code used to map by code alone are mapped, whatever the font.
+Nothing here guesses at a glyph's shape. A code with no row stays as it was, and
+`glyph_names.mark_gaps` then makes it a gap mark, for the text checks to report. A glyph the
+font names is read by `glyph_names` before this module runs. With `FONT_CODE_TABLES` off
+(`configure(False)`), only the two private-use bullets the code used to map by code alone are
+mapped, whatever the font.
 """
 
 from __future__ import annotations
@@ -260,7 +262,7 @@ def remap(blocks: list[dict[str, Any]]) -> None:
             code = ord(c) if len(c) == 1 else -1
             row = _mapped(table, c) if table else None
             if row is not None:
-                new.append(dict(char, c=row))
+                new.append(dict(char, c=row, how="font"))
                 changed = True
             elif 0x0B <= code <= 0x1F and code in tex and table is None:
                 before = chars[index - 1]["c"] if index else " "

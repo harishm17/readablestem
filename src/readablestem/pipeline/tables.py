@@ -3500,7 +3500,11 @@ def _attach_captions(view: _PageView, tables: list[PageTable], clean: Callable[[
 
 
 def _line_text(line: LineLike) -> str:
-    return "".join(c.c for c in line.chars)
+    """The line's text with its raised glyphs as superscript characters, as a cell's text
+    has them (`_marked`): a caption's "CP³" and a repeated header's raised mark must not
+    come out as "CP3"."""
+    raised = _raised(line.chars)
+    return _marked(line.chars, [i in raised for i in range(len(line.chars))])
 
 
 def _caption_lines(
