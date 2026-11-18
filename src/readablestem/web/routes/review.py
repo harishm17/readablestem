@@ -225,9 +225,9 @@ class RejectWords:
 REJECT_WORDS = {
     Kind.EQUATION: RejectWords(
         "Keep as image",
-        "Students see a picture; screen readers read the PDF's text, marked unchecked.",
+        "Students see a picture; screen readers read the PDF's text, as written in the PDF.",
         "Kept as an image of the original. Screen readers will hear the PDF text of the "
-        "equation, marked as not checked.",
+        "equation, said to be as written in the PDF.",
         "Kept as an image by you",
     ),
     # A table's image is kept, marked "not converted" (when there was no proposal, there

@@ -570,6 +570,37 @@ def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
     return job
 
 
+def served_html(ctx: AppContext, session: Session, job: Job, state: output.ExportState) -> str:
+    """The HTML as it leaves, for a `job` whose file is up to date (`current_html`).
+
+    A finished file is the stored student file as it is. A draft is made again from the stored
+    result in the checker's words (`assemble.CHECKER`: "Check it against the original." and
+    the like), marked as a draft, and not stored: those sentences are written to the person
+    who checks the file, so no stored page, student file or export of one holds them. If the
+    page cannot be made again the stored one is served, marked, which has fewer notes and
+    no other difference."""
+    if not state.draft:
+        return job.html or ""
+    from readablestem.pipeline.assemble import CHECKER
+    from readablestem.web.review import rerender_job_html
+
+    html = job.html or ""
+    try:
+        result = DocumentResult.model_validate(job.result_json or {})
+        with notation.in_force(ctx.factory, ctx.settings, job.id):
+            html = rerender_job_html(
+                job,
+                result,
+                _crops(session, job.id),
+                checked_on=last_decision(session, job),
+                math_alttext=ctx.settings.mathml_alttext,
+                audience=CHECKER,
+            )
+    except Exception as exc:
+        log_exception(logger, "draft_page_not_remade", exc, job_id=job.id)
+    return output.marked(html, state)
+
+
 # --------------------------------------------------------------------------- /app
 
 
@@ -2051,7 +2082,7 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
             return head_reply("text/html; charset=utf-8", name)
         job = current_html(ctx, session, job)
         title = documents.document_title(job).text
-        html = output.marked(job.html or "", state)
+        html = served_html(ctx, session, job, state)
         name = output.file_name(download_filename(title, job.id), state)
         still_open = state.open_decisions
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
@@ -2271,7 +2302,7 @@ def _canvas_source(
             return "", documents.document_title(job).text, job.id, state
         job = current_html(ctx, session, job)
         title = documents.document_title(job).text
-        html, job_ref = output.marked(job.html or "", state), job.id
+        html, job_ref = served_html(ctx, session, job, state), job.id
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
     return html, title, job_ref, state
@@ -2308,7 +2339,7 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
         # The preview can be saved as it is, so a draft says so here as in its download; a
         # reader is never shown one (`output.shown`).
         state = output.shown(job, role_of(session, job, user))
-        html = output.marked(current_html(ctx, session, job).html or "", state)
+        html = served_html(ctx, session, current_html(ctx, session, job), state)
     events.record(
         ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True
     )

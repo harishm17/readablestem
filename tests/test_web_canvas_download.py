@@ -86,7 +86,7 @@ def test_a_finished_job_downloads_as_a_zip(web):
 
 
 def test_with_a_course_number_the_zip_also_holds_the_page_to_paste(web):
-    job_id = finished_job(web)
+    job_id = ready_job(web)
     response = fetch(web.browser, f"/jobs/{job_id}/download/canvas?course=48213")
     assert response.status_code == 200
     archive = zip_of(response)
@@ -97,7 +97,7 @@ def test_with_a_course_number_the_zip_also_holds_the_page_to_paste(web):
 
 
 def test_the_pictures_of_a_real_document_are_files_in_the_zip(web):
-    job_id = finished_job(web)
+    job_id = ready_job(web)
     source = as_current(DEMO.read_text(encoding="utf-8"))
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)

@@ -147,7 +147,7 @@ def pictures_sentence(s: CheckedSummary) -> str:
         shown = "is shown as it was written" if k == 1 else "are shown as they were written"
         shown += " in the Word file" if s.origin == "docx" else " in LaTeX"
     return (
-        f"{parts} and {shown}, marked “Not converted” or “Needs a description”: ask your "
+        f"{parts} and {shown}, marked “Not converted” or “No description”: ask your "
         "instructor for a version you can read."
     )
 
@@ -376,21 +376,22 @@ ACTION_ROWS = {
 # --------------------------------------------------------------------------- exports
 
 SUMMARY_TOOL = "Made by ReadableSTEM, a tool that assists with accessibility."
-SUMMARY_UNKNOWN = (
-    f"{SUMMARY_TOOL} This file does not record what was converted or reviewed. Check it before "
-    "students use it."
-)
+SUMMARY_UNKNOWN = f"{SUMMARY_TOOL} This file does not record what was converted or reviewed."
+# Written to the person who checks a file, not to its readers: only a draft's page carries it
+# (`assemble.render_html(audience="checker")`), never the student file or an export of it.
+CHECK_BEFORE_USE = "Check it before students use it."
 
 
-def export_summary(s: CheckedSummary) -> str:
+def export_summary(s: CheckedSummary, for_checker: bool = False) -> str:
     """The plain-text statement an export carries (the EPUB's accessibilitySummary, the
     Canvas README's first lines): the tool, how many equations a screen reader can read,
-    and the student statement."""
+    and the student statement; for the checker (a draft) it ends with what to do."""
     c = s.converted
     parts = [SUMMARY_TOOL]
     if c.equations:
         verb = "is" if c.equations_mathml == 1 else "are"
         parts.append(f"{c.equations_mathml} of {plural(c.equations, 'equation')} {verb} MathML.")
     parts += statement(s)
-    parts.append("Check it before students use it.")
+    if for_checker:
+        parts.append(CHECK_BEFORE_USE)
     return " ".join(parts)

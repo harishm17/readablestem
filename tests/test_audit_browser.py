@@ -17,6 +17,7 @@ import time
 import pytest
 
 from fixtures.web.support import ALICE, WebEnv, as_current, make_pdf
+from readablestem.core.types import Status
 from readablestem.web.db import Job, session_scope
 
 pytestmark = pytest.mark.browser
@@ -79,6 +80,12 @@ def sign_in(page, base: str) -> None:
 
 
 def finished_job(site, page) -> str:
+    # Nothing left to decide: a draft's page is made again from the result when it leaves, so
+    # the stored page a test puts in place is served only for a document that is ready.
+    for fix in site.converter.output.result.fixes:
+        if fix.pending:
+            fix.status = Status.REJECTED if fix.status is Status.ABSTAINED else Status.ACCEPTED
+            fix.reviewed = True
     page.goto(f"{site.base}/app")
     page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)}]

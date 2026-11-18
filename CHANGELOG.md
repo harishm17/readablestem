@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: a reader's page, no draft for a reader, and notices that know who they are for (branch feat/reader-page-and-audience)
+
+- SW16, F-113, F-123, F-139: a person a document was shared with to view gets a page of their
+  own (`job_reader.html`): the title, who shared it, what they can do, when it will be deleted,
+  Open, Listen and the download formats, and nothing about posting, Canvas, decisions, checks,
+  the record or the owner's course. A reviewer keeps the owner's page without the owner-only
+  blocks, and sees the same single total of open decisions; a reader is told only "The owner is
+  still checking this document." (state `being_checked` in `web/states.py`). Fix: `/view` and
+  `/listen` gave a reader the draft of a document with decisions open; they now ask the one
+  export-state function (`output.shown`) like every download, and a reader gets the 403 page.
+  Every template partial starts with a comment naming its audiences, and one test fails when a
+  partial is reached by an audience it does not name. Not built: "Tell the owner about a
+  problem", "Ask for the Review right" (SW25) and the version-id line (WS20.1).
+- Notices carry an audience (`assemble.say`, `Words`): a sentence written to the person who
+  checks the file ("Check it against the original.", "...; not checked", "Needs a description.",
+  "Check it before students use it.") is only in a draft's page, made again from the stored
+  result when a draft leaves (`routes.jobs.served_html`) and never stored; the student file and
+  every file made from it say what is missing and whom to ask. The image-page note reads "This
+  page was read from a picture of the original, so small errors are possible." (alt "Original of
+  page N."), the equation alt suffix "as written in the PDF" and the figure label "No
+  description." **`RENDER_VERSION` is 8**: stored pages are made again once from their stored
+  results; the golden files moved with `UPDATE_GOLDEN=1`. A draft is not served from the stored
+  page any more, so a test that puts a page in the row needs a document with nothing open.
+- WS10.9: the owner's job page, once the job is done, says "Converting this document has cost
+  $x.xx in all." from `Job.cost_usd` (after a re-run, the total of both runs), in the admin
+  page's money format. Nothing while it runs; no one it was shared with sees it.
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
 - WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per
