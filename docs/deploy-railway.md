@@ -473,7 +473,7 @@ has its own address-space cap of 768 MB (a 117 MB, 500-page PDF was probed in 8 
 (docs/web.md, "The conversion runs in a child process"; it loads the table models itself, so
 `PRELOAD_TABLE_MODELS` no longer preloads them in the web process): while a job converts expect the
 web process plus a child of about 0.3-0.5 GB resident. Recommendation:
-**allow 2 GB, expect 0.4 to 0.9 GB resident, and do not set a limit below 1 GB** (an upload is held in memory about three times over while it is read, so one of 100 MB adds about 300 MB, and `MAX_CONCURRENT_UPLOADS=3` of them 900 MB: 1 GB was enough for 20 MB uploads); with
+**allow 2 GB, expect 0.4 to 0.9 GB resident, and do not set a limit below 1 GB** (an upload is held once while it is read and twice more by the database driver when it is stored, measured with SQLite: so one of 100 MB adds about 300 MB, and `MAX_CONCURRENT_UPLOADS=3` of them 900 MB: 1 GB was enough for 20 MB uploads); with
 `INSTALL_LIBREOFFICE=true` allow 2 GB (LibreOffice adds about 300 MB while a Word or PowerPoint file
 converts); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
 about 1.1 GB resident (measured, 74 crops), so allow 2 GB there too. Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing

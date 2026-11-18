@@ -104,7 +104,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.pdf_probe import MAX_PAGE_SIDE_PT
+from readablestem.web.pdf_probe import IMAGE_PAGE_REFUSALS, MAX_PAGE_SIDE_PT
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import (
     give_back_pages,
@@ -117,6 +117,7 @@ from readablestem.web.security import VIEW_CSP
 from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
 from readablestem.web.uploads import (
+    FORM_OVERHEAD_BYTES,
     INSPECT_TIMEOUT_S,
     UploadedFile,
     UploadRejected,
@@ -166,9 +167,9 @@ FRESH_COPY = (
     "If it opens on your computer, save a fresh copy (File > Save As, or Print to PDF) "
     "and upload that."
 )
-# The refusals of a PDF that is only scans or handwriting, and what is offered instead when
-# the deployment offers the conversion of such pages (ADR 0007).
-IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
+# What is offered instead of the refusals of a PDF that is only scans or handwriting
+# (`pdf_probe.IMAGE_PAGE_REFUSALS`) when the deployment offers the conversion of such pages
+# (ADR 0007).
 # With that option offered, the refusal says the pages were not asked for (not that the tool
 # cannot convert them), and what to tick. What the person had set stays on the form; the file
 # has to be chosen again.
@@ -971,6 +972,13 @@ OFFICE_BUDGET_S = 180.0
 async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> Response:
     """Read, check and store an upload of one or several files (inside the upload gate)."""
     s = ctx.settings
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit():  # a body that cannot fit what the person may still store is not read
+        refused = await run_in_threadpool(
+            _storage_refusal, request, ctx, user, int(declared) - FORM_OVERHEAD_BYTES
+        )
+        if refused is not None:
+            return refused
     try:
         form = await read_upload_form(
             request,
@@ -1039,6 +1047,33 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     if len(placed) == 1 and not placed.batch:  # a zip of documents is answered by the batch page
         return await _answer_one(request, user, placed[0], chosen, revises or "", form.fields)
     return await run_in_threadpool(_results_redirect, ctx, user, placed)
+
+
+def _storage_refusal(
+    request: Request, ctx: AppContext, user: CurrentUser, incoming: int
+) -> Response | None:
+    """The page for an upload whose body is more than the person may still store (their limit,
+    or the service's: `storage.check_room`), or None. `incoming` is what the body's declared
+    length leaves for the files once the form's own fields are taken off, so a file that would
+    have fitted is never turned away; the words are those of a file refused after being read."""
+    try:
+        with session_scope(ctx.factory) as session:
+            stored_bytes.check_room(session, ctx.settings, user.id, max(incoming, 0))
+    except stored_bytes.StorageRefused as exc:
+        log_event(logger, "upload_rejected", code="storage_user")
+        return _upload_error_page(
+            request, user, "storage_user", 413, pages=exc.used_mb or None, left=exc.limit_mb
+        )
+    except stored_bytes.StorageFull:
+        log_event(logger, "upload_rejected", code="storage_full")
+        return _upload_error_page(
+            request,
+            user,
+            "storage_full",
+            503,
+            headers={"Retry-After": retry_after(stored_bytes.FULL_WAIT_S).header},
+        )
+    return None
 
 
 def _place_files(

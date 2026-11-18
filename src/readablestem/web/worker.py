@@ -111,12 +111,14 @@ from readablestem.pipeline import step_facts as pipeline_step_facts
 from readablestem.web import access, carry_edits, events, office_census, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
-from readablestem.web.database import as_utc, rowcount
+from readablestem.web.database import as_utc, rowcount, utc_today
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
 from readablestem.web.fair_queue import claim_order_by
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.pdf_probe import IMAGE_PAGE_REFUSALS
 from readablestem.web.provider_health import HEALTH
+from readablestem.web.quota import give_back_pages
 from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
 from readablestem.web.states import CANCELED
 from readablestem.web.step_cache import DbStepCache
@@ -1118,7 +1120,10 @@ class Worker:
         self, attempt: _Attempt, code: str, detail: dict[str, Any] | None = None
     ) -> str:
         """Mark the job FAILED if this worker still owns it; "discarded" if not. `detail`:
-        the names that stopped a source (`Job.error_detail`)."""
+        the names that stopped a source (`Job.error_detail`). A file that is only scans or
+        handwriting (`IMAGE_PAGE_REFUSALS`) gives its pages back in the same transaction, when
+        they were counted today: the upload refuses the same file without counting it when its
+        probe can tell in its allowance (`web.quota`)."""
         values: dict[str, object] = {
             "status": JobStatus.FAILED,
             "error_code": code,
@@ -1136,7 +1141,17 @@ class Worker:
                     .execution_options(synchronize_session=False)
                 )
             )
+            if updated == 1 and code in IMAGE_PAGE_REFUSALS:
+                self._give_back_pages(session, attempt.claim.job_id)
         return JobStatus.FAILED if updated == 1 else DISCARDED
+
+    def _give_back_pages(self, session: Session, job_id: str) -> None:
+        """The pages of a job the upload could not tell was only scans or handwriting, back on
+        the day they were counted (`quota.give_back_pages`): the day of the upload, so a job
+        that fails after midnight gives nothing back, as for a canceled one."""
+        job = session.get(Job, job_id)
+        if job is not None and utc_today(as_utc(job.created_at)) == utc_today(self.clock()):
+            give_back_pages(session, job.user_id, job.page_count, day=utc_today(self.clock()))
 
     def _store(self, attempt: _Attempt, output: ConversionOutput, seconds: float) -> str:
         job_id = attempt.claim.job_id

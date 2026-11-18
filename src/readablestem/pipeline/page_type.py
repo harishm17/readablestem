@@ -243,11 +243,24 @@ INK_MAX_SEGMENTS = 500_000
 INK_GUARD_S = 60.0
 INK_WORK = "work"
 INK_TIME = "time"
-# The upload probe (`document_refusal`, `image_page_count`) runs in a child that is killed
-# after 30 s (`web.uploads.INSPECT_TIMEOUT_S`), so the whole document has an allowance of path
-# items as well (the corpus's largest, a handwritten upload, has 386,717 on the pages that
-# are not clearly typed), and the guard is one deadline for the document.
-PROBE_MAX_ITEMS = 1_000_000
+# The upload probe (`document_refusal`, `image_page_count`) runs inside the upload request, in a
+# child that is killed after 30 s (`web.uploads.INSPECT_TIMEOUT_S`). What bounds its ink analysis
+# is work, as everywhere here (`InkBudget`): the whole document has an allowance of path items
+# (50,000, a page of dense handwriting has 35,000), and the guard is a clock only against a hang,
+# one deadline for the document. The allowance is small because the exact analysis is the
+# conversion's first step, which runs it for every page with its own allowance (INK_MAX_ITEMS a
+# page, INK_GUARD_S) and fails a document of nothing but handwriting or scans
+# (`web.worker.result_outcome`, which gives the pages back): with 1,000,000 items, notes of 20
+# to 100 dense pages made the request take 4 to 8 s, and take 1.3 to 4.3 s with 50,000 (measured
+# 2026-11-18, generated pages: 0.5 s per 100,000 items analysed, and 0.07 s for the drawings of a
+# page of 35,000 items even when it is not analysed, which is why a page past the allowance is not
+# read at all, `_probe_ink`). Such a page is never refused, and with less than a line of text it
+# still counts as an unread page (`ImagePageCount`), so notes with no text keep the same count
+# for "more than half are scans or handwriting"; the split between handwritten and unread, the
+# pages with a typed title over ink, and the refusal of a document that is only handwriting wait
+# for the job. Every fixture of tests/fixtures/handwriting is inside the allowance (the most
+# items on its analysed pages is 9,795), and a clearly typed page is never analysed.
+PROBE_MAX_ITEMS = 50_000
 PROBE_GUARD_S = 20.0
 # The page cap (docs/layout.md "Time budget"). Every analysis step after the drawings are
 # extracted costs time and memory for each path (a page of 86,000 strokes took 5 to 9 s
@@ -2242,6 +2255,8 @@ def _probe_budget(budget_s: float) -> InkBudget:
 def _probe_ink(page: pymupdf.Page, budget: InkBudget) -> InkStats:
     if not budget.left():  # the guard: not even the drawings are read
         return InkStats(analysed=False, cause=INK_TIME, paths=1, marks=1)  # unknown
+    if budget.items_left == 0:  # the allowance is spent: reading the drawings would cost more
+        return InkStats(analysed=False, cause=INK_WORK, paths=1, marks=1)  # than analysing them
     return ink_stats(page, page.get_cdrawings(), budget)
 
 

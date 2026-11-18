@@ -153,6 +153,24 @@
 - WS20.4 (F-050): the expired-document page never prints a negative or zero span, says the date the
   document was deleted while the row still knows it, and after the purge says only when it was
   uploaded.
+## Unreleased: upload intake (branch perf/upload-intake)
+
+- PF8: a body whose Content-Length is more than the person may still store is refused (413,
+  the words of the storage refusal, "this file" for the name) before any of it is read
+  (`routes.jobs._storage_refusal`). The file is held once while it is read, not twice
+  (`uploads._body_of`): a file over the limit by a few bytes peaked at 2.06 times its size and now
+  at 1.04. An accepted upload still peaks at 3 times its size, in the database driver (SQLite
+  measured). The upload probe analyzes the ink of 50,000 path items in all, not 1,000,000
+  (`page_type.PROBE_MAX_ITEMS`; the clock, `PROBE_GUARD_S`, stays 20 s and only guards against a
+  hang, so the same file gets the same answer on any machine), and does not read the drawings of
+  the pages after it (`page_type._probe_ink`): notes of 20 to 100 dense pages took 4.1 to 8.2 s
+  and take 1.3 to 4.3 s. The count of scanned and handwritten pages, and so the choice for a file
+  of mostly such pages, does not change; the refusal of a document that is only handwriting or
+  scans is decided in the job when the probe could not tell, and the job then gives the person's
+  pages back for that day (`worker.Worker._finish_failed`, `quota.give_back_pages`): the upload
+  refuses the same file without counting a page when it can tell, so the count must not depend
+  on whether it could. Not built: the start-up check of the upload gate against the web memory
+  limit (no such limit is a setting). No migration and no version bump.
 
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 

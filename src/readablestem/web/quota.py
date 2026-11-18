@@ -5,9 +5,16 @@ UPDATE (`... WHERE pages + n <= quota`), so two uploads racing each other cannot
 squeeze under the limit: the database decides, not a read-then-write in Python.
 
 Pages are not refunded when a job fails or is deleted: the quota limits what a user can
-submit, and refunds would let a failing upload be retried without bound. The one exception
-is a document canceled before a worker began it, on the day it was counted (`give_back_pages`);
-converting it again counts its pages again (`routes.jobs.retry_job`).
+submit, and refunds would let a failing upload be retried without bound. There are two
+exceptions, both on the day the pages were counted (`give_back_pages`). A document canceled
+before a worker began it; converting it again counts its pages again (`routes.jobs.retry_job`).
+And a document the conversion fails because every page is scanned or handwritten
+(`pdf_probe.IMAGE_PAGE_REFUSALS`, `worker.Worker._finish_failed`, in the transaction that marks
+the job failed): the upload refuses the same file without counting any page when its probe can
+tell inside its allowance of path items (`page_type.PROBE_MAX_ITEMS`), so what the person pays
+must not depend on whether it could. This gives no way to retry without bound: the file is an
+accepted upload for the per-person rate rule (`web.abuse` `upload_user`, 15 in 10 minutes; only
+a refusal in the request gives that count back), and such a file is not offered "Try again".
 
 The same row counts the model reads an open-tier account starts from the review screen
 (`try_consume_reread`: a region marked as an equation, a table cell read as maths, "Read
