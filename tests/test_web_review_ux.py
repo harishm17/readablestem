@@ -456,24 +456,40 @@ JOB = "0123456789abcdef0123456789abcdef"
         (f"/jobs/{JOB}/review?item=p1-e2&page=2&accepted=1", True),
         (f"/jobs/{JOB}/review/list", True),
         (f"/jobs/{JOB}/view", True),
+        ("/courses", True),  # every page of a signed-in person is built from the routes
+        ("/account", True),
+        (f"/jobs/{JOB}/share", True),
+        (f"/jobs/{JOB}/listen", True),
         ("//elsewhere.example/app", False),
         ("/\\elsewhere.example", False),
         ("https://elsewhere.example/app", False),
         ("/app?next=//elsewhere.example", False),
         (f"/jobs/{JOB}/review?item=%3Cscript%3E", False),
-        (f"/jobs/{JOB}/pages/1.png", False),  # an image asked for in the background
-        (f"/jobs/{JOB}/review/marks.css", False),
-        (f"/jobs/{JOB}/download", False),
-        ("/jobs/not-a-job/review", False),
+        ("/jobs/../app", False),
+        ("/static/app.js", False),  # not a page of a signed-in person
+        (f"/jobs/{JOB}/nothing-here", False),
         ("/login", False),
         ("", False),
         (None, False),
     ],
 )
-def test_only_pages_of_this_app_are_come_back_to(path, kept):
+def test_only_pages_of_this_app_are_come_back_to(ux, path, kept):
+    from types import SimpleNamespace
+
     from readablestem.web.return_to import safe_return
 
-    assert safe_return(path) == (path if kept else None)
+    request = SimpleNamespace(app=ux.browser.app)  # ty: ignore[invalid-argument-type]
+    assert safe_return(request, path) == (path if kept else None)  # ty: ignore[invalid-argument-type]
+
+
+def test_a_form_posted_after_the_cookie_expired_gets_the_signed_out_page(ux):
+    """Not only a decision: any form posted when nobody is signed in says the session ended
+    (the cookie, and the form's token with it, were gone)."""
+    ux.browser.cookies.clear()
+    response = ux.browser.post("/courses", data={"csrf_token": "stale", "name": "Physics"})
+    assert response.status_code == 403
+    assert "Your session ended, so this was not saved." in response.text
+    assert 'href="/dev-login"' in response.text
 
 
 def sign_out_elsewhere(env) -> None:

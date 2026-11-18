@@ -10,10 +10,12 @@ decision she was on (or any deep link) was lost. Now:
   (`/jobs/{id}/review?item=<id>`), and Undo the review screen;
 - signing in (`auth.finish_login`) goes there instead of `/app`.
 
-Only pages of this app are kept, matched by one pattern: `/app`, `/admin`, a job's page,
-its review screen, list view or HTML, with a query of ids and numbers. Anything else (an
-image, a stylesheet, `//elsewhere.example`, `/\\elsewhere`) is never remembered or
-followed, so this cannot become an open redirect. It is ids only, never document
+Only pages of this app are kept: the GET routes whose function takes the signed-in or the
+admin user (`build_pages`, run once when the app is made), so a page added later is
+remembered without anyone adding it to a list. The path must also be plain (letters,
+digits, `_ - . /`), with a query of ids and numbers. Anything else (an image, a
+stylesheet, `//elsewhere.example`, `/\\elsewhere`) is never remembered or followed, so
+this cannot become an open redirect. It is ids only, never document
 content, and it lives in the signed session cookie, which signing in clears. What was
 typed is kept by the browser itself (`static/app.js`: a draft in this tab's
 `sessionStorage`), never by the server.
@@ -22,28 +24,51 @@ typed is kept by the browser itself (`static/app.js`: a draft in this tab's
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
-from fastapi import Request
+from fastapi import APIRouter, Request
+from fastapi.dependencies.models import Dependant
 from fastapi.responses import Response
+from fastapi.routing import APIRoute
 
-from readablestem.web.deps import render
+from readablestem.web.deps import render, require_admin, require_user
 
 NEXT_KEY = "next"  # in the session: where signing in goes
 DEFAULT = "/app"
 
 _JOB = r"[0-9a-f]{32}"
-_PAGE = re.compile(rf"^/(?:app|admin|jobs/{_JOB}(?:/review(?:/list)?|/view)?)$")
+_PLAIN = re.compile(r"^/(?!/)[A-Za-z0-9_./-]*$")
 _QUERY = re.compile(r"^[A-Za-z0-9_=&-]{0,200}$")
 _DECISION = re.compile(rf"^/jobs/({_JOB})/review/([A-Za-z0-9_-]{{1,64}})$")
 _UNDO = re.compile(rf"^/jobs/({_JOB})/undo$")
 
 
-def safe_return(path: object) -> str | None:
+def _takes_user(dependant: Dependant) -> bool:
+    return any(
+        sub.call in {require_user, require_admin} or _takes_user(sub)
+        for sub in dependant.dependencies
+    )
+
+
+def build_pages(routers: Iterable[APIRouter]) -> list[re.Pattern[str]]:
+    """The addresses of every GET page that needs a signed-in person or an admin, from the
+    app's routers: the pages to come back to after signing in."""
+    return [
+        route.path_regex
+        for router in routers
+        for route in router.routes
+        if isinstance(route, APIRoute) and "GET" in route.methods and _takes_user(route.dependant)
+    ]
+
+
+def safe_return(request: Request, path: object) -> str | None:
     """`path` when it is a page of this app to come back to, else None."""
     if not isinstance(path, str):
         return None
     page, _, query = path.partition("?")
-    if not _PAGE.match(page) or not _QUERY.match(query):
+    if not _PLAIN.match(page) or ".." in page or not _QUERY.match(query):
+        return None
+    if not any(pattern.match(page) for pattern in request.app.state.return_pages):
         return None
     return path
 
@@ -54,7 +79,7 @@ def return_path(request: Request) -> str | None:
     path = request.url.path
     if request.method in {"GET", "HEAD"}:
         query = request.url.query
-        return safe_return(f"{path}?{query}" if query else path)
+        return safe_return(request, f"{path}?{query}" if query else path)
     if request.method != "POST":
         return None
     if match := _DECISION.match(path):
@@ -77,7 +102,7 @@ def remember_return(request: Request) -> str | None:
 def take_return(request: Request) -> str:
     """Where signing in goes: the remembered page (forgotten now), else `/app`. Read it
     before the session is rotated (`deps.start_session` clears it)."""
-    return safe_return(request.session.pop(NEXT_KEY, None)) or DEFAULT
+    return safe_return(request, request.session.pop(NEXT_KEY, None)) or DEFAULT
 
 
 SIGNED_OUT_TITLE = "Please sign in again"
