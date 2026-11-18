@@ -368,9 +368,36 @@ def _row(t: Tolerance, baseline: float | None, current: float | None) -> GateRow
     )
 
 
+# The canonical-form equation score, printed beside the gated `exact_lenient` figures for one
+# release (docs/eval.md). Nothing here is gated: no tolerance reads these paths.
+BESIDE = (
+    ("exact_printed", "equations", "metrics.exact_printed"),
+    ("matched_exact_printed", "document", "metrics.matched_exact_printed"),
+    ("pairing_misses", "document", "metrics.pairing_misses"),
+)
+
+
+def _beside_notes(current: dict, baseline: dict) -> list[str]:
+    """Lines giving the canonical-form score of the baseline and the current report, for the
+    task they belong to; empty when neither report has it (a record made before the field)."""
+    lines = []
+    for name, task, path in BESIDE:
+        if current.get("task") != task:
+            continue
+        old, new = lookup(baseline, path), lookup(current, path)
+        if old is None and new is None:
+            continue
+        lines.append(
+            f"{name} (beside exact_lenient, not gated): baseline "
+            f"{'n/a' if old is None else f'{old:.3f}'}, current "
+            f"{'n/a' if new is None else f'{new:.3f}'}"
+        )
+    return lines
+
+
 def _notes(current: dict, baseline: dict) -> list[str]:
     """What changed between the runs (expected: that is why the gate runs)."""
-    notes = []
+    notes = _beside_notes(current, baseline)
     for key in ("pipeline_version", "prompt_versions", "models", "client"):
         if current.get(key) != baseline.get(key):
             notes.append(f"{key} changed: {baseline.get(key)} -> {current.get(key)}")

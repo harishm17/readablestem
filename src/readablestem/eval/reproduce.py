@@ -37,6 +37,7 @@ from pathlib import Path
 from readablestem.eval import pipeline_eval as pe
 from readablestem.eval import tables as tables_eval
 from readablestem.eval.equations import score_latex
+from readablestem.eval.equations_printed import exact_printed
 from readablestem.eval.gold_scoring import iter_gold_records, load_predictions, score_equations
 
 GOLD_DIR = Path("data/gold")
@@ -158,10 +159,13 @@ def check_scorer_ceiling(root: Path, predictions: Path | None = None) -> Check:
         return Check(name, False, f"{len(wrong)} row(s) disagree with the fixture", wrong[:10])
     summary = score_equations(list(gold.values()), load_predictions(path))["summary"]
     n = len(rows)
+    # Beside it for one release: the same known-correct LaTeX under the canonical-form score.
+    printed = sum(exact_printed(r["latex"], gold[r["id"]].get("latex")) for r in rows)
     matched = sum("known_gap" not in r for r in rows)
     ok = math.isclose(summary["exact_lenient"], matched / n, abs_tol=TOLERANCE)
     detail = (
         f"exact_lenient {summary['exact_lenient']:.3f} ({matched} of {n}), "
+        f"exact_printed {printed / n:.3f} ({printed} of {n}), "
         f"exact_strict {summary['exact_strict']:.3f}, mean TEDS {summary['mean_teds']:.3f}; "
         f"{n - matched} known normalisation gaps, so equation scores understate quality "
         f"by up to {1 - matched / n:.0%}; the secondary stream scorer (T2-12) matches "

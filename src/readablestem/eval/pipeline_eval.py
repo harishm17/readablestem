@@ -88,6 +88,7 @@ from readablestem.eval.equations import (
     score_latex,
     score_mathml,
 )
+from readablestem.eval.equations_printed import exact_printed, is_pairing_miss
 from readablestem.eval.gold_scoring import iter_gold_records
 from readablestem.models.base import VisionClient
 from readablestem.ops import profile as run_profile
@@ -667,6 +668,10 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "has_proposal": proposal is not None,
         "exact_strict": score.exact_strict,
         "exact_lenient": score.exact_lenient,
+        # Beside it for one release: the canonical-form score (eval.equations_printed).
+        "exact_printed": exact_printed(
+            proposal.latex if proposal is not None else None, record.get("latex")
+        ),
         "teds": score.teds,
         # The labelled secondary scorer (eval.equations_v2); `wrong` below stays primary.
         "exact_stream_v2": stream.exact,
@@ -730,6 +735,7 @@ def _group_rates(items: Sequence[dict], key: str, order: Sequence[str] | None = 
             "n": len(groups[name]),
             "share": len(groups[name]) / n if n else None,
             "exact_lenient": rate(i["exact_lenient"] for i in groups[name]),
+            "exact_printed": rate(i["exact_printed"] for i in groups[name] if "exact_printed" in i),
             "mean_teds": mean(i["teds"] for i in groups[name]),
         }
         for name in names
@@ -737,6 +743,33 @@ def _group_rates(items: Sequence[dict], key: str, order: Sequence[str] | None = 
 
 
 STATUS_ORDER = [s.value for s in Status]
+
+
+def _printed_rate(key: str, items: Sequence[dict]) -> dict:
+    """`key`'s rate over the items that carry it, for the one release the canonical-form score
+    (`eval.equations_printed`) is printed beside `exact_lenient`. Nothing when no item has it: a
+    record made before the field is read as it was, not as all wrong."""
+    scored = [i[key] for i in items if key in i]
+    return {key: rate(scored)} if scored else {}
+
+
+def _printed_pair_metrics(pairs: Sequence[dict], gold: int) -> dict:
+    """The canonical-form score of the matched pairs, and the pairing misses counted apart.
+
+    A pairing miss (the answer is what the file's own characters say; the gold is another
+    region's) is wrong in `matched_exact_printed` and is also counted in `pairing_misses`, so a
+    reader can take it out of both sides. Nothing when no pair has the field (an older record)."""
+    scored = [p for p in pairs if "exact_printed" in p]
+    if not scored:
+        return {}
+    return {
+        "matched_exact_printed": rate(p["exact_printed"] for p in scored),
+        "end_to_end_exact_printed": _safe_div(sum(p["exact_printed"] for p in scored), gold),
+        "pairing_misses": sum(bool(p.get("pairing_miss")) for p in scored),
+        "matched_exact_printed_without_pairing_misses": rate(
+            p["exact_printed"] for p in scored if not p.get("pairing_miss")
+        ),
+    }
 
 
 def equation_metrics(items: Sequence[dict]) -> dict:
@@ -747,6 +780,7 @@ def equation_metrics(items: Sequence[dict]) -> dict:
         "exact_strict": rate(i["exact_strict"] for i in items),
         "exact_lenient": rate(i["exact_lenient"] for i in items),
         "exact_lenient_ci95": wilson_interval(lenient, n),
+        **_printed_rate("exact_printed", items),
         "mean_teds": mean(i["teds"] for i in items),
         "proposal_rate": rate(i["has_proposal"] for i in items),
         "secondary_stream_v2": {
@@ -1411,6 +1445,9 @@ def document_page_item(
             if read is not None
             else chem_score.missing_chem(gold[gi]["mathml"])
         )
+        printed = exact_printed(
+            proposal.latex if proposal is not None else None, gold[gi].get("latex")
+        )
         matched.append(
             {
                 "gold_id": gold[gi]["id"],
@@ -1420,6 +1457,12 @@ def document_page_item(
                 "similarity": round(sim, 4),
                 "status": fix.status.value if fix is not None else None,
                 "exact_lenient": result.exact_lenient,
+                # Beside it for one release (eval.equations_printed): the canonical-form score,
+                # and whether the pair is a pairing miss (the answer is what the file's own
+                # characters say and the gold is another region's), which is never right.
+                "exact_printed": printed,
+                "pairing_miss": not printed
+                and is_pairing_miss((element.text or "")[:300], read, gold[gi]["mathml"]),
                 "teds": result.teds,
                 "exact_stream_v2": stream.exact,
                 "stream_similarity": stream.similarity,
@@ -1786,6 +1829,7 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "matched_exact_lenient": rate(p["exact_lenient"] for p in pairs),
         "matched_mean_teds": mean(p["teds"] for p in pairs),
         "end_to_end_exact_lenient": _safe_div(sum(p["exact_lenient"] for p in pairs), gold),
+        **_printed_pair_metrics(pairs, gold),
         # Why the unmatched predictions did not match, and the precision without the
         # inline formulas the gold has no MathML for (maths written as text). A
         # prediction is prose_math only with evidence that it is a formula
@@ -2405,15 +2449,16 @@ def _table(headers: Sequence[str], rows: Iterable[Sequence[Any]]) -> list[str]:
 
 
 HEADLINE = {
-    "equations": ["exact_strict", "exact_lenient", "exact_lenient_ci95", "mean_teds",
-                  "proposal_rate"],
+    "equations": ["exact_strict", "exact_lenient", "exact_lenient_ci95", "exact_printed",
+                  "mean_teds", "proposal_rate"],
     "headings": ["precision", "recall", "recall_ci95", "f1", "level_accuracy",
                  "gold_headings", "predicted_headings", "page_errors"],
     "figures": ["proposal_rate", "check_pass_rate", "judge_pass_rate",
                 "judge_pass_rate_ci95", "judge_pass_rate_answered", "judge_mean_score",
                 "judge_factual_error_rate", "judge_errors"],
     "document": ["detection_precision", "detection_recall", "matched_exact_lenient",
-                 "end_to_end_exact_lenient", "unmatched_predicted",
+                 "end_to_end_exact_lenient", "matched_exact_printed",
+                 "end_to_end_exact_printed", "pairing_misses", "unmatched_predicted",
                  "detection_precision_excluding_prose_math", "split_gold_equations",
                  "static_violations", "axe_violations", "axe_checked_pages",
                  "axe_skipped_pages", "axe_error_pages", "page_errors"],
@@ -2623,7 +2668,10 @@ def format_markdown(report: dict) -> str:
         for title, key in (("By status", "by_status"), ("By route", "by_route")):
             lines += ["", f"### {title}", ""]
             lines += _table(
-                ["group", "n", "exact_lenient", "mean_teds"],
-                ((g, v["n"], v["exact_lenient"], v["mean_teds"]) for g, v in metrics[key].items()),
+                ["group", "n", "exact_lenient", "exact_printed", "mean_teds"],
+                (
+                    (g, v["n"], v["exact_lenient"], v.get("exact_printed"), v["mean_teds"])
+                    for g, v in metrics[key].items()
+                ),
             )
     return "\n".join(lines) + "\n"
