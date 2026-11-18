@@ -8,7 +8,8 @@ operator reads the open ones at `/admin/reports`. Nobody else reads them.
 What a row holds: the document's id (as text, not a foreign key, so the report outlives the
 document), the item's id, its kind and page number, the code of a stopped job, the pipeline
 version, and what the sender typed (plain text, at most `MAX_TEXT` characters). No picture, no
-text of the document, no reply address. The ids are read from the stored job here, not from
+text of the document. The row names the sender's account, and the operator's page shows its
+email address (the form says so). The ids are read from the stored job here, not from
 what the form sent, so the form cannot name a kind or a page it does not have.
 
 Who writes: the owner of a document and a person it was shared with for review (the form's
