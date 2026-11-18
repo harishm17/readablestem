@@ -15,7 +15,7 @@ from datetime import timedelta
 
 import pytest
 
-from fixtures.web.support import ALICE, PNG, WebEnv, fake_output, make_pdf
+from fixtures.web.support import ALICE, PNG, WebEnv, as_current, fake_output, make_pdf
 from readablestem.core.types import ConversionOutput, Notice, SourceFacts, Status
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
@@ -68,8 +68,17 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
     from readablestem.pipeline import assemble
 
     patch = pytest.MonkeyPatch()
-    # The language control re-renders the file; the fake result's file is a stub.
-    patch.setattr(assemble, "render_html", lambda **kw: f'<html lang="{kw["lang"]}"></html>')
+    # The file is made again from the stored result on first use and by the language control;
+    # the fake result's file is a stub, so the page made from it is one too (with a body: the
+    # Word and EPUB files are made from it).
+    patch.setattr(
+        assemble,
+        "render_html",
+        lambda **kw: as_current(
+            f'<html lang="{kw["lang"]}"><head><title>Kinematics</title></head>'
+            "<body><main><h1>Kinematics</h1><p>Text.</p></main></body></html>"
+        ),
+    )
     env = WebEnv(tmp_path_factory.mktemp("job-browser"), per_user_daily_page_quota=1000)
     port = free_port()
     server = uvicorn.Server(
