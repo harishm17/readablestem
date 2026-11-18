@@ -5,10 +5,15 @@
    Rules this file keeps:
    - The transcript is plain text in the page and works without this file. Nothing here is
      needed to read it, and nothing here moves focus or takes a key a screen reader needs.
-   - Privacy: a voice that runs on this device (localService) is the default. When the browser
-     lists only online voices, some browsers send the text to their maker to speak it, so
-     nothing is spoken until the person chooses one on purpose (the full player) or presses the
-     button a second time (a one-line "Hear this").
+   - Privacy: a voice that runs on this device (localService === true) is the default. Every
+     other voice is one of two classes, and Play is never switched off for either: an online
+     voice (the browser says it is not local and the name says it is a network voice, such as
+     Chrome's "Google ..." voices), whose text some browsers send to their maker; and a voice
+     that is not known, which the browser reports as not local without saying where it runs
+     (all of Firefox's speech-dispatcher voices on Linux). The first Play with either asks, in
+     words, and the second press is the answer (a one-line "Hear this" does the same). The
+     answer is kept for the visit only. The words are in WORDS below, and the words for a voice
+     that is not known never say the text is sent anywhere.
    - State changes (playing, paused, stopped, which item) go to a polite status line; the item
      being spoken is not announced again, because the voice is already saying it.
    - Motion follows prefers-reduced-motion.
@@ -41,6 +46,24 @@
   var motion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
   var CHUNK = 200; // a long utterance can be cut off by a browser: speak it in pieces
 
+  // The sentences about voices (privacy claims: change them with care). Plain words.
+  var WORDS = {
+    none: "No voice on this device.",
+    askOnline: "This is an online voice. Some browsers send the text to their maker to speak it. " +
+      "Press Play again to use it anyway, or choose another voice.",
+    askUnknown: "Your browser does not tell this page whether this voice runs on this device. " +
+      "Press Play again to use it, or choose another voice.",
+    usingOnline: "Online voice: your browser may send the text to its maker.",
+    usingUnknown: "Your browser does not say whether this voice runs on this device.",
+    groupLocal: "On this device",
+    groupOnline: "Online (may send the text to the browser's maker)",
+    groupUnknown: "Not known (the browser does not say whether these run on this device)",
+    hearOnline: "This voice is online, and some browsers send the text to their maker to speak " +
+      "it. Press the button again to hear it anyway.",
+    hearUnknown: "Your browser does not tell this page whether this voice runs on this device. " +
+      "Press the button again to hear it.",
+  };
+
   // ---------------------------------------------------------------- voices
 
   function voiceList() {
@@ -64,8 +87,28 @@
     return pool.filter(function (v) { return v.default; })[0] || pool[0] || null;
   }
 
-  function localVoices(voices) {
-    return voices.filter(function (v) { return v.localService === true; });
+  // "local" runs on this device (the browser says so); "online" is known to be a network voice
+  // (the browser says it is not local and the name says so: Chrome's "Google ...", Edge's
+  // "... Online (Natural)"); anything else is "unknown": the browser does not say.
+  var ONLINE_NAME = /^google\b|\bonline\b/i;
+
+  function kindOf(v) {
+    if (!v) return "";
+    if (v.localService === true) return "local";
+    if (v.localService === false && ONLINE_NAME.test(String(v.name || ""))) return "online";
+    return "unknown";
+  }
+
+  function ofKind(voices, kind) {
+    return voices.filter(function (v) { return kindOf(v) === kind; });
+  }
+
+  function defaultVoice(voices, lang) {
+    // On this device first; else a voice not known (likely a system voice) before an online one.
+    var pool = ofKind(voices, "local");
+    if (!pool.length) pool = ofKind(voices, "unknown");
+    if (!pool.length) pool = ofKind(voices, "online");
+    return best(pool, lang);
   }
 
   function whenVoices(done) {
@@ -226,6 +269,7 @@
   function initPlayer(root) {
     var controls = root.querySelector("[data-listen-controls]");
     var transport = root.querySelector("[data-listen-transport]");
+    var bar = transport && transport.querySelector(".listen-bar");
     var list = root.querySelector("[data-listen-transcript]");
     var status = root.querySelector("[data-listen-status]");
     var position = root.querySelector("[data-listen-position]");
@@ -241,7 +285,7 @@
     var voiceSelect = root.querySelector("[data-listen-voice]");
     var rateSelect = root.querySelector("[data-listen-rate]");
     var voiceField = root.querySelector("[data-listen-voice-field]");
-    if (!controls || !transport || !list) return;
+    if (!controls || !transport || !bar || !list) return;
     if (!supported) {
       // The transcript stays as it is; say so once, where the controls would have been.
       var plain = root.querySelector("[data-listen-unsupported]");
@@ -271,6 +315,8 @@
     var token = 0;
     var voice = null;
     var voices = [];
+    var agreed = { online: false, unknown: false }; // answered yes to Play's question, this visit
+    var asking = false; // Play has asked about the chosen voice and waits for the second press
     var doc = root.getAttribute("data-listen-doc") || "page:" + window.location.pathname;
     var version = root.getAttribute("data-listen-version") || "page";
 
@@ -351,11 +397,19 @@
       // One button plays and pauses: its label says what pressing it does now, and with a
       // place kept, where it will start.
       var total = shownCount();
-      button.play.textContent = S.mode === "playing"
-        ? "Pause"
-        : S.mode === "idle" && S.at >= 0
-          ? "Resume from item " + (S.at + 1) + " of " + items.length
-          : "Play";
+      // In a short window only the first word shows (the place is beside it): listen.css.
+      var head = S.mode === "playing" ? "Pause" : S.mode === "idle" && S.at >= 0 ? "Resume" : "Play";
+      var tail = S.mode === "idle" && S.at >= 0 ? " from item " + (S.at + 1) + " of " + items.length : "";
+      var label = document.createElement("span"); // one flex item, so the words stay one line
+      label.textContent = head;
+      if (tail) {
+        var more = document.createElement("span");
+        more.className = "listen-tail";
+        more.textContent = tail;
+        label.appendChild(more);
+      }
+      button.play.textContent = "";
+      button.play.appendChild(label);
       enable(button.play, ready());
       enable(button.stop, S.mode !== "idle");
       ["prev", "next", "heading", "equation", "beginning"].forEach(function (name) {
@@ -477,6 +531,29 @@
       );
     }
 
+    function clear(byPlay) {
+      // May the chosen voice speak? A local voice, or one the person has said yes to this
+      // visit. Otherwise Play asks (once) and the next press of Play is the answer: Play stays
+      // on, and any other button only shows the question again.
+      var kind = kindOf(voice);
+      if (!voice || kind === "local" || agreed[kind]) {
+        asking = false;
+        return true;
+      }
+      if (asking && byPlay) {
+        agreed[kind] = true;
+        asking = false;
+        explain();
+        return true;
+      }
+      asking = true;
+      explain();
+      say(status, kind === "online" ? WORDS.askOnline : WORDS.askUnknown);
+      // In a short window the note is below the bar and may be scrolled away: bring it up.
+      voiceNote.scrollIntoView({ block: "nearest", behavior: "auto" });
+      return false;
+    }
+
     function play() {
       if (!ready()) return;
       if (S.mode === "paused") {
@@ -484,6 +561,7 @@
         setState("playing", "Playing.");
         return;
       }
+      if (!clear(true)) return;
       var from = placeToPlay();
       if (from < 0) return say(status, "No items match. Clear the filter to play.");
       S.mode = "playing";
@@ -530,6 +608,7 @@
 
     function go(i, words) {
       if (!ready() || i < 0 || i >= items.length) return false;
+      if (!clear()) return true; // Play's question is shown instead
       var keepGoing = S.mode !== "idle";
       S.mode = keepGoing ? "playing" : "idle";
       speakItem(i, keepGoing);
@@ -588,6 +667,7 @@
     button.heading.addEventListener("click", function () { jump("heading", "Heading"); });
     button.equation.addEventListener("click", function () { jump("equation", "Equation"); });
     button.beginning.addEventListener("click", function () {
+      if (!clear()) return;
       var first = nextShown(-1, 1);
       if (first < 0) return say(status, "No items match. Clear the filter to play.");
       S.mode = "playing";
@@ -625,10 +705,17 @@
       var chosen = voices.filter(function (v) { return v.voiceURI === voiceSelect.value; })[0] || null;
       voice = chosen;
       S.voiceName = chosen ? chosen.name : "";
+      asking = false;
       remember();
+      if (S.mode === "playing") {
+        if (clear()) speakItem(S.at, true);
+        else {
+          cancel(); // a voice not yet agreed to does not speak: Play asks
+          S.mode = "idle";
+        }
+      }
       explain();
       paint();
-      if (S.mode === "playing") speakItem(S.at, true);
     });
 
     if (follow) {
@@ -647,29 +734,20 @@
     }
 
     function explain() {
-      // Beside Play, outside the collapsed controls: why Play is off, and what to do.
-      var local = localVoices(voices);
+      // Beside Play, outside the collapsed controls: no voice, or what to know about this one.
+      var kind = kindOf(voice);
       var words = "";
-      var pick = false;
-      if (!voices.length) {
-        words = "No voice on this device.";
-      } else if (!local.length && !voice) {
-        words = "Only online voices: some browsers send the text to their maker.";
-        pick = true;
-      } else if (voice && voice.localService !== true) {
-        words = "Online voice: your browser may send the text to its maker.";
-      }
+      if (!voices.length) words = WORDS.none;
+      else if (asking) words = kind === "online" ? WORDS.askOnline : WORDS.askUnknown;
+      else if (kind !== "local" && agreed[kind]) words = kind === "online" ? WORDS.usingOnline : WORDS.usingUnknown;
       voiceText.textContent = words;
-      if (chooseVoice) chooseVoice.hidden = !pick;
+      if (chooseVoice) chooseVoice.hidden = !asking;
       if (readLink) readLink.hidden = !(words && !ready());
       voiceNote.hidden = !words;
-      transport.classList.toggle("has-note", !!words);
     }
 
     function fill(found) {
       voices = found;
-      var local = localVoices(voices);
-      var online = voices.filter(function (v) { return v.localService !== true; });
       var keepURI = voice && voice.voiceURI;
       function named(name) {
         return name ? voices.filter(function (v) { return v.name === name; })[0] || null : null;
@@ -687,26 +765,20 @@
         });
         voiceSelect.appendChild(g);
       }
-      if (!local.length && online.length) {
-        var none = document.createElement("option");
-        none.value = "";
-        none.textContent = "Choose a voice";
-        voiceSelect.appendChild(none);
-      }
-      group("On this device", local);
-      group("Online (may send the text to the browser's maker)", online);
-      // The voice the person chose, here or on an earlier visit (an online one was their own
-      // choice), else the one in use, else the best on this device.
+      group(WORDS.groupLocal, ofKind(voices, "local"));
+      group(WORDS.groupOnline, ofKind(voices, "online"));
+      group(WORDS.groupUnknown, ofKind(voices, "unknown"));
+      // The voice the person chose, here or on an earlier visit, else the one in use, else the
+      // best on this device (then one not known, then an online one): Play is never off for it.
       var chosen = named(S.voiceName);
       if (chosen) {
         voice = chosen;
       } else if (keepURI && voices.some(function (v) { return v.voiceURI === keepURI; })) {
         voice = voices.filter(function (v) { return v.voiceURI === keepURI; })[0];
-      } else if (local.length) {
-        voice = best(local, document.documentElement.getAttribute("lang") || "en");
       } else {
-        voice = null;
+        voice = defaultVoice(voices, document.documentElement.getAttribute("lang") || "en");
       }
+      if (!voice || kindOf(voice) === "local" || agreed[kindOf(voice)]) asking = false;
       voiceSelect.value = voice ? voice.voiceURI : "";
       voiceSelect.disabled = !voices.length;
       voiceField.hidden = !voices.length; // an empty menu explains nothing
@@ -758,11 +830,20 @@
     // note), so the room items need above them when scrolled into view is its real height,
     // measured, not a fixed guess. listen.css reads --listen-sticky.
     function measure() {
-      var sticky = window.getComputedStyle(transport).position === "sticky";
-      var height = sticky ? Math.ceil(transport.getBoundingClientRect().height) : 0;
+      // What sticks is the whole block, or in a short window (listen.css) only the bar.
+      var stuck = [transport, bar].filter(function (el) {
+        var style = window.getComputedStyle(el);
+        return style.position === "sticky" && style.display !== "contents";
+      })[0];
+      var height = stuck ? Math.ceil(stuck.getBoundingClientRect().height) : 0;
       root.style.setProperty("--listen-sticky", height + "px");
+      document.documentElement.style.setProperty("--listen-sticky", height + "px"); // scroll-padding
     }
-    if (window.ResizeObserver) new window.ResizeObserver(measure).observe(transport);
+    if (window.ResizeObserver) {
+      var watcher = new window.ResizeObserver(measure);
+      watcher.observe(transport);
+      watcher.observe(bar);
+    }
     window.addEventListener("resize", measure);
 
     // Shortcuts: only while focus is inside this page's content, never with a modifier, never
@@ -812,8 +893,8 @@
     if (!buttons.length || !supported) return;
     var token = 0;
     var speaking = null;
-    var online = false; // the person has agreed, on this page, to an online voice
-    var asked = null; // the button whose press was told about online voices
+    var agreed = { online: false, unknown: false }; // the person has said yes, on this page
+    var asked = null; // the button whose press was told about an online or a voice not known
 
     function reset() {
       buttons.forEach(function (b) {
@@ -879,17 +960,17 @@
           note(button, "This browser has no voices to speak with.");
           return;
         }
-        var local = localVoices(found);
-        if (local.length) {
-          start(button, best(local, voiceLang), voiceLang);
-        } else if (online || asked === button) {
-          online = true; // the second press is the person's own choice
+        var pick = defaultVoice(found, voiceLang);
+        var kind = kindOf(pick);
+        if (kind === "local") {
+          start(button, pick, voiceLang);
+        } else if (agreed[kind] || asked === button) {
+          agreed[kind] = true; // the second press is the person's own choice
           asked = null;
-          start(button, best(found, voiceLang), voiceLang);
+          start(button, pick, voiceLang);
         } else {
           asked = button;
-          note(button, "This browser has only online voices, and some browsers send the text " +
-            "to their maker to speak it. Press the button again to hear it anyway.");
+          note(button, kind === "online" ? WORDS.hearOnline : WORDS.hearUnknown);
         }
       });
     });
