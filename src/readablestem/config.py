@@ -228,13 +228,14 @@ class Settings(BaseSettings):
     # equations had no second look. This one asks a different Claude model (not the one
     # that read the page), with a different prompt written as an audit (prompts
     # `check_figure.md`, `check_equation.md`), whether the proposal matches the image.
-    #   off     - never asked;
+    #   off     - never asked. The default: the first real-model walkthrough (2026-11-09)
+    #             showed the shadow check changed no output and cost about 16% of the spend;
     #   shadow  - asked and recorded (agreement is counted in the aggregates and the eval),
-    #             nothing about the output changes. The default;
+    #             nothing about the output changes. Turn it on for a measured run;
     #   enforce - figures only: a flagged alt text gets the optional note "a second
     #             automated check found a possible mismatch", as the Decisions check does.
     #             Never a required decision, never a status change. Equations stay shadow.
-    claude_second_check: Literal["off", "shadow", "enforce"] = "shadow"
+    claude_second_check: Literal["off", "shadow", "enforce"] = "off"
     # Must not be the model that read the page (the cheap and main models) for the check to
     # be independent; sonnet is neither by default.
     claude_check_model: str = "claude-sonnet-5-5"

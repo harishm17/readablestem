@@ -1287,7 +1287,7 @@ confidence or reasoning, only the proposal (alt text and caption, or LaTeX) fenc
 | Flagged when | min(ok, 1 - factual_error) < `DECISIONS_FIGURE_FLAG_BELOW` (0.5): either answer is bad | `meaning_changing` >= `DECISIONS_EQUATION_FLAG_AT` (0.2) |
 | Asked about | an ACCEPTED, non-decorative figure with alt text | the final proposal of an ACCEPTED equation (`CLAUDE_CHECK_SCOPE=accepted`, default; `all` adds those already waiting for review) |
 
-**`CLAUDE_SECOND_CHECK`** (default **`shadow`**): `off` asks nothing. `shadow` asks, records
+**`CLAUDE_SECOND_CHECK`** (default **`off`**): `off` asks nothing. `shadow` asks, records
 a `Verification` with mode `shadow` and its `flagged` verdict, and changes nothing: no
 check, no note, no status, no review tier, no escalation. `enforce` (off by default) is for
 figures only: a flag adds the same optional `figure.second_check` note as the Decisions

@@ -92,7 +92,7 @@ def test_web_secret_check_follows_the_provider():
 def test_the_decisions_check_is_skipped_with_the_anthropic_provider():
     on = {"decisions_figure_verify": True, "decisions_equation_shadow": True}
     assert any_check_enabled(settings(**on))
-    claude = settings(model_provider="anthropic", **on)
+    claude = settings(model_provider="anthropic", claude_second_check="shadow", **on)
     assert not any_check_enabled(claude)
     # Offline too: the Claude provider's check is the Claude one (fake offline), not the
     # Decisions API's, and it names the Claude check model.

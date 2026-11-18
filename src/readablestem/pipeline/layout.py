@@ -109,6 +109,7 @@ from readablestem.pipeline import (
     glyph_names,
     glyph_reconcile,
     hyphens,
+    named_links,
     outline,
     page_labels,
     page_type,
@@ -214,6 +215,7 @@ RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 MIN_BARS = 2  # a filled drawing of this many rectangles keeps them (`_Path.rects`) ...
 MAX_BAR_ITEMS = 1000  # ... unless it has more items than this
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
+SET_OFF_FLAG = 1 << 20  # `_Char.flags` of a blank layout made between a note mark and a word
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
 # Raised and lowered text in a paragraph (`_script_kinds`): a glyph smaller than the row's
 # text is a script when it sits this far (x the row size) off the baseline; a full-size
@@ -1508,6 +1510,8 @@ class _Row:
     region: _Region | None = None  # the display equation it belongs to (_equation_regions)
     # An exercise number ("18.", "4)") cut off the front of a maths row: text, never maths.
     exercise_number: bool = False
+    # The destinations the file names for a footnote that starts at this row (`_mark_notes`).
+    note: tuple[str, ...] = ()
     # A line of a table of contents with its leaders and page number cut off
     # (`_contents_rows`): an entry of its own, at this nesting level (1 = outermost).
     contents_level: int = 0
@@ -8027,6 +8031,9 @@ def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
 class _Context:
     body: float  # body font size (pt)
     pitch: float  # typical baseline-to-baseline distance of body text (pt)
+    # The footnotes the file names, when it names any (`named_links`); None: it names none,
+    # and a footnote is decided by its mark and its place (`_footnote`).
+    notes: named_links.NamedNotes | None = None
 
 
 @dataclass(eq=False)
@@ -8043,6 +8050,7 @@ class _Run:
     block_end: bool = True
     code: bool = False  # rows of program code, grouped whatever their indentation
     contents: bool = False  # a line of a table of contents: a list item of its own
+    note: bool = False  # a footnote the file names, from its first line on (`_mark_notes`)
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # union of the rows' boxes
     margin: float = 0.0  # left edge of the rows after the first (the first's when alone)
 
@@ -8329,6 +8337,19 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
+            if row.note:  # a footnote the file names: a block of its own, text whatever it holds
+                row.kind, row.region = "text", None
+                run.block_end = True
+                runs.append(_Run([row], "text", block_start=True, note=True))
+                continue
+            if (
+                run.note
+                and row.kind == "text"
+                and not row.contents_level
+                and _continues(prev, row, run, ctx)
+            ):
+                run.add(row)
+                continue
             if row.contents_level or run.contents:
                 run.block_end = True
                 runs.append(
@@ -8362,13 +8383,16 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             starts = not geometric or restyled or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
+            if row.note:
+                row.kind, row.region = "text", None
             runs.append(
                 _Run(
                     [row],
                     row.kind,
                     block_start=True,
-                    code=id(row) in code,
+                    code=id(row) in code and not row.note,
                     contents=bool(row.contents_level),
+                    note=bool(row.note),
                 )
             )
     return runs
@@ -8702,6 +8726,8 @@ def _before_symbol(
     raised or lowered that start a word, a blank, a capital letter?"""
     if k <= start or k + 1 >= end or kinds[k - 1] is None or kinds[k + 1] is not None:
         return False
+    if chars[k].flags & SET_OFF_FLAG:
+        return False  # the blank `_set_off` made after a note mark: a note, not a nuclide
     if not chars[k + 1].c.isupper():
         return False
     j = k
@@ -9436,6 +9462,7 @@ def _page_blocks(
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
+    _mark_notes(rows, number, page_rect.height, ctx)
     for row in rows:
         _classify_row(row)
     rows = _contents_rows(rows)
@@ -10709,6 +10736,7 @@ def _analyze_document(
     forget()
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
+    ctx.notes = named_links.read(doc, list(selected)) or None
     global _COMPOUNDS, _WHOLE_WORDS
     _COMPOUNDS, _WHOLE_WORDS = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
@@ -11170,6 +11198,120 @@ FOOTNOTE_CONTEXT = 10  # characters printed before a footnote's mark that find i
 _FOOTNOTE_MARKS = frozenset("*\u2020\u2021\u00a7")
 
 
+def _row_at(rows: Sequence[_Row], point: tuple[float, float]) -> _Row | None:
+    """The line a destination points at: hyperref puts it a little above the top of its
+    line, so the row whose top is nearest below it (or at it), at its x."""
+    x, y = point
+    near = [
+        r
+        for r in rows
+        if not r.vertical and r.y0 - 0.7 * r.size <= y <= r.y1 and r.x0 - r.size <= x <= r.x1
+    ]
+    return min(near, key=lambda r: abs(r.y0 - y)) if near else None
+
+
+def _covers(row: _Row, box: BBox) -> bool:
+    """Does the link rectangle sit on the line of `row` (its middle between the row's top
+    and bottom)?"""
+    return row.y0 - 1 <= (box[1] + box[3]) / 2 <= row.y1 + 1
+
+
+def _mark_chars(row: _Row, box: BBox) -> list[int]:
+    """The glyphs of `row` a link's rectangle covers (by their centres): the raised ones
+    when it covers some, so a letter the rectangle touches is not part of the mark."""
+    hits = [
+        i
+        for i, c in enumerate(row.chars)
+        if not c.blank
+        and box[0] - 0.5 <= (c.x0 + c.x1) / 2 <= box[2] + 0.5
+        and box[1] - 0.5 <= (c.y0 + c.y1) / 2 <= box[3] + 0.5
+    ]
+    return [i for i in hits if row.is_script(row.chars[i])] or hits
+
+
+def _lead_mark(row: _Row, named: bool) -> int:
+    """Where the raised mark that starts `row` ends (a char index), or 0 without one. A
+    mark is digits and footnote signs (`_FOOTNOTE_MARKS`), any raised glyph in a footnote
+    the file names."""
+    end = 0
+    for i, c in enumerate(row.chars):
+        if c.blank:
+            if end:
+                break
+            continue
+        if not row.is_script(c) or not (named or c.c.isdigit() or c.c in _FOOTNOTE_MARKS):
+            break
+        end = i + 1
+    return end
+
+
+def _set_off(row: _Row, at: int) -> None:
+    """A blank before `row.chars[at]`, between a note mark and the word it touches: the glyph
+    where the mark ends is where the split is made (`row.text` and the rest are made again)."""
+    if not 0 < at < len(row.chars) or row.chars[at].blank or row.chars[at - 1].blank:
+        return
+    before = row.chars[at - 1]
+    blank = _Char(" ", before.x1, before.y0, before.x1, before.y1, before.baseline, before.size,
+                  before.font, before.flags | SET_OFF_FLAG)  # fmt: skip
+    row.chars.insert(at, blank)
+    for cached in ("text", "clean", "styled_text"):
+        row.__dict__.pop(cached, None)
+
+
+def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> None:
+    """Where a footnote starts on this page, and each note mark set off from the word it
+    touches (a raised "2" kept as a character of "Feehly" read "2Feehly").
+
+    A file that names its footnotes (`ctx.notes`): the line a destination points at starts
+    one (`Row.note`), and the glyphs a link to it covers are its mark in the text. Without
+    names, a line in the lower part of the page, in smaller type, that starts with a raised
+    digit or footnote sign starts one, as `_footnote` decides. The mark is split from the word
+    at the glyph, where it is known to be raised: never an exponent, which no destination
+    and no footnote line points at. A raised digit that ends a larger heading and is the
+    mark of a footnote on the page is set off from the heading's words in the same way."""
+    notes = ctx.notes
+    named = notes is not None
+    if notes is not None:
+        for dest in notes.destinations.get(number, ()):
+            row = _row_at(rows, dest.point)
+            if row is not None:
+                row.note = (*row.note, dest.name)
+    marks: set[str] = set()
+    for row in rows:
+        if row.vertical:
+            continue
+        low = row.y0 >= FOOTNOTE_ZONE * height and row.size < FOOTNOTE_SIZE * ctx.body
+        end = _lead_mark(row, named=bool(row.note)) if row.note or (not named and low) else 0
+        if end:
+            marks.add("".join(c.c for c in row.chars[:end] if not c.blank))
+            _set_off(row, end)
+    heading_rows = [r for r in rows if not r.note and not r.vertical and _heading_sized(r, ctx)]
+    for ref in notes.references.get(number, ()) if notes is not None else ():
+        for row in rows:
+            if row.note or not _covers(row, ref.box):
+                continue
+            hits = _mark_chars(row, ref.box)
+            if not hits:
+                continue
+            if row in heading_rows and hits[-1] == max(
+                i for i, c in enumerate(row.chars) if not c.blank
+            ):
+                _set_off(row, hits[0])  # the mark ends the heading: not one of its words
+            elif (after := hits[-1] + 1) < len(row.chars) and row.chars[after].c.isalnum():
+                _set_off(row, after)
+            break
+    if named or not marks:
+        return
+    for row in heading_rows:
+        last = max((i for i, c in enumerate(row.chars) if not c.blank), default=-1)
+        start = last
+        while start > 0 and row.is_script(row.chars[start]):
+            start -= 1
+        start += 1
+        if start <= last and "".join(c.c for c in row.chars[start : last + 1]) in marks:
+            _set_off(row, start)
+
+
 @dataclass(frozen=True)
 class _FootnoteMark:
     """A footnote's mark in the text above it: the block (by its element id) and what is
@@ -11188,10 +11330,19 @@ def _layout_notices(
 ) -> list[Notice]:
     """The code blocks and footnotes the job page lists under "Not handled in this file"
     (review "none": no decision). `marks_out`
-    gets each footnote's element id with the place of its mark (`_FootnoteMark`)."""
+    gets each footnote's element id with the place of its mark (`_FootnoteMark`).
+
+    A file that names its footnotes (`ctx.notes`) is read from the file: the block that
+    starts at a destination is a footnote, the glyphs of a link to it are its mark, and no
+    other block is a footnote. Otherwise a footnote is a block of smaller type low on the
+    page that starts with a mark printed raised in the text above it."""
     notices: list[Notice] = []
+    named = ctx.notes
+    started: dict[str, str] = {}  # destination name -> the footnote's element id
+    marks: dict[str, _FootnoteMark] = {}  # destination name -> the link's glyphs in the text
     for page in pages:
         raised: dict[str, _FootnoteMark] = {}  # marks printed raised above, on this page
+        refs = named.references.get(page.number, []) if named is not None else []
         for block in page.blocks:
             element_id = block_ids.get(id(block))
             if element_id is not None and block.flat_scripts:
@@ -11200,13 +11351,17 @@ def _layout_notices(
             if block.kind not in _TEXT_BLOCKS or element_id is None:
                 continue
             ink = [c for row in block.rows for c in row.chars if not c.blank]
-            if block.code or (
+            if named is not None and block.rows[0].note:
+                notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
+                                      review="none"))  # fmt: skip
+                started.update(dict.fromkeys(block.rows[0].note, element_id))
+            elif block.code or (
                 len(ink) >= CODE_MIN_GLYPHS
                 and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(ink)
             ):
                 notices.append(Notice(code="code_block", page=page.number, element_id=element_id,
                                       review="none"))  # fmt: skip
-            elif ink and _footnote(block, ink[0].c, page, ctx, raised.keys()):
+            elif named is None and ink and _footnote(block, ink[0].c, page, ctx, raised.keys()):
                 notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
                                       review="none"))  # fmt: skip
                 if marks_out is not None:
@@ -11216,6 +11371,21 @@ def _layout_notices(
                     if row.is_script(c) and c.c.strip():
                         before = _clean("".join(x.c for x in row.chars[:i]))[-FOOTNOTE_CONTEXT:]
                         raised[c.c] = _FootnoteMark(element_id, before, c.c)
+                if row.note:
+                    continue
+                for ref in refs:
+                    hits = _mark_chars(row, ref.box)
+                    if hits and ref.name not in marks and _covers(row, ref.box):
+                        before = _clean("".join(x.c for x in row.chars[: hits[0]]))
+                        marks[ref.name] = _FootnoteMark(
+                            element_id,
+                            before[-FOOTNOTE_CONTEXT:],
+                            "".join(row.chars[i].c for i in hits),
+                        )
+    if marks_out is not None:
+        for name, mark in marks.items():
+            if name in started:
+                marks_out.setdefault(started[name], mark)
     return notices
 
 

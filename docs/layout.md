@@ -1408,6 +1408,26 @@ text by the ten characters printed before it, and a mark that cannot be found ex
 gets no link (`_footnote_links`; an internal `Link` made by layout, which the text pass
 keeps and which wins over a PDF link on the same text).
 
+A file that names its footnotes is read from the file (WS2.8 g, `pipeline.named_links`, the one
+place that reads destinations and links from PyMuPDF). LaTeX's hyperref writes a named
+destination `Hfootnote.N` about 2 pt above the footnote's line and a link to it from the mark in
+the text. The line a destination points at starts a footnote (`_mark_notes` gives the rows from
+there their own run, which is why a footnote set in a mono font, a URL, is not a code block);
+the link's rectangle is the mark. In such a file a block it does not name is not made a
+footnote by its place and size alone (a listing's line numbers in small type were 40
+"footnotes" in one file, and a numbered list at the foot of a page was one too), and a file that
+names none behaves as before.
+
+A raised number is set off from the word it touches where the glyphs are cut (`_mark_notes`,
+`SET_OFF_FLAG`), not by repairing the string afterwards: the mark that opens a note's own text
+("2 We built"), a mark in the body that a link names, and a raised digit that ends a heading (a
+note mark, not one of the heading's words). The blank is one the nuclide rule (`_before_symbol`)
+leaves alone, so "2Feehly" no longer happens. An exponent is not touched, and nor is a raised
+mark of a table: in a file that names its footnotes only the glyphs a footnote link covers are
+marks, and in a file that names none only a raised digit or sign that opens a line of smaller
+type low on the page, or a raised run at the end of a heading that is the same as the opening
+of such a line on the page.
+
 **Contents pages.** A page with at least two lines that end in dot leaders (five dots, or
 an ellipsis counting for three) is a contents page (`_contents_rows`). Each such line is a
 list item of its own with its title only: the leaders go, and so does the page number (at

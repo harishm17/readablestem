@@ -35,7 +35,11 @@ What v2 does, in order:
 4. A degree sign or primes written as a superscript (`90^\circ`, `f^{\prime}`) are the
    same atoms as the characters written inline (`90°`, `f′`).
 5. A decimal point written as its own token between two numbers joins them.
-6. Structure stays: fractions, scripts, roots, tables and any fixed-arity grouping are
+6. Raised and lowered characters of a text token (`x²`, `CO₂`, `10^(-3)`, as a table cell or a
+   text layer states them) are scripts, as `<msup>`/`<msub>` of the atom before them: the
+   stream of `x²` is the stream of `x^2`, not the character order `x 2` (`read_scripts`,
+   `mathml_of_text`).
+7. Structure stays: fractions, scripts, roots, tables and any fixed-arity grouping are
    kept as open and close markers in the stream, so `a/b` is not `a b`. A leaf that
    splits into several atoms inside a script or fraction slot is a group there, as the
    same atoms written as an `mrow` are.
@@ -53,6 +57,7 @@ import re
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
+from typing import Literal
 
 from readablestem.eval.equations import MathMLError, latex_to_mathml, normalize
 
@@ -116,6 +121,12 @@ _PRIMES = {"′"}
 _MULTI_PRIME = {"″": 2, "‴": 3, "⁗": 4}
 _DEGREE = "°"
 _DECIMAL_POINT = "."
+# Raised and lowered characters of a text token, and the characters they stand for.
+_RAISED = dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱ", "0123456789+-=()ni", strict=True))
+_LOWERED = dict(zip("₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₕₖₗₘₙₚₛₜ", "0123456789+-=()aeoxhklmnpst", strict=True))
+_CARET_RUN = re.compile(r"\^\(([^()]+)\)")  # a raised run as a table cell writes it
+ScriptKind = Literal["sup", "sub"]
+ScriptSpan = tuple[int, int, ScriptKind]  # (start, end, kind) in the plain text
 # Atoms that separate equations when several are put together (`credit_*`).
 SEPARATORS = frozenset({",", ";", ".", "and", "or"})
 
@@ -146,10 +157,97 @@ def _leaf(elem: ET.Element) -> list[str]:
     return atoms
 
 
+def read_scripts(text: str) -> tuple[str, list[ScriptSpan]]:
+    """`text` with its raised and lowered characters as plain ones, and where they were:
+    Unicode superscript and subscript characters, and `^(...)` runs."""
+    plain: list[str] = []
+    runs: list[ScriptSpan] = []
+
+    def add(chars: str, kind: ScriptKind) -> None:
+        start = len(plain)
+        plain.extend(chars)
+        if runs and runs[-1][1] == start and runs[-1][2] == kind:
+            runs[-1] = (runs[-1][0], start + len(chars), kind)
+        else:
+            runs.append((start, start + len(chars), kind))
+
+    i = 0
+    while i < len(text):
+        match = _CARET_RUN.match(text, i)
+        if match:
+            add(match.group(1), "sup")
+            i = match.end()
+            continue
+        char = text[i]
+        if char in _RAISED:
+            add(_RAISED[char], "sup")
+        elif char in _LOWERED:
+            add(_LOWERED[char], "sub")
+        else:
+            plain.append(char)
+        i += 1
+    return "".join(plain), runs
+
+
+def _script_nodes(
+    text: str, runs: Sequence[ScriptSpan], leaf: str, variant: str | None = None
+) -> list[ET.Element]:
+    """The nodes of a text with raised and lowered runs: each run is a script of the atom
+    before it (`msup`/`msub`), the rest plain tokens (`leaf` is their tag)."""
+
+    def token(value: str) -> ET.Element:
+        node = ET.Element(leaf)
+        node.text = value
+        if variant:
+            node.set("mathvariant", variant)
+        return node
+
+    nodes: list[ET.Element] = []
+    at = 0
+    for start, end, kind in runs:
+        head = text[at:start]
+        found = list(_ATOM.finditer(head))
+        base = ""
+        if found and found[-1].end() == len(head):
+            base, head = found[-1].group(), head[: found[-1].start()]
+        if head.strip():
+            nodes.append(token(head))
+        script = ET.Element("msup" if kind == "sup" else "msub")
+        script.append(token(base) if base else ET.Element("mrow"))
+        script.append(token(text[start:end]))
+        nodes.append(script)
+        at = end
+    if text[at:].strip():
+        nodes.append(token(text[at:]))
+    return nodes
+
+
+def mathml_of_text(text: str, runs: Sequence[ScriptSpan] = ()) -> str | None:
+    """The MathML a piece of text states: its raised and lowered runs (`runs` as offsets
+    into `text`, or, when none are given, those `read_scripts` finds) as scripts. None for
+    text with no such run: it does not state itself as maths."""
+    if not runs:
+        text, found = read_scripts(text)
+        runs = found
+    if not runs:
+        return None
+    root = ET.Element("math")
+    root.extend(_script_nodes(text, runs, "mi"))
+    return ET.tostring(root, encoding="unicode")
+
+
 def _linearise(elem: ET.Element, *, slot: bool = False) -> list[str]:
     """The stream of one normalised element. `slot`: the element fills a fixed-arity slot
     (a numerator, a script), where several atoms are a group."""
     if elem.tag in {"tok", "mo"}:
+        plain, runs = read_scripts(elem.text or "")
+        if runs and runs[0][0] > 0:  # `x²`: the atom before the raised character has a script
+            atoms = [
+                a
+                for node in _script_nodes(plain, runs, "tok", elem.get("mathvariant"))
+                for a in _linearise(node)
+            ]
+            return ["<mrow>", *atoms, "</mrow>"] if slot and len(atoms) > 1 else atoms
         atoms = _leaf(elem)
         return ["<mrow>", *atoms, "</mrow>"] if slot and len(atoms) > 1 else atoms
     children = list(elem)
