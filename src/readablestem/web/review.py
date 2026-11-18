@@ -51,9 +51,12 @@ Decisions, not fixes, are what a reviewer makes: repeated headings that share a
 as headings, gives them all one level, or makes them all bold text, in one transaction.
 
 Every review write counts itself on the job (`bump_result_version`, `jobs.result_version`),
-and every decision form carries the number its page was drawn at: a form from a page that
-is out of date (a tab left open while the document was changed in another one) is refused
-(`is_stale`) instead of silently overwriting the newer decision.
+and every decision form carries the number its page was drawn at. A write that acts on one
+item (or on the members of a group) is refused only when a write since then touched one of
+those (`routes.review.refuse_stale`, read from the `ReviewEdit` rows that record each write's
+number); a write that depends on the whole document (Undo, a page edit that moves other
+elements) is refused when anything changed (`is_stale`). Either way, the write is made on the
+newest stored result, never on the copy the page was drawn from.
 
 Validators, speech and the HTML assembler are looked up on their modules at call time,
 so tests (and other work packages' stubs) can be swapped in with monkeypatch.
@@ -64,7 +67,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Any
@@ -178,12 +181,15 @@ class ReviewInvalid(Exception):
 
 
 class ReviewStale(Exception):
-    """The form was drawn before the job's last review write (another tab or window):
-    nothing is applied (`is_stale`)."""
+    """The form was drawn before a review write that matters to it (another tab, window or
+    person): nothing is applied (`is_stale`, `routes.review.refuse_stale`)."""
 
-    def __init__(self, job_id: str) -> None:
+    def __init__(self, job_id: str, changed: Sequence[str] = ()) -> None:
         super().__init__("review form out of date")
         self.job_id = job_id  # the owned job row's id, as on `ReviewInvalid`
+        # The elements the write acts on that changed after the page was drawn, when that is
+        # what refused it (empty: the document changed in a way that touches every item).
+        self.changed = list(changed)
 
 
 # --------------------------------------------------------------------------- versions

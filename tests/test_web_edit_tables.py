@@ -180,7 +180,7 @@ def test_only_a_maths_cell_with_a_place_on_the_page_is_read(tables):
 def test_a_stale_form_reads_nothing(tables):
     with_model(tables, {"is_equation": True, "latex": "x", "confidence": 0.99})
     old = version(tables)
-    decision_post(tables, "p1-e3", action="reject")
+    decision_post(tables, "p1-e1", action="reject")
     response = read_post(tables, version=old)
     assert response.status_code == 409
     assert not tables.clients or not tables.clients[0].requests

@@ -19,6 +19,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 
+from readablestem.core.types import DocumentResult, Kind
 from readablestem.web import inventory
 from readablestem.web.deps import UserDep, flash, pop_flash, render, require_csrf
 from readablestem.web.forms import submit_once
@@ -92,6 +93,11 @@ def symbols_page(request: Request, job_id: str, user: UserDep, view: str = "") -
     return _page(request, job_id, user, view=_view(view))
 
 
+def _all_equations(result: DocumentResult) -> list[str]:
+    """Every equation: the items a relettering may write."""
+    return [f.element_id for f in result.fixes if f.kind is Kind.EQUATION]
+
+
 @router.post("/jobs/{job_id}/symbols", dependencies=[Depends(require_csrf)])
 @submit_once("review.symbols")
 def relabel(
@@ -123,7 +129,9 @@ def relabel(
         return done.changes
 
     try:
-        changes, _, owned_id = write_review(request, job_id, user, version, make, kind="group")
+        changes, _, owned_id = write_review(
+            request, job_id, user, version, make, kind="group", acts_on=_all_equations
+        )
     except ReviewStale:
         log_event(logger, "review_stale", job_id=job_id)
         return _page(request, job_id, user, view=view, stale=True, status_code=409)
