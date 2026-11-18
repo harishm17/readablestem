@@ -108,10 +108,13 @@ New cause; it holds for 29 of the 44.
 
 ### baseline: 6 failed of 586
 
-Four pages have the text in a picture and the product asked a model; two are typed `blank` with
-route `nothing` and have visible text in Type 3 fonts with no text map. Those two pages come
-out empty with no flag and no model request. New cause, n = 2 of 747, no repeat inside this
-set.
+Four pages have the text in a picture and the product asked a model; two were typed `blank` with
+route `nothing` and came out empty with no flag and no model request. Their text is in the
+bitmap fonts dvips writes: Type 3 fonts measured in pixels, set at a stated size of 0.12 or
+0.24 pt and drawn 10 pt tall. The rule that text under 2 pt is unseen read the stated size.
+Fixed after this run (`page_type.drawn_size`, docs/layout.md "a span drawn under 2 pt"): both
+pages are now typed `born_digital` and read from their text. The scores above were made
+before the fix. n = 2 of 747.
 
 ## Adapter share
 
