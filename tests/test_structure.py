@@ -198,6 +198,91 @@ def test_text_outside_a_glossary_section_is_not_made_an_entry():
     assert not [e for e in analyze(page_of(fill)).elements if e.term_end]
 
 
+def lead_term_page(entries: list[tuple[str, str]]) -> bytes:
+    def fill(page):
+        page.insert_text((72, 80), "Notes", fontsize=18, fontname="hebo")
+        y = 120.0
+        for term, definition in entries:
+            page.insert_text((72, y), term, fontsize=BODY, fontname="hebo")
+            gap = pymupdf.get_text_length(term + " ", fontname="hebo", fontsize=BODY)
+            page.insert_text((72 + gap, y), definition, fontsize=BODY, fontname="helv")
+            y += 15
+
+    return page_of(fill)
+
+
+def test_three_lines_that_open_with_a_bold_lead_term_are_entries_not_one_paragraph():
+    entries = [
+        ("Impulse.", "the change in momentum of a body."),
+        ("Inertia.", "the resistance of a body to a change in motion."),
+        ("Momentum.", "the product of mass and velocity."),
+    ]
+    elements = analyze(lead_term_page(entries)).elements
+    found = [e.text[: e.term_end].strip(" .:") for e in elements if e.term_end]
+    assert found == ["Impulse", "Inertia", "Momentum"]
+    # Two such lines are a sentence with a bold start, not a list of entries.
+    assert not [e for e in analyze(lead_term_page(entries[:2])).elements if e.term_end]
+    # A theorem, its proof and a case open with a lead too: three blocks, no list of terms.
+    steps = [
+        ("Theorem 2.", "every bounded sequence has a convergent subsequence."),
+        ("Proof.", "split the interval in two and keep a half with many terms."),
+        ("Case 1:", "the left half holds infinitely many terms of the sequence."),
+    ]
+    blocks = [e for e in analyze(lead_term_page(steps)).elements if e.kind == Kind.PARAGRAPH]
+    assert len(blocks) == 3 and not [e for e in blocks if e.term_end]
+
+
+def test_capital_letters_alone_on_their_lines_head_the_sections_of_an_index():
+    def fill(page):
+        page.insert_text((72, 80), "Index", fontsize=18, fontname="hebo")
+        y = 120.0
+        for letter, words in [
+            ("A", ["acceleration, 4", "angle, 9"]),
+            ("B", ["body, 12", "buoyancy, 15"]),
+            ("C", ["circuit, 20", "current, 22"]),
+        ]:
+            page.insert_text((72, y), letter, fontsize=BODY, fontname="hebo")
+            y += 18
+            for word in words:
+                page.insert_text((72, y), word, fontsize=BODY, fontname="helv")
+                y += 14
+            y += 10
+
+    fixes = heading_fixes(analyze(page_of(fill)).elements)
+    headings = [(f.heading.text, f.heading.level) for f in fixes if f.heading]
+    assert headings == [("Index", 1), ("A", 2), ("B", 2), ("C", 2)]
+
+
+def test_a_hanging_indent_shared_by_entries_makes_each_entry_one_block():
+    filler = ["of", "the", "in", "on", "at", "to", "it", "is", "by"] * 2
+
+    def line(width: float, start: str) -> str:
+        words = [start]
+        for word in filler * 3:
+            if (
+                pymupdf.get_text_length(" ".join([*words, word]), fontname="tiro", fontsize=BODY)
+                > width
+            ):
+                break
+            words.append(word)
+        return " ".join(words)
+
+    def fill(page):
+        page.insert_text((72, 80), "References", fontsize=18, fontname="hebo")
+        y = 120.0
+        for k in range(4):
+            page.insert_text(
+                (72, y), line(468, f"Smith {k}, J., A study"), fontsize=BODY, fontname="tiro"
+            )
+            page.insert_text((96, y + 13), line(444, "and its"), fontsize=BODY, fontname="tiro")
+            page.insert_text((96, y + 26), f"pages 10-{k}0 (2001).", fontsize=BODY, fontname="tiro")
+            y += 39
+
+    paragraphs = [e.text for e in analyze(page_of(fill)).elements if e.kind == Kind.PARAGRAPH]
+    assert [p[:8] for p in paragraphs] == [f"Smith {k}," for k in range(4)]
+    assert all(p.endswith("(2001).") for p in paragraphs)
+
+
 # ------------------------------------------------------------------------ footnotes
 
 
@@ -352,6 +437,55 @@ def test_a_page_with_one_dotted_line_is_not_a_contents_page():
         )
 
     assert [e.kind for e in analyze(page_of(fill)).elements] == [Kind.PARAGRAPH]
+
+
+def numbers_only_contents(page_index: int = 0, heading: bool = True) -> bytes:
+    """A contents list with no leaders: each title at the margin and its page number apart,
+    at the right edge, and a real section heading right under the list."""
+
+    def fill(page):
+        if heading:
+            page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        y = 120.0
+        for title, number in [
+            ("Motion", "3"),
+            ("Forces", "9"),
+            ("Energy", "15"),
+            ("Waves", "21"),
+            ("Light", "30"),
+            ("Heat", "41"),
+            ("Fields", "52"),
+            ("Atoms", "63"),
+        ]:
+            page.insert_text((72, y), title, fontsize=BODY, fontname="helv")
+            width = pymupdf.get_text_length(number, fontname="helv", fontsize=BODY)
+            page.insert_text((540 - width, y), number, fontsize=BODY, fontname="helv")
+            y += 18
+        page.insert_text((72, y + 14), "Motion", fontsize=16, fontname="hebo")
+        page.insert_text((72, y + 40), "A body stays at rest.", fontsize=BODY, fontname="helv")
+
+    doc = pymupdf.open()
+    for _ in range(page_index):
+        doc.new_page(width=612, height=792)
+    fill(doc.new_page(width=612, height=792))
+    return doc.tobytes()
+
+
+def test_a_contents_list_with_no_leaders_keeps_its_numbers_and_is_not_a_table():
+    elements = analyze(numbers_only_contents()).elements
+    assert [e.kind for e in elements] == [Kind.HEADING] + [Kind.LIST_ITEM] * 8 + [
+        Kind.HEADING,
+        Kind.PARAGRAPH,
+    ]
+    entries = elements[1:9]
+    assert [e.text for e in entries[:3]] == ["Motion 3", "Forces 9", "Energy 15"]
+    # "Motion" under the list is the real section heading; the first entry links to it.
+    assert [(k.kind, k.target_id) for k in entries[0].links] == [("internal", elements[9].id)]
+
+
+def test_lines_that_end_in_numbers_far_from_the_front_are_not_a_contents_list():
+    elements = analyze(numbers_only_contents(page_index=5, heading=False)).elements
+    assert not [e for e in elements if "contents entry" in e.reasons]
 
 
 # ------------------------------------------------------------------------- axe

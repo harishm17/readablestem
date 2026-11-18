@@ -59,6 +59,44 @@
   figure. Borders thicker than 1.6 pt are still bars. A column of check boxes beside their
   labels is a checklist for the table finder, not a table of boxes.
 - `PIPELINE_VERSION` is not changed here.
+## Unreleased: entries of a glossary, an index and a bibliography are blocks of their own, a contents page with no leaders is a contents list (branch fix/entries-contents-pages)
+
+- SW34b: an entry of a glossary, an index or a bibliography starts a block of its own, by three
+  signals that need no heading over them: a lead term (bold, italic or small capitals) at a
+  line's start, ending in a period or a colon (`_lead_end`, `_starts_entry`); a single capital
+  letter alone on its line in an alphabetical run of three or more (`_letter_rows`: a heading
+  one level under the section); and a hanging indent shared by three or more entries
+  (`_hanging_entries`). Three or more lead-term blocks in a row are one definition list through
+  the existing writer. No new flag. Measured with layout only, base against head, on 113 files
+  (28 corpus files and 85 tracked files) and 154 more development files (the fetched layout set
+  and the real-world papers the scripts name; no held-out folder): 7 of the 113 files change
+  and 78 of the 154, no table in either. The letter signal turns 74 lines into headings: 71 in
+  the indexes of 8 OpenStax books, and the 3 panel labels A, B and C of one figure, which are
+  wrong (a figure's words are not known as a figure when the letters are read; left). A hanging
+  indent splits reference lists (one paper gains 101 paragraphs) and the lead term splits
+  "Term: definition" lines (19 development files and 4 of the 113 gain definition lists). A run
+  of "Remark 2.", "Case 1:" or "Simon:" lines is also a definition list: that is how the
+  rule reads any run of three. Still glued: a one-line entry between wrapped entries (the
+  list-marker work).
+- WS2.7: a contents list with no leaders is found by its shape (`_shape_entries`): three or more
+  lines in one column that end in a page number (or are followed by a line that is only the
+  number), the numbers at one right edge, or six lines or more with each number after its
+  title, not decreasing, under a "Contents" heading or on one of the first three pages. Each
+  line is an entry that keeps its number as its last words; the section heading right after
+  the list is not taken in. It is tried before a grid is taken for a table
+  (`_contents_lines` in `_claim_tables`), so the reason `contents entry` fires and no table
+  is made of the list. The entry links to its heading by its title with the number left out.
+  Measured: 5 files change (174 list items and 10 headings fewer in a 900-page corpus file, 4
+  development papers with 25 headings fewer in all), no table. Not read: a list of fewer than
+  six lines with no common edge, a title that wraps onto a second line, a two-column page.
+- SW34a follow-up: the 18 joins the indented-first-line rule makes in the development files
+  (not the corpus), read one by one: 12 right, 6 wrong (two centred author and affiliation
+  lines, two lines that open with a "[n]" reference number, a label in a diagram, one pair of
+  ▷ items). Two wrong classes fixed in `_continues` (lines centred on one another are not an
+  indent; a line that opens with a reference number starts the next reference; one test); the
+  diagram label and the ▷ pair are left. None of the 113 files changes.
+- `PIPELINE_VERSION` is not bumped here. The kinds on contents pages and entries change, so
+  stored heading decisions on such pages are stale until it is.
 
 ## Unreleased: nothing is cut on paper, long descriptions print open, the maths font stack, the words of a picture kept from a page (branch fix/wide-content-print-math-font)
 

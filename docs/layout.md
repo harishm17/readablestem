@@ -166,9 +166,23 @@ Element conventions:
    runs to the right edge of its column (`_RightEdges`: the end that a quarter of the
    column's lines of that size reach), is no list item or caption and does not end a
    sentence, the next line may start up to 4 em to its left (`INDENT_REACH`): the second
-   line of a paragraph that opens with a typewriter's tab is not a new paragraph. A
+   line of a paragraph that opens with a typewriter's tab is not a new paragraph. Two lines
+   centred on one another (an author over an affiliation) and a line that opens with a
+   reference number ("[20]") are not that. A
    two-line paragraph whose second line falls short of the first stays cut. A row continuing a list item never starts left of the item's
-   marker (so the paragraph after a list is not swallowed by its last item). A change
+   marker (so the paragraph after a list is not swallowed by its last item).
+   An entry of a glossary, an index or a bibliography is a block of its own (SW34b), by three
+   signals that need no heading over them: a lead term (bold, italic or small capitals, at a
+   line's start at the paragraph's left edge, ending in a period or a colon, after a line that
+   does not end in a lead term or run full to the right edge in mid-sentence; `_lead_end`,
+   `_starts_entry`); a single capital letter alone on a line, bold or larger than the text, in
+   an alphabetical run of three or more through the document (`_letter_rows`: a heading one
+   level under the section's, `REASON_LETTER`); and a hanging indent shared by three or more
+   entries in a row, each a line at the left edge with lines that start 1 to 4 em further
+   right, the same distance for every entry, the lines that go on running to the right edge
+   (`_hanging_entries`, `_flows`; a contents list nested by indent does not run full, so it is
+   not one). A one-line entry followed by an indented paragraph starts a paragraph of its own
+   (`_continues`). A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
    pitch is the last line of the sentence above (`... exactly one solution,` / `x =
@@ -489,6 +503,11 @@ the capitals drawn in an RSFS or EUSM face (`scr`): `docs/steps.md`, "Correction
   left alone. Not read: a glossary set as an unruled two-column table (the Word fixture
   in the dev set), an entry split across a page break, and terms and definitions that
   share a line without a bold term.
+  Outside such a section, three or more paragraph blocks in a row that open with a lead term
+  are entries too (`_lead_entries`): the run is one `<dl>`. Two are a sentence with a bold
+  start. The same rule reads dialogue ("Simon: ..."), "Case 1:", "Part A:" and "Proof."
+  lines as a list of terms; that is how the assembler writes any such run, and it is the
+  stated rule, not a reading of the words.
 - **Teacher tags.** OpenStax's level tags at the start of a paragraph or item, `[BL]`,
   `[OL]`, `[AL]`, `[All]` and runs of them (`[BL][OL] Describe a scenario ...`), are dropped
   (`_strip_teacher_tags`); a screen reader would spell them out. Only those four, in
@@ -1512,6 +1531,21 @@ whose title is the same once section numbers are left out (`_contents_links`); w
 PDF's own links already say where it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section
 lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
+
+A contents list with no leaders is found by its shape (WS2.7, `_shape_entries`): three or
+more lines one after the other in one column, each ending in a page number (or followed on
+its baseline by a line that is only that number, in a column of its own), the numbers at one
+right edge (within 1.5 em; a list of six or more lines may have each number follow its
+title instead) and not decreasing (roman numbers of the front matter come first), under a "Contents" heading or on one of the first three pages. Each line is an entry
+that keeps its number as its last word ("Motion 3"), joined to it where the number stood
+apart; a line with no number ends the list, so the section heading right after it is not
+taken in. It is tried before a grid is taken for a table: a table whose lines are mostly the
+list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`), so the
+reason `contents entry` fires and no second contents list is written. An entry with a number
+links to its heading by its title with the number left out (`_contents_links`). Not read: a
+list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
+it, a title that wraps onto a second line with the number on the second, and a two-column
+page (the columns are not known when tables are claimed).
 
 ### Tagged PDFs (T2-18, `pipeline/tagged.py`)
 
