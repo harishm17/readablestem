@@ -252,6 +252,11 @@ def table_failures(html: str) -> list[str | None]:
             "<p>TABLE 3: Results</p>",
             ["table_caption_missing"],
         ),
+        (
+            '<p>Table IV. Source parameters.</p><table><tr><th scope="col">A</th></tr>'
+            "<tr><td>1</td></tr></table>",
+            ["table_caption_missing"],
+        ),
     ],
 )
 def test_table_rules_fail_on_broken_tables(body, codes):

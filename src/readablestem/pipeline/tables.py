@@ -64,6 +64,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import pymupdf
 
+from readablestem.core.captions import TABLE_CAPTION
 from readablestem.core.types import (
     MAX_TABLE_CELLS,
     MAX_TABLE_COLS,
@@ -100,6 +101,8 @@ EDGE_GAP = 0.5  # x the table's text size: how close under the box a cut line si
 EDGE_SIZE_TOLERANCE = 0.6  # pt: the line's glyphs are the table's size, within this
 EDGE_COLUMN_TOLERANCE = 3.0  # pt: it starts where a column of the grid starts, within this
 CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (as figures)
+CAPTION_LINES_ABOVE = 7  # lines that may follow a caption's first line, over its table
+CAPTION_LINES_BELOW = 3  # ... under its table (the lines under it may be the text that follows)
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
 WORD_GRID_ROWS = 6  # ... no more rows than this, no digit, and no "Table N" caption
@@ -239,13 +242,6 @@ DROPPED = (
     "joined",
 )
 
-# "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", but not "Table 2 shows that ..." (as
-# layout's "Figure N" CAPTION).
-TABLE_CAPTION = re.compile(
-    r"^(?:Table|TABLE|Tab\.|TAB\.)\s*"
-    r"(?:\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*|[IVXLC]{1,6}\b)"  # 4, 2.3, 4a, or IV (APS, IEEE)
-    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
-)
 # Dot leaders of a table of contents: five dots (spaced or not), ellipses, middle dots.
 _LEADERS = re.compile(r"(?:\.\s?){5,}|\u2026{2,}|(?:[\u00b7\u2219\u22c5]\s?){5,}")
 # Spacing accents TeX and Word draw above a letter (as layout's _ACCENTS).
@@ -1691,16 +1687,22 @@ def _starts_a_column(seg: _Seg, block: list[list[_Seg]]) -> bool:
 
 
 def _has_caption(view: _PageView, box: BBox, *, above: bool = False) -> bool:
-    """A "Table N" line just above or below the box (within `CAPTION_MAX_GAP`), over it; with
-    `above` only one over the box (a caption under a box may be the next table's)."""
-    for line in view.lines:
+    """A "Table N" caption just above or below the box (within `CAPTION_MAX_GAP` from its
+    nearest edge), over it; with `above` only one over the box (a caption under a box may be
+    the next table's)."""
+    for i, line in enumerate(view.lines):
         if line.vertical:
             continue
         lx0, ly0, lx1, ly1 = line.bbox
         if min(lx1, box[2]) - max(lx0, box[0]) <= 0:
             continue
         gap = box[1] - ly1 if above else max(ly0 - box[3], box[1] - ly1)
-        if 0 <= gap <= CAPTION_MAX_GAP and TABLE_CAPTION.match(_line_text(line).strip()):
+        if gap < 0 or not TABLE_CAPTION.match(_line_text(line).strip()):
+            continue
+        if ly1 <= box[1]:  # over the box: the gap is to the caption's last line
+            block = _caption_lines(view, i, "above", box, set())
+            gap = box[1] - max(view.lines[m].bbox[3] for m in block)
+        if gap <= CAPTION_MAX_GAP:
             return True
     return False
 
@@ -3485,8 +3487,9 @@ def _claimed_paths(paths: Sequence[PathLike], box: BBox) -> set[int]:
 
 def _attach_captions(view: _PageView, tables: list[PageTable], clean: Callable[[str], str]) -> None:
     """A "Table N ..." caption printed just above or below a table (within
-    CAPTION_MAX_GAP, overlapping it horizontally) becomes its caption, with the lines that
-    continue it. Nearest first; one caption per table."""
+    CAPTION_MAX_GAP of the table from the caption's nearest edge, not from its first line,
+    overlapping it horizontally) becomes its caption, with the lines that continue it.
+    Nearest first; one caption per table."""
     if not tables:
         return
     inside = set().union(*(_claimed_lines(view, t.bbox) for t in tables))
@@ -3503,6 +3506,9 @@ def _attach_captions(view: _PageView, tables: list[PageTable], clean: Callable[[
             if min(lx1, tx1) - max(lx0, tx0) < 0.3 * min(lx1 - lx0, tx1 - tx0):
                 continue
             above, below = ty0 - ly1, ly0 - ty1
+            if above >= -2:  # the gap is to the block's last line, the one nearest the table
+                block = _caption_lines(view, i, "above", table.bbox, inside)
+                above = ty0 - max(view.lines[m].bbox[3] for m in block)
             if -2 <= above <= CAPTION_MAX_GAP:
                 candidates.append((above, i, t_index, "above"))
             elif -2 <= below <= CAPTION_MAX_GAP:
@@ -3535,7 +3541,7 @@ def _caption_lines(
     members = [first]
     current = view.lines[first]
     size = max((c.size for c in current.chars if not c.blank), default=10.0)
-    for _ in range(3):
+    for _ in range(CAPTION_LINES_ABOVE if side == "above" else CAPTION_LINES_BELOW):
         best = None
         for i, line in enumerate(view.lines):
             if i in taken or i in members or line.vertical:

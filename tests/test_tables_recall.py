@@ -251,3 +251,28 @@ def test_the_box_is_cut_below_a_numbered_equation_at_its_top_or_bottom():
 
 
 # ------------------------------------- captions in Roman numerals, and a caption's word for it
+
+
+def test_a_long_caption_is_measured_from_its_nearest_line_and_stays_with_its_table():
+    long = [
+        "Table 1. Source parameters of the measured runs, with the mass of the ball",
+        "and the length of the string that held it, the release angle and the",
+        "number of swings that were timed for each of the three trials that",
+        "were made on the first day of the session.",
+    ]
+    second = [
+        "Table 2. Second run of the series, with a caption",
+        "that goes on for a second line.",
+    ]
+
+    def fill(page):
+        for i, line in enumerate(long):  # the first line is 41 pt from the table, the last 5
+            write(page, 100, 207 + 12 * i, line, 10)
+        grid_table(page, PENDULUM, y0=250)
+        for i, line in enumerate(second):  # nearer the table above, whose caption is taken
+            write(page, 100, 365 + 12 * i, line, 10)
+        grid_table(page, PENDULUM, y0=392)
+
+    first, other = data_tables(pdf(fill))
+    assert first.caption == " ".join(long)
+    assert other.caption == " ".join(second)
