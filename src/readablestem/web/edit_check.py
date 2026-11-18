@@ -217,6 +217,8 @@ def evaluate(
                 name="equation.text_layer", passed=symbols is None, severity="warning", code=symbols
             )
         )
+    else:
+        checks.append(equation_step.not_compared(text))
     if differ is False:
         checks.extend(equation_step.text_layer_number_case_checks(text, mathml))
     style = equation_step.text_layer_style(
