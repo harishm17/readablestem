@@ -1232,6 +1232,33 @@ def _cmd_outputs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_say_once(args: argparse.Namespace) -> int:
+    """`eval say-once`: the share of each page's words that no element says, and that are
+    said twice, over the corpus, read by layout with no model (`eval.say_once_report`).
+    Spends nothing and gates nothing. Exit code 0: measured; 2: nothing could be measured."""
+    from readablestem.eval import corpus, measure, say_once_report
+
+    settings = measure.replay_settings(corpus.ANSWERS)
+    uploads = measure.every_upload()
+    if args.only:
+        unknown = sorted(set(args.only) - {upload.entry for upload in uploads})
+        if unknown:
+            return _error(f"not in the corpus: {', '.join(unknown)}")
+        uploads = [upload for upload in uploads if upload.entry in args.only]
+
+    def said(done: Any) -> None:
+        print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
+
+    run = say_once_report.run(uploads, at_once=args.at_once, said=said)
+    metrics = say_once_report.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(say_once_report.render(record))
+    if not metrics["uploads"]["measured"]:
+        return _error("no upload could be measured")
+    return 0
+
+
 def _cmd_page_audit(args: argparse.Namespace) -> int:
     """`eval page-audit`: the page audit in shadow on the corpus or on a layout gold set's
     folder (`eval.page_audit_eval`). It writes verdicts and changes no output. Exit code 0:
@@ -2193,6 +2220,20 @@ def register(
     )
     _add_measure_args(outputs, at_once=4)
     outputs.set_defaults(func=_cmd_outputs)
+
+    say_once = group.add_parser(
+        "say-once",
+        help="the share of each page's words that no element says and that are said twice, "
+        "over the corpus, read with no model (spends nothing, gates nothing)",
+    )
+    say_once.add_argument(
+        "--only", action="append", metavar="ID", help="a corpus file to measure (repeatable)"
+    )
+    say_once.add_argument(
+        "--at-once", type=_positive_int, default=2, help="files read at the same time (default 2)"
+    )
+    say_once.add_argument("--out", type=Path, help="write the report as JSON")
+    say_once.set_defaults(func=_cmd_say_once)
 
     page_audit = group.add_parser(
         "page-audit",

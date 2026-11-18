@@ -115,6 +115,7 @@ from readablestem.pipeline import (
     outline,
     page_labels,
     page_type,
+    say_once,
     script_marks,
     slides,
     tables,
@@ -544,6 +545,9 @@ class Layout:
     # "scanned_page", "unread_page"): nothing on them is read, they have no elements, and
     # the pipeline keeps each one as an image marked "Not converted", with a decision.
     kept_pages: dict[int, str] = field(default_factory=dict)
+    # Per page read for its text, the words the page has to say and what was left out by
+    # rule (`pipeline.say_once`): the say-once measure counts them against the elements.
+    sources: dict[int, say_once.PageSource] = field(default_factory=dict)
 
 
 # ============================================================================ public API
@@ -9833,6 +9837,20 @@ def _strip_teacher_tags(pieces: list[str | _Inline]) -> list[str | _Inline]:
     return [stripped, *rest] if stripped else rest
 
 
+def _leave_out_teacher_tags(source: say_once.PageSource, block: _Block) -> None:
+    """Tell the say-once measure which words `_strip_teacher_tags` took off the start of
+    `block`: the tags are no words of the lesson, so no element says them."""
+    if not block.rows or not isinstance(block.pieces[0] if block.pieces else None, str):
+        return
+    chars = block.rows[0].chars[(block.marker.end if block.marker is not None else 0) :]
+    found = _TEACHER_TAGS.match("".join(c.c for c in chars))
+    if found and not _TEACHER_TAGS.match(str(block.pieces[0])):
+        source.leave_out_at(
+            "teacher_tag",
+            [(c.x0, c.y0, c.x1, c.y1) for c in chars[: found.end()] if not c.blank],
+        )
+
+
 def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
     """Pull an inline equation's right edge in so its padded crop stops short of the
     punctuation that follows it ("d_0," in "positions d_0, d_f and ...", "in 1.5 s?").
@@ -10323,11 +10341,16 @@ class _PageBlocks:
 
 
 def _prepare_rows(
-    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter, rules: Sequence[_Path] = ()
+    page: pymupdf.Page,
+    frags: list[_Row],
+    margins: _MarginFilter,
+    rules: Sequence[_Path] = (),
+    source: say_once.PageSource | None = None,
 ) -> tuple[list[_Row], tuple[float, float] | None, list[_Row]]:
     """The page's rows without its running headers, footers, page numbers and watermarks,
     its column gutter, and the rows so dropped (a figure may claim some back as labels:
-    `_figure_labels`)."""
+    `_figure_labels`). `source` gets what the say-once measure counts: the words of the rows
+    kept, and the glyphs of the rows left out as `furniture`."""
     height = page.rect.height
     kept: list[_Row] = []
     dropped: list[_Row] = []
@@ -10356,7 +10379,13 @@ def _prepare_rows(
             gutter = None
     # Before the lines are made: a blank is part of its gap's width.
     _mark_blanks(kept, rules, gutter)
-    return _merge_baselines(kept, gutter, rules), gutter, _merge_baselines(dropped, gutter)
+    merged = _merge_baselines(kept, gutter, rules)
+    if source is not None:
+        for row in merged:
+            source.add_row(row.chars)
+        out = [f for f in frags if id(f) in gone or id(f) in placed]
+        source.leave_out("furniture", sum(1 for f in out for c in f.chars if not c.blank))
+    return merged, gutter, _merge_baselines(dropped, gutter)
 
 
 BLANK_LOW_LINES = 5  # a blank to fill in is written as this many underscores
@@ -10525,13 +10554,17 @@ def _page_blocks(
     label_keys: Collection[tuple] = frozenset(),
     covers: Sequence[tuple[float, float]] = (),
     page_math: Any = None,
+    source: say_once.PageSource | None = None,
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
     _mark_notes(rows, number, page_rect.height, ctx)
     for row in rows:
         _classify_row(row)
-    rows = _contents_rows(rows, number)
+    contents = _contents_rows(rows, number)
+    if source is not None:
+        source.leave_out_at("contents", _cut_boxes(rows, contents))
+    rows = contents
     _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
@@ -10667,6 +10700,8 @@ def _page_blocks(
     for block in final:
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
+            if source is not None:
+                _leave_out_teacher_tags(source, block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
     _flag_half_fractions(final, rules, text_rows)
     final = _key_term_lines(_term_items(final))
@@ -10690,6 +10725,18 @@ def _page_blocks(
         )
     )
     return _PageBlocks(number, size, final, left_out, unread)
+
+
+def _cut_boxes(before: Sequence[_Row], after: Sequence[_Row]) -> list[BBox]:
+    """The boxes of the glyphs that `before` has and `after` has no more: what a rule of layout
+    cut from the rows (`_contents_rows`: leaders and page numbers)."""
+    kept = {(c.c, c.x0, c.y0) for r in after for c in r.chars}
+    return [
+        (c.x0, c.y0, c.x1, c.y1)
+        for r in before
+        for c in r.chars
+        if not c.blank and (c.c, c.x0, c.y0) not in kept
+    ]
 
 
 def _covered_points(
@@ -11717,7 +11764,7 @@ def _analyze_document(
         # stored for it goes (`prepared`, `found` and `types` are indexed by page, and the
         # document-wide steps after this one read every page in them).
         for number in guard.failed:
-            for stored in (frags, paths, types, found, prepared):
+            for stored in (frags, paths, types, found, prepared, sources):
                 stored.pop(number, None)
 
     def keep_failed() -> None:
@@ -11727,6 +11774,7 @@ def _analyze_document(
 
     found: dict[int, list[tables.PageTable]] = {}
     prepared: dict[int, tuple[list[_Row], tuple[float, float] | None, list[_Row]]] = {}
+    sources: dict[int, say_once.PageSource] = {}
     for number in selected:
         with guard(number):
             rows, drawn, kind = _read_page(doc[number], budget, producer)
@@ -11802,6 +11850,7 @@ def _analyze_document(
             # grid by), and the detector is the slowest step on the pen-stroke pages these are.
             # `previous` is the page before's tables, unless that page failed: a page that is
             # now a picture takes no row the break split.
+            unclaimed = frags[number]
             found[number] = (
                 []
                 if number in text_kept
@@ -11814,7 +11863,15 @@ def _analyze_document(
                     detector,
                 )
             )
-            prepared[number] = _prepare_rows(doc[number], frags[number], margins, paths[number])
+            sources[number] = say_once.PageSource()
+            sources[number].leave_out("hidden", types[number].text.left_out)
+            # the rows a table claimed are said by the table, or by the text it becomes
+            still = {id(f) for f in frags[number]}
+            for row in _merge_baselines([f for f in unclaimed if id(f) not in still], None):
+                sources[number].add_row(row.chars)
+            prepared[number] = _prepare_rows(
+                doc[number], frags[number], margins, paths[number], sources[number]
+            )
             # Axes with tick labels, an axis title or a curve from their corner are a plot's:
             # the rows the header and footer rules dropped count (tick labels in the bands).
             # Rulers with no labels whose ticks are an answer field's cells are not rulers.
@@ -11860,6 +11917,7 @@ def _analyze_document(
                     label_keys=label_keys,
                     covers=_covered_points(doc[n], types[n]),
                     page_math=page_math,
+                    source=sources.get(n),
                 )
         pages.append(read if read is not None else _kept_page(doc[n], n))
     forget()
@@ -11926,6 +11984,7 @@ def _analyze_document(
         notices=notices + _hidden_text_notices(types, kept) + _ink_notices(types, kept),
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
+        sources=sources,
     )
 
 

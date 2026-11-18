@@ -31,7 +31,7 @@ from readablestem.config import Settings
 from readablestem.core.types import Kind
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
-from readablestem.pipeline import layout, page_type
+from readablestem.pipeline import layout, page_type, say_once
 from readablestem.pipeline.run import convert_pdf
 
 HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
@@ -557,3 +557,61 @@ def test_a_page_set_in_bitmap_tex_fonts_is_read_and_not_blank():
     assert out.page_types[0].kind == "born_digital"
     read = "".join(element.text or "" for element in out.elements)
     assert read.count("abcab") == 80
+
+
+# --------------------------------------------------------------------------- say once
+# A17 / SW60: what the page says is counted against what the elements say, and the
+# conversion notes, in shadow and content-free, a page that lost a block.
+
+
+def _text_page() -> bytes:
+    doc = pymupdf.open()
+    page = _page(doc)
+    _title(page, "Motion")
+    _paragraphs(page, n=3)
+    return doc.tobytes()
+
+
+def _noted(pdf: bytes, monkeypatch, *, lose: int | None = None):
+    """What a conversion of `pdf` keeps of the say-once measure, with its `lose`-th paragraph
+    taken out of layout's answer (a block layout lost) when asked."""
+    real = layout.analyze
+
+    def analyze(*args, **kwargs):
+        out = real(*args, **kwargs)
+        if lose is not None:
+            gone = [e for e in out.elements if e.kind == Kind.PARAGRAPH][lose]
+            out.elements = [e for e in out.elements if e is not gone]
+        return out
+
+    monkeypatch.setattr(layout, "analyze", analyze)
+    client = FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS))
+    done = convert_pdf(pdf, settings=Settings(_env_file=None), client=client)  # type: ignore[call-arg]
+    assert done.facts is not None
+    return [f for f in done.facts.shadow if f.step == say_once.NOTICE_CODE]
+
+
+def test_a_page_with_a_block_left_out_is_noted_in_shadow_and_a_clean_page_is_not(monkeypatch):
+    pdf = _text_page()
+    (clean,) = _noted(pdf, monkeypatch)
+    assert (clean.page, clean.outcome, clean.share) == (0, "same", 0.0)
+    (lost,) = _noted(pdf, monkeypatch, lose=1)
+    assert (lost.page, lost.outcome) == (0, "differs")
+    assert lost.share is not None and 0.2 < lost.share < 0.5  # one of three paragraphs
+
+
+def test_a_phrase_said_by_two_elements_is_counted_and_a_running_footer_is_not(monkeypatch):
+    doc = pymupdf.open()
+    for n in range(3):
+        page = _page(doc)
+        _paragraphs(page, n=2)
+        page.insert_text((72, 770), "PHYS 101 lab notes", fontsize=9)
+        page.insert_text((300, 770), str(n + 1), fontsize=9)
+    out = layout.analyze(doc.tobytes())
+    page = say_once.measure(out.sources, out.elements)[0]
+    assert page.count("no_owner") == 0 and page.count("said_twice") == 0
+    assert page.left_out["furniture"] > 0  # layout's own rule, counted and not a fault
+    first = out.elements[0]
+    out.elements[0] = first.model_copy(update={"text": f"{first.text} {first.text}"})
+    again = say_once.measure(out.sources, out.elements)[0]
+    assert again.count("said_twice") > 20 and again.count("no_owner") == 0

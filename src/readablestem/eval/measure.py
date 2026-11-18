@@ -133,6 +133,10 @@ class Converted:
     # holds and under `html` for the page a student is given. None when the file has no
     # gold, and in a record made before this was kept.
     order: dict[str, list[dict[str, Any]]] | None = None
+    # The say-once counts of each page (`pipeline.say_once.PageMeasure.record`): words and
+    # glyphs by code, and what layout left out by name. Counts only. None when the replay
+    # did not take them (`eval.say_once_report`), and in a record made before this was kept.
+    say_once: list[dict[str, Any]] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
