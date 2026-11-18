@@ -3,6 +3,7 @@ says, that LaTeX never reaches it, and that it is not in the file students downl
 
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -60,6 +61,11 @@ def site(tmp_path):
 
 def test_the_owner_hears_the_converted_page(site):
     listen.CACHE.clear()
+    with session_scope(site.ctx.factory) as session:  # p1-e2 was read by rules since replaced
+        job = session.get(Job, site.job_id)
+        stored = json.loads(json.dumps(job.result_json))
+        stored["fixes"][1]["equation"]["speech_version"] = 0
+        job.result_json = stored
     response = site.owner.get(f"/jobs/{site.job_id}/listen")
     assert response.status_code == 200
     body = response.text
@@ -72,8 +78,8 @@ def test_the_owner_hears_the_converted_page(site):
         in body
     )
     assert "Heading level 1" in body and "Kinematics" in body
-    # The stored reading ("d over t") was written before the speech rules had a version, so it
-    # is made again from the equation's MathML; a reading from the rules in force is kept.
+    # The stored reading of p1-e2 ("d over t") is from older speech rules, so it is made again
+    # from the equation's MathML; a reading from the rules in force (p1-e3) is kept.
     assert "The speed is v equals d divided by t." in body
     assert "Equation" in body and "x plus 1" in body  # the stored reading of p1-e3
     assert 'data-listen="play"' in body and 'data-listen="stop"' in body

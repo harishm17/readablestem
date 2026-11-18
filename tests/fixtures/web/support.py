@@ -38,6 +38,7 @@ from readablestem.core.types import (
 )
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline.assemble import RENDER_META, RENDER_VERSION
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.web.app import create_app
 from readablestem.web.auth import set_allowed
 from readablestem.web.db import LARGE_COLUMNS, Job, session_scope
@@ -159,12 +160,14 @@ def fake_result() -> DocumentResult:
         Fix(element_id="p1-e2", kind=Kind.EQUATION, status=Status.ACCEPTED, confidence=0.97,
             equation=EquationFix(latex="v = d / t", mathml="<math><mi>v</mi><mo>=</mo>"
                                  "<mi>d</mi><mo>/</mo><mi>t</mi></math>",
-                                 speech="v equals d over t", display="inline"),
+                                 speech="v equals d over t", display="inline",
+                                 speech_version=SPEECH_VERSION),
             checks=[Check(name="latex.allowed_commands", passed=True)], calls=[call]),
         Fix(element_id="p1-e3", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, confidence=0.55,
             equation=EquationFix(latex=r"\SECRETLATEX{x}", mathml="<math display=\"block\">"
                                  "<mi>x</mi><mo>+</mo><mn>1</mn></math>",
-                                 speech="x plus 1", display="block"),
+                                 speech="x plus 1", display="block",
+                                 speech_version=SPEECH_VERSION),
             checks=[Check(name="latex.allowed_commands", passed=False, severity="warning",
                           code="unknown_command")], calls=[call]),
         Fix(element_id="p1-e4", kind=Kind.FIGURE, status=Status.NEEDS_REVIEW, confidence=0.6,

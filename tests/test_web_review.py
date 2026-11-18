@@ -87,7 +87,7 @@ class FakePipeline:
             )
         ]
 
-    def mathml_to_speech(self, mathml: str) -> str:
+    def mathml_to_speech(self, mathml: str, *, readings=None) -> str:
         return "spoken form"
 
     def render_html(

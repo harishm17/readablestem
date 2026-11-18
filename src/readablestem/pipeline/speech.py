@@ -1347,7 +1347,9 @@ def reading_for(equation: EquationFix, readings: Mapping[str, str] | None = None
         return equation.speech
     try:
         said = mathml_to_speech(equation.mathml, readings=readings)
-    except SpeechError:
+    except Exception:
+        # Not only `SpeechError`: this runs on stored documents each time one is shown, and a
+        # fault in the rules on one equation must leave the page with the reading it has.
         return equation.speech
     return said or equation.speech
 

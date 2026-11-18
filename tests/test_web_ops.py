@@ -180,7 +180,9 @@ def test_document_content_never_reaches_the_logs(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(validate, "safe_latex_to_mathml", lambda latex, display="block": "<math/>")
     monkeypatch.setattr(validate, "check_mathml", lambda mathml: [])
     monkeypatch.setattr(
-        speech, "mathml_to_speech", lambda m: (_ for _ in ()).throw(ValueError("SECRET-DOC-TEXT"))
+        speech,
+        "mathml_to_speech",
+        lambda m, **kw: (_ for _ in ()).throw(ValueError("SECRET-DOC-TEXT")),
     )
     monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>SECRET-DOC-TEXT</html>")
     caplog.set_level(logging.DEBUG)
