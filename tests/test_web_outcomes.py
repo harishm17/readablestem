@@ -405,6 +405,24 @@ def test_scanned_pages_in_a_mixed_pdf_are_kept_flagged_and_reported(env):
     assert "OCR" not in text  # the old advice made exactly these files
 
 
+def test_the_pages_note_offers_to_read_them_with_the_price_and_the_form_filled_in(tmp_path):
+    """With the option offered and its box not checked, the job page says what reading the pages
+    would cost (the per-page setting) and the way to ask: the upload form with the box checked."""
+    env = WebEnv(tmp_path, daily_spend_cap_usd=CAP, max_pages_per_job=30, feature_image_pages=True)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        job_id = job_id_from(upload(client, scanned_pdf(2, then_text=True)))
+        assert real_worker(env).run_once() == job_id
+        page = client.get(f"/jobs/{job_id}").text
+        text = page_text(page)
+        assert "Pages 1 and 2 are scanned images, so they were not converted" in text
+        assert "would cost about $0.50 (2 pages at $0.25 each)" in text
+        assert f"/app?revises={job_id}&amp;image_pages=on" in page
+        form = client.get(f"/app?revises={job_id}&image_pages=on").text
+        assert re.search(r'id="image_pages"[^>]*\schecked', form)
+
+
 def test_a_pipeline_result_with_nothing_in_it_fails_instead_of_finishing_empty(env):
     def nothing(pdf_bytes, /, *, settings, client, progress=None):
         output = fake_output()

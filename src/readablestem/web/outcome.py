@@ -18,7 +18,13 @@ quote the document.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from readablestem.core.types import PageType
+from readablestem.pipeline import page_type
+
+if TYPE_CHECKING:
+    from readablestem.config import Settings
 
 # How many page numbers to list before "and N more".
 MAX_PAGES_LISTED = 10
@@ -308,6 +314,80 @@ def _kept(result_json: dict[str, Any] | None) -> tuple[dict[str, list[int]], lis
         for t in data.get("page_types") or []
     )
     return {r: sorted(set(p)) for r, p in by_reason.items()}, sorted(handwriting), hidden
+
+
+# The kinds `page_type.ImagePageCount` counts, in the words of `PAGE_WORDS` (the job page's
+# terms): "2 scanned images, 1 handwritten".
+_KIND_COUNT_WORDS = (
+    ("scanned", "scanned image", "scanned images"),
+    ("handwritten", "handwritten", "handwritten"),
+    (
+        "unread",
+        "with drawings or writing this tool could not read",
+        "with drawings or writing this tool could not read",
+    ),
+)
+
+
+def image_pages_in(result_json: dict[str, Any] | None) -> page_type.ImagePageCount:
+    """The pages of a stored result that the image page pass would read, by kind: the one
+    count (`page_type.count_image_pages`) over its page records. A result stored before page
+    records has the pages its fixes keep, by reason."""
+    data = result_json or {}
+    records = [
+        PageType.model_validate(p) for p in data.get("page_types") or [] if isinstance(p, dict)
+    ]
+    count = page_type.count_image_pages(records)
+    if count.found or records:
+        return count
+    by_reason, _, _ = _kept(result_json)
+    return page_type.ImagePageCount(
+        scanned=len(by_reason.get("scanned_page", ())),
+        handwritten=len(by_reason.get("handwritten_page", ())),
+        unread=len(by_reason.get("unread_page", ())),
+    )
+
+
+def _count_parts(count: page_type.ImagePageCount) -> str:
+    parts = []
+    for key, one, many in _KIND_COUNT_WORDS:
+        n = getattr(count, key)
+        if n:
+            parts.append(f"{n} {_plural(n, one, many)}")
+    return ", ".join(parts)
+
+
+def image_pages_offer(
+    count: page_type.ImagePageCount, settings: Settings, *, listed: bool = False
+) -> str:
+    """What is said of scanned and handwritten pages the box was not checked for: how many,
+    that they are kept as pictures unless the reader asks, and what reading them would cost
+    (the per-page setting, `Settings.image_pages_estimate`). `listed`: the page already names
+    the pages and says they are kept (the job page's gap note), so only the count's cost is added.
+    "" when there is no such page and none could not be told."""
+    if not count.possible:
+        return ""
+    pages = count.found
+    many = pages != 1 or count.at_least
+    sentences = []
+    if not listed:
+        what = f"{count.words} {'pages are' if many else 'page is'} scanned or handwritten"
+        if (parts := _count_parts(count)) and count.found:
+            what += f" ({parts})"
+        sentences.append(
+            f"{what}. They are kept as pictures, marked “Not converted”, unless you ask for "
+            "them to be read."
+        )
+    if pages:
+        per_page = settings.image_pages_usd_per_page
+        cost = settings.image_pages_estimate(pages)
+        capped = pages * per_page > settings.image_pages_max_usd_per_job
+        how = "at most" if capped or count.at_least else "about"
+        sentences.append(
+            f"Reading {'them' if many else 'it'} would cost {how} ${cost:.2f} "
+            f"({pages} {_plural(pages, 'page', 'pages')} at ${per_page:.2f} each)."
+        )
+    return " ".join(sentences)
 
 
 def _pages_message(result_json: dict[str, Any] | None) -> str:

@@ -32,7 +32,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -45,6 +45,9 @@ from readablestem.web import job_page
 from readablestem.web import outcome as words
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, utcnow
+
+if TYPE_CHECKING:
+    from readablestem.config import Settings
 
 # --------------------------------------------------------------------------- the table
 
@@ -286,6 +289,7 @@ class Facts:
     is_sample: bool = False
     deleted: bool = False
     deleted_on: datetime | None = None
+    image_pages: bool = False  # the box "Convert scanned or handwritten pages" was checked
 
     @classmethod
     def of(cls, job: Job) -> Facts:
@@ -303,6 +307,7 @@ class Facts:
             attempts_at_retry=job.attempts_at_retry or 0,
             lease_until=job.lease_until,
             is_sample=bool(job.is_sample),
+            image_pages=bool(job.image_pages),
         )
 
 
@@ -313,8 +318,12 @@ class Context:
 
     budget_closed: bool = False
     waiting_line: str = ""
-    image_pages_offered: bool = False
+    settings: Settings | None = None
     now: datetime | None = None
+
+    @property
+    def image_pages_offered(self) -> bool:
+        return self.settings is not None and self.settings.feature_image_pages
 
 
 @dataclass(frozen=True)
@@ -356,7 +365,7 @@ def state_of(
     if job.deleted:
         return _deleted(job)
     if job.is_sample and job.status == JobStatus.DONE:
-        under = _done(job, counts, left, viewer)
+        under = _done(job, counts, left, viewer, ctx)
         steps = (Step("open", "Open", f"/jobs/{job.id}"),)
         return _make("sample", under.message, steps, under.gaps, group=under.group)
     if job.status == JobStatus.QUEUED:
@@ -373,7 +382,7 @@ def state_of(
         return _make("converting", job_page.stage_sentence(dict(job.progress or {})))
     if job.status == JobStatus.FAILED:
         return _stopped(job, left, viewer, ctx)
-    return _done(job, counts, left, viewer)
+    return _done(job, counts, left, viewer, ctx)
 
 
 def _make(
@@ -488,7 +497,7 @@ def _no_tries(cause: str, retries: int) -> str:
 # --------------------------------------------------------------------------- finished
 
 
-def gaps_of(job: Facts, left: int, viewer: str = "owner") -> list[Gap]:
+def gaps_of(job: Facts, left: int, viewer: str = "owner", ctx: Context | None = None) -> list[Gap]:
     """The gap notes of a finished job: what of it was not converted, with what to do. A
     gap with nothing in it is not produced (F-319)."""
     code, result = job.error_code, job.result_json
@@ -515,10 +524,33 @@ def gaps_of(job: Facts, left: int, viewer: str = "owner") -> list[Gap]:
     if code in LIMIT_STOPS and (text := words.budget_message(data, code)):
         out.append(Gap("too_large", "Stopped early", text))
     if code in words.PAGES_NOT_CONVERTED and (text := words.pages_message(data)):
-        out.append(Gap("pages_as_pictures", "Pages kept as pictures", text))
+        out.append(
+            Gap("pages_as_pictures", "Pages kept as pictures", *_offer(job, data, text, owner, ctx))
+        )
     if not code and (text := words.unread_message(data)):
         out.append(Gap(words.SOURCE_UNREAD, "Parts not read", text))
     return out
+
+
+def _offer(
+    job: Facts, data: dict[str, Any] | None, text: str, owner: bool, ctx: Context | None
+) -> tuple[str, Step | None]:
+    """The pages note, with the cost of reading them and the way to ask when the deployment
+    offers it, the box was not checked and the viewer owns it: upload again with the box
+    checked (the form filled in from this document). The count is `outcome.image_pages_in`."""
+    if not owner or ctx is None or not ctx.image_pages_offered or job.image_pages:
+        return text, None
+    assert ctx.settings is not None
+    offer = words.image_pages_offer(words.image_pages_in(data), ctx.settings, listed=True)
+    if not offer:
+        return text, None
+    step = Step(
+        "upload",
+        "Upload it again with the box checked",
+        f"/app?revises={job.id}&image_pages=on#upload-heading",
+        explain="“Convert scanned or handwritten pages” is checked for you.",
+    )
+    return f"{text} {offer}", step
 
 
 def _unanalysed_pages(result: Mapping[str, Any] | None) -> int:
@@ -572,8 +604,8 @@ def _unanalysed_message(pages: int) -> str:
     )
 
 
-def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
-    gaps = gaps_of(job, left, viewer)
+def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | None = None) -> State:
+    gaps = gaps_of(job, left, viewer, ctx)
     review_ok = viewer in ("owner", "review")
     if counts.open:
         steps = (Step("review", "Review", f"/jobs/{job.id}/review"),) if review_ok else ()
