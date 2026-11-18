@@ -12,7 +12,8 @@
   recorded answers when a change touches the package (`eval burden --same`): every upload must
   ask for the decisions `data/eval/burden-corpus.json` has, fewer or more, so the record is
   re-made in the same pull request as a change that moves them. The record is re-made at
-  0.5.11. The eval guard also fires when a change touches a rule that decides acceptance
+  0.5.11 (45 of the 73 uploads: the others ask for answers the recording lacks, and a paid
+  recording is owed). The eval guard also fires when a change touches a rule that decides acceptance
   (module constants and accept functions of the pipeline steps), found by what a module does
   and compared by parsed value; `eval-unchanged` still opts out. The README's version is
   checked against `PIPELINE_VERSION` (`tests/test_eval_docs.py`).

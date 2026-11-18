@@ -3256,9 +3256,23 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
-pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
-report leaves out, for the same 126 answers.
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-18 at pipeline 0.5.11 by
+`eval burden --out`, production profile, 45 of the 73 uploads, 122 pages, 70 decisions,
+0.574 a page). Fewer uploads than the first baseline below: the changes of 0.5.11 (the
+MathTime fonts, blanks, the legend and axis rules) make the pipeline ask questions the
+recording does not hold, so 28 uploads are left out for 1,250 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 646, `w_lecture_5111`, `w_slides_60001_lec10`,
+`r17_arxiv_ligo`). The decisions a page of the two records are not comparable: the dense
+mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
+0.5.10 record, 43 of the 45 uploads ask the same; `d3_arabic_doc` asks for 3 decisions where
+it asked for 0 and `s05_form_acroform` for 0 where it asked for 1, which is why the record
+was re-made. **A paid recording of the answers is owed** (about 1,250 requests on the
+current code) to bring those uploads back into the gate. The cost, order and outputs records
+are still the 0.5.10 ones, and CI does not compare them.
+
+First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; the figures below are that record's, no longer the file's). The ten uploads left out
+are the ones the cost report leaves out, for the same 126 answers.
 
 | | |
 |---|---|
