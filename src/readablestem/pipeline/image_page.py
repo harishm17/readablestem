@@ -106,6 +106,7 @@ from readablestem.pipeline import (
 from readablestem.pipeline import image_page_check as second
 from readablestem.pipeline import image_page_omission as omission
 from readablestem.pipeline.page_type import PageTypeResult
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.pipeline.validate import check_alt, clean_alt, has_errors
 
 log = logging.getLogger(__name__)
@@ -729,7 +730,13 @@ def _inline_equation(
         kind=Kind.EQUATION,
         status=Status.ACCEPTED,
         confidence=CONFIDENCE_VALUE[block.confidence],
-        equation=EquationFix(latex=cleaned, mathml=mathml, speech=speech, display="inline"),
+        equation=EquationFix(
+            latex=cleaned,
+            mathml=mathml,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display="inline",
+        ),
         checks=[*checks, speech_check],
         review="none",
     )
@@ -984,7 +991,13 @@ def _add_equation(block: Block, builder: _Builder, *, skip_marker: bool = False)
             kind=Kind.EQUATION,
             status=Status.NEEDS_REVIEW,
             confidence=min(CONFIDENCE_VALUE[block.confidence], 0.6),
-            equation=EquationFix(latex=latex, mathml=mathml, speech=speech, display="block"),
+            equation=EquationFix(
+                latex=latex,
+                mathml=mathml,
+                speech=speech,
+                speech_version=SPEECH_VERSION,
+                display="block",
+            ),
             checks=[
                 *checks,
                 speech_check,
@@ -1378,7 +1391,11 @@ def rescued(fix: Fix, element: Element) -> Fix:
             "review": "required",
             "confidence": min(CONFIDENCE_VALUE.get(element.image_confidence or "low", 0.4), 0.6),
             "equation": EquationFix(
-                latex=element.page_latex, mathml=mathml, speech=speech, display="block"
+                latex=element.page_latex,
+                mathml=mathml,
+                speech=speech,
+                speech_version=SPEECH_VERSION,
+                display="block",
             ),
             "checks": [
                 *checks,

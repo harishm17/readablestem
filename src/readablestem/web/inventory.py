@@ -51,7 +51,7 @@ from readablestem.core.types import (
     Fix,
     Kind,
 )
-from readablestem.pipeline.speech import CAP, in_full_words
+from readablestem.pipeline.speech import CAP, SPEECH_VERSION, in_full_words
 from readablestem.web.review import (
     INVENTORY_KEY,
     RELABEL_ACTION,
@@ -517,7 +517,7 @@ def relabel(
         before = snapshot(fix)
         fix.equation = EquationFix(
             latex=checked.latex, mathml=checked.mathml, speech=checked.speech,
-            display=checked.display,
+            speech_version=SPEECH_VERSION, display=checked.display,
         )  # fmt: skip
         fix.checks = _kept_checks(fix.checks, checked.checks)
         after = snapshot(fix)

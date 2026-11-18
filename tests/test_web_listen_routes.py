@@ -69,7 +69,9 @@ def test_the_owner_hears_the_converted_page(site):
         in body
     )
     assert "Heading level 1" in body and "Kinematics" in body
-    assert "The speed is v equals d over t." in body
+    # The stored reading ("d over t") was written before the speech rules had a version, so it
+    # is made again from the equation's MathML; a reading from the rules in force is kept.
+    assert "The speed is v equals d divided by t." in body
     assert "Equation" in body and "x plus 1" in body  # the stored reading of p1-e3
     assert 'data-listen="play"' in body and 'data-listen="stop"' in body
     assert f"/jobs/{site.job_id}/view" in body
@@ -100,7 +102,7 @@ def test_the_demo_is_public(site):
     with site.client() as anonymous:
         response = anonymous.get("/demo/listen")
         assert response.status_code == 200
-        assert "Equation 2.4: capital delta bold d over capital delta t" in response.text
+        assert "Equation 2.4: cap delta bold d over cap delta t" in response.text
         assert "\\frac" not in response.text
         assert 'content="noindex"' in response.text
         assert anonymous.post("/demo/listen").status_code in {403, 405}

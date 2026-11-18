@@ -49,20 +49,28 @@ from __future__ import annotations
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
+from typing import Any
 
 import defusedxml
 import defusedxml.ElementTree as DET
 
 from readablestem.core.mathml_intent import ALLOWED_INTENTS
 from readablestem.core.notation import canonical_from_parts
+from readablestem.core.types import EquationFix
 from readablestem.eval.equations import normalize
 from readablestem.pipeline import speech_chem
 from readablestem.pipeline.speech_nuclides import ELEMENTS, nuclide_words
 from readablestem.pipeline.speech_units import unit_words
 
 MAX_DEPTH = 64
+
+# The version of these rules. A reading is stored with the version that wrote it
+# (`EquationFix.speech_version`); raise this number whenever a rule changes what is said, and
+# every older stored reading is made again from its MathML where it is shown (`reading_for`).
+# 2: "cap K" for a capital, no word for the letters of a name, a pause after a coefficient.
+SPEECH_VERSION = 2
 
 
 class SpeechError(ValueError):
@@ -1311,6 +1319,44 @@ def _join_italic_words(root: ET.Element) -> None:
                 i += 1
         if len(rebuilt) != len(kids):
             parent[:] = rebuilt
+
+
+def course_readings(applied: Iterable[Any] | None) -> dict[str, str]:
+    """The course's words for its styled letters ("vector" for a bold d), from the symbols a
+    stored result says the conversion was handed (`DocumentResult.notation_applied`): what
+    `mathml_to_speech(readings=...)` needs to say a stored equation as it was first said."""
+    from readablestem.pipeline import notation_memory
+
+    return notation_memory.readings(applied or ())
+
+
+def reading_for(equation: EquationFix, readings: Mapping[str, str] | None = None) -> str:
+    """The reading of a stored equation as the rules in force say it. A reading made by older
+    rules (`EquationFix.speech_version`) is made again from its MathML, at no model cost, so
+    the page, the EPUB and Word file, Listen and the review screen say the same words; one a
+    person wrote (a negative version) and one the rules cannot read stay as they are."""
+    version = equation.speech_version
+    if version < 0 or version >= SPEECH_VERSION or not equation.mathml.strip():
+        return equation.speech
+    try:
+        said = mathml_to_speech(equation.mathml, readings=readings)
+    except SpeechError:
+        return equation.speech
+    return said or equation.speech
+
+
+def refresh_readings(result: Any) -> None:
+    """Make every stored reading in a `DocumentResult` that older rules wrote again, in place
+    (`reading_for`, with the course's words from the result). A file is written again from a
+    stored result through this, so the page, and the EPUB and Word file made from it, say what
+    the rules in force say. A reading already current, and one a person wrote, is not touched."""
+    readings = course_readings(result.notation_applied)
+    for fix in result.fixes:
+        equation = fix.equation
+        if equation is None or not 0 <= equation.speech_version < SPEECH_VERSION:
+            continue
+        equation.speech = reading_for(equation, readings)
+        equation.speech_version = SPEECH_VERSION
 
 
 def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) -> str:

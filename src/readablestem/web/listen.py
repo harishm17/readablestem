@@ -916,6 +916,9 @@ def transcript_for(
 def stored_speeches(result: object) -> dict[str, str]:
     """Element id -> the equation's stored spoken reading, from a `DocumentResult`'s fixes
     (the strings the review screen shows as "Read aloud roughly as")."""
+    from readablestem.pipeline.speech import refresh_readings
+
+    refresh_readings(result)  # a reading older rules wrote is made again from its MathML
     fixes = getattr(result, "fixes", None) or []
     return {
         f.element_id: f.equation.speech

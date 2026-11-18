@@ -1160,7 +1160,7 @@ def equation_fix(
     required decision, with our own LaTeX conversion as the proposal when that works. Shared by
     the LaTeX reader and the Word reader (`source.docx_reader`), so a source equation is judged
     by one set of checks."""
-    from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+    from readablestem.pipeline.speech import SPEECH_VERSION, SpeechError, mathml_to_speech
     from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
 
     latex = re.sub(r"^\\displaystyle\s*", "", latex).strip()
@@ -1205,7 +1205,13 @@ def equation_fix(
         kind=Kind.EQUATION,
         status=Status.ACCEPTED,
         confidence=1.0,
-        equation=EquationFix(latex=latex, mathml=mathml_ok, speech=speech, display=display),
+        equation=EquationFix(
+            latex=latex,
+            mathml=mathml_ok,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display=display,
+        ),
         checks=checks,
         review="optional" if len(checks) > 1 else "none",
     )
@@ -1219,6 +1225,7 @@ def _own_conversion(latex: str, display: Display) -> EquationFix | None:
         return None
     try:
         from readablestem.pipeline.equation_step import _speech, read_latex
+        from readablestem.pipeline.speech import SPEECH_VERSION
         from readablestem.pipeline.validate import (
             LatexConversionError,
             check_latex,
@@ -1231,7 +1238,13 @@ def _own_conversion(latex: str, display: Display) -> EquationFix | None:
             return None
         mathml = safe_latex_to_mathml(cleaned, display)
         speech, _ = _speech(mathml)
-        return EquationFix(latex=cleaned, mathml=mathml, speech=speech, display=display)
+        return EquationFix(
+            latex=cleaned,
+            mathml=mathml,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display=display,
+        )
     except (LatexConversionError, ValueError, KeyError, RecursionError):
         return None
     except Exception:

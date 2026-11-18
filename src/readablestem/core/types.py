@@ -224,6 +224,11 @@ class EquationFix(BaseModel):
     latex: str
     mathml: str  # presentation MathML, <math> root, display attribute set
     speech: str  # plain-English reading, for the review screen and the report
+    # The version of the speech rules that wrote `speech` (`pipeline.speech.SPEECH_VERSION`);
+    # 0 is a reading made before rules had one, left out of the JSON. A reading older than the
+    # rules in force is made again from `mathml` where it is shown (`speech.reading_for`),
+    # unless a person wrote it (a negative version), which is never replaced.
+    speech_version: int = Field(default=0, exclude_if=lambda v: v == 0)
     display: Literal["block", "inline"] = "block"
     # The other reading of this formula when the crop's and the page witness's readings
     # differ (`pipeline.witness_reconcile`): `latex` is the one the glyphs favour (or the

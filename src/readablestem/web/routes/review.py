@@ -68,6 +68,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import table_math
 from readablestem.pipeline.layout import REASON_LARGER_FONT
 from readablestem.pipeline.notices import TEXT_NOTICE_OF
+from readablestem.pipeline.speech import refresh_readings
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
     bulk_accept,
@@ -1196,6 +1197,7 @@ def _load_versioned(
         role = shares.role_of(session, job, user) or REVIEW
         view = job_view(session, job, with_summary=True, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
+        refresh_readings(result)  # "Read aloud roughly as" says what the rules in force say
         crops = _crop_sizes(session, job.id)
         version = job.result_version or 0
     return view, result, crops, version

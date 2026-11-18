@@ -53,9 +53,7 @@ def test_openstax_couple_shape() -> None:
     # OpenStax: one mtext per symbol, the charge on an msup.
     inner = "<mi>E</mi><mo>(</mo><msup><mtext>Cu</mtext><mrow><mn>2</mn><mo>+</mo></mrow></msup>"
     inner += "<mo>/</mo><mtext>Cu</mtext><mo>)</mo>"
-    assert say_mathml(inner) == (
-        "cap E open parenthesis C u 2 plus slash C u close parenthesis"
-    )
+    assert say_mathml(inner) == ("cap E open parenthesis C u 2 plus slash C u close parenthesis")
 
 
 @pytest.mark.parametrize(

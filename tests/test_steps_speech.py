@@ -165,3 +165,21 @@ def test_unreadable_input_raises_content_free_error(bad):
     with pytest.raises(SpeechError) as exc:
         mathml_to_speech(bad)
     assert "secret" not in str(exc.value) and "<" not in str(exc.value)
+
+
+def test_a_stored_reading_from_older_rules_is_made_again_unless_a_person_wrote_it():
+    from readablestem.core.types import EquationFix
+    from readablestem.pipeline.speech import SPEECH_VERSION, reading_for
+
+    mathml = safe_latex_to_mathml("K = 2")
+
+    def stored(version: int) -> EquationFix:
+        return EquationFix(
+            latex="K = 2", mathml=mathml, speech="capital K equals 2", speech_version=version
+        )
+
+    assert reading_for(stored(0)) == "cap K equals 2"  # written before rules had a version
+    assert (
+        reading_for(stored(SPEECH_VERSION)) == "capital K equals 2"
+    )  # the rules in force wrote it
+    assert reading_for(stored(-1)) == "capital K equals 2"  # a person wrote it: never replaced

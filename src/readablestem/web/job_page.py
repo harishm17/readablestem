@@ -60,7 +60,7 @@ from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary, word_kind
 from readablestem.pipeline.checked_words import KIND_WORDS, join_words, kinds_phrase, plural
 from readablestem.pipeline.source_facts import flattened_parts
-from readablestem.pipeline.speech import GREEK, SYMBOLS
+from readablestem.pipeline.speech import GREEK, SYMBOLS, refresh_readings
 from readablestem.web import notice_places
 from readablestem.web.messages import HANDLED_MESSAGES, explain_notice
 from readablestem.web.outcome import unread_phrase
@@ -455,6 +455,7 @@ def _lost_sentence(parts: list[str]) -> str:
 
 def _examples(result: DocumentResult) -> list[Example]:
     """Up to four equations whose text layer loses the most, display ones first."""
+    refresh_readings(result)
     fixes = _first_fixes(result)
     scored: list[tuple[int, int, int, Example]] = []
     for element in result.elements:

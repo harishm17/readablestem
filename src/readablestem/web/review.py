@@ -88,6 +88,7 @@ from readablestem.core.types import (
     grid_problems,
 )
 from readablestem.pipeline.notices import TEXT_DECISION_KINDS, TEXT_NOTICE_OF
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.web import reading_chips
 from readablestem.web.edit_check import MEANING_CODES
 from readablestem.web.messages import explain_check
@@ -835,7 +836,11 @@ def _edit_equation(
         refused.override = True
         raise refused
     fix.equation = EquationFix(
-        latex=checked.latex, mathml=checked.mathml, speech=checked.speech, display=checked.display
+        latex=checked.latex,
+        mathml=checked.mathml,
+        speech=checked.speech,
+        speech_version=SPEECH_VERSION,
+        display=checked.display,
     )
     fix.checks = checked.checks
     return [c for c in fix.checks if not c.passed]
@@ -1857,7 +1862,11 @@ def rerender_html(
     (T2-24): the file made again must read like the first one (None: the process settings).
     """
     from readablestem.pipeline import assemble, checked, decoration, html_checks
+    from readablestem.pipeline.speech import refresh_readings
 
+    # A reading made by older speech rules is made again from its MathML, so the file says
+    # what the review screen and Listen say (`speech.reading_for`).
+    refresh_readings(result)
     # Empty alt text only for decoration with evidence (WS6.4), also for a result stored
     # before the rule: a figure its page writes as "Figure not described" waits for its
     # decision. A person's decision is never changed; a settled result is left as it is.
