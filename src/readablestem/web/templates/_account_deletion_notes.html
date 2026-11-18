@@ -2,7 +2,7 @@
    (web/routes/account.py); keep it in step with privacy.html, which has the full policy. #}
 {% from "_recipients.html" import retention_short %}
 {% set ai = recipients|selectattr("gets_documents")|list %}
-<p><strong>Not reached by deleting:</strong></p>
+<h3>Not reached by deleting</h3>
 <ul>
   <li>Backups keep a copy for about a week.</li>
   {# `sent_short`: the short names of what the settings send (web/recipients.py

@@ -52,6 +52,54 @@
     marked document through every step and finds the marker in no log, cookie, header or event.</li>
 </ul>
 
+<h3 id="by-company">The same data, by company</h3>
+{# One row per recipient, from web/recipients.py; what each receives is read from the same
+     `data_items` list as the first table. #}
+  {% call table_scroll("Companies that receive data from a conversion") %}
+  <table class="recipients-table">
+    <caption>Companies that receive data from a conversion</caption>
+    <thead>
+      <tr><th scope="col">Company</th><th scope="col">What it receives</th><th scope="col">What it says about training and retention</th></tr>
+    </thead>
+    <tbody>
+      {% for r in recipients %}
+      <tr>
+        <th scope="row">{{ r.name }}</th>
+        <td>
+          {% if "hosting" in r.purposes %}
+          Hosts the app and its database, in its United States region. It holds every row of the
+          first table that goes to Railway.
+          {% else %}
+          <ul class="cell-list">
+            {% for what in received_by(r.name) %}<li>{{ what }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </td>
+        {% if r.gets_documents %}
+        <td>{{ retention(r.name) }}</td>
+        {% elif "hosting" in r.purposes %}
+        <td>Daily database backups are kept about {{ backup_days }} days.</td>
+        {% elif "tracing" in r.purposes %}
+        <td>Set in the Langfuse project; see the privacy notice.</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+  <p>The <a href="/privacy">privacy notice</a> lists the same companies and is the page to cite.</p>
+<details>
+  <summary>What the model company keeps</summary>
+  <p>{% if model_company == "OpenAI" %}Requests to OpenAI are sent with the <code>store</code>
+    setting off, so OpenAI does not keep the response for later retrieval. See OpenAI's own
+    API data policies for how long it keeps requests.
+    {% else %}This server sends its model requests to {{ model_company }}. The
+    <code>store</code> setting belongs to the OpenAI path only and is not used here: for
+    {{ model_company }}, the retention statement in the table applies. No zero-retention
+    agreement is in place.{% endif %}
+    What the model companies say is their own statement; ReadableSTEM cannot check it.</p>
+</details>
+
 <h2 id="retention">How long it is kept, and deletion</h2>
 {% set retention_voice = "you" %}
 {% call table_scroll("How long a document is kept") %}

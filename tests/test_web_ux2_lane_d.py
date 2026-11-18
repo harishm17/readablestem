@@ -79,12 +79,13 @@ def test_the_matrix_the_company_table_and_the_summary_are_written_from_one_list(
     with env.running() as client:
         page = client.get(offices.PAGE_PATH).text
         summary = client.get(offices.SUMMARY_PATH).text
+        security = client.get("/security").text
     page_text, summary_text = text_of(page), text_of(summary)
     for label in labels:
         assert label in page_text, label
         assert label in summary_text, label
-    # Every company's cell on the page lists what the same list says it receives.
-    table = page.split('class="recipients-table"', 1)[1].split("</table>", 1)[0]
+    # Every company's cell on the security page lists what the same list says it receives.
+    table = security.split('class="recipients-table"', 1)[1].split("</table>", 1)[0]
     for r in recipients(env.settings):
         if "hosting" in r.purposes:
             continue

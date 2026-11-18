@@ -26,7 +26,7 @@
     <a class="button-secondary" href="/demo">See an example first (no sign-in)</a>
   </p>
   {% if not user %}
-  <p class="hint hero-hint">Free during the beta. <a href="#who">Who can use it</a> and
+  <p class="hint hero-hint">Free during the beta (<a href="/pricing">pricing</a>). <a href="#who">Who can use it</a> and
     <a href="#documents">what happens to your documents</a>.</p>
   {% endif %}
 </section>
@@ -97,7 +97,8 @@
     <p>Your file and everything made from it are deleted {{ retention_hours }} hours after you
       last work on it. You can keep a document for 7 days, or let us look at the results for
       {{ opt_in_days }} days to find mistakes in the tool. You can delete it at any time.
-      {% include "_vendor_line.html" %}</p>
+      {% include "_vendor_line.html" %}
+      <a href="/security">How the data is stored and who receives it</a>.</p>
   </details>
   <details>
     <summary>Why STEM courses need this now</summary>

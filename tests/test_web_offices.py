@@ -65,7 +65,7 @@ def page(tmp_path_factory):
 def test_the_table_has_one_row_per_recipient_in_the_privacy_pages_order(tmp_path):
     env = WebEnv(tmp_path, model_provider="anthropic", math_reader_openai_enabled=True)
     with env.running() as client:
-        html = client.get(PATH).text
+        html = client.get("/security").text
         privacy = client.get("/privacy").text
     found = recipients(env.settings)
     table = recipients_table(html)

@@ -26,7 +26,11 @@ and nothing links to it; `make site OUT=src/readablestem/web/showcase` makes one
 
 Search engines and AI crawlers: `web/seo.py` lists the public pages once (the sitemap names them;
 every other page is `noindex`), and writes `/robots.txt`, `/llms.txt` and the IndexNow key file.
-When a public page's text changes, update its date in `PUBLIC_PAGES` (or `SHOWCASE_UPDATED`).
+`PUBLIC_PAGES` is the one list: path, title, blurb and the files the page's text comes from. The
+sitemap, `llms.txt` and the structured-data dates all read it. A page's date is in
+`web/page_dates.json`, written from `git log` by `scripts/page_dates.py` (the Docker image has no
+`.git`); run it after changing a page's text. `tests/test_web_seo.py` fails when a page's files
+changed after its date (skipped where git has no history).
 
 ## Pages
 
