@@ -531,10 +531,15 @@ _OPEN_CHANGES_MESSAGE = (
 )
 
 
-def _open_changes(result: Mapping[str, Any] | None) -> bool:
-    """A stored result with the required notice for open tracked changes (`web.office_census`)."""
+_NOT_HANDLED_MESSAGE = (
+    "Part of this file was not handled, so check the notices before you share it."
+)
+
+
+def _required_notices(result: Mapping[str, Any] | None) -> set[str]:
+    """The codes of a stored result's notices that need a person (review "required")."""
     notices = (result or {}).get("notices") or []
-    return any(n.get("code") == "office_tracked_changes" for n in notices)
+    return {str(n.get("code")) for n in notices if n.get("review") == "required"}
 
 
 def _unanalysed_message(pages: int) -> str:
@@ -561,14 +566,17 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
     steps = (download, share) if viewer == "owner" else (download,)
     summary = counts.summary
     if summary is not None and summary.ready_to_share:
-        if _open_changes(job.result_json):
-            # A Word file whose tracked changes nobody accepted or rejected (`web.office_census`):
-            # the PDF may show deleted words, so it is not known to be the final text.
-            return _make("ready_remains", _OPEN_CHANGES_MESSAGE, steps)
         if pages := _unanalysed_pages(job.result_json):
             # The ink analysis ran out of work on these pages (`drawings_not_analysed`): the
             # page cannot say everything was converted.
             return _make("ready_remains", _unanalysed_message(pages), steps)
+        if required := _required_notices(job.result_json):
+            # A required notice with no decision behind it, so the summary does not count it: a
+            # Word file whose tracked changes nobody accepted or rejected (`web.office_census`:
+            # the PDF may show deleted words), or a fact of the text no decision can hold yet.
+            changes = "office_tracked_changes" in required
+            message = _OPEN_CHANGES_MESSAGE if changes else _NOT_HANDLED_MESSAGE
+            return _make("ready_remains", message, steps)
         return _make("ready", checked_words.READY_ALL, steps)
     # Not known to be whole (no summary), or a part is a picture, a page is left out or a
     # structure check failed: "Ready", and what remains, never "Ready to share".

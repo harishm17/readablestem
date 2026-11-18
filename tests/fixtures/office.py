@@ -274,9 +274,12 @@ _M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 _REVISION = 'w:id="{n}" w:author="A. Author" w:date="2026-01-01T00:00:00Z"'
 
 
-def docx_with_changes(*, insertions: int = 1, deletions: int = 1, comments: int = 1) -> bytes:
-    """`docx()` with open tracked changes (each one in a paragraph of its own) and comments. The
-    counts are by construction: a test never takes them from the reader."""
+def docx_with_changes(
+    *, insertions: int = 1, deletions: int = 1, comments: int = 1, moves: int = 0
+) -> bytes:
+    """`docx()` with open tracked changes (each one in a paragraph of its own) and comments; a
+    move is text taken out of one paragraph and put in another. The counts are by construction:
+    a test never takes them from the reader."""
     parts = docx_parts()
     body = ""
     for n in range(insertions):
@@ -285,6 +288,12 @@ def docx_with_changes(*, insertions: int = 1, deletions: int = 1, comments: int 
         body += (
             f"<w:p><w:del {_REVISION.format(n=200 + n)}><w:r><w:delText>deleted words</w:delText>"
             "</w:r></w:del></w:p>"
+        )
+    for n in range(moves):
+        body += (
+            f"<w:p><w:moveFrom {_REVISION.format(n=300 + n)}><w:r><w:t>moved words</w:t></w:r>"
+            f"</w:moveFrom></w:p><w:p><w:moveTo {_REVISION.format(n=400 + n)}><w:r>"
+            "<w:t>moved words</w:t></w:r></w:moveTo></w:p>"
         )
     for n in range(comments):
         body += (

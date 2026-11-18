@@ -190,6 +190,9 @@ def test_the_census_counts_what_the_pdf_route_leaves_out_and_nothing_else():
     assert clean.typed_equations == 0
     marked = preflight(office.docx_with_changes())
     assert (marked.tracked_insertions, marked.tracked_deletions, marked.comments) == (1, 1, 1)
+    # text moved with tracking on is printed in both places: one change of each kind
+    moved = preflight(office.docx_with_changes(insertions=0, deletions=0, comments=0, moves=1))
+    assert (moved.tracked_insertions, moved.tracked_deletions) == (1, 1)
     assert preflight(office.docx_with_equation()).typed_equations == 1
     deck = preflight(office.pptx_with_extras())
     assert (deck.comments, deck.speaker_notes, deck.hidden_slides) == (1, 1, 1)
@@ -197,6 +200,11 @@ def test_the_census_counts_what_the_pdf_route_leaves_out_and_nothing_else():
     assert json.dumps(deck.to_json()) and office_convert.Census.from_json(deck.to_json()) == deck
     with pytest.raises(ValueError):
         office_convert.Census.from_json({"kind": "docx", "comments": -1})
+    # a part that stops in the middle is not counted as far as it goes: the file is refused
+    parts = office.docx_parts()
+    cut = str(parts["word/document.xml"]).split("<w:sectPr>")[0]
+    with pytest.raises(OfficeRejected):
+        preflight(office.rebuild(parts, replace={"word/document.xml": cut}))
 
 
 def test_a_file_that_is_not_what_it_looks_like_never_escapes_as_another_exception():

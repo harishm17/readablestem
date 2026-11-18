@@ -916,7 +916,9 @@ class Notice(BaseModel):
     handled in this file", "optional" under "Worth checking". A notice never adds a
     decision of its own: when something needs one (`review="required"`, e.g. a table
     kept as an image), the decision is the `Fix` with the same `element_id`, and only
-    fixes count towards `DocumentStats.required_decisions`.
+    fixes count towards `DocumentStats.required_decisions`. A required notice with no fix
+    behind it (open tracked changes in a Word file) keeps the job at "Ready", never "Ready to
+    share" (`web.states`).
     """
 
     code: str

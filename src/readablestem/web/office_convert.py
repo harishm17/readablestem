@@ -241,7 +241,15 @@ _FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallba
 _MODERN_COMMENT = "{http://schemas.microsoft.com/office/powerpoint/2018/8/main}cm"
 # The only elements a part is searched for: counting every name would let a hostile part make
 # the table as big as it likes.
-_COUNTED = frozenset({_W + "ins", _W + "del", _W + "comment", _MATH, _P + "cm", _MODERN_COMMENT})
+_COUNTED = frozenset(
+    {_W + "ins", _W + "del", _W + "moveTo", _W + "moveFrom", _W + "cellIns", _W + "cellDel"}
+    | {_W + "comment", _MATH, _P + "cm", _MODERN_COMMENT}
+)
+# Tracked changes by what they do to the text: words (or a table cell) put in, and words taken
+# out, which LibreOffice still prints. Text moved with tracking on is both: it is printed where
+# it was and where it went.
+_PUT_IN = (_W + "ins", _W + "moveTo", _W + "cellIns")
+_TAKEN_OUT = (_W + "del", _W + "moveFrom", _W + "cellDel")
 # The parts of a Word file whose text the PDF shows: the body, its notes, headers and footers.
 _WORD_PARTS = re.compile(r"word/(?:document|header\d*|footer\d*|footnotes|endnotes)\.xml")
 _PAGES = re.compile(rb"<(?:\w+:)?Pages>\s*(\d{1,6})\s*<")
@@ -255,7 +263,8 @@ class Census:
     word of the file, so it can be kept and shown after the file is gone.
 
     `tracked_insertions`, `tracked_deletions`: changes made with change tracking on that nobody
-    accepted or rejected (LibreOffice prints the deleted words); `comments`; `speaker_notes`:
+    accepted or rejected (LibreOffice prints the deleted words, and moved text in both of its
+    places; a move is one of each); `comments`; `speaker_notes`:
     slides whose notes hold text; `hidden_slides`; `typed_equations`: equations typed in the
     editor of Word or PowerPoint, which the PDF holds as glyphs. `units` is what a charge could
     count before the PDF exists: for a deck its own slide list, hidden slides counted
@@ -351,8 +360,9 @@ class _Tally:
 
 def _scan(archive: zipfile.ZipFile, name: str) -> _Tally | None:
     """The tally of part `name`, read once in chunks (the part's declared size caps the read, as
-    in `_check_xml_part`); None when the part is not there. A part that is not well formed gives
-    what was counted before the fault."""
+    in `_check_xml_part`); None when the part is not there. A part that is not well formed is a
+    file that cannot be read (`OfficeRejected("office_failed")`, what LibreOffice says of a broken
+    main part): a count that stops at the fault would miss what comes after it and say nothing."""
     from defusedxml.common import DefusedXmlException
     from defusedxml.ElementTree import DefusedXMLParser, ParseError
 
@@ -368,7 +378,7 @@ def _scan(archive: zipfile.ZipFile, name: str) -> _Tally | None:
                 parser.feed(chunk)
         parser.close()
     except (ParseError, DefusedXmlException, zipfile.BadZipFile, ValueError):
-        pass
+        raise OfficeRejected("office_failed") from None
     return tally
 
 
@@ -403,8 +413,8 @@ def _census(archive: zipfile.ZipFile, kind: str) -> Census:
         comments = _scan(archive, "word/comments.xml")
         return Census(
             kind,
-            tracked_insertions=body[_W + "ins"],
-            tracked_deletions=body[_W + "del"],
+            tracked_insertions=sum(body[tag] for tag in _PUT_IN),
+            tracked_deletions=sum(body[tag] for tag in _TAKEN_OUT),
             comments=comments.count[_W + "comment"] if comments else 0,
             typed_equations=body[_MATH],
             units=_stated_pages(archive, names),

@@ -87,6 +87,20 @@ def test_an_ai_outage_is_not_finished():
     assert state(2, 4).key == "ready_remains" and state(0, 4).key == "ready_remains"
 
 
+def test_a_required_notice_with_no_decision_behind_it_holds_back_ready_to_share():
+    from readablestem.pipeline import checked
+
+    whole = states.counts_of(checked.summarize(elements=[], fixes=[], html_checks=[]))
+
+    def state(*notices: dict) -> states.State:
+        facts = states.Facts(id="j", status="done", result_json={"notices": list(notices)})
+        return states.state_of(facts, whole)
+
+    assert state({"code": "office_comments", "review": "optional"}).key == "ready"
+    held = state({"code": "rtl_text", "review": "required"})
+    assert held.key == "ready_remains" and "notices" in held.message
+
+
 # --------------------------------------------------------------------------- reading
 
 
