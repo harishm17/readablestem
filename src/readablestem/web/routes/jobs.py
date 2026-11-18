@@ -44,6 +44,7 @@ from readablestem.pipeline import language as languages
 from readablestem.source import envelope as source_envelope
 from readablestem.source import intake as source_intake
 from readablestem.source import latexml
+from readablestem.source import pandoc as pandoc_step
 from readablestem.source.support import SUPPORT
 from readablestem.web import (
     access,
@@ -104,6 +105,7 @@ from readablestem.web.uploads import (
     INSPECT_TIMEOUT_S,
     UploadedFile,
     UploadRejected,
+    check_word_isolated,
     convert_office_isolated,
     inspect_pdf_detail,
     inspect_pdf_isolated,
@@ -961,6 +963,13 @@ def _place_files(
                 )
             )
             continue
+        # A Word file the reader takes (`FEATURE_WORD_SOURCE`) is read from the file itself:
+        # no PDF is made. Anything it will not take goes on as below.
+        if s.feature_word_source:
+            word = _place_word(ctx, user, file, mode, course_id, exam, revises, len(files))
+            if word is not None:
+                placed.append(word)
+                continue
         # A Word or PowerPoint file is made into a tagged PDF first (T3-30); from here on the
         # PDF is what is probed, stored, split into parts and converted, as for any upload.
         data, office, census = file.data, False, None
@@ -1242,9 +1251,69 @@ def _place_source(
     return Placed(file.filename, info.pages, job_id=job_id)
 
 
+def _place_word(
+    ctx: AppContext,
+    user: CurrentUser,
+    file: UploadedFile,
+    mode: str,
+    course_id: str | None,
+    exam: bool,
+    revises: str | None,
+    files: int,
+) -> Placed | None:
+    """A `.docx` the Word reader takes, queued as a source job (`source.docx_reader`), or None:
+    the file goes the PDF route instead (a revision, a file that is not a Word file, no sandbox
+    or pandoc here, one the reader's gate refuses, or one longer than a job takes; the PDF route
+    has its own gate and says why when it refuses too). Pages are counted from the file's
+    characters and pictures (`docx_package.Facts.pages`)."""
+    s = ctx.settings
+    if (
+        revises is not None
+        or not file.data.startswith(b"PK\x03\x04")
+        or not (pandoc_step.installed() and sandbox.available() and ctx.sandbox.allows_source())
+    ):
+        return None
+    try:
+        census, pages = check_word_isolated(file.data)
+    except UploadRejected:
+        return None
+    if census.kind != "docx" or pages > s.max_pages_per_job:
+        return None  # a long file is split into parts by pages, which only the PDF route can do
+    blob = source_envelope.wrap("docx", file.filename, None, file.data)
+    try:
+        job_id = store_job(
+            ctx.factory,
+            s,
+            user.id,
+            file.filename,
+            blob,
+            pages,
+            mode,
+            course_id=course_id,
+            exam=exam,
+            now=utcnow(),
+            media_type=SOURCE_MEDIA_TYPES["docx"],
+            office=census.to_json(),
+        )
+    except TooManyJobs as exc:
+        return Placed(file.filename, code=exc.code, status=429, retry_after="60")
+    except QuotaRefused as exc:
+        return Placed(
+            file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
+            retry_after="3600",
+        )  # fmt: skip
+    ctx.wake_worker()
+    log_event(
+        logger, "job_created", job_id=job_id, pages=pages, source="docx",
+        opt_in=mode == "dev", retention=mode, files=files,
+    )  # fmt: skip
+    return Placed(file.filename, pages, job_id=job_id)
+
+
 SOURCE_MEDIA_TYPES = {
     "tex": "application/x-readablestem-tex",
     "zip": "application/x-readablestem-zip",
+    "docx": "application/x-readablestem-docx",
 }
 
 

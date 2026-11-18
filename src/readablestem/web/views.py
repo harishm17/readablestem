@@ -91,15 +91,16 @@ JOB_ERROR_MESSAGES = {
     "it into smaller parts.",
     "store_failed": "The conversion finished but its results could not be saved.",
     "upload_missing": "The uploaded file was no longer available.",
-    # LaTeX source (readablestem.source): nothing partial is kept.
-    "source_failed": "This LaTeX source could not be converted. Upload the PDF instead.",
-    "source_unreadable": "This LaTeX source could not be converted. Upload the PDF instead.",
-    "source_refused": "This LaTeX source uses something this tool will not run. Remove it, "
+    # LaTeX source and Word files read from the file (readablestem.source): nothing partial
+    # is kept.
+    "source_failed": "This source file could not be converted. Upload the PDF instead.",
+    "source_unreadable": "This source file could not be converted. Upload the PDF instead.",
+    "source_refused": "This source file uses something this tool will not run. Remove it, "
     "or upload the PDF instead.",
-    "source_busy": "The server is busy right now and could not start converting this LaTeX "
-    "source. Upload it again in a few minutes, or upload the PDF instead.",
-    "source_unavailable": "LaTeX source is not available on this server at the moment, so "
-    "this file was not converted. Compile it to a PDF and upload that.",
+    "source_busy": "The server is busy right now and could not start converting this source "
+    "file. Upload it again in a few minutes, or upload the PDF instead.",
+    "source_unavailable": "Reading source files is not available on this server at the "
+    "moment, so this file was not converted. Save it as a PDF and upload that.",
     # A source that would lose content outside a formula (source.report.stop). With the job's
     # `error_detail` the sentence names the file or commands (`source_stop_message`); these are
     # the words without it.
@@ -733,7 +734,10 @@ def job_view(
         carry=carried,
         carried_ids=_carried_ids(job),
         part_label=job.part_label or "",
-        office_lines=office_census.read_lines(office_census.parse(job.office_json))
+        office_lines=office_census.read_lines(
+            office_census.parse(job.office_json),
+            str((job.result_json or {}).get("origin") or "pdf"),
+        )
         if with_page
         else [],
         is_sample=bool(job.is_sample),

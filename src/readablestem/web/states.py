@@ -535,6 +535,14 @@ _HOLDS = {
     "office_tracked_changes": (
         "The Word file still has tracked changes, so check the notices before you share it."
     ),
+    # `source.docx_reader`: the file has the text as if every change were accepted
+    "word_tracked_changes": (
+        "The Word file still has tracked changes, so check the notices before you share it."
+    ),
+    "word_objects": (
+        "Diagrams or charts in the Word file are not in this file, so check the notices "
+        "before you share it."
+    ),
     # `pipeline.notices.TEXT_CODES`: a result stored before the text decision existed has the
     # notice and no decision behind it. A result with the decision is counted by the summary.
     "rtl_text": (

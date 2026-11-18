@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +74,6 @@ class Result:
     failure: str = ""  # one of the names above when `tree` is None
     version: str = ""  # pandoc's own version, recorded with the result and its cache key
     timed_out: bool = False
-    extra: dict[str, int] = field(default_factory=dict)
 
 
 def installed() -> str | None:
@@ -120,8 +119,9 @@ def read(kind: str, data: bytes, *, limits: sandbox.Limits | None = None) -> Res
         try:
             outcome = sandbox.run(
                 [
-                    program, "+RTS", f"-M{HEAP_BYTES}", "-RTS", "--sandbox", "-f", fmt, "-t", "json",
-                    *options, "-o", f"{out_inside}/tree.json", f"{inside}/{name}",
+                    program, "+RTS", f"-M{HEAP_BYTES}", "-RTS", "--sandbox",
+                    "-f", fmt, "-t", "json", *options,
+                    "-o", f"{out_inside}/tree.json", f"{inside}/{name}",
                 ],
                 ro=((work, "/work"),), rw=((out, "/out"),),
                 env={"HOME": "/tmp", "LANG": "C.UTF-8", "TZ": "UTC"},

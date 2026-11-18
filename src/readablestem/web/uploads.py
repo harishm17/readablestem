@@ -389,6 +389,48 @@ def convert_office_isolated(
         _OFFICE_SLOT.release()
 
 
+WORD_CHECK_TIMEOUT_S = 30.0
+
+
+def check_word_isolated(data: bytes) -> tuple[office_convert.Census, int]:
+    """The gate of the Word reader (`source.docx_package.check`) run in a child process, as
+    the conversion is: the file's census and the pages it will count as, or `UploadRejected`
+    with the category the Office route uses for the same file. Nothing is converted."""
+    try:
+        child = subprocess.Popen(
+            [sys.executable, "-m", "readablestem.web.office_convert", "--check"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=child_env(),
+            start_new_session=True,
+        )
+    except OSError:
+        raise UploadRejected("office_failed") from None
+    try:
+        out, _ = child.communicate(data, timeout=WORD_CHECK_TIMEOUT_S)
+    except (subprocess.TimeoutExpired, OSError):
+        office_convert.kill_group(child)
+        raise UploadRejected("office_failed") from None
+    finally:
+        office_convert.kill_group(child)
+    try:
+        answer = json.loads(out.partition(b"\n")[0].decode("utf-8"))
+    except ValueError:
+        raise UploadRejected("office_failed") from None
+    if isinstance(answer, dict) and answer.get("ok") is True:
+        pages = answer.get("pages")
+        try:
+            census = office_convert.Census.from_json(answer.get("census"))
+        except ValueError:
+            raise UploadRejected("office_failed") from None
+        if isinstance(pages, int) and not isinstance(pages, bool) and pages >= 1:
+            return census, pages
+        raise UploadRejected("office_failed")
+    code = answer.get("code") if isinstance(answer, dict) else None
+    raise UploadRejected(code if code in REJECTION_STATUS else "office_failed")
+
+
 def _run_office_child(
     data: bytes, soffice: str, timeout_s: float
 ) -> tuple[bytes, office_convert.Census]:

@@ -533,6 +533,15 @@ class Settings(BaseSettings):
     # rules (docs/web.md, "LaTeX source"). Only with FEATURE_LATEX_SOURCE; off until real decks
     # have been looked at (the spike used decks written for it).
     feature_beamer_source: bool = False
+    # Word (.docx) uploads read from the file itself, not from a LibreOffice PDF of it
+    # (`source.docx_reader`): headings, lists, tables with their header rows and spans, footnotes,
+    # links, the picture alt text the author wrote and the equations typed in Word (read exactly,
+    # no model). pandoc runs in the sandbox, so it needs the same conditions as LaTeX source
+    # (`FEATURE_LATEX_SOURCE` is not required, the sandbox and pandoc are). Off: a Word file goes
+    # to the PDF route as before, which also stays the route for any file the reader cannot take
+    # (it is refused or fails to start). On, the reader's result is the document; no PDF is made
+    # and no second reading is compared with it (WS18.19 to WS18.21 are not built).
+    feature_word_source: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).

@@ -104,6 +104,7 @@ _VANISH, _VAL = f"{{{W}}}vanish", f"{{{W}}}val"
 _LANG, _BIDI = f"{{{W}}}lang", f"{{{W}}}bidi"
 _PSTYLE, _RSTYLE = f"{{{W}}}pStyle", f"{{{W}}}rStyle"
 _TXBX = f"{{{W}}}txbxContent"
+_BLIP = "{http://schemas.openxmlformats.org/drawingml/2006/main}blip"
 _FALLBACK = f"{{{MC}}}Fallback"
 _OMATH = f"{{{M}}}oMath"
 _DELETED = (f"{{{W}}}del", f"{{{W}}}moveFrom")
@@ -142,7 +143,7 @@ def _check_members(archive: zipfile.ZipFile) -> None:
         parts = name.split("/")
         if (
             name.startswith("/") or "\\" in name or _DRIVE.match(name) or ".." in parts
-            or "." in parts[:-1] or name.endswith("/") and info.file_size
+            or "." in parts[:-1] or (name.endswith("/") and info.file_size)
             or folded in seen
         ):  # fmt: skip
             raise OfficeRejected("office_unsafe")
@@ -203,6 +204,14 @@ class Facts:
     language_chars: Counter[str] = field(default_factory=Counter)  # BCP 47 tag -> letters
     default_language: str = ""
     words: Counter[str] = field(default_factory=Counter)
+    chars: int = 0  # letters, digits and signs of the text, spaces between words included
+    pictures: int = 0  # picture relationships of the main part (an upper bound)
+
+    def pages(self) -> int:
+        """The pages the file counts as before it is read: one per 3,000 characters of text, or
+        one per picture, whichever is larger, and at least one (a source's rule,
+        `source.intake`)."""
+        return max(1, -(-self.chars // 3000), self.pictures)
 
     def counts(self) -> dict[str, int]:
         """Everything but the words and the languages, for logs and measurements."""
@@ -391,11 +400,9 @@ def _hide(root: ET.Element, hidden_styles: set[str], facts: Facts) -> None:
     while stack:
         parent = stack.pop()
         for child in list(parent):
-            if child.tag == _R and _run_hidden(child, hidden_styles):
-                facts.hidden_runs += 1
-                facts.hidden_words += len(_text_of(child).split())
-                parent.remove(child)
-            elif child.tag == _P and _paragraph_hidden(child, hidden_styles):
+            if (child.tag == _R and _run_hidden(child, hidden_styles)) or (
+                child.tag == _P and _paragraph_hidden(child, hidden_styles)
+            ):
                 facts.hidden_runs += 1
                 facts.hidden_words += len(_text_of(child).split())
                 parent.remove(child)
@@ -439,6 +446,8 @@ def _count(root: ET.Element, facts: Facts, *, main: bool) -> None:
             continue
         if node.tag == _TXBX and main:
             facts.text_boxes += 1
+        if node.tag == _BLIP and main:
+            facts.pictures += 1
         if node.tag == _OMATH:
             continue
         if node.tag in _DELETED:
@@ -475,7 +484,9 @@ def _paragraph(paragraph: ET.Element, facts: Facts) -> None:
             if letters:  # a run with no mark of its own is in the document's default language
                 facts.language_chars[tag or "en"] += letters
     # nested paragraphs (a text box inside a run) are counted as paragraphs of their own
-    facts.words.update(w for w in "".join(parts).split())
+    words = "".join(parts).split()
+    facts.words.update(words)
+    facts.chars += sum(len(w) for w in words) + max(len(words) - 1, 0)
 
 
 def _mark_tables(root: ET.Element, facts: Facts) -> None:

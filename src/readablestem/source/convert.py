@@ -27,10 +27,12 @@ from __future__ import annotations
 import logging
 import tempfile
 import time
+import zipfile
 from collections import Counter
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
@@ -62,7 +64,7 @@ log = logging.getLogger(__name__)
 FAILURE_CODES = {
     "source_unavailable",  # no sandbox or no LaTeXML on this machine
     "source_busy",  # the machine had no room for the conversion's tasks right now
-    "source_failed",  # LaTeXML did not produce a document
+    "source_failed",  # LaTeXML (or pandoc, for a Word file) did not produce a document
     "source_unreadable",  # it did, and it is not usable
     "source_refused",  # the source is not allowed (the child checks again)
     "timeout",
@@ -200,6 +202,44 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
     return document.read_bytes()
 
 
+def _read_word(blob: bytes) -> ltx_reader.Reading:
+    """The reading of a Word file (envelope kind "docx"): the gate again (the web process's
+    answer is not trusted here), the working copy, pandoc in the sandbox, then the reader.
+    `SourceFailed` with the codes of a LaTeX source: nothing partial is kept."""
+    from readablestem.source import docx_package, docx_reader
+    from readablestem.source import pandoc as pandoc_step
+    from readablestem.web.office_convert import OfficeRejected
+
+    try:
+        data = intake.unwrap(blob)[2]
+        prepared = docx_package.prepare(data)
+    except (intake.EnvelopeError, OfficeRejected):
+        raise SourceFailed("source_refused") from None
+    except (OSError, ValueError, zipfile.BadZipFile):
+        raise SourceFailed("source_unreadable") from None
+    try:
+        with sandbox.exclusive(GATE_NAME, GATE_WAIT_S):  # one source program at a time
+            result = pandoc_step.read("docx", prepared.working)
+    except TimeoutError:
+        raise SourceFailed("timeout") from None
+    except (sandbox.SandboxUnavailable, OSError):
+        raise SourceFailed("source_unavailable") from None
+    if result.tree is None:
+        if result.timed_out:
+            raise SourceFailed("timeout")
+        code = {
+            pandoc_step.NO_PANDOC: "source_unavailable",
+            pandoc_step.NO_SANDBOX: "source_unavailable",
+            pandoc_step.BUSY: "source_busy",
+        }
+        raise SourceFailed(code.get(result.failure, "source_failed"))
+    try:
+        reading, _ = docx_reader.read(prepared, result.tree)
+    except docx_reader.ReadError:
+        raise SourceFailed("source_unreadable") from None
+    return reading
+
+
 def _stop_if_lost(report: SourceReport, *, beamer: bool) -> None:
     """Stop the job when the source would lose content outside a formula
     (`source.report.stop`). Logs the counts, never a name."""
@@ -271,6 +311,28 @@ def _convert(
     watch = step_facts.Stopwatch()
     watch.stage("source")  # LaTeXML in its sandbox, then reading what it wrote
     pipeline._send(stage_progress, "layout")
+    finish = partial(
+        _finish,
+        started=started,
+        watch=watch,
+        settings=settings,
+        client=client,
+        progress=progress,
+        tracer=tracer,
+        concurrency=concurrency,
+        notice=notice,
+        source_note=source_note,
+        options=options,
+        stage_progress=stage_progress,
+        step_cache=step_cache,
+        call_observer=call_observer,
+    )
+    try:
+        kind = intake.unwrap(blob)[0]
+    except intake.EnvelopeError:
+        raise SourceFailed("source_refused") from None
+    if kind == "docx":  # a Word file: read from the file itself, with no LaTeXML
+        return finish(_read_word(blob), origin="docx", report=None)
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
         project, main, beamer, loaded = _project(
@@ -300,24 +362,7 @@ def _convert(
     report.unread_pictures = reading.unread_pictures
     report.unread_start = reading.unread_start
     _stop_if_lost(report, beamer=beamer)
-    return _finish(
-        reading,
-        started=started,
-        watch=watch,
-        settings=settings,
-        client=client,
-        progress=progress,
-        tracer=tracer,
-        concurrency=concurrency,
-        notice=notice,
-        source_note=source_note,
-        options=options,
-        stage_progress=stage_progress,
-        step_cache=step_cache,
-        call_observer=call_observer,
-        origin="beamer" if beamer else "latex",
-        report=report,
-    )
+    return finish(reading, origin="beamer" if beamer else "latex", report=report)
 
 
 def _finish(
@@ -336,7 +381,7 @@ def _finish(
     stage_progress: pipeline.StageProgressFn | None,
     step_cache: pipeline.StepCache | None,
     call_observer: Callable[[ModelCall], None] | None,
-    origin: Literal["latex", "beamer"] = "latex",
+    origin: Literal["latex", "beamer", "docx"] = "latex",
     report: SourceReport | None = None,
 ) -> ConversionOutput:
     """From a reading to a stored result: the figure steps, the assembler, the checks."""

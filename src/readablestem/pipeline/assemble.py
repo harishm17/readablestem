@@ -162,6 +162,10 @@ ABOUT_WORDING_BEAMER = (
     "This is a web version of a slide deck from your course, made with ReadableSTEM, "
     "a tool that assists with accessibility."
 )
+ABOUT_WORDING_DOCX = (
+    "This is a web version of a Word document from your course, made with ReadableSTEM, "
+    "a tool that assists with accessibility."
+)
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.
@@ -1483,9 +1487,11 @@ def _about_section(
     the file, with no review vocabulary ("needs review", "rejected"). `kept_pages`: 0-based
     pages kept whole as an image. The sentence about pages left out carries an id, so the
     notice at the top can link to it."""
-    opening = {"latex": ABOUT_WORDING_SOURCE, "beamer": ABOUT_WORDING_BEAMER}.get(
-        summary.origin, ABOUT_WORDING
-    )
+    opening = {
+        "latex": ABOUT_WORDING_SOURCE,
+        "beamer": ABOUT_WORDING_BEAMER,
+        "docx": ABOUT_WORDING_DOCX,
+    }.get(summary.origin, ABOUT_WORDING)
     maths = checked_words.maths_sentence(summary)
     lines = [f"<p>{opening} {maths}</p>" if maths else f"<p>{opening}</p>"]
     left_out = checked_words.left_out_sentence(summary)

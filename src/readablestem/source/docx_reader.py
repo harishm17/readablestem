@@ -101,7 +101,7 @@ FLAT_CHECK = "source.flat_equation"
 HEADER_CHECK = "source.header_unmarked"
 _FLAT = re.compile(r"[A-Za-z]\d")
 _COMMAND = re.compile(r"\\([A-Za-z]+)")
-_QUOTES = {"SingleQuote": ("‘", "’"), "DoubleQuote": ("“", "”")}
+_QUOTES = {"SingleQuote": ("\u2018", "\u2019"), "DoubleQuote": ("“", "”")}
 _TOC = re.compile(
     r"^(?:toc\s*\d*|toc heading|table of (?:contents|figures)|contents heading)$", re.I
 )
@@ -365,7 +365,7 @@ class _Reader:
 
         visit(inlines, depth)
         raw = "".join(parts)
-        text = re.sub(r"[ \t\r\n ]+", " ", raw)
+        text = re.sub(r"[ \t\r\n\u00a0]+", " ", raw)
         lead = len(text) - len(text.lstrip(" "))
         text = text.strip()
         # the squash changed the length only where whitespace ran together: spans are kept by
@@ -656,7 +656,7 @@ class _Reader:
             self.chars += len(text)
 
     def _picture(self, image: dict[str, Any]) -> None:
-        attr, alt, target = image["c"]
+        _, alt, target = image["c"]
         src = str(target[0])
         author = None
         words, _, _ = self._inline_text(alt, owner=None)
@@ -784,9 +784,7 @@ def _flat(inlines: list[Any]) -> list[dict[str, Any]]:
             "Subscript",
         ):
             stack.extend(reversed(content))
-        elif kind in ("Link", "Span"):
-            stack.extend(reversed(content[1]))
-        elif kind == "Quoted":
+        elif kind in ("Link", "Span") or kind == "Quoted":
             stack.extend(reversed(content[1]))
     return found
 
@@ -799,9 +797,7 @@ def _plain(inlines: list[Any]) -> str:
             out.append(item["c"])
         elif kind in ("Space", "SoftBreak", "LineBreak"):
             out.append(" ")
-        elif kind == "Math":
-            out.append(item["c"][1])
-        elif kind == "Code":
+        elif kind == "Math" or kind == "Code":
             out.append(item["c"][1])
     return re.sub(r"\s+", " ", "".join(out)).strip()
 
@@ -839,7 +835,7 @@ def _offsets(raw: str) -> list[int]:
     previous_space = False
     for i, ch in enumerate(raw):
         out[i] = position
-        space = ch in " \t\r\n "
+        space = ch in " \t\r\n\u00a0"
         if not (space and previous_space):
             position += 1
         previous_space = space
@@ -868,10 +864,15 @@ def _marker(number: int, style: str, delim: str) -> str:
     return f"{label}."
 
 
+_ROMAN = (
+    (1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"),
+    (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i"),
+)  # fmt: skip
+
+
 def _roman(number: int) -> str:
     out = ""
-    for value, symbol in ((1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"),
-                          (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")):  # fmt: skip
+    for value, symbol in _ROMAN:
         while number >= value:
             out += symbol
             number -= value

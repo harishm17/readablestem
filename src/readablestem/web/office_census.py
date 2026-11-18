@@ -39,12 +39,13 @@ def parse(data: Mapping[str, Any] | None) -> Census | None:
         return None
 
 
-def notices_of(census: Census) -> list[Notice]:
+def notices_of(census: Census, origin: str = "pdf") -> list[Notice]:
     """The notices the census calls for, for the whole document (`web.worker` adds them to
-    the result): a count each, never a word of the file."""
+    the result): a count each, never a word of the file. A Word file the reader read itself
+    (`origin` "docx") has its own tracked-changes notice (`source.docx_reader`)."""
     changes = census.tracked_insertions + census.tracked_deletions
     out: list[Notice] = []
-    if changes:
+    if changes and origin != "docx":
         out.append(Notice(code=TRACKED_CHANGES, count=changes, review="required"))
     for code, count in (
         (SPEAKER_NOTES, census.speaker_notes),
@@ -56,19 +57,25 @@ def notices_of(census: Census) -> list[Notice]:
     return out
 
 
-def with_notices(notices: list[Notice], census: Census | None) -> list[Notice]:
+def with_notices(notices: list[Notice], census: Census | None, origin: str = "pdf") -> list[Notice]:
     """`notices` with the census's, once each (a result written again, as by "Try again",
     does not list them twice)."""
     if census is None:
         return notices
-    return [n for n in notices if n.code not in CODES] + notices_of(census)
+    return [n for n in notices if n.code not in CODES] + notices_of(census, origin)
 
 
-def read_lines(census: Census | None) -> list[str]:
+def read_lines(census: Census | None, origin: str = "pdf") -> list[str]:
     """The job page's sentences about how the file was read: empty for a PDF."""
     if census is None:
         return []
     word = census.kind == "docx"
+    if origin == "docx":
+        return [
+            "This Word file was read from the file itself: its headings, lists, tables, "
+            "footnotes, links and the descriptions of pictures the author wrote, and its "
+            "equations as typed in the equation editor. No PDF was made of it first."
+        ]
     lines = [
         ("This Word file" if word else "This PowerPoint file")
         + " was turned into a tagged PDF first, and that PDF was read the way any PDF is. "

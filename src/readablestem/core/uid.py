@@ -71,7 +71,7 @@ from readablestem.core.types import INLINE_MARKER_RE, DocumentResult, Element, K
 PICTURE_KINDS = frozenset({Kind.EQUATION, Kind.FIGURE, Kind.TABLE})
 # Origins read from a source and not from pages (`DocumentResult.origin`): uids are counted
 # over the whole document.
-SOURCE_ORIGINS = frozenset({"latex", "beamer"})
+SOURCE_ORIGINS = frozenset({"latex", "beamer", "docx"})
 # Elements a reviewer added by hand ("p3-x0", `web.page_edits.next_added_id`) are a group of
 # their own, so adding one never renumbers what the tool found.
 _ADDED = re.compile(r"-x\d+$")

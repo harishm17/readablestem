@@ -528,7 +528,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "file says that it is not there.",
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
-    "source_unread": "This tool could not read part of the LaTeX source, so it is not in the file.",
+    "source_unread": "This tool could not read part of the source file, so it is not in the file.",
     # Word and PowerPoint uploads (`web.office_census`); "{count}" is the number counted.
     "office_tracked_changes": "Tracked changes (insertions and deletions) that nobody "
     "accepted or rejected in this Word file: {count}. The PDF this was read from may show "
@@ -538,6 +538,19 @@ NOTICE_MESSAGES: dict[str, str] = {
     "file: only the slides were read.",
     "office_hidden_slides": "Hidden slides: {count}. They are not in this file.",
     "office_comments": "Comments in the original file: {count}. They are not in this file.",
+    # A Word file read from the file itself (`source.docx_reader`); "{count}" as above.
+    "word_hidden_text": "Hidden text in the Word file: {count} runs of words. They are left "
+    "out of this file, as Word leaves them out of the page.",
+    "word_text_boxes": "Text boxes in the Word file: {count}. Check that their words are in "
+    "this file where they belong.",
+    "word_headers_footers": "Running headers and footers in the Word file: {count}. They are "
+    "not in this file.",
+    "word_objects": "Diagrams, charts or embedded objects in the Word file: {count}. They "
+    "are not in this file, so describe them or add them again as pictures.",
+    "word_tracked_changes": "Tracked changes (insertions and deletions) that nobody accepted "
+    "or rejected in this Word file: {count}. This file has the text as if all were accepted. "
+    "Accept or reject them in Word, then upload the file again, before you give this to "
+    "students.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."

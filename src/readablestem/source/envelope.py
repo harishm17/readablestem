@@ -3,7 +3,7 @@
 A job's upload is stored as the file the person sent (`Blob` kind "upload", media type
 `application/x-tex` or `application/zip`). The worker hands the converter one `bytes` value, as
 it does for a PDF; for a source it is this envelope: a magic line, one JSON line with the kind
-(`tex` or `zip`), the main file the person named (or null) and the display name, then the
+(`tex`, `zip` or `docx`), the main file the person named (or null) and the display name, then the
 upload as it was. `pipeline.run.convert_pdf` recognises the magic line and passes the envelope
 to `source.convert`. Kept in a module of its own so that hook imports nothing heavy.
 """
@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 
 MAGIC = b"RSSRC1\n"
+KINDS = ("tex", "zip", "docx")  # docx: a Word file read by `source.docx_reader`
 
 
 class EnvelopeError(ValueError):
@@ -39,6 +40,6 @@ def unwrap(blob: bytes) -> tuple[str, str | None, bytes]:
         main = meta.get("main")
     except (ValueError, KeyError, TypeError, AttributeError):
         raise EnvelopeError("bad header") from None
-    if kind not in ("tex", "zip") or not (main is None or isinstance(main, str)):
+    if kind not in KINDS or not (main is None or isinstance(main, str)):
         raise EnvelopeError("bad header")
     return kind, main, data
