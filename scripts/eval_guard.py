@@ -69,6 +69,7 @@ ANSWER_SETTINGS = frozenset(
         "claude_check_effort",
         "page_math_model",
         "page_witness_model",
+        "page_audit_model",
         "image_pages_model",
         "figure_model_max_edge_px",
     }
@@ -111,6 +112,9 @@ PROMPT_REPORTS: dict[str, tuple[str, ...]] = {
     # with one of them): measured with the same practice-set run.
     "math_reader": ("latest-image-pages.json",),
     "math_reader_claude": ("latest-image-pages.json",),
+    # The page audit runs in shadow and changes no output, so the document task does not
+    # measure it: its report is its own run (`eval page-audit`, docs/eval.md).
+    "page_audit": ("latest-page-audit.json",),
 }
 DEFAULT_PROMPT_REPORTS = ("latest-document.json",)
 # Model constant (name, lower case) -> the reports that record those models. The OpenAI
@@ -123,6 +127,8 @@ MODEL_REPORTS: dict[str, tuple[str, ...]] = {
     "anthropic_cheap_model": ANTHROPIC_REPORTS,
     "image_pages_model": ("latest-image-pages.json",),
     "anthropic_effort_image_pages": ("latest-image-pages.json",),
+    "page_audit_model": ("latest-page-audit.json",),
+    "anthropic_effort_page_audit": ("latest-page-audit.json",),
 }
 DEFAULT_MODEL_REPORTS = ("latest-document.json",)
 

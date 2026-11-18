@@ -1019,7 +1019,10 @@ tables local and document; `image_page*.md`, `IMAGE_PAGES_MODEL` and
 `ANTHROPIC_EFFORT_IMAGE_PAGES`: `latest-image-pages.json`, a run of the scanned and handwritten
 pages pass (the document task reads typed PDFs and never calls that pass; no such report is committed
 yet, the first prompt change adds it, and the practice-set run in docs/eval-handwriting.md, "Doubtful
-symbols: tried, not shipped", is the model for it); any other prompt: document); a change to the Claude model pair
+symbols: tried, not shipped", is the model for it); `page_audit.md`, `PAGE_AUDIT_MODEL` and
+`ANTHROPIC_EFFORT_PAGE_AUDIT`: `latest-page-audit.json`, the audit's own run (`eval page-audit`,
+below: it runs in shadow and changes no output, so the document task does not measure it; no such
+report is committed yet); any other prompt: document); a change to the Claude model pair
 needs all four Claude reports (equations, headings, figures, document); the OpenAI pair
 needs the tables report, which records it; any other model setting needs the document
 report.

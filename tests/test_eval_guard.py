@@ -66,15 +66,24 @@ def test_unlisted_prompt_needs_the_document_report() -> None:
 
 
 @pytest.mark.parametrize(
-    "name",
-    ["image_page", "image_page_crops", "image_page_notation", "math_reader", "math_reader_claude"],
+    ("name", "report"),
+    [
+        ("image_page", "latest-image-pages.json"),
+        ("image_page_crops", "latest-image-pages.json"),
+        ("image_page_notation", "latest-image-pages.json"),
+        ("math_reader", "latest-image-pages.json"),
+        ("math_reader_claude", "latest-image-pages.json"),
+        ("page_audit", "latest-page-audit.json"),
+    ],
 )
-def test_an_image_page_prompt_needs_the_image_pages_report(name: str) -> None:
+def test_a_prompt_the_document_task_does_not_run_needs_its_own_report(
+    name: str, report: str
+) -> None:
     path = f"src/readablestem/models/prompts/{name}.md"
     code, lines = guard.check([path], "", "")
     text = "\n".join(lines)
-    assert code == 1 and "latest-image-pages.json" in text and "latest-document.json" not in text
-    assert guard.check([path, "data/eval/latest-image-pages.json"], "", "")[0] == 0
+    assert code == 1 and report in text and "latest-document.json" not in text
+    assert guard.check([path, f"data/eval/{report}"], "", "")[0] == 0
 
 
 def test_claude_model_change_needs_every_claude_report() -> None:
