@@ -68,9 +68,9 @@ def main() -> int:
     original = layout._inline_runs
     seen: list = []
 
-    def hook(row, info=None, kinds=None):
-        runs = original(row, info, kinds)
-        seen.append((row, runs, info or layout._CharInfo.of(row)))
+    def hook(row, info=None, kinds=None, **kw):
+        runs = original(row, info, kinds, **kw)
+        seen.append((row, runs, info or layout._CharInfo.of(row, **kw)))
         return runs
 
     layout._inline_runs = hook

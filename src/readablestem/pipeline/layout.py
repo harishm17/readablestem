@@ -440,20 +440,43 @@ _SUPERSCRIPT_FLAG = 1
 _MONO_FLAG = 8
 
 _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a time
-# The document being analysed was typeset by TeX (`page_type.producer_hint`): the conventions
-# below that come from what a TeX author types (an italic letter is `$x$`, the maths stops
-# before a unit or a parenthesis of the sentence) apply only then. Set by `_analyze_document`
-# under `_LOCK`; a Chromium print of MathML or a Word file is read as before.
-_TEX_MADE = False
-# The document is a slide deck (`slides.detect`): the reading rules that suit a slide (a column
-# of two lines is a column; a line of maths that ends a wrapped bullet is part of it) apply
-# only then. Set by `_analyze_document` under `_LOCK` and cleared with `_TEX_MADE`.
-_SLIDE_DECK = False
-# How the document spells its own compounds (`hyphens.document_spellings`), for the hyphen at
-# the end of a line: pairs it hyphenates inside a line, words it writes whole. Set by
-# `_analyze_document` under `_LOCK` and cleared with `_TEX_MADE`.
-_COMPOUNDS: frozenset[str] = frozenset()
-_WHOLE_WORDS: frozenset[str] = frozenset()
+
+
+@dataclass
+class _Document:
+    """What is known of the one document being read, made by `analyze` for one call and
+    passed to every step that reads it (nothing of it is kept between documents).
+
+    The fields are set by `_analyze_document` as it learns them, and a step that runs before
+    that sees the default: a document that is none of these things.
+
+    `tex_made`: the document was typeset by TeX (`page_type.producer_hint`): the conventions
+    that come from what a TeX author types (an italic letter is `$x$`, the maths stops before
+    a unit or a parenthesis of the sentence) apply only then; a Chromium print of MathML or a
+    Word file is read as before.
+    `slide_deck`: the document is a slide deck (`slides.detect`): the reading rules that suit
+    a slide (a column of two lines is a column; a line of maths that ends a wrapped bullet is
+    part of it) apply only then.
+    `compounds`, `whole_words`: how the document spells its own compounds
+    (`hyphens.document_spellings`), for the hyphen at the end of a line: pairs it hyphenates
+    inside a line, words it writes whole.
+    `grouping`: `analyze(display_grouping=...)`.
+    `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector
+    (`tables.DetectorBudget`) may still spend on this document. Only `_read_page` and
+    `_claim_tables` use them, and they take the document of the call: `_PLAIN` is for the
+    functions that outside code calls on a row or a grid, and nothing spends from it."""
+
+    tex_made: bool = False
+    slide_deck: bool = False
+    compounds: frozenset[str] = frozenset()
+    whole_words: frozenset[str] = frozenset()
+    grouping: bool = False
+    ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)
+    detector: tables.DetectorBudget = field(default_factory=tables.DetectorBudget)
+
+
+_PLAIN = _Document()  # never changed: the document of a caller that has none
+
 # Run the table detector only on pages that could hold a table (`tables.may_hold_table`).
 # The result is the same either way; switched off, only to check that.
 TABLE_PREFILTER = True
@@ -592,13 +615,12 @@ def analyze(
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _check_content(lambda: content_budget.check(doc, selected))
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
-                return _analyze_document(doc, selected, page_math, display_grouping)
+                return _analyze_document(
+                    doc, selected, page_math, _Document(grouping=display_grouping)
+                )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
-                global _TEX_MADE, _SLIDE_DECK, _COMPOUNDS, _WHOLE_WORDS, _GROUPING
-                _TEX_MADE = _SLIDE_DECK = _GROUPING = False
-                _COMPOUNDS = _WHOLE_WORDS = frozenset()
                 doc.close()
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
@@ -2834,11 +2856,15 @@ def _reference_pages(page_count: int, selected: list[int], skip: Collection[int]
     return sorted(chosen)
 
 
-def _band_figures(page: pymupdf.Page, paths: list[_Path]) -> set[tuple[str, tuple]]:
+def _band_figures(
+    page: pymupdf.Page, paths: list[_Path], *, document: _Document
+) -> set[tuple[str, tuple]]:
     """(zone, rounded box) of the figures a page has in its header/footer band."""
     rect, height = page.rect, page.rect.height
     band_paths = [p for p in paths if _box_zone(p.bbox, height) is not None]
-    figures = _merge_figures(_raster_figures(page, rect) + _vector_figures(band_paths, [], rect))
+    figures = _merge_figures(
+        _raster_figures(page, rect) + _vector_figures(band_paths, [], rect, document=document)
+    )
     keys = set()
     for figure in figures:
         zone = _box_zone(figure.bbox, height)
@@ -2884,6 +2910,8 @@ def _margin_filter(
     paths: dict[int, list[_Path]],
     skip: Collection[int],
     guard: _PageGuard,
+    *,
+    document: _Document,
 ) -> _MarginFilter:
     """What repeats on the pages. A page that raises (`guard`) is left out of the count, as
     if it was not a reference page: the statistic is the others'."""
@@ -2923,7 +2951,9 @@ def _margin_filter(
                 key = (zone, _norm_margin(row.clean))
                 seen.add(("text", key))
                 texts.setdefault(key, set()).add(row.clean)
-            seen.update(("figure", key) for key in _band_figures(page, paths[number]))
+            seen.update(
+                ("figure", key) for key in _band_figures(page, paths[number], document=document)
+            )
             seen.update(("mark", key) for key in _band_marks(page, paths[number]))
             seen.update(("picture", xref) for xref in _page_pictures(page) if xref)
             counts.update(seen)
@@ -3289,7 +3319,7 @@ def _top_down(boxes: Sequence[BBox], members: Iterable[int]) -> list[int]:
 
 
 def _word_lengths(
-    chars: list[_Char], classes: list[str], script: list[bool]
+    chars: list[_Char], classes: list[str], script: list[bool], *, document: _Document
 ) -> tuple[list[int], list[bool]]:
     """For letters (class L), the length of the plain-letter word they belong to, and
     whether that word is a maths word (`sin`, `det`, `lim`, units such as `mol`).
@@ -3321,7 +3351,7 @@ def _word_lengths(
             and classes[j] == "L"
             and script[j] == script[i]
             # TeX sets "ln" upright and the variable after it in italic: two words, not one
-            and (not _TEX_MADE or chars[j].italic == chars[i].italic)
+            and (not document.tex_made or chars[j].italic == chars[i].italic)
         ):
             j += 1
         italic_variables = upright and j - i <= 3 and all(c.italic for c in chars[i:j])
@@ -3329,7 +3359,7 @@ def _word_lengths(
         if italic_variables and italic_text and j - i > 1 and word in hyphens.words():
             italic_variables = False
         named = (
-            _TEX_MADE
+            document.tex_made
             and not italic_variables
             and not script[i]
             and not any(c.italic for c in chars[i:j])
@@ -3360,7 +3390,7 @@ class _CharInfo:
     maths_words: list[bool]
 
     @classmethod
-    def of(cls, row: _Row) -> _CharInfo:
+    def of(cls, row: _Row, *, document: _Document = _PLAIN) -> _CharInfo:
         classes = ["M" if c.stacked else _char_class(c) for c in row.chars]
         first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
         if (
@@ -3370,7 +3400,7 @@ class _CharInfo:
         ):
             classes[first] = "P"  # "\u00b7 Measure the ramp": a bullet, not a product
         script = [row.is_script(c) for c in row.chars]
-        words, maths_words = _word_lengths(row.chars, classes, script)
+        words, maths_words = _word_lengths(row.chars, classes, script, document=document)
         return cls(classes, script, words, maths_words)
 
     def mathy(self, i: int) -> bool:
@@ -3412,13 +3442,15 @@ def _bracket_base(chars: list[_Char], info: _CharInfo, at: int) -> bool:
     return False
 
 
-def _script_kinds(row: _Row, info: _CharInfo | None = None) -> list[ScriptKind | None]:
+def _script_kinds(
+    row: _Row, info: _CharInfo | None = None, *, document: _Document
+) -> list[ScriptKind | None]:
     """`_script_glyphs(row, info)[1]`."""
-    return _script_glyphs(row, info)[1]
+    return _script_glyphs(row, info, document=document)[1]
 
 
 def _script_glyphs(
-    row: _Row, info: _CharInfo | None = None
+    row: _Row, info: _CharInfo | None = None, *, document: _Document
 ) -> tuple[list[ScriptKind | None], list[ScriptKind | None]]:
     """(raised or lowered glyphs, those among them that are scripts of upright text), per
     character of a prose row, each "sup", "sub" or None. The second marks what belongs to
@@ -3432,7 +3464,7 @@ def _script_glyphs(
     of an italic letter or a letter in a maths font is left for the equation step: it is
     not given a kind.
     """
-    info = info or _CharInfo.of(row)
+    info = info or _CharInfo.of(row, document=document)
     chars = row.chars
     size, base = row.size, row.baseline
     raw: list[ScriptKind | None] = [None] * len(chars)
@@ -3456,16 +3488,16 @@ def _script_glyphs(
         # One group: scripts side by side, a lowered and a raised run (SO4 2-) included.
         while j < n and raw[j] is not None:
             j += 1
-        if _script_base(chars, info, i, j, size):
+        if _script_base(chars, info, i, j, size, document=document):
             kinds[i:j] = raw[i:j]
         i = j
     return raw, kinds
 
 
-def _power_of_ten(chars: list[_Char], last: int, script: int) -> bool:
+def _power_of_ten(chars: list[_Char], last: int, script: int, *, document: _Document) -> bool:
     """Is the raised glyph at `script` the exponent of "10", whose last digit is at `last`
     ($10^{-6}$, $6 \\times 10^3$)? In a TeX paper that is maths, not the unit exponent of "cm3"."""
-    if not _TEX_MADE or chars[last].c != "0" or last < 1 or chars[last - 1].c != "1":
+    if not document.tex_made or chars[last].c != "0" or last < 1 or chars[last - 1].c != "1":
         return False
     before = chars[last - 2].c if last >= 2 else " "
     if before.isalnum() or before in ".,":
@@ -3473,14 +3505,16 @@ def _power_of_ten(chars: list[_Char], last: int, script: int) -> bool:
     return chars[script].baseline < chars[last].baseline - 0.2 * chars[last].size
 
 
-def _bold_variable(chars: list[_Char], at: int) -> bool:
+def _bold_variable(chars: list[_Char], at: int, *, document: _Document) -> bool:
     """Is the glyph at `at` a lone bold Latin letter, a vector in a text font (`\\mathbf{v}_2` set
     in Times Bold)? Its script is an index, not the count of "H2O"."""
     base = chars[at]
-    return _TEX_MADE and base.bold and base.c.isalpha() and (at == 0 or chars[at - 1].blank)
+    return document.tex_made and base.bold and base.c.isalpha() and (at == 0 or chars[at - 1].blank)
 
 
-def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size: float) -> bool:
+def _script_base(
+    chars: list[_Char], info: _CharInfo, start: int, end: int, size: float, *, document: _Document
+) -> bool:
     """Does the group of script glyphs `chars[start:end]` belong to upright text?"""
     reach = SCRIPT_BASE_GAP * size
     before = start - 1
@@ -3490,8 +3524,8 @@ def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size
         base = chars[before]
         if (
             _text_char(base)
-            and not _bold_variable(chars, before)
-            and not _power_of_ten(chars, before, start)
+            and not _bold_variable(chars, before, document=document)
+            and not _power_of_ten(chars, before, start, document=document)
         ):
             return True
         if base.c in ")]":
@@ -3569,6 +3603,8 @@ def _equation_pictures(
     rows: list[_Row],
     ctx: _Context,
     small: Sequence[_Figure] = (),
+    *,
+    document: _Document,
 ) -> tuple[list[_Figure], list[_Row]]:
     """Pictures of equations (module `equation_images`) leave the figures.
 
@@ -3586,7 +3622,7 @@ def _equation_pictures(
 
     def has_prose(row: _Row) -> bool:
         if id(row) not in prose:
-            prose[id(row)] = (row, _prose_words(row, _CharInfo.of(row)) >= 1)
+            prose[id(row)] = (row, _prose_words(row, _CharInfo.of(row, document=document)) >= 1)
         return prose[id(row)][1]
 
     for figure in [*figures, *small]:
@@ -3759,10 +3795,10 @@ def _is_equation_number(text: str) -> bool:
     return bool(EQUATION_NUMBER.match(text) or BARE_EQUATION_NUMBER.match(text))
 
 
-def _classify_row(row: _Row) -> None:
+def _classify_row(row: _Row, *, document: _Document = _PLAIN) -> None:
     """Set row.kind: "math" (a display-equation line), "frag" (short maths-only piece such
     as a lone denominator, decided later) or "text"."""
-    info = _CharInfo.of(row)
+    info = _CharInfo.of(row, document=document)
     text = row.clean
     fonts = sorted({c.font for c in row.ink})
     superscript = any(info.script)
@@ -3784,13 +3820,13 @@ def _classify_row(row: _Row) -> None:
         row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
     elif _reaction_list_row(row):
         row.kind = "text"  # "(a) A \u21cc B; (b) C \u21cc D": an item per reaction, inline
-    elif _reaction_row(row, info):
+    elif _reaction_row(row, info, document=document):
         row.kind = "math"  # a chemical reaction on its own line
         row.reasons = [*row.reasons, REACTION_REASON]
         row.score = max(row.score, EQUATION_THRESHOLD)
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
-    elif _GROUPING and prose >= 1 and ratio >= 0.5 and _joined_formulas(row, info):
+    elif document.grouping and prose >= 1 and ratio >= 0.5 and _joined_formulas(row, info):
         row.kind = "math"  # "P(A) = 1 and P(B) = 2": two formulas of one display
         row.reasons = [*row.reasons, JOINED_REASON]
     elif prose == 0 and ratio >= 0.6 and len(ink) <= 40:
@@ -3819,7 +3855,11 @@ class _Inline:
 
 
 def _inline_runs(
-    row: _Row, info: _CharInfo | None = None, kinds: list[ScriptKind | None] | None = None
+    row: _Row,
+    info: _CharInfo | None = None,
+    kinds: list[ScriptKind | None] | None = None,
+    *,
+    document: _Document = _PLAIN,
 ) -> list[tuple[int, int, list[str]]]:
     """(start, end, reasons) of the maths runs inside a prose row, by character index.
 
@@ -3832,8 +3872,8 @@ def _inline_runs(
     lowered text, so a run that only those scripts made is dropped; inside a run that is
     maths for another reason they stay part of it.
     """
-    info = info or _CharInfo.of(row)
-    kinds = _script_kinds(row, info) if kinds is None else kinds
+    info = info or _CharInfo.of(row, document=document)
+    kinds = _script_kinds(row, info, document=document) if kinds is None else kinds
     chars = row.chars
     runs: list[tuple[int, int, list[str]]] = []
     i, n = 0, len(chars)
@@ -3862,8 +3902,10 @@ def _inline_runs(
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
-                or (_TEX_MADE and glyph_math.script_punctuation(chars, info.script, i))
-                or (_TEX_MADE and glyph_math.percent_of_number(chars, i))  # the 5% of "phi = 5%"
+                or (document.tex_made and glyph_math.script_punctuation(chars, info.script, i))
+                or (
+                    document.tex_made and glyph_math.percent_of_number(chars, i)
+                )  # the 5% of "phi = 5%"
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
             # The degree sign of E°cell or ΔG°, a raised glyph of the text font after a symbol.
@@ -3872,30 +3914,33 @@ def _inline_runs(
             )
             if (
                 chars[i].blank
-                and (_between_formulas(chars, i) or _word_space_between_operands(chars, info, i))
-                and not (_TEX_MADE and glyph_math.touching(chars, i))
+                and (
+                    _between_formulas(chars, i)
+                    or _word_space_between_operands(chars, info, i, document=document)
+                )
+                and not (document.tex_made and glyph_math.touching(chars, i))
             ):
                 break
             if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
                 continue
             break
-        start, end = _trim_run(chars, info, start, i)
+        start, end = _trim_run(chars, info, start, i, document=document)
         if end > start:
-            reasons = _inline_evidence(chars, info, start, end, kinds)
+            reasons = _inline_evidence(chars, info, start, end, kinds, document=document)
             if reasons:
                 runs.append((start, end, reasons))
-    joined = _with_simple_maths(row, info, _join_signatures(chars, runs))
+    joined = _with_simple_maths(row, info, _join_signatures(chars, runs), document=document)
     return _with_chemistry(row, kinds, _with_nuclides(row, kinds, joined))
 
 
 def _with_simple_maths(
-    row: _Row, info: _CharInfo, runs: list[tuple[int, int, list[str]]]
+    row: _Row, info: _CharInfo, runs: list[tuple[int, int, list[str]]], *, document: _Document
 ) -> list[tuple[int, int, list[str]]]:
     """`runs` and the short formulas of `glyph_math` that no run covers: a relation set in a
     maths font before a number. TeX-made PDFs only; a candidate that touches a longer run is
     left to the run, and a run that is only its number is replaced by it."""
-    if not _TEX_MADE:
+    if not document.tex_made:
         return runs
     chars = row.chars
     out = list(runs)
@@ -4264,13 +4309,13 @@ _REACTION_PIECE = re.compile(
 )
 
 
-def _reaction_row(row: _Row, info: _CharInfo) -> bool:
+def _reaction_row(row: _Row, info: _CharInfo, *, document: _Document) -> bool:
     """Is the whole row one chemical reaction (`Ag+(aq) + Cl-(aq) -> AgCl(s)`)? Then it is a
     display equation line, not a sentence with an arrow in it: the ink outside the reaction
     is at most the punctuation that ends it."""
     if not any(c.c in chem.ARROW_HEADS for c in row.chars):
         return False
-    kinds = _script_kinds(row, info)
+    kinds = _script_kinds(row, info, document=document)
     labelled = chem.label_words(_chem_words(row, kinds))
     spans = chem.reactions(labelled)
     if len(spans) != 1:
@@ -4288,9 +4333,11 @@ _OPERAND_END = frozenset(")]}'\u2032!\u221e%")
 _OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
 
 
-def _word_space_between_operands(chars: list[_Char], info: _CharInfo, i: int) -> bool:
+def _word_space_between_operands(
+    chars: list[_Char], info: _CharInfo, i: int, *, document: _Document
+) -> bool:
     """Is the blank at `i` a word space between the end of one operand and the start of another?"""
-    if not _TEX_MADE:
+    if not document.tex_made:
         return False
     before = next((k for k in range(i - 1, -1, -1) if not chars[k].blank), None)
     after = next((k for k in range(i + 1, len(chars)) if not chars[k].blank), None)
@@ -4388,7 +4435,9 @@ def _trailing_ellipsis(chars: list[_Char], start: int, end: int) -> bool:
     return chars[dots[3]].c in ",<>=≤≥≠+−-×"  # noqa: RUF001
 
 
-def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tuple[int, int]:
+def _trim_run(
+    chars: list[_Char], info: _CharInfo, start: int, end: int, *, document: _Document = _PLAIN
+) -> tuple[int, int]:
     """Drop surrounding spaces, trailing operators/punctuation and unmatched brackets."""
     changed = True
     while changed and end > start:
@@ -4397,7 +4446,7 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
             chars[end - 1].blank
             or (
                 chars[end - 1].c in ",.;:"
-                and not (_GROUPING and _trailing_ellipsis(chars, start, end))
+                and not (document.grouping and _trailing_ellipsis(chars, start, end))
             )
         ):
             end -= 1
@@ -4431,13 +4480,15 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
             else:
                 end -= 1
             changed = True
-        elif _TEX_MADE and end - start > 1 and text[-1] in "([{":
+        elif document.tex_made and end - start > 1 and text[-1] in "([{":
             end -= 1  # "K (see below)": the run never ends with a bracket it opens
             changed = True
-        elif _TEX_MADE and end - start > 2 and _sentence_parentheses(text):
+        elif document.tex_made and end - start > 2 and _sentence_parentheses(text):
             start, end = start + 1, end - 1  # "(x = 0.9)": the pair is the sentence's
             changed = True
-        elif _TEX_MADE and (cut := _tail_outside_maths(chars, info, start, end)) is not None:
+        elif (
+            document.tex_made and (cut := _tail_outside_maths(chars, info, start, end)) is not None
+        ):
             end = cut  # "t = 915 s", "x = 5 [8]": a unit and a citation are text
             changed = True
     return start, end
@@ -4525,6 +4576,8 @@ def _inline_evidence(
     start: int,
     end: int,
     kinds: Sequence[ScriptKind | None] | None = None,
+    *,
+    document: _Document,
 ) -> list[str]:
     """Why a run inside a paragraph row is maths, or [] when it is not.
 
@@ -4583,13 +4636,13 @@ def _inline_evidence(
         if own[i] is None and own[i + 1] is None
     ):
         return ["signed number"]
-    if _italic_variables(chars, info, start, end, own):
+    if _italic_variables(chars, info, start, end, own, document=document):
         return ["italic variable in prose"]
     if any(
         chars[k].c == "0"
         and info.script[k + 1]
         and own[k + 1] is None
-        and _power_of_ten(chars, k, k + 1)
+        and _power_of_ten(chars, k, k + 1, document=document)
         for k in range(start, end - 1)
         if own[k] is None
     ):
@@ -4621,9 +4674,11 @@ def _italic_variables(
     start: int,
     end: int,
     own: Sequence[ScriptKind | None],
+    *,
+    document: _Document,
 ) -> bool:
     """Is the run `chars[start:end]` made of italic variables standing in upright prose?"""
-    if not _TEX_MADE:
+    if not document.tex_made:
         return False
     # The letters of a maths word ("ln" in "ln X") are upright and say nothing against the
     # italic of the variables beside them; a run of nothing but them is not evidence.
@@ -4718,7 +4773,11 @@ def _bold_word(chars: list[_Char], start: int, end: int) -> bool:
 
 
 def _bold_letter_runs(
-    row: _Row, runs: list[tuple[int, int, list[str]]], state: _BoldLetters | None
+    row: _Row,
+    runs: list[tuple[int, int, list[str]]],
+    state: _BoldLetters | None,
+    *,
+    document: _Document,
 ) -> list[tuple[int, int, list[str]]]:
     """`runs` (`_inline_runs`) plus the row's lone bold letters, by character index.
 
@@ -4734,7 +4793,7 @@ def _bold_letter_runs(
     if state is None:
         return runs
     chars = row.chars
-    info = _CharInfo.of(row)
+    info = _CharInfo.of(row, document=document)
     covered: set[int] = set()
     out: list[tuple[int, int, list[str]]] = []
     for start, end, reasons in runs:
@@ -4830,7 +4889,7 @@ def _bold_lead(row: _Row) -> int:
     return 0
 
 
-def _run_in_entries(block: _Block) -> list[_Block] | None:
+def _run_in_entries(block: _Block, *, document: _Document) -> list[_Block] | None:
     """A paragraph whose lines start entries of a glossary, each with a bold term that runs
     into its definition ("Derivative The limit of ..."), as one block per entry; None when
     the paragraph is not that. An entry starts at a line with a bold lead of at most
@@ -4852,27 +4911,31 @@ def _run_in_entries(block: _Block) -> list[_Block] | None:
     for number, first in enumerate(starts):
         end = starts[number + 1] if number + 1 < len(starts) else len(rows)
         group = rows[first:end]
-        entry = _lead_entry(group, _bold_lead(group[0]), block.bbox)
+        entry = _lead_entry(group, _bold_lead(group[0]), block.bbox, document=document)
         if entry is None:
             return None
         entries.append(entry)
     return entries
 
 
-def _lead_entry(group: list[_Row], lead: int, box: BBox) -> _Block | None:
+def _lead_entry(group: list[_Row], lead: int, box: BBox, *, document: _Document) -> _Block | None:
     """The lines of one entry, whose first line has its term in its first `lead` characters, as
     an entry block (`_entry`); None when the entry has no definition."""
     term = _Block(Kind.PARAGRAPH, box, [_Row(group[0].chars[:lead])])
     rest = [_Row(group[0].chars[lead:], column=group[0].column), *group[1:]]
-    definition = _paragraph_pieces(_Block(Kind.PARAGRAPH, box, rest))
+    definition = _paragraph_pieces(_Block(Kind.PARAGRAPH, box, rest), document=document)
     if not _has_content(definition):
         return None
     return _entry(
-        _paragraph_pieces(term), definition, _union(r.bbox for r in group), group, group[0].size
+        _paragraph_pieces(term, document=document),
+        definition,
+        _union(r.bbox for r in group),
+        group,
+        group[0].size,
     )
 
 
-def _lead_entries(pages: list[_PageBlocks]) -> None:
+def _lead_entries(pages: list[_PageBlocks], *, document: _Document) -> None:
     """Three or more paragraphs in a row that each start with a lead term (`_lead_end`), the
     terms in alphabetical order (`_listed_terms`), are the entries of a glossary: each is
     written as a term and its definition (in place; `Element.term_end`), which the assembler
@@ -4883,7 +4946,7 @@ def _lead_entries(pages: list[_PageBlocks]) -> None:
     row: list[tuple[_Block, int]] = []
 
     def settle() -> None:
-        entries = [(b, _lead_entry(b.rows, lead, b.bbox)) for b, lead in row]
+        entries = [(b, _lead_entry(b.rows, lead, b.bbox, document=document)) for b, lead in row]
         terms = ["".join(c.c for c in b.rows[0].chars[:lead]) for b, lead in row]
         if (
             len(row) >= LEAD_ENTRIES
@@ -4959,7 +5022,7 @@ def _term_over(block: _Block, following: _Block | None) -> bool:
     )
 
 
-def _glossary_entries(pages: list[_PageBlocks]) -> None:
+def _glossary_entries(pages: list[_PageBlocks], *, document: _Document) -> None:
     """Under a heading that ends in "Key Terms", "Glossary" or "Vocabulary", a term and its
     definition become one paragraph block that the assembler writes as a `<dt>` and `<dd>`
     (in place; `Element.term_end`). Two shapes: the term on a line of its own at the margin
@@ -4982,15 +5045,15 @@ def _glossary_entries(pages: list[_PageBlocks]) -> None:
                 elif strong:
                     active = False
             following = blocks[i + 1] if i + 1 < len(blocks) else None
-            if active and (entries := _run_in_entries(block)):
+            if active and (entries := _run_in_entries(block, document=document)):
                 out.extend(entries)
             elif active and block.kind == Kind.PARAGRAPH and (taken := _entry_rows(block)):
                 head = _Block(Kind.PARAGRAPH, block.bbox, block.rows[:taken])
                 tail = _Block(Kind.PARAGRAPH, block.bbox, block.rows[taken:])
                 out.append(
                     _entry(
-                        _paragraph_pieces(head),
-                        _paragraph_pieces(tail),
+                        _paragraph_pieces(head, document=document),
+                        _paragraph_pieces(tail, document=document),
                         block.bbox,
                         block.rows,
                         block.font_size,
@@ -5000,8 +5063,8 @@ def _glossary_entries(pages: list[_PageBlocks]) -> None:
                 assert following is not None
                 out.append(
                     _entry(
-                        _paragraph_pieces(block),
-                        _paragraph_pieces(following),
+                        _paragraph_pieces(block, document=document),
+                        _paragraph_pieces(following, document=document),
                         _union([block.bbox, following.bbox]),
                         [*block.rows, *following.rows],
                         block.font_size,
@@ -6294,7 +6357,7 @@ def _mark_case_rows(rows: list[_Row]) -> None:
             r.case_row = True
 
 
-def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
+def _split_braced_systems(rows: list[_Row], *, document: _Document) -> list[_Row]:
     """Cut the text off the front of the first row of a braced system.
 
     OpenStax prints "Solve the system by substitution. { 2x + y = 7" with the opening
@@ -6309,9 +6372,9 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
     index = _RowIndex([r for r in rows if not r.vertical])
     out: list[_Row] = []
     for row in rows:
-        cut = _brace_cut(row, index)
+        cut = _brace_cut(row, index, document=document)
         if cut is None:
-            cut = _stray_brace_cut(row, index)
+            cut = _stray_brace_cut(row, index, document=document)
         if cut is None:
             out.append(row)
             continue
@@ -6320,7 +6383,7 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
     return out
 
 
-def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
+def _stray_brace_cut(row: _Row, index: _RowIndex, *, document: _Document) -> int | None:
     """Index of the opening brace that ends a row of text, when it is the brace of the system
     set to its right, or None.
 
@@ -6347,7 +6410,7 @@ def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
         if not 0 <= right.x0 - brace.x1 <= STRAY_BRACE_REACH * size:
             continue
         probe = _Row(right.chars, column=right.column)
-        _classify_row(probe)
+        _classify_row(probe, document=document)
         if probe.kind != "math":
             continue
         for below in index.near(right.y1 - 0.3 * size, right.y1 + 1.0 * size):
@@ -6358,7 +6421,7 @@ def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
                 below.x1 - below.x0, right.x1 - right.x0
             ):
                 trial = _Row(below.chars, column=below.column)
-                _classify_row(trial)
+                _classify_row(trial, document=document)
                 middle = (brace.y0 + brace.y1) / 2
                 if (
                     trial.kind == "math"
@@ -6368,7 +6431,7 @@ def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
     return None
 
 
-def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
+def _brace_cut(row: _Row, index: _RowIndex, *, document: _Document) -> int | None:
     """Index of the brace to cut `row` at (see `_split_braced_systems`), or None."""
     chars = row.chars
     if row.vertical or len(chars) < 4 or not any(c.c == "{" for c in chars):
@@ -6379,7 +6442,7 @@ def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
     after = _Row(chars[start + 1 :], column=row.column)
     if not after.ink or after.ink[0].blank:
         return None
-    _classify_row(after)
+    _classify_row(after, document=document)
     if after.kind != "math" or after.x0 - chars[start].x1 > 1.5 * row.size:
         return None
     size = max(row.size, after.size)
@@ -6389,7 +6452,7 @@ def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
         shared = min(below.x1, after.x1) - max(below.x0, after.x0)
         if shared >= 0.5 * min(below.x1 - below.x0, after.x1 - after.x0):
             probe = _Row(below.chars, column=below.column)  # not classified yet
-            _classify_row(probe)
+            _classify_row(probe, document=document)
             if probe.kind == "math":
                 return start
     return None
@@ -6398,7 +6461,7 @@ def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
 _EXERCISE_NUMBER = re.compile(r"^\d{1,3}[.)]$")
 
 
-def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
+def _split_exercise_numbers(rows: list[_Row], *, document: _Document) -> list[_Row]:
     """Cut an exercise number ("18.", "4)") off the front of a maths row into a text row.
 
     A numbered exercise that is only an equation ("18. 0 = 5 t - 4.9 t") reads as one maths
@@ -6438,7 +6501,7 @@ def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
             out.append(row)
             continue
         remainder = _Row(row.chars[rest[0][0] :], column=row.column)
-        _classify_row(remainder)
+        _classify_row(remainder, document=document)
         if remainder.kind != "math":
             out.append(row)
             continue
@@ -6590,7 +6653,6 @@ def _punctuation_only(row: _Row) -> bool:
     return all(c.c in ",.;:" for c in row.ink)
 
 
-_GROUPING = False  # set by `analyze(display_grouping=...)` for the length of one call
 JOINED_REASON = "formulas joined by a word"
 JOINED_INDENT = 2.5  # x font size: least space on each side of a display line of two formulas
 
@@ -6625,7 +6687,9 @@ def _demote_joined_rows(rows: Sequence[_Row]) -> None:
         row.reasons = [r for r in row.reasons if r != JOINED_REASON]
 
 
-def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
+def _equation_regions(
+    rows: list[_Row], rules: list[_Path], *, document: _Document
+) -> list[_Region]:
     """Group the page's maths rows into display equations; sets `row.region`.
 
     1. Lines: rows touching one fraction bar or radical (numerator, denominator,
@@ -6693,7 +6757,7 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
         _Line(members, list({id(p): p for r in members for p in on_rule.get(id(r), [])}.values()))
         for members in groups.values()
     ]
-    if _GROUPING:
+    if document.grouping:
         lines = _join_connectives(lines, rows)
     for label in labels:
         centre = (label.y0 + label.y1) / 2
@@ -6709,7 +6773,7 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
             nearest.labels.append(label)
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
-    return _stack_lines(lines)
+    return _stack_lines(lines, document=document)
 
 
 def _join_connectives(lines: list[_Line], rows: Sequence[_Row]) -> list[_Line]:
@@ -6826,7 +6890,7 @@ def _table_rows(above: _Line, line: _Line, box: BBox, size: float) -> bool:
     return abs(left) <= tolerance or abs(right) <= tolerance or abs(left + right) <= 2 * tolerance
 
 
-def _stack_lines(lines: list[_Line]) -> list[_Region]:
+def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
     """Join lines into display equations top to bottom (see `_equation_regions`)."""
     regions: list[_Region] = []
     last: list[_Line] = []  # the lowest line of each region so far
@@ -6855,7 +6919,7 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
         region.box = _union([region.box, line.box])
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
-    if _GROUPING:
+    if document.grouping:
         regions = _merge_continued_regions(
             regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
         )
@@ -7345,6 +7409,7 @@ def _vector_figures(
     small_out: list[tuple[BBox, list[_Path]]] | None = None,
     ink: Collection[int] = frozenset(),
     hand: Sequence[BBox] = (),
+    document: _Document,
 ) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables.
 
@@ -7432,7 +7497,7 @@ def _vector_figures(
             # evidence of a plot is a plot, not a decorated border, with one curve and
             # with running text inside (which stays in the reading flow: `_label_owners`).
             plot = (curved or len(bars) >= 2) and any(p.plot or p.ruler for p in members)
-            running = ctx is not None and bool(_running_text(inside, ctx))
+            running = ctx is not None and bool(_running_text(inside, ctx, document=document))
             figure = plot or not ((len(curves) < 3 and len(bars) < 2) or running)
             inner = [p for p in members if not _border_member(p, box, page_rect)]
             border = bool(inner) and len(inner) < len(members) and depth < 2
@@ -7451,6 +7516,7 @@ def _vector_figures(
                     small_out=small_out,
                     ink=ink,
                     hand=hand,
+                    document=document,
                 )
                 _take_border_marks(found, [p for p in members if p not in inner])
                 figures += found
@@ -7475,7 +7541,7 @@ def _vector_figures(
             # it, whose running text stays in the reading flow). With neither signs nor
             # every row held by its boxes or rules, the page image keeps it.
             signs = _diagram_signs(members, index, ink, hand)
-            running = ctx is not None and bool(_running_text(inside, ctx))
+            running = ctx is not None and bool(_running_text(inside, ctx, document=document))
             if signs != "drawing" and (signs is None or running):
                 if not _round_text(members, inside) and left_out is not None:
                     left_out.append(box)
@@ -8096,7 +8162,12 @@ def _mostly_in(box: BBox, outer: BBox) -> bool:
 
 
 def _backdrop(
-    figure: _Figure, rows: Sequence[_Row], ctx: _Context, doc: pymupdf.Document | None = None
+    figure: _Figure,
+    rows: Sequence[_Row],
+    ctx: _Context,
+    doc: pymupdf.Document | None = None,
+    *,
+    document: _Document,
 ) -> bool:
     """Is the "figure" no figure: a plain picture under running text, or a box round code?
 
@@ -8111,7 +8182,7 @@ def _backdrop(
         for r in rows
         if not r.absorbed and not CAPTION.match(r.clean) and _mostly_in(r.bbox, figure.drawing)
     ]
-    running = _running_text(inside, ctx)
+    running = _running_text(inside, ctx, document=document)
     if running and figure.images == 1 and not figure.paths and _plain_image(doc, figure.xref):
         return True
     if figure.images or not inside or not all(r.code and id(r) in running for r in inside):
@@ -8257,7 +8328,7 @@ def _stroke_gap(box: BBox, figure: _Figure, labels: Sequence[BBox] = ()) -> floa
 
 
 def _label_owners(
-    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context
+    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
 ) -> dict[int, _Figure]:
     """The one rule for what a figure's labels are (SW40): the figure each row labels, by
     the id of the row.
@@ -8306,11 +8377,14 @@ def _label_owners(
                     in_drawing[id(figure)] = _running_text(
                         [r for r in rows if not r.absorbed and _mostly_in(r.bbox, figure.drawing)],
                         ctx,
+                        document=document,
                     )
                 running = in_drawing[id(figure)]
             else:  # ... or among the page's rows, where one runs on from a line above
                 if on_page is None:
-                    on_page = _running_text([r for r in rows if not r.absorbed], ctx)
+                    on_page = _running_text(
+                        [r for r in rows if not r.absorbed], ctx, document=document
+                    )
                 running = on_page
             if id(row) in running or not (
                 inside
@@ -8329,14 +8403,16 @@ def _label_owners(
     return owner
 
 
-def _claim_labels(figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context) -> None:
+def _claim_labels(
+    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
+) -> None:
     """Give each figure its labels (`_label_owners`) and grow its box, and so the picture
     cut for the figure step, to hold them. Before, a chart's tick labels and category
     names stayed in the body as stray paragraphs and its crop had none of them, so a model
     estimated its values (F-399, accuracy round 2, 2026-11-11), and a circuit's part names,
     an axis title or a part's name on a diagram became equations and one-letter paragraphs
     (F-549, F-248)."""
-    owner = _label_owners(figures, rows, ctx)
+    owner = _label_owners(figures, rows, ctx, document=document)
     for row in rows:
         if figure := owner.get(id(row)):
             row.absorbed = True
@@ -8356,7 +8432,12 @@ FRAGMENT_STROKE_EM = 6.0  # a stroke is short when its longer side is at most th
 
 
 def _fragment_figures(
-    rows: Sequence[_Row], strokes: Sequence[_Path], held: Sequence[BBox], ctx: _Context
+    rows: Sequence[_Row],
+    strokes: Sequence[_Path],
+    held: Sequence[BBox],
+    ctx: _Context,
+    *,
+    document: _Document,
 ) -> list[_Figure]:
     """Regions of the page that are a drawing made of text fragments, as figures.
 
@@ -8405,7 +8486,7 @@ def _fragment_figures(
             and not any(_centre_inside(r.bbox, other) for other in held)
         ]
         if statistics.median(len(r.clean) for r in inside) >= 4 or any(
-            _prose_words(r, _CharInfo.of(r)) >= 3 for r in inside
+            _prose_words(r, _CharInfo.of(r, document=document)) >= 3 for r in inside
         ):
             continue
         for row in inside:
@@ -8415,7 +8496,7 @@ def _fragment_figures(
     return found
 
 
-def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
+def _running_text(rows: list[_Row], ctx: _Context, *, document: _Document) -> set[int]:
     """Ids of rows that are not labels: lines of a paragraph (a prose line that the next
     or previous prose line continues) and title-sized lines of several words: at least
     HEADING_SIZE_RATIO x body size, or TITLE_MIN_PT whatever the body (a slide whose only
@@ -8431,7 +8512,7 @@ def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
         if row.code and len(row.ink) >= CODE_MIN_GLYPHS:
             found.add(id(row))  # a line of code in a box is code, not the box's label
             continue
-        words = _prose_words(row, _CharInfo.of(row))
+        words = _prose_words(row, _CharInfo.of(row, document=document))
         if words >= 2 and (row.size >= HEADING_SIZE_RATIO * ctx.body or row.size >= TITLE_MIN_PT):
             found.add(id(row))
         if words >= 3:
@@ -9307,7 +9388,7 @@ def _later_labels(rows: Sequence[_Row]) -> list[tuple[int, int]]:
     return found
 
 
-def _split_options(runs: list[_Run]) -> list[_Run]:
+def _split_options(runs: list[_Run], *, document: _Document) -> list[_Run]:
     """A line of options that reading order merged ("(A) 3 m (B) 5 m (C) 7 m") is cut at each
     later label into one run per option, the first keeping its list marker and the others
     getting one when it has one, when the line stands alone (pieces that are complete rows).
@@ -9326,7 +9407,7 @@ def _split_options(runs: list[_Run]) -> list[_Run]:
             while chars and chars[-1].blank:
                 chars = chars[:-1]
             piece = _Row(chars, column=row.column)
-            _classify_row(piece)
+            _classify_row(piece, document=document)
             pieces.append(piece)
         if not cuts or any(p.kind != "text" for p in pieces):
             out.append(run)
@@ -9364,7 +9445,7 @@ def _rtl_words(row: _Row) -> int:
     return words
 
 
-def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
+def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]:
     runs: list[_Run] = []
     code = _code_groups(rows)
     edges = _RightEdges(rows)
@@ -9410,7 +9491,11 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             if run.kind == "math" and row.kind == "math" and row.region is prev.region:
                 run.add(row)  # rows of one display equation (`_contiguous_regions`)
                 continue
-            if run.kind == "text" and row.kind == "math" and _wrapped_maths(prev, row, run, ctx):
+            if (
+                run.kind == "text"
+                and row.kind == "math"
+                and _wrapped_maths(prev, row, run, ctx, document=document)
+            ):
                 row.kind, row.region = "text", None  # its maths becomes inline equations
                 run.add(row)
                 continue
@@ -9443,7 +9528,7 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
     return runs
 
 
-def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
+def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context, *, document: _Document) -> bool:
     """Is maths row `row` the last line of the sentence above, not a display equation?
 
     "... the system has exactly one solution," / "x = A^-1 b." A display equation is
@@ -9455,7 +9540,7 @@ def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
     if region is None or region.forced or region.labels or len(region.rows) != 1:
         return False
     first = run.rows[0]
-    left = first.marker.x if first.marker is not None and _SLIDE_DECK else run.box[0]
+    left = first.marker.x if first.marker is not None and document.slide_deck else run.box[0]
     return abs(row.x0 - left) <= 0.5 and _continues(prev, row, run, ctx)
 
 
@@ -9473,7 +9558,7 @@ MATHS_HEADING_SHARE = 0.7  # a heading candidate with this share of maths charac
 _LONGEST_SYMBOL_WORD = 3  # letters: a longer plain word (outside _MATH_WORDS) is prose
 
 
-def _mostly_maths(rows: Sequence[_Row]) -> bool:
+def _mostly_maths(rows: Sequence[_Row], *, document: _Document) -> bool:
     """Is a heading candidate a formula? ("KE = m v", a large "F = m a" on a slide.)
 
     It needs a relation sign at full size, no plain word longer than three letters (a
@@ -9486,7 +9571,7 @@ def _mostly_maths(rows: Sequence[_Row]) -> bool:
     counted = mathy = 0
     relation = False
     for row in rows:
-        info = _CharInfo.of(row)
+        info = _CharInfo.of(row, document=document)
         chars = row.chars
         i = 0
         while i < len(chars):
@@ -9552,7 +9637,7 @@ def _equation_block(
     )
 
 
-def _classify_run(run: _Run, ctx: _Context) -> _Block:
+def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
     rows = run.rows
     box = _union(r.bbox for r in rows)
     size = _dominant_size(rows)
@@ -9584,7 +9669,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
     if run.kind == "math" and not trivial:
         return _equation_block(rows, box, size, ink)
-    text = _join_text(rows)
+    text = _join_text(rows, document=document)
     letters = sum(c.isalpha() for c in text)
     bold = all(r.bold for r in rows)
     ratio = size / ctx.body
@@ -9633,7 +9718,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
-    if heading is not None and _mostly_maths(rows):
+    if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
         # step like any display equation, and the page keeps its real headings.
         block = _equation_block(rows, box, size, ink, plain=bold)
@@ -9642,7 +9727,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     if heading is not None:
         if bold:
             heading.append("bold")
-        marked = readable_math_letters(_join_text(rows, marked=True))
+        marked = readable_math_letters(_join_text(rows, marked=True, document=document))
         return _Block(
             Kind.HEADING,
             box,
@@ -9686,22 +9771,26 @@ def readable_math_letters(text: str) -> str:
     )
 
 
-def _join_text(rows: Sequence[_Row], *, marked: bool = False) -> str:
+def _join_text(rows: Sequence[_Row], *, marked: bool = False, document: _Document) -> str:
     """Rows joined with spaces, end-of-line hyphenation repaired (see `_line_break`). With
     `marked`, raised and lowered text of upright text is between marks
     (`pipeline.script_marks`)."""
     out = ""
     for row in rows:
-        source = _marked(row.chars, _script_kinds(row), 0, len(row.chars)) if marked else row.text
+        source = (
+            _marked(row.chars, _script_kinds(row, document=document), 0, len(row.chars))
+            if marked
+            else row.text
+        )
         text = " ".join(source.split())  # soft hyphens survive until the final _clean
         if out:
-            out, separator = _line_break(out, text)
+            out, separator = _line_break(out, text, document=document)
             out += separator
         out += text
     return _clean(out)
 
 
-def _line_break(before: str, after: str) -> tuple[str, str]:
+def _line_break(before: str, after: str, *, document: _Document = _PLAIN) -> tuple[str, str]:
     """(`before` with any hyphen removed, separator) for joining two lines of a paragraph.
 
     "veloc-" + "ity" -> "velocity": a letter, a hyphen at the line end and a lowercase
@@ -9719,7 +9808,7 @@ def _line_break(before: str, after: str) -> tuple[str, str]:
         return before, ""
     if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
         if after[:1].islower() and not hyphens.keeps_hyphen(
-            before, after, _COMPOUNDS, _WHOLE_WORDS
+            before, after, document.compounds, document.whole_words
         ):
             return before[:-1], ""
         return before, ""
@@ -9877,7 +9966,7 @@ def _gap_after(chars: list[_Char], start: int, end: int) -> bool:
     return nxt.c not in _NO_SPACE_BEFORE and nxt.x0 - right >= SPACE_AFTER_SCRIPT * nxt.size
 
 
-def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
+def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
     if block.code:
@@ -9892,13 +9981,13 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
-        info = _CharInfo.of(row)
-        raw, kinds = _script_glyphs(row, info)
-        runs = _inline_runs(row, info, kinds)
+        info = _CharInfo.of(row, document=document)
+        raw, kinds = _script_glyphs(row, info, document=document)
+        runs = _inline_runs(row, info, kinds, document=document)
         page_latex: dict[tuple[int, int], str] = {}
         if row.page_checked:
             runs, page_latex = _with_page_spans(row, runs)
-        found = _bold_letter_runs(row, runs, letters)
+        found = _bold_letter_runs(row, runs, letters, document=document)
         found = sorted(
             [
                 *(
@@ -9948,7 +10037,7 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             if _gap_after(row.chars, start, end):
                 row_pieces.append(" ")
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
-        _append_row(pieces, row_pieces)
+        _append_row(pieces, row_pieces, document=document)
     return _strip_teacher_tags(_tidy(pieces))
 
 
@@ -10090,7 +10179,9 @@ def _wrapped_inline(pieces: list[str | _Inline], row_pieces: list[str | _Inline]
     return True
 
 
-def _append_row(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) -> None:
+def _append_row(
+    pieces: list[str | _Inline], row_pieces: list[str | _Inline], *, document: _Document
+) -> None:
     """Join the next row of a paragraph, repairing end-of-line hyphenation and inline maths
     that wraps from one row to the next (`_wrapped_inline`)."""
     if not pieces:
@@ -10100,7 +10191,7 @@ def _append_row(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) ->
         return
     last, first = pieces[-1], row_pieces[0] if row_pieces else ""
     if isinstance(last, str) and isinstance(first, str):
-        tail, separator = _line_break(last.rstrip(), first.lstrip())
+        tail, separator = _line_break(last.rstrip(), first.lstrip(), document=document)
         pieces[-1] = tail + separator
         if not separator:
             row_pieces[0] = first.lstrip()
@@ -10135,7 +10226,7 @@ def _tidy(pieces: list[str | _Inline]) -> list[str | _Inline]:
     return out
 
 
-def _attach_captions(blocks: list[_Block], figures: list[_Figure]) -> None:
+def _attach_captions(blocks: list[_Block], figures: list[_Figure], *, document: _Document) -> None:
     """Nearest caption (below preferred) within CAPTION_MAX_GAP; one per figure."""
     pairs = []
     for c_index, block in enumerate(blocks):
@@ -10158,9 +10249,9 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure]) -> None:
             continue
         figures[f_index].caption = blocks[c_index].text
         figures[f_index].flat_scripts = any(
-            kind for row in blocks[c_index].rows for kind in _script_kinds(row)
+            kind for row in blocks[c_index].rows for kind in _script_kinds(row, document=document)
         )
-        pieces = _paragraph_pieces(blocks[c_index])
+        pieces = _paragraph_pieces(blocks[c_index], document=document)
         if any(isinstance(piece, _Inline) for piece in pieces):
             figures[f_index].caption_pieces = pieces
             figures[f_index].caption_size = blocks[c_index].font_size
@@ -10179,7 +10270,8 @@ def _claim_tables(
     frags: dict[int, list[_Row]],
     paths: dict[int, list[_Path]],
     previous: list[tables.PageTable] | None,
-    budget: tables.DetectorBudget | None = None,
+    *,
+    document: _Document,
 ) -> list[tables.PageTable]:
     """Find the page's data tables (`pipeline.tables`) and take their lines (cells and
     "Table N" caption) and rules out of the page, before columns, rows, headings and
@@ -10192,11 +10284,19 @@ def _claim_tables(
     if TABLE_PREFILTER and not tables.may_hold_table(page, frags[number], paths[number]):
         found = []  # nothing the detector could find would be kept (`may_hold_table`)
     else:
-        found = tables.find(page, frags[number], paths[number], clean=_clean, budget=budget)
+        found = tables.find(
+            page, frags[number], paths[number], clean=_clean, budget=document.detector
+        )
     if previous and not (found and tables.continues(previous[-1], found[0], page.rect.width)):
         # The rest of an unruled table has too few lines to be found on its own page.
         rest = tables.find_continued(
-            page, frags[number], paths[number], previous[-1], found, clean=_clean, budget=budget
+            page,
+            frags[number],
+            paths[number],
+            previous[-1],
+            found,
+            clean=_clean,
+            budget=document.detector,
         )
         if rest is not None:
             found = [rest, *found]
@@ -10212,9 +10312,13 @@ def _claim_tables(
         # A cell keeps a raised mark as a superscript character (`tables._marked`) but not a
         # lowered one: it is written flat, and the notice `scripts_flattened` says so.
         cells = _merge_baselines([frags[number][i] for i in sorted(table.lines)], None)
-        if any("sub" in _script_glyphs(row)[0] for row in cells if not row.vertical):
+        if any(
+            "sub" in _script_glyphs(row, document=document)[0] for row in cells if not row.vertical
+        ):
             table.reasons.append(LOWERED_CELL_REASON)
-        table.cell_maths = _cell_maths(table.grid, [frags[number][i] for i in sorted(table.lines)])
+        table.cell_maths = _cell_maths(
+            table.grid, [frags[number][i] for i in sorted(table.lines)], document=document
+        )
     frags[number] = [f for i, f in enumerate(frags[number]) if i not in lines]
     paths[number] = [p for i, p in enumerate(paths[number]) if i not in drawn]
     if previous and tables.continues(previous[-1], found[0], page.rect.width):
@@ -10282,7 +10386,9 @@ def _cell_owners(grid: TableGrid, glyphs: Sequence[_Char]) -> list[int | None]:
     return owners
 
 
-def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], _Inline]:
+def _cell_maths(
+    grid: TableGrid, rows: Sequence[_Row], *, document: _Document = _PLAIN
+) -> dict[tuple[int, int], _Inline]:
     """The cells of a table whose whole content is one inline formula, by the glyphs.
 
     A cell of a TeX paper holds maths when the glyphs say it as they do in a line of prose
@@ -10293,7 +10399,7 @@ def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], 
     rotated table are not taken. Nothing here reads LaTeX: the cell's crop goes to the equation
     step like any inline equation, and what it reads is flagged by the same checks.
     """
-    if not _TEX_MADE or grid.turned or not grid.cells:
+    if not document.tex_made or grid.turned or not grid.cells:
         return {}
     glyphs = [c for row in rows if not row.vertical and not row.diagonal for c in row.chars]
     if not glyphs or len(grid.cells) * len(glyphs) > _CELL_SCAN_LIMIT:
@@ -10313,7 +10419,7 @@ def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], 
         ):
             continue
         row = _Row(mine)
-        runs = _inline_runs(row)
+        runs = _inline_runs(row, document=document)
         first = next(i for i, c in enumerate(mine) if not c.blank)
         last = max(i for i, c in enumerate(mine) if not c.blank)
         if (
@@ -10483,6 +10589,8 @@ def _prepare_rows(
     margins: _MarginFilter,
     rules: Sequence[_Path] = (),
     source: say_once.PageSource | None = None,
+    *,
+    document: _Document,
 ) -> tuple[list[_Row], tuple[float, float] | None, list[_Row]]:
     """The page's rows without its running headers, footers, page numbers and watermarks,
     its column gutter, and the rows so dropped (a figure may claim some back as labels:
@@ -10508,7 +10616,7 @@ def _prepare_rows(
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
-    if gutter is None and _SLIDE_DECK:
+    if gutter is None and document.slide_deck:
         # A slide's columns are short (`_find_gutter`, `slide`), so they must also hold words:
         # the brace and the cases of a piecewise function are not two columns of text.
         gutter = _find_gutter(body, slide=True)
@@ -10692,12 +10800,15 @@ def _page_blocks(
     covers: Sequence[tuple[float, float]] = (),
     page_math: Any = None,
     source: say_once.PageSource | None = None,
+    document: _Document,
 ) -> _PageBlocks:
     page_rect = page.rect
-    rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
+    rows = _split_exercise_numbers(
+        _split_braced_systems(_split_labels(rows), document=document), document=document
+    )
     _mark_notes(rows, number, page_rect.height, ctx)
     for row in rows:
-        _classify_row(row)
+        _classify_row(row, document=document)
     contents = _contents_rows(rows, number)
     if source is not None:
         source.leave_out_at("contents", _cut_boxes(rows, contents))
@@ -10719,6 +10830,7 @@ def _page_blocks(
         small_out=small,
         ink=ink_sources,
         hand=ink,
+        document=document,
     )
     small_pictures: list[_Figure] = []
     figures = _merge_figures(_raster_figures(page, page_rect, small_pictures) + vector)
@@ -10726,15 +10838,21 @@ def _page_blocks(
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     # A chart's tick labels in the footer band, or its axis title repeated on every slide,
     # are its labels, not running text.
-    restored = _figure_labels(dropped, figures, rows, page_rect.height, ctx, label_keys, margins)
+    restored = _figure_labels(
+        dropped, figures, rows, page_rect.height, ctx, label_keys, margins, document=document
+    )
     for row in restored:
-        _classify_row(row)
+        _classify_row(row, document=document)
     rows = [*rows, *restored]
-    figures = [f for f in figures if not _backdrop(f, rows, ctx, page.parent)]
-    _claim_labels(figures, rows, ctx)
-    figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
+    figures = [f for f in figures if not _backdrop(f, rows, ctx, page.parent, document=document)]
+    _claim_labels(figures, rows, ctx, document=document)
+    figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures, document=document)
     figures += _fragment_figures(
-        rows, loose, [f.bbox for f in figures] + [t.bbox for t in page_tables], ctx
+        rows,
+        loose,
+        [f.bbox for f in figures] + [t.bbox for t in page_tables],
+        ctx,
+        document=document,
     )
     text_rows = [r for r in rows if not r.absorbed]
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
@@ -10743,21 +10861,23 @@ def _page_blocks(
         # the model is shown, and its verified spans are laid over them before the rules
         # below group them into equations.
         first = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
-        text_rows = page_math.on_page(number, text_rows, [text_rows[i] for i in first], used_rules)
-    _equation_regions(text_rows, used_rules)
+        text_rows = page_math.on_page(
+            number, text_rows, [text_rows[i] for i in first], used_rules, document=document
+        )
+    _equation_regions(text_rows, used_rules, document=document)
     if page_math is not None:
         page_math.after_regions(number, text_rows)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
-    runs = _split_options(_runs(ordered, ctx))
-    blocks = [_classify_run(run, ctx) for run in runs]
+    runs = _split_options(_runs(ordered, ctx, document=document), document=document)
+    blocks = [_classify_run(run, ctx, document=document) for run in runs]
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
     _flag_text(blocks)
     for block in blocks:
         region = block.rows[0].region if block.rows else None
         if block.kind == Kind.EQUATION and region is not None:
             _add_rules(block, region.rules)
-    _attach_captions(blocks, figures)
+    _attach_captions(blocks, figures, document=document)
     captions = [b.bbox for b in blocks if b.kind == "attached"]
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:
@@ -10830,7 +10950,7 @@ def _page_blocks(
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
         if block.kind in _TEXT_BLOCKS:
-            block.pieces = _paragraph_pieces(block)
+            block.pieces = _paragraph_pieces(block, document=document)
             if source is not None:
                 _leave_out_teacher_tags(source, block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
@@ -10886,6 +11006,8 @@ def _figure_labels(
     ctx: _Context,
     accepted: Collection[tuple] = frozenset(),
     margins: _MarginFilter | None = None,
+    *,
+    document: _Document,
 ) -> list[_Row]:
     """Rows the header and footer rules dropped (`_prepare_rows`) that label a figure: a
     chart's tick labels in the footer band (bare numbers, read as page numbers), its axis
@@ -10906,7 +11028,7 @@ def _figure_labels(
         for r in _label_candidates(dropped, numbers=True)
         if _is_number_row(r) or _label_key(r, height) in accepted
     ]
-    owners = _label_owners(figures, [*rows, *candidates], ctx)
+    owners = _label_owners(figures, [*rows, *candidates], ctx, document=document)
     found = [r for r in candidates if id(r) in owners]
     numbers = [r for r in found if _is_number_row(r)]
     lone = {
@@ -10996,6 +11118,8 @@ def _label_keys(
     ctx: _Context,
     margins: _MarginFilter,
     guard: _PageGuard,
+    *,
+    document: _Document,
 ) -> set[tuple]:
     """Keys (`_label_key`) of the dropped repeated text that is beside a figure on every
     analysed page it was dropped from: an axis title repeated under each chart of a deck,
@@ -11015,8 +11139,8 @@ def _label_keys(
             if not candidates:
                 continue  # nothing, or only what a page of text already ruled out
             rows = prepared[n][0]
-            figures = _rough_figures(page, rows, paths[n], ctx, margins)
-            owners = _label_owners(figures, [*rows, *candidates], ctx)
+            figures = _rough_figures(page, rows, paths[n], ctx, margins, document=document)
+            owners = _label_owners(figures, [*rows, *candidates], ctx, document=document)
             here = [(_label_key(row, page.rect.height), id(row) in owners) for row in candidates]
             near.update(key for key, beside in here if beside)
             far.update(key for key, beside in here if not beside)
@@ -11029,11 +11153,15 @@ def _rough_figures(
     paths: list[_Path],
     ctx: _Context,
     margins: _MarginFilter,
+    *,
+    document: _Document,
 ) -> list[_Figure]:
     """The page's figures as `_page_blocks` finds them, roughly (equation rules are
     not taken out first): for `_label_keys` only."""
     rect = page.rect
-    figures = _merge_figures(_raster_figures(page, rect) + _vector_figures(paths, rows, rect, ctx))
+    figures = _merge_figures(
+        _raster_figures(page, rect) + _vector_figures(paths, rows, rect, ctx, document=document)
+    )
     return [f for f in figures if not margins.drops_figure(f.bbox, rect.height)]
 
 
@@ -11797,7 +11925,7 @@ def _body_and_pitch(rows_by_page: dict[int, list[_Row]]) -> _Context:
 
 
 def _read_page(
-    page: pymupdf.Page, budget: page_type.InkBudget, producer: str
+    page: pymupdf.Page, document: _Document, producer: str
 ) -> tuple[list[_Row], list[_Path], page_type.PageTypeResult]:
     """The page's rows and paths, and its page type, from one text extraction and one
     drawings list (`pipeline.page_type` reads the same two). A page saved sideways with no
@@ -11810,13 +11938,13 @@ def _read_page(
     images = page_type.image_boxes(page)
     if page_type.too_complex(drawings):  # PAGE_MAX_PATHS: no path is read (`kept_reason`)
         kind = page_type.classify(
-            page, raw, drawings, budget=budget, producer=producer, images=images
+            page, raw, drawings, budget=document.ink, producer=producer, images=images
         )
         rows = _page_rows(page, raw, kind.text.covered)
         return rows + _field_rows(fields, rows), [], kind
     seen = page_type.paint_visibility(drawings, images[0])  # once: the page type reads it too
     kind = page_type.classify(
-        page, raw, drawings, budget=budget, producer=producer, images=images, seen=seen
+        page, raw, drawings, budget=document.ink, producer=producer, images=images, seen=seen
     )
     rows = _page_rows(page, raw, kind.text.covered)
     return rows + _field_rows(fields, rows), _page_paths(page, drawings, seen), kind
@@ -11825,17 +11953,14 @@ def _read_page(
 def _analyze_document(
     doc: pymupdf.Document,
     selected: list[int],
-    page_math: Any = None,
-    display_grouping: bool = False,
+    page_math: Any,
+    document: _Document,
 ) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
     types: dict[int, page_type.PageTypeResult] = {}
-    budget = page_type.InkBudget()
     producer = page_type.producer_hint(doc)
-    global _TEX_MADE, _GROUPING
-    _TEX_MADE = producer == "tex"
-    _GROUPING = display_grouping
+    document.tex_made = producer == "tex"
     guard = _PageGuard()
     guard.pages = list(selected)
 
@@ -11857,7 +11982,7 @@ def _analyze_document(
     sources: dict[int, say_once.PageSource] = {}
     for number in selected:
         with guard(number):
-            rows, drawn, kind = _read_page(doc[number], budget, producer)
+            rows, drawn, kind = _read_page(doc[number], document, producer)
             if _kept_whole(kind):
                 # Nothing but the header and footer bands of its paths is read again (by the
                 # margin filter, before this page is dropped): a page of tens of thousands of
@@ -11869,8 +11994,7 @@ def _analyze_document(
     deck = _read_deck(doc, guard.live(selected), frags, types, paths, guard)
     forget()
     guard.settle()
-    global _SLIDE_DECK
-    _SLIDE_DECK = deck is not None
+    document.slide_deck = deck is not None
     if deck is not None and deck.dropped:
         # An earlier step of a frame has nothing the frame's last page lacks: it is not read
         # again, so it costs no crop, no model call and no line of the output.
@@ -11881,7 +12005,9 @@ def _analyze_document(
     # Pages that failed are not neighbours either (`_reference_pages`): they would be read
     # again as a reference page.
     skip = {*(deck.dropped if deck else ()), *guard.failed}
-    margins = _margin_filter(doc, guard.live(selected), frags, paths, skip, guard)
+    margins = _margin_filter(
+        doc, guard.live(selected), frags, paths, skip, guard, document=document
+    )
     forget()
     guard.settle()
     # Handwritten and scanned pages are kept as their page image: nothing on them is read
@@ -11915,7 +12041,6 @@ def _analyze_document(
         text_kept.discard(number)
     guard.on_purpose = {n for n in kept if n not in text_kept}
     guard.settle()
-    detector = tables.DetectorBudget()  # the slow detections of this document (tables.py)
     for number in guard.live(selected):
         with guard(number):
             if number in kept and number not in text_kept:
@@ -11940,7 +12065,7 @@ def _analyze_document(
                     frags,
                     paths,
                     found.get(number - 1) if guard.ok(number - 1) else None,
-                    detector,
+                    document=document,
                 )
             )
             sources[number] = say_once.PageSource()
@@ -11950,7 +12075,12 @@ def _analyze_document(
             for row in _merge_baselines([f for f in unclaimed if id(f) not in still], None):
                 sources[number].add_row(row.chars)
             prepared[number] = _prepare_rows(
-                doc[number], frags[number], margins, paths[number], sources[number]
+                doc[number],
+                frags[number],
+                margins,
+                paths[number],
+                sources[number],
+                document=document,
             )
             # Axes with tick labels, an axis title or a curve from their corner are a plot's:
             # the rows the header and footer rules dropped count (tick labels in the bands).
@@ -11962,15 +12092,16 @@ def _analyze_document(
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     ctx.notes = named_links.read(doc, list(selected)) or None
-    global _COMPOUNDS, _WHOLE_WORDS
-    _COMPOUNDS, _WHOLE_WORDS = hyphens.document_spellings(
+    document.compounds, document.whole_words = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
     )
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx, guard)
     _letter_rows({n: rows for n, (rows, _, _) in prepared.items()}, ctx)
     forget()
     guard.settle()
-    label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins, guard)
+    label_keys = _label_keys(
+        doc, list(prepared), prepared, paths, ctx, margins, guard, document=document
+    )
     forget()
     guard.settle()
     pages: list[_PageBlocks] = []
@@ -11998,20 +12129,21 @@ def _analyze_document(
                     covers=_covered_points(doc[n], types[n]),
                     page_math=page_math,
                     source=sources.get(n),
+                    document=document,
                 )
         pages.append(read if read is not None else _kept_page(doc[n], n))
     forget()
     keep_failed()
     guard.settle()
-    _glossary_entries(pages)
-    _lead_entries(pages)
+    _glossary_entries(pages, document=document)
+    _lead_entries(pages, document=document)
     _settle_bold_letters(pages)
     _promote_numbered_lines(pages, ctx)
     _mark_run_in_labels(pages, ctx)
     _join_page_splits(pages, ctx)
     block_ids: dict[int, str] = {}
     elements = outline.apply(
-        _to_elements(pages, ctx, block_ids, guard), outline.read(doc), selected
+        _to_elements(pages, ctx, block_ids, guard, document=document), outline.read(doc), selected
     )
     keep_failed()
     guard.settle()
@@ -12704,7 +12836,7 @@ def _footnote(
     return small and low and mark and first in raised
 
 
-def _whole_pieces(block: _Block) -> list[str | _Inline]:
+def _whole_pieces(block: _Block, *, document: _Document) -> list[str | _Inline]:
     """The pieces of a paragraph with the parts that follow it over page breaks joined on
     (hyphenation repaired as between lines); an inline equation of a later part keeps its
     own page."""
@@ -12716,7 +12848,7 @@ def _whole_pieces(block: _Block) -> list[str | _Inline]:
             replace(p, page=number) if isinstance(p, _Inline) and p.page is None else p
             for p in part.pieces
         ]
-        _append_row(pieces, later)
+        _append_row(pieces, later, document=document)
     if block.term_pieces is None:
         return _tidy(pieces)
     kept = block.term_pieces + 1  # a glossary entry: its term and the space after it stay
@@ -12728,6 +12860,8 @@ def _to_elements(
     ctx: _Context,
     block_ids: dict[int, str],
     guard: _PageGuard,
+    *,
+    document: _Document,
 ) -> list[Element]:
     """Blocks -> Elements with ids "p{page+1}-e{index}" and a global reading order
     (`block_ids` gets each block's element id).
@@ -12740,7 +12874,7 @@ def _to_elements(
     for page in pages:
         first = len(elements)
         with guard(page.number):
-            _page_elements(page, ctx, levels, block_ids, elements)
+            _page_elements(page, ctx, levels, block_ids, elements, document=document)
         if not guard.ok(page.number):
             del elements[first:]
             for block in page.blocks:
@@ -12757,6 +12891,8 @@ def _page_elements(
     levels: dict[int, int],
     block_ids: dict[int, str],
     elements: list[Element],
+    *,
+    document: _Document,
 ) -> None:
     """The elements of one page's blocks, appended to `elements`."""
     ids = (f"p{page.number + 1}-e{index}" for index in count())
@@ -12770,7 +12906,7 @@ def _page_elements(
             children = []
             parts = []
             term_length = 0
-            for number, piece in enumerate(_whole_pieces(block), start=1):
+            for number, piece in enumerate(_whole_pieces(block, document=document), start=1):
                 if isinstance(piece, _Inline):
                     child_id = next(ids)
                     children.append((child_id, piece))

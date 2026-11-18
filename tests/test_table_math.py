@@ -345,15 +345,15 @@ def _glyphs(text: str, x: float, font: str = "CMR10", y: float = 100.0) -> list:
     return out
 
 
-def test_a_cell_whose_glyphs_are_not_its_text_is_not_an_equation(monkeypatch):
+def test_a_cell_whose_glyphs_are_not_its_text_is_not_an_equation():
     from readablestem.pipeline import layout
     from readablestem.pipeline.layout import _Row
 
-    monkeypatch.setattr(layout, "_TEX_MADE", True)
     glyphs = _glyphs("65.1", 100) + _glyphs("±", 120, "CMSY10") + _glyphs("0.4", 125)
     cell = TableCell(row=0, col=0, text="65.1 ± 0.5", bbox=(95, 95, 150, 115))
     grid = TableGrid(rows=1, cols=1, cells=[cell], source="local")
-    assert layout._cell_maths(grid, [_Row(glyphs)]) == {}
+    tex = layout._Document(tex_made=True)
+    assert layout._cell_maths(grid, [_Row(glyphs)], document=tex) == {}
 
 
 # ------------------------------------------------------------------ settle
