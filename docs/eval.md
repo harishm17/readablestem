@@ -3416,6 +3416,25 @@ What none of the reports has yet:
   recorded, so the `source` kind has no row.
 - How long a background (batch) check takes to come back: no batch answer is recorded.
 
+### `eval say-once`
+
+The words of each page said by no element, and said twice (`pipeline/say_once.py`,
+[steps.md](steps.md), "Say once"), over the corpus. Each file is read by layout as a job reads
+it, with no model, and counted by the function the conversion runs at its end in shadow
+(`page_missing`, [eval-say-once.md](eval-say-once.md) has the figures). Counts only: no word
+or page text is kept in the record.
+
+```bash
+uv run readablestem eval say-once --out say-once.json
+uv run readablestem eval say-once --only r18_arxiv_opt        # one file
+```
+
+It spends nothing and gates nothing, and reads the corpus as a development set. The record is
+the usual one (`measure.record`: the split by document, the profile, the commit) with, under
+`metrics`, the pages by share in no element and said twice at each line, the words by code,
+what layout left out by rule, and the pages over the line. It does not see wrong reading order
+(`eval order`). Exit code 0: measured; 2: nothing could be measured.
+
 ## The page audit in shadow (`eval page-audit`)
 
 The page audit (steps.md, "Page audit") compares one page of the output with the page it

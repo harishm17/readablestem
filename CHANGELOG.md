@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: the say-once measure, in shadow (branch feat/say-once-and-page-words)
+
+- A17 and SW60: `pipeline/say_once.py` counts, for each page, the words said by no element and
+  the words said twice (by code: `no_owner`, `two_places`, `place_and_text`, `said_twice`),
+  against what layout read of the page (`Layout.sources`, recorded where layout prepares its
+  rows, so the margin filter, hidden text, a contents line's leaders and OpenStax level tags are
+  its own rules counted as left out, with no second copy) and what the elements say. No model, no
+  second read of the file, about 0.002 s a page.
+- At the end of a conversion a page of 40 words or more with 15% or more of them in no element
+  gets one content-free `page_missing` fact in the step facts (`Shadow.over_line`, `ShadowFact.share`),
+  as every other page gets a "same". It is shown to nobody and counted in `job_shadow`. No
+  notice, no card, no change to a counter a person sees. WS15.9's page-check writer is not built.
+- `readablestem eval say-once` gives the corpus figures again; the figures it was set on are in
+  docs/eval-say-once.md: over 551 pages of 40 words or more no page is over the line.
+- Changes no element, no stored document, no recording and no hash, so `PIPELINE_VERSION` is
+  not bumped and no migration is added.
+
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 
 - SW36 follow-up: a drawn rule was written as a blank to fill in ("_____") when the nearest
