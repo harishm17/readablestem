@@ -110,7 +110,10 @@ def make_file(file_type: str, html: str, title: str) -> bytes:
         if not _turns.acquire(timeout=WAIT_S):
             raise Busy
         try:
-            return export_docx.export_docx(html, title=title).data
+            made = export_docx.export_docx(html, title=title)
+            if made.not_word:  # the count only: which equation is document content
+                log_event(logger, "docx_equations_as_words", count=len(made.not_word))
+            return made.data
         finally:
             _turns.release()
     return export_epub.build_epub(export_epub.export_epub(html, title=title))

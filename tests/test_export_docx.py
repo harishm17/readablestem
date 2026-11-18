@@ -283,6 +283,32 @@ def test_a_file_that_lacks_an_equation_is_refused(tmp_path):
     assert error.value.code == "equations"
 
 
+def test_one_equation_pandoc_cannot_write_does_not_fail_the_file():
+    """F-502: a bold `"` (an instructor's edit) makes pandoc leave raw TeX in the text, and an
+    empty `<math>` leaves nothing. The file is made; each such equation is words in its place
+    (its reading and the sentence, in the Not Converted style), the export names its element,
+    the other equations are Office equations, and no TeX is left."""
+    bad = '<mi mathvariant="bold">&quot;</mi>'
+    html = (
+        '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
+        f'<p>a <math id="m1" alttext="quote">{bad}</math> b <math id="m2"><mi>x</mi></math>'
+        ' c <math id="m3"></math></p>'
+        f'<div class="equation" id="m4"><math display="block">{bad}</math></div>'
+        '<div class="equation" id="m5"><math display="block"><mi>y</mi></math></div>'
+        "</main></body></html>"
+    )
+    export = ed.export_docx(html)
+    assert export.not_word == ["m1", "m3", "m4"]
+    assert export.equations == 2
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        xml = archive.read("word/document.xml").decode()
+    assert xml.count("<m:oMath>") == 2
+    assert xml.count("it is complete on the web page") == 3
+    assert xml.count('<w:rStyle w:val="NotConverted" />') == 3
+    assert "quote. This equation could not be written" in xml
+    assert "$" not in xml and "mathbf" not in xml
+
+
 def test_output_that_is_not_a_word_file_is_refused(tmp_path):
     program = fake_pandoc(
         tmp_path,

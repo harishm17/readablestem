@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: one equation cannot fail the Word file (branch feat/exports-links-epub-title)
+
+- WS22.3 (F-502): one equation pandoc cannot write as an Office equation (a bold `"` in a
+  MathML token leaves raw TeX in the text; an empty `<math>` leaves nothing) made the whole
+  download fail with "cannot be made as a Word file". The page now wraps each `<math>` in a
+  span, and the pandoc filter (`pipeline/data/export_docx.lua`) tries every equation once with
+  the writer that makes the file; one it cannot write is the equation's reading and "This
+  equation could not be written as a Word equation; it is complete on the web page" in the
+  "Not Converted" style, never raw TeX. `DocxExport.not_word` names the element ids; the CLI
+  prints them and the route logs the count. The check that every equation is in the file, or
+  said, stays. Word files are made on request, so a document converted earlier gets this at its
+  next download; no `RENDER_VERSION` bump is owed. The job page's note and a link to the item
+  wait for an export state the app does not store yet.
+
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 
 - SW36 follow-up: a drawn rule was written as a blank to fill in ("_____") when the nearest

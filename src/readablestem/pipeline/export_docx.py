@@ -33,9 +33,15 @@ What this module does around pandoc:
   dropped when the first heading says the same thing. Headings are Word's Heading 1 to 6
   styles, lists are Word lists, links are hyperlinks, and the document language is set.
 
-Equations are counted: the file must hold as many `m:oMath` as the HTML had `<math>`. If
-pandoc could not convert one, the export fails (`DocxExportError("equations")`) rather than
-hand over a file that silently lacks an equation; the HTML and EPUB stay available.
+Equations are counted: the file must hold as many `m:oMath` as the HTML had `<math>`, less the
+ones the file says it could not write. One equation pandoc cannot write as an Office equation
+(a MathML shape its TeX step refuses leaves raw TeX in the text, or nothing) does not fail the
+file: the filter tries each equation once and writes, where it cannot, the equation's reading
+and the words "This equation could not be written as a Word equation; it is complete on the
+web page" in the "Not Converted" style (`DocxExport.not_word` lists their element ids; the
+failure is said in the file, never hidden). If the count still does not add up (an equation
+lost with nothing said) the export fails (`DocxExportError("equations")`) rather than hand
+over a file that silently lacks an equation; the HTML and EPUB stay available.
 
 What is not carried: scripts and styles (the Word styles are pandoc's), inline SVG,
 remote pictures, the page markers, and the colours of the flagged boxes (the words of a flag
@@ -49,6 +55,7 @@ import contextlib
 import io
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -119,6 +126,7 @@ class DocxExport:
     equations: int  # `<math>` in the HTML, and `m:oMath` in the file
     headings: int
     images: int  # pictures with alt text written
+    not_word: list[str]  # element ids of equations written as words, not as a Word equation
     tables: int
     header_rows: int  # tables whose first row is marked as a header
 
@@ -152,7 +160,9 @@ def _limits() -> None:  # pragma: no cover - runs in the forked child, before ex
         pass
 
 
-def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
+def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> tuple[bytes, str]:
+    """The Word file pandoc makes, and what the filter said on stderr (`_failed_keys` reads it:
+    pandoc's own warnings quote the document, so nothing else of it is kept)."""
     work = Path(tempfile.mkdtemp(prefix="readablestem-docx-"))
     try:
         work.chmod(0o700)
@@ -181,7 +191,7 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
                 cwd=work,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 start_new_session=True,
                 preexec_fn=_limits,
             )
@@ -189,7 +199,7 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
             raise DocxExportError("unavailable") from None
         try:
             try:
-                process.communicate(html.encode("utf-8"), timeout=timeout_s)
+                _, said = process.communicate(html.encode("utf-8"), timeout=timeout_s)
             except subprocess.TimeoutExpired:
                 raise DocxExportError("timeout") from None
         finally:
@@ -199,7 +209,7 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
                 process.wait(timeout=5)
         if process.returncode != 0 or not out.is_file():
             raise DocxExportError("failed")
-        return out.read_bytes()
+        return out.read_bytes(), said.decode("utf-8", "replace")
     except OSError:
         raise DocxExportError("failed") from None
     finally:
@@ -262,6 +272,40 @@ def _prepare(root: _Node) -> None:
 
 def _normal(text: str) -> str:
     return " ".join(text.split())
+
+
+# The longest reading written in place of an equation the file could not hold: a long one
+# is left out, since a reading cut short would mislead more than the words alone.
+_READING_MAX = 400
+
+
+def _mark_equations(root: _Node, token: str) -> list[str]:
+    """Wrap every `<math>` in `<span data-eq="TOKEN-N" data-reading="...">`, so the filter
+    can try each equation and write words where Word cannot hold it (`data/export_docx.lua`).
+    The reading is the stored speech (`alttext`) or else the equation's own characters.
+    Returns the element id of each equation (the nearest id on or above it, "" when none),
+    by N."""
+    ids: list[str] = []
+    for node in [n for n in root.walk() if n.tag == "math"]:
+        holder: _Node | None = node
+        while holder is not None and not holder.attrs.get("id"):
+            holder = holder.parent
+        ids.append(holder.attrs["id"] if holder is not None else "")
+        reading = _normal(node.attrs.get("alttext", "")) or _normal(_text(node))
+        attrs = {"data-eq": f"{token}-{len(ids) - 1}"}
+        if 0 < len(reading) <= _READING_MAX:
+            attrs["data-reading"] = reading
+        span = _Node("span", attrs, [node])
+        _replace(node, [span])
+        node.parent = span
+    return ids
+
+
+def _failed(said: str, token: str) -> set[int]:
+    """The equations the filter could not write as Word equations, by number (its lines on
+    stderr; anything else pandoc said quotes the document and is not read)."""
+    found = re.findall(rf"^RSFAIL {re.escape(token)}-(\d+)$", said, re.MULTILINE)
+    return {int(n) for n in found}
 
 
 # --------------------------------------------------------------------------- after
@@ -378,17 +422,30 @@ def export_docx(
     _sanitise(root, {s for s in images if _DATA_URI.match(s)})
     _prepare(root)
     _webp_to_png(root)
-    n_math = sum(1 for n in body.walk() if n.tag == "math")
+    token = secrets.token_hex(6)
+    equation_ids = _mark_equations(body, token)
+    n_math = len(equation_ids)
     n_headings = sum(1 for n in body.walk() if _HEADING.match(n.tag))
     document = (
         f'<!doctype html><html lang="{escape(lang, quote=True)}"><head><meta charset="utf-8">'
         f"<title>{escape(title, quote=False)}</title></head>"
         f"<body>{''.join(_write(c) for c in body.children)}</body></html>"
     )
-    data = _run_pandoc(document, lang, program, timeout_s)
+    data, said = _run_pandoc(document, lang, program, timeout_s)
     data, (equations, pictures, tables, headers) = _rebuild(data, title)
-    if equations != n_math:
+    not_word = sorted(_failed(said, token) & set(range(n_math)))
+    if equations + len(not_word) != n_math:
         raise DocxExportError("equations")
     if output_chars.count_in_zip(data, skip=_STYLE_PARTS):
         raise DocxExportError("unreadable_character")
-    return DocxExport(title, lang, data, equations, n_headings, pictures, tables, headers)
+    return DocxExport(
+        title,
+        lang,
+        data,
+        equations,
+        n_headings,
+        pictures,
+        [equation_ids[n] for n in not_word],
+        tables,
+        headers,
+    )

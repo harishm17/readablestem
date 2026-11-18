@@ -76,4 +76,9 @@ def _cmd_docx(args: argparse.Namespace) -> int:
         f"wrote {args.out}: {result.equations} equations, {result.headings} headings, "
         f"{result.images} pictures with alt text, {result.tables} tables"
     )
+    if result.not_word:
+        print(
+            f"{len(result.not_word)} equations could not be written as Word equations and are "
+            f"words in the file: {', '.join(i or '(no id)' for i in result.not_word)}"
+        )
     return 0

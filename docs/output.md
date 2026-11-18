@@ -202,7 +202,13 @@ our own would be a second MathML reader to keep right.
 - **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
   (`div.pagebreak`: `role="doc-pagebreak"` and their visible label) and the skip link are left
   out, and a figure with no picture is written as paragraphs (pandoc would make it a one-cell
-  table). A Word document has its own pages and its own navigation.
+  table). A Word document has its own pages and its own navigation. The same filter tries every
+  equation once, all together in a test file written by the writer that makes the real one: an
+  equation pandoc cannot write as an Office equation (a MathML shape its TeX step refuses
+  leaves raw TeX in the text, as `<mi mathvariant="bold">"</mi>` does, or nothing, as an
+  empty `<math>` does) is written, in the "Not Converted" character style, as its reading and
+  "This equation could not be written as a Word equation; it is complete on the web page."
+  The other equations are unchanged and the file is made (F-502).
 - **The child.** Its own process group, an environment of `PATH`, `LANG` and the like only
   (`core.childenv`: no keys, no database URL), a private temporary directory removed
   afterwards, 90 s of CPU, a file-size cap, 256 open files, a 2 GB heap (`+RTS -M2g`), and 60 s
@@ -218,8 +224,12 @@ our own would be a second MathML reader to keep right.
     title stays in the document properties).
 - **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
   (inside the document by bookmark); tables with their caption; alt text on each picture; the
-  document language and title; equations as `m:oMath`. The export fails
-  (`equations`) rather than hand over a file with fewer equations than the HTML has `<math>`.
+  document language and title; equations as `m:oMath`, or, where one could not be written, its
+  words (above; `DocxExport.not_word` lists their element ids, `readablestem export docx`
+  prints them, the route logs the count). The export fails (`equations`) rather than hand over
+  a file with fewer equations than the HTML has `<math>` and no words in place of the missing
+  ones. A stored document picks this up the next time it is downloaded: the file is made on
+  request from the stored page.
 - **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colors
   of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
   pictures, and any conformance claim: the tool assists, and nobody has checked how the file
