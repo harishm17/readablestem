@@ -149,7 +149,8 @@ def unread_message(result_json: dict[str, Any] | None) -> str:
 
 FAILED_MESSAGES = {
     # Every page handwritten or scanned (pipeline.page_type.refusal_code): the upload
-    # probe refuses these first; a job sees them when the probe could not tell in its time.
+    # probe refuses these first; a job sees them when the probe could not tell inside its
+    # allowance of path items.
     # Never "run OCR": OCR'd scans are what these are.
     "scanned": "Every page of this PDF is a scanned image, so this tool cannot convert it. "
     "It has no text this tool can use. Export a PDF from the original file (LaTeX, Word or "

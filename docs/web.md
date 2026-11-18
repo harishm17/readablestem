@@ -527,8 +527,8 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    hidden text is not used, that nothing was taken from the daily pages, and to upload a
    typed version: never "run OCR", which makes exactly these files) and one whose every
    page is blank (`no_content`). A page the probe cannot be sure of (a full-page picture
-   with a short title and no hidden layer, which may be a slide; ink not analyzed within
-   the 10 s budget) never refuses the upload: the conversion keeps it as an image with
+   with a short title and no hidden layer, which may be a slide; ink beyond the
+   probe's allowance of path items) never refuses the upload: the conversion keeps it as an image with
    a decision (docs/layout.md "Hidden text and page types"). The child caps its own address space at 768 MB. The conversion
    runs in a child process of its own too; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
@@ -536,7 +536,13 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    upload page again, naming the file, its pages and the pages left today). The quota is
    the person's tier's (`PER_USER_DAILY_PAGE_QUOTA` for invited people,
    `OPEN_TIER_DAILY_PAGE_QUOTA` for open-tier accounts, whose message says "the N pages a new
-   account can convert today"). Before all of this, an upload is refused (503) while the
+   account can convert today"). A file that is only scans or handwriting is refused here
+   without counting a page; when the probe could not tell inside its allowance, the file
+   becomes a job and the conversion's first step fails it with the same words, and its pages
+   come back the same day, in the transaction that marks the job failed (`quota.give_back_pages`,
+   `worker.Worker._finish_failed`). It still counts for the per-person upload rule
+   (`upload_user`) and no "Try again" is offered, so it cannot be repeated without bound. Every
+   other failed job keeps its pages. Before all of this, an upload is refused (503) while the
    day's spend cap is used up or, for an open-tier account, while its pool is.
 
 Validation errors re-show the upload page with an error summary linked to the file input.
@@ -562,14 +568,21 @@ to each of its parts that has such pages); the flag only offers it.
   `image_pages` when the box is checked, which also lets a PDF of scans or handwriting through):
   `page_type.probe_pages` makes one pass over the pages for the refusal and the count, by kind
   (`page_type.ImagePageCount`: scanned, handwritten, unread pages of ink or drawings, and
-  `unanalysed` pages whose ink the time guard did not analyze, which makes the count "at least").
-  The guard is half a second for the whole document (`page_type.PROBE_GUARD_S`): notes of many
-  dense pages made the request take 4 to 13 s with the old 20 s. A page past it is not refused;
-  with less than a line of text it still counts as an unread page of ink, so the count and the
-  choice for a file of mostly handwriting stay, while the split between handwritten and unread and
-  the refusal of a document that is only handwriting wait for the conversion
-  (`worker.result_outcome`, same words). The text pass, about 14 ms a page of a dense file, is
-  the rest of the time.
+  `unanalysed` pages whose ink the guard did not analyze, which makes the count "at least").
+  The ink analysis is bounded by work, not by a clock: the whole document has an allowance of
+  50,000 path items (`page_type.PROBE_MAX_ITEMS`, spent through `InkBudget.take`; a page of dense
+  handwriting has about 35,000), and a clock of 20 s (`PROBE_GUARD_S`) only guards against a hang,
+  so the same file gets the same answer on a slow machine and a fast one. Notes of many dense
+  pages made the request take 4 to 8 s with an allowance of 1,000,000; with 50,000 they take
+  1.3 to 4.3 s (20 pages of 6 MB, 100 pages of 30 MB, measured 2026-11-18), as long as the text
+  pass and the drawings of the pages analyzed take. Once the allowance is spent the drawings of
+  the pages after it are not read (`page_type._probe_ink`): reading them cost more than the
+  analysis. A page past the allowance is not refused; with less than a line of text it still
+  counts as an unread page of ink, so the count and the choice for a file of mostly handwriting
+  stay, while the split between handwritten and unread and the refusal of a document that is only
+  handwriting wait for the conversion (`worker.result_outcome`, same words, and the pages come
+  back: `worker.Worker._finish_failed`, docs below, "page quota"). The text pass, about 14 ms a
+  page of a dense file, is the rest of the time.
   The kinds are those of `page_type.image_kind`, the one predicate that also picks the pages the
   image page pass reads (`image_page.kept_reads`), so the count and the reading agree. Typed pages
   are told from their text alone, so only a page that is not clearly typed pays for the ink
@@ -1905,7 +1918,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
-  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analyzed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe refuses these first when it can tell within its half second). A result stored before page types: `scanned` when every page was only a picture of a page |
+  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analyzed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe refuses these first when it can tell inside its allowance of path items, and the pages of such a job are given back). A result stored before page types: `scanned` when every page was only a picture of a page |
   | `too_complex` | A page needs more time or memory to read than a conversion has: the layout step's child process (open and render the pages, `layout._probe_pages`) passed its time limit (`PROBE_TIMEOUT_S` + `PROBE_PER_PAGE_S` per page after the first) or its 768 MB address-space cap (`PROBE_MEMORY_BYTES`) |
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no key for the selected provider): every job would fail the same way |

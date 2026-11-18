@@ -276,23 +276,23 @@ def test_a_page_the_guard_stops_is_named_in_the_checks_and_still_counted(monkeyp
     assert page_type.image_page_count(doc).words == "2"
 
 
-def test_the_upload_probe_analyses_ink_for_only_about_a_second_and_still_counts_the_pages(
-    monkeypatch,
-):
-    """Notes of many dense pages made the upload request take 5 to 16 s (the analysis of their
-    ink); the request stops analysing after a short deadline and the conversion does the rest.
-    The clock is faked: every look at it takes a quarter of a second. The count of pages the pass
-    reads does not change; only the pages the deadline reached are told apart (handwritten or
-    unread)."""
+def test_the_upload_probe_stops_analysing_ink_at_its_allowance_whatever_the_clock(monkeypatch):
+    """Notes of many dense pages made the upload request take seconds (the analysis of their
+    ink): the request analyses a fixed number of path items, not a time. A page left unanalysed
+    is never refused, and with less than a line of text it still counts as an unread page, so
+    the count of the pages the image page pass reads does not depend on the allowance."""
     doc = pymupdf.open()
-    for _ in range(6):
+    for _ in range(6):  # six pages of handwriting with no text layer, 6,178 path items each
         with pymupdf.open(HANDWRITING / "ink_no_layer.pdf") as part:
             doc.insert_pdf(part)
-    ticks = iter(x * 0.25 for x in range(10_000))
-    monkeypatch.setattr(page_type, "time", type("Clock", (), {"monotonic": lambda: next(ticks)}))
-    count = page_type.image_page_count(doc)
-    assert count.found == 6
-    assert count.handwritten < 6 and not count.at_least
+    whole = page_type.probe_pages(doc, count=True)
+    assert whole[0] == "handwritten_no_text" and whole[1].handwritten == 6
+
+    monkeypatch.setattr(page_type, "PROBE_MAX_ITEMS", 13_000)  # two pages of it, not three
+    refusal, count = page_type.probe_pages(doc, count=True)
+    assert refusal is None  # the pages past the allowance may be anything: not refused
+    assert (count.handwritten, count.unread, count.unanalysed) == (2, 4, 0)
+    assert count.found == 6  # the same pages are counted as before, only told apart less
 
 
 def test_a_page_with_too_many_path_items_is_not_analysed(monkeypatch):

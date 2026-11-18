@@ -102,7 +102,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.pdf_probe import MAX_PAGE_SIDE_PT
+from readablestem.web.pdf_probe import IMAGE_PAGE_REFUSALS, MAX_PAGE_SIDE_PT
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import (
     give_back_pages,
@@ -165,9 +165,9 @@ FRESH_COPY = (
     "If it opens on your computer, save a fresh copy (File > Save As, or Print to PDF) "
     "and upload that."
 )
-# The refusals of a PDF that is only scans or handwriting, and what is offered instead when
-# the deployment offers the conversion of such pages (ADR 0007).
-IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
+# What is offered instead of the refusals of a PDF that is only scans or handwriting
+# (`pdf_probe.IMAGE_PAGE_REFUSALS`) when the deployment offers the conversion of such pages
+# (ADR 0007).
 # With that option offered, the refusal says the pages were not asked for (not that the tool
 # cannot convert them), and what to tick. What the person had set stays on the form; the file
 # has to be chosen again.

@@ -45,12 +45,15 @@ from readablestem.core.types import (
 from readablestem.models import OFFLINE_DEFAULTS, make_vision_client
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import estimate_max_cost_usd
+from readablestem.pipeline import page_type
 from readablestem.pipeline.run import convert_pdf
-from readablestem.web import states
+from readablestem.web import outcome, pdf_probe, quota, states
 from readablestem.web.auth import set_allowed
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, SpendDay, User, session_scope, utcnow
+from readablestem.web.routes import jobs as jobs_routes
 from readablestem.web.spend import largest_reservation_usd
+from readablestem.web.uploads import UploadRejected
 from readablestem.web.worker import (
     JobCancelled,
     Worker,
@@ -377,6 +380,47 @@ def test_pdfs_with_nothing_to_convert_are_refused_at_upload(env, data, code, mes
     assert "OCR" not in response.text or code != "scanned"  # never "run OCR first"
     with session_scope(env.ctx.factory) as session:
         assert session.scalar(select(Job.id)) is None  # nothing queued, no quota spent
+
+
+def test_a_file_of_only_handwriting_the_probe_could_not_finish_gives_its_pages_back(
+    env, monkeypatch
+):
+    """The upload refuses a file of nothing but handwriting without counting a page, when its
+    probe can tell inside its allowance of path items. When it cannot, the file becomes a job and
+    the conversion fails it with the same words: the pages come back, so what a person pays does
+    not depend on whether the probe got to the end."""
+    ink = (Path(__file__).parent / "fixtures" / "handwriting" / "ink_no_layer.pdf").read_bytes()
+
+    def probe_here(data, *, max_pages, **_):
+        # The probe runs in a child process, which a patched constant does not reach.
+        try:
+            return pdf_probe.probe(data, max_pages=max_pages)
+        except pdf_probe.ProbeRejected as exc:
+            raise UploadRejected(exc.code, exc.pages) from None
+
+    monkeypatch.setattr(jobs_routes, "inspect_pdf_isolated", probe_here)
+    refused = upload(env.browser, ink)
+    assert refused.status_code == 422  # the probe finished: refused, nothing counted
+    with pytest.raises(pdf_probe.ProbeRejected) as said:
+        pdf_probe.probe(ink, max_pages=30)
+    assert pages_used_today(env) == 0
+
+    monkeypatch.setattr(page_type, "PROBE_MAX_ITEMS", 1)  # the allowance runs out on this page
+    job_id = job_id_from(upload(env.browser, ink))
+    assert pages_used_today(env) == 1
+    assert real_worker(env).run_once() == job_id
+    job = env.job(job_id)
+    assert job.status == "failed" and job.error_code == said.value.code
+    assert page_text(outcome.failed_message(job.error_code)) in page_text(
+        env.browser.get(f"/jobs/{job_id}").text
+    )
+    assert pages_used_today(env) == 0
+
+
+def pages_used_today(env) -> int:
+    with session_scope(env.ctx.factory) as session:
+        user = session.scalar(select(User).where(User.email == ALICE))
+        return quota.pages_used(session, user.id, utc_today())
 
 
 def test_scanned_pages_in_a_mixed_pdf_are_kept_flagged_and_reported(env):
