@@ -178,14 +178,18 @@
 {{ equation_choices(p, item, anyway) }}
 {% if p.compare and p.compare.rows %}
 {# The first rows are enough to act on; an array read column by column gives many more, and
-   they are one fold away (F-077). #}
-{% set rows = p.compare.rows %}
+   they are one fold away (F-077). The differences that change the meaning come first, so a
+   fold never puts one of them behind a difference of style, and the fold says how many it
+   holds. #}
+{% set rows = p.compare.rows|sort(attribute="meaning", reverse=true) %}
+{% set folded = rows[5:] %}
+{% set grave = folded|selectattr("meaning")|list|length %}
 <div class="diff-wrap">
 {{ diff_table(rows[:5], "What differs") }}
-{% if rows|length > 5 %}
+{% if folded %}
 <details class="diff-more">
-  <summary>{{ rows|length - 5 }} more {{ "difference" if rows|length == 6 else "differences" }}</summary>
-  {{ diff_table(rows[5:], "More differences") }}
+  <summary>{{ folded|length }} more {{ "difference" if folded|length == 1 else "differences" }}{% if grave == folded|length %}, {{ "it changes" if grave == 1 else "all change" }} the meaning{% elif grave %}, {{ grave }} {{ "changes" if grave == 1 else "change" }} the meaning{% endif %}</summary>
+  {{ diff_table(folded, "More differences") }}
 </details>
 {% endif %}
 </div>
