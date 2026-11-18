@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: one body size and one look per heading level (branch fix/type-scale-and-headings)
+
+- WS24.1 and WS24.4, as far as their triage line. Measured in a browser over the app and public pages at 1280 and
+  390 px. Text is now 16 px on screens people operate and 18 px on pages people read (before: 16,
+  18 and 14 on operate screens, 18, 14 and 16 on read pages, set by the wrapper an element sat in).
+  `.hint` is one step below text (14 and 16 px; before 14, 16 and 18). Each heading level has one
+  size per kind of screen; the rules that sized a heading by where it sat (review cards, the
+  review list's boxes, the job page, footer columns, panes, notices) are gone, so an h4 no longer
+  looks like an h3 (F-429) and a review title is no longer as large as its h2 on a phone (F-196).
+  `.card-title` is the one class for a title that must be an h2 or h3 but should look smaller.
+  The comparison chart's title is a real heading. The student pages are not touched. `DESIGN.md`
+  says what is true.
+
 ## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
 
 - WS11.1e, as far as its triage line. Found by reading the upload, delete and purge code and by

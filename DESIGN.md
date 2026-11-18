@@ -108,6 +108,15 @@ Links in text are always underlined. Yellow is reserved for focus.
 
 Source Sans 3 (400, 700) for text everywhere; Source Serif 4 600 for display, h1 and h2 on Read/Persuade surfaces; Source Code Pro 400 for LaTeX and code; Latin Modern Math only for equations. Self-hosted woff2, latin plus a greek range loaded on demand, about 59 KB on a typical page. Scale: 56 (fluid 36-56) / 44 (fluid 32-44) / 28 / 22 / 18 / 16 / 14. 14px is the floor. Prose line height 1.6; UI 1.4. No tracking except -0.01em at display size.
 
+Text and headings are set once, in the top of `app.css`, by the kind of screen:
+
+| | Text | h1 | h2 | h3 | h4 | `.hint`, `.small` |
+|---|---|---|---|---|---|---|
+| Operate screens | 16 | 28 | 22 | 18 | 16 | 14 |
+| Read pages (`body.mode-read`) | 18 | 44 (fluid 32-44) | 28 | 22 | 18 | 16 |
+
+The header and footer stay at 16 on every page. No rule sets a heading's size by where it sits. A title that has to be an h2 or h3 for the outline but should look smaller takes `.card-title` (18, sans, 700); otherwise use a lower level. Heading levels do not skip. The landing page's h1 is display size, the one named exception. `.lede` (22) is an intro paragraph, not body text.
+
 ## Layout
 
 4px grid (`--space-1` to `--space-9`: 4, 8, 12, 16, 24, 32, 48, 64, 96). Page container 75rem; review screen up to 90rem; prose column 68ch; hero h1 20 to 22ch. Section rhythm 64px desktop, 48px mobile. Targets are 44px for primary actions, never under 24px. Below 52rem two-pane layouts stack, PDF first; below 40rem the navigation folds into a Menu disclosure. 200% zoom and 320px width must not scroll sideways. The landing page is short, in this order: headline, one line and two buttons; "Hear the difference" (one equation, two readings, two rows from 48rem, stacked on a phone, no cards inside cards, no badges); "How accurate it is" (two charts, one line, one link); three lines on what it handles; the questions folded. About 300 words are visible before anything is opened; each fact is said once and the detail lives on /limits, /privacy and the guides.
