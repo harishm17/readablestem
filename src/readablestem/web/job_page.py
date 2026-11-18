@@ -985,6 +985,8 @@ class PageData:
     # The title the file has without the instructor's choice (T1-7): the field's start.
     title_suggested: str = ""
     title_source: str = ""  # where it comes from, in words (`TITLE_SOURCE_WORDS`)
+    # The pages can be opened one by one on the review screen: not a LaTeX source (WS19.6).
+    has_pages: bool = True
 
 
 def suggested_plan(result: DocumentResult, filename: str = ""):
@@ -1044,4 +1046,5 @@ def page_data(result: DocumentResult, last_decision: date | None, filename: str 
         draft=draft_sentence(result.fixes),
         title_suggested=plan.text,
         title_source=TITLE_SOURCE_WORDS[plan.source],
+        has_pages=result.origin == "pdf",
     )

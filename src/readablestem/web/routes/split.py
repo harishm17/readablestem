@@ -398,6 +398,7 @@ def review_url(
     tools: bool = False,
     change: str | None = None,
     note: str | None = None,
+    page_mode: bool = False,
 ) -> str:
     query = {}
     if item:
@@ -412,6 +413,8 @@ def review_url(
         query["accepted"] = "1"
     if tools:  # the page tools open (T3-5, T3-16)
         query["tools"] = "1"
+    if page_mode:  # the page's tools first, no decision (WS19.6)
+        query["mode"] = "page"
     url = f"/jobs/{job_id}/review"
     if query:
         url += "?" + urlencode(query)
@@ -569,6 +572,7 @@ class SplitBuilder:
         self.view, self.result, self.crop_ids, self.version = _load_versioned(request, job_id, user)
         self.job_id = self.view.id
         self.show_accepted = show_accepted
+        self.page_mode = False  # set by `split_page`: "Fix something on a page"
         self.elements = {e.id: e for e in self.result.elements}
         self.numbers = item_numbers(self.result)
         self.labels = item_labels(self.result)
@@ -612,7 +616,12 @@ class SplitBuilder:
         self, *, item: str | None = None, page: int | None = None, anchor: str | None = None
     ) -> str:
         return review_url(
-            self.job_id, item=item, page=page, accepted=self.show_accepted, anchor=anchor
+            self.job_id,
+            item=item,
+            page=page,
+            accepted=self.show_accepted,
+            anchor=anchor,
+            page_mode=self.page_mode and item is None,
         )
 
     def page_of(self, fix: Fix) -> int | None:
@@ -692,9 +701,10 @@ class SplitBuilder:
         panel.show_on_page = self.url(page=page, anchor=f"box-{card.element_id}")
         return panel
 
-    def notice_lines(self) -> list[OptionalLine]:
+    def notice_lines(self, page: int | None = None) -> list[OptionalLine]:
         """The notices listed with the optional checks: which link or line, and where."""
-        rows = notice_places.rows(self.job_id, self.notes, self.url())
+        found = [p for p in self.notes if page is None or p.notice.page == page - 1]
+        rows = notice_places.rows(self.job_id, found, self.url())
         return [OptionalLine(r.label, r.sentence, r.href, r.what) for r in rows]
 
     # ------------------------------------------------------------------ panel
@@ -1180,13 +1190,19 @@ class SplitBuilder:
             for d in self.queue
         ]
 
-    def optional_lines(self) -> list[OptionalLine]:
+    def optional_lines(self, page: int | None = None) -> list[OptionalLine]:
         """Accepted automatically with a note nobody has acted on yet, in page and reading
-        order."""
+        order; `page` (1-based): those on that page only."""
         far = (1 << 30, 1 << 30)
         rank = {e.id: (e.page, e.order) for e in self.result.elements}
         notes = sorted(
-            (f for f in self.result.fixes if f.optional_note and f.kind in REVIEW_KINDS),
+            (
+                f
+                for f in self.result.fixes
+                if f.optional_note
+                and f.kind in REVIEW_KINDS
+                and (page is None or self.page_of(f) == page)
+            ),
             key=lambda f: rank.get(f.element_id, far),
         )
         out = []
@@ -1198,7 +1214,7 @@ class SplitBuilder:
                 else None
             )
             out.append(self._line(fix, _first_note(fix, compare), href))
-        return out + self.notice_lines()
+        return out + self.notice_lines(page)
 
     def _line(self, fix: Fix, note: str, href: str) -> OptionalLine:
         page = self.page_of(fix)
@@ -1336,11 +1352,19 @@ def split_page(
     top: str = "",
     right: str = "",
     bottom: str = "",
+    page_mode: bool = False,
 ) -> Response:
+    """`page_mode`: "Fix something on a page" (WS19.6): the page's tools are the first panel,
+    under the heading "Page N", with no decision (so none of another page) before them; the
+    optional checks of that page follow."""
     builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted)
-    place = builder.note(note)
-    decision, fix = (None, None) if place is not None else builder.select(item)
-    panel = builder.notice_panel(place) if place is not None else builder.panel(decision, fix)
+    builder.page_mode = page_mode
+    place = None if page_mode else builder.note(note)
+    decision, fix = (None, None) if place is not None or page_mode else builder.select(item)
+    if page_mode:
+        panel = Panel(mode="page", title="")
+    else:
+        panel = builder.notice_panel(place) if place is not None else builder.panel(decision, fix)
     if cell and panel.item is not None and panel.item.table is not None:
         panel.item.table.pick(cell)  # "Change a cell": that cell's form is open
     errors: list[FieldError] = []
@@ -1362,9 +1386,11 @@ def split_page(
     if place is not None and place.notice.element_id:
         selected = {place.notice.element_id}
     current_key = decision.key if decision is not None else (fix.element_id if fix else None)
+    if page_mode:
+        panel.title = f"Page {number}"
     page_view = builder.page_view(number, selected, current_key, place.key if place else None)
     open_count = sum(d.open for d in builder.queue)
-    optional = builder.optional_lines()
+    optional = builder.optional_lines(number if page_mode else None)
     flashes = pop_flash(request)
     notice = _notice(flashes, builder.result, builder.labels, open_count)
     target = _flash_target(flashes)
@@ -1373,7 +1399,7 @@ def split_page(
         "panel": panel,
         "page": page_view,
         "pages": builder.page_links(number, current_key),
-        "steps": builder.steps(decision),
+        "steps": [] if page_mode else builder.steps(decision),
         "total": len(builder.queue),
         "open_count": open_count,
         "decided": len(builder.queue) - open_count,
@@ -1402,10 +1428,10 @@ def split_page(
         )
         if stale
         else None,
-        "decided_lines": builder.decided_lines(),
+        "decided_lines": [] if page_mode else builder.decided_lines(),
         "tools": builder.page_tools(
             number,
-            opens=tools or bool(change),
+            opens=tools or bool(change) or page_mode,
             change=change,
             add={"add": add, "left": left, "top": top, "right": right, "bottom": bottom},
             invalid=invalid,
@@ -1482,8 +1508,10 @@ def review_screen(
     top: str = "",
     right: str = "",
     bottom: str = "",
+    mode: str = "",
 ) -> Response:
     """`cell` ("r1c2"): a table's "Change a cell" choice, whose form is then open.
+    `mode` "page": the page's tools first, for the page `page` (WS19.6).
     `tools` ("1"): the page tools are open; `change`: the text open in them; `add`, `left`,
     `top`, `right`, `bottom`: the region being described for something to add."""
     shown = accepted == "1"
@@ -1513,6 +1541,7 @@ def review_screen(
         top=top,
         right=right,
         bottom=bottom,
+        page_mode=mode == "page" and not item and not note,
     )
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "split")
