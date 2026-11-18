@@ -63,6 +63,10 @@ SHOWCASE_CANONICAL = {"examples/physics-2-3/converted.html": "/demo"}
 
 @router.get("/showcase")
 def showcase_root() -> Response:
+    """The folder's address. Where the showcase was not built (the folder is absent) there is
+    nothing to redirect to: a clean 404, not a redirect to one."""
+    if not seo.showcase_pages():
+        raise HTTPException(status_code=404)
     return Response(status_code=301, headers={"Location": seo.SHOWCASE_PREFIX})
 
 
@@ -129,6 +133,6 @@ def _with_head_tags(page: str, site: str, name: str) -> str:
     if Path(name).name in seo.SHOWCASE_NOINDEX:
         tags.append('<meta name="robots" content="noindex, follow">')
     else:
-        data = seo.structured_data(site, path, title, description, seo.SHOWCASE_UPDATED)
+        data = seo.structured_data(site, path, title, description, seo.showcase_updated())
         tags.append(str(seo.json_ld_tag(data)))
     return re.sub(r"<head[^>]*>", lambda m: m.group(0) + "\n" + "\n".join(tags), page, count=1)

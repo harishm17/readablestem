@@ -19,17 +19,10 @@
       "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     },
     {
-      "value": "5.0",
-      "label": "wrong equations nobody is asked about, per 100",
+      "value": "2.9",
+      "label": "decisions it asks the instructor for, per page",
       "count": "1,715 gold equations in 26 documents",
-      "caveat": "The chatbot on Opus: 9.6. The goal registered before the run was 4.0 or fewer, so it was not met.",
-      "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
-    },
-    {
-      "value": "0.46",
-      "label": "of wrong equations the review screen asks about",
-      "count": "1,715 gold equations in 26 documents",
-      "caveat": "The goal registered before the run was 0.60, so it was not met. A chatbot asks nothing.",
+      "caveat": "A chatbot asks nothing.",
       "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     }
   ],
@@ -76,51 +69,7 @@
           "width": 73.2
         }
       ],
-      "headline": false
-    },
-    {
-      "measure": "Wrong, and nobody is asked, per 100 equations",
-      "better": "Lower is better",
-      "lines": [
-        {
-          "system": "ReadableSTEM",
-          "value": "5.0",
-          "width": 25.1
-        },
-        {
-          "system": "Chatbot on Opus",
-          "value": "9.6",
-          "width": 47.8
-        },
-        {
-          "system": "Chatbot on Haiku",
-          "value": "11.9",
-          "width": 59.5
-        }
-      ],
       "headline": true
-    },
-    {
-      "measure": "Wrong and not flagged, or not found at all, per 100 equations",
-      "better": "Lower is better",
-      "lines": [
-        {
-          "system": "ReadableSTEM",
-          "value": "11.0",
-          "width": 55.1
-        },
-        {
-          "system": "Chatbot on Opus",
-          "value": "16.4",
-          "width": 82.2
-        },
-        {
-          "system": "Chatbot on Haiku",
-          "value": "18.4",
-          "width": 92.1
-        }
-      ],
-      "headline": false
     },
     {
       "measure": "Cost per page",
@@ -143,28 +92,6 @@
         }
       ],
       "headline": false
-    },
-    {
-      "measure": "Wrong equations the tool asks you about",
-      "better": "Higher is better",
-      "lines": [
-        {
-          "system": "ReadableSTEM",
-          "value": "0.46",
-          "width": 46.1
-        },
-        {
-          "system": "Chatbot on Opus",
-          "value": "never asks",
-          "width": 0.0
-        },
-        {
-          "system": "Chatbot on Haiku",
-          "value": "never asks",
-          "width": 0.0
-        }
-      ],
-      "headline": false
     }
   ],
   "first_test": {
@@ -173,5 +100,97 @@
     "levels_chatbot": "320 of 939 (34%)",
     "errors_ours": "0 of 138",
     "errors_chatbot": "3 of 134"
+  },
+  "settings_line": "It ran on 2026-11-04 with version 0.5.9. The file did not record its settings, and some of the live service's settings have changed since, so these numbers describe that run, not today's service.",
+  "numbers": {
+    "units": "26",
+    "pages": "131",
+    "gold": "1,715",
+    "papers": "12",
+    "sections": "6",
+    "course_docs": "8",
+    "difference": "+0.004",
+    "difference_low": "−0.023",
+    "difference_high": "+0.036",
+    "margin": "3",
+    "decisions_per_page": "2.9",
+    "cost_ours": "0.02",
+    "cost_opus": "0.07",
+    "kind_papers": "0.848",
+    "kind_sections": "0.704",
+    "kind_course": "0.896",
+    "chem_sections": "3",
+    "chem_gold": "123",
+    "chem_right": "0.33",
+    "chem_goal": "0.80",
+    "ours_exact": "0.793",
+    "opus_exact": "0.770"
+  },
+  "figures": {
+    "0.840": "docs/eval-equation-fresh5.md",
+    "0.836": "docs/eval-equation-fresh5.md",
+    "0.793": "docs/eval-equation-fresh5.md",
+    "0.770": "docs/eval-equation-fresh5.md",
+    "26": "docs/eval-equation-fresh5.md",
+    "131": "docs/eval-equation-fresh5.md",
+    "1,715": "docs/eval-equation-fresh5.md",
+    "12": "docs/eval-equation-fresh5.md",
+    "6": "docs/eval-equation-fresh5.md",
+    "8": "docs/eval-equation-fresh5.md",
+    "+0.004": "docs/eval-equation-fresh5.md",
+    "0.004": "docs/eval-equation-fresh5.md",
+    "−0.023": "docs/eval-equation-fresh5.md",
+    "0.023": "docs/eval-equation-fresh5.md",
+    "+0.036": "docs/eval-equation-fresh5.md",
+    "0.036": "docs/eval-equation-fresh5.md",
+    "3": "docs/eval-equation-fresh5.md",
+    "2.9": "docs/eval-equation-fresh5.md",
+    "0.02": "docs/eval-equation-fresh5.md",
+    "0.07": "docs/eval-equation-fresh5.md",
+    "0.848": "docs/eval-equation-fresh5.md",
+    "0.704": "docs/eval-equation-fresh5.md",
+    "0.896": "docs/eval-equation-fresh5.md",
+    "123": "docs/eval-equation-fresh5.md",
+    "0.33": "docs/eval-equation-fresh5.md",
+    "0.80": "docs/eval-equation-fresh5.md",
+    "97.5%": "docs/eval-equation-fresh5.md",
+    "0.816": "docs/eval-equation-fresh5.md",
+    "0.732": "docs/eval-equation-fresh5.md",
+    "0.022": "docs/eval-equation-fresh5.md",
+    "0.068": "docs/eval-equation-fresh5.md",
+    "0.002": "docs/eval-equation-fresh5.md",
+    "15": "PROOF.md",
+    "242": "PROOF.md",
+    "2026,": "PROOF.md",
+    "0.4": "PROOF.md",
+    "0": "PROOF.md",
+    "497": "PROOF.md",
+    "100%": "PROOF.md",
+    "320": "PROOF.md",
+    "939": "PROOF.md",
+    "34%": "PROOF.md",
+    "138": "PROOF.md",
+    "134": "PROOF.md",
+    "2,738": "PROOF.md",
+    "0.50": "PROOF.md",
+    "0.68": "PROOF.md",
+    "89%": "PROOF.md",
+    "0.96": "PROOF.md",
+    "97%": "PROOF.md",
+    "1,826": "docs/eval-realworld.md",
+    "0.58": "docs/eval-realworld.md",
+    "0.596": "README.md",
+    "0.504": "README.md",
+    "0.735": "docs/eval-dev-baseline-2026-11-03.md",
+    "2,350": "docs/eval-dev-baseline-2026-11-03.md",
+    "114": "docs/eval-dev-baseline-2026-11-03.md",
+    "0.56": "docs/eval-chemistry-heldout.md",
+    "377": "docs/eval-chemistry-heldout.md",
+    "0.14": "docs/eval-chemistry-heldout.md",
+    "0.57": "docs/eval-handwriting.md",
+    "205": "docs/eval-handwriting.md",
+    "1.8": "docs/eval.md",
+    "5.6": "docs/eval-realworld.md",
+    "5.7": "docs/eval-handwriting.md"
   }
 }

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -62,7 +64,7 @@ def test_a_trailing_slash_never_becomes_a_protocol_relative_address():
 def test_public_pages_carry_structured_data_and_private_ones_noindex(env):
     with env.running() as client:
         public = {page.path: client.get(page.path).text for page in seo.PUBLIC_PAGES}
-        private = {path: client.get(path).text for path in ("/login", "/status", "/missing")}
+        private = {path: client.get(path).text for path in ("/login", "/missing")}
     for path, html in public.items():
         assert 'name="robots"' not in html, path
         assert f'rel="canonical" href="{env.settings.base_url.rstrip("/")}{path}"' in html, path
@@ -138,3 +140,48 @@ def test_showcase_pages_are_served_with_their_own_address(showcase):
     assert "index.html" not in sitemap
     assert "converted.html" not in sitemap and "404.html" not in sitemap
     assert 'href="/showcase/examples/"' in landing
+
+
+def test_sitemap_and_llms_list_the_same_pages_each_with_its_own_date(env):
+    site = env.settings.base_url.rstrip("/")
+    with env.running() as client:
+        sitemap = client.get("/sitemap.xml").text
+        llms = client.get("/llms.txt").text
+        statuses = {page.path: client.get(page.path).status_code for page in seo.PUBLIC_PAGES}
+    assert set(statuses.values()) == {200}
+    assert {"/status", "/pricing", "/security"} <= seo.PUBLIC_PATHS
+    listed = {u for u in re.findall(r"\]\((https?://[^)]+)\)", llms) if u.startswith(site)}
+    assert listed == {site + page.path for page in seo.PUBLIC_PAGES}
+    for page in seo.PUBLIC_PAGES:
+        assert f"<loc>{site}{page.path}</loc><lastmod>{page.updated}</lastmod>" in sitemap
+
+
+def test_a_missing_showcase_answers_404_with_no_redirect(env):
+    with env.running() as client:
+        assert client.get("/showcase").status_code == 404
+        assert client.get("/showcase/").status_code == 404
+
+
+def test_no_public_page_changed_after_its_date():
+    """`web/page_dates.json` says when each page's text last changed (scripts/page_dates.py).
+    Skipped where git has no history (a shallow clone or an unpacked archive)."""
+    root = Path(__file__).resolve().parent.parent
+
+    def last_commit_day(name: str) -> str:
+        done = subprocess.run(
+            ["git", "log", "-1", "--format=%cs", "--", name],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        return done.stdout.strip() if done.returncode == 0 else ""
+
+    if not last_commit_day("README.md"):
+        pytest.skip("no git history")
+    for page in seo.PUBLIC_PAGES:
+        for name in page.files:
+            day = last_commit_day(name)
+            assert not day or day <= page.updated, (
+                f"{name} changed on {day}, after {page.path}'s date {page.updated}: "
+                "run `uv run python scripts/page_dates.py`"
+            )

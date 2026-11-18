@@ -127,10 +127,10 @@
 {% endif %}
 {%- endmacro %}
 {% macro cell_7(tool) -%}
-{% if tool == 0 %}26 documents held out (registered test, 1,715 equations): 0.840 of equations read the same as the original, end to end, and 0.793 exactly right. {{ src(PF, "2026-11-04", "Report") }}
+{% if tool == 0 %}{{ proof_facts.numbers.units }} documents held out (registered test, {{ proof_facts.numbers.gold }} equations): {{ proof_facts.facts[0].value }} of equations read the same as the original, end to end, and {{ proof_facts.numbers.ours_exact }} exactly right. {{ proof_facts.settings_line }} {{ src(PF, "2026-11-04", "Report") }}
 {% elif tool == 1 %}We have not run it, so this page makes no accuracy comparison.
 {% elif tool == 2 %}We have not run it. Its FAQ says automated scores do not establish WCAG conformance. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}The same test with one prompt on Claude Opus: 0.836 and 0.770; the test can detect no difference between the two on the first score. {{ src(PF, "2026-11-04", "Report") }}
+{% elif tool == 3 %}The same test with one prompt on Claude Opus: {{ proof_facts.chart[0].lines[1].value }} and {{ proof_facts.numbers.opus_exact }}; the test can detect no difference between the two on the first score. {{ src(PF, "2026-11-04", "Report") }}
 {% elif tool == 4 %}We have not run it; it starts from LaTeX source.
 {% endif %}
 {%- endmacro %}

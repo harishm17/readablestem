@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block body_class %}mode-read{% endblock %}
+{% block title %}Security{% endblock %}
+{% block description %}What ReadableSTEM stores, who receives it, how long it is kept, how uploaded files are handled, what was and was not tested, and how to report a problem.{% endblock %}
+{% block content %}
+{% from "_recipients.html" import retention %}
+{% from "_table_scroll.html" import table_scroll %}
+{% from "_data_matrix.html" import matrix, matrix_stack %}
+{# WS25.3. Written only from what the code and docs/security.md, docs/vendor-information.md and
+   docs/deploy-railway.md state. What needs the owner or a lawyer (an agreement, a named
+   sub-processor list beyond the one in web/recipients.py, a liability term) is not here: it is
+   drafted in docs/data-processing-agreement-draft.md. Who receives pictures of the pages is
+   read from the settings (`recipients`, `sent_material`), as on /privacy. No sentence here may
+   say that the tool or a document meets a standard or a law. #}
+<h1>Security</h1>
+<p class="lede">What the service stores, who receives it, how long it is kept, how uploaded
+  files are handled, and what has and has not been tested. This is a beta run by one person. It is
+  not a contract or an audit.</p>
+<p class="hint">The full notes are in the repository:
+  <a href="{{ source_url }}/blob/main/docs/security.md">docs/security.md</a>. Where this page and
+  the code disagree, the code is right and this page is the bug.</p>
+
+{% from "_contents.html" import contents %}
+{{ contents([
+  ("stored", "What is stored, and who receives it"),
+  ("retention", "How long it is kept, and deletion"),
+  ("access", "Sign-in and who can see a document"),
+  ("files", "How uploaded files are handled"),
+  ("tested", "What has and has not been tested"),
+  ("agreement", "No agreement is offered"),
+  ("report", "Report a problem")
+]) }}
+
+<h2 id="stored">What is stored, and who receives it</h2>
+<div class="matrix-wide-view">
+{% call table_scroll("What is sent where, and for how long") %}
+{{ matrix(data_items, "What is sent where, and for how long") }}
+{% endcall %}
+</div>
+{{ matrix_stack(data_items, "What is sent where, and for how long") }}
+<ul>
+  <li>The page pictures go to <strong>{{ model_names }}</strong>, the model provider: pictures
+    of the equations and figures cut from the file, with a little nearby text, and what the
+    list in the table shows for the features this server has on. The PDF file itself, its file
+    name and the instructor's email address are not sent.</li>
+  <li>Uploads are not used to train models by ReadableSTEM. {% for r in recipients if r.gets_documents %}{{ retention(r.name) }} {% endfor %}
+    What the companies say is their own statement; ReadableSTEM cannot check it. No
+    zero-retention agreement is in place.</li>
+  <li>Railway hosts the application and its database, in its United States region.</li>
+  <li>Logs and usage notes hold event names, random ids, counts, timings and error categories.
+    They do not hold document text, images, file names or email addresses. A test runs a
+    marked document through every step and finds the marker in no log, cookie, header or event.</li>
+</ul>
+
+<h2 id="retention">How long it is kept, and deletion</h2>
+{% set retention_voice = "you" %}
+{% call table_scroll("How long a document is kept") %}
+{% include "_retention_table.html" %}
+{% endcall %}
+<ul>
+  <li>A document past its time answers “not found” at once, and an hourly job deletes it and
+    what was made from it. “Delete now” removes the same rows at once, after a confirm page.</li>
+  <li>Deleting an account removes the person's documents, courses, events and sign-in. A
+    scrambled fingerprint of the address stays until the next day so the day's limits do not
+    reset, and one line of a one-way hash of the account id and the time stays so a restored
+    backup can delete the account again.</li>
+  <li>Not reached by deleting: database backups keep a copy for about {{ backup_days }} days,
+    and the model provider's own retention (see above) is its own.</li>
+</ul>
+
+<h2 id="access">Sign-in and who can see a document</h2>
+<ul>
+  <li>People sign in with Google{% if microsoft_login %}, or with a Microsoft school or work
+    account from a university that is set up{% endif %}. Students never sign in.</li>
+  <li>A document belongs to the person who uploaded it. Others get the same “not found” page as
+    for a document that does not exist. The owner can share a document with named people, who
+    must sign in with the exact address entered.</li>
+  <li>Every form is protected against cross-site requests, sign-in attempts and uploads are rate
+    limited, and the pages send security headers.</li>
+</ul>
+
+<h2 id="files">How uploaded files are handled</h2>
+<ul>
+  <li>A file is opened first by a separate short-lived process with time and memory limits, and
+    the conversion runs in a child process that can be stopped, with limits on memory, processor
+    time and run time. Page, size and daily limits apply.</li>
+  <li>Everything that reaches a web page is escaped or checked against an allowed list, and the
+    converted file is served with a policy that blocks scripts.</li>
+  {% if latex_source %}<li>LaTeX source is read by LaTeXML in a sandbox with no network.</li>{% endif %}
+  <li>Some steps write a temporary copy of derived content to a private folder on the server,
+    which is removed when the step ends. The uploaded file itself is kept in the database, not
+    on disk.</li>
+  <li>A crafted PDF can still make a conversion worse. The review screen is how a person
+    catches that; it is not a security control.</li>
+</ul>
+
+<h2 id="tested">What has and has not been tested</h2>
+<ul>
+  <li><strong>Tested by the project's own checks:</strong> who may open which document, the
+    retention clock, that no document content reaches logs, how hostile files are refused, and
+    the escaping of what reaches a page. The application was reviewed against a written
+    checklist before launch.</li>
+  <li><strong>Not done:</strong> no independent security test has been made, and no
+    accessibility conformance report is published. The output has not been tested by listening
+    with NVDA, JAWS or VoiceOver.</li>
+  <li>The accepted risks for the beta are listed in
+    <a href="{{ source_url }}/blob/main/docs/security.md#residual-risks-accepted-for-the-beta">the
+    security notes</a>.</li>
+</ul>
+
+<h2 id="agreement">No agreement is offered</h2>
+<p>ReadableSTEM does not sign a school-official agreement or a data processing agreement. There is
+  no company behind it that could sign one. If your institution requires one for any tool that
+  handles course material, ReadableSTEM does not meet that yet. The terms forbid uploading
+  student records, and the tool does not ask for students' names or accounts.
+  <a href="/for-accessibility-offices#ferpa">More for offices</a>.</p>
+
+<h2 id="report">Report a problem</h2>
+<p>Report privately, not in a public issue. Use
+  <a href="{{ source_url }}/security/advisories/new">GitHub's private reporting</a>{% if contact_email %} or email
+  <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> with “ReadableSTEM security” in the
+  subject{% endif %}. A small made-up PDF is enough; please do not send anyone's real documents or
+  test against other people's. This is one person's best effort, not a service level.
+  <a href="{{ source_url }}/blob/main/SECURITY.md">The full policy</a>.</p>
+{% endblock %}

@@ -20,41 +20,7 @@
    (what it handles, what it does not do, the measured results) follows. The numbers are the
    settings' (routes/pages.py `limits`, web/deps.py). #}
 <p>The limits on what you can upload and how much. How well a file converts is further down.</p>
-<dl class="limits-list">
-  <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if office_on %}
-    A Word or PowerPoint file is turned into a PDF first.{% endif %}{% if latex_source %} A LaTeX
-    file (.tex) or a zip of a LaTeX project has its equations read from the source. The PDF is
-    still the main path. Not taken yet, so upload the compiled PDF instead: the source of a
-    Beamer slide deck, a source that uses the {{ refused_classes }} class (read without its own
-    rules, its solutions and correct-answer marks could reach students), and one that loads the {{ refused_packages }}
-    package. Other classes without a LaTeXML binding (KOMA-Script, memoir, extarticle) are read
-    as an article.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
-  <div><dt>Size</dt><dd>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
-    {% if in_parts %}A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
-    for a day so you can choose which pages to convert; each part becomes a document of its
-    own. When two or more parts are finished, a “Combine parts” link on a part's page joins the
-    ones you still have into one file, in page order; a part you deleted is left out.{% else %}Split longer documents.{% endif %}</dd></div>
-  <div><dt>Daily limits</dt><dd>{% if signup_open %}A new account (one you made by signing in) can convert
-    {{ open_page_quota }} pages and start {{ open_rereads }} reads with the model from the
-    review screen (marking an equation, reading a table cell) a day{% if invited_page_quota %}; an
-    invited account can convert {{ invited_page_quota }} pages a day{% endif %}. New accounts
-    also share a small part of the day's budget for model calls: when it is used up,
-    conversions for new accounts pause until midnight UTC while others go on. New accounts
-    are limited in number each day too.
-    {% elif invited_page_quota %}You can convert {{ invited_page_quota }} pages a day.
-    {% endif %}
-    All limits start again at midnight UTC, and the whole service pauses for the day when its
-    budget for model calls is used up. When several people upload at once, the queue takes
-    one document from each person in turn.</dd></div>
-  <div><dt>Storage</dt><dd>You can keep up to {{ storage_mb }} MB of uploads and results at
-    once{% if signup_open %} ({{ open_storage_mb }} MB for a new account){% endif %}. An upload
-    that would go over is refused; delete documents you no longer need to make room. When the
-    service as a whole is full, uploads wait until older documents have been deleted.</dd></div>
-  <div><dt>How long it is kept</dt><dd>Your documents are deleted {{ retention_hours }} hours after you last
-    worked on them (7 days if you keep them, for one upload or as your default in
-    <a href="/account#account-keep">Account</a>; {{ opt_in_days }} if you also let us look
-    at the results). Download the file before then.</dd></div>
-</dl>
+{% include "_upload_limits.html" %}
 
 <h2 id="handles">What it handles, with limits</h2>
 <details open>
@@ -65,8 +31,8 @@
     A mistake that agrees with the PDF's text, or a PDF with no usable text layer, can still
     get through. Math inside a table cell or a figure is often missed.</li>
   <li><strong>Chemistry</strong> formulas and reactions are found and read out as formulas, but it is
-    the weakest area: in tests on textbook sections, 0.33 of the equations were right
-    as chemistry in the newest (3 sections) and 0.56 in an earlier one (5 sections). Check
+    the weakest area: in tests on textbook sections, {{ proof_facts.numbers.chem_right }} of the equations were right
+    as chemistry in the newest ({{ proof_facts.numbers.chem_sections }} sections) and 0.56 in an earlier one (5 sections). Check
     every one.</li>
   <li><strong>Slides.</strong> A Beamer deck is read frame by frame: overlay steps that only add
     to a frame are merged, and each frame title becomes a heading. Lists in themes that draw
@@ -157,31 +123,34 @@
 
 <h2 id="accuracy">How accurate it is</h2>
 {% include "_proof_strip.html" %}
-<p>The main result is the newest registered test: 26 documents the tool had not seen (12 arXiv
-  papers, 6 OpenStax sections and 8 course documents made with LaTeX, 131 pages, 1,715
-  equations), run once on 2026-11-04 with version 0.5.9 and the settings the live service uses
+{% set n = proof_facts.numbers %}
+<p>The main result is the newest registered test: {{ n.units }} documents the tool had not seen
+  ({{ n.papers }} arXiv papers, {{ n.sections }} OpenStax sections and {{ n.course_docs }} course documents made
+  with LaTeX, {{ n.pages }} pages, {{ n.gold }} equations), run once. {{ proof_facts.settings_line }}
   (<a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">the full
   report</a>):</p>
 <ul>
   <li>Equations, scored by whether a screen reader reads each one the same as the original:
-    0.840 for ReadableSTEM against 0.836 for the chatbot on Claude Opus (given the PDF and one
-    sentence). The registered wording is <strong>no difference this set can detect</strong>
-    (difference +0.004, 97.5% interval −0.023 to +0.036). The set could show a difference of
-    about 3 points.</li>
-  <li>Equations exactly right, symbol for symbol: 0.793 against 0.770.</li>
-  <li>Wrong equations that no decision pointed at: 5.0 per 100 equations against 9.6 for the
-    chatbot. The goal we registered before the run was 4.0 or fewer, so it was not met.</li>
-  <li>Decisions it asked for: 2.9 per page. It asked about 46% of the wrong equations; the goal
-    was 60%, so it was not met.</li>
-  <li>Cost: about $0.02 a page for ReadableSTEM, $0.07 for the chatbot on Opus.</li>
-  <li>By kind of document (point estimates, ReadableSTEM): arXiv papers 0.848, OpenStax sections
-    0.704, course documents made with LaTeX 0.896. The full report has every arm for each kind.</li>
-  <li>Chemistry (3 OpenStax sections, 123 equations): 0.33 right as chemistry, against a goal
-    of 0.80, so it was not met. The chatbot comparison for chemistry is not measured: the
-    scorer does not read the chatbots' chemistry notation.</li>
+    {{ proof_facts.facts[0].value }} for ReadableSTEM against {{ proof_facts.chart[0].lines[1].value }} for the chatbot
+    on Claude Opus (given the PDF and one sentence). The registered wording is
+    <strong>no difference this set can detect</strong> (difference {{ n.difference }}, 97.5%
+    interval {{ n.difference_low }} to {{ n.difference_high }}). The set could show a difference of about
+    {{ n.margin }} points.</li>
+  <li>Equations exactly right, symbol for symbol: {{ n.ours_exact }} against {{ n.opus_exact }}.</li>
+  <li>Decisions it asked for: {{ n.decisions_per_page }} per page. A chatbot asks about nothing.</li>
+  <li>Cost: about ${{ n.cost_ours }} a page for ReadableSTEM, ${{ n.cost_opus }} for the chatbot on Opus.</li>
+  <li>By kind of document (point estimates, ReadableSTEM): arXiv papers {{ n.kind_papers }}, OpenStax
+    sections {{ n.kind_sections }}, course documents made with LaTeX {{ n.kind_course }}. The full report has
+    every arm for each kind.</li>
+  <li>Chemistry ({{ n.chem_sections }} OpenStax sections, {{ n.chem_gold }} equations): {{ n.chem_right }} right as
+    chemistry, against a goal of {{ n.chem_goal }}, so it was not met. The chatbot comparison for chemistry is
+    not measured: the scorer does not read the chatbots' chemistry notation.</li>
+  <li>How many wrong equations pass without a decision is being scored again, so this page gives no
+    figure for it. The first scoring counted differences in notation that do not change what is
+    read as errors. The registered report still shows that first scoring.</li>
 </ul>
 <p>We therefore do not claim that ReadableSTEM does better than a general chatbot on
-  equations. This was one run on 26 documents; it says nothing about scans, handwriting, Word
+  equations. This was one run on {{ n.units }} documents; it says nothing about scans, handwriting, Word
   files or math inside figures.</p>
 <details>
 <summary>Earlier results, kept as history (older versions of the tool)</summary>
@@ -206,7 +175,7 @@
     <a href="{{ source_url }}/blob/main/README.md#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result">How
     it was measured</a>.</li>
   <li><strong>Development set, not held out</strong> (25 arXiv papers, 114 pages, 2,350
-    equations, 2026-11-03, with the settings the live service uses): 0.735 exactly right end
+    equations, 2026-11-03): 0.735 exactly right end
     to end. These papers were used to build and tune the tool, so expect less on your
     documents. <a href="{{ source_url }}/blob/main/docs/eval-dev-baseline-2026-11-03.md">The
     development report</a>.</li>

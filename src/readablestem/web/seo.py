@@ -3,8 +3,11 @@ sitemap.xml, llms.txt, the IndexNow key, the structured data (JSON-LD) of the pu
 and the middleware that answers requests the way crawlers make them.
 
 The public pages are the ones a person can read without signing in. They are listed once,
-here: the sitemap names them, and every other page carries `noindex` (base.html), so a
-sign-in page, an error page or a job page is never offered to a search engine.
+here: the sitemap and llms.txt are both written from `PUBLIC_PAGES`, and every other page
+carries `noindex` (base.html), so a sign-in page, an error page or a job page is never offered
+to a search engine. A page's date is the day its text last changed in git, written to
+`page_dates.json` by `scripts/page_dates.py` (the image has no git history, so the file is
+committed); `tests/test_web_seo.py` fails when a page's files changed after its date.
 
 The showcase (`/showcase/`, routes/discovery.py) is the static reviewer demo that
 `site/build.py` writes (docs/site.md); the Docker image builds it into `SHOWCASE_DIR`.
@@ -16,6 +19,7 @@ from __future__ import annotations
 import html
 import json
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -48,19 +52,41 @@ SHOWCASE_PREFIX = "/showcase/"
 # Built showcase pages that stay out of search: the stored conversions repeat OpenStax's own
 # text (the Physics 2.3 one is /demo), and the stemcheck sample is a generated report.
 SHOWCASE_NOINDEX = ("converted.html", "sample-report.html")
+# Where the dates of the pages are written (scripts/page_dates.py), by page path.
+PAGE_DATES_FILE = Path(__file__).with_name("page_dates.json")
+SHOWCASE_KEY = "showcase"
+
+
+@cache
+def page_dates() -> dict[str, str]:
+    return json.loads(PAGE_DATES_FILE.read_text(encoding="utf-8"))
+
+
 # The date the showcase's text last changed (site/templates, site/examples, PROOF.md).
-SHOWCASE_UPDATED = "2026-11-03"
+SHOWCASE_FILES = ("site/templates", "site/examples", "PROOF.md")
+
+
+def showcase_updated() -> str:
+    return page_dates()[SHOWCASE_KEY]
 
 
 @dataclass(frozen=True)
 class PublicPage:
     path: str
-    # The date the page's text last changed; update it with the template.
-    updated: str
+    title: str
+    # What llms.txt says the page is; the sitemap does not use it.
+    blurb: str
+    # The files (from the repository root) that hold the page's text; its date is the last
+    # change to any of them.
+    files: tuple[str, ...]
     # Set for the guides (/guides/...): the date the article first went up. A page with a
     # publication date is described as an Article in its structured data, and the page
     # shows both dates (routes/pages.py).
     published: str | None = None
+
+    @property
+    def updated(self) -> str:
+        return page_dates()[self.path]
 
 
 ADA_GUIDE = "/guides/ada-title-ii-stem-course-materials"
@@ -95,17 +121,76 @@ GUIDES = (
         "For anyone deciding which tool fits the file they have. Start with the short guide.",
     ),
 )
+_T = "src/readablestem/web/templates/"
 PUBLIC_PAGES = (
-    PublicPage("/", "2026-11-03"),
-    PublicPage("/demo", "2026-10-14"),
-    PublicPage("/limits", "2026-11-03"),
-    PublicPage(GUIDES_INDEX, "2026-11-02"),
-    PublicPage("/help/posting", "2026-11-03"),
-    PublicPage("/privacy", "2026-11-03"),
-    PublicPage("/terms", "2026-11-03"),
-    PublicPage("/for-accessibility-offices", "2026-11-03"),
-    PublicPage(ADA_GUIDE, "2026-11-03", "2026-10-28"),
-    PublicPage(COMPARE_GUIDE, "2026-11-03", "2026-10-28"),
+    PublicPage(
+        "/",
+        "Home",
+        "what it handles, what you download, how accurate it is, who can use it",
+        (_T + "landing.html", _T + "_proof_chart.html", _T + "_vendor_line.html"),
+    ),
+    PublicPage(
+        "/demo",
+        "Demo",
+        "OpenStax Physics 2.3 converted, no sign-in needed",
+        ("src/readablestem/web/demo/index.html",),
+    ),
+    PublicPage(
+        "/limits",
+        "Known limits",
+        "what it does not do yet, and every measured result with its sample size",
+        (_T + "limits.html", _T + "_proof_strip.html"),
+    ),
+    PublicPage(
+        "/pricing",
+        "Pricing",
+        "free during the beta, with the limits; no prices are set",
+        (_T + "pricing.html",),
+    ),
+    PublicPage(
+        "/security",
+        "Security",
+        "what is stored and where, who receives it, how long it is kept, how it is protected",
+        (_T + "security.html", "docs/security.md"),
+    ),
+    PublicPage(GUIDES_INDEX, "Guides", "the guides", (_T + "guides.html",)),
+    PublicPage(
+        "/help/posting",
+        "Posting in your course",
+        "sharing the HTML file with students",
+        (_T + "help_posting.html",),
+    ),
+    PublicPage(
+        "/privacy",
+        "Privacy",
+        "what happens to uploaded documents",
+        (_T + "privacy.html", _T + "_retention_table.html", _T + "_recipients.html"),
+    ),
+    PublicPage("/terms", "Terms", "the terms of use", (_T + "terms.html",)),
+    PublicPage(
+        "/for-accessibility-offices",
+        "For accessibility offices",
+        "where a document goes, who receives it, how long it is kept, and what the tool "
+        "does not do",
+        (_T + "offices.html", _T + "_data_flow.html", _T + "_data_matrix.html"),
+    ),
+    PublicPage("/status", "Service status", "whether the service is up and conversions are open", (_T + "status.html",)),
+    PublicPage(
+        ADA_GUIDE,
+        "ADA Title II and STEM course materials",
+        "the Justice Department's web rule, its technical standard and dates, with sources, "
+        "and what ReadableSTEM does and does not do",
+        (_T + "guide_ada_title_ii.html",),
+        "2026-10-28",
+    ),
+    PublicPage(
+        COMPARE_GUIDE,
+        "Choosing a tool for STEM course files",
+        "ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML: what each takes in and gives "
+        "back, from each project's own documentation",
+        (_T + "guide_compare.html",),
+        "2026-10-28",
+    ),
 )
 PUBLIC_PATHS = frozenset(page.path for page in PUBLIC_PAGES)
 
@@ -178,7 +263,7 @@ def robots_txt(site: str) -> str:
 
 def sitemap_xml(site: str, showcase: list[str]) -> str:
     entries = [(f"{site}{page.path}", page.updated) for page in PUBLIC_PAGES]
-    entries += [(f"{site}{path}", SHOWCASE_UPDATED) for path in showcase]
+    entries += [(f"{site}{path}", showcase_updated()) for path in showcase]
     urls = "\n".join(
         f"  <url><loc>{_xml_text(loc)}</loc><lastmod>{updated}</lastmod></url>"
         for loc, updated in entries
@@ -195,7 +280,11 @@ def _xml_text(text: str) -> str:
 
 
 def llms_txt(site: str, showcase: bool) -> str:
-    """llms.txt (llmstxt.org): what the site is and where its readable pages are."""
+    """llms.txt (llmstxt.org): what the site is and where its readable pages are. The pages
+    are the ones the sitemap lists (`PUBLIC_PAGES`)."""
+    from readablestem.web import proof_facts
+
+    facts = proof_facts.load()
     lines = [
         f"# {SITE_NAME}",
         "",
@@ -214,26 +303,20 @@ def llms_txt(site: str, showcase: bool) -> str:
         "",
         "## The service",
         "",
-        f"- [Home]({site}/): what it handles, what you download, how accurate it is, who can "
-        "use it",
-        f"- [Demo]({site}/demo): OpenStax Physics 2.3 converted, no sign-in needed",
-        f"- [Known limits]({site}/limits): what it does not do yet, and every measured result "
-        "with its sample size",
-        f"- [Posting in your course]({site}/help/posting): sharing the HTML file with students",
-        f"- [Privacy]({site}/privacy): what happens to uploaded documents",
-        f"- [Terms]({site}/terms)",
-        f"- [For accessibility offices]({site}/for-accessibility-offices): where a "
-        "document goes, who receives it, how long it is kept, and what the tool does not do",
+        *(
+            f"- [{page.title}]({site}{page.path}): {page.blurb}"
+            for page in PUBLIC_PAGES
+            if page.path != GUIDES_INDEX and page.published is None
+        ),
         "",
         "## Guides",
         "",
         f"- [All guides]({site}{GUIDES_INDEX})",
-        f"- [ADA Title II and STEM course materials]({site}{ADA_GUIDE}): "
-        "the Justice Department's web rule, its technical standard and dates, with sources, "
-        "and what ReadableSTEM does and does not do",
-        f"- [Choosing a tool for STEM course files]({site}{COMPARE_GUIDE}): "
-        "ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML: what each takes in and gives "
-        "back, from each project's own documentation",
+        *(
+            f"- [{page.title}]({site}{page.path}): {page.blurb}"
+            for page in PUBLIC_PAGES
+            if page.published is not None
+        ),
         "",
         "## Evidence",
         "",
@@ -248,8 +331,8 @@ def llms_txt(site: str, showcase: bool) -> str:
         ]
     lines += [
         f"- [PROOF.md]({PROOF_URL}): the pre-registered evaluations on held-out "
-        "documents: the newest (26 documents, version 0.5.9) found no difference it could "
-        "detect between ReadableSTEM and a general chatbot on equations",
+        f"documents: the newest ({facts.numbers['units']} documents, {facts.pipeline}) found no "
+        "difference it could detect between ReadableSTEM and a general chatbot on equations",
         "",
         "## Source and author",
         "",

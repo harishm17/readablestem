@@ -189,10 +189,10 @@ def test_the_chart_is_one_shared_component_with_the_numbers_in_a_real_table(tmp_
     # The bars are for the eye; the same numbers are a table a screen reader always reads.
     assert '<div class="chart" aria-hidden="true">' in chart
     hidden = chart.split('<div class="visually-hidden">', 1)[1].split("</table>", 1)[0]
-    assert "<caption>" in hidden and hidden.count('<th scope="row">') == 6
-    assert "0.840" in hidden and "$0.068" in hidden and "never asks" in hidden
+    assert "<caption>" in hidden and hidden.count('<th scope="row">') == 3
+    assert "0.840" in hidden and "$0.068" in hidden
     # Every bar has its system's name and number beside it, and no style attribute (the CSP).
-    assert chart.count('class="chart-name"') == chart.count('class="chart-value"') == 18
+    assert chart.count('class="chart-name"') == chart.count('class="chart-value"') == 9
     assert " style=" not in chart
     assert "ReadableSTEM and the Opus chatbot are" in " ".join(text_of(chart).split())
     assert "level" in text_of(chart) and "beat" not in text_of(chart).lower()
