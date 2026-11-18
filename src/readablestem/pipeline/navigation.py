@@ -17,9 +17,10 @@ writes the markup and holds the words, so both can be tested and changed on thei
   headings, made from the outline as written (after the repair that never skips a level), when
   there are at least `MIN_TOC_HEADINGS` of them and the PDF has no contents page of its own
   (two lists of contents would be one too many). The title is not an entry: it stands right
-  above the list. A heading repeated under the same parent is one entry. The list is a `<details>`, closed in the markup so that every reader of the file
-  that draws no style (a phone's first screen, Canvas, Word, a transcript) gets a short line,
-  and open to the eye from `WIDE` up and on paper (`TOC_CSS`).
+  above the list. A heading repeated under the same parent is one entry. The list is a
+  `<details>`, closed in the markup so that every reader of the file that draws no style (a
+  phone's first screen, Canvas, Word, a transcript) gets a short line, and open to the eye
+  from `WIDE` up and on paper (`TOC_CSS`).
 - `pagebreak`: an `<hr role="doc-pagebreak" aria-label="Page N">` (axe accepts that role on
   `hr` only) and the same words as visible text beside it, so an LMS that drops the role or
   the label, or the CSS (Canvas keeps no pseudo-element rules), still shows the page.
