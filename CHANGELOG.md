@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
+
+- SW36 follow-up: a drawn rule was written as a blank to fill in ("_____") when the nearest
+  glyph on its baseline was not text of its row. Three cases, one change in
+  `layout._mark_blanks`: a row of only the pieces of a big math sign (a radical, a brace) is
+  skipped (`_sign_pieces`); a rule is no blank when the gutter, an upright line or the side of
+  a frame stands between it and each word beside it (`_parted`: the other column's line, a
+  tick label across a plot's axis from a legend's sample). Over 277 development files the
+  drawn blanks go from 203 to 121: 82 false blanks leave 17 papers, and the 117 blanks of the
+  12 forms and worksheets are unchanged. Four false blanks remain (fraction bars and overlines
+  whose other parts sit in other rows).
+- Changes the text of a PDF that had such a blank, so `PIPELINE_VERSION` needs a bump at merge.
+
 ## Unreleased: a drawing set as glyphs is a figure (branch fix/glyph-drawn-figures)
 
 - WS6.11 (F-550): LaTeX's picture environment sets slanted lines, arrowheads and arcs as glyphs
