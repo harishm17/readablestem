@@ -117,6 +117,9 @@ from readablestem.pipeline import (
     slides,
     tables,
 )
+from readablestem.pipeline import (
+    notices as notice_rules,
+)
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
@@ -1724,8 +1727,26 @@ def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
         if block.get("type") == 0:
             for line in block["lines"]:
                 for span in line["spans"]:
+                    _swap_lam_alef(span["chars"])
                     _spread_ligatures(span["chars"], line["dir"])
     return blocks
+
+
+ALEFS = frozenset("\u0622\u0623\u0625\u0627\u0671")  # the alef family, the letters a lam joins
+
+
+def _swap_lam_alef(chars: list[dict]) -> None:
+    """A lam-alef ligature glyph is one glyph for the two letters, written lam then alef;
+    MuPDF reverses the characters of right-to-left text and the pair with them, so the alef
+    comes out before its lam ("إىل" for "إلى"; PDFium and Poppler do the same, and no second
+    reading can catch it). Where an alef-family letter and a lam follow one another and share
+    one glyph box (one has no width, at the other's edge, as `_spread_ligatures` finds the
+    characters of a ligature), they are put back in order. The boxes stay where they are."""
+    for first, second in pairwise(chars):
+        if first["c"] in ALEFS and second["c"] == "\u0644":
+            (a0, _, a1, _), (b0, _, b1, _) = first["bbox"], second["bbox"]
+            if (a1 - a0 < 1e-3 or b1 - b0 < 1e-3) and min(abs(a0 - b1), abs(a1 - b0)) < 0.5:
+                first["c"], second["c"] = second["c"], first["c"]
 
 
 def _spread_ligatures(chars: list[dict], direction: Sequence[float]) -> None:
@@ -7937,7 +7958,8 @@ def _fragment_figures(
     (`held`), when the rows in its box (grown to the short strokes among them, at least
     `FRAGMENT_STROKES` per fragment: a derivation has a fraction bar or two, a structure a
     bond to each atom, and a contents page's leader dots are not strokes) have a median
-    length under four characters and none of them holds three words. Its rows become the figure's labels and are written as text no more."""
+    length under four characters and none of them holds three words. Its rows become the
+    figure's labels and are written as text no more."""
     fragments = [
         r
         for r in rows
@@ -8205,7 +8227,9 @@ class _RightEdges:
         if key not in self._seen:
             near = max(1.0, 0.12 * row.size)
             ends = sorted(
-                r.x1 for r in self._rows if r.column == row.column and abs(r.size - row.size) <= near
+                r.x1
+                for r in self._rows
+                if r.column == row.column and abs(r.size - row.size) <= near
             )
             self._seen[key] = ends[min(len(ends) - 1, 3 * len(ends) // 4)] if ends else row.x1
         return self._seen[key]
@@ -8442,6 +8466,108 @@ def _code_text(rows: Sequence[_Row]) -> str:
             before = c
         lines.append(line.rstrip())
     return "\n".join(lines)
+
+
+# The text decisions layout raises on a paragraph or list item (`Element.reasons`; the
+# pipeline turns them into a decision, `run._text_decisions`). WS2.4a, SW54a.
+REASON_OPTION_LABELS = notice_rules.OPTION_LABELS
+REASON_RTL_ORDER = notice_rules.RTL_TEXT
+TEXT_DECISIONS = (REASON_OPTION_LABELS, REASON_RTL_ORDER)
+OPTION_GAP = 0.5  # em: a gap wider than a word space before a later option label
+
+
+def _later_labels(rows: Sequence[_Row]) -> list[tuple[int, int]]:
+    """Where the option labels after the first of a block's rows are, in sequence.
+
+    The block starts with a label (a list marker, or a first word like "(A)") and holds the
+    next one of the same form, "(B)", the next letter or number each time, set off by more
+    than a word space: a grid of options that reading order merged into lines of one block
+    (RC-18). Returns (row index, index in the row's characters) of each, [] when none."""
+    first = rows[0]
+    tokens = _tokens(first)
+    if first.marker is not None:
+        label = first.marker.text
+    elif len(tokens) >= 2:
+        label = "".join(c.c for c in first.chars[slice(*tokens[0])])
+    else:
+        return []
+    parsed = _ordered_marker(label)
+    if parsed is None:
+        return []
+    form, body = parsed
+    wanted = {(style, value + 1) for style, value in marker_readings(body)}
+    found: list[tuple[int, int]] = []
+    for r, row in enumerate(rows):
+        tokens = _tokens(row)
+        for k, (start, end) in enumerate(tokens):
+            if (r == 0 and k == 0) or k == len(tokens) - 1 or not wanted:
+                continue
+            token = _ordered_marker("".join(c.c for c in row.chars[start:end]))
+            if token is None or token[0] != form:
+                continue
+            readings = set(marker_readings(token[1])) & wanted
+            gap = row.chars[start].x0 - row.chars[tokens[k - 1][1] - 1].x1 if k else math.inf
+            if readings and gap >= OPTION_GAP * row.size:
+                found.append((r, start))
+                wanted = {(style, value + 1) for style, value in readings}
+    return found
+
+
+def _split_options(runs: list[_Run]) -> list[_Run]:
+    """A line of options that reading order merged ("(A) 3 m (B) 5 m (C) 7 m") is cut at each
+    later label into one run per option, the first keeping its list marker and the others
+    getting one when it has one, when the line stands alone (pieces that are complete rows).
+    Any other block that holds a later label stays whole and is flagged
+    (`REASON_OPTION_LABELS`, `_flag_text`)."""
+    out: list[_Run] = []
+    for run in runs:
+        if run.kind != "text" or run.code or run.contents or run.note or len(run.rows) != 1:
+            out.append(run)
+            continue
+        row = run.rows[0]
+        cuts = [start for _, start in _later_labels([row])]
+        pieces = []
+        for begin, end in pairwise([0, *cuts, len(row.chars)]):
+            chars = row.chars[begin:end]
+            while chars and chars[-1].blank:
+                chars = chars[:-1]
+            piece = _Row(chars, column=row.column)
+            _classify_row(piece)
+            pieces.append(piece)
+        if not cuts or any(p.kind != "text" for p in pieces):
+            out.append(run)
+            continue
+        pieces[0].marker = row.marker
+        for piece in pieces[1:] if row.marker is not None else ():
+            tokens = _tokens(piece)
+            text = "".join(c.c for c in piece.chars[slice(*tokens[0])])
+            piece.marker = _Marker(text, True, tokens[1][0], piece.chars[tokens[1][0]].x0)
+        out += [_Run([p], "text", block_start=True) for p in pieces]
+    return out
+
+
+def _flag_text(blocks: Sequence[_Block]) -> None:
+    """The text decisions of paragraphs and list items (`Element.reasons`): option labels
+    inside one block (`_later_labels`), and right-to-left text, whose word order is not
+    trusted (`_rtl_words`: at least two words, since one has no order to get wrong)."""
+    for block in blocks:
+        if block.kind not in _TEXT_BLOCKS or block.code or not block.rows:
+            continue
+        if _later_labels(block.rows):
+            block.reasons.append(REASON_OPTION_LABELS)
+        if sum(_rtl_words(r) for r in block.rows) >= 2:
+            block.reasons.append(REASON_RTL_ORDER)
+
+
+def _rtl_words(row: _Row) -> int:
+    """Words of the row with a strong right-to-left letter (Unicode bidi class R or AL)."""
+    words, inside = 0, False
+    for c in row.chars:
+        if c.blank:
+            inside = False
+        elif not inside and unicodedata.bidirectional(c.c[:1]) in ("R", "AL"):
+            words, inside = words + 1, True
+    return words
 
 
 def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
@@ -9634,9 +9760,10 @@ def _page_blocks(
         page_math.after_regions(number, text_rows)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
-    runs = _runs(ordered, ctx)
+    runs = _split_options(_runs(ordered, ctx))
     blocks = [_classify_run(run, ctx) for run in runs]
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
+    _flag_text(blocks)
     for block in blocks:
         region = block.rows[0].region if block.rows else None
         if block.kind == Kind.EQUATION and region is not None:
@@ -11688,9 +11815,15 @@ def _page_elements(
                     list_marker=marker.text if marker else None,
                     list_ordered=marker.ordered if marker else None,
                     list_level=block.contents_level or (levels.get(id(block)) if marker else None),
-                    reasons=[CONTENTS_ENTRY]
-                    if block.contents_level
-                    else ([REASON_JOINED_PAGES] if block.parts else []),
+                    reasons=[
+                        *([CONTENTS_ENTRY] if block.contents_level else []),
+                        *(
+                            [REASON_JOINED_PAGES]
+                            if block.parts and not block.contents_level
+                            else []
+                        ),
+                        *(r for r in block.reasons if r in TEXT_DECISIONS),
+                    ],
                     script_runs=script_runs,
                     last_page=block.parts[-1][0] if block.parts else None,
                 )

@@ -7,6 +7,7 @@ Every PDF is drawn here with PyMuPDF (publishable inputs only); no model is call
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pymupdf
@@ -21,6 +22,13 @@ from readablestem.pipeline.layout import (
     analyze,
     heading_levels,
 )
+from readablestem.pipeline.layout import (
+    REASON_OPTION_LABELS as OPTION_LABELS,
+)
+from readablestem.pipeline.layout import (
+    REASON_RTL_ORDER as RTL_TEXT,
+)
+from readablestem.pipeline.notices import from_reasons
 
 BODY = 11.0
 SENTENCE = "The cart rolls down the ramp and speeds up as it goes, so the velocity grows."
@@ -250,7 +258,8 @@ def indented_paragraphs(indent: float) -> bytes:
 @pytest.mark.parametrize("indent", [0.0, 33.0])
 def test_a_paragraph_is_not_cut_after_its_indented_first_line(indent):
     layout = analyze(indented_paragraphs(indent))
-    assert [len((e.text or "").split()) for e in paragraphs(layout)] == [3 * len(SENTENCE.split()), 5 * len(SENTENCE.split())]
+    words = len(SENTENCE.split())
+    assert [len((e.text or "").split()) for e in paragraphs(layout)] == [3 * words, 5 * words]
 
 
 # ---------------------------------------------- 4. paragraphs across a page break
@@ -475,3 +484,71 @@ def test_a_list_item_at_a_page_foot_is_not_joined_to_the_next_page():
     layout = analyze(pdf_of(fill, pages=2))
     assert not any("continues to speed up" in (e.text or "") for e in layout.elements)
     assert all(e.last_page is None for e in layout.elements)
+
+
+def options_page(*lines: str) -> bytes:
+    def fill(number, page):
+        page.insert_textbox(pymupdf.Rect(72, 72, 540, 130), SENTENCE, fontsize=BODY)
+        for k, text in enumerate(lines):
+            page.insert_text((72, 150 + 14 * k), text, fontsize=BODY)
+
+    return pdf_of(fill)
+
+
+@pytest.mark.parametrize(
+    ("lines", "texts", "flagged"),
+    [
+        # Options run together on one line are one item each.
+        (
+            ("(A) three metres   (B) five metres   (C) seven metres",),
+            ["(A) three metres", "(B) five metres", "(C) seven metres"],
+            False,
+        ),
+        # Over two rows they stay one block, and it says so.
+        (
+            ("(A) three metres   (B) five metres", "(C) seven metres   (D) nine metres"),
+            ["(A) three metres (B) five metres (C) seven metres (D) nine metres"],
+            True,
+        ),
+    ],
+)
+def test_answer_options_inside_one_block_are_split_or_flagged_never_silent(lines, texts, flagged):
+    layout = analyze(options_page(*lines))
+    options = [e for e in layout.elements if e.text and e.text.startswith("(")]
+    assert [e.text for e in options] == texts
+    assert [OPTION_LABELS in e.reasons for e in options] == [flagged] * len(options)
+    assert [n.review for n in from_reasons(options)] == ["required"] * flagged
+
+
+def arabic_and_hebrew_page() -> bytes:
+    """An Arabic word whose lam-alef is one ligature glyph (the PDF's ToUnicode gives the
+    two letters, lam then alef) and a Hebrew sentence, both set in DejaVu Sans."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    font = {"fontfile": str(DEJAVU.with_name("DejaVuSans.ttf")), "fontname": "dj", "fontsize": 14}
+    page.insert_text((72, 100), "إلى ﻻ", **font)
+    page.insert_text((72, 140), "שלום עולם", **font)
+    (cmap,) = [
+        x
+        for x in range(1, doc.xref_length())
+        if doc.xref_is_stream(x) and b"beginbfrange" in (doc.xref_stream(x) or b"")
+    ]
+    text = doc.xref_stream(cmap).decode("latin1")
+    (glyph,) = [
+        int(lo, 16) + 0xFEFB - int(to, 16)
+        for lo, hi, to in re.findall(r"<(\w{4})> <(\w{4})> <(\w{4})>", text)
+        if int(to, 16) <= 0xFEFB <= int(to, 16) + int(hi, 16) - int(lo, 16)
+    ]
+    patched = text.replace(
+        "endcmap", f"1 beginbfchar\n<{glyph:04x}> <06440627>\nendbfchar\nendcmap"
+    )
+    doc.update_stream(cmap, patched.encode("latin1"))
+    return doc.tobytes()
+
+
+def test_right_to_left_text_is_flagged_and_a_lam_alef_ligature_keeps_its_letter_order():
+    layout = analyze(arabic_and_hebrew_page())
+    arabic, hebrew = layout.elements
+    assert "لا" in (arabic.text or "") and "ال" not in (arabic.text or "")
+    assert RTL_TEXT in arabic.reasons and RTL_TEXT in hebrew.reasons
+    assert [n.code for n in from_reasons(layout.elements)] == [RTL_TEXT, RTL_TEXT]
