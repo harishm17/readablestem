@@ -5,16 +5,16 @@
    conversion was handed. None: converted before it was kept, so no list and no guess. Only
    the owner may open the course. #}
 {% if course is defined and course %}
-{% set from_course = "from " ~ course.name if course.name else "from a course you have since deleted" %}
+{% set from_course = "from " ~ course.name if course.name else "from a course that has since been deleted" %}
 <div id="job-course">
 {% if course.applied is none %}
-<p>Read with the notation of {% if course.id %}<a href="/courses/{{ course.id }}">{{ course.name }}</a>{% elif course.name %}{{ course.name }}{% else %}a course you have since deleted{% endif %}. This document was converted before the symbols were recorded, so they are not listed. Symbols added to the course since are not applied to it: upload the PDF again to apply them.</p>
+<p>Read with the notation of {% if course.id %}<a href="/courses/{{ course.id }}">{{ course.name }}</a>{% elif course.name %}{{ course.name }}{% else %}a course that has since been deleted{% endif %}. This document was converted before the symbols were recorded, so they are not listed.{% if job.is_owner %} Symbols added to the course since are not applied to it: upload the PDF again to apply them.{% endif %}</p>
 {% elif course.applied %}
 <p>Read with {{ course.applied|length }} symbol{{ "" if course.applied|length == 1 else "s" }} {% if course.id %}from <a href="/courses/{{ course.id }}">{{ course.name }}</a>{% else %}{{ from_course }}{% endif %}:</p>
 <ul>
 {% for phrase in course.applied %}<li>{{ phrase }}</li>
 {% endfor %}</ul>
-<p class="hint">Symbols added to the course since are not applied to it: upload the PDF again to apply them.</p>
+{% if job.is_owner %}<p class="hint">Symbols added to the course since are not applied to it: upload the PDF again to apply them.</p>{% endif %}
 {% else %}
 <p>Read with no symbols: {% if course.id %}<a href="/courses/{{ course.id }}">{{ course.name }}</a>{% else %}{{ course.name or "the course" }}{% endif %} had none when this document was converted.</p>
 {% endif %}
