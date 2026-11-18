@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: Word links land (branch feat/exports-links-epub-title)
+
+- WS22.2 (F-514, F-566): pandoc keeps an id as a Word bookmark on a heading, `div`, `span`,
+  `section`, `table`, `pre`, list item and picture only, so a link to a paragraph, figure, list or
+  cell led nowhere in Word. `export_docx._land_links` moves such an id to an empty span at the
+  start of the element; a link still without a bookmark in the built file is written as its
+  words and counted (`DocxExport.links_unlinked`). A footnote is a real Word footnote: the
+  mark was an empty note beside a body paragraph with a dead "Back to the text" link; the
+  filter moves the note's words to the mark and writes neither the block nor the link. Word
+  files are made on request, so a document converted earlier gets this at its next download; no
+  `RENDER_VERSION` bump is owed.
+
 ## Unreleased: one equation cannot fail the Word file (branch feat/exports-links-epub-title)
 
 - WS22.3 (F-502): one equation pandoc cannot write as an Office equation (a bold `"` in a

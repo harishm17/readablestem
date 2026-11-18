@@ -7,6 +7,11 @@
 --   * a figure with no picture in it (a picture left out, said in words) is written as
 --     paragraphs: pandoc writes a figure as a one-cell table, a layout table for a screen
 --     reader. Its words stay, the caption last;
+--   * a footnote of the page (a `doc-footnote` block, and a mark that links to it, which the
+--     export marks `data-rsnote`) is a real Word footnote: its words move to the mark, and the
+--     block and its "Back to the text" link are not written. (Left as `doc-noteref`, the
+--     reader makes the mark an empty note when the note stands after it, as it does.) A
+--     second mark for the same note is its text with no link;
 --   * an equation pandoc cannot write as a Word equation (a MathML shape its TeX step
 --     does not accept leaves the TeX in the text, or nothing at all) is written as the
 --     words below in the "Not Converted" style, so that one equation does not fail the file
@@ -98,10 +103,69 @@ local function failed_equations(doc)
   return failed, entries
 end
 
+local function is_role(element, role)
+  return element.attributes["role"] == role
+end
+
+-- A note's blocks without its link back to the mark, and without the space before it.
+local function note_blocks(div)
+  local blocks = pandoc.Div(div.content):walk({
+    Link = function(link)
+      if is_role(link, "doc-backlink") then
+        return {}
+      end
+    end,
+  }).content
+  local last = blocks[#blocks]
+  if last and (last.t == "Para" or last.t == "Plain") then
+    while #last.content > 0 and (last.content[#last.content].t == "Space" or last.content[#last.content].t == "SoftBreak") do
+      last.content:remove()
+    end
+    blocks[#blocks] = last
+  end
+  return blocks
+end
+
+local function footnotes(doc)
+  local bodies = {}
+  doc:walk({
+    Div = function(div)
+      if div.identifier ~= "" and is_role(div, "doc-footnote") then
+        bodies[div.identifier] = div
+      end
+    end,
+  })
+  if next(bodies) == nil then
+    return doc
+  end
+  local used = {}
+  doc = doc:walk({
+    Link = function(link)
+      local id = link.attributes["rsnote"] and link.target:match("^#(.+)$")
+      if not id or not bodies[id] then
+        return nil
+      end
+      if used[id] then
+        return link.content
+      end
+      used[id] = true
+      return pandoc.Note(note_blocks(bodies[id]))
+    end,
+  })
+  return doc:walk({
+    Div = function(div)
+      if used[div.identifier] and is_role(div, "doc-footnote") then
+        return {}
+      end
+    end,
+  })
+end
+
 function Pandoc(doc)
+  doc = footnotes(doc)
   local failed, entries = failed_equations(doc)
   if #entries == 0 then
-    return nil
+    return doc
   end
   for key in pairs(failed) do
     io.stderr:write("RSFAIL ", key, "\n")

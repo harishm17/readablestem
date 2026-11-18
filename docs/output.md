@@ -198,7 +198,11 @@ our own would be a second MathML reader to keep right.
   in bold and its paragraphs, after the figure. `<main>` is unwrapped, so the Contents and a
   draft's banner, which stand before it, are in the file; the note "About this version" is
   inside `<main>`. A WebP picture is written as a PNG. The page's language and title are
-  passed on.
+  passed on. Every id an in-page link names is put where pandoc writes a Word bookmark:
+  pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
+  picture and drops it on a paragraph, a figure, a list, a row or a cell, so there the id
+  moves to an empty `<span>` at the element's start (F-514). A footnote's mark (`doc-noteref`)
+  is renamed so pandoc's reader does not turn it into an empty note.
 - **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
   (`div.pagebreak`: `role="doc-pagebreak"` and their visible label) and the skip link are left
   out, and a figure with no picture is written as paragraphs (pandoc would make it a one-cell
@@ -208,7 +212,10 @@ our own would be a second MathML reader to keep right.
   leaves raw TeX in the text, as `<mi mathvariant="bold">"</mi>` does, or nothing, as an
   empty `<math>` does) is written, in the "Not Converted" character style, as its reading and
   "This equation could not be written as a Word equation; it is complete on the web page."
-  The other equations are unchanged and the file is made (F-502).
+  The other equations are unchanged and the file is made (F-502). The filter also writes each
+  footnote as a real Word footnote: the note's words go to its mark, and the page's block and its
+  "Back to the text" link are not written (F-566; a second mark for one note is its text, no
+  link).
 - **The child.** Its own process group, an environment of `PATH`, `LANG` and the like only
   (`core.childenv`: no keys, no database URL), a private temporary directory removed
   afterwards, 90 s of CPU, a file-size cap, 256 open files, a 2 GB heap (`+RTS -M2g`), and 60 s
@@ -221,7 +228,10 @@ our own would be a second MathML reader to keep right.
   - a table whose first row is a header gets `w:tblHeader`, so it repeats on each page and is
     read as a header;
   - pandoc's title paragraph is dropped when the first heading says the same thing (the
-    title stays in the document properties).
+    title stays in the document properties);
+  - an in-page link whose bookmark is not in the file (the target was a page marker, which Word
+    leaves out, or an id the page does not have) is written as its words, not as a link that
+    leads nowhere, and counted (`DocxExport.links_unlinked`, printed by the CLI).
 - **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
   (inside the document by bookmark); tables with their caption; alt text on each picture; the
   document language and title; equations as `m:oMath`, or, where one could not be written, its

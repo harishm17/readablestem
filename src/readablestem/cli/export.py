@@ -76,6 +76,8 @@ def _cmd_docx(args: argparse.Namespace) -> int:
         f"wrote {args.out}: {result.equations} equations, {result.headings} headings, "
         f"{result.images} pictures with alt text, {result.tables} tables"
     )
+    if result.links_unlinked:
+        print(f"{result.links_unlinked} links had no target in the file and are plain text")
     if result.not_word:
         print(
             f"{len(result.not_word)} equations could not be written as Word equations and are "

@@ -105,6 +105,8 @@ for _prefix, _uri in _NAMESPACES.items():
 # list styles draw their bullets with Symbol and Wingdings glyphs at private-use code points
 # (U+F0B7, U+F0A7), as Word itself does; Word shows them as list markers, not as text.
 _STYLE_PARTS = frozenset({"word/numbering.xml"})
+# The parts that hold text, and so links.
+_LINK_PARTS = ("word/document.xml", "word/footnotes.xml")
 
 
 class DocxExportError(ValueError):
@@ -129,6 +131,7 @@ class DocxExport:
     not_word: list[str]  # element ids of equations written as words, not as a Word equation
     tables: int
     header_rows: int  # tables whose first row is marked as a header
+    links_unlinked: int = 0  # in-page links with no target in the file, written as their words
 
 
 # --------------------------------------------------------------------------- pandoc
@@ -256,6 +259,11 @@ def _prepare(root: _Node) -> None:
     for node in list(root.walk()):
         if node.parent is None:
             continue
+        if node.tag == "a" and "doc-noteref" in node.attrs.get("role", "").split():
+            # The reader would make the mark an empty note (the note stands after it): the
+            # filter moves the note's words to the mark (`data/export_docx.lua`).
+            del node.attrs["role"]
+            node.attrs["data-rsnote"] = "1"
         if node.tag == "main":
             _replace(node, list(node.children))
         elif node.tag == "summary":
@@ -267,7 +275,10 @@ def _prepare(root: _Node) -> None:
             strong.parent = paragraph
             _replace(node, [paragraph])
         elif node.tag == "details":
-            _replace(node, list(node.children))
+            inner: list[_Node | str] = list(node.children)
+            if node.attrs.get("id"):  # a link to the description still lands at its start
+                inner.insert(0, _Node("span", {"id": node.attrs["id"]}))
+            _replace(node, inner)
 
 
 def _normal(text: str) -> str:
@@ -308,12 +319,98 @@ def _failed(said: str, token: str) -> set[int]:
     return {int(n) for n in found}
 
 
+# Where pandoc 3.7 writes an element's id as a Word bookmark (checked by running it with each
+# tag, tests/test_export_docx.py): a heading, `div`, `span`, `section`, `table`, `pre`, list
+# item, picture and a figure that has one. On any other element it drops the id, and a link
+# to it leads nowhere.
+_BOOKMARKED = frozenset(["div", "span", "section", "table", "pre", "li", "img"]) | {
+    f"h{n}" for n in range(1, 7)
+}
+# A link target's id goes on an empty span (which pandoc writes as a bookmark) at the start of
+# the element; for these it goes before the element, since a span cannot start inside them.
+_INLINE = frozenset(
+    ["math", "a", "em", "strong", "i", "b", "code", "sup", "sub", "mark", "small", "u", "s"]
+)
+# ... and for a list, a row or a table's body, at the start of its first item or cell.
+_GROUPS = frozenset(["ul", "ol", "dl", "tr", "tbody", "thead", "tfoot"])
+
+
+def _land_links(root: _Node) -> None:
+    """Every id an in-page link names is on something pandoc keeps (F-514): where it is not
+    (a paragraph, a figure, a list, a cell, a row), the id moves to an empty span at the start
+    of the element. A link whose target is still missing after pandoc is plain text
+    (`_unlink`)."""
+    targets = {
+        n.attrs["href"][1:]
+        for n in root.walk()
+        if n.tag == "a" and n.attrs.get("href", "").startswith("#") and len(n.attrs["href"]) > 1
+    }
+    for node in list(root.walk()):
+        ident = node.attrs.get("id")
+        if not ident or ident not in targets or node.parent is None:
+            continue
+        if node.tag in _BOOKMARKED:
+            continue
+        # A figure with a picture keeps its id (a span inside it makes pandoc write the figure
+        # as a one-cell layout table); one without is written as paragraphs by the filter.
+        if node.tag == "figure" and any(n.tag == "img" for n in node.walk()):
+            continue
+        if node.tag == "hr":  # nothing can stand in it (a page marker, which is left out)
+            continue
+        del node.attrs["id"]
+        mark = _Node("span", {"id": ident})
+        inside = node
+        while inside.tag in _GROUPS:
+            first = next((c for c in inside.children if isinstance(c, _Node)), None)
+            if first is None:
+                break
+            inside = first
+        if inside.tag in _INLINE:
+            before = inside.parent if inside.parent and "data-eq" in inside.parent.attrs else inside
+            assert before.parent is not None
+            siblings = before.parent.children
+            siblings.insert(siblings.index(before), mark)
+            mark.parent = before.parent
+        else:
+            inside.children.insert(0, mark)
+            mark.parent = inside
+
+
 # --------------------------------------------------------------------------- after
 
 
-def _fix_document(xml: bytes, title: str) -> tuple[bytes, tuple[int, int, int, int]]:
-    """Alt text on the picture itself, header rows, the duplicate title paragraph. Returns the
-    new part and the counts (equations, pictures with alt text, tables, header rows)."""
+def _unlink(root: ET.Element, bookmarks: set[str]) -> int:
+    """A link inside the document to a bookmark the file does not have is its words, not a
+    link that leads nowhere; returns how many. (A link is dead when the page's id was on
+    something pandoc does not write, or nothing at all, `_land_links`.)"""
+    parent_of = {child: parent for parent in root.iter() for child in parent}
+    count = 0
+    for link in list(root.iter(f"{{{W}}}hyperlink")):
+        anchor = link.get(f"{{{W}}}anchor")
+        if anchor is None or anchor in bookmarks:
+            continue
+        parent = parent_of[link]
+        at = list(parent).index(link)
+        parent.remove(link)
+        for offset, run in enumerate(list(link)):
+            properties = run.find(f"{{{W}}}rPr")
+            style = properties.find(f"{{{W}}}rStyle") if properties is not None else None
+            if properties is not None and style is not None:
+                if style.get(f"{{{W}}}val") == "Hyperlink":
+                    properties.remove(style)
+                if len(properties) == 0:
+                    run.remove(properties)
+            parent.insert(at + offset, run)
+        count += 1
+    return count
+
+
+def _fix_document(
+    xml: bytes, title: str, bookmarks: set[str]
+) -> tuple[bytes, tuple[int, int, int, int, int]]:
+    """Alt text on the picture itself, header rows, the duplicate title paragraph, links with
+    no target. Returns the new part and the counts (equations, pictures with alt text, tables,
+    header rows, links turned into words)."""
     root = SafeET.fromstring(xml)
     pictures = 0
     for inline in root.iter(f"{{{WP}}}inline"):
@@ -346,8 +443,20 @@ def _fix_document(xml: bytes, title: str) -> tuple[bytes, tuple[int, int, int, i
     if body is not None:
         _drop_title_paragraph(body, title)
     equations = sum(1 for _ in root.iter(f"{{{M}}}oMath"))
+    unlinked = _unlink(root, bookmarks)
     out = ET.tostring(root, encoding="UTF-8", xml_declaration=True)
-    return out, (equations, pictures, tables, headers)
+    return out, (equations, pictures, tables, headers, unlinked)
+
+
+def _bookmarks(source: zipfile.ZipFile) -> set[str]:
+    """The names of the bookmarks in the body and the notes: a link in either may name one in
+    the other."""
+    names: set[str] = set()
+    for part in _LINK_PARTS:
+        if part in source.namelist():
+            root = SafeET.fromstring(source.read(part))
+            names.update(b.get(f"{{{W}}}name", "") for b in root.iter(f"{{{W}}}bookmarkStart"))
+    return names
 
 
 def _paragraph_text(paragraph: ET.Element) -> str:
@@ -373,23 +482,43 @@ def _drop_title_paragraph(body: ET.Element, title: str) -> None:
         body.remove(paragraphs[0])
 
 
-def _rebuild(data: bytes, title: str) -> tuple[bytes, tuple[int, int, int, int]]:
+def _fix_notes(xml: bytes, bookmarks: set[str]) -> tuple[bytes, int, int]:
+    """The footnotes part: links with no target, and the equations in it (counted with the
+    body's). Returns the new part, those equations and the links turned into words."""
+    root = SafeET.fromstring(xml)
+    unlinked = _unlink(root, bookmarks)
+    equations = sum(1 for _ in root.iter(f"{{{M}}}oMath"))
+    return ET.tostring(root, encoding="UTF-8", xml_declaration=True), equations, unlinked
+
+
+def _rebuild(data: bytes, title: str) -> tuple[bytes, tuple[int, int, int, int, int]]:
     try:
         source = zipfile.ZipFile(io.BytesIO(data))
         names = source.namelist()
         if "word/document.xml" not in names:
             raise DocxExportError("invalid")
+        bookmarks = _bookmarks(source)
         out = io.BytesIO()
-        counts = (0, 0, 0, 0)  # equations, pictures, tables, header rows
+        counts = (0, 0, 0, 0, 0)  # equations, pictures, tables, header rows, unlinked
+        in_notes = (0, 0)  # equations, unlinked
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target:
             for info in source.infolist():
                 content = source.read(info.filename)
                 if info.filename == "word/document.xml":
-                    content, counts = _fix_document(content, title)
+                    content, counts = _fix_document(content, title, bookmarks)
+                elif info.filename == "word/footnotes.xml":
+                    content, *in_notes = _fix_notes(content, bookmarks)
                 target.writestr(info, content)
     except (zipfile.BadZipFile, ET.ParseError, SafeET.ParseError):
         raise DocxExportError("invalid") from None
-    return out.getvalue(), counts
+    equations, pictures, tables, headers, unlinked = counts
+    return out.getvalue(), (
+        equations + in_notes[0],
+        pictures,
+        tables,
+        headers,
+        unlinked + in_notes[1],
+    )
 
 
 # --------------------------------------------------------------------------- export
@@ -424,6 +553,7 @@ def export_docx(
     _webp_to_png(root)
     token = secrets.token_hex(6)
     equation_ids = _mark_equations(body, token)
+    _land_links(body)
     n_math = len(equation_ids)
     n_headings = sum(1 for n in body.walk() if _HEADING.match(n.tag))
     document = (
@@ -432,7 +562,7 @@ def export_docx(
         f"<body>{''.join(_write(c) for c in body.children)}</body></html>"
     )
     data, said = _run_pandoc(document, lang, program, timeout_s)
-    data, (equations, pictures, tables, headers) = _rebuild(data, title)
+    data, (equations, pictures, tables, headers, unlinked) = _rebuild(data, title)
     not_word = sorted(_failed(said, token) & set(range(n_math)))
     if equations + len(not_word) != n_math:
         raise DocxExportError("equations")
@@ -448,4 +578,5 @@ def export_docx(
         [equation_ids[n] for n in not_word],
         tables,
         headers,
+        unlinked,
     )
