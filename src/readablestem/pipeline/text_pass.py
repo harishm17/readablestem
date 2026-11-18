@@ -1147,11 +1147,18 @@ def comment_notes(
     count = 0
     for page, found in sorted(marks.items()):
         body = [e for e in elements if e.page == page and e.display != "inline"]
+        placed: dict[int, Element | None] = {}
         for mark in _in_reading_order(found):
-            owner = _anchor(body, mark, strikes.get(page, ()))
+            # A reply stands where its parent does (its own box is the parent's, more or less).
+            owner = (
+                placed[mark.parent]
+                if mark.parent in placed
+                else _anchor(body, mark, strikes.get(page, ()))
+            )
             if owner is None:  # nothing of the page: after the last element before it
                 before = [e for e in elements if e.page < page and e.display != "inline"]
                 owner = before[-1] if before else None
+            placed[mark.xref] = owner
             index[page] = index.get(page, -1) + 1
             words = f"replace with {mark.contents}" if mark.replaces else mark.contents
             after[owner.id if owner else None].append(
