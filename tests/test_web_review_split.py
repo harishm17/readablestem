@@ -294,3 +294,35 @@ def test_without_page_sizes_a_failed_probe_leaves_the_decisions_usable(split, mo
     assert boxes(page) == {}
     css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
     assert "#box-" not in css
+
+
+def test_a_long_difference_list_is_folded_and_the_latex_box_opens_tall(tmp_path):
+    """An array the PDF's text reads column by column differs in many numbers (F-077): the
+    first rows show, the rest are one fold away, and the box for the LaTeX has room."""
+    from readablestem.core.types import EquationFix
+    from readablestem.pipeline.validate import safe_latex_to_mathml
+
+    output = review_output()
+    latex = r"v = 63\ 25\ 17\ 81\ 49\ 34\ 56"
+    for element in output.result.elements:
+        if element.id == "p1-e5":
+            element.text = "v = 36 52 71 18 94 43 65"
+    fix = output.result.fix_for("p1-e5")
+    assert fix is not None
+    fix.equation = EquationFix(latex=latex, mathml=safe_latex_to_mathml(latex, "block"), speech="")
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        body = panel(screen(env, "?item=p1-e5"))
+        rows = re.findall(r'<tr class="diff-', body)
+        folded = re.findall(
+            r'<tr class="diff-', section(body, '<details class="diff-more"', "</details>")
+        )
+        assert len(rows) > 5 and len(rows) - len(folded) <= 5
+        box = re.search(r'<textarea id="latex-p1-e5"[^>]*rows="(\d+)"', body)
+        assert box is not None and int(box.group(1)) >= 6

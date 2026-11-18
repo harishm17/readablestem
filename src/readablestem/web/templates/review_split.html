@@ -88,6 +88,24 @@
 <a class="enlarge-link" href="{{ url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ what }}</span></a>
 {% endmacro %}
 
+{# One table of the differences between the PDF's text and the proposal. #}
+{% macro diff_table(rows, caption) %}
+<table class="diff-table">
+  <caption>{{ caption }}</caption>
+  <thead><tr><th scope="col">Symbol</th><th scope="col">In the PDF</th><th scope="col">Proposal</th><th scope="col">Changes the meaning</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr class="{{ 'diff-meaning' if row.meaning else 'diff-cosmetic' }}">
+      <th scope="row"><span class="diff-symbol">{{ row.symbol }}</span> <span class="diff-what">{{ row.what|lower }}</span></th>
+      <td data-label="In the PDF">{{ row.pdf }}</td>
+      <td data-label="Proposal">{{ row.proposal }}</td>
+      <td data-label="Changes the meaning">{% if row.meaning %}<strong>Yes</strong>{% else %}No{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
 {# The choices for an equation, first in the card (before the longer evidence under it): the
    recommended repair when the checks point to one, Accept (or "Accept anyway" when the
    proposal changes the meaning), and one line each that says what the button does. Its
@@ -159,21 +177,17 @@
 {% endif %}
 {{ equation_choices(p, item, anyway) }}
 {% if p.compare and p.compare.rows %}
+{# The first rows are enough to act on; an array read column by column gives many more, and
+   they are one fold away (F-077). #}
+{% set rows = p.compare.rows %}
 <div class="diff-wrap">
-<table class="diff-table">
-  <caption>What differs</caption>
-  <thead><tr><th scope="col">Symbol</th><th scope="col">In the PDF</th><th scope="col">Proposal</th><th scope="col">Changes the meaning</th></tr></thead>
-  <tbody>
-    {% for row in p.compare.rows %}
-    <tr class="{{ 'diff-meaning' if row.meaning else 'diff-cosmetic' }}">
-      <th scope="row"><span class="diff-symbol">{{ row.symbol }}</span> <span class="diff-what">{{ row.what|lower }}</span></th>
-      <td data-label="In the PDF">{{ row.pdf }}</td>
-      <td data-label="Proposal">{{ row.proposal }}</td>
-      <td data-label="Changes the meaning">{% if row.meaning %}<strong>Yes</strong>{% else %}No{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{{ diff_table(rows[:5], "What differs") }}
+{% if rows|length > 5 %}
+<details class="diff-more">
+  <summary>{{ rows|length - 5 }} more {{ "difference" if rows|length == 6 else "differences" }}</summary>
+  {{ diff_table(rows[5:], "More differences") }}
+</details>
+{% endif %}
 </div>
 {% endif %}
 {% if p.compare and p.compare.same %}<p class="same-line">Same in both: {{ p.compare.same|join(", ") }}.</p>{% endif %}

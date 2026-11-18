@@ -163,6 +163,9 @@ def test_only_undecided_items_with_nothing_failed_are_candidates():
     assert [f.element_id for f in bulk_accept.candidates(result, "figures")] == FIGURE_CANDIDATES
     offers = {o.slug: o.count for o in bulk_accept.offers(result)}
     assert offers == {"equations": 2, "figures": 2}
+    # A single item is decided on its card: "Accept many figures (1)" is not offered.
+    result.fix_for("p2-e12").status = Status.ACCEPTED
+    assert {o.slug: o.count for o in bulk_accept.offers(result)} == {"equations": 2}
 
 
 def test_a_heading_group_or_kept_page_is_never_a_candidate():
@@ -474,8 +477,8 @@ def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_check
     assert is_image_page_item(element)
     assert not bulk_accept.is_bulk_candidate(fix, "equations", element)
     assert "p1-e2" not in [f.element_id for f in bulk_accept.candidates(result, "equations")]
-    offers = {o.slug: o.count for o in bulk_accept.offers(result)}
-    assert offers["equations"] == len(EQUATION_CANDIDATES) - 1
+    assert len(bulk_accept.candidates(result, "equations")) == len(EQUATION_CANDIDATES) - 1
+    assert "equations" not in {o.slug for o in bulk_accept.offers(result)}  # one: its own card
     changes = bulk_accept.accept_all(result, "equations")
     assert "p1-e2" not in [c.element_id for c in changes]
     assert result.fix_for("p1-e2").pending  # type: ignore[union-attr]
