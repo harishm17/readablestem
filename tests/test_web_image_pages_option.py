@@ -37,6 +37,11 @@ def mixed_pdf() -> bytes:
     return scan_pdf(2, typed_first=True)
 
 
+def part_scanned_pdf() -> bytes:
+    """A typed page and one scan: not more than half of it is scans."""
+    return scan_pdf(1, typed_first=True)
+
+
 @pytest.fixture
 def offered(tmp_path):
     env = WebEnv(tmp_path, feature_image_pages=True, max_pages_per_job=5, max_source_pages=5)
@@ -97,17 +102,17 @@ def test_with_the_option_a_scan_becomes_a_job_that_remembers_it(offered):
 
 
 def test_a_mixed_pdf_with_the_option_converts_and_without_it_keeps_the_scans_as_images(offered):
-    asked_at = upload(offered.browser, mixed_pdf(), image_pages=True)
-    plain_at = upload(offered.browser, mixed_pdf())
+    asked_at = upload(offered.browser, part_scanned_pdf(), image_pages=True)
+    plain_at = upload(offered.browser, part_scanned_pdf())
     asked, plain = job_of(asked_at, offered), job_of(plain_at, offered)
     assert asked.image_pages is True and plain.image_pages is False
-    assert asked.page_count == plain.page_count == 3
+    assert asked.page_count == plain.page_count == 2
 
     # Without the box the answer says how many pages are scans, that they stay pictures
-    # and what reading them would cost (2 pages at the per-page setting, $0.25 by default).
+    # and what reading them would cost (1 page at the per-page setting, $0.25 by default).
     said = " ".join(offered.browser.get(plain_at.headers["location"]).text.split())
-    assert "2 pages are scanned or handwritten (2 scanned images)" in said
-    assert "kept as pictures" in said and "would cost about $0.50 (2 pages at $0.25 each)" in said
+    assert "1 page is scanned or handwritten (1 scanned image)" in said
+    assert "kept as pictures" in said and "would cost about $0.25 (1 page at $0.25 each)" in said
     # With it, nothing is offered: the pages are being read.
     assert "scanned or handwritten (" not in offered.browser.get(asked_at.headers["location"]).text
 
@@ -118,13 +123,13 @@ def test_a_batch_names_the_scanned_pages_of_each_document_that_has_them(offered)
         "/jobs",
         data={"csrf_token": token(client)},
         files=[
-            ("pdf", ("mixed.pdf", mixed_pdf(), "application/pdf")),
+            ("pdf", ("mixed.pdf", part_scanned_pdf(), "application/pdf")),
             ("pdf", ("typed.pdf", make_pdf(), "application/pdf")),
         ],
     )
     said = " ".join(client.get(response.headers["location"]).text.split())
     assert said.count("scanned or handwritten (") == 1  # the typed document has none
-    assert "would cost about $0.50" in said
+    assert "would cost about $0.25" in said
 
 
 def test_the_pages_of_a_converted_scan_count_against_the_daily_quota_as_usual(offered):
@@ -229,6 +234,48 @@ def test_a_job_converts_scans_only_if_it_asked_whatever_the_flag(offered):
 
 
 # ---------------------------------------------------------------------- large files in parts
+
+
+@pytest.mark.parametrize("answer", ["pictures", "read"])
+def test_a_file_of_mostly_scans_waits_for_the_choice_before_anything_is_converted(offered, answer):
+    """WS7.8: more than half the pages are scans or handwriting, the box not checked: the file
+    is kept (no job, no pages counted) with the same message the upload gives for fewer, and the
+    person chooses whether the scanned pages are read; the document keeps its own name."""
+    client = offered.browser
+    response = upload(client, mixed_pdf(), filename="notes.pdf")
+    assert response.status_code == 303 and response.headers["location"].startswith("/uploads/")
+    held = response.headers["location"]
+    said = " ".join(client.get(held).text.split())
+    assert "2 pages are scanned or handwritten (2 scanned images)" in said
+    assert "would cost about $0.50 (2 pages at $0.25 each)" in said
+    assert "Nothing is converted" in said
+    with session_scope(offered.ctx.factory) as session:
+        assert session.query(Job).count() == 0
+    sent = client.post(
+        held, data={"csrf_token": token(client, held), "whole": "1", "images": answer}
+    )
+    job = job_of(sent, offered)
+    assert (job.filename, job.image_pages, job.page_count) == ("notes.pdf", answer == "read", 3)
+    assert job.part_group is None
+
+
+def test_a_large_file_kept_for_its_pages_says_what_it_holds_of_scans(tmp_path):
+    env = WebEnv(
+        tmp_path,
+        feature_image_pages=True,
+        max_pages_per_job=2,
+        max_source_pages=6,
+        max_large_upload_mb=5,
+        upload_limit_mb=5,
+    )
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        held = upload(client, scan_pdf(3, typed_first=True)).headers["location"]  # no box
+        assert held.startswith("/uploads/")
+        said = " ".join(client.get(held).text.split())
+        assert "3 pages are scanned or handwritten (3 scanned images)" in said
+        assert "Each part is its own document" in said  # the parts chooser, as before
 
 
 def test_a_large_scan_keeps_the_choice_for_its_parts(tmp_path):

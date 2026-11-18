@@ -14,7 +14,7 @@ from html import unescape
 import pytest
 
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
-from readablestem.core.types import Check, PageStats, Status
+from readablestem.core.types import Check, Notice, PageStats, Status
 from readablestem.web import states
 from readablestem.web.db import Job, session_scope
 from readablestem.web.outcome import FAILED_MESSAGES
@@ -171,3 +171,21 @@ def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
 
 
 # --------------------------------------------------------------------------- queue
+
+
+def test_footnotes_and_code_are_counted_as_handled_and_only_what_was_left_out_is_not_handled(web):
+    """F-043: a footnote or a block of code the file holds is converted, so it is not listed
+    as not handled; a file with something recorded as left out lists that, and only that."""
+    kept = [
+        Notice(code="footnote", page=0, count=2, review="none"),
+        Notice(code="code_block", page=0, review="none"),
+    ]
+    html = web.browser.get(f"/jobs/{convert(web, notices=kept)}").text
+    assert "not-handled-heading" not in html
+    handled = page_text(section(html, "handled-heading"))
+    assert "2 footnotes" in handled and "1 block of program code" in handled
+
+    left_out = [*kept, Notice(code="form_fields", count=1, review="none")]
+    html = web.browser.get(f"/jobs/{convert(web, notices=left_out)}").text
+    assert "fillable form" in page_text(section(html, "not-handled-heading"))
+    assert "footnote" not in page_text(section(html, "not-handled-heading"))

@@ -1,0 +1,228 @@
+{# Everything on the job page that differs between a waiting, a stopped and a finished job: the
+   waiting note and steps, then the results, the settings and the delete box. The page holds it in
+   #job-body, and the status answer of a job that has just finished sends it again out of band, so
+   the finished page replaces the waiting one without a reload (web/poll.py, SW8). #}
+{% set field_errors = field_errors|default({}) %}
+{% set typed = typed|default({}) %}
+{% if not job.finished %}
+{# How long it has been, outside the live region (ux2-lane-a, `_wait_note.html`). #}
+{% if job.waiting_since %}
+{% with wait_lead = "Waiting for" if state.tone == "waiting" else "Converting for", wait_tail = "", wait_text = job.waited_text, wait_since = job.waiting_since.isoformat(), wait_slow_after = job.slow_after_s, wait_slow = job.slow, wait_live = true %}
+{% include "_wait_note.html" %}
+{% endwith %}
+{% endif %}
+{% include "_job_progress.html" %}
+{% if job.is_owner and state.key != "stopping" %}
+{# Stops a document that is waiting (at once, its pages back) or converting (at its next step).
+   The upload is kept either way (web/routes/jobs.py `cancel_job`). #}
+{% from "components/forms.html" import form with context %}
+{% call form("job.cancel", "/jobs/" ~ job.id ~ "/cancel", {"class": "inline-form", "id": "cancel-form"}) %}
+  <p id="cancel-explain" class="hint">Cancel stops it. Your file is kept, so you can convert it later or delete it.</p>
+  <button type="submit" class="button-secondary" aria-describedby="cancel-explain">Cancel</button>
+{% endcall %}
+{% endif %}
+{# Opt-in browser notice when the conversion finishes (static/app.js "When a job finishes").
+   Hidden until the script finds the Notification API; nothing is asked until the button is
+   used, and nothing leaves the device. #}
+<div id="notify-box" class="notify-box" hidden>
+  <button type="button" id="notify-button" class="button-secondary" aria-describedby="notify-hint">Notify me when it finishes</button>
+  <p class="hint" id="notify-hint">Your browser asks first. Works while this page is open.</p>
+  <p class="hint" id="notify-state" role="status"></p>
+</div>
+<p class="hint"><a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">Refresh the status</a></p>
+<noscript>
+  {% if auto_reload %}
+  <p>This page reloads every {{ auto_reload_s }} seconds until the conversion finishes. <a href="/jobs/{{ job.id }}">Stop reloading this page</a></p>
+  {% else %}
+  <p><a href="/jobs/{{ job.id }}?auto=1">Reload this page every {{ auto_reload_s }} seconds until the conversion finishes</a></p>
+  {% endif %}
+</noscript>
+{% endif %}
+
+{% if job.status == "done" and job.summary and job.page %}
+{% set s = job.summary %}
+{% set c = s.counts %}
+{% set pg = job.page %}
+{% set review_url = "/jobs/" ~ job.id ~ "/review" ~ ("?item=" ~ pg.first_open if pg.first_open else "") %}
+{# ux2-lane-a: five groups, each under one heading, with links to them under the status. What
+   was found and checked sits after the first group and has its own link. #}
+{% set owns = job.is_owner and not job.is_sample %}
+<nav class="jump-links" aria-label="On this page">
+  <ul>
+    <li><a href="#review-and-download">Review and download</a></li>
+    <li><a href="#results-heading">Results and checks</a></li>
+    {% if job.is_owner %}<li><a href="#for-students-heading">For students</a></li>{% endif %}
+    {% if owns %}<li><a href="#settings-heading">Settings and sharing</a></li>{% endif %}
+    <li><a href="#record-link-heading">Record</a></li>
+    {% if job.is_owner %}<li><a href="#delete-heading">Delete</a></li>{% endif %}
+  </ul>
+</nav>
+<div id="review-and-download" class="job-group">
+{% if state.group == "needs" %}
+{# Decisions open: the review is the main action; downloading now is a draft, and the
+   draft link asks first (/jobs/{id}/draft) what students would get. The heading names the
+   task; the state is said once, in the status box (F-415). #}
+<section aria-labelledby="decisions-heading">
+  <h2 id="decisions-heading">{{ state.task }}</h2>
+  <ul class="actions" id="next-actions">
+    {% if job.can_review %}<li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>{% endif %}
+    <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
+    <li><a href="/jobs/{{ job.id }}/listen">Listen as a student</a></li>
+    {# A person who can only view is never offered a draft (SW21); the route refuses it too. #}
+    {% if job.can_review %}<li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>{% endif %}
+  </ul>
+  {# ux-a: under the download link, where to post the file and the two questions. #}
+  {% include "_after_download.html" %}
+</section>
+{% else %}
+{% include "_job_ready.html" %}
+{% endif %}
+</div>
+
+{% if job.carry and job.is_owner %}
+{% include "_job_carry.html" %}
+{% endif %}
+
+{% if pg.notices.total %}
+{% include "_job_notices.html" %}
+{% endif %}
+
+{% if job.office_lines %}
+<section aria-labelledby="office-read-heading" id="office-read">
+  <h2 id="office-read-heading">How this file was read</h2>
+  {% for line in job.office_lines %}<p>{{ line }}</p>{% endfor %}
+</section>
+{% endif %}
+
+{% if pg.card %}
+{% include "_job_card.html" %}
+{% endif %}
+
+<section aria-labelledby="results-heading">
+  <h2 id="results-heading">Results</h2>
+  {% if state.gaps %}
+  <div class="notice notice-warning" id="partial-note">
+    {% for gap in state.gaps %}
+    <p><strong>{{ gap.title }}:</strong> part of this document was not converted. Those parts
+      stay as images marked “Not converted”.</p>
+    {% endfor %}
+    {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
+  </div>
+  {% elif job.rerun and job.is_owner %}
+  {# A finished document made by an older converter: "Convert it again" (WS10.15). #}
+  {% include "_job_retry.html" %}
+  {% endif %}
+  {# One line, then the counts for anyone who wants them (ux2-lane-a: seven tiles were the
+     page's biggest block). Decisions are the one unit (MF6, T1-3, T1-11): the same count here,
+     on the review screen and in My documents. Items are not counted; a group of repeated
+     headings is one decision. #}
+  <p id="results-line">{{ pg.found }}</p>
+  <details class="more-detail" id="counts-detail">
+  <summary>Counts in detail</summary>
+  <dl class="summary-list">
+    {# What was found is the line above; these are the counts it does not say. Pages and handwriting kept as images are figures in the data, not in words. #}
+    {% if s.by_kind.get("page") %}<div><dt>Pages kept as images</dt><dd>{{ s.by_kind["page"] }}</dd></div>{% endif %}
+    {% if s.by_kind.get("handwriting") %}<div><dt>Handwriting kept as images</dt><dd>{{ s.by_kind["handwriting"] }}</dd></div>{% endif %}
+    <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
+    <div><dt>{{ "Decisions to make" if job.can_review else "Decisions still open" }}</dt><dd>{{ c.decisions }}</dd></div>
+    <div><dt>Decisions made</dt><dd>{{ c.decided_units }}</dd></div>
+  </dl>
+  </details>
+  {# Said by the status box when the job is ready (web/states.py); here in every other
+     state. Every sentence is the summary's (pipeline/checked_words.py). #}
+  {% set pictures = checked_words.as_image_sentence(s.checked) %}
+  {% if pictures and state.key not in ["ready", "ready_remains"] %}<p id="items-count">{{ pictures }}</p>{% endif %}
+  {% set notes = checked_words.notes_line(s.checked) %}
+  {% if notes %}
+  <p id="notes-line">{{ notes }}{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. {{ checked_words.NOTES_HOLD }}</p>
+  {% endif %}
+  {% if c.decisions and job.can_review %}
+  {# One link per kind, straight to its first decision on the review screen. A group of
+     repeated headings is one decision, and so are the pages kept as images for one
+     reason. #}
+  <p id="review-breakdown">{{ c.decisions }} {{ "needs" if c.decisions == 1 else "need" }} your decision:
+    {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("table", "tables"), ("heading", "headings"), ("page", "pages"), ("handwriting", "pieces of handwriting")] if s.review_by_kind.get(kind) %}
+    <a href="/jobs/{{ job.id }}/review{% if s.review_first.get(kind) %}?item={{ s.review_first[kind] }}{% endif %}">{{ s.review_labels.get(kind, s.review_by_kind[kind] ~ " " ~ many) }}</a>{{ "." if loop.last else "," }}
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% if job.can_review %}
+  <p class="hint"><a href="/jobs/{{ job.id }}/review/list">All items as a list</a></p>
+  {% endif %}
+  {% if s.checks_run %}
+  <h3 id="checks-heading">Structure checks of the HTML file</h3>
+  <p>{{ checked_words.checks_line(s.checked, c.decisions) }}</p>
+  {% if s.failed_checks %}
+  <ul class="check-list" aria-labelledby="checks-heading">
+    {% for check in s.failed_checks %}
+    <li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endif %}
+  {# T1-11: say what ran and what did not, so a pass is not read as more than it is. #}
+  <details class="tech" id="checks-ran">
+    <summary>What was checked, and what was not</summary>
+    <p><strong>Ran on this file:</strong> {{ checked_words.checks_ran(s.checked) }}
+      <strong>Did not run on this file:</strong> {{ checked_words.DID_NOT_RUN }}</p>
+  </details>
+</section>
+
+{% if job.is_owner %}
+{# What students get of this file, set here: its language, the notation found in it and the
+   title and contact line. One group; the parts are its sub-headings. #}
+<div class="job-group" id="for-students">
+  <h2 id="for-students-heading">For students</h2>
+  {% with hl = 3 %}
+  {% include "_job_language.html" %}
+  {% include "_notation_suggestions.html" %}
+  {% include "_job_student_file.html" %}
+  {% endwith %}
+</div>
+{% endif %}
+{% if owns %}
+<div class="job-group" id="settings">
+  <h2 id="settings-heading">Settings and sharing</h2>
+  {% with hl = 3 %}{% include "_job_sharing.html" %}{% endwith %}
+  <section aria-labelledby="revise-heading">
+    <h3 id="revise-heading">If you change the PDF</h3>
+    <p><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a>
+      (your decisions carry over)</p>
+  </section>
+</div>
+{% endif %}
+{% include "_job_record.html" %}
+{% elif state.stopped %}
+{# The reason is in the status box above, once. This section is what to do about it: the
+   state's next steps (web/states.py): try again while a try is left and can help, otherwise
+   the safe ways on (ux2-lane-a). #}
+<section aria-labelledby="failed-heading">
+  <h2 id="failed-heading">What you can do</h2>
+  {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
+  <ul class="actions" id="stopped-actions">
+    {% for step in state.steps if not step.form %}<li><a class="{{ 'button-secondary' if job.retry else 'button' }}" href="{{ step.href }}">{{ step.label }}</a></li>{% endfor %}
+    <li><a href="/app">Back to My documents</a></li>
+    <li><a href="/status">Service status</a></li>
+    {% if contact_email %}<li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20stopped%20conversion">Email us about it</a></li>{% endif %}
+  </ul>
+  <details class="tech">
+    <summary>Details for a bug report</summary>
+    <p>Error code: <code>{{ job.error_code or "unknown" }}</code></p>
+  </details>
+</section>
+{% endif %}
+
+{# Last on the page (MF17): when it will be deleted, the one way to keep it longer, and
+   deleting now, which is confirmed on its own page (/jobs/{id}/delete). The deletion time is
+   explained once, here (`_job_retention.html`, web/retention.py). #}
+{% if job.is_owner %}
+<section aria-labelledby="delete-heading" class="job-group">
+  <h2 id="delete-heading">Delete this document</h2>
+  {% include "_job_retention.html" %}
+  <p>Removes the PDF and everything made from it, after you confirm.</p>
+  <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-danger-outline">Delete now</button>
+  </form>
+</section>
+{% endif %}

@@ -117,6 +117,7 @@ from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
+from readablestem.web.states import CANCELED
 from readablestem.web.step_cache import DbStepCache
 from readablestem.web.step_cache import forget as forget_steps
 
@@ -667,7 +668,10 @@ class Worker:
         """
         if attempt.cancelled.is_set():
             raise JobCancelled()
-        under_caps = [Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON]
+        under_caps = [
+            Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON,
+            Job.cancel_requested_at.is_(None),  # "Cancel" pressed: no more model calls
+        ]
         if calls:
             under_caps.append(Job.model_calls + calls <= attempt.max_calls)
         with session_scope(self.factory) as session:
@@ -682,10 +686,16 @@ class Worker:
             if won == 1:
                 return
             row = session.execute(
-                select(Job.cost_usd, Job.model_calls).where(*self._owned(attempt.claim))
+                select(Job.cost_usd, Job.model_calls, Job.cancel_requested_at).where(
+                    *self._owned(attempt.claim)
+                )
             ).one_or_none()
         if row is None:
             self._cancel(attempt, "not_owned")
+            raise JobCancelled()
+        if row.cancel_requested_at is not None:
+            self._finish_failed(attempt, CANCELED)
+            self._cancel(attempt, "canceled")
             raise JobCancelled()
         if calls and int(row.model_calls or 0) + calls > attempt.max_calls:
             raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")
@@ -757,8 +767,13 @@ class Worker:
         pool: str | None = None,
         image_pages: bool = False,
         user_id: str | None = None,
+        base_usd: float = 0.0,
+        base_calls: int = 0,
     ) -> _Attempt:
+        # The caps count from `base_*`: what the job had spent when a re-run after a new
+        # version began (`Job.cap_base_usd`, `web.retry.start`); 0 for any other run.
         max_usd, max_calls = job_caps(self.settings, page_count, image_pages)
+        max_usd, max_calls = max_usd + base_usd, max_calls + base_calls
         attempt = _Attempt(
             claim=claim,
             prior_usd=prior_usd,
@@ -792,6 +807,22 @@ class Worker:
             return
         if not owned:
             self._cancel(attempt, "not_owned")
+        elif self._cancel_asked(attempt.claim):
+            # The owner pressed "Cancel" (`routes.jobs.cancel_job`): end the job as canceled and
+            # stop what has not been sent, as for a deleted job. The pages are not returned.
+            self._finish_failed(attempt, CANCELED)
+            self._cancel(attempt, "canceled")
+
+    def _cancel_asked(self, claim: Claim) -> bool:
+        try:
+            with session_scope(self.factory) as session:
+                return (
+                    session.scalar(select(Job.cancel_requested_at).where(*self._owned(claim)))
+                    is not None
+                )
+        except Exception as exc:  # a missed check is made again at the next beat
+            log_exception(logger, "cancel_check_failed", exc, job_id=claim.job_id)
+            return False
 
     def _progress(self, attempt: _Attempt) -> ProgressFn:
         """Progress callback. Raising from it aborts `convert_pdf` (queued steps cancelled)."""
@@ -993,6 +1024,8 @@ class Worker:
                     Job.model_calls,
                     Job.user_id,
                     Job.image_pages,
+                    Job.cap_base_usd,
+                    Job.cap_base_calls,
                 ).where(Job.id == claim.job_id)
             ).one_or_none()
             pool = access.spend_pool(access.tier_of(session, job.user_id)) if job else None
@@ -1011,6 +1044,8 @@ class Worker:
             pool,
             bool(job.image_pages),
             job.user_id,
+            float(job.cap_base_usd or 0.0),
+            int(job.cap_base_calls or 0),
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")
@@ -1248,7 +1283,7 @@ class Worker:
         made on a partly converted document survive "Convert the missing parts"). Else the
         earlier version the upload said it revises (T3-2, `web.carry`), if it is still the
         owner's, finished and not past its deletion time."""
-        if job.retries and job.result_json:
+        if (job.retries or job.rerun_version) and job.result_json:
             source, own = job, True
         elif job.revises_job_id:
             source, own = session.get(Job, job.revises_job_id), False

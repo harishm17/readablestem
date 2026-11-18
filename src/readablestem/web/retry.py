@@ -69,12 +69,20 @@ class RetryRefused(Exception):
         self.code = code
 
 
-def start(job: Job, *, active_others: int, max_active: int) -> None:
-    """Put `job` back in the queue (the caller holds the row's lock and commits).
+def start(job: Job, *, active_others: int, max_active: int) -> str:
+    """Put `job` back in the queue (the caller holds the row's lock and commits). Returns
+    "retry", or "rerun" for a finished document made by an older converter
+    (`states.rerun_step`).
+
+    A re-run is not a try after a failure: it uses no try, and its spend caps count from what
+    the job had spent when it began (`Job.cap_base_usd`), so a document that used most of its
+    cap the first time can be read again. It is offered once for each version
+    (`Job.rerun_version`).
 
     Raises `RetryRefused`: "not_stopped" (nothing to try again), "no_tries_left" or
     "too_many_active" (the person already has `max_active` documents waiting or converting).
     """
+    rerun = False
     if (
         offer(
             status=str(job.status),
@@ -84,16 +92,30 @@ def start(job: Job, *, active_others: int, max_active: int) -> None:
         )
         is None
     ):
-        refused = "no_tries_left" if (job.retries or 0) >= MAX_RETRIES_PER_JOB else "not_stopped"
-        raise RetryRefused(refused)
+        if states.rerun_step(states.Facts.of(job)) is None:
+            refused = (
+                "no_tries_left" if (job.retries or 0) >= MAX_RETRIES_PER_JOB else "not_stopped"
+            )
+            raise RetryRefused(refused)
+        rerun = True
     if active_others >= max_active:
         raise RetryRefused("too_many_active")
+    canceled = job.error_code == states.CANCELED
     job.status = JobStatus.QUEUED
     job.error_code = None
+    job.cancel_requested_at = None
     job.error_detail = None
     job.finished_at = None
     job.lease_until = None
     job.pages_done = 0
     job.progress_json = None
-    job.retries = (job.retries or 0) + 1
+    if rerun:
+        from readablestem.pipeline.run import PIPELINE_VERSION
+
+        job.rerun_version = PIPELINE_VERSION
+        job.cap_base_usd = float(job.cost_usd or 0.0)
+        job.cap_base_calls = int(job.model_calls or 0)
+    elif not canceled:  # converting what its owner stopped is not a try after a failure
+        job.retries = (job.retries or 0) + 1
     job.attempts_at_retry = job.attempts or 0
+    return "rerun" if rerun else "retry"

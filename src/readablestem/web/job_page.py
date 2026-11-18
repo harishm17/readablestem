@@ -23,8 +23,10 @@ wording is tested in one place. Design notes:
   layer is never called unreadable, and there is no score. The equation text shown is
   document content: it is rendered for the owner only and never logged.
 - **Notices** (`notice_lists`): `pipeline.notices.current` sorted into "Not handled in
-  this file" and "Worth checking", one sentence each (`web.messages`), with the page
-  and a link to the decision when a notice has one.
+  this file" (what the result records as found and not converted), "Worth checking", and
+  "Handled in this file" (footnotes and code blocks, one line each with its count). One
+  sentence each (`web.messages`), with the page and a link to the decision when a notice
+  has one; what the file does not contain is never listed.
 - **Language** (`language_line`, `language_choices`): the document language and where
   it came from, for the control that sets it. The names are the text work's
   (`pipeline.language.LANGUAGE_NAMES`); the change itself is
@@ -60,7 +62,7 @@ from readablestem.pipeline.checked_words import KIND_WORDS, join_words, kinds_ph
 from readablestem.pipeline.source_facts import flattened_parts
 from readablestem.pipeline.speech import GREEK, SYMBOLS
 from readablestem.web import notice_places
-from readablestem.web.messages import explain_notice
+from readablestem.web.messages import HANDLED_MESSAGES, explain_notice
 from readablestem.web.outcome import unread_phrase
 
 # --------------------------------------------------------------------------- words
@@ -98,6 +100,9 @@ FOUND_KINDS = (
 class StageLine:
     text: str
     state: StageState
+    # The step's own counts, for the progress element (0 when the step has none to show).
+    done: int = 0
+    total: int = 0
 
 
 def _events(progress: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -171,7 +176,7 @@ def stage_lines(progress: dict[str, Any] | None) -> list[StageLine]:
         if event is not None and _count(event, "total"):
             done, total = _count(event, "done"), _count(event, "total")
             text = f"{stage.capitalize()}: {done} of {total} {verb}"
-            lines.append(StageLine(text, "done" if _finished(event) else "now"))
+            lines.append(StageLine(text, "done" if _finished(event) else "now", done, total))
     for stage, text in (
         ("assemble", "Building the HTML file"),
         ("checks", "Running the structure checks"),
@@ -732,14 +737,25 @@ DECISION_NOTICES = (
 )
 
 
+@dataclass(frozen=True)
+class HandledLine:
+    """What was found and converted, of one kind, with its count: "3 footnotes: kept where
+    they fall in the text" (`pipeline.notices.HANDLED_CODES`)."""
+
+    code: str
+    count: int
+    text: str
+
+
 @dataclass
 class NoticeLists:
     not_handled: list[NoticeLine] = field(default_factory=list)
     worth_checking: list[NoticeLine] = field(default_factory=list)
+    handled: list[HandledLine] = field(default_factory=list)
 
     @property
     def total(self) -> int:
-        return len(self.not_handled) + len(self.worth_checking)
+        return len(self.not_handled) + len(self.worth_checking) + len(self.handled)
 
 
 def _line(
@@ -782,7 +798,11 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
     labels = item_labels(result)
     elements = {e.id: e for e in result.elements}
     lists = NoticeLists()
+    handled: Counter[str] = Counter()
     for notice in notice_rules.current(result):
+        if notice_rules.section(notice) == "handled":
+            handled[notice.code] += notice.count
+            continue
         line = _line(notice, fixes, labels, elements)
         if notice.code == "source_error" and (names := _unknown_commands(result)):
             line = replace(line, names=names, lead="The commands LaTeX did not know", place="")
@@ -801,6 +821,9 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
         else:
             lists.not_handled.append(line)
     lists.not_handled = _one_line_per_kept_page(lists.not_handled, fixes, labels)
+    for code, count in handled.items():
+        one, many, done = HANDLED_MESSAGES[code]
+        lists.handled.append(HandledLine(code, count, f"{plural(count, one, many)}: {done}"))
     return lists
 
 

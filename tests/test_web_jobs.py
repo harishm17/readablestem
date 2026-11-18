@@ -326,11 +326,40 @@ def test_a_poll_of_a_job_still_converting_does_not_read_its_stored_result(web, p
     engine = web.ctx.factory.kw["bind"]
     event.listen(engine, "before_cursor_execute", spy)
     try:
-        response = web.browser.get(f"/jobs/{job_id}/{poll}")
+        response = web.browser.get(f"/jobs/{job_id}/{poll}", headers={"HX-Request": "true"})
     finally:
         event.remove(engine, "before_cursor_execute", spy)
     assert response.status_code == 200
     assert read == []
+
+
+@pytest.mark.parametrize(
+    ("fragment", "page"),
+    [
+        ("/jobs/{id}/status", "/jobs/{id}"),
+        ("/jobs/{id}/progress", "/jobs/{id}"),
+        ("/app/documents", "/app"),
+    ],
+)
+def test_a_fragment_opened_directly_leads_to_the_page_that_holds_it(web, fragment, page):
+    job_id = job_id_from(upload(web.browser, make_pdf(1)))
+    direct = web.browser.get(fragment.format(id=job_id))
+    assert direct.status_code == 303 and direct.headers["location"] == page.format(id=job_id)
+    polled = web.browser.get(fragment.format(id=job_id), headers={"HX-Request": "true"})
+    assert polled.status_code == 200 and "<html" not in polled.text
+
+
+def test_the_status_answer_of_a_job_that_finishes_carries_the_finished_page(web):
+    """A waiting page that polls gets, once the job is done, its heading and body for the
+    finished page (out of band), so it needs no reload."""
+    job_id = job_id_from(upload(web.browser, make_pdf(1)))
+    waiting = web.browser.get(f"/jobs/{job_id}").text
+    assert 'id="job-body"' in waiting and "Refresh the status" in waiting
+    web.run_worker()
+    done = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"}).text
+    assert 'id="job-body" hx-swap-oob="true"' in done
+    assert 'id="job-heading" hx-swap-oob="true"' in done
+    assert "Refresh the status" not in done and "Download" in done
 
 
 def test_status_poll_for_a_deleted_job_reloads_the_page(web):

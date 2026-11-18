@@ -6,7 +6,7 @@
    change. Every link keeps its id, so htmx puts focus back on the same link after a swap.
    Without JavaScript this is a plain list: reload the page. A document's file name leads when
    several came out with the same title. #}
-<div id="batch-rows"{% if unfinished %} hx-get="/app/batch/{{ result_id }}?v={{ version }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+<div id="batch-rows"{% if unfinished %} hx-get="/app/batch/{{ result_id }}?v={{ version }}" hx-trigger="{{ poll_trigger }}" hx-swap="outerHTML"{% endif %}>
   {% if oob|default(false) %}<p id="batch-summary" class="batch-summary" hx-swap-oob="innerHTML">{{ summary }}</p>{% endif %}
   {% if rows %}
   <section aria-label="Next step" class="batch-next">

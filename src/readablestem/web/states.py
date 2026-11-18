@@ -11,8 +11,8 @@ or conditions.
 
 The table (`TABLE`) has one row per key. A row says when it applies (worked out from stored
 facts only, in `state_of`), its label, its tone and its next step. Rows that need facts not
-stored yet (a cancel request, checks that answer late, the daily reset of pages, the review's
-page cards) are not in it; they are added as rows when their facts exist, never as a surface.
+stored yet (checks that answer late, the daily reset of pages, the review's page cards) are not
+in it; they are added as rows when their facts exist, never as a surface.
 
 Rules the function owns, so no template decides them:
 
@@ -30,7 +30,7 @@ Messages say what happened and what to do, and never quote the document.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -94,6 +94,10 @@ TABLE: dict[str, Row] = {
     "waiting_reset": Row("Waiting until {time}", WAITING, False),
     "converting": Row("Converting", WORKING, False),
     "restarting": Row("Restarting", WORKING, False),
+    # The owner pressed "Cancel" on a conversion a worker has begun; it stops at its next step.
+    "stopping": Row("Stopping", WORKING, False),
+    # Stopped on request (`cancel_job`): the upload is kept, so it can be converted later.
+    "canceled": Row("Canceled", WAITING, True),
     "stopped_file": Row("Stopped: this file cannot be converted as it is", FAILED, True),
     "stopped_service": Row("Stopped: not caused by your file", FAILED, True),
     "stopped_no_tries": Row("Stopped", FAILED, True),
@@ -117,6 +121,9 @@ READY_KEYS = frozenset({"ready", "ready_remains"})
 FINAL_GAPS = frozenset({"pages_as_pictures", "source_unread"})
 
 # --------------------------------------------------------------------------- stop codes
+
+# The error code of a job its owner stopped (`routes.jobs.cancel_job`, `worker.Worker._beat`).
+CANCELED = "canceled"
 
 # Tries a person may ask for on one job (`web.retry`): each costs only what was not
 # finished before, but a job that fails the same way four times will not be helped by a fifth.
@@ -226,6 +233,9 @@ class State:
     # The documents list group: from the tone, or for the sample, from the state under it.
     group: str = READY
     tries_left: int = 0
+    # "Convert it again with the current version" (`rerun_step`): offered on a finished
+    # document made by an older converter, for the owner only.
+    rerun: Step | None = None
 
     @property
     def badge(self) -> str:
@@ -253,7 +263,7 @@ class State:
 
     @property
     def stopped(self) -> bool:
-        return self.tone == FAILED
+        return self.tone == FAILED or self.key == "canceled"
 
     @property
     def working(self) -> bool:
@@ -290,6 +300,8 @@ class Facts:
     deleted: bool = False
     deleted_on: datetime | None = None
     image_pages: bool = False  # the box "Convert scanned or handwritten pages" was checked
+    cancel_requested: bool = False  # the owner asked a running conversion to stop
+    rerun_version: str | None = None  # the version a re-run was last started for (WS10.15)
 
     @classmethod
     def of(cls, job: Job) -> Facts:
@@ -308,6 +320,8 @@ class Facts:
             lease_until=job.lease_until,
             is_sample=bool(job.is_sample),
             image_pages=bool(job.image_pages),
+            cancel_requested=job.cancel_requested_at is not None,
+            rerun_version=job.rerun_version,
         )
 
 
@@ -376,13 +390,53 @@ def state_of(
             return _make("waiting_reset", words.WAITING_BUDGET, time=f"{reset:%H:%M} UTC")
         return _make("waiting", ctx.waiting_line or "Waiting for its turn.")
     if job.status == JobStatus.RUNNING:
+        if job.cancel_requested:
+            return _make("stopping", "Stopping at the next step. What was not sent will not be.")
         lease = as_utc(job.lease_until)
         if lease is not None and lease < (ctx.now or utcnow()):
             return _make("restarting", _restart_message())
         return _make("converting", job_page.stage_sentence(dict(job.progress or {})))
     if job.status == JobStatus.FAILED:
         return _stopped(job, left, viewer, ctx)
-    return _done(job, counts, left, viewer, ctx)
+    state = _done(job, counts, left, viewer, ctx)
+    if viewer == "owner" and state.retry is None and (again := rerun_step(job)) is not None:
+        return replace(state, rerun=again)
+    return state
+
+
+def _version_key(version: str | None) -> tuple[int, ...] | None:
+    """ "0.5.11" as (0, 5, 11); None for a version that is not dotted numbers."""
+    parts = (version or "").strip().split(".")
+    return tuple(int(p) for p in parts) if parts and all(p.isdigit() for p in parts) else None
+
+
+def rerun_step(job: Facts) -> Step | None:
+    """The re-run of a finished document made at an older `PIPELINE_VERSION` than the code's
+    (WS10.15): a form that puts the same job back in the queue (`web.retry.start`), with a spend
+    cap of its own and none of the day's pages. Offered once for each version, and never when
+    "Try again" is (a document with parts not converted has that)."""
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    if job.status != JobStatus.DONE or job.deleted or job.is_sample:
+        return None
+    if job.rerun_version == PIPELINE_VERSION:  # already offered and started for this version
+        return None
+    made = _version_key((job.result_json or {}).get("pipeline_version"))
+    now = _version_key(PIPELINE_VERSION)
+    if made is None or now is None or made >= now:
+        return None
+    return Step(
+        "rerun",
+        "Convert it again",
+        f"/jobs/{job.id}/retry",
+        form=True,
+        explain=(
+            "This document was converted before the converter's latest changes. Converting it "
+            "again keeps the decisions you made, uses none of your daily pages and has a "
+            "spending limit of its own. It can open new decisions. It is offered once for each "
+            "version."
+        ),
+    )
 
 
 def _make(
@@ -457,6 +511,8 @@ def _stopped(job: Facts, left: int, viewer: str, ctx: Context) -> State:
 
     code = job.error_code or ""
     owner = viewer == "owner"
+    if code == CANCELED:
+        return _canceled(job, owner)
     if code in RETRYABLE_FAILURES:
         cause = job_error_message(code, with_hint=False)
         if left:
@@ -485,6 +541,21 @@ def _stopped(job: Facts, left: int, viewer: str, ctx: Context) -> State:
         steps = (_retry_step(job, left), _upload()) if owner else ()
         return _make("stopped_unknown", " ".join(parts), steps, tries=left)
     return _make("stopped_unknown", " ".join(parts), (_upload(),) if owner else ())
+
+
+def _canceled(job: Facts, owner: bool) -> State:
+    """Stopped by its owner: the upload is kept, so it can be converted later (no try is used,
+    and a conversion that had not begun counted no pages: `retry.start`)."""
+    convert = Step(
+        "retry",
+        "Convert it",
+        f"/jobs/{job.id}/retry",
+        form=True,
+        explain="Converting puts your document back in the queue. It does not use one of the "
+        "tries for a document that stopped on its own.",
+    )
+    message = "You canceled this conversion. Your file is kept, so you can convert it later."
+    return _make("canceled", message, (convert, _upload()) if owner else (), group=NEEDS)
 
 
 def _no_tries(cause: str, retries: int) -> str:
@@ -655,6 +726,7 @@ _COLUMNS = (
     Job.lease_until,
     Job.is_sample,
     Job.open_decisions,
+    Job.cancel_requested_at,
 )
 
 
@@ -695,6 +767,7 @@ def load(
             attempts_at_retry=r.attempts_at_retry or 0,
             lease_until=r.lease_until,
             is_sample=bool(r.is_sample),
+            cancel_requested=r.cancel_requested_at is not None,
         )
         out[r.id] = state_of(facts, counts, context=context)
     return out

@@ -366,8 +366,11 @@ def _set_state(job: Job, key: str) -> None:
     if key in {"waiting", "restarting"}:
         job.status, job.attempts, job.attempts_at_retry = JobStatus.QUEUED, 0, 0
         job.attempts = 1 if key == "restarting" else 0  # put back after a lost attempt
-    elif key == "converting":
+    elif key in {"converting", "stopping"}:
         job.status, job.lease_until, job.pages_done = JobStatus.RUNNING, now + timedelta(hours=1), 0
+        job.cancel_requested_at = now if key == "stopping" else None
+    elif key == "canceled":
+        job.status, job.error_code = JobStatus.FAILED, "canceled"
     elif key.startswith("stopped_"):
         job.status = JobStatus.FAILED
         job.error_code = {
@@ -427,7 +430,7 @@ def test_every_state_reads_the_same_on_every_surface_from_the_one_table(web):
             return
         page = web.alice.get(f"/jobs/{job_id}").text
         assert re.search(r"<title>\s*" + re.escape(label) + ":", page), (key, label)
-        listing = web.alice.get("/app/documents").text
+        listing = web.alice.get("/app/documents", headers={"HX-Request": "true"}).text
         assert _badge(listing, f'id="doc-{job_id}"').startswith(label), key
         assert _badge(batch, f'id="batch-doc-{job_id}"').startswith(label), key
         parts = web.alice.get(f"/jobs/{by_key['host']}").text

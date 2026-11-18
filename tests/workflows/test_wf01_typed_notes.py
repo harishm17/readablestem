@@ -51,7 +51,6 @@ def test_the_document_page_says_what_the_conversion_cost(
     assert f"${cost:.2f}" in harness.words(document_page)
 
 
-@harness.finding("F-043")
 def test_not_handled_lists_nothing_the_student_file_holds(
     document_page: lxml.html.HtmlElement,
 ) -> None:

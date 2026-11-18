@@ -171,7 +171,7 @@ def test_a_stopped_document_is_listed_with_what_needs_you_and_offers_try_again(w
         job = session.get(Job, stopped)
         assert job is not None
         job.status, job.error_code = JobStatus.FAILED, "timeout"
-    html = web.browser.get("/app/documents").text
+    html = web.browser.get("/app/documents", headers={"HX-Request": "true"}).text
     needs = html[html.index(f'id="docs-{states.NEEDS}"') : html.index("</table>")]
     assert f'id="doc-{stopped}"' in needs and f'id="doc-{waiting}"' not in needs
     assert states.TABLE["stopped_service"].label in text(needs)
@@ -192,5 +192,5 @@ def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
     assert shown and shown in first and "3 decisions to make" in first
     assert (web.job(job_id).open_decisions, web.job(job_id).result_title) == (3, shown)
     reads = Reads(web)
-    web.browser.get("/app/documents")
+    web.browser.get("/app/documents", headers={"HX-Request": "true"})
     assert not any("result_json" in s for s in reads.stop())  # read once, not every poll

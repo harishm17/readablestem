@@ -143,8 +143,9 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/uploads/{id}` | owner | Convert the chosen parts: each is cut out, checked, counted against the quota and queued as a document of its own; rate limited like an upload. 400 for pages that cannot be used, 413 for a part over the size limit, 429 for the quota or the caps |
 | POST `/uploads/{id}/delete` | owner | "Discard this file": only a POST with `confirm=yes` deletes it, any other POST shows the confirmation page |
 | GET `/jobs/{id}` | view | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
-| GET `/jobs/{id}/status?v=` | view | Status fragment for htmx polling (204 while unchanged); changes per step |
-| GET `/jobs/{id}/progress?v=` | view | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
+| GET `/jobs/{id}/status?v=` | view | Status fragment for htmx polling (204 while unchanged); changes per step. When the job has finished it answers with the status box plus the heading and `#job-body` out of band, so the open page becomes the finished page without a reload. Opened directly (no `HX-Request` header) it redirects (303) to the job page: a fragment is never a page (`web/poll.py`) |
+| GET `/jobs/{id}/progress?v=` | view | The list of steps with their counts, polled on its own outside the live region (204 while unchanged); the same redirect when opened directly. A step with counts draws a `<progress>` element with its text beside it |
+| POST `/jobs/{id}/cancel` | owner | "Cancel" on a waiting or converting document (WS11.3a). A queued job stops at once (`canceled`) and its pages come back when they were counted today; a running one is asked to stop and the worker ends it at its next reservation or beat with nothing returned. The upload is kept; "Convert it" (the retry route) starts it again without using a try |
 | GET `/jobs/{id}/draft?format=&course=` | review | Asked before a draft leaves (SW21, `web/output.py`): what students would get, the banner the file will open with, "Review N decisions first" or "Download the draft anyway" for the file type asked for (`html`, `canvas`, `cartridge`, `docx`, `epub`); with none open, 303 to the finish line; 403 for a person who can only view |
 | POST `/jobs/{id}/draft` | review | "Download the draft anyway": makes the confirm token (signed with the session's secret, for this job and its current `result_version`, 10 minutes) and 303s to the download with it. Every single download of a draft without a valid token 303s to the GET above, so a typed or bookmarked address cannot skip the question; with the token the file's name ends in `-draft`, its head carries `<meta name="readablestem-state" content="draft">` and its body opens with "Draft: N decisions are still open. Not for students." (in the Word, EPUB, Canvas and Cartridge files too). A person who can only view gets a 403 from every download of a draft; the student preview (`/view`) of a draft carries the same banner |
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
@@ -1057,6 +1058,15 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
   the results page of a part (when two or more finished parts are kept) joins the ones the
   person still keeps into one HTML file (`web/combine.py`, docs/output.md "Combining the parts
   of a long source").
+- **Scanned and handwritten pages (WS7.8).** With the offer on and the box not checked, the
+  upload probe's count (`page_type.ImagePageCount`) is kept on the row (`pending_uploads.scans_json`)
+  and the page says it in the words of every other place (`routes.jobs.scans_note`). A file
+  within the limits of which more than half the pages are such pages (`ImagePageCount.mostly`) is
+  kept the same way even though it is small: its page asks whether to keep those pages as
+  pictures or read them, nothing is converted or counted before the answer, and the answer
+  (`POST /uploads/{id}` with `whole=1` and `images=pictures|read`) makes one document with the
+  file's own name and no parts. When no room for a waiting file is left, it is converted at once
+  as for any file.
 - **Retention.** The pending upload is deleted `RETENTION_HOURS` after it was made, by the
   hourly purge (`ops.retention.purge_pending`), "Discard this file" (asks first), when its last
   page has been sent, and with the person (`erase_user`). Past its time it answers 404 at
@@ -1186,6 +1196,8 @@ offer and the admin queue (F-213).
 | `waiting_reset` | Waiting until 00:00 UTC | queued, today's budget spent | Working | none |
 | `converting` | Converting | running, its lease current | Working | none |
 | `restarting` | Restarting | running past its lease, or put back after a lost attempt | Working | none |
+| `stopping` | Stopping | running, the owner pressed Cancel (`jobs.cancel_requested_at`) | Working | none |
+| `canceled` | Canceled | failed with the code `canceled` | Needs you | Convert it |
 | `stopped_file` | Stopped: this file cannot be converted as it is | failed by the file (encrypted, unreadable, scanned, no content, ...) | Needs you | Upload it again |
 | `stopped_service` | Stopped: not caused by your file | failed by the service, a try left | Needs you | Try again (N left) |
 | `stopped_no_tries` | Stopped | failed by the service with no try left, or a stop a try cannot help | Needs you | Upload it again as a new document |
@@ -1254,8 +1266,7 @@ page (type, unread ink: WS14.1, WS14.7, WS14.11), the language found (P2), page 
 the record link (SW25) and the audience helper (SW16).
 
 Not in the table yet, because nothing stored says so: the final checks of a conversion,
-a canceled job (no cancel code, column or route), and "checking", "paused for an update"
-and "waiting its turn" (P9). "Convert it in parts" for a job that is too large and "Report
+and "checking", "paused for an update" and "waiting its turn" (P9). "Convert it in parts" for a job that is too large and "Report
 this" for an unknown stop are not offered: no route does either from a stored job.
 
 ## My documents (`web/documents.py`)
@@ -1917,6 +1928,19 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
 ### Trying a document again (`web/retry.py`, `web/step_cache.py`)
 
+A finished document made at an older `PIPELINE_VERSION` than the code's is offered **"Convert it
+again"** on its job page (owner only; `states.rerun_step`; WS10.15), through the same route and
+form. It is a re-run, not a try after a failure: it uses no try (`jobs.retries` stays), no daily
+pages and none of the page allowance, keeps the decisions made (the worker carries them over as
+for a try), and has a spend cap of its own: `jobs.cap_base_usd` and `jobs.cap_base_calls` record
+what the job had spent when the re-run began, and the caps (`worker.job_caps`, and the equation
+read's budget in `web/reread.py`) count from there, so a document that used most of its cap the
+first time can be read again. `jobs.rerun_version` records the version it was started for, so it
+is offered once for each version. It is never offered where "Try again" or "Convert the missing
+parts" is, nor on a sample. The finished steps of a finished document are not kept (`forget_steps`),
+so the re-run asks the model again for all of it, up to its cap, until raw answers are kept for
+the job's life.
+
 A conversion can stop for reasons that are nobody's fault. The job page offers a button, not
 a dead end:
 
@@ -2113,9 +2137,13 @@ From top to bottom:
    is feature-aware (`outcome.failed_message`): with "Convert scanned or handwritten pages"
    offered it says such pages are read only when asked for and gives that route, and does not
    say the tool cannot convert them; without the option it says it cannot.
-4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
-   (notices derived again from the fixes as they are now, plus the stored ones of other
-   codes), one sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
+4. **Not handled in this file**, **Worth checking** and **Handled in this file**:
+   `pipeline.notices.current(result)` (notices derived again from the fixes as they are now,
+   plus the stored ones of other codes). "Not handled" holds only what the result records as
+   found and not converted; footnotes and code blocks, which are converted, are counted under
+   "Handled in this file" with one line each ("2 footnotes: kept where they fall in the text",
+   `notices.HANDLED_CODES`, `messages.HANDLED_MESSAGES`), and what the file does not contain is
+   not listed (F-043). One sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
    "The whole document:"), "(2 times)" for a count (a message with "{count}" in it, the
    hidden-text notices, says "(1,083 characters)" in the sentence instead), and, when the
    notice has a decision, "Decide it (one of your decisions)" or "You have decided it". A

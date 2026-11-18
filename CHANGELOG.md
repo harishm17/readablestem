@@ -36,6 +36,37 @@
   `Retry-After`.
 - PF11, first step: `readablestem ops storage-report` prints bytes per table and per finished
   document (docs/operations.md). No stored data, hash, migration or version changes.
+## Unreleased: the job page between upload and finished (branch feat/job-page-waiting-and-rerun)
+
+- Migration (two revisions, both additive, `alembic upgrade head`): `a3c7e1f95b24` adds
+  `jobs.cancel_requested_at`; `c5d2a8e6f1b7` adds `jobs.rerun_version`, `jobs.cap_base_usd`,
+  `jobs.cap_base_calls` and `pending_uploads.scans_json`. Existing rows get NULL and 0.
+- SW8: one poll contract (`web/poll.py`). A fragment (`/jobs/{id}/status`, `/progress`,
+  `/app/documents`, a part's `/preview`) opened without `HX-Request` redirects to the page that
+  holds it, and a job that finishes while its page is open becomes the finished page without a
+  reload (the status answer carries the heading and the body out of band).
+- WS11.3a: "Cancel" on a waiting or converting document (`POST /jobs/{id}/cancel`), the states
+  `stopping` and `canceled`, and a `<progress>` element with a text equivalent for a step with
+  counts. A queued job stops at once and its pages come back when counted today; a running one
+  stops its model calls at the next reservation. No time estimate. A canceled job is converted
+  again with "Convert it", which uses no try.
+- WS11.3e: nothing to build beyond a sweep. There is no late-check state, `checks_out` or "Stop
+  the checks" in this tree; every count and gate (job page, list, zip, combine, draft banner,
+  record) already reads `core.triage.review_load`.
+- WS11.3b (F-043): "Not handled in this file" lists only what the result records as found and
+  not converted. Footnotes and blocks of program code are converted: they are counted under
+  "Handled in this file" ("2 footnotes: kept where they fall in the text"), and the "Not
+  handled" pointer in "Before you share" appears only when something is listed.
+- WS10.15: a finished document made at an older `PIPELINE_VERSION` than the code's is offered
+  "Convert it again" on its job page, once for each version. It uses no try and no daily pages,
+  keeps the decisions, and its spend caps count from what the job had spent when it began, so
+  it is not stopped by the first run's cap. No release record (`releases.toml`) is added.
+- WS7.8: a file of which more than half the pages are scans or handwriting, with the box not
+  checked, waits for a choice (keep them as pictures, or read them, with the price) before
+  anything is converted or counted; a large file kept for its pages says its scans on the page
+  where it waits. One count (`ImagePageCount`), one wording (`scans_note`).
+- No stored document, recording, hash or prompt changes; `PIPELINE_VERSION` and
+  `RENDER_VERSION` are not bumped. A bump is not owed by this branch.
 
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 

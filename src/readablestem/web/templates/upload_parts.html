@@ -20,6 +20,34 @@
   </ul>
 </div>
 {% endif %}
+{% if scans_choice %}
+{# Most pages are scans or handwriting (WS7.8): the file waits for a choice, and nothing is
+   converted or counted until it is made. The words are `routes.jobs.scans_note`'s. #}
+<p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages ({{ size_text }}).
+  Nothing is converted or counted yet.</p>
+<p id="parts-scans">{{ scans_note }}</p>
+{% call form("upload.parts", "/uploads/" ~ pending.id, {"class": "upload-form"}) %}
+  <input type="hidden" name="whole" value="1">
+  <fieldset class="field">
+    <legend>What should happen to the scanned and handwritten pages?</legend>
+    <div class="field checkbox-field">
+      <input type="radio" id="images-pictures" name="images" value="pictures" checked>
+      <label for="images-pictures">Keep them as pictures, marked “Not converted”</label>
+    </div>
+    <div class="field checkbox-field">
+      <input type="radio" id="images-read" name="images" value="read">
+      <label for="images-read">Read them too</label>
+    </div>
+  </fieldset>
+  <button type="submit" class="button">Convert the document</button>
+{% endcall %}
+<p class="hint">Kept until {{ pending.retain_until|utc }}, then deleted.</p>
+<form method="post" action="/uploads/{{ pending.id }}/delete" class="inline-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <button type="submit" class="button-danger-outline">Discard this file</button>
+</form>
+{% else %}
+{% if scans_note %}<p id="parts-scans">{{ scans_note }}</p>{% endif %}
 <p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages ({{ size_text }}). Each part is its own document of up to
   {{ limit }} pages. Nothing is converted or counted yet.
   {% if pages_left is not none %}{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% endif %}</p>
@@ -78,4 +106,5 @@
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   <button type="submit" class="button-danger-outline">Discard this file</button>
 </form>
+{% endif %}
 {% endblock %}

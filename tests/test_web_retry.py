@@ -167,6 +167,76 @@ def fixes_json(result: DocumentResult) -> list[dict]:
     return [f.model_dump(mode="json") for f in result.fixes]
 
 
+# --------------------------------------------------------------------------- cancel
+
+
+def test_a_document_canceled_before_it_starts_gives_its_pages_back_and_counts_them_again(site):
+    """Cancel on a waiting document stops it at once and returns the pages counted at upload;
+    "Convert it" queues it again without using a try, and counts the pages again."""
+    job_id = job_id_from(upload(site.browser, PDF.read_bytes(), filename="waiting.pdf"))
+    counted = site.pages_used()
+    assert counted > 0
+    page = f"/jobs/{job_id}"
+    cancel = site.browser.post(
+        f"{page}/cancel", data={"csrf_token": csrf_from(site.browser.get(page).text)}
+    )
+    assert cancel.status_code == 303
+    job = site.job(job_id)
+    assert (job.status, job.error_code) == ("failed", "canceled")
+    assert site.pages_used() == 0
+    assert site.run_worker() is None  # nothing is waiting any more
+    shown = text_of(site.browser.get(page).text)
+    assert "Canceled" in shown and "Convert it" in shown
+    assert site.post_retry(site.browser, job_id).status_code == 303
+    job = site.job(job_id)
+    assert (job.status, job.retries, job.error_code) == ("queued", 0, None)
+    assert site.pages_used() == counted
+    assert site.run_worker() == job_id and site.job(job_id).status == "done"
+    # Not an upload of someone else's: only the owner may cancel.
+    other = site.bob.post(
+        f"{page}/cancel", data={"csrf_token": csrf_from(site.bob.get("/app").text)}
+    )
+    assert other.status_code == 404
+
+
+# --------------------------------------------------------------------------- a new version
+
+
+def test_a_document_made_by_an_older_converter_is_offered_one_rerun_with_a_cap_of_its_own(site):
+    """WS10.15: the offer is on the job page of a finished document whose stored version is
+    older than the code's; it uses no pages and no try, keeps the decisions, and counts the
+    spend cap from what the job had spent; it is offered once for each version."""
+    job_id = job_id_from(upload(site.browser, PDF.read_bytes(), filename="old.pdf"))
+    assert site.run_worker() == job_id
+    page = f"/jobs/{job_id}"
+    assert 'id="rerun-form"' not in site.browser.get(page).text  # made by this version
+    cap = site.ctx.settings.max_usd_per_job
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.result_json = {**job.result_json, "pipeline_version": "0.0.1"}
+        job.cost_usd = cap  # the first run used all of its cap
+    pages = site.pages_used()
+    assert "Convert it again" in text_of(site.browser.get(page).text)
+    assert (
+        site.bob.post(
+            f"{page}/retry", data={"csrf_token": csrf_from(site.bob.get("/app").text)}
+        ).status_code
+        == 404
+    )
+
+    assert site.post_retry(site.browser, job_id).status_code == 303
+    job = site.job(job_id)
+    assert (job.status, job.retries, job.cap_base_usd) == ("queued", 0, cap)
+    assert site.pages_used() == pages
+    assert site.run_worker() == job_id
+    job = site.job(job_id)
+    assert (job.status, job.error_code) == ("done", None)  # not stopped by the first run's cap
+    assert job.cost_usd > cap
+    assert 'id="rerun-form"' not in site.browser.get(page).text
+    assert site.post_retry(site.browser, job_id).status_code == 409
+
+
 # --------------------------------------------------------------------------- the pipeline
 
 

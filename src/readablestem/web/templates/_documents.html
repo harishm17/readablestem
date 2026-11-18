@@ -10,7 +10,7 @@
 {% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
 {% set list_url = list_url|default("/app/documents") %}
-<div id="documents" class="documents"{% if documents.unfinished %} hx-get="{{ list_url }}{{ "&" if "?" in list_url else "?" }}v={{ documents.version }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+<div id="documents" class="documents"{% if documents.unfinished %} hx-get="{{ list_url }}{{ "&" if "?" in list_url else "?" }}v={{ documents.version }}" hx-trigger="{{ poll_trigger }}" hx-swap="outerHTML"{% endif %}>
   <p class="documents-summary">{{ documents.summary }}.</p>
   {% set next = documents.review_next %}
   {% if next %}

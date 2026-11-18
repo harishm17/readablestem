@@ -200,6 +200,17 @@ class Job(Base):
     # A Word or PowerPoint upload (T3-30): the census its preflight counted (what the PDF route
     # did with the file; `web.office_convert.Census.to_json`, counts only). NULL for a PDF.
     office_json: Mapped[dict | None] = mapped_column(JSON)
+    # When the owner asked for this document to stop (`POST /jobs/{id}/cancel`). A queued job is
+    # stopped by the request itself; a running one is stopped by the worker at its next beat,
+    # which ends it with the error code `canceled` (`web.worker.Worker._beat`).
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A finished document converted again because the converter's version moved on (WS10.15,
+    # `web.retry`): the `PIPELINE_VERSION` it was last offered and started for (at most once per
+    # version), and what the job had spent when that run began. The new run's spend caps count
+    # from that spend, so a document that used most of its cap the first time can be read again.
+    rerun_version: Mapped[str | None] = mapped_column(String(32))
+    cap_base_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    cap_base_calls: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -507,6 +518,10 @@ class PendingUpload(Base):
     # The census of a Word or PowerPoint file made into this PDF (`Job.office_json`), handed to
     # every part cut from it.
     office_json: Mapped[dict | None] = mapped_column(JSON)
+    # The scanned and handwritten pages the probe counted (`page_type.ImagePageCount` as a
+    # dict) when the box was not checked: the chooser says them (`routes.jobs.scans_note`), and
+    # for a file within the limits with most pages of that kind it asks what to do with them.
+    scans_json: Mapped[dict | None] = mapped_column(JSON)
     # The 0-based pages already sent to be converted, so the rest can be chosen later.
     done_pages: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

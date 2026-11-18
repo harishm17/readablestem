@@ -58,6 +58,7 @@ from readablestem.web import (
     office_convert,
     output,
     pending,
+    poll,
     retention,
     sample,
     shares,
@@ -101,7 +102,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
 )
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.pending import MAX_PENDING_PER_USER
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import give_back_pages, next_day_start, pages_left, try_consume_pages
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
@@ -695,11 +696,15 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
     converting. 204 (no swap) while nothing changed, so an open tab costs one small
     query every few seconds; when something did, the whole list, with a `<title>` that
     htmx moves into the tab title ("My documents (4 of 6 finished)")."""
+    course_id = course if JOB_ID.match(course) else None
+    if redirect := poll.fragment_or_redirect(
+        request, f"/courses/{course_id}" if course_id else "/app"
+    ):
+        return redirect
     ctx = get_ctx(request)
     spend_closed = conversions_closed(ctx, user) is not None
     now = utcnow()
     # The list of one course's documents (the course page, T3-4) polls with its own id.
-    course_id = course if JOB_ID.match(course) else None
     with session_scope(ctx.factory) as session:
         if v and v == documents.list_version(
             session, user.id, now=now, budget_closed=spend_closed, course_id=course_id
@@ -712,8 +717,7 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
         "documents": listing,
         "list_url": f"/app/documents?course={course_id}" if course_id else "/app/documents",
     }
-    if request.headers.get("HX-Request") == "true":
-        context["page_title"] = listing.page_title
+    context["page_title"] = listing.page_title  # htmx moves it into the tab title
     return render(request, "_documents.html", context)
 
 
@@ -1045,6 +1049,8 @@ def _place_files(
             )
             continue
         too_big = len(data) > max_upload_bytes(s.max_upload_mb)
+        # Scanned and handwritten pages the box was not checked for (`scans_note` says them).
+        scans = asdict(found) if found.possible and not convert_images else None
         if pages > s.max_pages_per_job or too_big:
             placed.append(
                 _keep_for_parts(
@@ -1058,10 +1064,32 @@ def _place_files(
                     revises,
                     convert_images,
                     office=census.to_json() if census else None,
+                    scans=scans,
                 )
             )
             placed[-1].office = office
             continue
+        if scans and found.mostly(pages) and revises is None:
+            # More than half the pages are scans or handwriting: the file waits for the
+            # person's choice before anything is converted or counted (WS7.8). When it cannot
+            # wait (the room for waiting files is full), it is converted as for any file.
+            held = _keep_for_parts(
+                ctx,
+                user,
+                UploadedFile(file.filename, data),
+                pages,
+                mode,
+                course_id,
+                exam,
+                revises,
+                convert_images,
+                office=census.to_json() if census else None,
+                scans=scans,
+            )
+            if held.pending_id:
+                held.office = office
+                placed.append(held)
+                continue
         try:
             job_id = store_job(
                 ctx.factory,
@@ -1135,7 +1163,6 @@ def _place_files(
             ctx.factory, s, user_id=user.id, job_id=job_id, data=file.data, pages=pages
         )
         # Pages kept as pictures for want of the box are said at once (`scans_note`).
-        scans = asdict(found) if found.possible and not convert_images else None
         placed.append(Placed(file.filename, pages, job_id=job_id, office=office, scans=scans))
     return placed
 
@@ -1361,9 +1388,11 @@ def _keep_for_parts(
     revises: str | None,
     image_pages: bool = False,
     office: dict | None = None,
+    scans: dict[str, int] | None = None,
 ) -> Placed:
     """A file over the page or size limit is kept for the person to choose its pages
-    (T3-3, `web.pending`); nothing is converted or counted until they do."""
+    (T3-3, `web.pending`); nothing is converted or counted until they do. `scans`: the count of
+    scanned and handwritten pages, kept with it so the page it waits on says them (WS7.8)."""
     if revises is not None:
         return Placed(file.filename, pages, code="revision_too_large", status=422)
     try:
@@ -1380,6 +1409,7 @@ def _keep_for_parts(
                 exam=exam,
                 image_pages=image_pages,
                 office=office,
+                scans=scans,
             )
             pending_id = row.id
     except pending.TooManyPending:
@@ -1393,7 +1423,7 @@ def _keep_for_parts(
         log_event(logger, "upload_rejected", code="storage_full")
         return Placed(file.filename, code="storage_full", status=503, retry_after="3600")
     log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
-    return Placed(file.filename, pages, pending_id=pending_id)
+    return Placed(file.filename, pages, pending_id=pending_id, scans=scans)
 
 
 async def _answer_one(
@@ -1604,16 +1634,12 @@ def status_context(job: JobView) -> dict[str, Any]:
     }
 
 
-@router.get("/jobs/{job_id}")
-def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Response:
-    """Status page. Without JavaScript it reloads itself only if the user opted in
-    (`?auto=1`, offered in a <noscript> link); htmx polls otherwise.
-
-    `state` (`web.states`) is in the context: the status box, the tab title and the next
-    steps all print it.
-    """
-    job = load_job_status(request, job_id, user)
-    context = status_context(job) | {"auto_reload": auto == "1"}
+def job_page_context(
+    request: Request, job_id: str, user: CurrentUser, job: JobView
+) -> dict[str, Any]:
+    """Everything the job page prints beyond the status box: the page itself, and the body a
+    finished job sends in place of the waiting one (`job_status`)."""
+    context = status_context(job)
     context["course"] = _job_course(request, job_id, user)  # notation memory
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
@@ -1624,6 +1650,19 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     context["keep_until"] = (
         retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
     )
+    return context
+
+
+@router.get("/jobs/{job_id}")
+def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Response:
+    """Status page. Without JavaScript it reloads itself only if the user opted in
+    (`?auto=1`, offered in a <noscript> link); htmx polls otherwise.
+
+    `state` (`web.states`) is in the context: the status box, the tab title and the next
+    steps all print it.
+    """
+    job = load_job_status(request, job_id, user)
+    context = job_page_context(request, job_id, user, job) | {"auto_reload": auto == "1"}
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
@@ -1631,21 +1670,27 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
 
 @router.get("/jobs/{job_id}/status")
 def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Response:
-    """Status fragment polled by htmx. 204 (no swap) while nothing changed.
+    """Status fragment polled by htmx (SW8). 204 (no swap) while nothing changed.
 
-    Once the job finishes, the fragment says so and links to the results instead of
-    reloading the page (HX-Refresh did that before): a reload nobody asked for sends a
-    screen reader back to the top of the page and loses the reader's place, while the
-    status region already announces the change and the link is one step away.
+    When the job has finished, the answer is the status box and, out of band, the heading
+    and `#job-body` of the finished page, so the waiting page becomes the finished one where
+    the person is reading: no reload, the focus stays where it was, and the live region
+    says the new state once. Without scripts the page's "Refresh the status" link reloads it.
     """
     job = load_job_status(request, job_id, user)
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
+        return redirect
     context = status_context(job)
     if v and v == context["status_version"]:
         return Response(status_code=204)
-    context["results_link"] = job.finished
-    if request.headers.get("HX-Request") == "true":
-        # htmx sets document.title from a top-level <title> in the fragment.
-        context["page_title"] = f"{context['state'].label}: {job.title}"
+    # htmx sets document.title from a top-level <title> in the fragment.
+    context["page_title"] = f"{context['state'].label}: {job.title}"
+    if job.finished:
+        context = job_page_context(request, job_id, user, job) | {
+            "page_title": context["page_title"],
+            "oob": True,
+            "finished_swap": True,
+        }
     return render(request, "_job_status.html", context)
 
 
@@ -1660,6 +1705,8 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     with session_scope(ctx.factory) as session:
         row = job_access(session, job_id, user, VIEW)
         job = job_view(session, row, role=shares.role_of(session, row, user) or VIEW)
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
+        return redirect
     if v and v == job.progress_version:
         return Response(status_code=204)
     return render(request, "_job_progress.html", {"job": job})
@@ -1804,6 +1851,12 @@ RETRY_REFUSED = {
         "You already have as many documents waiting or being converted as one person may. "
         "Wait for one to finish, then try again. Nothing was changed.",
     ),
+    "over_quota": (
+        429,
+        "Not enough pages left today",
+        "This document's pages no longer fit in what is left of today's pages. Try again after "
+        "the limit starts again. Nothing was changed.",
+    ),
 }
 
 
@@ -1811,13 +1864,16 @@ RETRY_REFUSED = {
 @submit_once("job.retry")
 def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Try again" on a stopped or partly converted document (T3-1, `web.retry`): the same
-    job goes back in the queue. Nothing is counted against the daily pages (this is not an
+    job goes back in the queue. "Convert it again" on a finished document made by an older
+    converter (WS10.15) is the same route, with a spend limit of its own. Nothing is counted
+    against the daily pages (this is not an
     upload), the finished steps and the decisions made are kept, and every limit holds: the
     daily budget (a queued job waits for it), the job's own spend caps, the documents
     waiting or converting at once, the tries per job and the rate limit."""
     ctx = get_ctx(request)
     enforce(request, "retry_user", user.id)
     refused = ""
+    started = "retry"
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # the redirect is built from the owned row, not the request
@@ -1833,8 +1889,11 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             )
             or 0
         )
+        # A document canceled before any worker began it had its pages given back: converting
+        # it counts them again (a canceled one that had begun kept them counted).
+        recount = job.error_code == states.CANCELED and not job.attempts
         try:
-            retry_rules.start(
+            started = retry_rules.start(
                 job, active_others=others, max_active=access.files_per_upload(user.access_tier)
             )
         except retry_rules.RetryRefused as exc:
@@ -1842,7 +1901,14 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             if refused == "not_stopped" and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
                 refused = "already_queued"
         else:
-            retention.restart_clock(job, ctx.settings)
+            quota = access.page_quota(ctx.settings, user.access_tier)
+            if recount and not try_consume_pages(
+                session, user.id, job.page_count, quota=quota, day=utc_today()
+            ):
+                session.rollback()  # it stays canceled, and nothing was counted
+                refused = "over_quota"
+            else:
+                retention.restart_clock(job, ctx.settings)
             tries = job.retries or 0
     if refused == "no_tries_left":
         raise PageError(
@@ -1860,12 +1926,58 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     if refused:
         status, title, message = RETRY_REFUSED[refused]
         raise PageError(status, title, message, context={"job_id": job_id})
-    log_event(logger, "job_retried", job_id=job_id, tries=tries)
+    log_event(
+        logger, "job_rerun" if started == "rerun" else "job_retried", job_id=job_id, tries=tries
+    )
     flash(
         request,
         "Your document is queued again. What was already converted is kept, and nothing "
-        "was counted against your daily pages.",
+        "was counted against your daily pages."
+        if started == "retry"
+        else "Your document is queued to be converted again with the current version. Your "
+        "decisions are kept, and nothing was counted against your daily pages.",
         undo=False,
+    )
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
+
+
+@router.post("/jobs/{job_id}/cancel", dependencies=[limited("retry"), Depends(require_csrf)])
+@submit_once("job.cancel")
+def cancel_job(request: Request, job_id: str, user: UserDep) -> Response:
+    """Cancel a document that is waiting or converting (WS11.3a). A document no worker has
+    begun stops at once and its pages come back (when they were counted today); one a worker
+    has begun is asked to stop, and the worker ends it at its next beat (`web.worker`) with
+    nothing returned. Either way the upload is kept: "Convert it" starts it again, or it can be
+    deleted."""
+    ctx = get_ctx(request)
+    enforce(request, "retry_user", user.id)
+    now = utcnow()
+    gave_back = False
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        owned_id = job.id
+        if job.status == JobStatus.QUEUED:
+            job.status = JobStatus.FAILED
+            job.error_code = states.CANCELED
+            job.finished_at = now
+            if not job.attempts and utc_today(as_utc(job.created_at)) == utc_today(now):
+                gave_back = give_back_pages(session, user.id, job.page_count, day=utc_today(now))
+            stopped = True
+        elif job.status == JobStatus.RUNNING:
+            job.cancel_requested_at = job.cancel_requested_at or now
+            stopped = True
+        else:
+            stopped = False
+    if not stopped:
+        raise PageError(
+            409,
+            "Nothing to cancel",
+            "This document is not waiting or converting. Nothing was changed.",
+            context={"job_id": job_id},
+        )
+    log_event(logger, "job_cancel_requested", job_id=owned_id, pages_given_back=gave_back)
+    flash(
+        request, "Canceled. Your file is kept; you can convert it later or delete it.", undo=False
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 

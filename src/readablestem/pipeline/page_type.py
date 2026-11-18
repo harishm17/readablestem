@@ -2314,6 +2314,11 @@ class ImagePageCount:
         """The count as a sentence says it: "3", or "at least 3"."""
         return f"at least {self.found}" if self.at_least else str(self.found)
 
+    def mostly(self, pages: int) -> bool:
+        """More than half of a file's `pages` are pages the image page pass reads (WS7.8): the
+        upload says so, as a choice, before it converts anything."""
+        return pages > 0 and self.found * 2 > pages
+
 
 def count_image_pages(pages: Iterable[PageType]) -> ImagePageCount:
     """The count by kind of the pages the image page pass reads (`image_kind`) among page

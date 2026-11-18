@@ -231,12 +231,47 @@ def test_the_steps_update_without_touching_the_live_region(site, browser, jobs):
     assert region.inner_text() == before
     site.converter.output = card_output()  # 3 decisions open
     finish(site, job_id)
-    page.locator("#job-status").get_by_role("link", name="Start the review").wait_for(timeout=15000)
+    page.get_by_role("link", name="Review 3 decisions").wait_for(timeout=15000)
     # The tab title follows the finished state (the state table's label), then the document.
     title = page.title()
     assert title.endswith(": SECRET-HEADING Kinematics | ReadableSTEM")
     assert not title.startswith(("Waiting", "Converting", "Restarting"))
     assert page.locator("#job-progress li").count() == 0
+    context.close()
+
+
+def test_a_job_that_finishes_while_its_page_is_open_becomes_the_finished_page(
+    site, browser, axe_source
+):
+    """No navigation: the heading, the finished body and the title replace the waiting ones, the
+    waiting-only link is gone, the focus stays where it was, and the swapped page passes axe."""
+    job_id = upload(site, browser)
+    set_progress(site, job_id, equations=(1, 21))
+    context, page = open_page(browser, site)
+    page.goto(f"{site.base}/jobs/{job_id}")
+    assert page.get_by_role("link", name="Refresh the status").count() == 1
+    page.get_by_role("link", name="Skip to main content").focus()  # outside what is swapped
+    focused = page.evaluate("document.activeElement.outerHTML")
+    navigations: list[str] = []
+    page.on("framenavigated", lambda frame: navigations.append(frame.url))
+    site.converter.output = card_output()
+    finish(site, job_id)
+    page.get_by_role("link", name="Review 3 decisions").wait_for(timeout=15000)
+    assert page.get_by_role("link", name="Refresh the status").count() == 0
+    assert page.locator("h1").inner_text() == "SECRET-HEADING Kinematics"
+    assert page.evaluate("document.activeElement.outerHTML") == focused
+    assert navigations == []
+    assert not strict_axe(page, axe_source)
+    context.close()
+
+
+def test_cancel_on_the_waiting_page_stops_the_document_and_offers_to_convert_it(site, browser):
+    job_id = upload(site, browser)
+    context, page = open_page(browser, site)
+    page.goto(f"{site.base}/jobs/{job_id}")
+    page.get_by_role("button", name="Cancel").click()
+    page.get_by_role("button", name="Convert it").wait_for(timeout=15000)
+    assert "Canceled" in page.locator("#job-status").inner_text()
     context.close()
 
 

@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 
-from readablestem.web import access, events, pending, ranges
+from readablestem.web import access, events, pending, poll, ranges
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import utc_today
 from readablestem.web.db import PendingUpload, session_scope, utcnow
@@ -115,6 +116,9 @@ def chooser_context(
 ) -> dict[str, Any]:
     s = ctx.settings
     now = utcnow()
+    from readablestem.pipeline.page_type import ImagePageCount
+    from readablestem.web.routes.jobs import Placed, scans_note
+
     with session_scope(ctx.factory) as session:
         row = owned_pending(session, upload_id, user)
         left = pages_left(
@@ -128,7 +132,17 @@ def chooser_context(
     heavy = row.size_bytes > s.max_upload_mb * 1024 * 1024
     shown_text = ranges.suggestion_text(suggested) if typed is None else typed
     rows = ranges.preview(shown_text, total=row.pages, limit=s.max_pages_per_job, taken=done)
+    # The scanned and handwritten pages the upload probe counted, said as everywhere else
+    # (`scans_note`). A file within the limits with most pages of that kind waits for a choice
+    # about them before anything is converted (WS7.8); a larger one says it beside its parts.
+    note = scans_note(s, Placed(row.filename, row.pages, scans=row.scans_json))
+    counted = ImagePageCount(**row.scans_json) if row.scans_json else ImagePageCount()
+    choice = bool(
+        note and not done and row.pages <= s.max_pages_per_job and counted.mostly(row.pages)
+    )
     context: dict[str, Any] = {
+        "scans_note": note,
+        "scans_choice": choice,
         "preview_rows": rows,
         "preview_summary": preview_summary(rows, left),
         "pending": row,
@@ -196,6 +210,10 @@ def preview(request: Request, upload_id: str, user: UserDep, parts: str = "") ->
     """The parts as typed, with their page counts: what the chooser's preview swaps in while
     the person types (htmx). Only page numbers are sent; nothing is stored or logged."""
     context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000])
+    if redirect := poll.fragment_or_redirect(
+        request, f"/uploads/{upload_id}"
+    ):  # after the owner check
+        return redirect
     return render(request, "_parts_preview.html", context | {"oob": True})
 
 
@@ -213,9 +231,20 @@ class Outcome:
 
 
 def _start_parts(
-    ctx: AppContext, user: CurrentUser, upload_id: str, text: str, shrink: bool, enforce_each
+    ctx: AppContext,
+    user: CurrentUser,
+    upload_id: str,
+    text: str,
+    shrink: bool,
+    enforce_each,
+    *,
+    whole: bool = False,
+    images: bool | None = None,
 ) -> Outcome:
-    """Cut out, check and queue the parts typed in `text`, in order, until one cannot be."""
+    """Cut out, check and queue the parts typed in `text`, in order, until one cannot be.
+
+    `whole`: the choice about scanned and handwritten pages (WS7.8): the file as it is, one
+    document with its own name, and `images` says whether those pages are read."""
     s = ctx.settings
     out = Outcome()
     with session_scope(ctx.factory) as session:
@@ -225,6 +254,9 @@ def _start_parts(
         course, exam, mode = row.course_id, bool(row.exam_mode), row.retention_mode
         asked_images = bool(row.image_pages) and s.feature_image_pages
         office = dict(row.office_json) if row.office_json else None
+    if whole:
+        text, shrink = f"1-{total}", False
+        asked_images = bool(images) and s.feature_image_pages
     try:
         parts = ranges.parse_parts(text, total=total, limit=s.max_pages_per_job, taken=done)
     except ranges.PartsError as exc:
@@ -236,7 +268,7 @@ def _start_parts(
     for number, part in enumerate(parts, start=1):
         named = f"Part {number} (pages {part.label})" if len(parts) > 1 else f"Pages {part.label}"
         try:
-            cut = extract_part_isolated(data, list(part.pages), shrink=shrink)
+            cut = data if whole else extract_part_isolated(data, list(part.pages), shrink=shrink)
             if len(cut) > limit_bytes:
                 out.error = (
                     f"{named} is {pending.size_text(len(cut))}, over the {s.max_upload_mb} MB "
@@ -252,7 +284,7 @@ def _start_parts(
                 may_have = found.possible
             else:
                 pages, may_have = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job), False
-            filename = part_filename(name, part.label)
+            filename = name if whole else part_filename(name, part.label)
             job_id = store_job(
                 ctx.factory,
                 s,
@@ -264,8 +296,8 @@ def _start_parts(
                 course_id=course,
                 exam=exam,
                 image_pages=asked_images and may_have,
-                part_group=upload_id,
-                part_label=part.label,
+                part_group=None if whole else upload_id,
+                part_label=None if whole else part.label,
                 office=office,
             )
         except ExtractFailed:
@@ -355,6 +387,8 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
     form = await request.form()
     text = str(form.get("parts") or "")
     shrink = form.get("shrink") == "on"
+    whole = form.get("whole") == "1"  # the choice about scanned pages: the file as it is
+    images = form.get("images") == "read"
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         from readablestem.web.routes.jobs import conversions_paused
 
@@ -375,8 +409,11 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
                 counted[0] += 1
 
         outcome = await run_in_threadpool(
-            _start_parts, ctx, user, upload_id, text, shrink, enforce_each
-        )
+            partial(
+                _start_parts, ctx, user, upload_id, text, shrink, enforce_each,
+                whole=whole, images=images,
+            )
+        )  # fmt: skip
     finally:
         ctx.uploads.leave(user.id)
         # The per-person rule counts accepted parts only: a part not started gives its count back.

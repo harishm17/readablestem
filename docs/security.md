@@ -101,7 +101,7 @@ cannot skip these checks unnoticed.
 
 `GET /jobs/{id}/share` and `POST /jobs/{id}/share` and `/share/{share_id}/revoke` (who can open a document, below) are owner-only; the POSTs are CSRF-checked and not rate limited (they send nothing, and a document holds at most 10 shares).
 
-`POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
+`POST /jobs/{id}/cancel` ("Cancel", on a waiting or converting document) is owner-only, CSRF-checked and rate limited like the retry route; it stores a request and changes nothing else about the job. `POST /jobs/{id}/retry` ("Try again", and "Convert it again" for a finished document made by an older converter) is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
 
 The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, are owner-only
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
