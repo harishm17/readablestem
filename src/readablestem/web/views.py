@@ -56,15 +56,6 @@ def fix_status_label(fix: Fix) -> str:
     return FIX_STATUS_LABELS.get(fix.status, fix.status.value)
 
 
-KIND_LABELS = {
-    Kind.EQUATION: "Equation",
-    Kind.FIGURE: "Figure",
-    Kind.TABLE: "Table",
-    Kind.HEADING: "Heading",
-    Kind.PARAGRAPH: "Paragraph",
-    Kind.LIST_ITEM: "List item",
-}
-
 # The sentence a stop that "Try again" can help ends with. It is said only while a try is
 # left (`web.states`: the message and the offer come from one call), so a job with no tries
 # left never says "use Try again" (F-315).

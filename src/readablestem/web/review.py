@@ -354,7 +354,7 @@ def item_labels(result: DocumentResult) -> dict[str, str]:
     print when every table has a "Table N" caption and no two share one: a table the
     detector missed would otherwise shift every number, and the card titled "Table 3"
     would show the caption "Table 4"."""
-    from readablestem.web.views import KIND_LABELS
+    from readablestem.web.messages import KIND_LABELS
 
     numbers = item_numbers(result)
     labels: dict[str, str] = _kept_image_labels(result)

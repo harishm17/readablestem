@@ -2,7 +2,8 @@
 {# `audience` (web.views.audience_of): the owner is testing what a student hears; anyone the
    document was shared with is just listening to it. The demo has none: it is the owner's view. #}
 {% set for_owner = audience|default("owner") == "owner" %}
-{% block title %}{% if for_owner %}Listen as a student{% else %}Listen to {{ title }}{% endif %}{% endblock %}
+{# The page's name is the document's name, then "Listen": a tab or a history list tells one document's transcript from another's (`documents.document_title`, the name every page uses). #}
+{% block title %}{{ title }}: Listen{% endblock %}
 {% block description %}Roughly what a screen reader says for a converted document, so you can hear it before you share it.{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ static_url('listen.css') }}">

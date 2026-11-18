@@ -101,6 +101,7 @@ from readablestem.web.job_page import word_kind
 from readablestem.web.logsafe import log_event
 from readablestem.web.mathml import try_sanitize_mathml
 from readablestem.web.messages import (
+    KIND_LABELS,
     NOTE_LABEL,
     Explained,
     confidence_label,
@@ -171,7 +172,6 @@ from readablestem.web.routes.jobs import (
 from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
-    KIND_LABELS,
     JobView,
     decisions_label,
     fix_status_label,

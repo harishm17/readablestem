@@ -5,18 +5,23 @@
    JavaScript, or in a browser that cannot speak, the transcript is still plain text: the
    controls are hidden until the script has found a speech engine. Play, Previous and Next
    are the whole transport; everything else is under "More controls". Play starts at the
-   lesson (past the title, notices and licence); "Play from the beginning" is in the
-   disclosure. #}
-{% set lesson = namespace(at=0) %}
-{% for item in items %}{% if not lesson.at and item.role.startswith("Main landmark") %}{% set lesson.at = loop.index %}{% endif %}{% endfor %}
-{% set before = lesson.at - 1 if lesson.at > 1 else 0 %}
+   first content item (past the title, the skip link and the bare landmark, which the
+   transcript marks with `item.before`, by kind); "Play from the beginning" is in the
+   disclosure. On a wide window a second column draws the selected item (an equation, a
+   picture, a table) from the <template> inside its row; the column is for the eyes: it is
+   hidden from assistive technology, never takes focus and is never a live region. Every item
+   also links to its place on the student page when the page has one (`student_url`). #}
+{% set before = items|selectattr("before")|list|length %}
+{% set lesson = namespace(at=before + 1 if before and before < items|length else 0) %}
+{% set student = student_url|default("") %}
 {% macro entries(rows, start, label_id, lesson_at) %}
 <ol class="listen-transcript" role="list" start="{{ start }}" aria-labelledby="{{ label_id }}">
   {% for item in rows %}
   {% set n = start + loop.index0 %}
   <li class="listen-item" id="item-{{ n }}" data-listen-item data-listen-id="{{ item.ref }}"{% if n == lesson_at %} data-listen-lesson{% endif %} data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
     <span class="listen-role">{{ item.role }}</span>{% if item.text %}<span class="visually-hidden">: </span> <span class="listen-text">{{ item.text }}</span>{% endif %}
-
+    {% if student %}<a class="listen-place" href="{{ student }}{% if item.anchor %}#{{ item.anchor|urlencode }}{% endif %}">Student page<span class="visually-hidden">: {{ item.role }}</span></a>{% endif %}
+    {% if item.thing %}<template data-listen-thing>{{ item.thing|safe }}</template>{% endif %}
   </li>
   {% endfor %}
 </ol>
@@ -77,7 +82,7 @@
 
   <h2 id="transcript-heading">Transcript</h2>
   <p class="hint" id="transcript-hint">{{ items|length }} {{ "item" if items|length == 1 else "items" }}.
-    {%- if before %} Play starts at the lesson.{% endif %}</p>
+    {%- if before %} Play starts at the first item of the lesson.{% endif %}</p>
   {# A compact index of plain links (it works without script) and a filter (needs script, so
      it stays hidden until the controls are shown). #}
   {% set headings = [] %}{% set equations = [] %}{% set pages = [] %}
@@ -126,6 +131,7 @@
     </div>
     <p class="hint listen-filter-count" data-listen-filter-count role="status"></p>
   </div>
+  <div class="listen-layout">
   <div data-listen-transcript>
     {% if before %}
     <details class="listen-before" data-listen-before>
@@ -136,5 +142,8 @@
     {% else %}
     {{ entries(items, 1, "transcript-heading", lesson.at) }}
     {% endif %}
+  </div>
+  {# The thing itself, for sighted readers on a wide window. Not a landmark, not announced. #}
+  <div class="listen-thing" data-listen-thing-panel aria-hidden="true" hidden></div>
   </div>
 </div>

@@ -64,6 +64,9 @@ def test_the_owner_hears_the_converted_page(site):
     assert response.status_code == 200
     body = response.text
     assert "<h1>Listen as a student</h1>" in body
+    # F-371: the tab says which document it is (the name every page uses), then "Listen".
+    name = re.search(r'<p class="listen-doc"><strong>(.+?)</strong>', body).group(1)
+    assert f"<title>{name}: Listen | ReadableSTEM</title>" in body
     assert (
         "Roughly what a screen reader says.</strong> Each one speaks differently: test with yours."
         in body
@@ -75,6 +78,12 @@ def test_the_owner_hears_the_converted_page(site):
     assert "Equation" in body and "x plus 1" in body  # the stored reading of p1-e3
     assert 'data-listen="play"' in body and 'data-listen="stop"' in body
     assert f"/jobs/{site.job_id}/view" in body
+    # F-465: every item links to its place on the student page; an equation's row carries the
+    # equation itself for the second column, and the column is not announced.
+    assert body.count('class="listen-place"') == body.count("data-listen-item")
+    assert f'href="/jobs/{site.job_id}/view#p1-e3"' in body
+    assert "<template data-listen-thing><math" in body
+    assert 'data-listen-thing-panel aria-hidden="true"' in body
     assert re.search(r"/static/listen\.[0-9a-f]{12}\.js", body)
     assert "<script>" not in body  # script-src 'self': no inline script
     assert f'data-listen-doc="{site.job_id}"' in body  # the player keeps its place per document

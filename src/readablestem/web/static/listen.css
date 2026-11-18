@@ -60,17 +60,28 @@
 
 /* The transcript: one line per thing a screen reader says, each with its role, divided by
    a hairline and not boxed, so a long document reads as a document and not a stack of cards.
-   On a wide screen the role sits in its own column. */
+   The transcript has the reading width (--prose-max), the role a small line above the text.
+   On a wide window a second column draws the selected item (an equation, a picture, a table):
+   the page's .listen-layout. It is for the eyes only (aria-hidden, no focus, no live region)
+   and hidden below the width where it would crowd the text. */
 [data-listen-transcript] { max-width: var(--prose-max); }
 .listen-transcript { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
 .listen-item { border-top: 1px solid var(--border-subtle); padding: var(--space-2) var(--space-2); margin: 0; overflow-wrap: anywhere; scroll-margin-top: calc(var(--listen-sticky) + var(--space-3)); }
 .listen-item[hidden], .listen-before[hidden] { display: none; }
 .listen-transcript:last-child .listen-item:last-child { border-bottom: 1px solid var(--border-subtle); }
 .listen-role { display: block; font-size: var(--step--1); font-weight: 700; color: var(--ink-muted); }
-@media (min-width: 40rem) {
-  .listen-item { display: grid; grid-template-columns: 10rem 1fr; gap: var(--space-3); }
-  .listen-item .visually-hidden { grid-column: 1 / -1; }
+.listen-place { display: inline-block; margin-top: var(--space-1); font-size: var(--step--1); }
+.listen-layout { display: block; }
+.listen-thing { display: none; }
+@media (min-width: 64rem) {
+  .listen-layout { display: grid; grid-template-columns: minmax(0, var(--prose-max)) minmax(16rem, 1fr); gap: var(--space-5); align-items: start; }
+  .listen-thing:not([hidden]) { display: block; position: sticky; top: calc(var(--listen-sticky) + var(--space-3)); max-height: calc(100vh - var(--listen-sticky) - var(--space-5)); overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-4); }
+  .listen-thing math { font-size: 1.6em; }
+  .listen-thing img { max-width: 100%; height: auto; }
+  .listen-thing table { border-collapse: collapse; }
+  .listen-thing th, .listen-thing td { border: 1px solid var(--border-subtle); padding: var(--space-1) var(--space-2); text-align: left; }
 }
+@media (min-width: 64rem) and (forced-colors: active) { .listen-thing:not([hidden]) { border-color: CanvasText; } }
 .listen-item[data-kinds^="heading"] .listen-text { font-weight: 700; }
 .listen-item[data-kinds^="landmark"], .listen-item[data-kinds^="title"], .listen-item[data-kinds^="language"], .listen-item[data-kinds^="page-break"] { color: var(--ink-muted); }
 .listen-item[data-kinds^="not-converted"] { border: 1px solid var(--warn); border-radius: var(--radius-control); background: var(--warn-tint); }

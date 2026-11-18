@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from readablestem.core.types import Check, DocumentResult, Notice
+from readablestem.core.types import Check, DocumentResult, Kind, Notice
 from readablestem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
@@ -604,6 +604,50 @@ TABLE_CHECK_PARTS = {
 }
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
 UNKNOWN_NOTICE_MESSAGE = "Something in this file may need a look."
+
+# What each kind of decision is called, for the review screen's headings and for the role a
+# screen reader says in Listen (`web.listen`): one table, so the two never say it two ways.
+KIND_LABELS = {
+    Kind.EQUATION: "Equation",
+    Kind.FIGURE: "Figure",
+    Kind.TABLE: "Table",
+    Kind.HEADING: "Heading",
+    Kind.PARAGRAPH: "Paragraph",
+    Kind.LIST_ITEM: "List item",
+}
+
+# The other roles Listen names, in plain words: not the ARIA terms ("Complementary
+# landmark", "Content information landmark") a person who has never met them would not know.
+LISTEN_LABELS = {
+    "main": "Main content",
+    "navigation": "Navigation",
+    "complementary": "Side notes",
+    "contentinfo": "Footer",
+    "banner": "Header",
+    "region": "Section",
+    "search": "Search",
+    "list": "List",
+    "page-title": "Page title",
+    "page-language": "Page language",
+    "language-change": "Language change",
+    "caption": "Caption",
+    "image": "Image",
+    "image-not-converted": "Image, not converted",
+    "not-converted": "Not converted",
+    "note": "Note",
+    "term": "Term",
+    "definition": "Definition",
+    "code": "Code",
+    "quote": "Quote",
+    "end-quote": "End quote",
+    "page-break": "Page break",
+    "section-closed": "Collapsed section",
+    "expandable": "Expandable section",
+    "row": "Row",
+    "section": "Section",
+    "long-description": "Long description",
+    "skip-link": "Skip link",
+}
 
 SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth checking"}
 # Failed checks of a fix accepted with optional notes (`Fix.review == "optional"`): they

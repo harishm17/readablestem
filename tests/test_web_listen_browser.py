@@ -156,21 +156,21 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     assert play.inner_text() == "Play" and stop.is_disabled()
 
-    play.click()  # Play starts at the lesson, past the title and the language
-    assert spoken(page) == ["Main landmark"]
+    play.click()  # Play starts at the lesson, past the title, the language and the bare landmark
+    assert spoken(page) == ["Heading level 1: Kinematics"]
     assert page.locator(".listen-item.is-current").count() == 1
-    assert "Main landmark" in current(page)
+    assert "Kinematics" in current(page)
     assert page.locator(".listen-item.is-current").get_attribute("aria-current") == "true"
     assert status(page) == "Playing."
     assert play.inner_text() == "Pause"  # one button plays and pauses
     assert page.evaluate("window.__spoken[0].voice") == "Local Voice"
 
     page.evaluate("window.__end()")  # the voice finishes an item: the next is spoken
-    assert spoken(page)[1] == "Heading level 1: Kinematics"
+    assert spoken(page)[1] == "The speed is v equals d divided by t."
 
     page.get_by_role("button", name="Next", exact=True).click()
-    assert spoken(page)[-1].startswith("The speed is")
-    assert "Item 5 of" in page.locator("[data-listen-position]").inner_text()
+    assert spoken(page)[-1] == "Heading level 2: Average speed"
+    assert "Item 6 of" in page.locator("[data-listen-position]").inner_text()
 
     play.click()  # Pause
     assert page.evaluate("window.__paused") is True
@@ -180,10 +180,10 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     assert page.evaluate("window.__paused") is False
     assert status(page) == "Playing."
 
+    page.get_by_role("button", name="Previous", exact=True).click()
+    assert "The speed is v equals d divided by t." in spoken(page)[-1]
     page.get_by_role("button", name="Next heading").click()
     assert spoken(page)[-1] == "Heading level 2: Average speed"
-    page.get_by_role("button", name="Previous", exact=True).click()
-    assert "The speed is v equals d over t." in spoken(page)[-1]
     page.get_by_role("button", name="Next equation").click()
     assert spoken(page)[-1] == "Equation: x plus 1"
 
@@ -311,7 +311,7 @@ def test_a_browser_that_blocks_storage_still_plays(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=blocked + STUB)
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
     page.locator("[data-listen=play]").click()
-    assert spoken(page) == ["Main landmark"]
+    assert spoken(page) == ["Heading level 1: Kinematics"]
     context.close()
 
 
@@ -374,7 +374,8 @@ def test_without_javascript_the_transcript_is_text_and_the_controls_stay_hidden(
     assert page.locator("[data-listen-controls]").is_hidden()
     assert "Playing needs JavaScript" in page.locator("noscript").inner_text()
     assert (
-        "The speed is v equals d over t." in page.locator("[data-listen-transcript]").inner_text()
+        "The speed is v equals d divided by t."
+        in page.locator("[data-listen-transcript]").inner_text()
     )
     context.close()
 
@@ -442,4 +443,26 @@ def test_the_scroll_offset_follows_the_real_height_of_the_transport(site, browse
     page.wait_for_timeout(300)
     top = page.locator("#item-6").evaluate("e => e.getBoundingClientRect().top")
     assert top >= height - 1
+    context.close()
+
+
+def test_a_wide_window_shows_the_selected_equation_without_stealing_focus(site, browser, job):
+    """F-465: the second column draws the selected item, is hidden from assistive technology,
+    never takes focus and is not a live region; each item links to its student page place."""
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    panel = page.locator("[data-listen-thing-panel]")
+    assert panel.get_attribute("aria-hidden") == "true" and panel.get_attribute("aria-live") is None
+    assert not panel.is_visible()  # nothing selected yet
+    page.locator('[data-listen-id="p1-e3"] .listen-text').click()
+    assert panel.is_visible() and panel.locator("math").count() == 1
+    assert page.evaluate("document.activeElement.closest('[data-listen-thing-panel]')") is None
+    assert page.evaluate("document.activeElement.tagName") in {"MAIN", "BODY"}  # not the panel
+    link = page.locator('[data-listen-id="p1-e3"] a.listen-place')
+    assert link.get_attribute("href") == f"/jobs/{job}/view#p1-e3"
+    page.locator('.listen-item[data-kinds^="heading"] .listen-text').first.click()  # no thing
+    assert not panel.is_visible()
+    page.set_viewport_size(NARROW)
+    page.locator('[data-listen-id="p1-e3"] .listen-text').click()
+    assert not panel.is_visible()  # a narrow window has the transcript alone
     context.close()

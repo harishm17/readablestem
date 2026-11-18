@@ -36,16 +36,20 @@ def test_page_title_landmarks_headings_paragraphs_and_lists():
     )
     spoken = said(items)
     assert spoken[:2] == ["Page title: Kinematics", "Page language: English"]
-    assert "link Skip to main content" in spoken
-    assert "Navigation landmark, Contents" in spoken
-    assert "Main landmark" in spoken
+    # F-120: the skip link and the bare landmark are said before the lesson, chosen by kind;
+    # Play starts at the navigation, the first item with content. F-122: plain role words.
+    assert spoken[2:4] == ["Skip link: Skip to main content", "Navigation, Contents"]
+    assert [i.before for i in items[:5]] == [True, True, True, False, False]
+    assert "Main content" in spoken
+    assert items[2].kind == "skip-link"
+    assert "Navigation, Contents" in spoken
     assert "Heading level 1: Motion" in spoken
     assert "Heading level 2: Kinematics" in spoken
     assert "Speed is distance over time." in spoken
     assert "List, 3 items" in spoken
     assert "List, 1 item, nested" in spoken
     assert spoken.index("one") < spoken.index("two") < spoken.index("inner") < spoken.index("three")
-    assert "Content information landmark, About this version" in spoken
+    assert "Footer, About this version" in spoken
     # the style sheet is never read
     assert not any("color" in s for s in spoken)
     assert [i.kind for i in items if i.kind == "heading"] == ["heading", "heading"]
@@ -122,7 +126,7 @@ def test_figure_alt_caption_and_long_description():
     spoken = said(items)
     assert "Figure: A rising line." in spoken
     assert "Figure 2.1 Position." in spoken
-    assert "Expandable section, collapsed: Long description of figure 2.1" in spoken
+    assert "Collapsed section: Long description of figure 2.1" in spoken
     assert "The line starts at zero." in spoken
     assert next(i for i in items if i.text == "The line starts at zero.").role == (
         "Long description"
@@ -272,3 +276,15 @@ def test_speakable_rule_matches_the_review_screen():
 
     for text in ("v equals d over t", r"\frac{d}{t}", "x^2", "a_b", "{x}", "", None, "  "):
         assert _speakable(text) == listen.speakable(text)
+
+
+def test_a_line_break_is_a_pause_and_a_quotation_ends():
+    items = listen.build_transcript(
+        doc(
+            "<main><p>Line one<br>line two<br><br>three.<br></p>"
+            "<blockquote><p>To be.</p></blockquote></main>"
+        )
+    )
+    spoken = said(items)
+    assert "Line one, line two, three." in spoken
+    assert spoken[-3:] == ["Quote", "To be.", "End quote"]
