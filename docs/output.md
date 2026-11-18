@@ -201,8 +201,10 @@ our own would be a second MathML reader to keep right.
   inside `<main>`. A WebP picture is written as a PNG. The page's language and title are
   passed on. Every id an in-page link names is put where pandoc writes a Word bookmark:
   pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
-  picture and drops it on a paragraph, a figure, a list, a row or a cell, so there the id
-  moves to an empty `<span>` at the element's start (F-514). A footnote's mark (`doc-noteref`)
+  picture and drops it on a paragraph, a list, a row or a cell, so there the id moves to an
+  empty `<span>` at the element's start (F-514). A figure's id is a bookmark only from pandoc
+  3.2 on (production runs 3.1.11.1, CI 3.1.3), so the filter wraps the figure in a div that
+  has the id, the same in every version (F-581). A footnote's mark (`doc-noteref`)
   is renamed so pandoc's reader does not turn it into an empty note.
 - **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
   (`div.pagebreak`: `role="doc-pagebreak"` and their visible label) and the skip link are left

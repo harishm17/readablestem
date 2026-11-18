@@ -40,6 +40,14 @@ function Figure(figure)
     end,
   })
   if has_picture then
+    -- Before pandoc 3.2 a figure's id is no Word bookmark, so a link to it led nowhere. The
+    -- figure goes in a div that has the id, which every version writes as a bookmark (a span
+    -- inside the figure would make pandoc write it as a one-cell layout table).
+    if figure.identifier ~= "" then
+      local name = figure.identifier
+      figure.identifier = ""
+      return pandoc.Div({ figure }, pandoc.Attr(name))
+    end
     return nil
   end
   local blocks = pandoc.List(figure.content)

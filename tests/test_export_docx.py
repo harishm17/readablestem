@@ -341,6 +341,9 @@ def test_every_link_in_a_word_file_lands_and_a_note_is_a_word_footnote():
     anchors = [h.get(f"{W}anchor") for h in body.iter(f"{W}hyperlink")]
     assert anchors == ["h1", "p3", "fig", "l2", "c", "d", "pic"]
     assert set(anchors) <= bookmarks
+    # One bookmark to a name, with any pandoc: 3.7 writes a figure's own id as well as the span.
+    names = [b.get(f"{W}name") for b in body.iter(f"{W}bookmarkStart")]
+    assert len(names) == len(set(names))
     assert export.links_unlinked == 1  # "nothing" is text
     real = [n for n in notes if n.get(f"{W}type") is None]
     assert len(real) == 1

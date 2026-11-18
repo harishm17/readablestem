@@ -319,10 +319,11 @@ def _failed(said: str, token: str) -> set[int]:
     return {int(n) for n in found}
 
 
-# Where pandoc 3.7 writes an element's id as a Word bookmark (checked by running it with each
-# tag, tests/test_export_docx.py): a heading, `div`, `span`, `section`, `table`, `pre`, list
-# item, picture and a figure that has one. On any other element it drops the id, and a link
-# to it leads nowhere.
+# Where pandoc writes an element's id as a Word bookmark in every version we run (3.1.3 in CI,
+# 3.1.11.1 in production, 3.7 here; checked by running each with each tag): a heading, `div`,
+# `span`, `section`, `table`, `pre`, list item and picture. On any other element it drops the
+# id, and a link to it leads nowhere. (A figure's id is a bookmark only from 3.2 on: the filter
+# puts the figure in a div that has the id.)
 _BOOKMARKED = frozenset(["div", "span", "section", "table", "pre", "li", "img"]) | {
     f"h{n}" for n in range(1, 7)
 }
@@ -351,8 +352,9 @@ def _land_links(root: _Node) -> None:
             continue
         if node.tag in _BOOKMARKED:
             continue
-        # A figure with a picture keeps its id (a span inside it makes pandoc write the figure
-        # as a one-cell layout table); one without is written as paragraphs by the filter.
+        # A figure with a picture keeps its id for the filter, which wraps the figure in a
+        # div with it (a span inside the figure makes pandoc write a one-cell layout table);
+        # one without is written as paragraphs by the filter.
         if node.tag == "figure" and any(n.tag == "img" for n in node.walk()):
             continue
         if node.tag == "hr":  # nothing can stand in it (a page marker, which is left out)

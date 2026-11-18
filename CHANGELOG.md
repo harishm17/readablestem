@@ -51,6 +51,9 @@
   filter moves the note's words to the mark and writes neither the block nor the link. Word
   files are made on request, so a document converted earlier gets this at its next download; no
   `RENDER_VERSION` bump is owed.
+  F-581: before pandoc 3.2 a figure's id is no Word bookmark, so under production's 3.1.11.1 a
+  link to a figure with a picture was written as its words. The filter now wraps the figure in a div
+  that has the id, which every version writes as a bookmark.
   The output audit no longer counts a note's "Back to the text" link as words of the note, which
   a Word footnote leaves to Word (it had reported 11 notes lost in Word files).
 
