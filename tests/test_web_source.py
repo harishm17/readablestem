@@ -393,7 +393,9 @@ class TestRealConversion:
         formula = next(f for f in result.fixes if f.kind is Kind.EQUATION and f.pending)
         table = next(f for f in result.fixes if f.kind is Kind.TABLE)
         to_item = env.browser.get(f"/jobs/{job_id}/review?item={formula.element_id}")
-        assert to_item.headers["location"].endswith(f"/review/list#item-{formula.element_id}")
+        assert to_item.headers["location"].endswith(
+            f"/review/list?at=item-{formula.element_id}#item-{formula.element_id}"
+        )
         # "Reject" keeps a formula as written; a table with nothing to keep is refused.
         token = csrf_from(review.text)
         for fix in (table, formula):
