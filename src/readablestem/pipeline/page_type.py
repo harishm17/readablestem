@@ -310,6 +310,54 @@ def span_hidden(span: dict[str, Any]) -> bool:
     return int(span.get("alpha", 255)) <= INVISIBLE_ALPHA and not flags & CHAR_CLIPPED
 
 
+# A sideways page (WS14.3): at least SIDEWAYS_SHARE of the characters of a page with no
+# /Rotate run up the page (turn it 90 degrees clockwise to read it) or down it (270), and
+# the page has SIDEWAYS_MIN_CHARS characters. A label set sideways on an upright page (a
+# figure's axis, an arXiv stamp) is nowhere near it.
+SIDEWAYS_SHARE = 0.8
+SIDEWAYS_MIN_CHARS = 60
+
+
+def sideways_turn(page: pymupdf.Page) -> int:
+    """How far to turn the page clockwise to read it: 90 or 270 when it was saved sideways
+    with no /Rotate (a landscape page printed to PDF, `sidewaystable`), else 0. Only visible
+    text votes (`span_hidden`)."""
+    if page.rotation % 360:
+        return 0
+    up = down = total = 0
+    for block in page.get_text("dict", flags=0)["blocks"]:
+        for line in block.get("lines", ()):
+            n = sum(
+                1
+                for span in line["spans"]
+                if not span_hidden(span)
+                for ch in span["text"]
+                if _ink(ch)
+            )
+            total += n
+            dx, dy = line["dir"]
+            if abs(dx) < 0.02 and dy < 0:
+                up += n
+            elif abs(dx) < 0.02 and dy > 0:
+                down += n
+    if total < SIDEWAYS_MIN_CHARS:
+        return 0
+    if up >= SIDEWAYS_SHARE * total:
+        return 90
+    return 270 if down >= SIDEWAYS_SHARE * total else 0
+
+
+def turn_page(page: pymupdf.Page) -> int:
+    """Set the page's /Rotate to the turn that reads it (`sideways_turn`) and return it. In
+    the open document only: everything that reads the page after this sees it upright, in
+    the display frame a /Rotate page has. Every reader that opens a PDF and works with
+    layout's boxes calls this on the pages it uses."""
+    turn = sideways_turn(page)
+    if turn:
+        page.set_rotation(turn)
+    return turn
+
+
 def origin_key(origin: Sequence[float]) -> tuple[int, int]:
     """A character's origin rounded to half a point: how layout's characters are matched
     to the covered ones found in the paint-order trace (both in unrotated page space)."""

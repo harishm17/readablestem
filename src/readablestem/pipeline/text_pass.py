@@ -74,7 +74,7 @@ from readablestem.core.types import (
     Run,
     is_safe_href,
 )
-from readablestem.pipeline import contrast, language, layout
+from readablestem.pipeline import contrast, language, layout, page_type
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.layout import Glyph, Strike
 
@@ -253,6 +253,7 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
                 found.lang = _catalog_lang(doc)
                 in_doc = {p for p in wanted if 0 <= p < doc.page_count}
                 for number in sorted(in_doc):
+                    page_type.turn_page(doc[number])  # layout's display frame
                     annotations = doc[number].get_links()
                     found.annotations += len(annotations)
                     links = _pdf_links(doc, number, annotations, in_doc)

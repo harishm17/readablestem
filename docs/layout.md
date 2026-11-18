@@ -34,7 +34,8 @@ Element conventions:
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
   `text` does not include the marker.
-- **Boxes** are PDF points in display space: the page's `/Rotate` is applied, so a
+- **Boxes** are PDF points in display space: the page's `/Rotate` is applied (and the turn of
+  a page saved sideways with none, "A page saved sideways" below), so a
   landscape page reports `(792, 612)` in `page_sizes` and `crop` uses the boxes as they are.
   The origin is the top-left of the CropBox; content outside it is ignored and figure boxes
   are clipped to the page.
@@ -1558,6 +1559,20 @@ the pass cannot read stays a kept image exactly as described here.
   ones.
 
 The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
+
+**A page saved sideways.** A page with no `/Rotate` whose text runs up or down the page (a
+landscape page printed to PDF, a `sidewaystable` page) has only "vertical" rows if it is read
+as it is. When at least 80 % of its visible characters (60 or more of them) run one way,
+the page is turned before anything reads it (`page_type.turn_page`: 90 degrees clockwise when
+the text runs up, 270 when it runs down): its `/Rotate` is set in the open document, so
+rows, headings, reading order, tables, crops and page sizes are in the turned frame, as for a
+page that has a `/Rotate`. Every reader that opens the PDF again and uses layout's boxes
+calls the same function on the pages it uses (the crop cache, the text pass, tagged figures,
+the source facts, the page labels and the review page image in `web/pdf_probe.py`). A table
+set sideways on an otherwise upright page is still turned by the table step alone
+(`tables._page_turn`); a short label set sideways (an axis title, an arXiv stamp) turns
+nothing. The turn is in the document the readers open, not in the PDF file: no output says it
+yet (the checks list line "Page N was turned to read it" is not built).
 
 **Page types.** `page_type.classify` reads the rawdict and the drawings layout already
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no

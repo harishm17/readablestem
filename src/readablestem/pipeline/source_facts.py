@@ -40,7 +40,7 @@ import defusedxml.ElementTree as SafeET
 import pymupdf
 
 from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, SourceFacts
-from readablestem.pipeline import layout, text_pass
+from readablestem.pipeline import layout, page_type, text_pass
 
 log = logging.getLogger(__name__)
 
@@ -301,6 +301,7 @@ def _from_pdf(
                 continue
             try:
                 page = doc[number]
+                page_type.turn_page(page)  # element boxes are in the turned frame
                 images += _pictures(page)
                 # Link annotations of any kind, counted as the text pass counts them.
                 links += text_pass.link_count(doc, [number])

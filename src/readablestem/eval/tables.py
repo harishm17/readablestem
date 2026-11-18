@@ -70,6 +70,7 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 import defusedxml.ElementTree as SafeET
+import pymupdf
 
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget
@@ -80,7 +81,7 @@ from readablestem.eval.equations import MathMLError, canonical, normalize
 from readablestem.models.base import VisionClient
 from readablestem.models.fake import FakeVisionClient
 from readablestem.ops import profile as run_profile
-from readablestem.pipeline import layout, run, table_step
+from readablestem.pipeline import layout, page_type, run, table_step
 from readablestem.pipeline import options as run_options
 
 TASK = "tables"
@@ -1757,6 +1758,27 @@ def score_real_document(
     }
 
 
+def labelled_as_read(
+    pdf: bytes, labelled: Sequence[tuple[int, Sequence[float]]]
+) -> list[tuple[int, Sequence[float]]]:
+    """The labelled boxes in the frame the pages are read in. A page saved sideways with no
+    /Rotate is read turned (`page_type.turn_page`) and its boxes are in the turned frame; the
+    labels were drawn on the page as it is saved. Other pages are unchanged."""
+    out: list[tuple[int, Sequence[float]]] = []
+    turned: dict[int, pymupdf.Matrix | None] = {}
+    with pymupdf.open(stream=pdf, filetype="pdf") as doc:
+        for number, box in labelled:
+            if number not in turned:
+                page = doc[number] if 0 <= number < doc.page_count else None
+                turned[number] = (
+                    page.rotation_matrix if page and page_type.turn_page(page) else None
+                )
+            if (matrix := turned[number]) is not None:
+                box = tuple(pymupdf.Rect(box).transform(matrix).normalize())
+            out.append((number, box))
+    return out
+
+
 def real_document_metrics(real_dir: Path) -> dict | None:
     """Detection on private real documents (`labels.json` beside the PDFs).
 
@@ -1791,7 +1813,9 @@ def real_document_metrics(real_dir: Path) -> dict | None:
             for e in found.elements
             if e.kind is Kind.TABLE and (e.table is None or e.table.is_data)
         ]
-        labelled = [(int(t["page"]), t["bbox"]) for t in entry.get("tables", [])]
+        labelled = labelled_as_read(
+            pdf, [(int(t["page"]), t["bbox"]) for t in entry.get("tables", [])]
+        )
         totals.update(score_real_document(predicted, labelled, entry.get("pages")))
         totals["pdf_pages"] += len(found.pages)
     return {

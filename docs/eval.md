@@ -1379,7 +1379,9 @@ is one: `private-inputs/tables/` (git-ignored; or `--real-dir`) with the PDFs an
 ```
 
 Pages are 0-based; boxes are PDF points in PyMuPDF's page frame (`Element.bbox`'s);
-`pages` (optional) limits the check to the pages that were labeled. A predicted data
+`pages` (optional) limits the check to the pages that were labeled. A page saved sideways with
+no /Rotate is read turned, so its labeled boxes are mapped into the turned frame before the
+comparison (`labelled_as_read`). A predicted data
 table is a real table when it shares at least half of the smaller box with a labeled one;
 a labeled table is found at full extent when one prediction covers at least 90% of it and
 at least 75% of that prediction lies inside it (not cut short, not merged with a plot).
