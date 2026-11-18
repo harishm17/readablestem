@@ -22,6 +22,7 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
+from readablestem.source import intake as source_intake
 from readablestem.web import (
     analytics,
     dev_only,
@@ -30,6 +31,7 @@ from readablestem.web import (
     report_item,
     seo,
     signin_words,
+    uploads,
 )
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
@@ -401,6 +403,12 @@ def render(
         **recipients.material_context(ctx.settings),
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,
+        # The two sizes an upload is held to, each with one name (`web.uploads`).
+        "one_document": uploads.one_document(ctx.settings),
+        "one_file": uploads.one_file(ctx.settings),
+        # What a LaTeX project zip may be, and how many characters of LaTeX count as a page.
+        "project_zip": uploads.zip_limits(),
+        "chars_per_page": f"{source_intake.CHARS_PER_PAGE:,}",
         "retention_hours": ctx.settings.retention_hours,
         "opt_in_days": ctx.settings.opt_in_retention_days,
         # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.

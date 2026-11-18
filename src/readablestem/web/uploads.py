@@ -44,10 +44,11 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import Request
 
 from readablestem.core.childenv import child_env
-from readablestem.web import office_convert
+from readablestem.web import archive_intake, office_convert
 from readablestem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
 
 if TYPE_CHECKING:
+    from readablestem.config import Settings
     from readablestem.pipeline.page_type import ImagePageCount
 
 # Room for the multipart boundaries and the small text fields around the file itself.
@@ -126,6 +127,34 @@ class UploadForm:
 
 def max_upload_bytes(max_upload_mb: int) -> int:
     return max_upload_mb * 1024 * 1024
+
+
+# The two sizes an upload is held to, each with one name wherever a page or a refusal says it
+# (SW12). Both are read from the settings, never typed:
+# - "one document" (`max_pages_per_job`, `max_upload_mb`): converted as it is;
+# - "one file" (`source_page_limit`, `upload_limit_mb`): the most one upload may be. A file
+#   bigger than one document is kept so its pages can be chosen, in parts that are documents.
+def one_document(settings: Settings) -> str:
+    """The size of one document, as the pages say it: "100 pages and 50 MB"."""
+    return f"{settings.max_pages_per_job} pages and {settings.max_upload_mb} MB"
+
+
+def zip_limits(unpacked_bytes: int | None = None) -> str:
+    """What a zip may be, as the pages say it: "20 MB, 100 MB unpacked and 500 files", read
+    from the limits the intake enforces (`archive_intake.DEFAULT_LIMITS`); `unpacked_bytes`
+    for a zip of documents, whose unpacked size is the request's budget."""
+    limits = archive_intake.DEFAULT_LIMITS
+    mb = 1024 * 1024
+    unpacked = limits.max_unpacked_bytes if unpacked_bytes is None else unpacked_bytes
+    return (
+        f"{limits.max_zip_bytes // mb} MB, {unpacked // mb} MB unpacked and "
+        f"{limits.max_entries} files"
+    )
+
+
+def one_file(settings: Settings) -> str:
+    """The size of one file, as the pages say it: "500 pages and 100 MB"."""
+    return f"{settings.source_page_limit} pages and {settings.upload_limit_mb} MB"
 
 
 @dataclass

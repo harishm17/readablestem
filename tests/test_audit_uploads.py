@@ -157,7 +157,7 @@ def test_too_many_parts_or_files_is_a_bad_form_not_a_crash(web):
 def test_too_many_pages_is_refused_without_spending_the_daily_allowance(web):
     response = upload(web.browser, make_pdf(6))
     assert response.status_code == 422
-    assert "limit is 5" in response.text
+    assert "one file is up to 5 pages" in response.text
     assert rows(web, Job) == 0 and rows(web, Blob) == 0 and pages_used(web) == 0
 
 

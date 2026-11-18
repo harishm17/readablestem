@@ -10,9 +10,9 @@
     rules, its solutions and correct-answer marks could reach students), and one that loads the {{ refused_packages }}
     package. Other classes without a LaTeXML binding (KOMA-Script, memoir, extarticle) are read
     as an article.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
-  <div><dt>Size</dt><dd>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
-    {% if in_parts %}A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
-    for a day so you can choose which pages to convert; each part becomes a document of its
+  <div><dt>Size</dt><dd>One document is up to {{ one_document }}, and it is converted as it is.
+    {% if in_parts %}One file is up to {{ one_file }}: a file bigger than one document is kept
+    for {{ retention_hours }} hours so you can choose which pages to convert; each part becomes a document of its
     own. When two or more parts are finished, a “Combine parts” link on a part's page joins the
     ones you still have into one file, in page order; a part you deleted is left out.{% else %}Split longer documents.{% endif %}</dd></div>
   <div><dt>Daily limits</dt><dd>{% if signup_open %}A new account (one you made by signing in) can convert

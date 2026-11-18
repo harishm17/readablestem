@@ -98,6 +98,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.pdf_probe import MAX_PAGE_SIDE_PT
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left, retry_after
 from readablestem.web.security import VIEW_CSP
@@ -112,7 +113,9 @@ from readablestem.web.uploads import (
     inspect_pdf_isolated,
     is_office_upload,
     max_upload_bytes,
+    one_file,
     read_upload_form,
+    zip_limits,
 )
 from readablestem.web.views import JobView, job_view, last_decision
 
@@ -201,6 +204,7 @@ def upload_error_message(
     name = filename or "This file"
     limit = s.source_page_limit
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
+    side = MAX_PAGE_SIDE_PT / 72 * 0.0254  # the longest side a page may have, in meters
     if code == "page_quota":
         return _quota_message(
             name, pages, left, access.page_quota(s, tier), new_account=access.is_open(tier)
@@ -216,8 +220,8 @@ def upload_error_message(
         "bad_form": "The upload did not arrive complete. Please try again.",
         "empty": f"{name} is empty. Choose a file that has content.",
         "not_pdf": not_accepted,
-        "too_large": f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
-        "files and upload each one.",
+        "too_large": f"{name} is larger than {s.upload_limit_mb} MB, the most one file can be. "
+        "Split it into smaller files and upload each one.",
         "too_many_files": f"You chose more than {access.files_per_upload(tier)} files. Upload "
         f"{access.files_per_upload(tier)} or fewer at a time.",
         "revise_one_file": "A revised version replaces one document: choose one file. To "
@@ -254,14 +258,14 @@ def upload_error_message(
         f"downloading. {FRESH_COPY}",
         "no_pages": f"{name} has no pages. Check that you chose the right file.",
         "too_many_pages": f"{too_many} once it is made into a PDF (the count can differ from "
-        f"Word's or PowerPoint's); the limit is {limit} per upload. Split it into parts of "
-        f"up to {limit} pages and upload each part."
+        f"Word's or PowerPoint's); one file is up to {one_file(s)}. Split it into parts of "
+        f"up to {s.max_pages_per_job} pages and upload each part."
         if office
-        else f"{too_many}; the limit is {limit} per upload. Split it into parts "
-        f"of up to {limit} pages (in Acrobat: Organize Pages, then Split) and upload each "
-        "part.",
-        "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
-        "large to convert. Course documents are usually Letter or A4 size.",
+        else f"{too_many}; one file is up to {one_file(s)}. Split it into parts "
+        f"of up to {s.max_pages_per_job} pages (in Acrobat: Organize Pages, then Split) and "
+        "upload each part.",
+        "page_too_large": f"{name} has a page larger than {side:.2f} meters on a side, which "
+        "is too large to convert. Course documents are usually Letter or A4 size.",
         "image_too_large": f"{name} has a picture that is too large to read. Export the PDF "
         "again with its pictures at a normal size (300 dpi is plenty) and upload that.",
         "content_too_large": f"{name} is too large to read: a page of it, or the file as a "
@@ -295,7 +299,7 @@ def upload_error_message(
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
         **source_messages(name, s.max_pages_per_job),
-        **batch_messages(name, access.files_per_upload(tier)),
+        **batch_messages(name, access.files_per_upload(tier), zip_words(s)),
         "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
@@ -328,8 +332,8 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
         "source_bad_zip": f"{name} could not be opened as a zip file. It may be damaged or "
         f"protected with a password. Zip the project again without a password, or {pdf}",
         "source_zip_limits": f"{name} is too big or has too many files. A project zip may be up "
-        "to 20 MB, 100 MB unpacked and 500 files. Remove what the document does not use, or "
-        f"{pdf}",
+        f"to {zip_limits()}. Remove what the document "
+        f"does not use, or {pdf}",
         "source_unsafe_zip": f"{name} has a file with a path or a link this tool will not open. "
         f"Zip the project again with plain files only, or {pdf}",
         "source_unsupported_file": f"{name} has a kind of file this tool does not read (such as "
@@ -357,13 +361,22 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
     }
 
 
-def batch_messages(name: str, limit: int) -> dict[str, str]:
+def zip_words(settings: Settings) -> str:
+    """The limits of a zip of documents: what one request may unpack is the budget its intake
+    makes (`batch_intake.RequestBudget.for_upload_limit`)."""
+    budget = batch_intake.RequestBudget.for_upload_limit(
+        settings.upload_limit_bytes, max_upload_bytes(settings.max_upload_mb)
+    )
+    return zip_limits(budget.total)
+
+
+def batch_messages(name: str, limit: int, zip_limits: str) -> dict[str, str]:
     """What went wrong with a zip of documents (`web.batch_intake`) or one of its documents."""
     return {
         "zip_bad": f"{name} could not be opened as a zip file. It may be damaged or protected "
         "with a password. Zip the files again without a password, or upload them one by one.",
-        "zip_limits": f"{name} is too big or has too many files. A zip may be up to 20 MB, "
-        "80 MB unpacked and 500 files. Split it into smaller zips, or upload the files one by one.",
+        "zip_limits": f"{name} is too big or has too many files. A zip may be up to "
+        f"{zip_limits}. Split it into smaller zips, or upload the files one by one.",
         "zip_unsafe": f"{name} has a file with a path or a link this tool will not open. Zip the "
         "files again as plain files, or upload them one by one.",
         "zip_unsupported": f"{name} has a kind of file this tool does not read (such as another "
