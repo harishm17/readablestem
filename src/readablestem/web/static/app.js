@@ -947,6 +947,12 @@
   }
 
   var finished = false;
+  // The finished answer replaces the part of the page the button is in (#job-body), so where
+  // the keyboard was is noted before the swap takes the button away.
+  var wasInBox = false;
+  document.addEventListener("htmx:beforeSwap", function () {
+    wasInBox = !!box && box.contains(document.activeElement);
+  });
   document.addEventListener("htmx:afterSettle", function () {
     var now = document.getElementById("job-status");
     if (finished || !now || !now.hasAttribute("data-finished")) return;
@@ -955,7 +961,7 @@
     if (title) document.title = title + " | ReadableSTEM";
     if (box) {
       // Keep the keyboard's place: focus on the button moves to the status box.
-      if (box.contains(document.activeElement)) {
+      if (wasInBox || box.contains(document.activeElement)) {
         region.setAttribute("tabindex", "-1");
         region.focus();
       }
@@ -1238,3 +1244,21 @@
   mark();
 })();
 /* ==== end ux2-lane-b ======================================================================== */
+
+/* The review's decision bar sticks to the bottom of a wide, tall window (app.css). Its height
+ * depends on the item (one or two rows of choices, up to three notes), so the room a focused
+ * control needs to stay above it is measured, not guessed: app.css reads --decision-bar-height
+ * as the page's scroll padding. Without this file the padding is a fixed two rows. */
+(function () {
+  "use strict";
+  var bar = document.querySelector(".decision-area .decision-bar");
+  if (!bar) return;
+  function measure() {
+    var sticky = window.getComputedStyle(bar).position === "sticky";
+    var height = sticky ? Math.ceil(bar.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty("--decision-bar-height", height + "px");
+  }
+  if (window.ResizeObserver) new window.ResizeObserver(measure).observe(bar);
+  window.addEventListener("resize", measure);
+  measure();
+})();
