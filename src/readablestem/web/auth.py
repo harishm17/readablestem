@@ -402,7 +402,7 @@ def login_page(request: Request) -> Response:
     return render(request, "login.html")
 
 
-@router.post("/login", dependencies=[limited("login"), Depends(require_csrf)])
+@router.post("/login", dependencies=[Depends(require_csrf), limited("login_google")])
 async def login_start(request: Request) -> Response:
     ctx = get_ctx(request)
     google = ctx.sign_in_client(GOOGLE)
@@ -420,12 +420,10 @@ async def auth_callback(request: Request) -> Response:
     google = ctx.sign_in_client(GOOGLE)
     if google is None:
         raise PageError(404, "Page not found", "There is nothing at this address.")
-    from authlib.integrations.starlette_client import OAuthError
-
     try:
         token = await google.authorize_access_token(request)
-    except OAuthError:
-        log_event(logger, "login_failed", reason="oauth_error")
+    except Exception as exc:  # authlib's base error (no code, a bad token), or no answer
+        log_exception(logger, "login_failed", exc, reason="provider_error", provider=GOOGLE)
         raise PageError(
             400, "Sign-in did not finish", "Google did not complete the sign-in. Please try again."
         ) from None
@@ -461,7 +459,7 @@ MS_DID_NOT_FINISH = (
 )
 
 
-@router.post("/login/microsoft", dependencies=[limited("login"), Depends(require_csrf)])
+@router.post("/login/microsoft", dependencies=[Depends(require_csrf), limited("login_microsoft")])
 async def microsoft_login_start(request: Request) -> Response:
     ctx = get_ctx(request)
     client = ctx.sign_in_client(MICROSOFT)
@@ -547,7 +545,7 @@ def dev_login_page(request: Request) -> Response:
 
 @router.post(
     "/dev-login",
-    dependencies=[Depends(_require_dev_login), limited("login"), Depends(require_csrf)],
+    dependencies=[Depends(_require_dev_login), Depends(require_csrf), limited("login_dev")],
 )
 def dev_login(request: Request, email: Annotated[str, Form()] = "") -> Response:
     normalised = normalise_email(email)
@@ -571,4 +569,5 @@ def logout(request: Request) -> Response:
         end_sessions(get_ctx(request).factory, user.id)
         log_event(logger, "logout", user_id=user.id)
     request.session.clear()
+    flash(request, "You are signed out on every device.", undo=False)
     return RedirectResponse("/", status_code=303)

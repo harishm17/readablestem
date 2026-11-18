@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from functools import partial
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -21,7 +20,7 @@ from starlette.background import BackgroundTask
 from readablestem.web import email_login
 from readablestem.web.auth import normalise_email, signed_in
 from readablestem.web.deps import PageError, get_ctx, limited, render, require_csrf
-from readablestem.web.email_senders import make_sender
+from readablestem.web.email_senders import LinkSender, make_sender
 from readablestem.web.logsafe import log_event
 
 logger = logging.getLogger(__name__)
@@ -33,9 +32,23 @@ def _require_enabled(request: Request) -> None:
         raise PageError(404, "Page not found", "There is nothing at this address.")
 
 
+ASKED = "email_link_asked"  # this browser has asked for a link before (a flag in its session)
+
+
+def _send_link(ctx, address: str, sender: LinkSender) -> None:
+    """Make the link and send it, after the page has been answered: the page takes the same
+    time for an address with an account and one without (F-508), because the database work
+    that differs between them happens here, out of the answer's reach."""
+    token = email_login.issue(ctx.factory, address, minutes=ctx.settings.email_link_minutes)
+    if token is None:
+        log_event(logger, "login_refused", reason="not_allowlisted", provider="email")
+        return
+    email_login.send_quietly(sender, email_login.message_for(ctx.settings, address, token))
+
+
 @router.post(
     "/login/email",
-    dependencies=[limited("login"), Depends(require_csrf), Depends(_require_enabled)],
+    dependencies=[Depends(require_csrf), Depends(_require_enabled), limited("login_email")],
 )
 async def start(request: Request, email: Annotated[str, Form()] = "") -> Response:
     """Send a link to the address if it can sign in. The page is the same either way."""
@@ -52,23 +65,26 @@ async def start(request: Request, email: Annotated[str, Form()] = "") -> Respons
             },
             status_code=422,
         )
-    response = render(request, "login_email.html", {"sent": True, "error": "", "email": ""})
     sender = make_sender(ctx.settings)
     if sender is None:  # refused at start-up; defensive
         log_event(logger, "email_login_no_sender")
-        return response
+        return render(request, "login_email.html", {"sent": True, "error": "", "email": ""})
     key = hashlib.sha256(address.encode()).hexdigest()
-    if ctx.settings.rate_limits_enabled and ctx.limiter.check("email_link", key) is not None:
-        log_event(logger, "rate_limited", rule="email_link")
-        return response
-    token = await run_in_threadpool(
-        email_login.issue, ctx.factory, address, minutes=ctx.settings.email_link_minutes
-    )
-    if token is None:
-        log_event(logger, "login_refused", reason="not_allowlisted", provider="email")
-        return response
-    message = email_login.message_for(ctx.settings, address, token)
-    response.background = BackgroundTask(partial(email_login.send_quietly, sender, message))
+    if ctx.settings.rate_limits_enabled:
+        wait = ctx.limiter.check("email_link", key)
+        if wait is not None:
+            log_event(logger, "rate_limited", rule="email_link")
+            # The same words for every address. A browser that has asked before is told how
+            # long; one that has not sees the usual page, so nobody learns anything from it.
+            minutes = max(1, round(wait / 60)) if request.session.get(ASKED) else None
+            return render(
+                request,
+                "login_email.html",
+                {"sent": True, "error": "", "email": "", "wait": minutes},
+            )
+    request.session[ASKED] = True
+    response = render(request, "login_email.html", {"sent": True, "error": "", "email": ""})
+    response.background = BackgroundTask(_send_link, ctx, address, sender)
     return response
 
 

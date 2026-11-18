@@ -24,7 +24,7 @@
 {% endif %}
 {% set primary_href = back_href|default(none) or ("/jobs/" ~ job_id if job_id else none) %}
 {% if not primary_href and user %}{% set primary_href = "/courses" if (area == "course" and courses_enabled) else "/app" %}{% endif %}
-{% set primary_label = "Back to the decision" if back_href|default(none) else "Back to the document's status" if job_id else ("Go to your courses" if primary_href == "/courses" else "Go to my documents") %}
+{% set primary_label = back_label|default(none) or ("Back to the decision" if back_href|default(none) else "Back to the document's status" if job_id else ("Go to your courses" if primary_href == "/courses" else "Go to my documents")) %}
 {% if primary_href %}
 <p class="button-row"><a class="button" href="{{ primary_href }}">{{ primary_label }}</a></p>
 {% endif %}

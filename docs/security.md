@@ -48,7 +48,13 @@ provider's own handling of what is sent to it (see "Where document data goes").
   token of which only the SHA-256 is stored, one use, 15 minutes, a newer link replacing
   older ones, a button page so a mail scanner cannot use the link up, CSRF on the
   button, a limit of three messages per target address per 15 minutes besides the
-  sign-in rate limits, nothing about the address or token logged. Tests:
+  sign-in rate limits (a browser that has asked before is told how long to wait, in the same
+  words for every address), the link made and sent after the page is answered so the answer
+  takes the same time for a known and an unknown address, nothing about the address or token
+  logged. Each way of starting a sign-in has its own rule (`login_google`, `login_microsoft`,
+  `login_email`, `login_dev`), counted after the form's CSRF check, so an expired form uses no
+  attempt and one way in does not block another. The CSRF token is made when a page prints
+  it, so a page with no form sets no cookie. Tests:
   `test_web_email_login.py`, `test_web_signin_browser.py`.
 - Access is `users.is_allowed`, checked on **every request**, so removing or blocking
   someone ends their session at once, and admin demotion likewise (`test_audit_auth.py`).

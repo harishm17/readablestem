@@ -442,8 +442,7 @@ def job_access(
 SIGN_IN_AGAIN = (
     "Sign in again to open this document",
     "This document was shared with your email address, but this sign-in did not confirm the "
-    "address. Sign out, then sign in again with Google or your university's Microsoft "
-    "account, using that address.",
+    "address. Sign out, then sign in again using that address.",
 )
 
 _TOO_LITTLE = {

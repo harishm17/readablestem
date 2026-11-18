@@ -65,8 +65,7 @@
 
 <section aria-labelledby="signup-heading">
   <h2 id="signup-heading">Sign-up</h2>
-  <p>{% if signup.open %}Open: anyone with a verified Google account (or an allowed Microsoft
-    account) gets an account on first sign-in, in the open tier. New accounts can convert
+  <p>{% if signup.open %}Open: anyone with a verified {{ signup_words or "Google" }} account gets an account on first sign-in, in the open tier. New accounts can convert
     {{ signup.page_quota }} pages and start {{ signup.rereads }} model reads from review a day.
     {% else %}By invitation: only the people listed below can sign in. (Accounts made while
     sign-up was open keep working until you block them.){% endif %}

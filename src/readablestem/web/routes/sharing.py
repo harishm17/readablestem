@@ -42,24 +42,6 @@ def _title(job: Job) -> str:
     return documents.display_title(documents.stored_title(job), job.filename, job.title_override)
 
 
-def sign_in_words(*, google: bool, microsoft: bool, email_link: bool) -> str:
-    """The ways a person can sign in on this server, for the sharing page: "Google", "Google
-    or Microsoft", "Google, Microsoft or an emailed sign-in link". Empty when none is on
-    (development sign-in only), so the page does not name a provider that is not there."""
-    names = [
-        name
-        for name, on in (
-            ("Google", google),
-            ("Microsoft", microsoft),
-            ("an emailed sign-in link", email_link),
-        )
-        if on
-    ]
-    if len(names) < 2:
-        return "".join(names)
-    return ", ".join(names[:-1]) + " or " + names[-1]
-
-
 def _page(
     request: Request,
     job_id: str,
@@ -86,11 +68,6 @@ def _page(
         "shares": listed,
         "address": f"{ctx.settings.base_url.rstrip('/')}/jobs/{job_id}",
         "roles": [(role, shares.ROLE_WORDS[role], shares.ROLE_HELP[role]) for role in shares.ROLES],
-        "sign_in_words": sign_in_words(
-            google=ctx.sign_in_client("google") is not None,
-            microsoft=ctx.sign_in_client("microsoft") is not None,
-            email_link=ctx.settings.email_login_enabled,
-        ),
         "retain_until": retain_until,
         "retention_mode": retention_mode,
         "max_shares": shares.MAX_SHARES_PER_JOB,

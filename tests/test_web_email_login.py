@@ -213,6 +213,31 @@ def test_one_address_cannot_be_flooded_with_mail(web):
     assert len(OutboxSender.sent) == 3  # the per-address allowance; the page never changes
 
 
+def test_asking_again_from_the_same_browser_says_when_the_next_link_can_be_asked_for(web):
+    """The page was the same for every request, so a person who asked four times had no
+    sign that a limit stopped them. Once this browser has asked, a refused ask says how long;
+    the words are the same for an address with no account, so they tell nothing about it."""
+    for address in (ALICE, "stranger@example.org"):
+        env_browser = web.client()
+        for _ in range(3):
+            assert "Check your email" in ask(web, address, env_browser).text
+        refused = ask(web, address, env_browser)
+        assert refused.status_code == 200 and "minute" in refused.text
+        assert "ask for another" in refused.text
+        stranger_view = ask(web, address, web.client())  # a browser that never asked
+        assert "ask for another" not in stranger_view.text
+        env_browser.close()
+    assert len(OutboxSender.sent) == 3
+
+
+def test_email_link_requests_do_not_use_up_the_other_sign_in_buttons(web):
+    for _ in range(web.ctx.limiter.rules["login_email"].limit + 2):
+        ask(web, "stranger@example.org", web.client())
+    page = web.browser.get("/dev-login").text
+    done = web.browser.post("/dev-login", data={"csrf_token": csrf_from(page), "email": ALICE})
+    assert done.status_code == 303
+
+
 def test_a_failing_sender_is_not_shown_and_leaks_nothing(web, caplog):
     OutboxSender.fails = True
     response = ask(web, ALICE)

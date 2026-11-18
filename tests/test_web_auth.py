@@ -171,6 +171,21 @@ def test_logout_is_post_only_with_csrf(web):
     assert web.browser.get("/app").status_code == 303
 
 
+@pytest.mark.parametrize("path", ["/", "/limits", "/privacy", "/no-such-page"])
+def test_a_page_with_no_form_sets_no_cookie_and_the_sign_in_page_sets_one(web, path):
+    fresh = web.client()
+    assert "set-cookie" not in fresh.get(path).headers
+    assert "set-cookie" in fresh.get("/dev-login").headers  # its form needs a token
+    fresh.close()
+
+
+def test_signing_out_says_it_ended_every_session(web):
+    web.allow(ALICE)
+    login(web.browser, ALICE)
+    sign_out(web.browser)
+    assert "signed out on every device" in web.browser.get("/").text
+
+
 def test_removing_someone_from_the_allowlist_ends_their_access_immediately(web):
     web.allow(ALICE)
     login(web.browser, ALICE)
@@ -363,6 +378,28 @@ def test_google_sign_in_requires_a_verified_email(google):
     assert response.status_code == 403
     assert "not verified" in response.text
     assert google.browser.get("/app").status_code == 303
+
+
+def _callback_failures():
+    """What authlib or the network can raise on the way back from Google that is not an
+    `OAuthError`: no code at all, a token that does not verify, an unreachable provider."""
+    import httpx
+    from authlib.jose.errors import BadSignatureError
+    from authlib.oauth2.rfc6749.errors import MissingCodeException
+
+    return [MissingCodeException(), BadSignatureError("x"), httpx.ConnectError("down")]
+
+
+@pytest.mark.parametrize("failure", _callback_failures(), ids=lambda e: type(e).__name__)
+def test_a_callback_that_breaks_in_any_way_shows_the_retry_page_not_a_500(
+    google, monkeypatch, failure
+):
+    async def broken(request, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(google.ctx.oauth.google, "authorize_access_token", broken)
+    response = google.browser.get("/auth/callback")
+    assert response.status_code == 400 and "Sign-in did not finish" in response.text
 
 
 def test_google_error_shows_a_retry_page(google):

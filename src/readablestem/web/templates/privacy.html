@@ -127,8 +127,8 @@
 {# SIGNUP_MODE=open. Keep in step with web/auth.py, web/routes/account.py and the checks of
    ops/launch.py (this page must say that the first sign-in makes an account, and how to
    delete it). #}
-<p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
-  account){% endif %}. We receive your email address, your name, and whether the address
+<p>You sign in with {{ sign_in_words or "Google" }}{% if microsoft_on %} (Microsoft is for school or work
+  accounts){% endif %}. We receive your email address, your name, and whether the address
   is verified. <strong>The first time you sign in, we make an account for you.</strong> It
   stores your email address, your name, the time of your last sign-in, and the id your
   sign-in provider gives your account{% if microsoft_on %} (for Microsoft, also your
@@ -154,8 +154,8 @@
   An account that an administrator has blocked is kept, with its address, so that the block
   holds; write to us to have it deleted.</p>
 {% else %}
-<p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
-  account){% endif %}. We receive your email address, your name, and whether the address
+<p>You sign in with {{ sign_in_words or "Google" }}{% if microsoft_on %} (Microsoft is for school or work
+  accounts){% endif %}. We receive your email address, your name, and whether the address
   is verified. For people on the beta list we store the email address, name, the time of
   the last sign-in, and the id your sign-in provider gives your account{% if microsoft_on %}
   (for Microsoft, also your organization's directory id){% endif %}, so we know it is you

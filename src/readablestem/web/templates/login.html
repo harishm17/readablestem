@@ -16,8 +16,8 @@
 <p class="lede">Sign in with your Google account.</p>
 {% endif %}
 {% include "_signin.html" %}
-<p class="signin-consent"><strong>If you do not have an account yet, signing in makes one.</strong>
-  By signing in you accept the <a href="/terms">terms</a> and the
+<p class="signin-consent">{% if signup_words %}<strong>If you do not have an account yet, signing in with {{ signup_words }} makes one.</strong>
+  {% endif %}By signing in you accept the <a href="/terms">terms</a> and the
   <a href="/privacy">privacy notice</a>. You can delete your account yourself at any time.</p>
 <p>ReadableSTEM is a free beta built and maintained by Harish Manoharan, open to anyone. <a href="/for-accessibility-offices#continuity">Support and continuity</a>. New accounts have
   daily limits ({{ open_page_quota }} pages a day).</p>
