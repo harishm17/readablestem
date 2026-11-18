@@ -10,7 +10,7 @@
 <section aria-labelledby="export-heading" class="confirm-export">
   <h2 id="export-heading">Download what you want to keep first</h2>
   <ul class="actions">
-    <li><a href="/account/export">Download everything (zip)</a>: {% if ready_documents %}the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} in each file type, {% endif %}their review records, your courses and your account settings</li>
+    <li><a href="/account/export">Download everything (zip)</a>: {% if ready_documents %}the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} in each file type with {{ "its review record" if ready_documents == 1 else "their review records" }}, {% endif %}your courses and your account settings</li>
     {% if documents %}<li><a href="/app">Open My documents</a> for single files</li>{% endif %}
   </ul>
 </section>

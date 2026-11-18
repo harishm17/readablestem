@@ -72,7 +72,7 @@
     Set with <code>SIGNUP_MODE</code>.</p>
   {% if signup.full %}
   <div class="notice notice-warning" role="status">
-    <p>Today's limit on new accounts is reached ({{ allowance(signup.today, signup.limit, "account") }}). New
+    <p>Today's limit on new accounts is reached: {{ allowance(signup.today, signup.limit, "account") }} New
       people are told to come back tomorrow. Raise <code>MAX_NEW_ACCOUNTS_PER_DAY</code> if that
       is not what you want.</p>
   </div>
