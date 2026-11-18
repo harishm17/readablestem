@@ -987,7 +987,7 @@ before a change to these rules:
   request, so a remade reading costs nothing.
 - Where no reading is stored (a LaTeX one is not used) the Listen transcript, `speech_diff` and the
   decision cards speak the MathML with the speech of the day: the new words, whenever a page is opened.
-- A table header's name (`table_html.named_maths`) is spoken from the stored cell MathML each time the
+- A table header's name (the `aria-label` `table_html` writes) is spoken from the stored cell MathML each time the
   page is made, so a stored document takes the new words when its page is made again (a
   `RENDER_VERSION` bump, or an edit that renders the HTML) and keeps the old in the file it
   already holds.

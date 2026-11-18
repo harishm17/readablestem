@@ -81,6 +81,9 @@ class RenderContext(Protocol):
         """Add CSS to this document's stylesheet (once per name)."""
         ...
 
+    math_alttext: bool
+    """Write each reading as the `alttext` of its `<math>` (`Settings.mathml_alttext`)."""
+
 
 # Spacing accents a text layer may give for maths accents (as tables._ACCENTS).
 _SPACING_ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
@@ -251,7 +254,7 @@ def render_table_element(element: Element, fix: Fix | None, ctx: RenderContext) 
             # Layout took the "Table N" caption out of the text, so a proposal without it
             # (an edited grid) would lose it: it is the table's caption either way.
             grid = grid.model_copy(update={"caption": element.caption})
-        table = render_table(grid, id_prefix=prefix)
+        table = render_table(grid, id_prefix=prefix, math_alttext=ctx.math_alttext)
         attrs = ctx.id_attr(element.id) + _scroll_attrs(grid, prefix)
         return f'<div class="table-scroll"{attrs}>{table}</div>'
     if fix is None:

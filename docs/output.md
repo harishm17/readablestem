@@ -533,11 +533,17 @@ first row), `<th scope="row">`, a body split into one `<tbody>` per section with
 `scope="rowgroup"` on a full-width section heading, and `headers`/`id` only when scope
 cannot say which headers apply (a row header after data cells, a column header below the
 header rows, or nested column headers whose spans cross). Cell text and captions are
-escaped; a math cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
-header cell that is only math also gets its reading (`speech.mathml_to_speech`) as
-visually hidden text, with the MathML hidden from assistive technology: browsers name a
-`<th>` from its text, never from MathML, and screen readers announce a cell's headers by
-name (the static rule `html.table_header_text` does not count MathML as header text). A
+escaped. Math in a cell is written the way math in the text is
+(`assemble.converted_mathml`): MathML rebuilt by `sanitize_mathml` (the cell's text when it
+cannot be shown), with the reading as its `alttext` when `MATHML_ALTTEXT` is on. A cell stores
+no reading, so it is made the way `speech.reading_for` makes one for a stored equation with no
+current reading, the same words the text, the review screen and Listen say. A header with
+math in it also gets that reading as its `aria-label`, because browsers name a `<th>` from
+its text, never from MathML, and screen readers announce a cell's headers by name. The
+MathML stays in the header, not hidden from anything, so a braille display gets the math.
+Where no reading can be made the header has no name (the static rule
+`html.table_header_text`, which does not count MathML as header text, then says so); it is
+never named from the cell's LaTeX. A
 broken grid (`core.types.grid_problems`) still renders as a rectangular table.
 
 `pipeline/assemble_tables.py` wraps a rebuilt table in a box that scrolls sideways on a

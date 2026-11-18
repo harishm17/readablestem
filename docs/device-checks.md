@@ -169,6 +169,7 @@ a bottom):
 | 18 | The end of the page. | “About this version” and the short note for students. | R12 |
 | 19 | A paragraph, and a passage in another language if the document has one. | An English voice for the page; another voice for the passage. | R13 |
 | 20 | Listen: from the job page open “Listen as a student” and press play. | There is sound, the voice is reasonable, and the highlighted text follows the speech. | none |
+| 21 | A table whose column header is only math (a unit or a symbol), if the document has one: arrow across the cells of that column. D5, D6 and D7 run this one too. | Not tested with any reader. The header is named by its reading (`aria-label` on the `<th>`) and holds its MathML: write down what is announced when moving across the data cells (the reading once, twice or not at all), and whether the math inside the header can still be entered. | R10 |
 
 Result: not done
 Date:
