@@ -874,11 +874,14 @@ def _cmd_ledger(args: argparse.Namespace) -> int:
     figure with its counts, a bound and a label, held against its two bars (`eval.ledger`).
     Measures nothing and spends nothing. Exit code 0: no held-out figure is worse than its
     release bar; 1: one is, or `--for-release` and a row with a release bar has no held-out
-    figure of this release; 2: refused."""
+    figure of this release; 2: refused. `--record-release` adds the release to
+    `ops/releases.toml` when the exit code is 0."""
     from readablestem.config import Settings
     from readablestem.eval import corpus, ledger, run_record
-    from readablestem.ops import profile
+    from readablestem.ops import profile, releases
 
+    if args.record_release and not args.for_release:
+        return _error("--record-release is for a release: add --for-release")
     folder: Path = args.records or _default(Path("data/eval"))
     bars_path: Path = args.bars or folder / ledger.BARS_FILE
     try:
@@ -909,6 +912,11 @@ def _cmd_ledger(args: argparse.Namespace) -> int:
     failed = ledger.failures(made, for_release=args.for_release)
     _write_record(args.out, made)
     print(ledger.render(made, failed))
+    if args.record_release and not failed:
+        version, _, profile_hash = made["release"].partition("+")
+        row = releases.Release(made["release"], version, profile_hash, made["date"])
+        added = releases.record(row)
+        print(f"release record: {made['release']} " + ("added" if added else "was already there"))
     return 1 if failed else 0
 
 
@@ -1044,8 +1052,9 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     """`eval burden`: decisions a page asks of a reviewer, by page kind, by what is decided
     and by why it was asked, from a replay of the corpus under the production profile, and
     the bar against an earlier record (`eval.burden`). Spends nothing. Exit code 0: the bar
-    is met or none was asked; 1: a page kind asks for more than before; 2: the two records
-    cannot be compared."""
+    is met or none was asked; 1: a page kind asks for more than before (with `--same`: an
+    upload asks for other decisions than the record has); 2: the two records cannot be
+    compared."""
     from readablestem.eval import burden, measure
 
     before = None
@@ -1061,7 +1070,11 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     metrics = burden.report(run)
     record = measure.record(run, settings, metrics)
     _write_record(args.out, record)
-    verdict = None if before is None else burden.judge(record, before, allowance=args.allowance)
+    verdict = (
+        None
+        if before is None
+        else burden.judge(record, before, allowance=args.allowance, same=args.same)
+    )
     print(burden.render(record, verdict))
     if not metrics["uploads"]["measured"]:
         return _error("no upload could be measured")
@@ -2066,6 +2079,13 @@ def register(
         default=0.0,
         help="how many more decisions a page a page kind may ask for than before (0)",
     )
+    burden.add_argument(
+        "--same",
+        action="store_true",
+        help="with --against: every upload measured now must ask for exactly the decisions "
+        "the record has, fewer or more (CI's eval gate); an upload this machine cannot "
+        "replay is not compared",
+    )
     burden.set_defaults(func=_cmd_burden)
 
     ledger = group.add_parser(
@@ -2084,6 +2104,12 @@ def register(
         "--for-release",
         action="store_true",
         help="also fail when a row that has a release bar has no held-out figure of this release",
+    )
+    ledger.add_argument(
+        "--record-release",
+        action="store_true",
+        help="with --for-release, when no release fails: add this release to the release "
+        "record (src/readablestem/ops/releases.toml), the only way it is written",
     )
     ledger.add_argument(
         "--register-bars",

@@ -588,7 +588,9 @@ Changed pipeline version, step prompt versions, model ids or client are listed u
 table (they are usually why the gate is being run). With `--require-current` (CI uses
 it) the gate also refuses (`stale_report`) a current report produced with other prompts
 or models than the code under test, so a prompt change cannot pass on an old committed
-`latest-<task>.json`. Tolerances live in `data/eval/tolerances.json`; an entry with only
+`latest-<task>.json`. The pipeline version counts too (`pipeline X (code: Y)`): a report made
+by another version than the code's is refused whatever its prompts and models were, and a
+`--fake` report has no models to compare. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -1009,8 +1011,19 @@ needs all four Claude reports (equations, headings, figures, document); the Open
 needs the tables report, which records it; any other model setting needs the document
 report.
 
-Opt-out, for a change that does not alter what a model is asked or which model answers (a
-renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
+**What decides acceptance.** A change to a rule that decides whether a reading is accepted or
+goes to a person needs the replay record, `data/eval/burden-corpus.json` ("The replay
+record"), re-made in the same pull request. The rule is small and has no line numbers. A
+module under `src/readablestem/pipeline/` with a function that sets `Status.ACCEPTED` or
+`Status.NEEDS_REVIEW` decides acceptance: its module-level `UPPER_CASE` constants and those
+deciding functions are the rules, and so is a `config.py` setting with `accept` in its name.
+They are compared by parsed value (`ast`; a function without its docstring), so a comment, a
+docstring or `0.80` written `0.8` is no change, and a constant in a module that decides
+nothing (`layout.py`) is not a rule. A module is found by what it does, so a new step that
+sets a status is covered without a list to update.
+
+Opt-out, for a change that does not alter what a model is asked, which model answers or what
+is accepted (a renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
 trailer `Eval-Unchanged: <reason>` in the last paragraph of any of its commit messages (the reason is required). The guard
 prints the waiver and the reports it did not need, so a reviewer sees it. Prompt text a
 model reads is never a refactor: change it and re-run.
@@ -3202,11 +3215,33 @@ number of uploads.
 |---|---|
 | 0 | the bar is met, or no record was given |
 | 1 | the set or a page kind asks for more than before; the lines name each |
-| 2 | not judged: other documents, or a different number of uploads measured |
+| 2 | not judged: other documents, or a different number of uploads measured (with `--same`: no upload was measured) |
 
 **Fewer is not better by itself.** A change that stops asking about something wrong lowers
 this figure and raises the errors nobody is told about. The bar is read with the counts of
 silent errors (the lane evals and the page audit), never alone.
+
+**The replay record, and CI.** `data/eval/burden-corpus.json` is also the record CI's eval
+gate holds a pull request to. With `--same` the bar is not "no more decisions" but "the
+decisions the record has": every upload measured now must ask for exactly the decisions, on
+exactly the pages, that the record has, fewer as well as more, because a rule that stops
+asking about something wrong is as much a change as one that asks more (and raises the
+silent errors the lane evals count). An upload measured now and not in the record is a
+difference; an upload the record has and this machine cannot replay is not compared. CI
+holds the public files only: the answers for the CC BY-NC-SA files are kept out of the
+repository (`corpus.KEPT_OUT`), so CI replays about half the uploads and the box replays
+all. The record is made on the box, with the kept-out answers, by this command and never by
+hand:
+
+```bash
+uv run readablestem eval burden --out data/eval/burden-corpus.json
+uv run readablestem eval burden --against data/eval/burden-corpus.json --same   # what CI runs
+```
+
+A pull request that changes the pipeline fails the second command when its change moves any
+upload's decisions, and passes when the record was re-made in the same pull request. The
+eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
+decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
 Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
@@ -3475,6 +3510,7 @@ the figure, a bound and a label.
 uv run readablestem eval ledger --out data/eval/ledger.json
 uv run readablestem eval ledger --for-release          # the check a release runs
 uv run readablestem eval ledger --register-bars        # after the first held-out run
+uv run readablestem eval ledger --for-release --record-release   # and keep the release
 ```
 
 **The labels.**
@@ -3506,6 +3542,16 @@ Exit code 0: no held-out line is worse than its release bar. 1: one is, or, with
 `--for-release`, a row that has a release bar has no held-out figure of this release on the
 bar's set. 2: refused. A record that does not say its split, its set's hash, the profile's
 hash and the pipeline version is not read around: the run stops and names the file.
+
+**The release record** (`src/readablestem/ops/releases.toml`, read by `ops/releases.py`).
+`PIPELINE_VERSION` goes up for any change, so a stored job cannot say that a release has come
+since it was made. `--for-release --record-release` adds a row (release, pipeline version,
+profile, date) when no held-out figure is worse than its release bar, and does nothing when
+the release is already there. It is written by this command and never by hand;
+`--record-release` without `--for-release` is refused. A stored job says that an older
+pipeline made it with `web.retry.made_by_older_pipeline(result_json)`. Offering such a job a
+re-run with a fresh spending cap (the retry route, the same upload and the answers it
+already has, a new cap) is the next step; nothing offers it yet.
 
 **The whole-document record** (`whole-<set>.json`) is what the top rows are made of. Its
 `metrics` hold one row a document, with no name: `pages`, `silent_errors` (anything wrong in

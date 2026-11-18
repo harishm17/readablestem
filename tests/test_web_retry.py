@@ -482,3 +482,11 @@ def test_the_service_counts_as_not_answering_after_a_run_of_failures_and_recover
     now[0] += provider_health.WINDOW_S + 1  # nothing seen for ten minutes: no claim
     assert not health.is_down()
     health.reset()
+
+
+def test_a_stored_job_says_when_an_older_pipeline_made_it():
+    here = pipeline_run.PIPELINE_VERSION
+    assert not retry.made_by_older_pipeline({"pipeline_version": here})
+    assert retry.made_by_older_pipeline({"pipeline_version": "0.0.1"})
+    assert not retry.made_by_older_pipeline(None)
+    assert not retry.made_by_older_pipeline({})

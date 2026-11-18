@@ -1,11 +1,14 @@
 name: Eval guard
 
-# A pull request that changes a model constant in config.py or a prompt under
-# src/readablestem/models/prompts/ must also change the matching data/eval/latest-*.json
-# report(s), so the change was measured. Logic and the report mapping: scripts/eval_guard.py
-# (tests: tests/test_eval_guard.py). Opt-out for a change that does not alter what a model
-# is asked or which model answers: the label `eval-unchanged`, or a commit trailer
-# `Eval-Unchanged: <reason>` (docs/eval.md, "Eval guard"). Spends nothing.
+# A pull request that changes a model constant in config.py, a prompt under
+# src/readablestem/models/prompts/, or a rule that decides acceptance (a constant or accept
+# function in a pipeline step, found by scripts/eval_guard.py) must also change the matching
+# data/eval report: the latest-*.json of the model's task, or the replay record
+# data/eval/burden-corpus.json for an acceptance rule, so the change was measured. Logic and
+# the report mapping: scripts/eval_guard.py (tests: tests/test_eval_guard.py). Opt-out for a
+# change that does not alter what a model is asked, which model answers or what is accepted:
+# the label `eval-unchanged`, or a commit trailer `Eval-Unchanged: <reason>` (docs/eval.md,
+# "Eval guard"). Spends nothing.
 
 on:
   pull_request:

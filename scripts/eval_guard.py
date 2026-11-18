@@ -1,4 +1,4 @@
-"""Fail a pull request that changes a model or a prompt without re-running the eval.
+"""Fail a pull request that changes a model, a prompt or an acceptance rule without its eval.
 
     python3 scripts/eval_guard.py --base origin/main [--head HEAD] [--labels-json '["x"]']
 
@@ -13,6 +13,17 @@ concurrency, call limits) are not. It is "a prompt" when a `.md` file under
 file only moved without a change of content is not. Either
 needs the matching `latest-*.json` reports in the same pull request (`docs/eval.md`, "How
 to rerun").
+
+A change can also move what a student is given without moving a model or a prompt: a rule
+that decides whether a reading is taken as it stands or goes to a person. That is an
+acceptance rule, and it needs the run record of the replay (`REPLAY_RECORD`, made at no cost
+by `readablestem eval burden` from the recorded answers; the CI eval gate re-makes it and
+fails on a difference). What counts (`rule_changes`) is read from the code, not from a list
+of modules or lines: in a module of `src/readablestem/pipeline/` with a function that sets
+`Status.ACCEPTED` or `Status.NEEDS_REVIEW`, every module-level constant (an ALL_CAPS name)
+and every such function, by parsed value; and a setting of `config.py` with "accept" in its
+name (the confidence a reading must reach). A module that decides nothing of this kind, and
+a comment, a docstring or the formatting of any, is not a change.
 
 Opt-out for a change that does not alter what a model is asked or which model answers (a
 rename, a comment, a typo that is not in the prompt text the model sees): the label
@@ -31,11 +42,15 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
 CONFIG = "src/readablestem/config.py"
 PROMPTS_DIR = "src/readablestem/models/prompts/"
+PIPELINE_DIR = "src/readablestem/pipeline/"
+# The run record of the $0 replay that CI's eval gate re-makes and compares
+# (`readablestem eval burden --against data/eval/burden-corpus.json --same`).
+REPLAY_RECORD = "burden-corpus.json"
 EVAL_DIR = "data/eval/"
 OPT_OUT_LABEL = "eval-unchanged"
 TRAILER = re.compile(r"^Eval-Unchanged:[ \t]*(\S.*)$", re.IGNORECASE)
@@ -58,6 +73,9 @@ ANSWER_SETTINGS = frozenset(
         "figure_model_max_edge_px",
     }
 )
+_ACCEPT_SETTING = re.compile(r"\w*accept\w*")
+_DECIDES = frozenset({"ACCEPTED", "NEEDS_REVIEW"})  # the `Status` members that settle a reading
+_CONSTANT = re.compile(r"[A-Z][A-Z0-9_]*")
 _ANSWER_PATTERNS = (
     re.compile(r"anthropic_effort_\w+"),
     re.compile(r"\w*max_output_tokens\w*"),
@@ -116,6 +134,11 @@ def is_answer_setting(name: str) -> bool:
     return lowered in ANSWER_SETTINGS or any(p.fullmatch(lowered) for p in _ANSWER_PATTERNS)
 
 
+def is_accept_setting(name: str) -> bool:
+    """Whether the config name (any case) is a bar a reading must reach to be accepted."""
+    return bool(_ACCEPT_SETTING.fullmatch(name.lower()))
+
+
 def _value(node: ast.expr) -> str:
     """The parsed value of a right-hand side: `Field(default=x, ...)` is x, so a change of
     a bound or a description is not a change of the value."""
@@ -127,9 +150,12 @@ def _value(node: ast.expr) -> str:
     return ast.dump(node)
 
 
-def model_assignments(source: str) -> dict[str, set[str]]:
-    """Answer setting (lower case) -> every parsed value it is assigned in `source`, in the
-    module and in class bodies. Comments, spacing and line breaks do not matter (`ast`)."""
+def model_assignments(
+    source: str, wanted: Callable[[str], bool] = is_answer_setting
+) -> dict[str, set[str]]:
+    """Setting (lower case) that `wanted` names -> every parsed value it is assigned in
+    `source`, in the module and in class bodies. Comments, spacing and line breaks do not
+    matter (`ast`)."""
     found: dict[str, set[str]] = {}
     scopes: list[Sequence[ast.stmt]] = []
     tree = ast.parse(source)
@@ -144,15 +170,62 @@ def model_assignments(source: str) -> dict[str, set[str]]:
             else:
                 continue
             for target in targets:
-                if isinstance(target, ast.Name) and is_answer_setting(target.id):
+                if isinstance(target, ast.Name) and wanted(target.id):
                     value = _value(node.value)  # type: ignore[arg-type]
                     found.setdefault(target.id.lower(), set()).add(value)
     return found
 
 
-def changed_model_names(base_source: str, head_source: str) -> list[str]:
-    """Names of answer settings added, removed or given another value."""
-    before, after = model_assignments(base_source), model_assignments(head_source)
+def changed_model_names(
+    base_source: str, head_source: str, wanted: Callable[[str], bool] = is_answer_setting
+) -> list[str]:
+    """Names of settings (answer settings, or what `wanted` names) added, removed or given
+    another value."""
+    before = model_assignments(base_source, wanted)
+    after = model_assignments(head_source, wanted)
+    return sorted(
+        name for name in before.keys() | after.keys() if before.get(name) != after.get(name)
+    )
+
+
+def _decides(node: ast.stmt) -> bool:
+    return isinstance(node, ast.FunctionDef) and any(
+        isinstance(part, ast.Attribute) and part.attr in _DECIDES for part in ast.walk(node)
+    )
+
+
+def acceptance_rules(source: str) -> dict[str, str]:
+    """Rule name -> parsed value, for a pipeline module that decides whether a reading is
+    accepted (it has a function that sets `Status.ACCEPTED` or `Status.NEEDS_REVIEW`): its
+    module-level constants and those functions. A function is its arguments and its body
+    without the docstring, so a comment, a docstring or the formatting is not a change. A
+    module that decides nothing has no rules."""
+    tree = ast.parse(source)
+    deciders = [node for node in tree.body if isinstance(node, ast.FunctionDef) and _decides(node)]
+    if not deciders:
+        return {}
+    rules: dict[str, str] = {}
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+        elif isinstance(node, ast.Assign):
+            targets = node.targets
+        else:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name) and _CONSTANT.fullmatch(target.id):
+                rules[target.id] = _value(node.value)  # type: ignore[arg-type]
+    for node in deciders:
+        body = node.body
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+            body = body[1:]  # the docstring
+        rules[f"{node.name}()"] = ast.dump(node.args) + "".join(ast.dump(part) for part in body)
+    return rules
+
+
+def rule_changes(base_source: str, head_source: str) -> list[str]:
+    """Names of the acceptance rules of a pipeline module added, removed or changed."""
+    before, after = acceptance_rules(base_source), acceptance_rules(head_source)
     return sorted(
         name for name in before.keys() | after.keys() if before.get(name) != after.get(name)
     )
@@ -168,10 +241,15 @@ def prompt_name(path: str) -> str | None:
 
 
 def required_reports(
-    changed_files: Iterable[str], config_names_changed: Sequence[str]
+    changed_files: Iterable[str],
+    config_names_changed: Sequence[str],
+    rules_changed: Sequence[str] = (),
 ) -> dict[str, list[str]]:
-    """Report file name -> the reasons it must change, for this change set."""
+    """Report file name -> the reasons it must change, for this change set. `rules_changed`
+    names the acceptance rules the change moves (`rule_changes`), each as `where: name`."""
     needed: dict[str, list[str]] = {}
+    for rule in rules_changed:
+        needed.setdefault(REPLAY_RECORD, []).append(f"acceptance rule {rule} changed")
     for path in sorted(set(changed_files)):
         name = prompt_name(path)
         if name is None:
@@ -206,12 +284,20 @@ def check(
     head_config: str,
     labels: Iterable[str] = (),
     commit_messages: Iterable[str] = (),
+    rules_changed: Sequence[str] = (),
 ) -> tuple[int, list[str]]:
-    """(exit code, lines to print)."""
+    """(exit code, lines to print). `rules_changed`: the acceptance rules of the pipeline the
+    change moves, each as `where: name`; the caller reads them from the two versions of each
+    changed module (`main`)."""
     names = changed_model_names(base_config, head_config) if CONFIG in changed_files else []
-    needed = required_reports(changed_files, names)
+    if CONFIG in changed_files:
+        names_rules = changed_model_names(base_config, head_config, is_accept_setting)
+        rules_changed = [*rules_changed, *(f"{CONFIG}: {name}" for name in names_rules)]
+    needed = required_reports(changed_files, names, rules_changed)
     if not needed:
-        return 0, ["eval guard: no model constant or prompt changed; nothing to check"]
+        return 0, [
+            "eval guard: no model constant, prompt or acceptance rule changed; nothing to check"
+        ]
     updated = {f[len(EVAL_DIR) :] for f in changed_files if f.startswith(EVAL_DIR)}
     missing = {report: why for report, why in needed.items() if report not in updated}
     if not missing:
@@ -221,17 +307,23 @@ def check(
         lines = [f"eval guard: waived by {waiver}", "reports not updated:"]
         lines += [f"  {EVAL_DIR}{report}: {', '.join(why)}" for report, why in missing.items()]
         return 0, lines
-    lines = ["eval guard: this change alters a model or a prompt but not its eval report(s):"]
+    lines = [
+        "eval guard: this change alters a model, a prompt or an acceptance rule but not its "
+        "eval report(s):"
+    ]
     lines += [f"  {EVAL_DIR}{report}: {', '.join(why)}" for report, why in sorted(missing.items())]
     lines += [
         "",
         "Re-run the task(s), promote the report `--as latest` and commit it with the change:",
         'docs/eval.md, section "How to rerun" (`readablestem eval pipeline`, then',
         "`readablestem eval promote ... --as latest`).",
+        f"For an acceptance rule, re-make {EVAL_DIR}{REPLAY_RECORD} from the recorded answers, at",
+        'no cost: docs/eval.md, "The replay record" (`readablestem eval burden --out ...`).',
         "",
-        "If the change does not alter what a model is asked or which model answers (a rename,",
-        f"a comment), add the label `{OPT_OUT_LABEL}` to the pull request, or a commit trailer",
-        '`Eval-Unchanged: <reason>`. Both are documented in docs/eval.md, "Eval guard".',
+        "If the change does not alter what a model is asked, which model answers or what a",
+        f"rule accepts (a rename, a comment), add the label `{OPT_OUT_LABEL}` to the pull",
+        "request, or a commit trailer `Eval-Unchanged: <reason>`. Both are documented in",
+        'docs/eval.md, "Eval guard".',
     ]
     return 1, lines
 
@@ -282,14 +374,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     changed, config_path = changed_files(args.base, args.head)
     base = _git("merge-base", args.base, args.head).strip()
     messages = _git("log", "--format=%B%x00", f"{args.base}..{args.head}").split("\x00")
+    rules = [
+        f"{path.removeprefix('src/readablestem/')}: {name}"
+        for path in sorted(set(changed))
+        if path.startswith(PIPELINE_DIR) and path.endswith(".py")
+        for name in rule_changes(_show(base, path), _show(args.head, path))
+    ]
     code, lines = check(
-        changed, _show(base, config_path), _show(args.head, CONFIG), labels, messages
+        changed, _show(base, config_path), _show(args.head, CONFIG), labels, messages, rules
     )
     print("\n".join(lines))
     if code:
         print(
-            "::error::eval guard: re-run the eval for the changed model or prompt "
-            "(docs/eval.md, How to rerun)"
+            "::error::eval guard: re-run the eval for the changed model, prompt or acceptance "
+            "rule (docs/eval.md, How to rerun)"
         )
     return code
 
