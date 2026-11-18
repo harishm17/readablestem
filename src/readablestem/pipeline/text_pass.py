@@ -1136,7 +1136,10 @@ def source_links(
         if element.kind not in LINK_KINDS or not element.text:
             out.append(element)
             continue
-        links = _guessed_links(element, list(element.links), targets)
+        own = list(element.links)
+        if element.kind in RUNNING_KINDS:  # the number alone is linked: take in its word
+            own = widen_internal(element.text, own)
+        links = _guessed_links(element, own, targets)
         out.append(
             element.model_copy(update={"links": links}) if links != element.links else element
         )

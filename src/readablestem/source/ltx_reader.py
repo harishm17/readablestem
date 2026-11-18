@@ -221,6 +221,11 @@ class _Reader:
         self.skipped: set[int] = set()
         self.loose: list[Node] = []
         self.pictured: set[str] = set()  # figure elements made from a picture
+        # LaTeXML's id of a node -> the element it became (or the first one made inside it), and
+        # the links of the file to such an id (`\ref`, `\eqref`, `\cite`, a contents entry):
+        # element, start, end, the id. They become links once every element exists (`link_refs`).
+        self.ids: dict[str, str] = {}
+        self.refs: list[tuple[Element, int, int, str]] = []
 
     def _take(self, node: Node) -> str:
         """The text of `node` and all below it, now read."""
@@ -272,9 +277,20 @@ class _Reader:
 
     # ------------------------------------------------------------------ walking
 
+    def _tie(self, node: Node, element: Element, *, below: bool = True) -> None:
+        """The ids on `node` (and, with `below`, every node under it) name `element`; an id
+        already tied to an element made inside `node` keeps it."""
+        for item in node.iter() if below else (node,):
+            if (name := item.get("id")) and name not in self.ids:
+                self.ids[name] = element.id
+
     def walk(self, node: Node, depth: int = 0) -> None:
-        before = self.counter
-        if not self._walk(node, depth):
+        before, first = self.counter, len(self.out.elements)
+        took = self._walk(node, depth)
+        if len(self.out.elements) > first:
+            # a node is the first element made inside it; a block read whole holds its ids too
+            self._tie(node, self.out.elements[first], below=took)
+        if not took:
             return
         if self.counter > before:
             # a block taken whole: an error node in it that no rule placed is in its last element
@@ -596,6 +612,8 @@ class _Reader:
                     href = item.get("href") or ""
                     if length[0] > start and href.startswith(("http://", "https://", "mailto:")):
                         spans.append(("uri", start, length[0], href))
+                    elif length[0] > start and len(href) > 1 and href.startswith("#"):
+                        spans.append(("ref", start, length[0], href[1:]))
                 elif tag in ("sup", "sub") and length[0] > start:
                     spans.append((tag, start, length[0], None))
                 if classes & STRUCK and length[0] > start:
@@ -620,8 +638,7 @@ class _Reader:
                 shifted.append((kind, a, b, extra))
         return text, shifted
 
-    @staticmethod
-    def _apply_spans(element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
         text = element.text or ""
         for kind, start, end, extra in spans:
             if start >= end or end > len(text):
@@ -634,6 +651,8 @@ class _Reader:
             try:
                 if kind == "uri":
                     inline.add(element, Link(kind="uri", start=start, end=end, href=str(extra)))
+                elif kind == "ref":
+                    self.refs.append((element, start, end, str(extra)))
                 elif kind in ("sup", "sub"):
                     inline.add(element, ScriptRun(start=start, end=end, kind=kind))
                 elif kind == "deleted":
@@ -689,6 +708,7 @@ class _Reader:
                 ]
             element.text = texts[0] if texts else ""
             self._apply_spans(element, spans)
+            self._tie(item, element)
             self.chars += len(element.text or "")
             self._flush_pictures()  # a picture in the item follows it
             self._deferred_items(ordered, level)
@@ -737,6 +757,7 @@ class _Reader:
                 body = _squash(self._plain(child))
                 text = f"{term} {body}".strip() if term else body
                 element = self._new(Kind.PARAGRAPH, text=text)
+                self._tie(child, element)
                 if term:
                     element.term_end = len(term)
                 self.chars += len(text)
@@ -801,6 +822,7 @@ class _Reader:
 
     def _equation_table(self, node: Node) -> None:
         rows = [r for r in node.iter() if _local(r.tag) == "tr"]
+        parents = {id(child): item for item in node.iter() for child in item}
         for row in rows:
             maths = [m for m in row.iter() if _local(m.tag) == "math"]
             if not maths or _squash(_text_without_tag(row, maths=False)):
@@ -812,7 +834,12 @@ class _Reader:
             for cell in row.iter():
                 if "ltx_tag_equation" in _classes(cell):
                     label = _squash(self._plain(cell))
+            before = len(self.out.elements)
             self._display_math(maths, label or None)
+            if len(self.out.elements) > before:  # the row's own number is what `\eqref` names
+                self._tie(row, self.out.elements[before])
+                if (holder := parents.get(id(row))) is not None:
+                    self._tie(holder, self.out.elements[before], below=False)
 
     # ------------------------------------------------------------------ tables
 
@@ -1605,6 +1632,26 @@ def _count_unread(reader: _Reader, body: Node) -> None:
     out.unread_start = clean(" ".join(first))
 
 
+def link_internal(
+    elements: list[Element],
+    ids: dict[str, str],
+    refs: list[tuple[Element, int, int, str]],
+) -> None:
+    """The links a source file makes to a place in itself (`\\ref`, `\\eqref`, `\\cite`,
+    `\\autoref`, a contents entry; a Word link to a bookmark) as internal links. `refs`: where
+    each one is (element, start, end) and the id it names, which `ids` maps to the element
+    that place became. An id that became no element, a link inside the element it points to
+    and one that overlaps another link make none: the words stay as text."""
+    made = {e.id for e in elements}
+    for element, start, end, name in refs:
+        target = ids.get(name)
+        if target is None or target not in made or target == element.id:
+            continue
+        if any(k.start < end and start < k.end for k in element.links):
+            continue
+        inline.add(element, Link(kind="internal", start=start, end=end, target_id=target))
+
+
 def read(
     xhtml: bytes, project: Path, graphics: dict[str, str] | None = None, *, beamer: bool = False
 ) -> Reading:
@@ -1626,6 +1673,7 @@ def read(
     in_formula = {id(n) for m in body.iter() if _local(m.tag) == "math" for n in m.iter()}
     error_nodes = [n for n in body.iter() if "ltx_ERROR" in _classes(n)]
     reader.walk(body)
+    link_internal(reader.out.elements, reader.ids, reader.refs)
     out = reader.out
     out.errors = reader.errors
     out.error_nodes = len(error_nodes)
@@ -1675,4 +1723,4 @@ def read(
     return out
 
 
-__all__ = ["ReadError", "Reading", "read"]
+__all__ = ["ReadError", "Reading", "link_internal", "read"]
