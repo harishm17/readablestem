@@ -25,16 +25,16 @@
    it does ("Make bold text", "Keep as image"), each with what that means for students named in
    the same block, so the row of buttons and its explanation stay together when the row sticks
    to the bottom of the window. #}
-{% macro decide_row(item, anyway=False) %}
+{% macro decide_row(item, form_id=None) %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
-<div class="decision-bar" role="group" aria-label="Choices for {{ name }}">
+<div class="decision-bar" role="group" aria-label="Choices for {{ name }}"{% if form_id %} data-decide-form="{{ form_id }}"{% endif %}>
   {{ error_line(item, "actions") }}
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
     {% if item.can_accept %}
-    <button type="submit" name="action" value="accept" class="button" data-role="accept" aria-describedby="accept-note-{{ eid }}">{{ item.accept_label }}<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit"{% if form_id %} form="{{ form_id }}"{% endif %} name="action" value="accept" class="button" data-role="accept" aria-describedby="accept-note-{{ eid }}">{{ item.accept_label }}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
-    {% if item.can_reject %}<button type="submit" name="action" value="reject" class="button-secondary" data-role="reject" data-tone="quiet" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
+    {% if item.can_reject %}<button type="submit"{% if form_id %} form="{{ form_id }}"{% endif %} name="action" value="reject" class="button-secondary" data-role="reject" data-tone="quiet" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
   </div>
   {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">{{ item.accept_label }} keeps it as proposed.</p>{% endif %}
   {% if item.can_reject %}<p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>{% endif %}
@@ -123,7 +123,7 @@
     <button type="submit" form="suggest-{{ eid }}" class="button" data-role="suggest" aria-describedby="suggest-hint-{{ eid }}">{{ p.suggestion.label }}<span class="visually-hidden"> in {{ name }}</span></button>
     {% endif %}
     {% if item.can_accept %}
-    <button type="submit" form="decide-{{ eid }}" name="action" value="accept" class="{{ 'button-secondary' if (anyway or p.suggestion) else 'button' }}" data-role="accept"{% if anyway %} data-tone="caution"{% endif %} {% if anyway %}aria-describedby="accept-note-{{ eid }}"{% endif %}>Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" form="decide-{{ eid }}" name="action" value="accept" class="{{ 'button-secondary' if (anyway or p.suggestion) else 'button' }}" data-role="accept"{% if anyway %} data-tone="caution" data-anyway{% endif %} {% if anyway %}aria-describedby="accept-note-{{ eid }}"{% endif %}>Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
     {{ own_choices(item, "decide-" ~ eid) }}
   </div>
@@ -140,6 +140,7 @@
 {% set item = p.item %}
 {% set eid = item.element_id %}
 {% set anyway = p.changes_meaning %}
+{{ equation_choices(p, item, anyway) }}
 {% if p.region_url and p.compare_size %}
 <div class="compare" role="group" aria-label="PDF and proposal at the same scale">
   {# Same font size (marks.css, compare.compare_geometry); the letter shapes can differ
@@ -175,7 +176,6 @@
   {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="latex" value="{{ p.suggestion.latex }}">
 {% endcall %}
 {% endif %}
-{{ equation_choices(p, item, anyway) }}
 {% if p.compare and p.compare.rows %}
 {# The first rows are enough to act on; an array read column by column gives many more, and
    they are one fold away (F-077). The differences that change the meaning come first, so a
@@ -251,6 +251,9 @@
 {% macro figure_body(p) %}
 {% set item = p.item %}
 {% set eid = item.element_id %}
+<div class="decision-bar" data-decide-form="decide-{{ eid }}">
+  {{ figure_choices(item, "decide-" ~ eid) }}
+</div>
 <figure class="figure-view">
   {% if item.crop_url %}
   <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} alt="{{ item.label }} as it is in the PDF.">
@@ -269,7 +272,7 @@
 {% if item.data_table and not item.data_table_offered %}
 <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
 {% endif %}
-{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"id": "decide-" ~ eid, "class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {{ alt_fields(item) }}
   {% if item.long_description is not none %}
@@ -290,9 +293,6 @@
     <label for="datatable-{{ eid }}">Remove the data table (keep the descriptions)</label>
   </div>
   {% endif %}
-  <div class="decision-bar">
-    {{ figure_choices(item) }}
-  </div>
   {{ figure_fallback(item) }}
 {% endcall %}
 {% if item.data_table and item.data_table_offered %}
@@ -314,20 +314,21 @@
 {% macro text_body(p) %}
 {% set item = p.item %}
 {% set eid = item.element_id %}
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
+  {{ hidden_fields() }}
+  {{ decide_row(item) }}
+{% endcall %}
 {{ region(p) }}
 <dl class="facts">
   <div><dt>{{ item.read_label }}</dt><dd class="read-text" dir="auto"{% if item.read_lang %} lang="{{ item.read_lang }}"{% endif %}>{{ item.read_text or "(no text)" }}</dd></div>
 </dl>
 {% if p.change_href %}<p class="notice-actions"><a class="button-secondary" href="{{ p.change_href }}" data-role="change-words">Change the words<span class="visually-hidden"> of {{ item.label|lower }}</span></a></p>{% endif %}
-{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
-  {{ hidden_fields() }}
-  {{ decide_row(item) }}
-{% endcall %}
 {% endmacro %}
 
 {% macro heading_body(p) %}
 {% set item = p.item %}
 {% set eid = item.element_id %}
+{{ decide_row(item, "decide-" ~ eid) }}
 {{ region(p) }}
 <dl class="facts">
   <div><dt>Text</dt><dd class="heading-text">{{ item.heading_text or "(no text)" }}</dd></div>
@@ -335,7 +336,7 @@
   {% if item.heading_shown %}<div><dt>{% if item.heading_in_document %}In the document{% else %}If accepted{% endif %}</dt><dd>level {{ item.heading_shown }}</dd></div>{% endif %}
 </dl>
 {{ hear_button(item) }}
-{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"id": "decide-" ~ eid, "class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {% set err = item.errors.get("level") %}
   <div class="field field-inline{% if err %} field-error{% endif %}">
@@ -350,7 +351,6 @@
       {{ save_button(item) }}
     </div>
   </div>
-  {{ decide_row(item) }}
 {% endcall %}
 {% endmacro %}
 
@@ -390,8 +390,6 @@
 {% set n = hg.waiting %}
 <p class="group-question">“{{ hg.text }}” appears {{ hg.times }} {{ hg.style }}{% if n and n != hg.size %} ({{ n }} still waiting){% endif %}.</p>
 {% if n and hg.fact %}<p class="group-fact" id="group-fact-{{ key }}"><strong>Suggested: {{ "make them bold text" if hg.suggest == "bold" else "keep them as headings" }}.</strong> {{ hg.fact }}</p>{% endif %}
-{% if hg.crops %}{{ group_crops(hg) }}{% else %}{{ region(p) }}{% endif %}
-{% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if n %}
 {% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
 <div class="decision-bar" role="group" aria-label="One choice for all {{ n }}">
@@ -406,6 +404,10 @@
   </div>
   <p class="hint decide-note">Bold text leaves the outline.</p>
 </div>
+{% endif %}
+{% if hg.crops %}{{ group_crops(hg) }}{% else %}{{ region(p) }}{% endif %}
+{% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
+{% if n %}
 {% if not hg.keep %}<p class="hint">Level {{ hg.level }} would skip a level: choose another.</p>
 {% elif hg.keep < n %}<p class="hint">{{ n - hg.keep }} would show at another level: choose a level below.</p>{% endif %}
 <details class="edit-box"{% if hg.error or not hg.keep %} open{% endif %}>
@@ -482,10 +484,6 @@
 {% set key = pg.key %}
 <p class="group-question">{{ pg.lead }}</p>
 <p>{{ pg.explain }}</p>
-{{ region(p) }}
-{# "On pages 2, 3 and 5", each number a link to its page (its purpose is clear in the
-   sentence; a hidden "page" in each made screen readers say "pages page 2"). #}
-{% if p.group_pages|length > 1 %}<p class="group-pages">On pages {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
 {% if pg.waiting %}
 {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key, {"class": "inline-form"}) %}
@@ -496,6 +494,10 @@
 {% endcall %}
 {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
 <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+{{ region(p) }}
+{# "On pages 2, 3 and 5", each number a link to its page (its purpose is clear in the
+   sentence; a hidden "page" in each made screen readers say "pages page 2"). #}
+{% if p.group_pages|length > 1 %}<p class="group-pages">On pages {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {{ leave_out_forms(pg, "split") }}
 {# T3-16: the text becomes the image's alt text, one box for each page or piece. #}
 {% for member in pg.describe %}{{ describe_box(member, "split") }}{% endfor %}
@@ -573,7 +575,7 @@
     <a href="#decision-title" data-view="decision" aria-current="true">Decision</a>
     <a href="#page-view" data-view="page">Page {{ page.number }}</a>
   </nav>
-  <section class="decision-area panel-{{ panel.mode }}" id="decision" aria-labelledby="decision-title">
+  <section class="decision-area panel-{{ panel.mode }}" id="decision" aria-labelledby="decision-title"{% if panel.pages %} data-card="page"{% endif %}>
     {% if notice %}
     {# What the last decision did, with Undo for it (only from the page that decision
        made: the form carries its version). `data-saved` names the item it saved, so
@@ -587,6 +589,9 @@
       {% endcall %}
       {% endif %}
     </div>
+    {% else %}
+    {# The same status line when nothing was saved: a key that has nothing to act on says so here (app.js). #}
+    <p class="decision-status" id="decision-notice" role="status"></p>
     {% endif %}
     {# Notation memory: "Remember for <course>: bold ω is a vector", under the notice of
        the decision that settled the letter. #}
@@ -655,8 +660,8 @@
     {% endif %}
     {% endif %}
 
-    <details class="shortcuts" id="shortcuts" hidden>
-      <summary>Keyboard shortcuts</summary>
+    <div class="shortcuts" id="shortcuts" role="group" aria-labelledby="shortcuts-title" hidden>
+      <p class="part-label" id="shortcuts-title">Keyboard shortcuts</p>
       <div class="field checkbox-field">
         <input type="checkbox" id="shortcuts-on">
         <label for="shortcuts-on">Use keyboard shortcuts</label>
@@ -667,8 +672,8 @@
         <div><dt><kbd>A</kbd></dt><dd>accept</dd></div>
         <div><dt><kbd>E</kbd></dt><dd>edit (go to the field)</dd></div>
       </dl>
-      <p class="hint">Off by default. Not active while you type.</p>
-    </details>
+      <p class="hint">On until you turn them off. A key does nothing while you type or hold Ctrl, Alt, Shift or Command. A never presses “Accept anyway” or a choice for a whole page: those need a press.</p>
+    </div>
   </section>
 
   <section class="optional-area" aria-labelledby="optional-summary{% if decided_lines %} decided-summary{% endif %}">
