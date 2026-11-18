@@ -40,6 +40,7 @@ PIPELINE_MODULES = (
     "html_checks",
     "run",
     "table_step",
+    "table_math",
     "notation_memory",
     "image_page",
     "image_page_vector",

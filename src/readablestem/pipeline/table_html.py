@@ -187,15 +187,23 @@ def _needs_ids(layout: _Layout) -> bool:
     return False
 
 
-def render_table(grid: TableGrid, *, id_prefix: str, math_display: Display = "inline") -> str:
+def render_table(
+    grid: TableGrid,
+    *,
+    id_prefix: str,
+    math_display: Display = "inline",
+    marked: frozenset[tuple[int, int]] = frozenset(),
+) -> str:
     """The grid as one `<table>` element (see the module docstring). `id_prefix` must be
-    unique in the document (e.g. the element id); every id written starts with it."""
+    unique in the document (e.g. the element id); every id written starts with it. `marked`
+    is for the review card only: the (row, column) of cells that get `class="cell-differs"`;
+    no output of the document passes it."""
     if not _ID_PREFIX.fullmatch(id_prefix):
         raise ValueError("id_prefix must be a plain id (a letter, then letters, digits, -_.:)")
     layout = _Layout.of(grid)
     if not grid.is_data:
         return _layout_table(layout, math_display)
-    writer = _Writer(layout, id_prefix, math_display, ids=_needs_ids(layout))
+    writer = _Writer(layout, id_prefix, math_display, ids=_needs_ids(layout), marked=marked)
     parts = ["<table>"]
     if grid.caption and grid.caption.strip():
         caption = escape_text(" ".join(grid.caption.split()))
@@ -227,6 +235,7 @@ class _Writer:
     math_display: Display
     ids: bool  # write headers/id (irregular table)
     plain: bool = False  # layout table: every cell a <td>, no scope
+    marked: frozenset[tuple[int, int]] = frozenset()  # cells to mark (the review card)
 
     def rows(self, rows: range) -> str:
         return "".join(f"<tr>{self.row(r)}</tr>" for r in rows)
@@ -256,6 +265,8 @@ class _Writer:
             headers = self.headers_of(placed)
             if headers:
                 attrs += f' headers="{" ".join(headers)}"'
+        if (placed.row, placed.col) in self.marked:
+            attrs += ' class="cell-differs"'
         tag = "th" if header else "td"
         content = self.content(placed.cell)
         if header and "<math" in content:

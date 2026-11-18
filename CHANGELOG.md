@@ -80,6 +80,18 @@
   words (docs/deploy-railway.md lists what must change first). `PIPELINE_VERSION` and
   `RENDER_VERSION` are not bumped: no document is made differently.
 
+## Unreleased: the table card names the cells that differ (branch feat/table-card-differing-cells)
+
+- SW24 / WS8.20, as far as their triage lines: when the words check of a table fails
+  (`table.cell_text`: `text_mismatch`, `cell_mismatch`, `row_mismatch`) or a math cell's check does
+  (`table.math_symbols`, `table.math_signs`, `table.math_style` when it changes the meaning), the card
+  lists the cells that differ under the check's sentence ("Row 3 (Ball), column 2 (Distance (m)): rebuilt
+  table 7, PDF text 6") and marks the same cells in the table with a dashed frame and a ≠ sign. The
+  failed checks were already stored by name (`Fix.checks`, content-free); the cells are worked out when the
+  card is drawn, with the check's own comparison, so a spacing or spelling difference it does not count is
+  not listed, and nothing new is stored. At most 8 are listed, then a count; no list when the grids cannot
+  be compared cell by cell. `table.cell_reading` (a formula in a table cell that differs from the
+  table's reading) had no sentence and has one. No model request, stored record or choice changes.
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 
 - SW47 (F-080, F-407, F-481), as far as its triage line: a review write is refused as stale only

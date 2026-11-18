@@ -216,7 +216,7 @@ def test_a_cell_changed_is_checked_escaped_and_shown_again(tables):
     assert fix_of(tables, "p1-e1").status is Status.NEEDS_REVIEW
     cell = next(c for c in grid(tables, "p1-e1").cells if (c.row, c.col) == (1, 1))
     assert cell.text == "<b>12</b> & up"
-    assert "<td>&lt;b&gt;12&lt;/b&gt; &amp; up</td>" in panel(page)
+    assert "&lt;b&gt;12&lt;/b&gt; &amp; up</td>" in panel(page)  # marked: it differs
     assert "&lt;b&gt;12&lt;/b&gt; &amp; up" in with_file(tables).html
     assert "<b>12</b>" not in with_file(tables).html
     # The same text again changes nothing.
@@ -225,6 +225,21 @@ def test_a_cell_changed_is_checked_escaped_and_shown_again(tables):
     )
     assert again.status_code == 422
     assert "This is the text the cell has already." in again.text
+    # The card names the cell that differs with both values (the table has no headers yet).
+    shown = text_of(section(panel(page), 'class="difference-list"', "</ul>"))
+    assert shown.count("Row 2, column 2") == 1 and shown.count("PDF text") == 1
+    assert "rebuilt table <b>12</b> & up" in shown and "PDF text 10" in shown
+    # With headers it names them. A cell that differs only in spacing ("1 0" for "10") is not
+    # listed beside the one that really differs; with nothing else wrong, nothing is listed.
+    post(tables, "p1-e1", action="edit", change="headers", header_row="on", header_col="on")
+    post(tables, "p1-e1", action="edit", change="cell", row="1", col="1", cell="1 0")
+    post(tables, "p1-e1", action="edit", change="cell", row="2", col="1", cell="7")
+    page = panel(screen(tables, "?item=p1-e1"))
+    shown = text_of(section(page, 'class="difference-list"', "</ul>"))
+    assert "Row 3 (Ball), column 2 (Distance (m))" in shown and "Row 2" not in shown
+    assert "rebuilt table 7" in shown and "PDF text 6" in shown
+    post(tables, "p1-e1", action="edit", change="cell", row="2", col="1", cell="6")
+    assert "Cells that differ" not in screen(tables, "?item=p1-e1")
 
 
 def test_a_maths_cell_goes_through_the_latex_checks(tables):

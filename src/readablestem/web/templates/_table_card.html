@@ -52,6 +52,23 @@
 
 {# ------------------------------------------------------------------ review screen #}
 
+{# The cells where the proposal and the PDF's text differ, under the sentence of the check that
+   found them (web/table_card.py `Finding.differences`): a real list, read in order after the
+   sentence. The same cells are marked in the table, with a dashed frame and a ≠ sign. #}
+{% macro cell_differences(f, eid, n) %}
+{% if f.differences %}
+<div class="cell-differences" role="group" aria-labelledby="diff-title-{{ eid }}-{{ n }}">
+  <p class="part-label" id="diff-title-{{ eid }}-{{ n }}">Cells that differ</p>
+  <ul class="difference-list">
+    {% for d in f.differences %}
+    <li class="difference"><span class="difference-place">{{ d.place }}</span>: rebuilt table <q>{{ d.proposal }}</q>, PDF text <q>{{ d.pdf }}</q></li>
+    {% endfor %}
+  </ul>
+  {% if f.more %}<p class="hint">{{ f.more }} more {{ "cell differs" if f.more == 1 else "cells differ" }}: compare the rest with the image. The table marks every one with ≠.</p>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
 {# What is wrong with the proposal, one sentence each that names the part of the table it is
    about, and under it the one correction the card can make: the first row as headers, the
    grid read from the PDF, or the place below where headers and cells are changed. #}
@@ -66,6 +83,7 @@
     {% for f in t.findings %}
     <li class="finding">
       <span class="finding-text">{{ f.text }}</span>
+      {{ cell_differences(f, eid, loop.index) }}
       {% if f.fix == "headers" and not t.only_headers_missing %}
       {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form finding-action"}) %}
         {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
@@ -289,7 +307,7 @@
 {% if t.findings %}
 <p class="part-label">What the checks found</p>
 <ul class="finding-list">
-  {% for f in t.findings %}<li class="finding"><span class="finding-text">{{ f.text }}</span>{% if f.fix == "edit" or (f.fix == "headers" and not t.only_headers_missing) %} <a class="finding-action" href="/jobs/{{ job.id }}/review?item={{ item.element_id }}#table-correct-{{ item.element_id }}">Change the table<span class="visually-hidden"> {{ name }} on the review screen</span></a>{% endif %}</li>{% endfor %}
+  {% for f in t.findings %}<li class="finding"><span class="finding-text">{{ f.text }}</span>{{ cell_differences(f, item.element_id, loop.index) }}{% if f.fix == "edit" or (f.fix == "headers" and not t.only_headers_missing) %} <a class="finding-action" href="/jobs/{{ job.id }}/review?item={{ item.element_id }}#table-correct-{{ item.element_id }}">Change the table<span class="visually-hidden"> {{ name }} on the review screen</span></a>{% endif %}</li>{% endfor %}
 </ul>
 {% endif %}
 {% endmacro %}
