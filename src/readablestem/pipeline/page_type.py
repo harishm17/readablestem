@@ -243,12 +243,21 @@ INK_MAX_SEGMENTS = 500_000
 INK_GUARD_S = 60.0
 INK_WORK = "work"
 INK_TIME = "time"
-# The upload probe (`document_refusal`, `image_page_count`) runs in a child that is killed
-# after 30 s (`web.uploads.INSPECT_TIMEOUT_S`), so the whole document has an allowance of path
-# items as well (the corpus's largest, a handwritten upload, has 386,717 on the pages that
-# are not clearly typed), and the guard is one deadline for the document.
+# The upload probe (`document_refusal`, `image_page_count`) runs inside the upload request, in a
+# child that is killed after 30 s (`web.uploads.INSPECT_TIMEOUT_S`), so the whole document has an
+# allowance of path items as well (the corpus's largest, a handwritten upload, has 386,717 on
+# the pages that are not clearly typed), and the guard is one deadline for the document. The
+# deadline is short because the exact analysis is the conversion's first step, which runs it
+# for every page with its own guard (INK_GUARD_S) and fails a document of nothing but handwriting
+# or scans (`web.worker.result_outcome`): with 20 s, notes of 20 to 100 dense pages made the
+# request take 5 to 16 s (measured 2026-11-18, generated pages, 0.5 s per 100,000 path items
+# analysed). A page the deadline left unanalysed is never refused, and with less than a line of
+# text it still counts as an unread page (`ImagePageCount`), so notes with no text keep the same
+# answer to "more than half are scans or handwriting"; the split between handwritten and
+# unread, the pages with a typed title over ink, and the refusal of a document that is only
+# handwriting wait for the job when the deadline is reached.
 PROBE_MAX_ITEMS = 1_000_000
-PROBE_GUARD_S = 20.0
+PROBE_GUARD_S = 0.5
 # The page cap (docs/layout.md "Time budget"). Every analysis step after the drawings are
 # extracted costs time and memory for each path (a page of 86,000 strokes took 5 to 9 s
 # and 50 MB of Python objects in layout alone, 30 such pages 4 minutes and 1.8 GB), so a

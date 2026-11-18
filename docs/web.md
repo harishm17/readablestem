@@ -489,7 +489,7 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    (`Wait.words`, `Wait.header`). The daily ones (the page quota, the daily spend cap, sign-ups full) are the seconds to the
    next midnight UTC, the time `quota.next_day_start` resets at; the rate limiter's are its own wait; the fixed pauses (storage
    full, busy) are named constants. Refusals that give no time carry a plain `Retry-After` only.
-1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
+1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a body whose Content-Length is already more than they may still store (less 64 KB for the form's fields) is refused the same way before any of it is read (`routes.jobs._storage_refusal`, which cannot name the file); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
 2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
    while it is read, copied and probed, so this keeps uploads to at most about 900 MB (three
@@ -563,6 +563,13 @@ to each of its parts that has such pages); the flag only offers it.
   `page_type.probe_pages` makes one pass over the pages for the refusal and the count, by kind
   (`page_type.ImagePageCount`: scanned, handwritten, unread pages of ink or drawings, and
   `unanalysed` pages whose ink the time guard did not analyze, which makes the count "at least").
+  The guard is half a second for the whole document (`page_type.PROBE_GUARD_S`): notes of many
+  dense pages made the request take 4 to 13 s with the old 20 s. A page past it is not refused;
+  with less than a line of text it still counts as an unread page of ink, so the count and the
+  choice for a file of mostly handwriting stay, while the split between handwritten and unread and
+  the refusal of a document that is only handwriting wait for the conversion
+  (`worker.result_outcome`, same words). The text pass, about 14 ms a page of a dense file, is
+  the rest of the time.
   The kinds are those of `page_type.image_kind`, the one predicate that also picks the pages the
   image page pass reads (`image_page.kept_reads`), so the count and the reading agree. Typed pages
   are told from their text alone, so only a page that is not clearly typed pays for the ink
@@ -1898,7 +1905,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
-  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analyzed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe normally refuses these first). A result stored before page types: `scanned` when every page was only a picture of a page |
+  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analyzed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe refuses these first when it can tell within its half second). A result stored before page types: `scanned` when every page was only a picture of a page |
   | `too_complex` | A page needs more time or memory to read than a conversion has: the layout step's child process (open and render the pages, `layout._probe_pages`) passed its time limit (`PROBE_TIMEOUT_S` + `PROBE_PER_PAGE_S` per page after the first) or its 768 MB address-space cap (`PROBE_MEMORY_BYTES`) |
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no key for the selected provider): every job would fail the same way |

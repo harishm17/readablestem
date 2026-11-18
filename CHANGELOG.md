@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: upload intake (branch perf/upload-intake)
+
+- PF8: a body whose Content-Length is more than the person may still store is refused (413,
+  the words of the storage refusal, "this file" for the name) before any of it is read
+  (`routes.jobs._storage_refusal`). The file is held once while it is read, not twice
+  (`uploads._body_of`): a file over the limit by a few bytes peaked at 2.06 times its size and now
+  at 1.04. An accepted upload still peaks at 3 times its size, in the database driver (SQLite
+  measured). The upload probe analyzes ink for half a second, not 20 (`page_type.PROBE_GUARD_S`):
+  notes of 20 to 100 dense pages took 3.9 to 13.2 s and take 1.6 to 4.4 s. The count of scanned and
+  handwritten pages, and so the choice for a file of mostly such pages, does not change; the
+  refusal of a document that is only handwriting is decided in the job when the probe ran out of
+  time. Not built: the start-up check of the upload gate against the web memory limit (no such
+  limit is a setting). No migration and no version bump.
+
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
 - WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per

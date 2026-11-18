@@ -11,12 +11,17 @@ Uploads are untrusted bytes from the internet, so:
   `web.pdf_probe`): a malformed file that crashes or hangs MuPDF takes down a child, not
   the web server.
 
+- A body that says (Content-Length) it is more than the person may still store is refused
+  before any of it is read (`routes.jobs._storage_refusal`, with the words of a file refused
+  after being read).
 - At most `MAX_CONCURRENT_UPLOADS` uploads are taken in at once, and one per user
-  (`UploadGate`). An upload is held in memory while it is read, copied once, and read
-  again by the probe child, so each costs about three times its size: with the defaults
-  (3 at once, up to 100 MB each: `MAX_LARGE_UPLOAD_MB`) that is at most about 900 MB when all
-  three are as large as allowed, and near 100 MB for ordinary 5 to 10 MB files, however many
-  requests arrive at once (the limit was set when Cloud Run sent up to 20 at a time); see
+  (`UploadGate`). The file is held once while it is read (`_body_of` hands out the parser's
+  buffer, it does not copy it), and a second and third time by the database driver when it is
+  stored (measured with SQLite: 3 times in all; Postgres has not been measured). The probe child
+  reads it from a pipe. So each costs about three times its size: with the defaults (3 at once,
+  up to 100 MB each: `MAX_LARGE_UPLOAD_MB`) that is at most about 900 MB when all three are as
+  large as allowed, and near 100 MB for ordinary 5 to 10 MB files, however many requests arrive
+  at once (the limit was set when Cloud Run sent up to 20 at a time); see
   docs/deploy-railway.md, "Request size", for the memory to allow. A batch zip
   (`FEATURE_BATCH_ZIP`, docs/web.md "memory, per request") adds to that the text of its `.tex`
   files (24 MB) and one unpacked document (at most 100 MB, the budget of
@@ -30,6 +35,7 @@ Every rejection is an `UploadRejected` with a category `code`, safe to log.
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
@@ -246,13 +252,25 @@ async def read_upload_form(
             raise UploadRejected("too_many_files")
         files = []
         for upload in uploads:
-            data = await upload.read()
+            data = _body_of(upload)
             if len(data) > max_bytes:
                 raise UploadRejected("too_large")
             files.append(UploadedFile(safe_filename(upload.filename), data))
         return UploadForm(fields=fields, files=files)
     finally:
         await form.close()
+
+
+def _body_of(upload: UploadFile) -> bytes:
+    """The bytes of an uploaded file, without a second copy of them. The parser keeps the file
+    in a `BytesIO` (`_InMemoryParser`), and `read()` copies it, so a 100 MB file peaked at
+    twice its size; `getvalue()` hands out the buffer itself. A file that is not in memory (not
+    the case here) is read."""
+    held = getattr(upload.file, "_file", None)  # SpooledTemporaryFile's in-memory buffer
+    if isinstance(held, io.BytesIO):
+        return held.getvalue()
+    upload.file.seek(0)
+    return upload.file.read()
 
 
 def safe_filename(raw: str | None, *, limit: int = 200) -> str:
