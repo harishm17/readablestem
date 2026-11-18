@@ -92,6 +92,23 @@
   not listed, and nothing new is stored. At most 8 are listed, then a count; no list when the grids cannot
   be compared cell by cell. `table.cell_reading` (a formula in a table cell that differs from the
   table's reading) had no sentence and has one. No model request, stored record or choice changes.
+## Unreleased: a table's math is written the way the text's math is (branch fix/table-cell-math-one-writer)
+
+- WS5.8 (F-303): math in a table cell is written by the same rule as an equation in the text:
+  the rebuilt `<math display="inline">`, with the reading as its `alttext` when `MATHML_ALTTEXT`
+  is on, and nothing hidden from assistive technology. Before, a header cell with math got a
+  visually hidden spoken string and its MathML inside `aria-hidden="true"` (so a braille display
+  got words, never the math), the Word file printed that hidden string as visible text beside the
+  equation, and when no reading could be made the name fell back to the cell's LaTeX. Now such a
+  header is named by its reading as the `aria-label` of the `<th>` (the name browsers cannot take
+  from MathML, which is why a name exists at all, `db6ea689`), taken from the same reading the
+  text, the review screen and Listen use (`speech.reading_for`); where no reading can be made it
+  has no name and the existing `html.table_header_text` check says so; the LaTeX is never used.
+  The student page, the paste version, EPUB, Canvas and Word all follow, because they are made
+  from that page. No stored record, model request, `PIPELINE_VERSION` or golden file changes
+  (`RENDER_VERSION` 8 is already unshipped). Not tested with a screen reader: row 21 of
+  `docs/device-checks.md`.
+
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 
 - SW47 (F-080, F-407, F-481), as far as its triage line: a review write is refused as stale only

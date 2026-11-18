@@ -128,6 +128,18 @@ def _attributes(node: XmlElement) -> str:
     return "".join(kept)
 
 
+# Longest speech written as alttext. A reading cut short would mislead more than none, so a
+# longer one is left out and the screen reader reads the MathML itself.
+MAX_ALTTEXT_CHARS = 300
+
+
+def alttext_from_speech(speech: str | None) -> str | None:
+    """A reading as an `alttext` value (one line of text), or None when there is none or it
+    is too long to be a useful label. Body equations and table cells both write it."""
+    text = " ".join((speech or "").split())
+    return text if text and len(text) <= MAX_ALTTEXT_CHARS else None
+
+
 def sanitize_mathml(
     mathml: str,
     *,

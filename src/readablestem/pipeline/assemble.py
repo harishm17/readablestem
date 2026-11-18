@@ -90,12 +90,11 @@ from readablestem.pipeline.safe_html import MATHML_NS as MATHML_NS
 from readablestem.pipeline.safe_html import MATHML_UNWRAP as MATHML_UNWRAP
 from readablestem.pipeline.safe_html import MAX_MATHML_DEPTH as MAX_MATHML_DEPTH
 from readablestem.pipeline.safe_html import MAX_MATHML_NODES as MAX_MATHML_NODES
-from readablestem.pipeline.safe_html import Display, sanitize_mathml
+from readablestem.pipeline.safe_html import Display, alttext_from_speech, sanitize_mathml
 from readablestem.pipeline.safe_html import escape_text as _escape
 from readablestem.pipeline.safe_html import split_tag as _split_tag
 
-# Class on every element whose text this module wrote (notes, labels, the about section);
-# the table serialiser marks a maths header's reading with it too.
+# Class on every element whose text this module wrote (notes, labels, the about section).
 AUTHORED_CLASS = table_html.AUTHORED_CLASS
 
 # The version of the student file's making: raise it with any change to the sheet, the
@@ -671,18 +670,6 @@ def _equation_label(label: str | None) -> str:
 # The estimate came within -18% / +44% of Chromium's widths for the gold equations, and
 # maths fonts differ between systems, hence the margin.
 WIDE_EQUATION_EM = 11.0
-
-
-# Longest speech written as alttext. A reading cut short would mislead more than none, so a
-# longer one is left out and the screen reader reads the MathML itself.
-MAX_ALTTEXT_CHARS = 300
-
-
-def alttext_from_speech(speech: str | None) -> str | None:
-    """The stored speech as an `alttext` value (one line of text), or None when there is
-    none or it is too long to be a useful label."""
-    text = " ".join((speech or "").split())
-    return text if text and len(text) <= MAX_ALTTEXT_CHARS else None
 
 
 def _scroller_attrs(mathml: str, label: str | None) -> str:
@@ -1561,7 +1548,11 @@ class _Renderer:
                 else:
                     self.add_style("table", student_sheet.TABLE)
             details = figure_details.render_details(
-                proposal, element.caption, table_id=table_id, authored_class=AUTHORED_CLASS
+                proposal,
+                element.caption,
+                table_id=table_id,
+                authored_class=AUTHORED_CLASS,
+                math_alttext=self.math_alttext,
             )
             return html + details
         figure = f"<figure>{picture(FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"

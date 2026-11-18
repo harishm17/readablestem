@@ -245,7 +245,12 @@ def has_details(figure: FigureFix | None) -> bool:
 
 
 def render_details(
-    figure: FigureFix, caption: str | None, *, table_id: str | None, authored_class: str
+    figure: FigureFix,
+    caption: str | None,
+    *,
+    table_id: str | None,
+    authored_class: str,
+    math_alttext: bool = False,
 ) -> str:
     """The `<details>` written right after a figure: the long description as paragraphs,
     then the data table when it is shown (`data_table_shown`) and `table_id`, a unique
@@ -260,7 +265,7 @@ def render_details(
     grid = figure.data_table if data_table_shown(figure) else None
     if grid is not None and table_id is not None:
         grid = grid.model_copy(update={"caption": table_caption(figure, caption)})
-        table = render_table(grid, id_prefix=table_id)
+        table = render_table(grid, id_prefix=table_id, math_alttext=math_alttext)
         parts.append(
             f'<div class="table-scroll" role="group" aria-labelledby="{table_id}-caption" '
             f'tabindex="0">{table}</div>'
