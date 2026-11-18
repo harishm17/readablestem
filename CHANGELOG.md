@@ -66,6 +66,18 @@
   column; results without the field read as before), no request change, no version bump.
   Not built: "Convert again to apply", the course page's marks, starter sets, the table of
   suggestions, the lede, the double-click handling.
+## Unreleased: the documents list reads no results (branch perf/documents-list-summary)
+
+- PF5 (F-279, F-496, F-497): the documents list, the batch page, the course page, the "Delete my
+  account" count and the admin queue no longer load the stored result of every finished document
+  that has nothing open. `states.load` reads what the state needs of it from `jobs.state_facts`
+  (the summary's "ready to share" and what remains, the converter version, and whether the result
+  has any gap note or notice to word), written next to `open_decisions` whenever a result is
+  stored, and `states.state_of` stays the only function that names a state. With 50 finished
+  documents the list was 61 statements and 50 result loads; it is now 10 statements and none,
+  the same as for 2. A document with an outcome code, an outage, unread LaTeX or a notice that
+  holds it back still has its result read. One migration (`state_facts`, nullable): a row from
+  before it is read once and filled the first time a list shows it. No version bump.
 
 ## Unreleased: page pictures and exports are made once (branch perf/render-once)
 

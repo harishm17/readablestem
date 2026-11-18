@@ -1345,7 +1345,12 @@ only for finished jobs. While a document is waiting or converting, htmx polls
 of open decisions of a finished job are columns of the job (`jobs.result_title`,
 `jobs.open_decisions`), set whenever `result_json` is assigned (a SQLAlchemy set event in
 `web/db.py`), and a finished job from before them is filled in the first time the list
-sees it. `list_version` (from the jobs' own columns) answers 204 when
+sees it. What the state of a finished job with nothing open and no outcome code reads of its
+result is stored the same way in `jobs.state_facts` (`states.finished_facts`: what its summary
+says, the converter version, and whether it has a gap note or a notice to word), so the list,
+the batch page, the course page and the admin queue count name that state with `states.state_of`
+and load no result; a document whose facts say it has something to word, or that has an outcome
+code, has its result read as before. `list_version` (from the jobs' own columns) answers 204 when
 nothing changed, otherwise the whole list is swapped. Every link in it has a stable id,
 so htmx puts focus back on the same link after a swap; the list is not a live region,
 but the tab title follows it ("My documents (4 of 6 finished)"). Without JavaScript a

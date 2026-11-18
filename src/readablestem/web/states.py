@@ -34,6 +34,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -345,20 +346,23 @@ class Context:
 @dataclass(frozen=True)
 class Counts:
     """The open required decisions of a finished job (a group of repeated headings counted
-    once), and the statement of what was converted, checked and reviewed
-    (`pipeline.checked.CheckedSummary`). `open` is the summary's own count when there is one;
-    the documents list passes the stored `jobs.open_decisions` alone for a job with decisions
-    open, made by the same function (`core.triage.review_load`)."""
+    once), and what the statement of what was converted, checked and reviewed
+    (`pipeline.checked.CheckedSummary`) says of it: `whole`, whether it is ready to share, and
+    `remains`, what stands between it and that. `open` is the summary's own count when there
+    is one; the documents list passes the stored `jobs.open_decisions` alone for a job with
+    decisions open, made by the same function (`core.triage.review_load`). `whole` None: not
+    known to be whole (no summary)."""
 
     open: int = 0
-    summary: CheckedSummary | None = None
+    whole: bool | None = None
+    remains: str = ""
 
 
 def counts_of(summary: CheckedSummary | None) -> Counts:
     """`Counts` from a finished result's summary (`pipeline.checked.of_result`)."""
     if summary is None:
         return Counts()
-    return Counts(summary.open_required, summary)
+    return Counts(summary.open_required, summary.ready_to_share, checked_words.remains(summary))
 
 
 def tries_left(retries: int) -> int:
@@ -690,6 +694,51 @@ def _unanalysed_message(pages: int) -> str:
     )
 
 
+def _facts_stamp() -> str:
+    """The code that makes `finished_facts`: the pipeline and render versions, one of which
+    changes with every release that changes a result's summary or its words."""
+    from readablestem.pipeline.assemble import RENDER_VERSION
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    return f"{PIPELINE_VERSION}/{RENDER_VERSION}"
+
+
+def _facts_current(stored: object) -> bool:
+    """`jobs.state_facts` made by this code."""
+    return isinstance(stored, dict) and stored.get("by") == _facts_stamp()
+
+
+def finished_facts(result: object) -> dict[str, Any] | None:
+    """What the state of a finished job with no outcome code reads of its stored result, kept
+    in `jobs.state_facts` whenever a result is stored (the `Job.result_json` set event in
+    `web.db`): what its summary says (`whole`, `remains`: `counts_of`), the version that made
+    it (`rerun_step`) and `plain`, whether none of the result's gap notes or notices has a
+    word to add (`gaps_of`, `_unanalysed_pages`, `_held_by_notice`). A plain result is read by
+    `load` from these alone; any other has its result read. `by` names the code that made
+    them (`_facts_stamp`): facts made by other code are made again on first sight, so a list
+    never shows a sentence or a "Ready to share" that this code would not say. None for a
+    result this version cannot read."""
+    if not isinstance(result, dict):
+        return None
+    try:
+        counts = counts_of(checked.of_result(DocumentResult.model_validate(result)))
+    except ValidationError:
+        return None
+    version = result.get("pipeline_version")
+    return {
+        "whole": counts.whole,
+        "remains": counts.remains,
+        "version": version if isinstance(version, str) else None,
+        "by": _facts_stamp(),
+        "plain": not (
+            words.outage_message(result)
+            or words.unread_message(result)
+            or _unanalysed_pages(result)
+            or _held_by_notice(result)
+        ),
+    }
+
+
 def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | None = None) -> State:
     gaps = gaps_of(job, left, viewer, ctx)
     if counts.open:
@@ -706,8 +755,7 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | Non
         steps = (*actions, download) if actions else (download,)
         return _make("partly_converted", " ".join(g.text for g in gaps), steps, gaps)
     steps = (download, share) if viewer == "owner" else (download,)
-    summary = counts.summary
-    if summary is not None and summary.ready_to_share:
+    if counts.whole:
         if pages := _unanalysed_pages(job.result_json):
             # The ink analysis ran out of work on these pages (`drawings_not_analysed`): the
             # page cannot say everything was converted.
@@ -717,7 +765,7 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | Non
         return _make("ready", checked_words.READY_ALL, steps)
     # Not known to be whole (no summary), or a part is a picture, a page is left out or a
     # structure check failed: "Ready", and what remains, never "Ready to share".
-    return _make("ready_remains", checked_words.remains(summary) if summary else "", steps)
+    return _make("ready_remains", counts.remains, steps)
 
 
 # --------------------------------------------------------------------------- loading
@@ -734,30 +782,54 @@ _COLUMNS = (
     Job.lease_until,
     Job.is_sample,
     Job.open_decisions,
+    Job.state_facts,
     Job.cancel_requested_at,
 )
+
+
+def _stored_plain(row: Any) -> bool:
+    """A finished job whose state needs no result: no outcome code, no decision open, and
+    stored facts, made by this code, that say its result has nothing else to word
+    (`finished_facts`)."""
+    return (
+        row.status == JobStatus.DONE
+        and not row.error_code
+        and not row.open_decisions
+        and _facts_current(row.state_facts)
+        and bool(row.state_facts.get("plain"))
+    )
 
 
 def load(
     session: Session, job_ids: Iterable[str], *, context: Context | None = None
 ) -> dict[str, State]:
-    """The state of each job, from its columns. A finished job with no decision open, or
-    with an outcome code, has its result read: its label is the summary's
-    (`pipeline.checked`), and only a job with a code can carry a gap note. A job with
-    decisions open needs only the stored count. A finished job from before
-    `jobs.open_decisions` existed has the column filled once (`documents.list_facts`)."""
+    """The state of each job, from its columns. A finished job with decisions open needs only
+    the stored count. One with no decision open and no outcome code reads the facts stored
+    with its result (`finished_facts`), and has its result read only when they say it has a
+    gap note or a notice to word; one with an outcome code has its result read, since only
+    such a job carries a budget or pages note. A finished job from before `jobs.open_decisions`
+    or `jobs.state_facts` existed has them filled once (the set event, `documents.list_facts`)."""
     ids = list(dict.fromkeys(job_ids))
     if not ids:
         return {}
     rows = session.execute(select(*_COLUMNS).where(Job.id.in_(ids))).all()
     with_result = [
-        r.id for r in rows if r.status == JobStatus.DONE and (r.error_code or not r.open_decisions)
+        r.id
+        for r in rows
+        if r.status == JobStatus.DONE
+        and (r.error_code or not r.open_decisions)
+        and not _stored_plain(r)
     ]
     results: dict[str, tuple[Any, int | None]] = {}
     if with_result:
         for job in session.scalars(select(Job).where(Job.id.in_(with_result))):
-            if job.open_decisions is None:
-                job.result_json = job.result_json  # the set event stores the list's facts
+            # The set event stores the list's facts: for a row from before a column, and for
+            # facts another release made. A job with decisions open keeps none, by design, so
+            # it is not read again for them on every view.
+            if job.open_decisions is None or (
+                not job.open_decisions and not _facts_current(job.state_facts)
+            ):
+                job.result_json = job.result_json
             results[job.id] = (job.result_json, job.open_decisions)
     out: dict[str, State] = {}
     for r in rows:
@@ -765,6 +837,11 @@ def load(
         counts = Counts(open=int(opened or 0))
         if result:
             counts = counts_of(checked.of_result(DocumentResult.model_validate(result)))
+        elif _stored_plain(r):
+            stored = r.state_facts
+            counts = Counts(0, stored.get("whole"), stored.get("remains") or "")
+            version = stored.get("version")
+            result = {"pipeline_version": version} if version else None
         facts = Facts(
             id=r.id,
             status=str(r.status),

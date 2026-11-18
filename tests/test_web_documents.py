@@ -231,6 +231,76 @@ def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
     assert not any("result_json" in s for s in reads.stop())  # read once, not every poll
 
 
+def test_the_list_of_finished_documents_costs_the_same_for_two_as_for_fifty_and_loads_no_result(
+    web,
+):
+    """F-496, F-497: the state of a finished document with nothing open is read from the facts
+    stored with its result, so the list, the batch page and the counts load no result and the
+    statements do not grow with the documents. A row from before the column costs one read
+    of its result, once."""
+    from sqlalchemy import select
+
+    from readablestem.core.types import DocumentResult
+    from readablestem.pipeline import checked
+    from readablestem.web import upload_result
+
+    first = finish(web, filename="first.pdf", decided=True)
+
+    def copies(count: int) -> None:
+        with session_scope(web.ctx.factory) as session:
+            source = session.get(Job, first)
+            assert source is not None
+            for i in range(count):
+                copy = Job(
+                    user_id=source.user_id,
+                    status=source.status,
+                    filename=f"copy{i}.pdf",
+                    page_count=source.page_count,
+                    retain_until=source.retain_until,
+                )
+                copy.result_json = source.result_json
+                session.add(copy)
+
+    def cost() -> tuple[int, int, dict[str, str]]:
+        with session_scope(web.ctx.factory) as session:
+            ids = list(session.scalars(select(Job.id)))
+            batch = upload_result.store(
+                session,
+                session.get(Job, first).user_id,
+                [{"filename": "x", "job_id": i} for i in ids],
+            )
+        reads = Reads(web)
+        for url in ("/app", f"/app/batch/{batch}"):
+            assert web.browser.get(url).status_code == 200
+        sql = reads.stop()
+        loaded = [s for s in sql if "jobs.result_json" in s.split(" FROM ")[0]]
+        with session_scope(web.ctx.factory) as session:
+            return len(sql), len(loaded), {j: v.key for j, v in states.load(session, ids).items()}
+
+    copies(1)
+    few, few_loaded, _ = cost()
+    copies(48)
+    many, many_loaded, many_states = cost()
+    assert (few_loaded, many_loaded) == (0, 0) and many == few
+
+    # The state is the one the job's own page names from its result.
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, first)
+        assert job is not None
+        whole = states.state_of(
+            states.Facts.of(job),
+            states.counts_of(checked.of_result(DocumentResult.model_validate(job.result_json))),
+        )
+    assert set(many_states.values()) == {whole.key}
+
+    with session_scope(web.ctx.factory) as session:  # every row from before the column
+        session.execute(Job.__table__.update().values(state_facts=None))
+    _, first_loaded, _ = cost()
+    _, again_loaded, again_states = cost()
+    assert (first_loaded, again_loaded) == (50, 0)
+    assert again_states == many_states
+
+
 def test_the_zip_link_says_how_many_documents_the_zip_holds_and_names_the_rest(web, monkeypatch):
     """F-325: with more ready documents than one zip holds, the link counts what the zip has
     (the number the route returns) and the others are listed with the held-back one named."""

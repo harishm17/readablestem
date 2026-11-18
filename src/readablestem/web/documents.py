@@ -24,9 +24,11 @@ event in `web.db`): while anything is waiting or converting, htmx polls
 load and validate the fixes of every finished document each time. `list_version` says
 whether anything changed from the jobs' own columns alone, so an unchanged list costs one
 small query and a 204. A finished job from before the columns existed (both NULL) is read
-once from its result and the two facts are stored. A finished job with no decision open, or
-with an outcome code, has its result read for its label (`states.load`): "Ready to share"
-or "Ready" is the summary's (`pipeline.checked`), which is not stored (SW7).
+once from its result and the two facts are stored. A finished job with no decision open reads
+what its label needs of the result from `jobs.state_facts` (`states.finished_facts`): "Ready
+to share" or "Ready" is the summary's (`pipeline.checked`), stored as what it says (SW7). Only
+one with an outcome code, or whose facts say it has a gap note or a notice to word, has its
+result read (`states.load`).
 """
 
 from __future__ import annotations

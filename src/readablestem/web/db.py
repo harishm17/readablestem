@@ -179,6 +179,13 @@ class Job(Base):
     # list fills in on first sight (`web.documents`). Document-derived: deleted with the job.
     open_decisions: Mapped[int | None] = mapped_column(Integer)
     result_title: Mapped[str | None] = mapped_column(Text)
+    # What a finished job's state reads of its result when it has no decision open and no
+    # outcome code (`web.states.finished_facts`): so the list, the batch page and the counts
+    # name the state without loading the result. Set with the two above when no decision is
+    # open; NULL while one is, on a row from before the column and for a result this version
+    # cannot read, which `states.load` fills on first sight. Counts and sentences only, never
+    # the document's words.
+    state_facts: Mapped[dict | None] = mapped_column(JSON)
     # The render version written in `html`'s head (`pipeline.assemble.render_version`), set
     # whenever `html` is assigned (`_keep_html_version`), so "is the page made by an older
     # renderer" and "has a page been made" are answered without loading it. NULL: no page,
@@ -245,12 +252,16 @@ class Job(Base):
 
 @event.listens_for(Job.result_json, "set")
 def _keep_list_facts(target: Job, value: object, _old: object, _initiator: object) -> None:
-    """Whenever a result is stored, store the two facts the list reads next to it."""
-    from readablestem.web import documents
+    """Whenever a result is stored, store the facts the list reads next to it."""
+    from readablestem.web import documents, states
 
     target.open_decisions, target.result_title = documents.list_facts(
         value, getattr(target, "filename", None) or ""
     )
+    # Only a result with nothing open has its state read from them; a review click on a
+    # document still being decided does not pay for them, and the click that closes the last
+    # decision does.
+    target.state_facts = None if target.open_decisions else states.finished_facts(value)
 
 
 @event.listens_for(Job.html, "set")
