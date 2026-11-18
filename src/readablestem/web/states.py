@@ -29,7 +29,7 @@ Messages say what happened and what to do, and never quote the document.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -232,6 +232,9 @@ class State:
     # The documents list group: from the tone, or for the sample, from the state under it.
     group: str = READY
     tries_left: int = 0
+    # "Convert it again with the current version" (`rerun_step`): offered on a finished
+    # document made by an older converter, for the owner only.
+    rerun: Step | None = None
 
     @property
     def badge(self) -> str:
@@ -297,6 +300,7 @@ class Facts:
     deleted_on: datetime | None = None
     image_pages: bool = False  # the box "Convert scanned or handwritten pages" was checked
     cancel_requested: bool = False  # the owner asked a running conversion to stop
+    rerun_version: str | None = None  # the version a re-run was last started for (WS10.15)
 
     @classmethod
     def of(cls, job: Job) -> Facts:
@@ -316,6 +320,7 @@ class Facts:
             is_sample=bool(job.is_sample),
             image_pages=bool(job.image_pages),
             cancel_requested=job.cancel_requested_at is not None,
+            rerun_version=job.rerun_version,
         )
 
 
@@ -392,7 +397,45 @@ def state_of(
         return _make("converting", job_page.stage_sentence(dict(job.progress or {})))
     if job.status == JobStatus.FAILED:
         return _stopped(job, left, viewer, ctx)
-    return _done(job, counts, left, viewer, ctx)
+    state = _done(job, counts, left, viewer, ctx)
+    if viewer == "owner" and state.retry is None and (again := rerun_step(job)) is not None:
+        return replace(state, rerun=again)
+    return state
+
+
+def _version_key(version: str | None) -> tuple[int, ...] | None:
+    """"0.5.11" as (0, 5, 11); None for a version that is not dotted numbers."""
+    parts = (version or "").strip().split(".")
+    return tuple(int(p) for p in parts) if parts and all(p.isdigit() for p in parts) else None
+
+
+def rerun_step(job: Facts) -> Step | None:
+    """The re-run of a finished document made at an older `PIPELINE_VERSION` than the code's
+    (WS10.15): a form that puts the same job back in the queue (`web.retry.start`), with a spend
+    cap of its own and none of the day's pages. Offered once for each version, and never when
+    "Try again" is (a document with parts not converted has that)."""
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    if job.status != JobStatus.DONE or job.deleted or job.is_sample:
+        return None
+    if job.rerun_version == PIPELINE_VERSION:  # already offered and started for this version
+        return None
+    made = _version_key((job.result_json or {}).get("pipeline_version"))
+    now = _version_key(PIPELINE_VERSION)
+    if made is None or now is None or made >= now:
+        return None
+    return Step(
+        "rerun",
+        "Convert it again",
+        f"/jobs/{job.id}/retry",
+        form=True,
+        explain=(
+            "This document was converted before the converter's latest changes. Converting it "
+            "again keeps the decisions you made, uses none of your daily pages and has a "
+            "spending limit of its own. It can open new decisions. It is offered once for each "
+            "version."
+        ),
+    )
 
 
 def _make(

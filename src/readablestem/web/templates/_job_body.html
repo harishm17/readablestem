@@ -108,6 +108,9 @@
     {% endfor %}
     {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
   </div>
+  {% elif job.rerun and job.is_owner %}
+  {# A finished document made by an older converter: "Convert it again" (WS10.15). #}
+  {% include "_job_retry.html" %}
   {% endif %}
   {# One line, then the counts for anyone who wants them (ux2-lane-a: seven tiles were the
      page's biggest block). Decisions are the one unit (MF6, T1-3, T1-11): the same count here,

@@ -1759,13 +1759,15 @@ RETRY_REFUSED = {
 @submit_once("job.retry")
 def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Try again" on a stopped or partly converted document (T3-1, `web.retry`): the same
-    job goes back in the queue. Nothing is counted against the daily pages (this is not an
+    job goes back in the queue. "Convert it again" on a finished document made by an older
+    converter (WS10.15) is the same route, with a spend limit of its own. Nothing is counted against the daily pages (this is not an
     upload), the finished steps and the decisions made are kept, and every limit holds: the
     daily budget (a queued job waits for it), the job's own spend caps, the documents
     waiting or converting at once, the tries per job and the rate limit."""
     ctx = get_ctx(request)
     enforce(request, "retry_user", user.id)
     refused = ""
+    started = "retry"
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # the redirect is built from the owned row, not the request
@@ -1785,7 +1787,7 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
         # it counts them again (a canceled one that had begun kept them counted).
         recount = job.error_code == states.CANCELED and not job.attempts
         try:
-            retry_rules.start(
+            started = retry_rules.start(
                 job, active_others=others, max_active=access.files_per_upload(user.access_tier)
             )
         except retry_rules.RetryRefused as exc:
@@ -1818,11 +1820,14 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     if refused:
         status, title, message = RETRY_REFUSED[refused]
         raise PageError(status, title, message, context={"job_id": job_id})
-    log_event(logger, "job_retried", job_id=job_id, tries=tries)
+    log_event(logger, "job_rerun" if started == "rerun" else "job_retried", job_id=job_id, tries=tries)
     flash(
         request,
         "Your document is queued again. What was already converted is kept, and nothing "
-        "was counted against your daily pages.",
+        "was counted against your daily pages."
+        if started == "retry"
+        else "Your document is queued to be converted again with the current version. Your "
+        "decisions are kept, and nothing was counted against your daily pages.",
         undo=False,
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

@@ -14,3 +14,11 @@
   at the same place. It is safe to try again later: nothing is lost.</p>
 {% endif %}
 {% endif %}
+{# "Convert it again" (WS10.15): a finished document made by an older converter. The same route
+   and form as "Try again"; `job.rerun` is the state's offer (web/states.py). #}
+{% if job.rerun and not job.retry %}
+{% call form("job.retry", job.rerun.href, {"class": "inline-form", "id": "rerun-form"}) %}
+  <p id="rerun-explain">{{ job.rerun.explain }}</p>
+  <button type="submit" class="button-secondary" aria-describedby="rerun-explain">{{ job.rerun.label }}</button>
+{% endcall %}
+{% endif %}

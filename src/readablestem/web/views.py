@@ -445,6 +445,11 @@ class JobView:
         return self.state.retry if self.state is not None else None
 
     @property
+    def rerun(self) -> states.Step | None:
+        """"Convert it again" on a finished document made by an older converter (WS10.15)."""
+        return self.state.rerun if self.state is not None else None
+
+    @property
     def stop_names(self) -> list[tuple[str, str]]:
         """The list under a stopped source job's sentence (`source_stop_names`)."""
         return source_stop_names(self.error_detail) if self.status == JobStatus.FAILED else []

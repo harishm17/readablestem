@@ -758,8 +758,13 @@ class Worker:
         pool: str | None = None,
         image_pages: bool = False,
         user_id: str | None = None,
+        base_usd: float = 0.0,
+        base_calls: int = 0,
     ) -> _Attempt:
+        # The caps count from `base_*`: what the job had spent when a re-run after a new
+        # version began (`Job.cap_base_usd`, `web.retry.start`); 0 for any other run.
         max_usd, max_calls = job_caps(self.settings, page_count, image_pages)
+        max_usd, max_calls = max_usd + base_usd, max_calls + base_calls
         attempt = _Attempt(
             claim=claim,
             prior_usd=prior_usd,
@@ -1010,6 +1015,8 @@ class Worker:
                     Job.model_calls,
                     Job.user_id,
                     Job.image_pages,
+                    Job.cap_base_usd,
+                    Job.cap_base_calls,
                 ).where(Job.id == claim.job_id)
             ).one_or_none()
             pool = access.spend_pool(access.tier_of(session, job.user_id)) if job else None
@@ -1028,6 +1035,8 @@ class Worker:
             pool,
             bool(job.image_pages),
             job.user_id,
+            float(job.cap_base_usd or 0.0),
+            int(job.cap_base_calls or 0),
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")
@@ -1257,7 +1266,7 @@ class Worker:
         made on a partly converted document survive "Convert the missing parts"). Else the
         earlier version the upload said it revises (T3-2, `web.carry`), if it is still the
         owner's, finished and not past its deletion time."""
-        if job.retries and job.result_json:
+        if (job.retries or job.rerun_version) and job.result_json:
             source, own = job, True
         elif job.revises_job_id:
             source, own = session.get(Job, job.revises_job_id), False
