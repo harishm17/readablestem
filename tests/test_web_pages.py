@@ -57,6 +57,9 @@ class Page(HTMLParser):
         return sum(1 for t, _ in self.tags if t == tag)
 
 
+SIGN_IN_PAGES = {"/login", "/dev-login", "not_allowed"}
+
+
 @pytest.fixture(scope="module")
 def pages(tmp_path_factory) -> dict[str, str]:
     """Every kind of page, rendered once, as the user who can see it."""
@@ -78,8 +81,14 @@ def pages(tmp_path_factory) -> dict[str, str]:
             "/status",
             "/login",
             "/dev-login",
+            "/help",
+            "/help/review",
+            "/help/posting",
+            "/help/latex",
         ):
-            out[path] = anon.get(path).text
+            response = anon.get(path)
+            assert response.status_code == 200, path
+            out[path] = response.text
         out["404"] = anon.get("/missing").text
         out["not_allowed"] = login(env.client(), "stranger@example.org").text
         env.allow(ALICE)
@@ -107,8 +116,16 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         assert '<a class="skip-link" href="#main">Skip to main content</a>' in html, name
         assert '<main id="main"' in html, name
         assert page.count("header") == 1 and page.count("footer") == 1, name
-        for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"', 'href="/status"'):
+        for link in (
+            'href="/privacy"',
+            'href="/terms"',
+            'href="/limits"',
+            'href="/status"',
+        ):
             assert link in html, (name, link)
+        # The help pages are in every footer except the sign-in pages' one-task footer.
+        if name not in SIGN_IN_PAGES:
+            assert 'href="/help"' in html, name
         # The licence sentence is on the Terms page; every footer has a plain link to it.
         assert "offered under AGPL-3.0 terms" not in html or name == "/terms", name
         assert 'href="/terms#open-source">Open source</a>' in html, name

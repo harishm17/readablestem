@@ -34,7 +34,10 @@ PAGES = [
     "/guides",
     "/guides/readablestem-mathpix-latexml",
     "/guides/ada-title-ii-stem-course-materials",
+    "/help",
+    "/help/review",
     "/help/posting",
+    "/help/latex",
     "/",
 ]
 

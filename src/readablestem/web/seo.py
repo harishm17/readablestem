@@ -155,10 +155,28 @@ PUBLIC_PAGES = (
     ),
     PublicPage(GUIDES_INDEX, "Guides", "the guides", (_T + "guides.html",)),
     PublicPage(
+        "/help",
+        "Help",
+        "the help pages and what each one answers",
+        (_T + "help_index.html", _T + "_help_pages.html"),
+    ),
+    PublicPage(
+        "/help/review",
+        "Reviewing a converted document",
+        "what each decision and button on the review screen does, and when a document is ready",
+        (_T + "help_review.html", _T + "_help_pages.html"),
+    ),
+    PublicPage(
         "/help/posting",
         "Posting in your course",
         "sharing the HTML file with students",
-        (_T + "help_posting.html",),
+        (_T + "help_posting.html", _T + "_help_pages.html"),
+    ),
+    PublicPage(
+        "/help/latex",
+        "When a LaTeX upload fails",
+        "what a LaTeX file or zip may hold, what each message means, and what to change",
+        (_T + "help_latex.html", _T + "_help_pages.html"),
     ),
     PublicPage(
         "/privacy",

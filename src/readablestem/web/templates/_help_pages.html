@@ -1,0 +1,29 @@
+{# The help pages, listed once: the index (/help) writes them as a list with a line each, and
+   every help page ends with them as a short row of links, so each one is reachable from the
+   others. Use: {% from "_help_pages.html" import help_pages, help_row %}. The paths are in
+   web/seo.py PUBLIC_PAGES. #}
+{% set HELP = [
+  ("/help/review", "review", "Reviewing a converted document",
+   "What each decision on the review screen means, what each button does, and when a document is ready to post."),
+  ("/help/posting", "posting", "Posting the file in your course",
+   "How to put the file in Canvas or another course system, and why you link to it instead of pasting it."),
+  ("/help/latex", "latex", "When a LaTeX upload fails",
+   "What a LaTeX file or zip may hold, what each message means, and what to change."),
+  ("/limits", "limits", "Known limits",
+   "What the tool does not do yet, the limits on uploads, and how accurate it is."),
+] %}
+{% macro help_pages() %}
+<ul class="guide-list">
+  {% for path, key, title, line in HELP %}
+  <li>
+    <h2><a href="{{ path }}">{{ title }}</a></h2>
+    <p>{{ line }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+{% macro help_row(current) %}
+<p class="hint">More help:
+  {% for path, key, title, line in HELP if key != current %}<a href="{{ path }}">{{ title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+  <a href="/help">All help pages</a></p>
+{% endmacro %}

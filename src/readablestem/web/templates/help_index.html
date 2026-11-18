@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_help_pages.html" import help_pages %}
+{% block body_class %}mode-read{% endblock %}
+{% block title %}Help{% endblock %}
+{% block description %}Help for ReadableSTEM: how to review a converted document, how to post the file in your course, what to do when a LaTeX upload fails, and the known limits.{% endblock %}
+{% block content %}
+{# The help pages (web/seo.py PUBLIC_PAGES; routes/pages.py). The fourth is /limits, which
+   already says what the tool does not do: it is linked here, not copied. #}
+<h1>Help</h1>
+<p class="lede">Four pages for the places an instructor most often gets stuck. Each one says
+  what it answers.</p>
+{{ help_pages() }}
+{% endblock %}

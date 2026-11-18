@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% from "_help_pages.html" import help_row %}
+{% block body_class %}mode-read{% endblock %}
+{% block title %}When a LaTeX upload fails{% endblock %}
+{% block description %}What a LaTeX file or zip may hold when you upload it to ReadableSTEM, what each message means, which classes and packages are not read, and what to change or do instead.{% endblock %}
+{% block content %}
+{# WS25.4. Every sentence here is from the code: the upload messages (routes/jobs.py
+   `source_messages`, `batch_messages`), the stop messages (web/views.py), the zip rules
+   (web/archive_intake.py), the intake (source/intake.py), the lint (source/lint.py) and the
+   class and package lists (source/support.py). The numbers and the two refused lists come from
+   the same settings the upload checks use (`project_zip`, `chars_per_page`, `refused_classes`,
+   `refused_packages`). The page is the same whether or not the server takes LaTeX source:
+   the first section says which. #}
+<h1>When a LaTeX upload fails</h1>
+<p class="lede">{% if latex_source %}You can upload a LaTeX file or a zip of a LaTeX project, and the
+  tool reads it from the source instead of from a PDF. When that does not work, the message says
+  why. This page says what each message means and what you can change.{% else %}This server does
+  not take LaTeX files or zips right now. Compile your source to a PDF and upload that. The rest
+  of this page is for when it does.{% endif %}</p>
+
+<h2 id="glance">At a glance</h2>
+<ul>
+  <li><strong>Always available:</strong> compile the version students should see to a PDF and
+    upload that.</li>
+  <li><strong>A zip:</strong> zip the whole project folder, with every file the document reads.</li>
+  <li><strong>Stopped:</strong> the tool stops rather than give students raw code or missing
+    text. The message says what to fix.</li>
+  <li><strong>Finished with parts missing:</strong> the page lists them under “Not handled in
+    this file”.</li>
+</ul>
+
+{% from "_contents.html" import contents %}
+{{ contents([
+  ("what", "What you can upload"),
+  ("refused", "When the upload is refused"),
+  ("stopped", "When the conversion stops"),
+  ("not-read", "Classes and packages it does not read"),
+  ("wrong", "When it finishes but a part is wrong or missing"),
+  ("pdf", "When the PDF is the better way")
+]) }}
+
+<h2 id="what">What you can upload</h2>
+<ul>
+  <li><strong>One file:</strong> a <code>.tex</code> file, with no other files. It must be a
+    complete document: a document class and a document body. A <code>.tex</code> file over 4 MB
+    is refused, and so is a zip whose <code>.tex</code> and other text files add up to over
+    24 MB.</li>
+  <li><strong>A zip of the project:</strong> up to {{ project_zip }}. Put in the main file and
+    everything it reads: other <code>.tex</code> files, pictures, <code>.bib</code> and
+    <code>.bbl</code> files, and your own <code>.sty</code> and <code>.cls</code> files. Folders
+    inside the zip are fine, to a path of eight names at most.</li>
+  <li><strong>Pictures:</strong> PNG, JPEG, GIF and PDF. A file with any other extension
+    (EPS, SVG, another zip) makes the whole upload refused.</li>
+  <li><strong>Left out without a word:</strong> what a TeX run leaves behind, such as
+    <code>.aux</code>, <code>.log</code>, <code>.toc</code> and <code>.synctex.gz</code> files,
+    and a <code>__MACOSX</code> folder. They still count against the zip's limits.</li>
+  <li><strong>More than one main file:</strong> if a zip has several complete documents, the
+    tool tries to pick the one that nothing else includes, using folder depth and usual names
+    such as <code>main</code> and <code>paper</code>. If it cannot, type the file's name in
+    the upload form's “Main file” box and upload again. The box is under “Uploading a LaTeX
+    project zip with more than one main file?” If the name you type is not a complete document,
+    the message is “No main file was found”.</li>
+  <li><strong>Pages:</strong> a source counts against your daily pages as one page for every
+    {{ chars_per_page }} characters of <code>.tex</code> text (comments left out), or one for
+    each <code>\includegraphics</code> or <code>tikzpicture</code>, whichever is larger, and at
+    least one. The count is an estimate made at upload, before conversion.</li>
+  <li><strong>A revised version</strong> takes a PDF. Upload LaTeX source as a new document.</li>
+</ul>
+
+<h2 id="refused">When the upload is refused</h2>
+<p>These come back on the upload form, under the file box. Most of them say that nothing was
+  converted and no pages were taken from your daily allowance, and most say to upload the PDF
+  instead.</p>
+<ul>
+  <li><strong>“could not be opened as a zip file”.</strong> The zip is damaged or has a
+    password. Zip the project again without a password.</li>
+  <li><strong>“is too big or has too many files”.</strong> A project zip may be up to
+    {{ project_zip }}. A folder counts as a file, a file in the zip may be up to 50 MB, and a
+    member that unpacks to far more than it takes zipped is refused as well. A single
+    <code>.tex</code> file over 4 MB gets this message too. Remove what the document does not
+    use.</li>
+  <li><strong>“has a file with a path or a link this tool will not open”.</strong> The zip
+    holds an absolute path, a drive letter, <code>..</code>, a backslash, a name used twice, a
+    name that is too long or too deep, or a link instead of a file. Zip the project again with
+    plain files only.</li>
+  <li><strong>“has a kind of file this tool does not read”.</strong> A file ends in an extension
+    the tool does not take, such as <code>.eps</code> or <code>.svg</code>, or the zip holds
+    another zip. Convert pictures to PNG, JPEG or PDF and zip again.</li>
+  <li><strong>“uses something this tool will not run”.</strong> The source has a command that
+    starts a program or writes a file (for example <code>\write18</code>, <code>\openout</code>,
+    <code>\directlua</code>, or a package such as <code>minted</code> or
+    <code>pythontex</code>), or it names a file by an absolute path, a path that goes up with
+    <code>..</code>, a home folder or a web address. Remove it.</li>
+  <li><strong>“No main file was found”.</strong> No <code>.tex</code> file has both a document
+    class and a document body. Check the project.</li>
+  <li><strong>“has more than one main file”.</strong> Type the name of the one to convert in
+    “Main file” and upload again.</li>
+  <li><strong>“is longer than one conversion takes”.</strong> The estimated page count is over
+    the limit for one document, which the message gives. Split the project into parts.</li>
+  <li><strong>“is a Beamer slide deck, which this tool cannot convert from source yet”.</strong>
+    Upload the compiled PDF.</li>
+  <li><strong>“uses a document class this tool cannot read from source yet”</strong> or
+    <strong>“loads a package this tool cannot read yet”.</strong> The message names the class or
+    package. See <a href="#not-read">below</a>.</li>
+  <li><strong>“LaTeX source is not available on this server right now”.</strong> Compile it to a
+    PDF and upload that.</li>
+</ul>
+
+<h2 id="stopped">When the conversion stops</h2>
+<p>These appear on the document's page. The tool stops rather than finish with raw commands or
+  missing text where students would see them, and it keeps nothing partial. The pages counted at
+  upload stay counted. The next step is to change the source and upload it again, or to upload
+  the PDF.</p>
+<ul>
+  <li><strong>“asks for the file ... and it is not in the upload”.</strong> The source reads a
+    file the zip does not hold. The message gives its name and the line, or lists several. Zip
+    the whole project folder with those files in it.</li>
+  <li><strong>“LaTeX cannot read this source past ...”.</strong> A brace or an environment is
+    not closed, so everything after that point would be missing. The message gives the file and
+    line. Compile the source yourself, fix the error and upload again.</li>
+  <li><strong>“has the character ... in its text”.</strong> A <code>^</code>, <code>_</code>,
+    <code>&amp;</code> or <code>#</code> sits in running text, where LaTeX cannot read it. Put an
+    exponent or a subscript inside <code>$</code> signs, and write the character itself with a
+    backslash: <code>\&amp;</code>, <code>\#</code>, <code>\_</code> or <code>\^{}</code>.</li>
+  <li><strong>“are not defined”.</strong> The source uses commands that no one defined. They
+    would show to students as raw code. Define them in the source. A file the source reads with
+    <code>\input</code> counts.</li>
+  <li><strong>“which this tool cannot read yet”.</strong> The source uses commands from a
+    package the tool does not read, or loads a package it refuses by name. If the package is
+    your own file in the zip, the tool does not read package files from the upload: copy the
+    definitions you use into the source. If it is a standard TeX package, upload the PDF.</li>
+  <li><strong>“uses the document class ..., which this tool cannot read from source
+    yet”.</strong> Upload the PDF.</li>
+  <li><strong>“could not be converted. Upload the PDF instead.”</strong> The source could not be
+    converted and the tool cannot say more. Upload the PDF.</li>
+  <li><strong>“uses something this tool will not run”.</strong> The source has a command the
+    tool will not run, as in the list above. Remove it, or upload the PDF.</li>
+  <li><strong>“The server is busy right now”.</strong> Upload it again in a few minutes, or
+    upload the PDF.</li>
+  <li><strong>“Reading source files is not available on this server at the moment”.</strong>
+    Save the file as a PDF and upload that.</li>
+</ul>
+<p>A list under the message names each file or command that stopped it, with the file and line
+  when LaTeX gave them.</p>
+
+<h2 id="not-read">Classes and packages it does not read</h2>
+<ul>
+  <li><strong>Refused by name:</strong> {% if refused_classes %}the <code>{{ refused_classes }}</code> class{% endif %}{% if refused_classes and refused_packages %} and {% endif %}{% if refused_packages %}the <code>{{ refused_packages }}</code> package{% endif %}.
+    The message says to compile the version students should see to a PDF and upload that. An
+    <code>exam</code> source, read without the class's own rules, would show its solutions and
+    correct-answer marks.</li>
+  <li><strong>Read as an article:</strong> classes without their own reader (<code>scrartcl</code>,
+    <code>scrreprt</code>, <code>scrbook</code>, <code>memoir</code> and
+    <code>extarticle</code>). Their commands set the layout, not the content.</li>
+  <li><strong><code>babel</code>:</strong> loading it is fine. A document that uses its commands,
+    such as <code>\selectlanguage</code> or <code>\foreignlanguage</code>, stops with
+    “which this tool cannot read yet”.</li>
+  <li><strong>Any other class or package:</strong> it is passed to the converter. If errors
+    follow, the job stops and names what it could not read. The tool reads the literal
+    <code>\documentclass</code> and <code>\usepackage</code> lines. One written through a macro
+    is not caught at upload.</li>
+</ul>
+
+<h2 id="wrong">When it finishes but a part is wrong or missing</h2>
+<p>The tool does not stop for these. It asks you, or it says what is missing. Open the document
+  and see the <a href="/help/review">review help</a> for how the decisions work.</p>
+<ul>
+  <li><strong>A formula with an unknown command.</strong> It is shown as it was written and
+    becomes a decision: “A formula in the LaTeX source uses a command LaTeX does not know, so it
+    is shown as it was written and is a decision for you.” Correct the LaTeX, or accept it as it is, or choose
+    <strong>Leave as written</strong>: students then see the LaTeX as it was written, marked “Not converted”.</li>
+  <li><strong>A figure with no picture.</strong> The tool could not read a picture from the
+    project: a drawing made in LaTeX, a missing file, or a format it does not read, such as EPS
+    or SVG. You describe it yourself. A figure whose picture is a PNG, JPEG, GIF or PDF in the
+    zip is described like one from a PDF.</li>
+  <li><strong>A picture in a table cell.</strong> The picture follows the table as a figure of
+    its own, and the cell reads as empty. The table becomes a decision: say in the cell what the
+    picture is, or accept the table as it is.</li>
+  <li><strong>A formula shown as LaTeX code in a table, heading or caption.</strong> The item
+    becomes a decision: correct it, or accept it as it is.</li>
+  <li><strong>Parts it could not read.</strong> The document's page says “This tool could not
+    read part of the LaTeX source”, with the words and pictures that are not in the file,
+    listed under “Not handled in this file”. The document is “Partly converted”, not “Ready to
+    share”. Check that the file reads well without them before you share it, or upload the PDF.</li>
+</ul>
+
+<h2 id="pdf">When the PDF is the better way</h2>
+<p>If the source cannot be read, the PDF you compile from it always can be uploaded. The tool then
+  works out headings, lists, tables and equations from how the page looks, which it does less
+  well than reading them from the source. See the <a href="/limits">known limits</a>
+  for what it does with a PDF.</p>
+
+{{ help_row("latex") }}
+{% endblock %}
