@@ -10343,7 +10343,8 @@ def _prepare_rows(
         gutter = _find_gutter(body, slide=True)
         if gutter is not None and not _words_both_sides(kept, gutter, height):
             gutter = None
-    _mark_blanks(kept, rules)  # before the lines are made: a blank is part of its gap's width
+    # Before the lines are made: a blank is part of its gap's width.
+    _mark_blanks(kept, rules, gutter)
     return _merge_baselines(kept, gutter, rules), gutter, _merge_baselines(dropped, gutter)
 
 
@@ -10355,14 +10356,19 @@ _AFTER_BLANK = frozenset(".,;:!?)]}\u201d\u2019")  # no space between a blank an
 _ROW_CACHES = tuple(n for n, v in vars(_Row).items() if isinstance(v, cached_property))
 
 
-def _mark_blanks(rows: list[_Row], paths: Sequence[_Path]) -> None:
+def _mark_blanks(
+    rows: list[_Row], paths: Sequence[_Path], gutter: tuple[float, float] | None = None
+) -> None:
     """A rule drawn under a gap in a row, or after its last word, is a blank to fill in
     (SW36): the row gets `BLANK_LOW_LINES` underscores there, which the text pass marks as a
     `blank` run like a typed "____". Which rules are blanks is `baseline_rules.classify`'s
     call, the same one the text pass asks about struck text, so no rule is both. A rule with
     text over or under it (a fraction bar, a brace) or that meets another drawn line is no
-    blank. Done on the lines' fragments, before they are merged, so the lines are made with
-    the blank in them; the rows are changed in place."""
+    blank; nor is the bar of a radical or the straight part of a brace, which TeX draws as a
+    rule beside the sign's own glyphs (`_sign_pieces`), nor a rule the row is parted from
+    (`_parted`: by the gutter, or by a drawn line such as a plot's axis). Done on the lines'
+    fragments, before they are merged, so the lines are made with the blank in them; the
+    rows are changed in place."""
     rules = [
         p
         for p in paths
@@ -10379,12 +10385,16 @@ def _mark_blanks(rows: list[_Row], paths: Sequence[_Path]) -> None:
         if _ink_across(rule.bbox, index):
             continue  # a fraction bar, a division bar, a brace's label: not a blank
         for row in index.near(y0 - baseline_rules.BELOW_BASELINE_PT - 2.0, y1 + 1.0):
+            if _sign_pieces(row):
+                continue
             ink = [
                 baseline_rules.Ink((c.x0, c.y0, c.x1, c.y1), c.size, c.baseline)
                 for c in row.chars
                 if not c.blank
             ]
-            if baseline_rules.classify(rule.bbox, ink).kind == "blank":
+            if baseline_rules.classify(rule.bbox, ink).kind != "blank":
+                continue
+            if not _parted(rule.bbox, row, paths, gutter):
                 found.setdefault(id(row), (row, []))[1].append(rule.bbox)
                 break
     for row, boxes in found.values():
@@ -10393,6 +10403,44 @@ def _mark_blanks(rows: list[_Row], paths: Sequence[_Path]) -> None:
             row.chars[at:at] = _blank_chars(row.chars, at, box)
         for cached in _ROW_CACHES:
             row.__dict__.pop(cached, None)
+
+
+_SIGN_PIECES = frozenset("\u221a\u221b\u221c\u231c\u23b7\u23d0\u23de\u23df\u23dc\u23dd")
+
+
+def _sign_pieces(row: _Row) -> bool:
+    """A row that is only the glyphs of a big maths sign: a radical sign, the ends and the
+    middle of a brace over or under a formula. TeX sets those glyphs with their baseline at
+    their top, level with the rule that finishes the sign, so the rule reads as one that
+    follows the row's last glyph; a row of words is never only these."""
+    ink = [c for c in row.chars if not c.blank]
+    return bool(ink) and all(c.c in _SIGN_PIECES or _MATH_SYMBOL_FONT.match(c.font) for c in ink)
+
+
+def _parted(
+    rule: BBox, row: _Row, paths: Sequence[_Path], gutter: tuple[float, float] | None
+) -> bool:
+    """Whether something stands between the rule and each glyph of the row beside it: the
+    page's gutter (a rule at the head of one column level with a line of the other) or a
+    drawn upright line (a plot's axis between a tick label and the line sample of the
+    legend; the side of a frame). A blank and the words it belongs to are in one column
+    and one cell."""
+    x0, y, x1, _ = rule
+    ink = [c for c in row.chars if not c.blank]
+    before = max((c.x1 for c in ink if (c.x0 + c.x1) / 2 < x0), default=None)
+    after = min((c.x0 for c in ink if (c.x0 + c.x1) / 2 > x1), default=None)
+    walls = [(gutter[0] + gutter[1]) / 2] if gutter is not None else []
+    for p in paths:
+        upright = p.kind == "vrule" or p.frame
+        if upright and p.bbox[1] - EDGE_TOUCH <= y <= p.bbox[3] + EDGE_TOUCH:
+            walls += [p.bbox[0], p.bbox[2]]
+    reach = baseline_rules.NEIGHBOUR_EM * row.size  # further off is no neighbour of the rule
+    gaps = []
+    if before is not None and x0 - before <= reach:
+        gaps.append((before, x0))
+    if after is not None and after - x1 <= reach:
+        gaps.append((x1, after))
+    return bool(gaps) and all(any(a <= wall <= b for wall in walls) for a, b in gaps)
 
 
 def _ink_across(rule: BBox, index: _RowIndex) -> bool:
