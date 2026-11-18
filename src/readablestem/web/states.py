@@ -537,9 +537,16 @@ _NOT_HANDLED_MESSAGE = (
 
 
 def _required_notices(result: Mapping[str, Any] | None) -> set[str]:
-    """The codes of a stored result's notices that need a person (review "required")."""
-    notices = (result or {}).get("notices") or []
-    return {str(n.get("code")) for n in notices if n.get("review") == "required"}
+    """The codes of a stored result's notices that need a person (review "required") and have
+    no decision behind them: a notice on an element with a fix is that fix's, and the summary
+    counts it."""
+    result = result or {}
+    decided = {f.get("element_id") for f in result.get("fixes") or []}
+    return {
+        str(n.get("code"))
+        for n in result.get("notices") or []
+        if n.get("review") == "required" and n.get("element_id") not in decided
+    }
 
 
 def _unanalysed_message(pages: int) -> str:

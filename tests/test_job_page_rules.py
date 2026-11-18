@@ -92,13 +92,16 @@ def test_a_required_notice_with_no_decision_behind_it_holds_back_ready_to_share(
 
     whole = states.counts_of(checked.summarize(elements=[], fixes=[], html_checks=[]))
 
-    def state(*notices: dict) -> states.State:
-        facts = states.Facts(id="j", status="done", result_json={"notices": list(notices)})
-        return states.state_of(facts, whole)
+    def state(notice: dict, fixes: tuple[dict, ...] = ()) -> states.State:
+        result = {"notices": [notice], "fixes": list(fixes)}
+        return states.state_of(states.Facts(id="j", status="done", result_json=result), whole)
 
     assert state({"code": "office_comments", "review": "optional"}).key == "ready"
-    held = state({"code": "rtl_text", "review": "required"})
+    notice = {"code": "rtl_text", "review": "required", "element_id": "p3"}
+    held = state(notice)
     assert held.key == "ready_remains" and "notices" in held.message
+    # with a decision on the same element the summary counts it, not this rule
+    assert state(notice, ({"element_id": "p3"},)).key == "ready"
 
 
 # --------------------------------------------------------------------------- reading
