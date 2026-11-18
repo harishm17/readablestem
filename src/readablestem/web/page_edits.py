@@ -310,11 +310,13 @@ def equation_tokens(
     """The inline equations of an element's text, named as the review names them: marker
     id -> "[equation 3]" and back. A reviewer types the name; the marker (which no one
     could type) is put back when the text is saved."""
-    numbers = item_numbers(result)
     to_token: dict[str, str] = {}
     from_token: dict[str, str] = {}
+    numbers: dict[str, int] | None = None  # the whole document's numbering: only when needed
     for match in INLINE_MARKER_RE.finditer(element.text or ""):
         marker_id = match.group(1)
+        if numbers is None:
+            numbers = item_numbers(result)
         number = numbers.get(marker_id)
         token = f"[equation {number}]" if number else f"[equation {marker_id}]"
         to_token[marker_id] = token

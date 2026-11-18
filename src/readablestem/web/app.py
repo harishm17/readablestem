@@ -11,6 +11,7 @@ Run locally: `readablestem serve --reload` (see docs/web.md).
 from __future__ import annotations
 
 import functools
+import gc
 import logging
 import re
 import secrets
@@ -495,6 +496,11 @@ def create_app(
         if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
+        # A finished document is one 2.5 MB result of some 100,000 small objects that a review
+        # click reads and writes whole. At the stock threshold (700) the collector keeps
+        # passing over them: 115 of the 250 ms of an Accept on a 100-page file (writing the
+        # result takes 18 ms with it off). Cycles still go, only less often.
+        gc.set_threshold(20_000, 20, 50)
         sandbox.make_undumpable()  # TeX of the same user cannot read our /proc/<pid>/environ
         if settings.sandbox_probe_at_startup and ctx.rows is None:
             # In the background: neither start-up nor /healthz waits for it.
