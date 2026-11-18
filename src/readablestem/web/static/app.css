@@ -1080,6 +1080,7 @@ section.job-group { padding-top: 0; }
 .bulk-preview li p { margin: 0 0 var(--space-1); }
 .report-link { margin: var(--space-3) 0 0; font-size: var(--step-0); }
 .report-link a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+.report-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .leave-out { margin-top: var(--space-3); }
 .leave-out .part-label { margin-top: 0; }
 .notify-box { margin: var(--space-3) 0; }

@@ -25,6 +25,10 @@ daily spend remain. A new table with a user id must be added there.
 
 Usage events (`web.events`) outlive the jobs they mention, by design, but not for ever:
 the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
+
+Problem reports (`web.reports`) go with their sender's account (`erase_user`), `CLOSED_DAYS`
+(30) after they are closed, and `MAX_DAYS` (180) after they were made, whatever their state
+(`purge_closed_reports`, `purge_old_reports`, run by the same purge).
 """
 
 from __future__ import annotations
@@ -50,7 +54,7 @@ from readablestem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
-from readablestem.web import forms
+from readablestem.web import forms, reports
 from readablestem.web.database import insert_ignore
 from readablestem.web.db import (
     AuthIdentity,
@@ -69,6 +73,7 @@ from readablestem.web.db import (
     LoginLink,
     PendingUpload,
     QuotaDay,
+    Report,
     RequestToken,
     ReviewEdit,
     StepRecord,
@@ -91,6 +96,7 @@ class PurgeStats:
     results_deleted: int = 0  # answers to uploads of several files, past their hour (T3-4)
     tombstones_deleted: int = 0  # deleted-account records of earlier days (web.tombstones)
     tokens_deleted: int = 0  # request tokens older than a session lives (web.forms)
+    reports_deleted: int = 0  # problem reports past their closed or their longest clock
 
 
 def purge_expired(
@@ -120,6 +126,7 @@ def purge_expired(
         stats.results_deleted = purge_upload_results(session, now)
         stats.tombstones_deleted = purge_tombstones(session, now)
         stats.tokens_deleted = forms.purge(session, now)
+        stats.reports_deleted = purge_closed_reports(session, now) + purge_old_reports(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -131,6 +138,7 @@ def purge_expired(
         results_deleted=stats.results_deleted,
         tombstones_deleted=stats.tombstones_deleted,
         tokens_deleted=stats.tokens_deleted,
+        reports_deleted=stats.reports_deleted,
     )
     return stats
 
@@ -160,6 +168,20 @@ def purge_old_events(session: Session, now: datetime) -> int:
     Returns how many. One DELETE on the indexed `created_at`."""
     cutoff = _as_utc(now) - timedelta(days=EVENT_RETENTION_DAYS)
     return _deleted(session.execute(delete(Event).where(Event.created_at < cutoff)))
+
+
+def purge_closed_reports(session: Session, now: datetime) -> int:
+    """Delete problem reports closed more than `reports.CLOSED_DAYS` ago, in the caller's
+    transaction. Returns how many."""
+    cutoff = _as_utc(now) - timedelta(days=reports.CLOSED_DAYS)
+    return _deleted(session.execute(delete(Report).where(Report.closed_at < cutoff)))
+
+
+def purge_old_reports(session: Session, now: datetime) -> int:
+    """Delete problem reports made more than `reports.MAX_DAYS` ago, open or closed, in the
+    caller's transaction. Returns how many."""
+    cutoff = _as_utc(now) - timedelta(days=reports.MAX_DAYS)
+    return _deleted(session.execute(delete(Report).where(Report.created_at < cutoff)))
 
 
 def aggregate_and_purge(
@@ -286,9 +308,9 @@ def erase_user(
     Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
     before parents and without relying on ON DELETE CASCADE (see the module docstring):
     review edits they made on any job, shares of other people's documents that name their
-    address, their courses' notation entries, their courses, their usage events, sign-in
-    identities, linked Google addresses, email sign-in links and daily page counts, and the
-    user row.
+    address, their courses' notation entries, their courses, their usage events, their
+    problem reports, sign-in identities, linked Google addresses, email sign-in links and daily
+    page counts, and the user row.
     With `tombstone_key`, what the account used today is first recorded under a hash of its
     address (`web.tombstones`), so that signing up again today does not reset the day's limits.
     The erasure is also written to the ledger (`erasure_ledger`: a hash of the user id and the
@@ -317,6 +339,7 @@ def erase_user(
     session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))
     session.execute(delete(Course).where(Course.user_id == user_id))
     session.execute(delete(Event).where(Event.user_id == user_id))
+    session.execute(delete(Report).where(Report.from_user_id == user_id))
     session.execute(delete(AuthIdentity).where(AuthIdentity.user_id == user_id))
     session.execute(delete(LinkedEmail).where(LinkedEmail.user_id == user_id))
     session.execute(delete(LoginLink).where(LoginLink.user_id == user_id))

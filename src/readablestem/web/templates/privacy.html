@@ -214,6 +214,15 @@
   them or of their pages. No cookies or scripts are used for this. These notes are deleted after {{ event_days }}
   days, or with your account.</p>
 {% endif %}
+{# Problem reports (web/reports.py, ops/retention.py): the two numbers are `reports.CLOSED_DAYS`
+   and `reports.MAX_DAYS`, checked by ops/launch.py `privacy_claim_problems`. #}
+<p>If you send a problem report from "Report this item" or from a document that stopped
+  converting, we store the ids it names (the document, the item, what kind of item it is and
+  its page number, the code that stopped a conversion, and the converter's version) and
+  whatever you type, never text or pictures from your document. The people who run
+  ReadableSTEM read it, and no one else does. A report is kept until it is closed and for
+  {{ report_closed_days }} days after that, is deleted {{ report_max_days }} days after you
+  send it at the latest, and is deleted with your account.</p>
 </details>
 
 <h2>How it is protected</h2>

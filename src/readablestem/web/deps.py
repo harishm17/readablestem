@@ -341,6 +341,11 @@ REFUSAL_WORDS: dict[str, tuple[str, str, dict[str, Any]]] = {
         "Several zip files of your documents were made in the last few minutes.",
         {},
     ),
+    "report": (
+        "Too many reports",
+        "Several reports were sent from this account in the last few minutes.",
+        {},
+    ),
 }
 
 
@@ -408,8 +413,10 @@ def render(
         "source_url": ctx.settings.source_url,
         "contact_email": ctx.settings.contact_email,
         "feedback_url": ctx.settings.feedback_url,  # the footer's Feedback link
-        # "Report this item" on a review card: that path, with the job and item ids.
-        "report_url": lambda job_id, item_id: report_item.item_url(ctx.settings, job_id, item_id),
+        # "Report this item" on a review card and the stopped document's report link: the
+        # app's own form, with the job and item ids.
+        "report_url": report_item.item_url,
+        "report_job_url": report_item.job_url,
         "google_login": ctx.sign_in_client("google") is not None,
         "microsoft_login": ctx.sign_in_client("microsoft") is not None,
         "dev_login": ctx.dev_login_enabled,

@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 
 import jinja2
 
-from readablestem.web import office_convert
+from readablestem.web import office_convert, reports
 from readablestem.web.events import (
     EVENT_RETENTION_DAYS,
     MAX_SHARE,
@@ -288,6 +288,9 @@ def privacy_context(settings: Settings, *, tracer_on: bool = False) -> dict[str,
         "tracing": tracer_on,
         "events_on": settings.events_enabled,
         "event_days": EVENT_RETENTION_DAYS,
+        # Problem reports (`web.reports`): how long one is kept after it is closed, and at most.
+        "report_closed_days": reports.CLOSED_DAYS,
+        "report_max_days": reports.MAX_DAYS,
         # What the content features send and keep, only when they are on.
         "tables_on": settings.feature_tables,
         "notation_on": settings.feature_notation_memory,

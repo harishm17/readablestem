@@ -99,6 +99,7 @@ BUSY_LABELS = {
     "reading": "Reading…",
     "removing": "Removing…",
     "saving": "Saving…",
+    "sending": "Sending…",
     "starting": "Starting…",
     "stopping": "Stopping…",
     "undoing": "Undoing…",
@@ -195,6 +196,10 @@ FORMS: dict[str, FormRow] = {
                 "a second click said the address was already linked, as an error"),
         FormRow("admin.unlink", "POST /admin/linked-emails/remove", Kind.STATE, "removing",
                 "none: removing again changes nothing"),
+        FormRow("report.send", "POST /jobs/{job_id}/report", Kind.SEND, "sending",
+                "a second click sent the same report twice"),
+        FormRow("admin.report_close", "POST /admin/reports/{report_id}/close", Kind.STATE,
+                "saving", "none: closing a closed report changes nothing"),
         # Convert: an upload, the parts of a large file, the sample and "Try again".
         FormRow("upload.create", "POST /jobs", Kind.CREATE, "uploading",
                 "a second click said 'Another upload of yours is still being checked'"),

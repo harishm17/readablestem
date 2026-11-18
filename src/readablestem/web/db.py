@@ -645,6 +645,37 @@ class Event(Base):
     __table_args__ = (Index("ix_events_name_reason_release", "name", "reason", "release"),)
 
 
+class Report(Base):
+    """A problem report to the operator (`web.reports`): where the problem is and what the
+    person typed, nothing from the document. Only `kind` "tool" is written so far; the column
+    stays so a later kind needs no migration. `job_ref` is a job id but not a foreign key, so
+    the report outlives the document (like `events.job_ref`). `item_ref`, `item_kind`, `page`
+    and `code` are content-free ids and codes. `text` is what the sender typed (at most
+    `reports.MAX_TEXT` characters), plain and shown escaped. Deleted with the sender's account,
+    `reports.CLOSED_DAYS` after it is closed and `reports.MAX_DAYS` after it was made
+    (`ops.retention`)."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(16), default="tool", server_default="tool")
+    from_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    job_ref: Mapped[str | None] = mapped_column(String(32))
+    item_ref: Mapped[str | None] = mapped_column(String(64))
+    item_kind: Mapped[str | None] = mapped_column(String(16))
+    page: Mapped[int | None] = mapped_column(Integer)
+    code: Mapped[str | None] = mapped_column(String(64))
+    pipeline_version: Mapped[str | None] = mapped_column(String(40))
+    text: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(8), default="open", server_default="open")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AuthIdentity(Base):
     """A sign-in identity linked to a user: one per (provider, issuer, subject).
 
