@@ -433,14 +433,11 @@ def post_admin(env, path: str, **fields):
 def test_an_admin_can_block_and_unblock_an_open_tier_account(admin_web):
     carol = client_for(admin_web, CAROL)
     # The Block button and the typed address only open the question; nothing is blocked yet.
-    listed = admin_web.browser.get("/admin").text
-    assert f"/admin/users/block?email={CAROL.replace('@', '%40')}" in listed
-    question = admin_web.browser.get("/admin/users/block", params={"email": CAROL})
+    question = post_admin(admin_web, "/admin/users/block", email=CAROL)
     assert question.status_code == 200 and f"Block {CAROL}?" in question.text
     assert 'action="/admin/users/block"' in question.text and 'href="/admin"' in question.text
     assert carol.get("/app").status_code == 200
-    assert carol.get("/admin/users/block", params={"email": BOB}).status_code == 403
-    response = post_admin(admin_web, "/admin/users/block", email=CAROL)
+    response = post_admin(admin_web, "/admin/users/block", email=CAROL, confirm="yes")
     assert response.status_code == 303
     assert carol.get("/app").status_code == 303  # signed out at once
     assert login(admin_web.client(), CAROL).status_code == 403
@@ -486,7 +483,7 @@ def test_every_admin_post_says_what_happened_and_nothing_succeeds_without_a_chan
     says("/admin/allowlist", "Changed: they are now an admin", email=DAVE, admin="on")
     says("/admin/allowlist/remove", "Nothing changed: enter an email address", email="")
     says("/admin/allowlist/remove", "Nothing changed: nobody has an account", email=BOB)
-    says("/admin/allowlist/remove", "Removed from the allowlist", email=DAVE)
+    says("/admin/allowlist/remove", "Removed from the allowlist", email=DAVE, confirm="yes")
     says("/admin/allowlist/remove", "Nothing changed: that address was already off", email=DAVE)
     says("/admin/users/block", "Nothing changed: that account was already blocked", email=DAVE)
     says("/admin/users/unblock", "The account was unblocked", email=DAVE)

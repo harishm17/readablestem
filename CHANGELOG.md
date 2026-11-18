@@ -6,8 +6,11 @@
   at once now open a confirmation page that names the thing and says what is lost, with a red
   button and "No, keep it". They are Remove on a course's symbol, Block and Remove next to a
   person on the Admin page, the "Block by email" form, and "Remove the link" for a class link
-  (its address cannot be got back). The openers are links or a GET form; each question is a
-  GET page and the POST is as it was, CSRF-checked and answering a repeat as the first click.
+  (its address cannot be got back). For a symbol and a class link the opener is a link to a GET
+  page and the POST is as it was. On the Admin page the question is the answer to the same POST
+  without `confirm=yes` (as deleting a course asks), so a person's address is never in a URL,
+  where the host's request log would keep it. Every POST is CSRF-checked and answers a repeat
+  as the first click.
   Removing a symbol joins the one-submit rule (`course.remove_entry`). The class link's opener
   uses the outlined red look instead of the filled one, as the other openers do. Not built: Undo
   notices, three levels of buttons, sorting symbols by first use. Unlinking an address,

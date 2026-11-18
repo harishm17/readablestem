@@ -168,7 +168,11 @@
         <td>
           {% if person.email != user.email %}
           {% set blocks = person.tier == "open" %}
-          <a class="button-secondary" href="/admin/{{ 'users/block' if blocks else 'allowlist/remove' }}?email={{ person.email|urlencode }}">{{ "Block" if blocks else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></a>
+          {# Asks first: the POST without `confirm` answers with the question (routes/admin.py). #}
+          {% call form("admin.block" if blocks else "admin.remove", "/admin/users/block" if blocks else "/admin/allowlist/remove", {"class": "inline-form"}) %}
+            <input type="hidden" name="email" value="{{ person.email }}">
+            <button type="submit" class="button-secondary">{{ "Block" if blocks else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></button>
+          {% endcall %}
           {% else %}
           You
           {% endif %}
@@ -182,14 +186,14 @@
   <h3 id="block-heading">Block by email</h3>
   <p>Stops any account, whether or not it is in the list above: it is signed out everywhere,
     its queued and running jobs are stopped, and its sign-ins are refused.</p>
-  {# A GET form: it opens the question (routes/admin.py), nothing is blocked until the next page. #}
-  <form method="get" action="/admin/users/block" novalidate class="stack-form" aria-labelledby="block-heading">
+  {# Opens the question (routes/admin.py): nothing is blocked until the next page's button. #}
+  {% call form("admin.block", "/admin/users/block", {"novalidate": true, "class": "stack-form", "aria-labelledby": "block-heading"}) %}
     <div class="field">
       <label for="block-email">Email address to block</label>
       <input type="email" id="block-email" name="email" autocomplete="off" spellcheck="false">
     </div>
     <button type="submit" class="button-secondary">Block</button>
-  </form>
+  {% endcall %}
 
   <h3 id="blocked-heading">Blocked accounts</h3>
   <p>Accounts that cannot sign in: people you removed or blocked. Their documents are deleted

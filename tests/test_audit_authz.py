@@ -90,9 +90,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/admin/reports/{report_id}/close"): ADMIN_ONLY,
     ("GET", "/admin/health"): ADMIN_ONLY,  # stale task names, storage, sandbox probe
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
-    ("GET", "/admin/allowlist/remove"): ADMIN_ONLY,  # the question before a removal
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
-    ("GET", "/admin/users/block"): ADMIN_ONLY,  # the question before a block
     ("POST", "/admin/users/block"): ADMIN_ONLY,  # open sign-up: stop an account
     ("POST", "/admin/users/unblock"): ADMIN_ONLY,
     ("POST", "/admin/linked-emails"): ADMIN_ONLY,  # T3-10: another Google account per instructor

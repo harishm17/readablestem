@@ -202,8 +202,8 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the checked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, the queue (how many stored documents are in each state, in the table's labels, F-213), aggregate counts, usage counts per day and per pseudonymous person |
-| POST `/admin/allowlist`; GET, POST `/admin/allowlist/remove` | admins | Add or remove someone (the Remove link opens `GET /admin/allowlist/remove?email=`, a question that names the address and says what is lost, and its button posts; adding makes them `invited`; removing blocks them). Every admin POST says what happened: "Nothing changed: ..." with the reason for an empty or unknown address or a repeat, never a success when no row changed (`routes/admin.py`, the words of `routes/sharing.SHARE_OUTCOME`'s shape) |
-| GET, POST `/admin/users/block`; POST `/admin/users/unblock` | admins | Block an account (the Block link and the "Block by email" form are GETs that open a question naming the address, and its button posts; signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
+| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (the Remove button's POST answers with a question that names the address and says what is lost, and removes only with `confirm=yes`, so no address is in a URL; adding makes them `invited`; removing blocks them). Every admin POST says what happened: "Nothing changed: ..." with the reason for an empty or unknown address or a repeat, never a success when no row changed (`routes/admin.py`, the words of `routes/sharing.SHARE_OUTCOME`'s shape) |
+| POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (the Block button and the "Block by email" form post, the answer is a question naming the address, and only `confirm=yes` blocks; signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
@@ -484,7 +484,7 @@ pseudonym (`quota_days.spent_usd`), and a "Blocked accounts" table with Unblock.
 `auth.set_blocked(blocked=True)`: `set_allowed(allowed=False)`, so sessions end, queued and
 running jobs fail with `access_removed`, and admin rights are lost (not given back by
 unblocking). An admin cannot block themselves. With thousands of accounts the page lists the
-newest 300 of each table, and a "Block by email" form (a GET to the same question as the Block links) reaches
+newest 300 of each table, and a "Block by email" form (the same `POST /admin/users/block`, which asks first) reaches
 any account, listed or not.
 
 Pages and `ops launch-check`: the public pages that carry invitation wording render it only

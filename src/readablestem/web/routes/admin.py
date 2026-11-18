@@ -326,7 +326,9 @@ def _allow(session: Session, email: str, *, admin: bool | None) -> tuple[str, st
 def _confirm_stop(request: Request, user: AdminDep, email: str, *, blocking: bool) -> Response:
     """The question before an account is stopped: Block and Remove both sign the person out,
     stop their queued and running work and take their admin rights, so each is asked first.
-    An address that cannot be stopped gets the notice the POST would give, on the admin page."""
+    An address that cannot be stopped gets its notice on the admin page at once. The question
+    is the answer to the POST without `confirm=yes` (as a course's deletion asks), not a GET
+    page: a person's address never goes into a URL, where the host's request log would keep it."""
     normalised = normalise_email(email)
     word = "block" if blocking else "remove"
     message = ""
@@ -354,19 +356,17 @@ def _confirm_stop(request: Request, user: AdminDep, email: str, *, blocking: boo
     return render(request, "admin_stop_confirm.html", context)
 
 
-@router.get("/admin/users/block")
-def confirm_block(request: Request, user: AdminDep, email: str = "") -> Response:
-    return _confirm_stop(request, user, email, blocking=True)
-
-
-@router.get("/admin/allowlist/remove")
-def confirm_remove(request: Request, user: AdminDep, email: str = "") -> Response:
-    return _confirm_stop(request, user, email, blocking=False)
-
-
 @router.post("/admin/allowlist/remove", dependencies=[Depends(require_csrf)])
 @submit_once("admin.remove")
-def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
+def remove(
+    request: Request,
+    user: AdminDep,
+    email: Annotated[str, Form()] = "",
+    confirm: Annotated[str, Form()] = "",
+) -> Response:
+    """Remove only with `confirm=yes`; the "Remove" button gets the question first."""
+    if confirm != "yes":
+        return _confirm_stop(request, user, email, blocking=False)
     normalised = normalise_email(email)
     if normalised == user.email:
         flash(request, "You cannot remove yourself. Ask another admin.", undo=False)
@@ -423,9 +423,17 @@ def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Re
 
 @router.post("/admin/users/block", dependencies=[Depends(require_csrf)])
 @submit_once("admin.block")
-def block(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
+def block(
+    request: Request,
+    user: AdminDep,
+    email: Annotated[str, Form()] = "",
+    confirm: Annotated[str, Form()] = "",
+) -> Response:
     """Stop an account: signed out everywhere, its queued and running jobs stopped, and its
-    sign-ins refused (in either sign-up mode) until it is unblocked."""
+    sign-ins refused (in either sign-up mode) until it is unblocked. Only with `confirm=yes`;
+    the "Block" buttons get the question first."""
+    if confirm != "yes":
+        return _confirm_stop(request, user, email, blocking=True)
     return _block(request, user, email, blocked=True)
 
 

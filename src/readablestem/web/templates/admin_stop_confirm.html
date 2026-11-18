@@ -12,6 +12,7 @@
 <div class="confirm-actions">
   {% call form("admin.block" if blocking else "admin.remove", "/admin/users/block" if blocking else "/admin/allowlist/remove", {"class": "inline-form"}) %}
     <input type="hidden" name="email" value="{{ email }}">
+    <input type="hidden" name="confirm" value="yes">
     <button type="submit" class="button-danger">{{ verb }} {{ email|truncate(48, True, "…") }}</button>
   {% endcall %}
   <a class="button-secondary" href="/admin">No, keep them</a>
