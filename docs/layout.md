@@ -1420,6 +1420,28 @@ math by the document's evidence; the equation step's own tiers then decide it.
   over at most, with typed glyphs on both sides) whose drawing is a fill with no stroke
   that lies in the line too is outline math (an italic variable, the digits of a
   quantity), not handwriting: it becomes a small figure for the figure step.
+- **Glyphs drawn as lines** (`pipeline/glyph_strokes.py`, 2026-11-17, WS6.11, F-550): LaTeX's
+  picture environment sets a slanted line, an arrowhead or an arc as glyphs of a drawing font,
+  and xy-pic does the same with its own: `line10` and `linew10`, `lcircle10` and `lcirclew10`,
+  and `xyatip`, `xybtip`, `xybsql`, `xycirc`, `xycmat`, `xycmbt`, `xydash`, `xyeuat`, `xyeubt`,
+  `xyline`, `xyluat`, `xylubt`, `xymisc` and `xyqc` at their sizes (the TFMs of a TeX Live
+  install). A font is one of these when its whole name after the subset prefix is (`LINE10`,
+  `IIMURR+LINE10`); a font whose name only contains "line" or "circle" is text. A triangle's
+  slanted side was a paragraph of 17 quote marks beside seven equations, and no figure existed
+  to hold the drawing. `_text_blocks`, the one place layout reads characters, takes those
+  glyphs out of the text it returns, so rows, the text pass's glyphs and the line reader see
+  text without them, and leaves them in one block of type 2. `_read_page`, where a page's
+  drawings are gathered, turns that block into entries of the page's drawing list (what
+  `get_cdrawings` gives), before the page type, the ink analysis and the path classification
+  read it, so the figure clustering sees a drawing. A glyph's geometry is its outline as
+  MuPDF draws it (the page's SVG with text as paths, read once on a page that has such
+  glyphs): a thin straight outline (its width at most 12 % of its length, as a line's glyph
+  is) is the segment it draws, stroked; any other outline (an arrowhead, an arc) is a filled
+  path. A glyph the SVG has no outline for is left out. Labels join the figure by the rules
+  above, none of them new: the labels of the picture-environment triangle that sit within
+  their reach (`c`, `θ`, `a = 6`) are the figure's, the ones further out stay equations (the
+  one label rule is SW40). Glyphs in a font that is not on the list are not read this way:
+  none of the 28 corpus files and 116 tracked test PDFs has a stroke set in another font.
 - **Captions**: a run starting `Figure N` / `Fig. N` followed by punctuation or a capital
   letter ("Figure 2 shows ..." is prose) attaches to the nearest figure that overlaps it
   horizontally, below or above within 36 pt (below wins ties). An unattached caption stays

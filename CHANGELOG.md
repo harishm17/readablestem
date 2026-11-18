@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: a drawing set as glyphs is a figure (branch fix/glyph-drawn-figures)
+
+- WS6.11 (F-550): LaTeX's picture environment sets slanted lines, arrowheads and arcs as glyphs
+  of the fonts `line10`, `linew10`, `lcircle10` and `lcirclew10`, and xy-pic does the same with
+  its `xy...` fonts (`pipeline/glyph_strokes.py`). Layout read them as text: a triangle's slanted
+  side was a paragraph of 17 quote marks, its labels seven equations, and no figure was found.
+  `_text_blocks` now takes those glyphs out of the text, and `_read_page` adds each as a stroke
+  to the page's drawings (the segment a thin straight glyph draws, else its outline, from the
+  page's SVG), so the figure clustering finds the drawing and no paragraph or equation is made
+  of it. A font is a drawing font only by its whole name after the subset prefix. No other
+  font is read this way: none of the corpus or test PDFs has a bare-stroke glyph in another font.
+- Changes the elements of a PDF with such a drawing, so `PIPELINE_VERSION` needs a bump at merge.
+  The new figure has no recorded description, so a replay of such a file asks the model for one.
+
 ## Unreleased: right-to-left text and run-together answer options are a decision (branch feat/text-decisions)
 
 - WS16.6 part 1: `rtl_text` and `option_labels` raise a decision on the paragraph or list
