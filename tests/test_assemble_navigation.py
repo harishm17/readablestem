@@ -322,9 +322,11 @@ def test_a_paragraph_over_two_pages_does_not_swallow_the_marker_of_its_last_page
 
 
 @pytest.mark.browser
-def test_on_a_phone_the_title_is_on_the_first_screen_and_the_skip_link_lands_on_it():
+def test_on_a_phone_the_title_is_on_the_first_screen_and_the_skip_link_lands_on_its_target():
     """F-116: a long Contents list no longer hides the title on a 390 px screen. It is a closed
-    line there, a control that works from the keyboard, and an open list from 40rem up."""
+    line there, a control that works from the keyboard, and an open list from 40rem up. The
+    skip link lands on the notice a reader must not miss (this page is not reviewed), which
+    stands right above the title."""
     sync_api = pytest.importorskip("playwright.sync_api")
     pairs = [heading(0, "Motion", 1)]
     for n in range(20):
@@ -344,8 +346,11 @@ def test_on_a_phone_the_title_is_on_the_first_screen_and_the_skip_link_lands_on_
             was_open = page.evaluate("document.querySelector('.toc-details').open")
             page.keyboard.press("Tab")
             page.keyboard.press("Enter")  # the skip link
-            focused = page.evaluate("document.activeElement.tagName")
-            page.keyboard.press("Tab")
+            landed = page.evaluate(
+                "'#' + document.activeElement.id === "
+                "document.querySelector('.skip-link').getAttribute('href')"
+            )
+            page.focus(".toc-details > summary")
             page.keyboard.press("Enter")  # the contents line, from the keyboard
             opened = page.evaluate("document.querySelector('.toc-details').open")
             page.set_viewport_size({"width": 1000, "height": 700})
@@ -357,5 +362,5 @@ def test_on_a_phone_the_title_is_on_the_first_screen_and_the_skip_link_lands_on_
             )
         finally:
             browser.close()
-    assert title_bottom < 700 and not was_open and focused == "H1" and opened
+    assert title_bottom < 700 and not was_open and landed and opened
     assert controls == "none" and first_link > 0  # from 40rem up the list is shown, with no control

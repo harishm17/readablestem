@@ -103,7 +103,9 @@ def test_a_hostile_document_runs_nothing_and_sees_no_cookie(site, browser):
     sign_in(page, site.base)
     job_id = finished_job(site, page)
     with session_scope(site.ctx.factory) as session:
-        session.get(Job, job_id).html = as_current(HOSTILE_DOCUMENT)
+        job = session.get(Job, job_id)
+        # served as stored: a finished job's page is otherwise made again on first use
+        job.html, job.html_stale = as_current(HOSTILE_DOCUMENT), False
     page.goto(f"{site.base}/jobs/{job_id}/view")
     assert page.locator("h1").inner_text() == "Hostile"
     page.locator("h1").click()

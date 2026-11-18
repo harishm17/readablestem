@@ -222,7 +222,8 @@ def test_the_tools_of_page_2_are_two_clicks_from_the_job_page_of_a_document_with
     assert page.locator("#decision #page-tools").count() == 1
     assert "Decision" not in page.inner_text("#decision").split("Change page")[0]
     top = page.evaluate("document.getElementById('decision-title').getBoundingClientRect().top")
-    assert 0 <= top < DESKTOP["height"]  # the tools' heading is on the first screen
+    # the tools' heading is on the first screen (a fraction of a pixel above 0 is layout rounding)
+    assert -1 < top < DESKTOP["height"]
     context.close()
 
 
