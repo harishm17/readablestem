@@ -427,6 +427,7 @@
 {% block content %}
 <h1>All items as a list</h1>
 <p class="lede">{{ job.filename }}{% if page_count %} · {{ counted(page_count, "page", "pages") }}{% endif %}</p>
+<p class="hint"><a href="/help/review">How reviewing works</a></p>
 {% include "_error_summary.html" %}
 {% include "_stale_notice.html" %}
 

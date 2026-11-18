@@ -216,6 +216,7 @@ def test_a_bad_zip_is_refused_with_a_plain_message(web, data, words):
     text = refused(web, data, "project.zip")
     assert words in text and "project.zip" in text
     assert "upload the PDF instead" in text or "Zip the project again" in text
+    assert 'href="/help/latex"' in text  # the page that says what each message means
 
 
 def test_a_zip_bomb_is_refused_before_anything_is_unpacked(web):
@@ -297,6 +298,7 @@ def test_a_failed_source_conversion_fails_the_job_cleanly(web):
     assert job.status == JobStatus.FAILED and job.error_code == "source_failed"
     page = web.browser.get(f"/jobs/{job_id}")
     assert page.status_code == 200 and "Upload the PDF instead" in page.text
+    assert 'href="/help/latex"' in page.text
     assert web.browser.get(f"/jobs/{job_id}/view").status_code in {404, 409, 303, 200}
     assert job.result_json is None  # nothing half-made is kept
 

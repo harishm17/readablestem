@@ -18,6 +18,9 @@
     {% endfor %}
   </ul>
   {% endif %}
+  {% if (job.error_code or "").startswith("source_") and state.key.startswith("stopped") %}
+  <p class="hint"><a href="/help/latex">What this message means</a></p>
+  {% endif %}
   {# What of a finished job was not converted, beside its open decisions (a partly
      converted job says it as its message). #}
   {% if state.key != "partly_converted" %}{% for gap in state.gaps %}
