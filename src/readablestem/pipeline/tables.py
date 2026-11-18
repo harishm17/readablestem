@@ -1687,22 +1687,16 @@ def _starts_a_column(seg: _Seg, block: list[list[_Seg]]) -> bool:
 
 
 def _has_caption(view: _PageView, box: BBox, *, above: bool = False) -> bool:
-    """A "Table N" caption just above or below the box (within `CAPTION_MAX_GAP` from its
-    nearest edge), over it; with `above` only one over the box (a caption under a box may be
-    the next table's)."""
-    for i, line in enumerate(view.lines):
+    """A "Table N" line just above or below the box (within `CAPTION_MAX_GAP`), over it; with
+    `above` only one over the box (a caption under a box may be the next table's)."""
+    for line in view.lines:
         if line.vertical:
             continue
         lx0, ly0, lx1, ly1 = line.bbox
         if min(lx1, box[2]) - max(lx0, box[0]) <= 0:
             continue
         gap = box[1] - ly1 if above else max(ly0 - box[3], box[1] - ly1)
-        if gap < 0 or not TABLE_CAPTION.match(_line_text(line).strip()):
-            continue
-        if ly1 <= box[1]:  # over the box: the gap is to the caption's last line
-            block = _caption_lines(view, i, "above", box, set())
-            gap = box[1] - max(view.lines[m].bbox[3] for m in block)
-        if gap <= CAPTION_MAX_GAP:
+        if 0 <= gap <= CAPTION_MAX_GAP and TABLE_CAPTION.match(_line_text(line).strip()):
             return True
     return False
 
