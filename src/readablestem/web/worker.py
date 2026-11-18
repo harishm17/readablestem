@@ -1508,9 +1508,7 @@ class Worker:
         from readablestem.ops.retention import purge_expired
 
         try:
-            stats = purge_expired(
-                self.factory, self.clock(), source="worker", settings=self.settings
-            )
+            stats = purge_expired(self.factory, self.clock(), source="worker")
         except Exception as exc:
             log_exception(logger, "purge_backstop_failed", exc)
             return None

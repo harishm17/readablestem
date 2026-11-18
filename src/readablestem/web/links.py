@@ -27,12 +27,16 @@ How long it lasts. `closes_at` is required and at most `MAX_DAYS` after the link
 `opens_at` is optional. `is_live` is the one answer to "is this link open" for the route, the
 share page and retention. While a document has a link that is kept (not removed, not yet
 closed; a paused or not-yet-open link still keeps it, or pausing would end the document) its
-`retain_until` is the latest `closes_at`, and there is no new retention mode. When the last
-link closes or is removed the document goes back to the retention it had with the clock
-starting then (`retention.clock_after_link`): at removal at once (`reconcile`), at closing by
-the hourly purge (`ops.retention.release_closed_links`). A link's row is deleted with its
-document and `ROW_KEEP` after it closes or is removed, so the owner can still read its count.
-The published copy goes when no link is kept any more, or with the document.
+`retain_until` is the latest `closes_at` plus the window the document goes back to
+(`retention.after_link`: `day` 24 hours, `week` 7 days, `dev` its 30 days from upload or a day,
+whichever ends later), and there is no new retention mode. So the document runs out on its own
+clock after the link closes and nothing has to release it: it never reads as expired while the
+link works or in the window after it. Removing the link ends the keeping at once: the document
+goes back to its retention with the clock starting then (`reconcile`,
+`retention.clock_after_link`). A link's row is deleted with its document and `ROW_KEEP` after it
+closes or is removed, so the owner can still read its count. The published copy goes when no
+link is kept any more (at once on removal, by the hourly purge after a closing: `purge_copies`;
+`find` and `is_live` refuse it from the closing on), or with the document.
 """
 
 from __future__ import annotations
@@ -44,7 +48,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
-from readablestem.config import Settings, get_settings
+from readablestem.config import Settings
 from readablestem.web import output, retention
 from readablestem.web.database import as_utc
 from readablestem.web.db import Blob, Job, JobLink, utcnow
@@ -108,11 +112,46 @@ def current_link(session: Session, job_id: str) -> JobLink | None:
 
 
 def held_until(session: Session, job_id: str, now: datetime | None = None) -> datetime | None:
-    """When the document's links stop keeping it: the latest `closes_at` of a link that keeps
+    """When the document's links stop working: the latest `closes_at` of a link that keeps
     it, or None when none does."""
     moment = as_utc(now) or utcnow()
     ends = [_ends(row) for row in links_of(session, job_id) if is_live(row, moment, serving=False)]
     return max(ends) if ends else None
+
+
+def retention_for(
+    session: Session, job: Job, settings: Settings, now: datetime | None = None
+) -> datetime | None:
+    """The `retain_until` the document's links give it: their last day plus the window it goes
+    back to (`retention.after_link`), or None when no link keeps it."""
+    closing = held_until(session, job.id, now)
+    return None if closing is None else retention.after_link(job, settings, closing)
+
+
+def keeping(
+    session: Session, job: Job, settings: Settings, now: datetime | None = None
+) -> datetime | None:
+    """The last day of the link that decides when the document is deleted, for the job page's
+    line: None when no link keeps it, when it is kept longer for another reason (7 days, or
+    30 for `dev`), or when the link adds nothing."""
+    closing = held_until(session, job.id, now)
+    if closing is None or as_utc(job.retain_until) != retention.after_link(job, settings, closing):
+        return None
+    if job.retention_mode == "dev" and (
+        closing + retention.window(settings, "day")
+        <= (as_utc(job.created_at) or closing) + retention.window(settings, "dev")
+    ):
+        return None
+    return closing
+
+
+def extend(session: Session, job: Job, settings: Settings, now: datetime | None = None) -> None:
+    """After the document's mode changed under a link ("Keep for 7 days"): the link's window
+    is now the new mode's. Never shortens."""
+    target = retention_for(session, job, settings, now)
+    current = as_utc(job.retain_until)
+    if target is not None and (current is None or current < target):
+        job.retain_until = target
 
 
 # --------------------------------------------------------------------------- making
@@ -168,7 +207,7 @@ def make(
     owner's and ready, and publishes the copy (`store_copy`) in the same transaction."""
     moment = as_utc(now) or utcnow()
     opens_at, closes_at = check_dates(opens, closes, moment)
-    before = held_until(session, job.id, moment)
+    before = retention_for(session, job, settings, moment)
     for old in links_of(session, job.id):
         if old.revoked_at is None:
             old.revoked_at = moment
@@ -185,6 +224,9 @@ def make(
     session.add(row)
     session.flush()
     reconcile(session, job, settings, before, moment)
+    # Written now: the caller publishes the copy next, and `current_html` refreshes the job row,
+    # which would drop an unflushed `retain_until` and leave the link keeping nothing.
+    session.flush()
     return token
 
 
@@ -206,7 +248,7 @@ def remove(session: Session, job: Job, settings: Settings, now: datetime | None 
     """Remove the document's link: it stops working at once and the document goes back to its
     earlier retention. False when there is none."""
     moment = as_utc(now) or utcnow()
-    before = held_until(session, job.id, moment)
+    before = retention_for(session, job, settings, moment)
     row = current_link(session, job.id)
     if row is None:
         return False
@@ -218,13 +260,13 @@ def remove(session: Session, job: Job, settings: Settings, now: datetime | None 
 def reconcile(
     session: Session, job: Job, settings: Settings, before: datetime | None, now: datetime
 ) -> None:
-    """After a link was made or removed: `retain_until` is the end of the links that keep the
-    document, and when none is left it goes back to its retention with the clock starting now
-    (`retention.clock_after_link`). `before` is `held_until` as it was before the change; a
-    document is kept by its link only when its `retain_until` was that (a document kept longer
-    for another reason, 7 days or 30, is not shortened by a link). The published copy is
-    deleted when no link keeps the document."""
-    after = held_until(session, job.id, now)
+    """After a link was made or removed: `retain_until` is what the links that keep the document
+    give it (`retention_for`), and when none is left it goes back to its retention with the
+    clock starting now (`retention.clock_after_link`). `before` is `retention_for` as it was
+    before the change; a document is kept by its link only when its `retain_until` was that
+    (a document kept longer for another reason, 7 days or 30, is not shortened by a link). The
+    published copy is deleted when no link keeps the document."""
+    after = retention_for(session, job, settings, now)
     current = as_utc(job.retain_until)
     by_link = before is not None and current is not None and current <= before
     if after is not None:
@@ -309,32 +351,11 @@ def record_open(session: Session, link: JobLink, now: datetime) -> None:
 # --------------------------------------------------------------------------- lifecycle (purge)
 
 
-def release_closed(session: Session, settings: Settings | None, now: datetime) -> int:
-    """For the hourly purge, before it deletes anything: a document whose last link closed
-    (its `retain_until` is that closing and has passed) goes back to its retention with the
-    clock starting now instead of being deleted at the closing. Also deletes the published
-    copy of every document that no link keeps. `settings` None: the process's own, read only
-    when a document is released. Returns how many documents were released."""
-    candidates = session.scalars(
-        select(Job)
-        .where(
-            Job.retain_until <= now,
-            select(JobLink.id)
-            .where(
-                JobLink.job_id == Job.id,
-                JobLink.revoked_at.is_(None),
-                JobLink.closes_at >= Job.retain_until,
-                JobLink.closes_at <= now,
-            )
-            .exists(),
-        )
-        .with_for_update(skip_locked=True)
-    ).all()
-    released = 0
-    for job in candidates:
-        if held_until(session, job.id, now) is None:
-            retention.clock_after_link(job, settings or get_settings(), now)
-            released += 1
+def purge_copies(session: Session, now: datetime) -> int:
+    """For the hourly purge: delete the published copy of every document that no link keeps
+    (every link removed or closed). A closed link's copy was never served after its closing
+    (`find`); this frees it. The document itself expires on its own clock, so nothing here
+    touches `retain_until`. Returns how many copies went."""
     kept = (
         select(JobLink.id)
         .where(
@@ -344,8 +365,8 @@ def release_closed(session: Session, settings: Settings | None, now: datetime) -
         )
         .exists()
     )
-    session.execute(delete(Blob).where(Blob.kind == PUBLISHED, ~kept))
-    return released
+    result = session.execute(delete(Blob).where(Blob.kind == PUBLISHED, ~kept))
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 def purge_rows(session: Session, now: datetime) -> int:

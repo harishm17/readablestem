@@ -795,17 +795,25 @@ def _day(days: int) -> str:
     return (utcnow() + timedelta(days=days)).date().isoformat()
 
 
-def make_link(env, *, closes: str | None = None, opens: str = "", label: str = "PHYS 201"):
+def make_link(
+    env,
+    *,
+    closes: str | None = None,
+    opens: str = "",
+    label: str = "PHYS 201",
+    request_token: str = "",
+):
     owner = env.who[OWNER]
-    return owner.post(
-        f"/jobs/{env.job_id}/share/link",
-        data={
-            "csrf_token": page_token(owner, f"/jobs/{env.job_id}/share"),
-            "label": label,
-            "closes": closes if closes is not None else _day(30),
-            "opens": opens,
-        },
-    )
+    data = {
+        "csrf_token": page_token(owner, f"/jobs/{env.job_id}/share"),
+        "label": label,
+        "closes": closes if closes is not None else _day(30),
+        "opens": opens,
+    }
+    if request_token:  # a browser's reload of the answer re-sends the form and its Referer
+        data["request_token"] = request_token
+    referer = {"referer": f"http://testserver/jobs/{env.job_id}/share"}
+    return owner.post(f"/jobs/{env.job_id}/share/link", data=data, headers=referer)
 
 
 def link_token(env, **kwargs) -> str:
@@ -856,12 +864,18 @@ def test_the_link_page_has_no_cookie_and_the_headers_that_keep_it_private(ready_
         assert page.headers["referrer-policy"] == "no-referrer"
         assert page.headers["cache-control"] == "private, no-store"
         assert 'class="site-header"' not in page.text
+    head = ready_site.client().head(f"/s/{token}")  # a link checker's HEAD is not an open
+    assert head.status_code == 200 and head.content == b""
     row = stored_link(ready_site)
     assert row.open_count == 2 and row.first_opened_at is not None
     assert row.token_hash != token and token not in row.token_hash
     # The page the owner comes back to counts the opens and no longer holds the address.
     again = ready_site.who[OWNER].get(f"/jobs/{ready_site.job_id}/share")
     assert "2 times" in again.text and token not in again.text
+    # Both pages say the rule: kept past the link's last day for the document's usual window.
+    assert "at least until the link's last day and then for 24 hours" in again.text
+    job_page = ready_site.who[OWNER].get(f"/jobs/{ready_site.job_id}").text
+    assert "its class link works until" in job_page and "kept for 24 hours after that" in job_page
 
 
 def test_only_the_owner_makes_pauses_or_removes_a_link(ready_site):
@@ -929,6 +943,30 @@ def test_a_closed_removed_paused_or_wrong_link_gets_one_404_page(ready_site, mon
     monkeypatch.setattr(ready_site.settings, "rate_limits_enabled", True)
     answers = [anyone.get("/s/" + "b" * 43).status_code for _ in range(25)]
     assert answers[:20] == [404] * 20 and set(answers[20:]) == {429}
+
+
+def test_reloading_the_page_that_showed_the_address_makes_no_second_link(ready_site):
+    """The answer to making a link is the page with its address, so a reload sends the same
+    form again. It must not make another link and end the first: the address the owner has
+    handed out keeps working, and the repeat lands on the share page, which has no address."""
+    owner = ready_site.who[OWNER]
+    form = owner.get(f"/jobs/{ready_site.job_id}/share").text
+    sent = re.search(
+        r'data-submit-once="link.make".*?name="request_token" value="([^"]+)"', form, re.S
+    )
+    first = make_link(ready_site, request_token=sent.group(1))
+    token = re.search(r"/s/([A-Za-z0-9_-]{43})", first.text).group(1)
+    again = make_link(ready_site, request_token=sent.group(1))  # the reload
+    share = f"/jobs/{ready_site.job_id}/share"
+    assert (again.status_code, again.headers["location"]) == (303, share)
+    assert token not in owner.get(share).text
+    with session_scope(ready_site.ctx.factory) as session:
+        rows = session.scalars(select(JobLink)).all()
+    assert len(rows) == 1 and rows[0].revoked_at is None
+    assert ready_site.client().get(f"/s/{token}").status_code == 200
+    # A new link made on purpose is another form, so another token: it replaces the first.
+    assert make_link(ready_site).status_code == 200
+    assert ready_site.client().get(f"/s/{token}").status_code == 404
 
 
 def test_a_link_can_last_at_most_180_days_and_needs_an_end(ready_site):

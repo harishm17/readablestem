@@ -52,7 +52,7 @@ def aggregate_and_purge(
         aggregated = aggregate.aggregate_finished(ctx.factory, now)
     except Exception as exc:
         log_exception(logger, "aggregate_failed", exc)
-    purged = retention.purge_expired(ctx.factory, now, settings=ctx.settings)
+    purged = retention.purge_expired(ctx.factory, now)
     from readablestem.ops import canary
 
     canaries = canary.run_daily(ctx.factory, ctx.settings, ctx.guard, now)

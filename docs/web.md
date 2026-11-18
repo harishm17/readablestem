@@ -1286,7 +1286,8 @@ is turned on".
   `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer`, `Cache-Control: private,
   no-store`. A wrong, paused, removed, not-yet-open or closed token gets one identical plain 404
   page; guesses are limited by address (`class_link_miss`, 20 per 10 minutes, then a 429; every
-  fetch also counts against `class_link`). `open_count` goes up by one per successful GET and
+  fetch also counts against `class_link`). `open_count` goes up by one per successful GET (a HEAD, which `seo.CrawlerRequestsMiddleware`
+  serves as a GET without the body, is not counted) and
   `first_opened_at` is set once; nothing identifies a reader.
 - **Who may do what.** Only the owner (not a person the document is shared with, at any rank)
   makes, pauses, resumes or removes the link, or updates the published copy (`routes/sharing.py`;
@@ -1297,19 +1298,30 @@ is turned on".
   link's (`web.email_login`): 32 random bytes, and only the SHA-256 is stored (`token_hash`). The
   address is shown once, in the answer to making the link; later the page shows that a link
   exists, its label, dates, open count and published version. "Make a new link" removes the old.
+  The answer is the page itself, not a redirect: a redirect could carry the address only in the
+  URL or in the session cookie, which is signed but not encrypted. Making a link follows the
+  one submit rule (`link.make` in `web.forms.FORMS`), so a reload of that answer, which sends the
+  same form with the same request token, is answered with a redirect to the share page (no
+  address) and makes no second link; a link made on purpose is a new form and a new token.
 - **Ready only.** A link is made, and the copy updated, only while `output.export_state(job)` is
   ready; the copy is the HTML at that moment and an edit afterwards changes nothing a class sees
   until "Update the published copy".
 - **How long.** `closes_at` is required and at most 180 days after the link is made; `opens_at`
   is optional (`links.is_live` answers "is this link open"). While a link is kept (not removed, not
-  closed; a paused one still keeps it) `retain_until` is its `closes_at` and there is no new
-  retention mode. When the last link closes or is removed the document goes back to its earlier
-  retention with the clock starting then (`retention.clock_after_link`): at removal at once, at
-  closing by the hourly purge (`ops.retention.purge_expired` -> `links.release_closed`), so a
-  document is not deleted at the closing. A document with a kept link is not purged. Between the
-  closing and the next purge (up to an hour) the document reads as expired to its owner (the
-  sites that test `retain_until`), which is the cost of not adding a retention mode. A link's row
-  is deleted with its document and 30 days after the link closes or is removed.
+  closed; a paused or not-yet-open one still keeps it) `retain_until` is the latest `closes_at`
+  plus the window the document goes back to (`retention.after_link`: 24 hours for a `day`
+  document, 7 days for `week`, and for `dev` its 30 days from upload or a day after the last day,
+  whichever ends later), and there is no new retention mode. The document therefore runs out on
+  its own clock after the link closes: nothing releases it, it never reads as expired while the
+  link works or in the window after, and the purge needs no rule for links. Removing the link
+  (`retention.clock_after_link`) gives the earlier retention with the clock starting at the
+  removal. A document already kept longer for another reason (7 or 30 days) keeps that time: a
+  link only ever extends it, and removing the link does not shorten it. A new link replaces the
+  old one and the document follows the new last day; "Keep for 7 days" while a link is open makes
+  the week count from the last day too (`links.extend`). The hourly purge deletes the published
+  copy of every document no link keeps (`links.purge_copies`); a closed link's copy is never
+  served after `closes_at` (`links.find`, `is_live`), whether or not that purge has run. A link's
+  row is deleted with its document and 30 days after the link closes or is removed.
 - **Table** `job_links` (migration `b7d2f4a8c613`): `id`, `job_id` (cascade), `token_hash` (unique),
   `kind` (`class` only), `label`, `opens_at`, `closes_at`, `paused_at`, `revoked_at`,
   `first_opened_at`, `open_count`, `created_at`. `ops.retention.delete_jobs` deletes the rows and

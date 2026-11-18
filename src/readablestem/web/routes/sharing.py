@@ -14,9 +14,13 @@ With `FEATURE_CLASS_LINK` the page also has a "Class link" section and five more
 (`web.links`): make a link, pause it, resume it, remove it, and update the published copy. All
 are CSRF-checked and work without JavaScript. Making a link answers with the page itself (not a
 redirect), because the address is shown that once and a redirect could carry it only in the
-session cookie or the URL; every later view of the page shows that a link exists and what it
-has done, never the address. With the setting off the five routes and the section do not exist
-for anyone (404).
+session cookie (signed, not encrypted, so readable by whoever holds it) or the URL; every later
+view of the page shows that a link exists and what it has done, never the address. Making one
+follows the one submit rule (`web.forms`, `link.make`), so a reload of that answer, which sends
+the same form again, is answered with a redirect to this page and makes no second link: the
+first link, and its address in the owner's hands, stay. A new link made on purpose is a new
+form, so a new token. With the setting off the five routes and the section do not exist for
+anyone (404).
 """
 
 from __future__ import annotations
@@ -272,6 +276,7 @@ NO_ROOM_FOR_LINK = (
 
 
 @router.post("/jobs/{job_id}/share/link", dependencies=[Depends(require_csrf)])
+@submit_once("link.make")
 def make_link(
     request: Request,
     job_id: str,

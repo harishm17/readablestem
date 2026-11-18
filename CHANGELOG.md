@@ -67,6 +67,21 @@
   votes nor is marked. The combine page says once when such a part exists or when no language
   is held by most parts, however many parts there are. The combined file is stored nowhere
   and has no language control; the language is changed on a part, and the next file follows.
+## Unreleased: the class link's follow-up fixes (branch fix/class-link-followup)
+
+- A document kept by a class link now runs out on its own clock: while a link keeps it,
+  `retain_until` is the link's last day plus the window the document goes back to (24 hours,
+  7 days, or for `dev` its 30 days from upload or a day), so it no longer reads as expired for up
+  to an hour after the link closes and then comes back. The hourly purge only frees the published
+  copy of a document no link keeps (`links.purge_copies`, was `release_closed`);
+  `purge_expired` and `aggregate_and_purge` no longer take `settings`. Removing a link still gives
+  the earlier window from the removal. The job page's line and the share page say the new rule.
+- Reloading the page that shows a new link's address no longer makes a second link and ends the
+  first: making a link follows the one submit rule (`link.make`), so the repeat is a redirect to
+  the share page. A HEAD on `/s/{token}` is answered and not counted as an open (now tested).
+  The published copy was checked to have no address that needs a sign-in (every picture is a
+  `data:` address). No migration.
+
 ## Unreleased: typed addresses and numbered references are links (branch feat/links-typed-and-references)
 
 - SW52 (F-517, F-518), as far as its triage line: a web address (`https://`, `http://`, `www.`)
