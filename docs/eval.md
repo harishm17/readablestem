@@ -58,7 +58,7 @@ answered). `eval-live.yml` re-measures them weekly on the current code and compa
 with the baselines; a paid recording of the three is owed before they can gate a pull
 request again. The same job replays the corpus against the committed record (`eval burden
 --same`, "The replay record, and CI" under `eval burden`) when a change touches the package,
-which finds a change of behaviour that a version number alone would not.
+which finds a change of behavior that a version number alone would not.
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
 latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions and
