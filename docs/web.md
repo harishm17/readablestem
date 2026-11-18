@@ -546,17 +546,34 @@ every converted equation and table needs your check)", beside the exam box. It i
 choice for that upload (`Job.image_pages`, and `PendingUpload.image_pages` for a large file, applied
 to each of its parts that has such pages); the flag only offers it.
 
-- **The probe.** Only when the box is checked is the probe told so (`pdf_probe MAX_PAGES
-  image_pages`): it then lets a PDF of scans or handwriting through and counts the pages
-  `page_type` calls scanned or handwritten (`page_type.image_page_count`, the same classifier layout
-  uses; typed pages are told from their text alone, so only a page that is not clearly typed pays
-  for the ink analysis; a page whose text covers little of it (under 12 %) pays for it too, as a
-  watermark or a page number can lie over vector handwriting). The count is an estimate: a page
-  whose picture is the template's background is counted by the probe and found typed by layout.
-  A file with none is not refused and not changed: the request does not
-  apply, and the job is made as if the box were not checked. Without the box a PDF of only scans
-  or handwriting is refused as before, and the message (`upload_error_message`) says to upload it
-  again with the box checked when the server offers it.
+- **The probe.** With the flag on, every upload is counted (`pdf_probe MAX_PAGES count`, or
+  `image_pages` when the box is checked, which also lets a PDF of scans or handwriting through):
+  `page_type.probe_pages` makes one pass over the pages for the refusal and the count, by kind
+  (`page_type.ImagePageCount`: scanned, handwritten, unread pages of ink or drawings, and
+  `unanalysed` pages whose ink the time guard did not analyze, which makes the count "at least").
+  The kinds are those of `page_type.image_kind`, the one predicate that also picks the pages the
+  image page pass reads (`image_page.kept_reads`), so the count and the reading agree. Typed pages
+  are told from their text alone, so only a page that is not clearly typed pays for the ink
+  analysis (a page whose text covers little of it, under 12 %, pays too, as a watermark or a page
+  number can lie over vector handwriting); the text pass over typed pages of a long file costs
+  about 26 ms a page. The count is an estimate: a page whose picture is the template's background
+  is counted by the probe and found typed by layout. A file with none is not refused and not
+  changed: the request does not apply, and the job is made as if the box were not checked. Without
+  the box a PDF of only scans or handwriting is refused as before, and the message
+  (`upload_error_message`) says to upload it again with the box checked when the server offers it.
+- **Said at upload.** A file with such pages and the box not checked is queued with them kept as
+  pictures, and the answer says how many pages are scans or handwriting, that they stay pictures
+  marked "Not converted" unless asked for, and what reading them would cost
+  (`outcome.image_pages_offer`: pages times `IMAGE_PAGES_USD_PER_PAGE`, at most
+  `IMAGE_PAGES_MAX_USD_PER_JOB`, `Settings.image_pages_estimate`, the same figure the job's cap
+  uses). A single file's answer is a notice on its job page; a batch's is a line under the
+  document's row (`Placed.scans`, kept with the answer in `upload_result`). The finished job's
+  "pages kept as pictures" note says the same from the stored page records
+  (`outcome.image_pages_in`, the same count function) to its owner, with "Upload it again with the
+  box checked", which opens the upload form for a revised version with the box checked
+  (`/app?revises=<id>&image_pages=on`). Until a re-read of a finished document exists, that is the
+  way to ask. A large file kept for choosing its pages says nothing at upload; each part's job
+  page does when it is done.
 - **Quota.** Pages count against the daily quota as for any document (`intake.store_job`),
   open-tier accounts included.
 - **Spend.** A job that asked has the dollar cap `max(MAX_USD_PER_JOB limited by MAX_USD_PER_PAGE,
