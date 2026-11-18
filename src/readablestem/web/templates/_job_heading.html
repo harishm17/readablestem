@@ -5,4 +5,5 @@
 <div id="job-heading"{% if oob|default(false) %} hx-swap-oob="true"{% endif %}>
   <h1>{{ job.title }}</h1>
   {% if job.title != job.filename and job.audience != "reader" %}<p class="doc-file">File: {{ job.filename }}</p>{% endif %}
+  {% if job.version_line %}<p class="doc-file" id="job-version">{{ job.version_line }}</p>{% endif %}
 </div>

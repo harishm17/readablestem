@@ -106,7 +106,6 @@ from readablestem.core.types import (
     StepFacts,
 )
 from readablestem.ops import limits
-from readablestem.pipeline import assemble
 from readablestem.pipeline import step_facts as pipeline_step_facts
 from readablestem.web import access, carry_edits, events, office_census, step_facts
 from readablestem.web import combine as combine_rules
@@ -1253,6 +1252,7 @@ class Worker:
             ):
                 return False
             from readablestem.web import notation
+            from readablestem.web import output as output_rules  # imports the app's deps
 
             result.notation_applied = notation.applied_record(
                 self.settings, job, result, attempt.notation
@@ -1273,21 +1273,21 @@ class Worker:
                 self._carry_decisions(session, job, result, output.crops, earlier)
             # A part of a longer file: its pages are numbered as in that file, and the file
             # is made again from the result (lazily, `current_html`) to say so.
-            numbered = combine_rules.number_part_pages(job, result)
+            combine_rules.number_part_pages(job, result)
             # A Word or PowerPoint upload: what its PDF route left out or kept open (T3-30).
             result.notices = office_census.with_notices(
                 result.notices, office_census.parse(job.office_json), result.origin
             )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
+            # A job that already had a file (a part tried again, a re-run after a release) has
+            # its output changed by this one; the first file is version 1 (WS20.1).
+            had_output = job.has_html
             job.html = db_safe(result.html)
-            # False: the file is made from this result. The file name is the page's title when
-            # the PDF and its headings have none (SW14), which the pipeline does not see, so
-            # that page is made again from the stored result on first use.
-            job.html_stale = numbered or (
-                assemble.title_plan(
-                    result.elements, result.fixes, title=result.title, filename=job.filename
-                ).source
-                == assemble.TITLE_FILE
+            # The file is made again from the stored result on first use, with its version id
+            # (the pipeline has no job to name), the file name when the PDF and its headings
+            # have no title (SW14) and the part's page numbers.
+            output_rules.output_changed(
+                job, output_rules.RERUN if had_output else output_rules.CONVERTED, self.clock()
             )
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.

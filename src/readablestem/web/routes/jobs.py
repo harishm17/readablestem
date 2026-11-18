@@ -1948,6 +1948,7 @@ def set_language(
         crops = _crops(session, job.id)
         from readablestem.web.review import bump_result_version, rerender_job_html
 
+        output.output_changed(job, output.LANGUAGE)  # counted first: the file says its version
         job.html = rerender_job_html(
             job,
             result,

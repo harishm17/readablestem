@@ -387,6 +387,10 @@ class JobView:
     # No decision is open, so the file may leave for anyone (`web.output.export_state`): the
     # one answer the reader page asks before it offers Open, Listen or a download.
     exportable: bool = False
+    # Which version of the document its file is ("Version b9487b-12, November 10, 2026", WS20.1,
+    # `web.output.stamp_of`): for the owner and a reviewer of a finished document; empty for
+    # anyone else and while it converts.
+    version_line: str = ""
     # The course symbols the conversion was handed (`DocumentResult.notation_applied`), as
     # "bold d is a vector"; None where there is no record. Set with the page of a finished job.
     notation_applied: list[str] | None = None
@@ -765,6 +769,7 @@ def job_view(
         shared_by=_owner_name(session, job) if not owner else "",
         exportable=with_page and output.export_state(job).key == output.READY,
         notation_applied=applied,
+        version_line=output.stamp_of(job).line if done and output.may_take_draft(role) else "",
     )
     if with_page:
         # Counts are read only for a finished job: a stopped or waiting job may still hold an

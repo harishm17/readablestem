@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from readablestem.config import Settings
 from readablestem.core.types import DocumentResult
 from readablestem.web import job_page as page_rules
-from readablestem.web import retention, titles
+from readablestem.web import output, retention, titles
 from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.deps import (
     CurrentUser,
@@ -71,9 +71,12 @@ def _job_page_with_errors(
     return render(request, "job.html", context, status_code=400)
 
 
-def _remake_html(session: Session, job: Job, settings: Settings) -> DocumentResult:
-    """Make the HTML file again with the job's own choices (the caller holds the job)."""
+def _remake_html(session: Session, job: Job, settings: Settings, cause: str) -> DocumentResult:
+    """Make the HTML file again with the job's own choices (the caller holds the job). `cause`
+    is `output.TITLE` or `output.CONTACT`: the change is counted first, so the file is made
+    with its new version id."""
     result = DocumentResult.model_validate(job.result_json or {})
+    output.output_changed(job, cause)
     job.html = rerender_job_html(
         job,
         result,
@@ -113,7 +116,7 @@ def set_title(
             flash(request, "The title is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.title_override = chosen
-        _remake_html(session, job, ctx.settings)
+        _remake_html(session, job, ctx.settings, output.TITLE)
         say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
         now_title = chosen or page_rules.suggested_title(result, job.filename)
     log_event(logger, "title_set", job_id=job_id, own=chosen is not None)
@@ -146,7 +149,7 @@ def set_contact(
             flash(request, "The contact line is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.contact_line = line or None
-        _remake_html(session, job, ctx.settings)
+        _remake_html(session, job, ctx.settings, output.CONTACT)
         say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
     log_event(logger, "contact_set", job_id=job_id, has_contact=bool(line))
     message = (

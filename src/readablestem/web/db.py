@@ -146,6 +146,15 @@ class Job(Base):
     # Bumped by every review write, so a review screen open in an older tab can tell its
     # copy is stale. The server default keeps rows inserted by an older release valid.
     result_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # The identity of the document's output (`web.output.output_changed`): how many changes
+    # have reached it, from 1, and when the last one did. Together with the first six
+    # characters of the job id they are the version id and date the student file, the job
+    # page and the page's head say (`pipeline.assemble.Stamp`). Counted only where something a
+    # reader would see changes; a write that leaves the output alone (a share, keeping the
+    # document longer) does not count. NULL time: a row from before the column was filled by
+    # the migration; one from an older release that inserts a job reads as its finish time.
+    output_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    output_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # How long the job is kept (`web.retention`): "day" (the default hours), "week" (7
     # days, only its owner sees it) or "dev" (30 days, the developer may look; always
     # with `opt_in_retention`). The clock restarts on activity for "day" and "week".
