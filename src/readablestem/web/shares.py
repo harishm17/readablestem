@@ -1,7 +1,8 @@
 """Sharing one document with named, signed-in people (G1).
 
 The owner of a document can give another person access to that one document by email
-address. There are no links that work without signing in, and nothing is sent: the owner
+address. A share is never a link that works without signing in (the one such link is the
+class link, `web.links`, which is not a share and not a role), and nothing is sent: the owner
 copies the document's address and gives it to the person.
 
 - The person must be signed in with that exact address, and the sign-in must have proved it:

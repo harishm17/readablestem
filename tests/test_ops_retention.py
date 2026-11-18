@@ -161,3 +161,111 @@ def test_problem_reports_go_on_three_clocks_and_with_their_senders_account(facto
         retention.erase_user(s, leaving, NOW)
     with db.session_scope(factory) as s:
         assert {r.item_ref for r in s.query(db.Report)} == {"open-young", "closed-recent"}
+
+
+# --------------------------------------------------------------------------- the class link
+# WS27.2 (web/links.py): a live link keeps its document until the link's last day; when the
+# link ends the document goes back to its earlier retention with the clock starting then.
+
+
+def _settings():
+    from readablestem.config import Settings
+
+    return Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def _day_window(settings):
+    from readablestem.web import retention as rules
+
+    return rules.window(settings, "day")
+
+
+def _published_copy(job_id: str) -> db.Blob:
+    from readablestem.web import links
+
+    return db.Blob(
+        job_id=job_id,
+        kind=links.PUBLISHED,
+        element_id="v1",
+        media_type="text/html",
+        content=b"<p>x</p>",
+    )
+
+
+def test_a_class_link_keeps_the_document_and_then_gives_the_clock_back(factory):
+    from readablestem.web import links
+    from readablestem.web.database import as_utc
+
+    settings = _settings()
+    closes = NOW + timedelta(days=10)
+    with db.session_scope(factory) as s:
+        job_id = add_job(s, add_user(s), retain_until=closes)  # what making the link did
+        s.add(_published_copy(job_id))
+        s.add(db.JobLink(job_id=job_id, token_hash="h" * 64, closes_at=closes, created_at=NOW))
+
+    # Past its ordinary day the document is kept, and so is its published copy.
+    assert purge_expired(factory, NOW + timedelta(days=5), settings=settings).jobs_deleted == 0
+    # The link closes: the first purge after it restarts the clock instead of deleting.
+    after = closes + timedelta(minutes=30)
+    assert purge_expired(factory, after, settings=settings).jobs_deleted == 0
+    with db.session_scope(factory) as s:
+        job = s.get(db.Job, job_id)
+        assert as_utc(job.retain_until) == after + _day_window(settings)
+        assert s.query(db.Blob).filter_by(kind=links.PUBLISHED).count() == 0
+    # And on that restored clock it is purged like any other document.
+    later = after + _day_window(settings) + timedelta(minutes=1)
+    assert purge_expired(factory, later, settings=settings).jobs_deleted == 1
+
+
+def test_removing_a_link_goes_back_to_earlier_retention_and_old_rows_go_after_30_days(factory):
+    from readablestem.web import links
+    from readablestem.web.database import as_utc
+
+    settings = _settings()
+    removed = NOW + timedelta(days=1)
+    with db.session_scope(factory) as s:
+        user = add_user(s)
+        job_id = add_job(s, user, retain_until=KEPT)
+        job = s.get(db.Job, job_id)
+        links.make(
+            s,
+            job,
+            settings,
+            label="",
+            opens=None,
+            closes=(NOW + timedelta(days=20)).date(),
+            now=NOW,
+        )
+        s.add(_published_copy(job_id))
+        assert as_utc(job.retain_until) > NOW + timedelta(days=19)
+        assert links.remove(s, job, settings, removed)
+        assert as_utc(job.retain_until) == removed + _day_window(settings)
+        assert s.query(db.Blob).filter_by(kind=links.PUBLISHED).count() == 0
+        assert s.query(db.JobLink).count() == 1
+    # A removed link's row stays 30 days (so the owner can still read its count), then goes,
+    # while the document it belonged to is still there.
+    with db.session_scope(factory) as s:
+        long_job = add_job(s, user, retain_until=NOW + timedelta(days=90))
+        for hash_, closed in (("a", 29), ("b", 31)):
+            s.add(
+                db.JobLink(
+                    job_id=long_job,
+                    token_hash=hash_ * 64,
+                    closes_at=NOW - timedelta(days=closed),
+                    created_at=NOW - timedelta(days=40),
+                )
+            )
+    purge_expired(factory, NOW, settings=settings)
+    with db.session_scope(factory) as s:
+        assert [r.token_hash[0] for r in s.query(db.JobLink).filter_by(job_id=long_job)] == ["a"]
+
+
+def test_every_delete_path_takes_the_links_and_the_published_copy(factory):
+    with db.session_scope(factory) as s:
+        job_id = add_job(s, add_user(s), retain_until=KEPT)
+        s.add(_published_copy(job_id))
+        s.add(db.JobLink(job_id=job_id, token_hash="g" * 64, closes_at=KEPT, created_at=NOW))
+    with db.session_scope(factory) as s:
+        assert delete_jobs(s, [job_id], NOW).jobs_deleted == 1
+    with db.session_scope(factory) as s:
+        assert (s.query(db.JobLink).count(), s.query(db.Blob).count()) == (0, 0)

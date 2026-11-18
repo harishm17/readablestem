@@ -58,6 +58,7 @@ value and where that value came from. This page does not repeat those values.
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
 | `FEATURE_WORD_SOURCE` | Off by default. Reads a `.docx` from the file itself with pandoc in the sandbox, in place of a LibreOffice PDF; the PDF route stays the fallback for what the reader does not take. See "Word files read from the file" |
+| `FEATURE_CLASS_LINK` | Off by default. The class link (WS27.2, `web/links.py`, `routes/class_link.py`): the owner of a ready document makes one link that opens the published student version at `/s/{token}` without a sign-in, until a last day at most 180 days away. Off, there is no section on the share page and `/s/...` answers 404. See "The class link" below and docs/deploy-railway.md, "Before `FEATURE_CLASS_LINK` is turned on" |
 | `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default in code; which are on in production is in the production profile |
 | `CONTENT_RUNS` | Struck text (WS16.1, F-509) stored and written as a `deleted` run (docs/output.md "Struck, bold and other marked text"). Off by default: the shadow rollout, where struck runs are found and counted in the trace but not written |
@@ -1226,6 +1227,53 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
 - Tests: `tests/test_job_shares.py` (the matrix of every job route against the owner, a viewer, a
   reviewer, a removed person and a stranger; the address rules; removal at once; who is
   recorded; the clock; deletion), `tests/test_audit_authz.py`, `tests/test_web_auth.py`.
+
+### The class link (`web/links.py`, `routes/class_link.py`, `FEATURE_CLASS_LINK`, WS27.2)
+
+One link an owner makes for a whole class. Behind `FEATURE_CLASS_LINK` (off): with it off there is
+no section on the share page, `/s/...` answers the same 404 as any wrong address, and the public
+pages are unchanged. Before turning it on read docs/deploy-railway.md, "Before `FEATURE_CLASS_LINK`
+is turned on".
+
+- **What it gives.** `GET /s/{token}` serves the published copy of the student version: the HTML
+  stored as a `Blob` of kind `published` (its `element_id` is the version id of
+  `web.output.version_id`), through the same serving function as `/jobs/{id}/view`
+  (`routes.jobs.student_page`: the same `VIEW_CSP` sandbox). It is not a role and never passes
+  through `job_access`: a token opens this one address and nothing under `/jobs/...`, signed in or
+  not. No app header or footer, no `Set-Cookie` (the route never touches the session),
+  `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer`, `Cache-Control: private,
+  no-store`. A wrong, paused, removed, not-yet-open or closed token gets one identical plain 404
+  page; guesses are limited by address (`class_link_miss`, 20 per 10 minutes, then a 429; every
+  fetch also counts against `class_link`). `open_count` goes up by one per successful GET and
+  `first_opened_at` is set once; nothing identifies a reader.
+- **Who may do what.** Only the owner (not a person the document is shared with, at any rank)
+  makes, pauses, resumes or removes the link, or updates the published copy (`routes/sharing.py`;
+  each asks `job_access` for the owner right and checks CSRF). The token is made like a sign-in
+  link's (`web.email_login`): 32 random bytes, and only the SHA-256 is stored (`token_hash`). The
+  address is shown once, in the answer to making the link; later the page shows that a link
+  exists, its label, dates, open count and published version. "Make a new link" removes the old.
+- **Ready only.** A link is made, and the copy updated, only while `output.export_state(job)` is
+  ready; the copy is the HTML at that moment and an edit afterwards changes nothing a class sees
+  until "Update the published copy".
+- **How long.** `closes_at` is required and at most 180 days after the link is made; `opens_at`
+  is optional (`links.is_live` answers "is this link open"). While a link is kept (not removed, not
+  closed; a paused one still keeps it) `retain_until` is its `closes_at` and there is no new
+  retention mode. When the last link closes or is removed the document goes back to its earlier
+  retention with the clock starting then (`retention.clock_after_link`): at removal at once, at
+  closing by the hourly purge (`ops.retention.purge_expired` -> `links.release_closed`), so a
+  document is not deleted at the closing. A document with a kept link is not purged. Between the
+  closing and the next purge (up to an hour) the document reads as expired to its owner (the
+  sites that test `retain_until`), which is the cost of not adding a retention mode. A link's row
+  is deleted with its document and 30 days after the link closes or is removed.
+- **Table** `job_links` (migration `b7d2f4a8c613`): `id`, `job_id` (cascade), `token_hash` (unique),
+  `kind` (`class` only), `label`, `opens_at`, `closes_at`, `paused_at`, `revoked_at`,
+  `first_opened_at`, `open_count`, `created_at`. `ops.retention.delete_jobs` deletes the rows and
+  the published `Blob` with the document.
+- **Not built.** `/s/{token}/listen`, Word or EPUB through a link, a link for a named person, and
+  any change to the privacy, terms or limits pages.
+- Tests: `tests/test_job_shares.py` (the link as a kind of visitor, the headers and no cookie,
+  owner-only, the one 404, the 180 days, ready only, publish and update, switch off),
+  `tests/test_ops_retention.py`, `tests/test_web_migrations.py`, `tests/test_audit_authz.py`.
 
 ### The sample document (`web/sample.py`)
 

@@ -495,3 +495,27 @@ def test_the_upload_results_migration_downgrades_and_upgrades_again(tmp_path):
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:
         engine.dispose()
+
+
+def test_the_job_links_migration_downgrades_and_upgrades_again(tmp_path):
+    """WS27.2: `job_links` is one step past the revision before it, and a link row goes with
+    its job (the foreign key cascades) on a database made by the migration."""
+    url = f"sqlite:///{tmp_path}/links.db"
+    upgrade(url)
+    migrate(url, "a9c3e5b7d1f2", down=True)
+    engine = create_engine(url)
+    try:
+        assert "job_links" not in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        inspector = inspect(engine)
+        assert "job_links" in inspector.get_table_names()
+        unique = {tuple(u["column_names"]) for u in inspector.get_unique_constraints("job_links")}
+        assert ("token_hash",) in unique
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()

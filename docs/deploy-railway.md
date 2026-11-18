@@ -166,6 +166,7 @@ production if a required one is missing, and logs the reason):
 | `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | Production's value is in the production profile (it was turned on 2026-11-04 13:53 UTC, once the start-up sandbox probe passed on Railway, see "LaTeXML" below). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
 | `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
 | `FEATURE_WORD_SOURCE` | Reads a `.docx` from the file itself (pandoc in the sandbox, `source/docx_reader.py`) instead of from a LibreOffice PDF; needs pandoc, a passing sandbox probe, and takes only files the reader's gate accepts, the rest go the PDF route (docs/web.md, "Word files read from the file"). Not declared on `web` in `railway.ts` yet. | Production's value is in the production profile; off until real Word files have been read both ways. |
+| `FEATURE_CLASS_LINK` | The class link: an owner's link that opens the published student version without a sign-in (docs/web.md, "The class link"). Declared on `web` in `railway.ts`. | Off, and stays off until the list in "Before `FEATURE_CLASS_LINK` is turned on" below is done. |
 | `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until a few real decks have been converted and read. |
 | `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is: the probe passes on Railway with it. |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off by default (production's values: the production profile). With it, allow 2 GB of memory. | Unset. |
@@ -233,6 +234,46 @@ open tier 150 pages a day; invited 300 pages a day (`PER_USER_DAILY_PAGE_QUOTA`)
 of 250 MB per open-tier person, 300 MB per invited person and 2000 MB for everybody
 (`STORAGE_*_MB`; these cap what is stored at a time, not what is uploaded per day); a spend cap of
 $6 per job and $10 a day for the site, of which open-tier accounts may use $4.
+
+## Before `FEATURE_CLASS_LINK` is turned on
+
+The class link (WS27.2, docs/web.md "The class link") is the one way a document's content reaches
+someone who is not signed in: `GET /s/{token}`. It is off in code and in the production profile.
+Do not set it to `true` on `web` until all of this is true; none of it is done by the code, and the
+public pages were deliberately not changed with the feature, so with the switch off they stay
+accurate.
+
+1. **The service owner supplies terms for publishing.** The terms say nothing today about an
+   instructor putting a converted document where a class can open it without signing in: whose
+   material may be published, that the instructor answers for the rights to it, what the service
+   may do about a link (pause or remove it), and that a link's address is a secret that anyone
+   holding it can use. This is the service owner's text, not an engineering one.
+2. **A takedown contact that is watched.** `terms.html:88` and `privacy.html:292-296` send
+   takedown requests to `CONTACT_EMAIL`, or to "the contact address of this service" when it is
+   unset. Public pages now carry owners' material, so `CONTACT_EMAIL` must be set, read daily, and
+   someone must know how to remove a link by hand (delete the `job_links` row or set `revoked_at`;
+   the published copy then goes with the next hourly purge).
+3. **These sentences must change** (they are true only while there is no link; `src/readablestem/web/templates/`):
+   - `privacy.html:246-251`: "Only you can open your documents, and the people you name." With a
+     link, anyone holding the address can open the published student version, without signing in.
+   - `privacy.html:56`: "Nobody else looks at it." (the 7-day choice) is no longer the whole
+     truth for a document with a link.
+   - `privacy.html:48-54` and `privacy.html:65-66`: the deletion times ("deleted automatically 24
+     hours after you last worked on it", "a person you share with does not keep it longer") need
+     the exception that a document with a class link is kept until the link's last day (at most 180
+     days) and then for its usual time again; and `_upload_limits.html:38-40`, the limits page's
+     "How long it is kept", says the same thing and needs the same exception.
+   - `privacy.html:127-128`: "No one else. We do not use your uploads to train models, sell them or
+     share them beyond the services named here." needs to say that the owner may publish a copy and
+     that the page sets no cookie and keeps no record of who opened it, only a count.
+   - `terms.html:14` ("Check the output before you share it") and `terms.html:53-55` ("process
+     material you are not allowed to share") should name publishing by link next to sharing.
+4. **Know what the link does not do** (so the pages above can say it): its address is in the URL, so
+   a browser history, a proxy or a log that records URLs holds it (the app's own logs record the
+   route template, not the address, and uvicorn's access log is off); `open_count` counts fetches,
+   including a chat app's link preview; the page has no way to show who opened it.
+
+Then set `FEATURE_CLASS_LINK=true` on `web` and in the production profile.
 
 ## Microsoft sign-in on Railway
 

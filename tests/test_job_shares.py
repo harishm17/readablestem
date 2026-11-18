@@ -31,7 +31,17 @@ from readablestem.ops import retention as purge
 from readablestem.pipeline import export_docx
 from readablestem.web import shares
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobShare, JobStatus, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.db import (
+    Job,
+    JobLink,
+    JobShare,
+    JobStatus,
+    ReviewEdit,
+    User,
+    session_scope,
+    utcnow,
+)
+from readablestem.web.security import VIEW_CSP
 from readablestem.web.views import audience_of
 from test_audit_authz import ROUTES
 
@@ -79,6 +89,11 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/share"): "owner",
     ("POST", "/jobs/{job_id}/share"): "owner",
     ("POST", "/jobs/{job_id}/share/{share_id}/revoke"): "owner",
+    ("POST", "/jobs/{job_id}/share/link"): "owner",
+    ("POST", "/jobs/{job_id}/share/link/pause"): "owner",
+    ("POST", "/jobs/{job_id}/share/link/resume"): "owner",
+    ("POST", "/jobs/{job_id}/share/link/remove"): "owner",
+    ("POST", "/jobs/{job_id}/share/link/update"): "owner",
     ("GET", "/jobs/{job_id}/review"): "review",
     ("GET", "/jobs/{job_id}/review/list"): "review",
     ("GET", "/jobs/{job_id}/review/marks.css"): "review",
@@ -121,7 +136,7 @@ def ready_site(tmp_path):
 
 
 def _site(tmp_path, *, ready: bool):
-    env = WebEnv(tmp_path)
+    env = WebEnv(tmp_path, feature_class_link=True)
     with env.running() as owner:
         for email in (ALICE, BOB, CAROL, DAVE, ERIN):
             env.allow(email)
@@ -239,6 +254,7 @@ def snapshot(env) -> dict:
             "edits": session.scalar(select(func.count()).select_from(ReviewEdit)),
             "shares": sorted((r.email, r.role) for r in session.scalars(select(JobShare)).all()),
             "jobs": session.scalar(select(func.count()).select_from(Job)),
+            "links": session.scalar(select(func.count()).select_from(JobLink)),
         }
 
 
@@ -767,3 +783,187 @@ def test_the_settled_cost_is_the_owner_s_alone_and_is_the_total_after_a_rerun(re
         session.get(Job, job_id).status = JobStatus.RUNNING
     running = send(ready_site, OWNER, "GET", f"/jobs/{job_id}").text
     assert "settled-cost" not in running and "$1.50" not in running
+
+
+# --------------------------------------------------------------------------- the class link
+# WS27.2 (web/links.py, routes/class_link.py): one link that opens the published student
+# version for whoever holds it. These use the matrix's five people, with the setting on.
+
+
+def _day(days: int) -> str:
+    return (utcnow() + timedelta(days=days)).date().isoformat()
+
+
+def make_link(env, *, closes: str | None = None, opens: str = "", label: str = "PHYS 201"):
+    owner = env.who[OWNER]
+    return owner.post(
+        f"/jobs/{env.job_id}/share/link",
+        data={
+            "csrf_token": page_token(owner, f"/jobs/{env.job_id}/share"),
+            "label": label,
+            "closes": closes if closes is not None else _day(30),
+            "opens": opens,
+        },
+    )
+
+
+def link_token(env, **kwargs) -> str:
+    response = make_link(env, **kwargs)
+    assert response.status_code == 200, response.text[:300]
+    return re.search(r"/s/([A-Za-z0-9_-]{43})", response.text).group(1)
+
+
+def link_post(env, action: str, actor: str = OWNER):
+    client = env.who[actor]
+    return client.post(
+        f"/jobs/{env.job_id}/share/link/{action}",
+        data={"csrf_token": page_token(client, f"/jobs/{env.job_id}/share")},
+    )
+
+
+def stored_link(env) -> JobLink | None:
+    with session_scope(env.ctx.factory) as session:
+        return session.scalars(select(JobLink).order_by(JobLink.created_at.desc())).first()
+
+
+def test_a_link_holder_gets_the_published_copy_and_no_job_address(ready_site):
+    """The link as a kind of visitor: signed out, or signed in as a stranger, the token opens
+    `/s/{token}` and nothing under `/jobs/...`, where each is answered as without it."""
+    token = link_token(ready_site)
+    shown = ready_site.who[OWNER].get(f"/jobs/{ready_site.job_id}/view")
+    signed_out = ready_site.client()
+    for name, client in (("signed out", signed_out), ("stranger", ready_site.who[STRANGER])):
+        page = client.get(f"/s/{token}")
+        assert page.status_code == 200 and page.text == shown.text, name
+        assert page.headers["content-security-policy"] == VIEW_CSP
+        for (method, template), _need in NEEDS.items():
+            if method == "GET":
+                answer = client.get(fill(ready_site, template))
+                assert answer.status_code in {303, 404}, (name, template)
+                assert "SECRET-DOC-TEXT" not in answer.text, (name, template)
+    assert ready_site.who[STRANGER].get(f"/s/{token}/listen").status_code == 404
+    signed_out.close()
+
+
+def test_the_link_page_has_no_cookie_and_the_headers_that_keep_it_private(ready_site):
+    token = link_token(ready_site)
+    for client in (ready_site.client(), ready_site.who[STRANGER]):  # the stranger holds a session
+        page = client.get(f"/s/{token}")
+        assert page.status_code == 200
+        assert "set-cookie" not in page.headers
+        assert page.headers["x-robots-tag"] == "noindex, nofollow"
+        assert page.headers["referrer-policy"] == "no-referrer"
+        assert page.headers["cache-control"] == "private, no-store"
+        assert 'class="site-header"' not in page.text
+    row = stored_link(ready_site)
+    assert row.open_count == 2 and row.first_opened_at is not None
+    assert row.token_hash != token and token not in row.token_hash
+    # The page the owner comes back to counts the opens and no longer holds the address.
+    again = ready_site.who[OWNER].get(f"/jobs/{ready_site.job_id}/share")
+    assert "2 times" in again.text and token not in again.text
+
+
+def test_only_the_owner_makes_pauses_or_removes_a_link(ready_site):
+    token = link_token(ready_site)
+    before = snapshot(ready_site)
+    for actor in (VIEWER, REVIEWER):
+        assert make_link_as(ready_site, actor).status_code == 403
+        for action in ("pause", "resume", "remove", "update"):
+            assert link_post(ready_site, action, actor).status_code == 403, (actor, action)
+    for actor in (STRANGER, REVOKED):
+        assert link_post(ready_site, "remove", actor).status_code == 404
+    assert snapshot(ready_site) == before
+    assert ready_site.client().get(f"/s/{token}").status_code == 200
+
+
+def make_link_as(env, actor: str):
+    client = env.who[actor]
+    return client.post(
+        f"/jobs/{env.job_id}/share/link",
+        data={
+            "csrf_token": page_token(client, "/app"),
+            "closes": _day(30),
+            "label": "x",
+        },
+    )
+
+
+def test_a_closed_removed_paused_or_wrong_link_gets_one_404_page(ready_site, monkeypatch):
+    token = link_token(ready_site)
+    anyone = ready_site.client()
+    wrong = anyone.get("/s/" + "a" * 43)
+    assert (
+        wrong.status_code == 404 and "not open" in wrong.text and "set-cookie" not in wrong.headers
+    )
+
+    def same_answer() -> None:
+        answer = anyone.get(f"/s/{token}")
+        assert (answer.status_code, answer.text) == (404, wrong.text)
+
+    assert link_post(ready_site, "pause").status_code == 303
+    same_answer()
+    assert link_post(ready_site, "resume").status_code == 303
+    assert anyone.get(f"/s/{token}").status_code == 200
+    with session_scope(ready_site.ctx.factory) as session:  # not yet open
+        session.scalars(select(JobLink)).first().opens_at = utcnow() + timedelta(days=1)
+    same_answer()
+    with session_scope(ready_site.ctx.factory) as session:  # closed
+        link = session.scalars(select(JobLink)).first()
+        link.opens_at, link.closes_at = None, utcnow() - timedelta(minutes=1)
+    same_answer()
+    other = link_token(ready_site)  # a new link removes the old; removing it closes the new
+    assert anyone.get(f"/s/{other}").status_code == 200
+    assert link_post(ready_site, "remove").status_code == 303
+    assert anyone.get(f"/s/{other}").status_code == 404
+    # Tokens cannot be tried at speed: after the allowance, a different, plain refusal.
+    monkeypatch.setattr(ready_site.settings, "rate_limits_enabled", True)
+    answers = [anyone.get("/s/" + "b" * 43).status_code for _ in range(25)]
+    assert answers[:20] == [404] * 20 and set(answers[20:]) == {429}
+
+
+def test_a_link_can_last_at_most_180_days_and_needs_an_end(ready_site):
+    for closes in (_day(181), "", "not a day", _day(-1)):
+        refused = make_link(ready_site, closes=closes)
+        assert refused.status_code == 422, closes
+    assert stored_link(ready_site) is None
+    assert make_link(ready_site, closes=_day(179)).status_code == 200
+    assert make_link(ready_site, closes=_day(30), opens=_day(40)).status_code == 422
+
+
+def test_a_link_needs_a_ready_document(site):
+    refused = make_link(site)
+    assert refused.status_code == 422 and stored_link(site) is None
+    assert site.client().get("/s/" + "c" * 43).status_code == 404
+
+
+def test_an_edit_after_publishing_changes_nothing_a_class_sees_until_the_copy_is_updated(
+    ready_site,
+):
+    token = link_token(ready_site)
+    anyone = ready_site.client()
+    published = anyone.get(f"/s/{token}").text
+    owner = ready_site.who[OWNER]
+    renamed = owner.post(
+        f"/jobs/{ready_site.job_id}/title",
+        data={"csrf_token": page_token(owner, f"/jobs/{ready_site.job_id}"), "title": "A new name"},
+    )
+    assert renamed.status_code == 303
+    assert "A new name" in owner.get(f"/jobs/{ready_site.job_id}/view").text
+    assert anyone.get(f"/s/{token}").text == published  # still the copy that was published
+    share = owner.get(f"/jobs/{ready_site.job_id}/share").text
+    assert "is now version" in share and "Update the published copy" in share
+    assert link_post(ready_site, "update").status_code == 303
+    updated = anyone.get(f"/s/{token}").text
+    assert "A new name" in updated and updated != published
+    assert "Update the published copy" not in owner.get(f"/jobs/{ready_site.job_id}/share").text
+
+
+def test_the_class_link_does_not_exist_while_the_setting_is_off(ready_site, monkeypatch):
+    token = link_token(ready_site)
+    monkeypatch.setattr(ready_site.settings, "feature_class_link", False)
+    owner = ready_site.who[OWNER]
+    assert ready_site.client().get(f"/s/{token}").status_code == 404
+    page = owner.get(f"/jobs/{ready_site.job_id}/share")
+    assert page.status_code == 200 and "Class link" not in page.text
+    assert make_link(ready_site).status_code == 404
+    assert link_post(ready_site, "remove").status_code == 404

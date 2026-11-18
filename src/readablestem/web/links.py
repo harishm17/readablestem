@@ -70,6 +70,11 @@ class LinkError(ValueError):
 # --------------------------------------------------------------------------- is it open
 
 
+def _ends(link: JobLink) -> datetime:
+    """`closes_at` as an aware UTC time (SQLite returns naive ones; the column is never null)."""
+    return link.closes_at.replace(tzinfo=UTC) if link.closes_at.tzinfo is None else link.closes_at
+
+
 def is_live(link: JobLink, now: datetime | None = None, *, serving: bool = True) -> bool:
     """Is this link open? The one answer, for the route (`serving`), the share page and
     retention. Open means not removed, not paused, opened (`opens_at` empty or past) and not
@@ -77,7 +82,7 @@ def is_live(link: JobLink, now: datetime | None = None, *, serving: bool = True)
     its document": pausing and an `opens_at` still ahead do not end that, removing and closing
     do."""
     moment = as_utc(now) or utcnow()
-    if link.revoked_at is not None or as_utc(link.closes_at) <= moment:
+    if link.revoked_at is not None or _ends(link) <= moment:
         return False
     if not serving:
         return True
@@ -106,11 +111,7 @@ def held_until(session: Session, job_id: str, now: datetime | None = None) -> da
     """When the document's links stop keeping it: the latest `closes_at` of a link that keeps
     it, or None when none does."""
     moment = as_utc(now) or utcnow()
-    ends = [
-        as_utc(row.closes_at)
-        for row in links_of(session, job_id)
-        if is_live(row, moment, serving=False)
-    ]
+    ends = [_ends(row) for row in links_of(session, job_id) if is_live(row, moment, serving=False)]
     return max(ends) if ends else None
 
 
