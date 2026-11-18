@@ -56,6 +56,7 @@ from readablestem.web import (
     documents,
     events,
     export_store,
+    links,
     notation,
     office_convert,
     output,
@@ -1778,7 +1779,13 @@ def job_page_context(
     context["keep_until"] = keep_until
     context["keep_hint"] = retention.keep_hint(keep_until) if keep_until else ""
     context["keep_label"] = retention.keep_label()
-    context["retention_line"] = retention.kept_line(settings, job.retention_mode, job.retain_until)
+    link_until = None
+    if settings.feature_class_link and job.is_owner:  # the class link that is keeping it
+        with session_scope(get_ctx(request).factory) as session:
+            link_until = links.held_until(session, job_id)
+    context["retention_line"] = retention.kept_line(
+        settings, job.retention_mode, job.retain_until, link_until
+    )
     return context
 
 
@@ -2491,8 +2498,18 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
     events.record(
         ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True
     )
+    return student_page(html)
+
+
+def student_page(html: str, headers: dict[str, str] | None = None) -> Response:
+    """The student version as the browser gets it: the bare HTML under the sandboxing policy
+    (`VIEW_CSP`: no script, no form, no access to the app). The one function that serves it, for
+    the owner's preview here and for a class link (`routes.class_link`), which adds its own
+    headers."""
     return Response(
-        html, media_type="text/html; charset=utf-8", headers={"Content-Security-Policy": VIEW_CSP}
+        html,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Security-Policy": VIEW_CSP, **(headers or {})},
     )
 
 

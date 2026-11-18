@@ -414,6 +414,30 @@ class JobShare(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class JobLink(Base):
+    """A link that lets whoever holds it read one document's published student version
+    (`web.links`, WS27.2). Only a SHA-256 of the token is stored, as for `LoginLink`, so a
+    copy of the database opens nothing. A link is not a role and has no person: the page it
+    opens sets no cookie, so the only state is how many times it was opened and when first.
+    Content-free; deleted with the document, and 30 days after it closes or is removed."""
+
+    __tablename__ = "job_links"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(8), default="class", server_default="class")
+    # What the owner calls it ("PHYS 201, fall"); shown to the owner only.
+    label: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    open_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class SpendDay(Base):
     """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend).
 

@@ -551,6 +551,13 @@ class Settings(BaseSettings):
     # (it is refused or fails to start). On, the reader's result is the document; no PDF is made
     # and no second reading is compared with it (WS18.19 to WS18.21 are not built).
     feature_word_source: bool = False
+    # A class link (`web.links`, WS27.2): the owner of a finished document makes one link that
+    # lets whoever holds it read the published student version, with no sign-in, until an end
+    # date at most 180 days away. OFF: no section on the share page, `/s/...` answers 404 and
+    # no link can exist. Not to be turned on until the privacy, terms and limits pages say what
+    # a link holder can see and the service has terms for publishing and a takedown contact
+    # (docs/deploy-railway.md, "Before FEATURE_CLASS_LINK is turned on").
+    feature_class_link: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).

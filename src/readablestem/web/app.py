@@ -77,6 +77,7 @@ from readablestem.web.routes import (
     batch,
     bulk,
     bundle,
+    class_link,
     courses,
     cron,
     dev,
@@ -587,6 +588,7 @@ def create_app(
         courses,
         record,
         listen,
+        class_link,
         email_login,
         discovery,
     ):

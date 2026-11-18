@@ -179,7 +179,7 @@ def test_only_a_hash_of_the_token_is_stored(web):
     with session_scope(web.ctx.factory) as session:
         row = session.scalar(select(LoginLink))
         assert row is not None and token not in row.token_hash
-        assert row.token_hash == email_login._hash(token)
+        assert row.token_hash == email_login.hash_token(token)
 
 
 @pytest.mark.parametrize("junk", ["", "x", "a" * 43, "a" * 44, "../" * 15, "%00" * 20])

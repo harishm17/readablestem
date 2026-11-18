@@ -55,7 +55,7 @@ PURGE_AFTER = timedelta(days=1)  # used and expired links are removed this long 
 EMAIL_LINK_RULE = "email_link"  # `web.abuse.RULES`: per target address
 
 
-def _hash(token: str) -> str:
+def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
@@ -95,7 +95,7 @@ def issue(factory: sessionmaker[Session], email: str, *, minutes: int) -> str | 
         session.add(
             LoginLink(
                 user_id=user.id,
-                token_hash=_hash(token),
+                token_hash=hash_token(token),
                 email=email.strip().lower(),
                 expires_at=now + timedelta(minutes=minutes),
             )
@@ -108,7 +108,7 @@ def is_usable(factory: sessionmaker[Session], token: str) -> bool:
     if not valid_token_shape(token):
         return False
     with session_scope(factory) as session:
-        row = session.scalar(select(LoginLink).where(LoginLink.token_hash == _hash(token)))
+        row = session.scalar(select(LoginLink).where(LoginLink.token_hash == hash_token(token)))
         if row is None or row.used_at is not None:
             return False
         user = session.get(User, row.user_id)
@@ -135,7 +135,7 @@ def redeem(factory: sessionmaker[Session], token: str) -> tuple[str, int, bool] 
         used = session.execute(
             update(LoginLink)
             .where(
-                LoginLink.token_hash == _hash(token),
+                LoginLink.token_hash == hash_token(token),
                 LoginLink.used_at.is_(None),
                 LoginLink.expires_at > now,
             )
@@ -144,7 +144,7 @@ def redeem(factory: sessionmaker[Session], token: str) -> tuple[str, int, bool] 
         )
         if rowcount(used) != 1:
             return None
-        row = session.scalar(select(LoginLink).where(LoginLink.token_hash == _hash(token)))
+        row = session.scalar(select(LoginLink).where(LoginLink.token_hash == hash_token(token)))
         user = session.get(User, row.user_id) if row is not None else None
         if user is None or not user.is_allowed:
             return None

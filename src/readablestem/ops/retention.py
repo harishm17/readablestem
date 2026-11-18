@@ -26,6 +26,11 @@ daily spend remain. A new table with a user id must be added there.
 Usage events (`web.events`) outlive the jobs they mention, by design, but not for ever:
 the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
 
+Class links (`web.links`) keep a document until their last day: `purge_expired` first lets a
+document whose last link has closed back to its earlier retention with the clock starting then
+(`links.release_closed`), so it is deleted on that clock and not at the closing; link rows go
+with their document and 30 days after they close or are removed (`links.purge_rows`).
+
 Problem reports (`web.reports`) go with their sender's account (`erase_user`), `CLOSED_DAYS`
 (30) after they are closed, and `MAX_DAYS` (180) after they were made, whatever their state
 (`purge_closed_reports`, `purge_old_reports`, run by the same purge).
@@ -44,6 +49,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, sessionmaker
 
+from readablestem.config import Settings
 from readablestem.observability.logging import get_logger
 from readablestem.ops.aggregate import (
     FINISHED,
@@ -54,7 +60,7 @@ from readablestem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
-from readablestem.web import forms, reports
+from readablestem.web import forms, links, reports
 from readablestem.web.database import insert_ignore
 from readablestem.web.db import (
     AuthIdentity,
@@ -66,6 +72,7 @@ from readablestem.web.db import (
     Event,
     Job,
     JobCall,
+    JobLink,
     JobNotFinished,
     JobShare,
     JobStage,
@@ -100,7 +107,11 @@ class PurgeStats:
 
 
 def purge_expired(
-    factory: sessionmaker[Session], now: datetime | None = None, *, source: str = "cron"
+    factory: sessionmaker[Session],
+    now: datetime | None = None,
+    *,
+    source: str = "cron",
+    settings: Settings | None = None,
 ) -> PurgeStats:
     """Delete every job whose `retain_until` is before `now` (default: current UTC time).
 
@@ -108,10 +119,13 @@ def purge_expired(
     locked with SKIP LOCKED, so a job the worker is updating at that instant is left for
     the next run instead of blocking it. `source` (a code: "cron", "worker", "cli") is
     logged with `purge_done`, so the hourly scheduler run and the worker's backstop can
-    be told apart.
+    be told apart. `settings` gives the retention windows a document returns to when its class
+    link has closed (the process's own when not given).
     """
     now = _as_utc(now or datetime.now(UTC))
     stats = PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
+    with session_scope(factory) as session:
+        links.release_closed(session, settings, now)
     while True:
         with session_scope(factory) as session:
             batch = _purge_batch(session, now)
@@ -127,6 +141,7 @@ def purge_expired(
         stats.tombstones_deleted = purge_tombstones(session, now)
         stats.tokens_deleted = forms.purge(session, now)
         stats.reports_deleted = purge_closed_reports(session, now) + purge_old_reports(session, now)
+        links.purge_rows(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -185,7 +200,9 @@ def purge_old_reports(session: Session, now: datetime) -> int:
 
 
 def aggregate_and_purge(
-    factory: sessionmaker[Session], now: datetime | None = None
+    factory: sessionmaker[Session],
+    now: datetime | None = None,
+    settings: Settings | None = None,
 ) -> tuple[int | None, PurgeStats]:
     """The cron task: aggregate, then purge even if aggregation raised.
 
@@ -199,7 +216,7 @@ def aggregate_and_purge(
     except Exception as exc:
         get_logger(__name__).error("aggregate_failed", error_type=type(exc).__name__)
         aggregated = None
-    stats = purge_expired(factory, now)
+    stats = purge_expired(factory, now, settings=settings)
     vacuum_after_purge(factory, stats)
     return aggregated, stats
 
@@ -281,6 +298,7 @@ def delete_jobs(
     blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     session.execute(delete(JobShare).where(JobShare.job_id.in_(ids)))
+    session.execute(delete(JobLink).where(JobLink.job_id.in_(ids)))
     session.execute(delete(StepRecord).where(StepRecord.job_id.in_(ids)))
     session.execute(delete(JobCall).where(JobCall.job_id.in_(ids)))
     session.execute(delete(JobStage).where(JobStage.job_id.in_(ids)))

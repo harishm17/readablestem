@@ -9,18 +9,28 @@ document will be deleted, which ends every share. The address works for nobody w
 in with the shared address.
 
 No address is written to a log, a flash notice (it lives in the session cookie) or an event.
+
+With `FEATURE_CLASS_LINK` the page also has a "Class link" section and five more owner-only POSTs
+(`web.links`): make a link, pause it, resume it, remove it, and update the published copy. All
+are CSRF-checked and work without JavaScript. Making a link answers with the page itself (not a
+redirect), because the address is shown that once and a redirect could carry it only in the
+session cookie or the URL; every later view of the page shows that a link exists and what it
+has done, never the address. With the setting off the five routes and the section do not exist
+for anyone (404).
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 
-from readablestem.web import documents, shares
-from readablestem.web.db import Job, session_scope
+from readablestem.web import documents, links, output, retention, shares, storage
+from readablestem.web.dates import format_when
+from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.deps import (
     PageError,
     UserDep,
@@ -31,7 +41,7 @@ from readablestem.web.deps import (
 )
 from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
-from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, current_html, job_access, require_done
 from readablestem.web.shares import OWNER
 
 logger = logging.getLogger(__name__)
@@ -64,9 +74,12 @@ def _page(
     typed: str = "",
     typed_role: str = shares.VIEW,
     status_code: int = 200,
+    link_address: str = "",
+    link_errors: list[dict[str, str]] | None = None,
+    link_typed: dict[str, str] | None = None,
 ) -> Response:
     """The sharing page of a document the caller has loaded as its owner (`title` is read
-    before the session closes)."""
+    before the session closes). `link_address`: the class link just made, shown this once."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         rows = shares.shares_of(session, job_id)
@@ -75,6 +88,11 @@ def _page(
         # The shares go with the document, so its deletion time is the shares' too.
         retain_until = job.retain_until if job is not None else None
         retention_mode = job.retention_mode if job is not None else "day"
+        class_link = (
+            _class_link(ctx, session, job, link_address, link_errors or [], link_typed or {})
+            if ctx.settings.feature_class_link and job is not None
+            else None
+        )
     context = {
         "job_id": job_id,
         "doc_title": title,
@@ -84,7 +102,7 @@ def _page(
         "retain_until": retain_until,
         "retention_mode": retention_mode,
         "max_shares": shares.MAX_SHARES_PER_JOB,
-        "errors": errors or [],
+        "errors": (errors or []) + (link_errors or []),
         "email_error": next(
             (e["message"] for e in errors or [] if e["field_id"] == "share-email"), ""
         ),
@@ -94,8 +112,58 @@ def _page(
         "typed": typed,
         "typed_role": typed_role,
         "role_words": shares.ROLE_WORDS,
+        "class_link": class_link,
     }
     return render(request, "share.html", context, status_code=status_code)
+
+
+def _class_link(
+    ctx, session, job: Job, address: str, errors: list[dict[str, str]], typed: dict[str, str]
+) -> dict:
+    """What the "Class link" section prints: the link's state in words, what it has done, which
+    version is published and which is current, and what the owner may do now."""
+    now = utcnow()
+    row = links.current_link(session, job.id)
+    ready = output.export_state(job).key == output.READY
+    current = output.version_id(job)
+    published = links.published_version(session, job.id)
+    kept = row is not None and links.is_live(row, now, serving=False)
+    shown = None
+    if row is not None:
+        if not kept:
+            state = f"Closed on {format_when(row.closes_at)}"
+        elif row.paused_at is not None:
+            state = "Paused"
+        elif not links.is_live(row, now):
+            state = f"Opens on {format_when(row.opens_at)}"
+        else:
+            state = "Open"
+        shown = {
+            "label": row.label,
+            "state": state,
+            "paused": row.paused_at is not None,
+            "kept": kept,
+            "opens_at": row.opens_at,
+            "closes_at": row.closes_at,
+            "open_count": row.open_count,
+            "first_opened_at": row.first_opened_at,
+        }
+    latest = links.last_day(now)
+    return {
+        "link": shown,
+        "address": address,
+        "ready": ready,
+        "published": published,
+        "current": current,
+        "out_of_date": kept and published is not None and published != current,
+        "can_update": kept and ready and published != current,
+        "today": now.date().isoformat(),
+        "latest": latest.isoformat(),
+        "max_days": links.MAX_DAYS,
+        "after": retention.after_link_words(ctx.settings, job.retention_mode),
+        "typed": typed,
+        "errors": {e["field_id"]: e["message"] for e in errors},
+    }
 
 
 def _owned(request: Request, job_id: str, user) -> tuple[str, str]:
@@ -164,4 +232,164 @@ def revoke_share(request: Request, job_id: str, share_id: str, user: UserDep) ->
     # Not there (often a second click on Remove): the access is gone either way, so the
     # answer is the one the first click got (SW43, "already in that state").
     flash(request, "Access removed. They cannot open this document any more.", undo=False)
+    return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
+
+
+# --------------------------------------------------------------------------- the class link
+
+
+def _link_ctx(request: Request):
+    """The app's context, for a class link route: 404 for everyone, as for any address that is
+    not there, when the setting is off. Asked before the document, so the answer does not say
+    whether the document exists."""
+    ctx = get_ctx(request)
+    if not ctx.settings.feature_class_link:
+        raise PageError(404, *NOT_FOUND)
+    return ctx
+
+
+def _publish(ctx, session, job: Job, user) -> str:
+    """Make the published copy from the ready, up-to-date student file; its version id.
+    `StorageRefused` or `StorageFull` when the copy does not fit the person's allowance."""
+    job = current_html(ctx, session, job)
+    html = job.html or ""
+    old = links.published(session, job.id)
+    storage.check_room(
+        session,
+        ctx.settings,
+        user.id,
+        max(0, len(html.encode()) - (len(old.html.encode()) if old else 0)),
+    )
+    return links.store_copy(session, job, html)
+
+
+NOT_READY_FOR_LINK = (
+    "A class link can be made once this document is ready, with nothing left to check."
+)
+NO_ROOM_FOR_LINK = (
+    "There is no room to keep a published copy. Delete a document you no longer need."
+)
+
+
+@router.post("/jobs/{job_id}/share/link", dependencies=[Depends(require_csrf)])
+def make_link(
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    label: Annotated[str, Form()] = "",
+    opens: Annotated[str, Form()] = "",
+    closes: Annotated[str, Form()] = "",
+) -> Response:
+    """Make the class link (the one the document had is removed) and show its address, once."""
+    ctx = _link_ctx(request)
+    typed = {"label": label[:200], "opens": opens[:10], "closes": closes[:10]}
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        require_done(job)
+        if job.is_sample:
+            raise PageError(404, *NOT_FOUND)
+        owned_id, title = job.id, _title(job)
+        problem: dict[str, str] | None = None
+        token = ""
+        if output.export_state(job).key != output.READY:
+            problem = {"field_id": "class-link-heading", "message": NOT_READY_FOR_LINK}
+        else:
+            try:
+                token = links.make(
+                    session,
+                    job,
+                    ctx.settings,
+                    label=label,
+                    opens=_day(opens, "link-opens"),
+                    closes=_day(closes, "link-closes"),
+                )
+                _publish(ctx, session, job, user)
+            except links.LinkError as exc:
+                problem = {"field_id": exc.field, "message": exc.message}
+            except (storage.StorageRefused, storage.StorageFull):
+                problem = {"field_id": "class-link-heading", "message": NO_ROOM_FOR_LINK}
+            if problem is not None:
+                session.rollback()
+    if problem is not None:
+        log_event(logger, "link_refused", job_id=owned_id)
+        return _page(
+            request, owned_id, title, status_code=422, link_errors=[problem], link_typed=typed
+        )
+    log_event(logger, "link_made", job_id=owned_id)
+    address = f"{ctx.settings.base_url.rstrip('/')}/s/{token}"
+    return _page(request, owned_id, title, link_address=address)
+
+
+def _day(value: str, field: str) -> date | None:
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise links.LinkError(field, "Enter the day as year-month-day.") from None
+
+
+@router.post("/jobs/{job_id}/share/link/pause", dependencies=[Depends(require_csrf)])
+@submit_once("link.pause")
+def pause_link(request: Request, job_id: str, user: UserDep) -> Response:
+    return _link_change(request, job_id, user, "pause")
+
+
+@router.post("/jobs/{job_id}/share/link/resume", dependencies=[Depends(require_csrf)])
+@submit_once("link.resume")
+def resume_link(request: Request, job_id: str, user: UserDep) -> Response:
+    return _link_change(request, job_id, user, "resume")
+
+
+@router.post("/jobs/{job_id}/share/link/remove", dependencies=[Depends(require_csrf)])
+@submit_once("link.remove")
+def remove_link(request: Request, job_id: str, user: UserDep) -> Response:
+    return _link_change(request, job_id, user, "remove")
+
+
+@router.post("/jobs/{job_id}/share/link/update", dependencies=[Depends(require_csrf)])
+@submit_once("link.update")
+def update_copy(request: Request, job_id: str, user: UserDep) -> Response:
+    return _link_change(request, job_id, user, "update")
+
+
+def _link_change(request: Request, job_id: str, user, action: str) -> Response:
+    """Pause, resume or remove the link, or update the published copy: owner only. The answer is
+    a notice on the share page; a change that is already made says so and changes nothing."""
+    ctx = _link_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        require_done(job)
+        if job.is_sample:
+            raise PageError(404, *NOT_FOUND)
+        owned_id = job.id
+        row = links.current_link(session, owned_id)
+        words = "There is no class link to change."
+        if action == "remove":
+            if links.remove(session, job, ctx.settings):
+                words = "The class link is removed. It cannot be opened any more."
+        elif action in ("pause", "resume"):
+            if links.pause(session, job, paused=action == "pause"):
+                words = (
+                    "The class link is paused. Nobody can open it until you resume it."
+                    if action == "pause"
+                    else "The class link is resumed."
+                )
+            elif row is not None:
+                words = "No change: the link is already " + (
+                    "paused." if action == "pause" else "not paused."
+                )
+        elif row is not None and links.is_live(row, serving=False):
+            if output.export_state(job).key != output.READY:
+                words = NOT_READY_FOR_LINK
+            else:
+                try:
+                    version = _publish(ctx, session, job, user)
+                    words = f"The published copy is now version {version}."
+                except (storage.StorageRefused, storage.StorageFull):
+                    session.rollback()
+                    words = NO_ROOM_FOR_LINK
+    log_event(logger, "link_changed", job_id=owned_id, action=action)
+    flash(request, words, undo=False)
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
