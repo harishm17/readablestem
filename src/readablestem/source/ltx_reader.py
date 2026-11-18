@@ -71,9 +71,9 @@ from readablestem.core.types import (
     inline_marker,
 )
 from readablestem.source import figures
+from readablestem.source.intake import CHARS_PER_PAGE
 from readablestem.source.report import clean
 
-CHARS_PER_PAGE = 3000
 MAX_XHTML_BYTES = 60 * 1024 * 1024
 MAX_DEPTH = 80
 Display = Literal["block", "inline"]

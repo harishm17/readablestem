@@ -32,7 +32,7 @@
 <summary>What is stored, and the exact clocks</summary>
 <p>For each upload we store the file as you uploaded it: the PDF{% if latex_source %}, the LaTeX .tex file or the
   zip of the LaTeX project{% endif %}{% if word_source %}, the Word .docx file{% endif %}.{% if office_on %}
-  {% if word_source %}A PowerPoint file, and a Word file that is not read from the file itself, is{% else %}A Word or
+  {% if word_source %}A PowerPoint file, or a Word file that is not read from the file itself, is{% else %}A Word or
   PowerPoint file is{% endif %} turned into a PDF first, and we store that PDF:
   the Word or PowerPoint file itself is not kept.{% endif %}{% if latex_source %} For LaTeX source we also store the names of the files, packages and
   commands LaTeX reported a problem with.{% endif %} We also store its file name, images cut from it (equations and

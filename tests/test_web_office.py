@@ -187,7 +187,7 @@ def test_a_second_conversion_waits_briefly_then_is_told_to_try_again(web, monkey
         response = send(web.browser, office.docx(), "notes.docx")
     finally:
         uploads._OFFICE_SLOT.release()
-    assert response.status_code == 503 and response.headers["retry-after"] == "10"
+    assert response.status_code == 503 and response.headers["retry-after"] == "60"
     assert "Another Word or PowerPoint file is being converted" in response.text
     assert jobs(web) == []
 

@@ -90,8 +90,8 @@
           {% endif %}
           {% if word_source %}
           <li>A Word (.docx) file is read from the file itself and kept as uploaded; every
-            {{ chars_per_page }} characters or picture count as one page.{% if office_kinds %} PowerPoint, and a
-            Word file that cannot be read that way, become a PDF first; its page count applies.{% endif %}</li>
+            {{ chars_per_page }} characters or picture count as one page.{% if office_kinds %} A PowerPoint file, or a
+            Word file that cannot be read that way, becomes a PDF first, and the PDF's page count applies.{% endif %}</li>
           {% elif office_kinds %}
           <li>Word and PowerPoint become a PDF first; its page count applies.</li>
           {% endif %}

@@ -50,6 +50,7 @@ from xml.parsers import expat
 import defusedxml.ElementTree as SafeET
 from defusedxml.common import DefusedXmlException
 
+from readablestem.source.intake import CHARS_PER_PAGE
 from readablestem.web import office_convert as office
 from readablestem.web.office_convert import Census, OfficeRejected
 
@@ -223,7 +224,7 @@ class Facts:
         """The pages the file counts as before it is read: one per 3,000 characters of text, or
         one per picture, whichever is larger, and at least one (a source's rule,
         `source.intake`)."""
-        return max(1, -(-self.chars // 3000), self.pictures)
+        return max(1, -(-self.chars // CHARS_PER_PAGE), self.pictures)
 
     def counts(self) -> dict[str, int]:
         """Everything but the words and the languages, for logs and measurements."""
