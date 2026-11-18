@@ -43,10 +43,9 @@
   <button type="submit" class="button">Convert the document</button>
 {% endcall %}
 <p class="hint">Kept until {{ pending.retain_until|utc }}, then deleted.</p>
-<form method="post" action="/uploads/{{ pending.id }}/delete" class="inline-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <button type="submit" class="button-danger-outline">Discard this file</button>
-</form>
+{% call form("upload.discard", "/uploads/" ~ pending.id ~ "/delete", {"class": "inline-form"}) %}
+  <button type="submit" data-busy-label="Opening…" class="button-danger-outline">Discard this file</button>
+{% endcall %}
 {% else %}
 {% if scans_note %}<p id="parts-scans">{{ scans_note }}</p>{% endif %}
 <p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages ({{ size_text }}). Each part is its own document, up to {{ one_document }}. Nothing is converted or counted yet.
@@ -101,9 +100,8 @@
 <p>All pages have been sent. <a href="/app">Go to My documents</a></p>
 {% endif %}
 <p class="hint">Kept until {{ pending.retain_until|utc }}, then deleted.</p>
-<form method="post" action="/uploads/{{ pending.id }}/delete" class="inline-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <button type="submit" class="button-danger-outline">Discard this file</button>
-</form>
+{% call form("upload.discard", "/uploads/" ~ pending.id ~ "/delete", {"class": "inline-form"}) %}
+  <button type="submit" data-busy-label="Opening…" class="button-danger-outline">Discard this file</button>
+{% endcall %}
 {% endif %}
 {% endblock %}

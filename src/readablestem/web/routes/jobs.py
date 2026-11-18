@@ -2016,6 +2016,7 @@ def confirm_draft(
 
 
 @router.post("/jobs/{job_id}/language", dependencies=[Depends(require_csrf)])
+@submit_once("job.language")
 def set_language(
     request: Request, job_id: str, user: UserDep, lang: Annotated[str, Form()] = ""
 ) -> Response:
@@ -2068,6 +2069,7 @@ def set_language(
 
 
 @router.post("/jobs/{job_id}/cut-off", dependencies=[Depends(require_csrf)])
+@submit_once("job.cut_off")
 def continue_cut_off(request: Request, job_id: str, user: UserDep) -> Response:
     """The owner of a PDF that looks cut off (`file_cut_off`) continues with the pages before the
     empty ones: the notice stops holding the document back and stays, so the job page and the
@@ -2702,6 +2704,7 @@ def confirm_delete(
 
 
 @router.post("/jobs/{job_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("job.delete")
 async def delete_job(request: Request, job_id: str, user: UserDep) -> Response:
     """Delete only with `confirm=yes`; any other POST (the "Delete" buttons) gets the
     confirmation page first. Deleting user data cannot be undone, so it is confirmed

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Edit one symbol of a course (routes/courses.py). #}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Edit {{ entry.words }}: {{ course.name }}{% endblock %}
@@ -7,8 +8,7 @@
 <h1>Edit {{ entry.words }}</h1>
 {% include "_error_summary.html" %}
 <p>In <a href="/courses/{{ course.id }}">{{ course.name }}</a>.</p>
-<form method="post" action="/courses/{{ course.id }}/entries/{{ entry.id }}" novalidate>
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("course.save_entry", "/courses/" ~ course.id ~ "/entries/" ~ entry.id, {"novalidate": true}) %}
   {% set err = field_errors.get("symbol") %}
   <div class="field{% if err %} field-error{% endif %}">
     <label for="symbol">Symbol</label>
@@ -37,7 +37,7 @@
     <li><button type="submit" class="button">Save</button></li>
     <li><a href="/courses/{{ course.id }}">Cancel</a></li>
   </ul>
-</form>
+{% endcall %}
 
 <section aria-labelledby="remove-heading">
   <h2 id="remove-heading">Remove it</h2>

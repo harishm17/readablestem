@@ -1,9 +1,9 @@
 {# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
 {# The two optional questions after a download (web/feedback.py), on the job page
    (_after_download.html) and on their own page (feedback.html). Needs fb_job_id,
    fb_choices, fb_values (what was typed) and fb_errors (field id -> message). #}
-<form method="post" action="/jobs/{{ fb_job_id }}/feedback" novalidate class="feedback-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("job.feedback", "/jobs/" ~ fb_job_id ~ "/feedback", {"novalidate": true, "class": "feedback-form"}) %}
   {% set post_error = fb_errors.get("will-post-yes") %}
   <fieldset class="field choice-field{% if post_error %} field-error{% endif %}"{% if post_error %} aria-describedby="will-post-error"{% endif %}>
     <legend>Will you post this for students?</legend>
@@ -29,4 +29,4 @@
            aria-describedby="minutes-hint{% if minutes_error %} minutes-error{% endif %}"{% if minutes_error %} aria-invalid="true"{% endif %}>
   </div>
   <button type="submit" class="button-secondary">Send answers</button>
-</form>
+{% endcall %}

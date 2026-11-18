@@ -267,7 +267,7 @@ def confirm_delete(request: Request, course_id: str, user: UserDep) -> Response:
 
 
 @router.post("/courses/{course_id}/delete", dependencies=[Depends(require_csrf)])
-@submit_once("course.delete_ask")
+@submit_once("course.delete")
 def delete_course(request: Request, course_id: str, user: UserDep, confirm: Field = "") -> Response:
     """Delete only with `confirm=yes`; the "Delete course" button gets the question
     first. The documents converted for the course keep their results."""
@@ -431,6 +431,7 @@ def entry_page(request: Request, course_id: str, entry_id: str, user: UserDep) -
 
 
 @router.post("/courses/{course_id}/entries/{entry_id}", dependencies=[Depends(require_csrf)])
+@submit_once("course.save_entry")
 def save_entry(
     request: Request,
     course_id: str,

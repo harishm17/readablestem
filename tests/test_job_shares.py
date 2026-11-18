@@ -98,6 +98,7 @@ NEEDS: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/retry"): "owner",
     ("POST", "/jobs/{job_id}/cancel"): "owner",
     ("POST", "/jobs/{job_id}/language"): "owner",
+    ("POST", "/jobs/{job_id}/cut-off"): "owner",
     ("POST", "/jobs/{job_id}/title"): "owner",
     ("POST", "/jobs/{job_id}/contact"): "owner",
     ("POST", "/jobs/{job_id}/keep"): "owner",

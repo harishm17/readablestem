@@ -35,6 +35,7 @@ from readablestem.web.deps import (
     require_csrf,
     say_new_time,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import rerender_job_html
 from readablestem.web.routes.jobs import (
@@ -94,6 +95,7 @@ def _remake_html(session: Session, job: Job, settings: Settings, cause: str) -> 
 
 
 @router.post("/jobs/{job_id}/title", dependencies=[Depends(require_csrf)])
+@submit_once("job.title")
 def set_title(
     request: Request, job_id: str, user: UserDep, title: Annotated[str, Form()] = ""
 ) -> Response:
@@ -132,6 +134,7 @@ def set_title(
 
 
 @router.post("/jobs/{job_id}/contact", dependencies=[Depends(require_csrf)])
+@submit_once("job.contact")
 def set_contact(
     request: Request, job_id: str, user: UserDep, contact: Annotated[str, Form()] = ""
 ) -> Response:
@@ -165,6 +168,7 @@ def set_contact(
 
 
 @router.post("/jobs/{job_id}/keep", dependencies=[Depends(require_csrf)])
+@submit_once("job.keep")
 def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Keep for 7 days": seven days from now, only the owner sees it. Refused (429, nothing
     changed) when keeping this document would put the person over the number of documents

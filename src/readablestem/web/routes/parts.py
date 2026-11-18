@@ -475,6 +475,7 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
 
 
 @router.post("/uploads/{upload_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("upload.discard")
 async def discard(request: Request, upload_id: str, user: UserDep) -> Response:
     """Discard a waiting file. Only a POST with `confirm=yes` deletes it; any other POST
     (the "Discard" button) gets the confirmation page first (WCAG 3.3.4)."""

@@ -4,7 +4,8 @@
     form(key, action, attrs): a POST form of the registry's form `key` (`web.forms.FORMS`;
     an unknown key fails the render). It writes the CSRF token, a request token minted for
     this drawing of the form, and the busy label `static/app.js` shows while the request is
-    on its way. `attrs` are the form's other attributes. `token_in_action`: the handler reads
+    on its way. A row without a token (`FormRow.token` False: the sign-in and sign-out forms, where
+    nobody is signed in) writes the CSRF token and the busy label only. `attrs` are the form's other attributes. `token_in_action`: the handler reads
     the body itself (the upload), so the token also goes in the action's query string.
 
     submit_button(label, busy, ...): a submit button whose busy label is `busy`, a key of
@@ -12,9 +13,9 @@
     their form's busy label. SW10's button macro takes this one over. -#}
 {% macro form(key, action, attrs={}, token_in_action=false) -%}
 {%- set row = form_row(key) -%}
-{%- set token = mint_request_token() -%}
-<form method="post" action="{{ action }}{% if token_in_action %}{{ '&' if '?' in action else '?' }}{{ request_token_field }}={{ token }}{% endif %}"{{ attrs|xmlattr }} data-submit-once="{{ key }}" data-busy-label="{{ row.busy_label }}">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="{{ request_token_field }}" value="{{ token }}">
+{%- set token = mint_request_token() if row.token else "" -%}
+<form method="post" action="{{ action }}{% if token_in_action and token %}{{ '&' if '?' in action else '?' }}{{ request_token_field }}={{ token }}{% endif %}"{{ attrs|xmlattr }} data-submit-once="{{ key }}" data-busy-label="{{ row.busy_label }}">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">{% if token %}<input type="hidden" name="{{ request_token_field }}" value="{{ token }}">{% endif %}
 {{- caller() }}
 </form>
 {%- endmacro %}

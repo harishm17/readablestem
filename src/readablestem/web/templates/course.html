@@ -147,7 +147,7 @@
   <h3 id="delete-heading">Delete</h3>
   <p>Documents keep their results.</p>
   {# Posts without confirm=yes: the next page asks before anything is deleted. #}
-  {% call form("course.delete_ask", "/courses/" ~ course.id ~ "/delete", {"aria-labelledby": "delete-heading"}) %}
+  {% call form("course.delete", "/courses/" ~ course.id ~ "/delete", {"aria-labelledby": "delete-heading"}) %}
     <button type="submit" class="button-danger-outline">Delete course</button>
   {% endcall %}
 </section>

@@ -523,6 +523,20 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
         assert [(e.name, e.code) for e in uploads if e.name == "uploaded"] == [("uploaded", None)]
 
 
+def test_a_delete_sent_twice_with_its_request_token_gets_the_first_answer(web):
+    """The one submit rule (SW43): the question's button, clicked again, is answered as the
+    first click was (a second delete would be 'Page not found')."""
+    job_id = finished_job(web)
+    asked = web.browser.get(f"/jobs/{job_id}/delete").text
+    sent = re.search(r'name="request_token" value="([^"]+)"', asked)
+    assert sent, "the question's form carries a request token"
+    data = {"csrf_token": token(web.browser), "confirm": "yes", "request_token": sent.group(1)}
+    answers = [web.browser.post(f"/jobs/{job_id}/delete", data=data) for _ in range(2)]
+    assert [r.status_code for r in answers] == [303, 303]
+    assert answers[0].headers["location"] == answers[1].headers["location"] == "/app"
+    assert count(web, Job) == 0
+
+
 def test_a_job_past_its_retention_time_is_gone_before_the_purge_runs(web):
     """retain_until was only checked by the hourly purge: if the scheduler stopped, an
     expired document stayed viewable and downloadable."""

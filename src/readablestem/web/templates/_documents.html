@@ -1,3 +1,4 @@
+{% from "components/forms.html" import form with context %}
 {# My documents as a to-do list (web/documents.py, UX review BW5). While a document is
    waiting or converting, htmx polls GET /app/documents and swaps the whole list when
    something changed (204 otherwise); every link keeps its id, so htmx puts focus back
@@ -42,10 +43,9 @@
         <td role="cell" class="row-actions">
           {% set step = row.action %}
           {% if step and step.form %}
-          <form method="post" action="{{ step.href }}" class="inline-form">
-            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          {% call form("job.retry", step.href, {"class": "inline-form"}) %}
             <button type="submit" id="act-{{ row.id }}" class="button-secondary button-small">{{ step.label }}<span class="visually-hidden"> {{ row.control_name }}</span></button>
-          </form>
+          {% endcall %}
           {% elif step %}
           <a id="act-{{ row.id }}" class="row-primary" href="{{ step.href }}">{{ step.label }}<span class="visually-hidden"> {{ row.control_name }}</span></a>
           {% endif %}
