@@ -92,6 +92,22 @@
   provider with each equation; the upload form's course hint says the same; the job page's course line says which
   symbols were used (those the course had at conversion) and that later ones are not applied.
 - No migration, no pipeline or render version change, no prompt or request change, no limiter change.
+## Unreleased: an equation score on the printed form (branch feat/equation-score-canonical)
+
+- F-580 (plan A1): `exact_printed`, a second equation score (`eval/equations_printed.py`) that
+  compares the answer's LaTeX and the gold's after one spelling is chosen for every notation that
+  prints alike (style commands, spacing, braces that only group, `\dots` against `\ldots`,
+  `\dfrac` against `\frac`, the order of a prime and a subscript). It still calls wrong a
+  different character, a sign, relation or operator, an accent on one side only, a prime added or
+  missing, a structure difference, and bold against plain. Of the 669 accepted development
+  equations `exact_lenient` calls wrong, 639 print the same by this score.
+- A pair whose answer is what the file's own characters say while the gold is another region's is
+  a pairing miss: counted in its own number (`pairing_miss` on a pair, `pairing_misses` in the
+  document metrics) and never as right. 284 of the development pairs.
+- `exact_lenient` stays for one release and is printed beside the new score in the pipeline eval
+  report (equations, document, by status and route), `eval reproduce`, `eval gate` (information
+  lines; no threshold or gated figure changed) and `scripts/realworld_report.py`. A record made
+  before the fields reads as it was; none is re-made here.
 
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 

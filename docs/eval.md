@@ -204,6 +204,7 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `exact_strict` | share whose normalised MathML equals the gold exactly (see the `eval/equations.py` docstring for the normalisation) |
 | `exact_lenient` | same, after lenient normalisation (`mi`/`mn`/`mtext` alike, trailing sentence punctuation dropped) |
 | `exact_lenient_ci95` | Wilson 95% interval for `exact_lenient` |
+| `exact_printed` | share whose LaTeX and the gold's LaTeX print the same (below); printed beside `exact_lenient` for one release. Only where the gold has LaTeX (the real-world sets; the OpenStax sample is MathML only, so it has none), and absent from a report made before it existed |
 | `mean_teds` | mean of TEDS = 1 - TED / max(nodes), Zhang-Shasha tree edit distance on normalised trees; 0 with no proposal |
 | `proposal_rate` | share where the step proposed MathML at all |
 | `secondary_stream_v2` | the labeled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
@@ -211,6 +212,39 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `by_route` | same, per route: `cheap` (cheap model only), `main` (main model only), `escalated` (cheap first, then main), `fallback` (any call made as a fallback), `none` (no call) |
 | `by_display` | same, per gold `display` (block, inline) |
 | `selective` | for t = 0.50, 0.55, ..., 0.95: keep only proposals with confidence >= t. `coverage` = kept / n; `accuracy` = `exact_lenient` among kept (n/a when none kept); `kept`; `mean_teds` among kept. A useful confidence makes accuracy rise with t |
+
+#### The printed-form score (`exact_printed`)
+
+`exact_lenient` compares the MathML trees of the answer and the gold. Two LaTeX sources that print
+the same can have different trees (`\dots` against `\ldots`, braces round a single letter,
+`\mathrm{sin}` against `\sin`, `\to` against `\rightarrow`), and on the five development parts of
+the real-world set 669 accepted equations were called wrong for that reason or because the gold
+was paired with another region. `exact_printed` (`eval/equations_printed.py`) compares the two
+LaTeX sources after one spelling is chosen for every notation that prints alike: style commands
+(`\rm`, `\bf`, `\mathrm`), spacing and sizing commands, braces that only group, alignment
+environment names, dot commands, `\dfrac` and `\frac`, the order of a prime and a subscript, and
+a few symbols that have two names.
+
+What it still calls wrong: a different character, a different sign, relation or operator, an
+accent on one side only, a prime added or missing, a difference in structure (a fraction against
+a slash, a grouping that changes what is under a script), and a bold, script or double-struck
+letter against a plain one. Where the two sources set the same letters in the same styles but
+spell the style two ways, that is one style, and it scores right. An answer with no LaTeX, or a
+gold with none, scores wrong.
+
+A *pairing miss* is a pair that `exact_printed` calls wrong where the answer's letters and digits
+equal those of the file's own text for that region and the gold's do not. The gold was matched to
+another region, so the pair says nothing about the reading. It is counted in its own number
+(`pairing_misses` in the document metrics, `pairing_miss` on each pair) wherever the score is
+summed, and it is never counted as right. `matched_exact_printed_without_pairing_misses` takes
+them out of the denominator.
+
+`exact_lenient` stays beside the new score for one release, and every report that printed it
+prints both. No gate threshold, target or public figure reads the new score. On the development
+parts: 8,035 matched pairs, `exact_lenient` right on 6,556, `exact_printed` right on 7,182, 284
+pairing misses among the pairs it calls wrong; and 13 pairs right under the old score and wrong
+under the new one, each a real difference in style (a `\text` subscript against a `\textbf` one,
+an upright letter against an italic one, `\mathds{1}` against `1`).
 
 `review_load` (see "Review load" below): `required`, `optional`, per item and per
 section, the reasons for each tier, `flags` and `flags_excluding_scorer_gaps`
@@ -389,6 +423,8 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `detection_recall` | matched / gold equations |
 | `detection_recall_by_display` | recall for gold block and inline equations separately |
 | `matched_exact_lenient` | `exact_lenient` over matched pairs (no proposal = wrong) |
+| `matched_exact_printed`, `end_to_end_exact_printed` | the same two figures under `exact_printed` (above), for one release; a pairing miss is wrong in both. Absent from a report made before it existed |
+| `pairing_misses`, `matched_exact_printed_without_pairing_misses` | the matched pairs whose answer is what the file says and whose gold is another region's, counted apart; and `matched_exact_printed` without them |
 | `matched_mean_teds` | mean TEDS over matched pairs |
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
 | `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (math OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
@@ -590,6 +626,9 @@ Compares a current report with a baseline report of the same task.
 | `document_matched_exact_lenient` | document | drops by more than 0.03 |
 | `document_axe_violations` | document | rises at all (`max_increase`, limit 0) |
 | `document_cost` (`cost.per_item_usd`) | document | rises by more than 25% |
+
+The gate also prints `exact_printed`, `matched_exact_printed` and `pairing_misses` of the two
+reports as lines under the table. Nothing is gated on them.
 
 Exit 0: all within tolerance. Exit 1: a tracked metric regressed, or is missing from the
 current report. Exit 2: not comparable, so no verdict: different task, different gold
