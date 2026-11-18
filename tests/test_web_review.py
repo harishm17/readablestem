@@ -43,7 +43,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.web.db import ReviewEdit, session_scope
+from readablestem.web.db import Job, ReviewEdit, session_scope
 from readablestem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
 
 
@@ -729,3 +729,78 @@ def test_every_review_write_records_a_content_free_outcome(tmp_path):
             held = getattr(event, column.name)
             if isinstance(held, str):
                 assert not any(w.lower() in held.lower() for w in words), (column.name, held)
+
+
+# --------------------------------------------------------------------------- a card with no proposal (WS8.5, WS4.5)
+
+
+def _give_text(env, element_id: str, text: str) -> None:
+    """The PDF's own glyphs for an element (the fake document has none for its equations)."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    with session_scope(env.ctx.factory) as session:
+        job = session.get(Job, env.job_id)
+        assert job is not None
+        data = DocumentResult.model_validate(job.result_json)
+        for element in data.elements:
+            if element.id == element_id:
+                element.text = text
+        job.result_json = data.model_dump(mode="json")
+        flag_modified(job, "result_json")
+
+
+def _undo(env):
+    version = str(env.job(env.job_id).result_version or 0)
+    page = f"/jobs/{env.job_id}/review"
+    data = {"csrf_token": token(env.browser, page), "version": version, "view": "list"}
+    return env.browser.post(f"/jobs/{env.job_id}/undo", data=data)
+
+
+def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(web):
+    """An abstained equation's card offers Read again, a picture with the reviewer's
+    description and Not an equation. Each stores its own decision, the rendered output says
+    the same, and Undo puts the stored result back as it was."""
+    from readablestem.models.fake import FakeVisionClient
+
+    _give_text(web, "p1-e5", "x = 1")
+    web.ctx.client_factory = lambda settings, budget: FakeVisionClient(
+        budget=budget,
+        defaults={"equation": {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}},
+    )
+    def held() -> dict:
+        """What the review decides: the elements and their fixes, as stored."""
+        stored = result(web).model_dump(mode="json")
+        return {k: stored[k] for k in ("elements", "fixes", "notices")}
+
+    settled(web)
+    before = held()
+    mine = card(review_page(web), "p1-e5")
+    assert 'value="reread"' in mine and 'value="not_equation"' in mine
+    assert "Keep as a picture with my description" in mine
+
+    # Read again: a proposal where there was none, on the same item, still waiting.
+    assert post(web, "p1-e5", action="reread").status_code == 303
+    read = result(web).fix_for("p1-e5")
+    assert read is not None and read.pending and read.equation is not None
+    assert read.equation.latex == "x^2 + 1"
+    assert held()["elements"] == before["elements"]
+    assert _undo(web).status_code == 303
+    assert held() == before
+
+    # A picture with the reviewer's description.
+    assert post(web, "p1-e5", action="describe", description="A fraction one over two").status_code == 303
+    kept = result(web).fix_for("p1-e5")
+    assert kept is not None and kept.status is Status.REJECTED and kept.described
+    assert "p1-e5:rejected" in fetch(web.browser, f"/jobs/{web.job_id}/download").text
+    assert _undo(web).status_code == 303
+    assert held() == before
+
+    # Not an equation: the glyphs go back to the text as a paragraph, with no fix left.
+    assert post(web, "p1-e5", action="not_equation").status_code == 303
+    after = result(web)
+    assert after.fix_for("p1-e5") is None
+    assert "p1-e5:" not in fetch(web.browser, f"/jobs/{web.job_id}/download").text
+    element = next(e for e in after.elements if e.id == "p1-e5")
+    assert element.kind is Kind.PARAGRAPH and element.text == "x = 1"
+    assert _undo(web).status_code == 303
+    assert held() == before
