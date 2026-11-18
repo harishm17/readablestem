@@ -2983,7 +2983,19 @@ an image is a decision the screen shows and the job can be done. The card has:
   proposal's grid (`core.types.grid_problems`, `web.review.GRID_PROBLEM_SENTENCES`) that no check already
   reported. Each finding has the one correction that answers it: **Use the first row as headers**, **Use
   the grid read from the PDF**, or **Change the table** (opens the folded place below). The codes stay in
-  "More about this item";
+  "More about this item". A failed check of the words (`table.cell_text`: `text_mismatch`,
+  `cell_mismatch`, `row_mismatch`) or of a math cell (`table.math_symbols`, `table.math_signs`,
+  `table.math_style` when it changes the meaning) also lists **Cells that differ**, in a list under its
+  sentence: each cell by its row and column, with the nearest header in brackets where the table has
+  one ("Row 3 (Ball), column 2 (Distance (m))"), the cell in the rebuilt table and the PDF's text where it
+  stands. The same cells are marked in the table above (`class="cell-differs"`: a dashed frame and a ≠
+  sign, so color carries nothing). The list is worked out when the card is drawn, from the proposal and
+  the grid read from the PDF, by the table step's own comparison (`table_step.text_differences`,
+  `maths_differences`), so a difference in spacing or in a spelling that the check folds is not listed;
+  nothing is stored (a `Check` stays free of cell text). It stops at 8 cells, then says how many more
+  differ. When the two grids cannot be compared cell by cell (another number of rows or columns,
+  merged cells that differ, no PDF text) no list is shown: the check's sentence says why. It is
+  information: it adds no choice, and Accept stores what it stored;
 - **Change the table** (folded; one place for headers, a cell and the grid read from the PDF): "Cell to change", a list of every cell ("Row 4,
   columns 2 to 3: v = d / t") with **Change this cell**, a GET that comes back with that
   cell's form open and its field focused (`?item=<id>&cell=r3c1`); and **Headers**, two

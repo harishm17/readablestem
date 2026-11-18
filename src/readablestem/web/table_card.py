@@ -220,7 +220,7 @@ def _clip(text: str, chars: int) -> str:
 
 
 def _place(grid: TableGrid, cell: TableCell) -> str:
-    """"Row 2 (Cart), column 3 (Time (s))": the cell's row and column numbers, each with the
+    """ "Row 2 (Cart), column 3 (Time (s))": the cell's row and column numbers, each with the
     nearest header of the proposal that names it, where the table has one."""
 
     def header(cells: list[TableCell], key) -> str:
@@ -239,7 +239,11 @@ def _place(grid: TableGrid, cell: TableCell) -> str:
     ]
     row, col = cell_label(cell).split(", ")
     row_head, col_head = header(left, lambda h: h.col), header(above, lambda h: h.row)
-    return f"{row}{f' ({row_head})' if row_head else ''}, {col}{f' ({col_head})' if col_head else ''}"
+    if row_head:
+        row = f"{row} ({row_head})"
+    if col_head:
+        col = f"{col} ({col_head})"
+    return f"{row}, {col}"
 
 
 def _difference(grid: TableGrid, found: CellDifference) -> Difference:
@@ -251,7 +255,9 @@ def _difference(grid: TableGrid, found: CellDifference) -> Difference:
     )
 
 
-def _differences(fix: Fix, grid: TableGrid, element: Element | None) -> dict[str, list[CellDifference]]:
+def _differences(
+    fix: Fix, grid: TableGrid, element: Element | None
+) -> dict[str, list[CellDifference]]:
     """The cells that differ, by the kind of failed check that names them ("words",
     "symbols", "signs", "style"). Worked out from the proposal and the grid read from the
     PDF, with the table step's own comparison, so nothing is stored and a difference the

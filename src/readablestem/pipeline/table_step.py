@@ -727,7 +727,7 @@ def text_differences(grid: TableGrid, element: Element) -> list[CellDifference]:
         if Counter(words(cell.text)) != Counter(
             w for c in under for w in words(c.text)
         ) and _joined([cell]) != _joined(under):
-            pdf =" ".join(t for t in (c.text.strip() for c in under) if t)
+            pdf = " ".join(t for t in (c.text.strip() for c in under) if t)
             out.append(CellDifference(cell, pdf))
     return out
 
