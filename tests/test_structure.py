@@ -213,15 +213,23 @@ def lead_term_page(entries: list[tuple[str, str]]) -> bytes:
 
 def test_three_lines_that_open_with_a_bold_lead_term_are_entries_not_one_paragraph():
     entries = [
-        ("Momentum.", "the product of mass and velocity."),
         ("Impulse.", "the change in momentum of a body."),
         ("Inertia.", "the resistance of a body to a change in motion."),
+        ("Momentum.", "the product of mass and velocity."),
     ]
     elements = analyze(lead_term_page(entries)).elements
     found = [e.text[: e.term_end].strip(" .:") for e in elements if e.term_end]
-    assert found == ["Momentum", "Impulse", "Inertia"]
+    assert found == ["Impulse", "Inertia", "Momentum"]
     # Two such lines are a sentence with a bold start, not a list of entries.
     assert not [e for e in analyze(lead_term_page(entries[:2])).elements if e.term_end]
+    # A theorem, its proof and a case open with a lead too: three blocks, no list of terms.
+    steps = [
+        ("Theorem 2.", "every bounded sequence has a convergent subsequence."),
+        ("Proof.", "split the interval in two and keep a half with many terms."),
+        ("Case 1:", "the left half holds infinitely many terms of the sequence."),
+    ]
+    blocks = [e for e in analyze(lead_term_page(steps)).elements if e.kind == Kind.PARAGRAPH]
+    assert len(blocks) == 3 and not [e for e in blocks if e.term_end]
 
 
 def test_capital_letters_alone_on_their_lines_head_the_sections_of_an_index():

@@ -4756,16 +4756,23 @@ def _lead_entry(group: list[_Row], lead: int, box: BBox) -> _Block | None:
 
 
 def _lead_entries(pages: list[_PageBlocks]) -> None:
-    """Three or more paragraphs in a row that each start with a lead term (`_lead_end`) are the
-    entries of a glossary or a list of terms: each is written as a term and its definition (in
-    place; `Element.term_end`), which the assembler makes one definition list. The letter
-    headings of an index between them do not end the row; anything else does. Fewer than three
-    are paragraphs that begin with an emphasised phrase, and stay paragraphs."""
+    """Three or more paragraphs in a row that each start with a lead term (`_lead_end`), the
+    terms in alphabetical order (`_listed_terms`), are the entries of a glossary: each is
+    written as a term and its definition (in place; `Element.term_end`), which the assembler
+    makes one definition list. The letter headings of an index between them do not end the
+    row; anything else does. Fewer than three, or leads in any other order (a theorem and its
+    proof, the cases of a proof, the speakers of a dialogue), are paragraphs that begin with
+    an emphasised phrase, and stay paragraphs."""
     row: list[tuple[_Block, int]] = []
 
     def settle() -> None:
         entries = [(b, _lead_entry(b.rows, lead, b.bbox)) for b, lead in row]
-        if len(row) >= LEAD_ENTRIES and all(e is not None for _, e in entries):
+        terms = ["".join(c.c for c in b.rows[0].chars[:lead]) for b, lead in row]
+        if (
+            len(row) >= LEAD_ENTRIES
+            and all(e is not None for _, e in entries)
+            and _listed_terms(terms)
+        ):
             for block, entry in entries:
                 assert entry is not None
                 block.pieces, block.term_pieces = entry.pieces, entry.term_pieces
@@ -4788,6 +4795,19 @@ def _lead_entries(pages: list[_PageBlocks]) -> None:
         else:
             row.append((block, found[0]))
     settle()
+
+
+def _listed_terms(terms: Sequence[str]) -> bool:
+    """Are these the terms of a glossary: names in alphabetical order? A label with a number
+    ("Case 2:", "Theorem 3.1.") is no name, and labels that differ only in their last word
+    ("Part A:", "Part B:") are parts in order, not terms. One term in ten may be out of place
+    (a glossary sorted by another rule, a misread letter)."""
+    keys = ["".join(c for c in term.casefold() if c.isalnum()) for term in terms]
+    stems = {tuple(term.strip(" .:").split()[:-1]) for term in terms}
+    if len(stems) == 1 and stems != {()}:
+        return False
+    odd = sum(a >= b for a, b in pairwise(keys)) + sum(any(c.isdigit() for c in k) for k in keys)
+    return odd <= 0.1 * len(keys)
 
 
 def _entry(term: list[str | _Inline], definition: list[str | _Inline], box: BBox, rows, size):
@@ -8452,12 +8472,31 @@ def _hangs(group: Sequence[_Row]) -> list[tuple[int, int, float]]:
 
 def _flows(entry: Sequence[_Row], edges: _RightEdges) -> bool:
     """Do the lines of an entry set with a hanging indent run on from one to the next: every
-    line but the last reaches the right edge, the first line when it is followed by only
-    one line, and otherwise not the first, which may be a short term. The lines of a
-    contents list, nested by indent, each stop where their own title does."""
-    body = entry[1:]
-    counted = body[:-1] if len(body) > 1 else entry[:1]
-    return all(r.x1 >= edges.of(r) - 1.5 * r.size for r in counted)
+    line but the last reaches the right edge or stops where the next line's first word no
+    longer fits (text set ragged), the first line when it is followed by only one line, and
+    otherwise not the first, which may be a short term. The lines of a contents list, nested
+    by indent, each stop where their own title does."""
+    first = 1 if len(entry) > 2 else 0
+    return all(
+        row.x1 >= edges.of(row) - 1.5 * row.size
+        or row.x1 + 0.25 * row.size + _first_word(following) > edges.of(row)
+        for row, following in pairwise(entry[first:])
+    )
+
+
+def _one_line(row: _Row, left: float, edges: _RightEdges) -> bool:
+    """Is the line an entry of one line between entries set with a hanging indent: at their
+    left edge, and stopping short of the right edge (a line of running text reaches it)?"""
+    return row.x0 - left <= 0.5 * row.size and row.x1 < edges.of(row) - 1.5 * row.size
+
+
+def _first_word(row: _Row) -> float:
+    """How wide the first word of the line is."""
+    start = next((i for i, c in enumerate(row.chars) if not c.blank), None)
+    if start is None:
+        return 0.0
+    end = next((i for i in range(start, len(row.chars)) if row.chars[i].blank), len(row.chars))
+    return row.chars[end - 1].x1 - row.chars[start].x0
 
 
 def _hanging_entries(rows: Sequence[_Row], edges: _RightEdges) -> dict[int, int]:
@@ -8477,16 +8516,19 @@ def _hanging_entries(rows: Sequence[_Row], edges: _RightEdges) -> dict[int, int]
     def settle(group: Sequence[_Row]) -> None:
         nonlocal entry
         chains: list[list[tuple[int, int, float]]] = [[]]
+        left = min(r.x0 for r in group)
         for item in _hangs(group):
             chain = chains[-1]
+            between = range(chain[-1][1], item[0]) if chain else range(0)
             if chain and (
-                item[0] != chain[-1][1] or abs(item[2] - chain[0][2]) > 0.5 * group[item[0]].size
+                abs(item[2] - chain[0][2]) > 0.5 * group[item[0]].size
+                or not all(_one_line(group[i], left, edges) for i in between)
             ):
                 chains.append(chain := [])
+            chain += [(i, i + 1, item[2]) for i in between]  # entries of one line
             chain.append(item)
-        left = min(r.x0 for r in group)
         for chain in chains:
-            if len(chain) < HANGING_ENTRIES or not all(
+            if sum(end - first > 1 for first, end, _ in chain) < HANGING_ENTRIES or not all(
                 _flows(group[first:end], edges) for first, end, _ in chain
             ):
                 continue
@@ -12252,7 +12294,10 @@ def _whole_pieces(block: _Block) -> list[str | _Inline]:
             for p in part.pieces
         ]
         _append_row(pieces, later)
-    return _tidy(pieces)
+    if block.term_pieces is None:
+        return _tidy(pieces)
+    kept = block.term_pieces + 1  # a glossary entry: its term and the space after it stay
+    return [*pieces[:kept], *_tidy(pieces[kept:])]
 
 
 def _to_elements(
