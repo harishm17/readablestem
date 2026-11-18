@@ -64,6 +64,7 @@ from __future__ import annotations
 from readablestem.pipeline.layout.access import (
     _CACHE,
     _LOCK,
+    CROP_PAD,
     crop,
     crop_line,
     line_across,
@@ -165,6 +166,7 @@ from readablestem.pipeline.layout.tables import (
 )
 
 __all__ = [
+    "CROP_PAD",
     "MIN_IMAGE_PT",
     "REASON_BOLD_BODY",
     "REASON_DRAWING_FRAGMENTS",
