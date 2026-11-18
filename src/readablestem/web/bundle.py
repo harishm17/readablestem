@@ -85,6 +85,27 @@ def build(
     return bundle
 
 
+def build_everything(files: list[tuple[str, bytes]], notes: list[str]) -> bytes:
+    """The zip of "Download everything" (`routes.bundle`): `files` are (path, bytes) in order,
+    and `contents.txt` says in words what is in it and what was left out."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path, raw in files:
+            _add(archive, path, raw)
+        lines = [
+            "Everything ReadableSTEM holds for your account that you can use again:",
+            "",
+            "documents/: the ready documents (html, word and epub folders).",
+            "records: the review record of each ready document, as a CSV file.",
+            "courses.json: your courses and their notation, if you use courses.",
+            "account.json: your account and its settings.",
+            "",
+            *notes,
+        ]
+        _add(archive, "contents.txt", ("\n".join(lines) + "\n").encode("utf-8"))
+    return buffer.getvalue()
+
+
 def _add(archive: zipfile.ZipFile, name: str, raw: bytes) -> None:
     info = zipfile.ZipInfo(name, date_time=_STAMP)
     info.compress_type = zipfile.ZIP_DEFLATED

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import re
 import secrets
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
@@ -173,6 +174,15 @@ def _utc(value: datetime | None) -> Markup:
     )
 
 
+_BREAK_AFTER = re.compile(r"([@._-])")
+
+
+def _breakable(text: str | None) -> Markup:
+    """A long value (an address, a file name) with places it may wrap, after the characters
+    @ . _ and -, so it never breaks in the middle of a word."""
+    return Markup(_BREAK_AFTER.sub(r"\1<wbr>", str(Markup.escape(text or ""))))
+
+
 def _usd(value: float | None) -> str:
     return f"${(value or 0):.4f}" if (value or 0) < 0.01 else f"${(value or 0):.2f}"
 
@@ -187,6 +197,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     )
     env.filters["utc"] = _utc
     env.filters["utc_text"] = _utc_text
+    env.filters["breakable"] = _breakable
     env.filters["usd"] = _usd
     env.filters["speakable"] = _speakable
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)

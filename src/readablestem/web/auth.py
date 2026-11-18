@@ -253,7 +253,7 @@ def _sign_in_by_email(
                 refused="blocked" if open_signup is not None else "not_allowlisted", email=email
             )
         user.last_login_at = utcnow()
-        if name and not created:
+        if name and not created and not user.name:  # a name the person chose stays
             user.name = name[:200]
         return SignIn(user_id=user.id, session_version=user.session_version, created=created)
 

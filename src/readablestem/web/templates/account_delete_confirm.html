@@ -7,15 +7,13 @@
 {% block content %}
 <h1>Delete your account?</h1>
 <p>This deletes the account for <strong>{{ user.email }}</strong> and signs you out. It cannot be undone.</p>
-{% if documents %}
 <section aria-labelledby="export-heading" class="confirm-export">
   <h2 id="export-heading">Download what you want to keep first</h2>
   <ul class="actions">
-    {% if ready_documents %}<li><a href="/app/download">Download the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></li>{% endif %}
-    <li><a href="/app">Open My documents</a> for single files, Word and EPUB</li>
+    <li><a href="/account/export">Download everything (zip)</a>: {% if ready_documents %}the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} in each file type, {% endif %}their review records, your courses and your account settings</li>
+    {% if documents %}<li><a href="/app">Open My documents</a> for single files</li>{% endif %}
   </ul>
 </section>
-{% endif %}
 <h2>What is deleted</h2>
 <p>Your email and name, {% if documents %}{{ documents }} {{ "document" if documents == 1 else "documents" }}{% else %}any documents{% endif %} with their decisions, your courses and notation.</p>
 {% include "_account_deletion_notes.html" %}

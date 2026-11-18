@@ -97,12 +97,18 @@ def record_page(request: Request, job_id: str, user: UserDep) -> Response:
     return render(request, "record.html", context)
 
 
+def record_csv_file(request: Request, job_id: str, user: CurrentUser) -> tuple[bytes, str]:
+    """The record as the bytes of its CSV file and the file's name."""
+    made, name = _record(request, job_id, user)
+    # The mark lets Excel read the letters right.
+    return ("\ufeff" + record.to_csv(made)).encode("utf-8"), name + ".csv"
+
+
 @router.get("/jobs/{job_id}/record.csv")
 def record_csv(request: Request, job_id: str, user: UserDep) -> Response:
-    made, name = _record(request, job_id, user)
-    body = "\ufeff" + record.to_csv(made)  # the mark lets Excel read the letters right
+    body, name = record_csv_file(request, job_id, user)
     return Response(
-        body.encode("utf-8"),
+        body,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": content_disposition(name + ".csv")},
+        headers={"Content-Disposition": content_disposition(name)},
     )

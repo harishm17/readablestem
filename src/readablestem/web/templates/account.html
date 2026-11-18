@@ -8,11 +8,24 @@
 <section aria-labelledby="account-details">
   <h2 id="account-details">What we hold</h2>
   <dl class="summary-list">
-    <div><dt>Email address</dt><dd>{{ user.email }}</dd></div>
-    {% if user.name %}<div><dt>Name</dt><dd>{{ user.name }}</dd></div>{% endif %}
+    <div class="summary-long"><dt>Email address</dt><dd>{{ user.email|breakable }}</dd></div>
+    {% if user.name %}<div class="summary-long"><dt>Name</dt><dd>{{ user.name|breakable }}</dd></div>{% endif %}
     {% if joined %}<div><dt>Account made</dt><dd>{{ joined|utc }}</dd></div>{% endif %}
     <div><dt>Documents kept now</dt><dd>{{ documents }}</dd></div>
   </dl>
+</section>
+
+<section aria-labelledby="account-name-heading" id="account-name">
+  <h2 id="account-name-heading">Your name</h2>
+  <form method="post" action="/account/name" class="stack-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="account-name-input">Name</label>
+      <p class="hint" id="account-name-hint">People you share a document with see this beside your address. Leave it empty to show only the address.</p>
+      <input type="text" id="account-name-input" name="name" value="{{ name }}" maxlength="200" autocomplete="name" aria-describedby="account-name-hint">
+    </div>
+    <button type="submit" class="button">Save name</button>
+  </form>
 </section>
 
 <section aria-labelledby="account-keep-heading" id="account-keep" class="account-keep">
@@ -42,8 +55,14 @@
   <p class="hint">{% if tier_open %}New-account limits{% else %}Invited-account limits{% endif %}, reset {{ next_reset|utc }}. <a href="/limits">Known limits</a>.</p>
 </section>
 
+<section aria-labelledby="account-export">
+  <h2 id="account-export">Download everything</h2>
+  <p>One zip with your ready documents in each file type, the review record of each, your courses and your account settings.</p>
+  <p><a class="button-secondary" href="/account/export">Download everything (zip)</a></p>
+</section>
+
 <section aria-labelledby="account-delete">
-  <h2 id="account-delete">Delete my account</h2>
+  <h2 id="account-delete">Delete account</h2>
   <p>Deletes your email, name, documents, decisions and courses. It cannot be undone.</p>
   {% include "_account_deletion_notes.html" %}
   <p><a class="button-danger-outline" href="/account/delete">Delete my account</a></p>

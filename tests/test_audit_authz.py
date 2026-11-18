@@ -82,6 +82,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/account/delete"): USER,
     ("POST", "/account/delete"): USER,  # CSRF; erases the caller's own account only
     ("POST", "/account/keep-default"): USER,  # CSRF; the caller's own setting only
+    ("POST", "/account/name"): USER,  # CSRF; the caller's own name only
+    ("GET", "/account/export"): USER,  # the caller's own documents, records, courses, settings
     ("GET", "/app"): USER,
     ("GET", "/app/documents"): USER,
     ("GET", "/app/download"): USER,  # T3-4: a zip of the person's own ready documents

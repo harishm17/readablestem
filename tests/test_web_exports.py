@@ -334,3 +334,24 @@ def test_the_record_says_nothing_about_downloads_when_events_are_off(web):  # no
 def test_the_record_does_not_vouch_for_the_other_files(web):  # noqa: F811
     words = record_words(web, finished_job(web))
     assert "Nobody has checked how they open in Word or a reading app" in words
+
+
+@needs_pandoc
+def test_download_everything_holds_each_file_type_the_records_and_the_settings(web):  # noqa: F811
+    import json
+
+    ready_job(web)
+    response = web.browser.get("/account/export")
+    assert response.status_code == 200 and response.headers["content-type"] == "application/zip"
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    names = archive.namelist()
+    for folder, ending in (("html", ".html"), ("word", ".docx"), ("epub", ".epub")):
+        assert any(n.startswith(f"documents/{folder}/") and n.endswith(ending) for n in names)
+    assert any(n.startswith("records/") and n.endswith(".csv") for n in names)
+    assert json.loads(archive.read("account.json"))["email"]
+    # Someone else's account holds none of it.
+    bob = web.client()
+    login(bob, BOB)
+    other = zipfile.ZipFile(io.BytesIO(bob.get("/account/export").content)).namelist()
+    assert not any(n.startswith(("documents/", "records/")) for n in other)
+    bob.close()
