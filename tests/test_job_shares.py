@@ -28,9 +28,10 @@ from fixtures.web.support import (
 )
 from readablestem.core.types import Status
 from readablestem.ops import retention as purge
+from readablestem.pipeline import export_docx
 from readablestem.web import shares
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobShare, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.db import Job, JobShare, JobStatus, ReviewEdit, User, session_scope, utcnow
 from readablestem.web.views import audience_of
 from test_audit_authz import ROUTES
 
@@ -46,12 +47,12 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}"): "view",
     ("GET", "/jobs/{job_id}/status"): "view",
     ("GET", "/jobs/{job_id}/progress"): "view",
-    ("GET", "/jobs/{job_id}/view"): "view",
-    ("GET", "/jobs/{job_id}/listen"): "view",
     ("GET", "/jobs/{job_id}/record"): "view",
     ("GET", "/jobs/{job_id}/record.csv"): "view",
     # The site's document has decisions open, so it is a draft: a person who can only view is
-    # never given one (`web.output`); a ready document's downloads need only "view".
+    # never given one, nor shown or read it (`web.output`); a ready document's need only "view".
+    ("GET", "/jobs/{job_id}/view"): "review",
+    ("GET", "/jobs/{job_id}/listen"): "review",
     ("GET", "/jobs/{job_id}/draft"): "review",
     ("POST", "/jobs/{job_id}/draft"): "review",
     ("GET", "/jobs/{job_id}/download"): "review",
@@ -314,6 +315,84 @@ def test_words_written_to_the_owner_do_not_reach_a_person_the_document_was_share
     assert audience_of("view") == audience_of("anything else") == audience_of(None) == "reader"
 
 
+# What the owner's page has that nobody else is given: where to post it, the checks before
+# sharing, the record for the office, the student file's settings, deleting. Ids the templates
+# own, so the test does not pin any sentence.
+OWNER_BLOCKS = (
+    "route-web",
+    "route-canvas",
+    "before-heading",
+    "record-link-heading",
+    "for-students",
+    "settings",
+    "delete-heading",
+)
+
+
+def test_a_reader_gets_the_reader_page_and_a_reviewer_the_owner_s_page_without_its_blocks(
+    ready_site,
+):
+    job = ready_site.job_id
+    pages = {a: send(ready_site, a, "GET", f"/jobs/{job}").text for a in (OWNER, REVIEWER, VIEWER)}
+    for block in OWNER_BLOCKS:
+        assert f'id="{block}"' in pages[OWNER] or f'id="{block}-' in pages[OWNER], block
+        assert f'id="{block}"' not in pages[REVIEWER], block
+        assert f'id="{block}"' not in pages[VIEWER], block
+    # A reviewer keeps the review page; a reader has a page of their own, with the way in.
+    assert 'id="results-heading"' in pages[REVIEWER] and 'id="shared-note"' in pages[REVIEWER]
+    assert 'id="results-heading"' not in pages[VIEWER] and 'id="shared-note"' in pages[VIEWER]
+    for path in ("view", "listen", "download", "download.epub"):
+        assert f"/jobs/{job}/{path}" in pages[VIEWER], path
+    # The owner's two questions and the record are not for them; the routes say so too.
+    for actor in (REVIEWER, VIEWER):
+        assert send(ready_site, actor, "GET", f"/jobs/{job}/feedback").status_code == 403, actor
+        assert 'id="feedback"' not in pages[actor], actor
+
+
+def test_a_reviewer_sees_the_owners_one_total_and_a_reader_is_given_none(site):
+    """While a decision is open, a reviewer's page counts what the owner's counts (one
+    function); a reader is told only that the owner is still checking, with no number."""
+    job = site.job_id
+    with session_scope(site.ctx.factory) as session:
+        open_now = session.get(Job, job).open_decisions
+    assert open_now
+    asked = {a: send(site, a, "GET", f"/jobs/{job}").text for a in (OWNER, REVIEWER, VIEWER)}
+    totals = {a: re.findall(r"Review (\d+) decisions?", asked[a]) for a in (OWNER, REVIEWER)}
+    assert totals[OWNER] == totals[REVIEWER] != []
+    assert 'data-state="being_checked"' in asked[VIEWER]
+    assert not re.search(rf"\b{open_now}\b[^<]{{0,12}}decision", asked[VIEWER])
+    assert 'id="ready"' not in asked[VIEWER] and f"/jobs/{job}/view" not in asked[VIEWER]
+
+
+@pytest.mark.parametrize(("which", "answer"), [("site", 403), ("ready_site", 200)])
+def test_a_reader_gets_no_draft_from_any_route_while_a_decision_is_open(request, which, answer):
+    """Every route that gives a reader the document, or a page made of it: refused while the
+    owner has a decision open (nothing of a draft is shown, read out or sent), given once it
+    is ready. The owner's answer to the same route is the control."""
+    env = request.getfixturevalue(which)
+    job = env.job_id
+    routes = [
+        f"/jobs/{job}/view",
+        f"/jobs/{job}/listen",
+        f"/jobs/{job}/download",
+        f"/jobs/{job}/download/canvas",
+        f"/jobs/{job}/download/cartridge",
+        f"/jobs/{job}/download.epub",
+    ]
+    if export_docx.available():
+        routes.append(f"/jobs/{job}/download.docx")
+    for path in routes:
+        reader = send(env, VIEWER, "GET", path)
+        assert reader.status_code == answer, path
+        assert send(env, OWNER, "GET", path).status_code in {200, 303}, path
+        if answer == 403:
+            assert "attachment" not in reader.headers.get("content-disposition", ""), path
+            assert "SECRET-DOC-TEXT" not in reader.text, path
+    # The draft page is no way round it.
+    drafted = send(env, VIEWER, "GET", f"/jobs/{job}/draft")
+    assert drafted.status_code == (403 if answer == 403 else 303)
+
+
 def test_the_post_routes_refuse_everyone_without_the_right_and_change_nothing(site):
     before = snapshot(site)
     for (method, template), need in NEEDS.items():
@@ -565,7 +644,8 @@ def test_only_the_owner_sees_email_addresses_in_the_record(site):
     listing = site.who[VIEWER].get("/app").text
     assert "shared with you, you can" in listing and "The owner" not in listing
     banner = site.who[VIEWER].get(f"/jobs/{site.job_id}").text
-    assert "The owner" not in banner and "This document was shared with you." in banner
+    assert "</strong> shared this document with you" not in banner  # no name, no placeholder
+    assert "This document was shared with you." in banner
 
 
 def test_a_reviewer_s_decision_does_not_restart_the_deletion_clock(site):
@@ -624,3 +704,23 @@ def test_a_share_needs_a_proved_address(site):
         assert shares.role_of(session, job, unproved) is None
         assert shares.shared_with(session, unproved, utcnow()) == []
         assert len(shares.shared_with(session, proved, utcnow())) == 1
+
+
+def test_the_settled_cost_is_the_owner_s_alone_and_is_the_total_after_a_rerun(ready_site):
+    """WS10.9: once the job is done, the owner's page says what the document has cost in all
+    (after a re-run, both runs), from the stored total; a person it was shared with is told
+    nothing of it, and nobody is told a figure while it is converting."""
+    job_id = ready_site.job_id
+    with session_scope(ready_site.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        job.cost_usd, job.cap_base_usd = 1.5, 1.0  # a re-run began when it had spent $1.00
+    asked = {
+        a: send(ready_site, a, "GET", f"/jobs/{job_id}").text for a in (OWNER, REVIEWER, VIEWER)
+    }
+    assert 'id="settled-cost"' in asked[OWNER] and "$1.50" in asked[OWNER]
+    for actor in (REVIEWER, VIEWER):
+        assert "settled-cost" not in asked[actor] and "$1.50" not in asked[actor], actor
+    with session_scope(ready_site.ctx.factory) as session:
+        session.get(Job, job_id).status = JobStatus.RUNNING
+    running = send(ready_site, OWNER, "GET", f"/jobs/{job_id}").text
+    assert "settled-cost" not in running and "$1.50" not in running

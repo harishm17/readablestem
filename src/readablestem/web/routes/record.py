@@ -25,6 +25,7 @@ from readablestem.web.routes.jobs import (
     slug,
 )
 from readablestem.web.shares import VIEW
+from readablestem.web.views import audience_of
 
 router = APIRouter()
 
@@ -58,7 +59,7 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
         owner = who.get(job.user_id, owner)
         title = documents.document_title(job).text
         role = shares.role_of(session, job, user) or VIEW
-        viewer = "owner" if role == "owner" else ("review" if role == shares.REVIEW else "view")
+        viewer = audience_of(role)
         state = states.state_of(
             states.Facts.of(job),
             states.counts_of(checked.of_result(result)),

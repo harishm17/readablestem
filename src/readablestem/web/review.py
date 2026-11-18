@@ -1834,8 +1834,11 @@ def rerender_html(
     contact: str | None = None,
     math_alttext: bool | None = None,
     filename: str = "",
+    audience: str = "student",
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
+    `audience` "checker" makes a draft's page in the checker's words (`assemble.CHECKER`);
+    it is never stored.
 
     The static checks of the new HTML replace `result.html_checks`, so the job page lists
     the checks of the file the user downloads, not of the one before the review.
@@ -1867,6 +1870,7 @@ def rerender_html(
         unread=checked.unread_of(result),
         title=title_override or result.title,
         filename=filename,
+        audience=audience,
         **chosen,
         lang=result.lang,
         elements=result.elements,
@@ -1894,6 +1898,7 @@ def rerender_job_html(
     *,
     checked_on: date | None = None,
     math_alttext: bool | None = None,
+    audience: str = "student",
 ) -> str:
     """`rerender_html` with the job's own choices for the student file: the title the
     instructor set and the contact line (T1-7, T1-17), and the app's MathML setting."""
@@ -1905,4 +1910,5 @@ def rerender_job_html(
         contact=job.contact_line,
         math_alttext=math_alttext,
         filename=job.filename,
+        audience=audience,
     )

@@ -314,8 +314,9 @@ no network, no model.
   when there is a page list. Also `schema:accessMode` (textual, and visual when there are
   pictures). The `accessibilitySummary` is the page's statement (`readablestem-summary` in
   its head: how many equations are MathML, how much a person reviewed, what is a picture or
-  left out, "Check it before students use it."); a page without it (made before it existed)
-  gets "This file does not record what was converted or reviewed." `accessModeSufficient` is
+  left out; a draft's page adds "Check it before students use it.", the student file does not);
+  a page without it (made before it existed) gets "This file does not record what was
+  converted or reviewed." `accessModeSufficient` is
   always written: `textual` only when the page says the text alone is enough and no item is
   flagged, else `textual,visual`. `accessibilityHazard` is `none` (no script, audio or video
   is written), and `unknown` only when a picture is a GIF or WebP file, which can move. A page
@@ -734,6 +735,22 @@ The estimate is not calibrated (A23); a table cell with math that is wider than 
 is not scaled. Canvas has no style block, so none of this is in it; Word and the EPUB
 reader's own pagination do not use these rules.
 
+## Audiences of notices (SW16)
+
+Every notice the tool writes is built through one helper, `assemble.say(Words, audience)`, which
+says who hears it. `STUDENT` words are in the student file and in every file made from it
+(Word, EPUB, the Canvas zip, the cartridge, the Listen transcript and speech): what is missing
+and whom to ask. `CHECKER` words are written to the person who checks the file, and appear only
+in a draft's page (`render_html(audience="checker")`, made again from the stored result when a
+draft leaves, never stored): the image-page note "Converted from an image of the page. Check it
+against the original." (the student's is "This page was read from a picture of the original, so
+small errors are possible."), the alt text of that page's original ("..., shown for checking the
+converted text."), the equation alt suffix "...; not checked" (the student's: "as written in the
+PDF"), the figure label "Needs a description." (the student's: "No description.") and the
+statement's last sentence "Check it before students use it.". `RENDER_VERSION` is 8 for these
+words. A student file with no checker sentence is a rule (`tests/test_assemble_render.py`),
+not a wording.
+
 ## Flagged items
 
 Anything the pipeline could not convert keeps the original crop. Sighted readers lose
@@ -741,9 +758,10 @@ nothing, and screen reader users hear a fixed, honest alt text ("Figure without 
 description") and a note, instead of a guess read aloud as if it were right.
 
 An equation kept as an image (`assemble.equation_alt`) has the text the PDF holds for its
-region as alt text, with a marker that says where it comes from and that nobody has checked
-it: `6.0 m/s, read from the PDF text; not checked`, or `Equation (2.4): v = d / t, read from
-the PDF text; not checked` when it has a number. Where layout saw fractions, roots,
+region as alt text, with a marker that says where it comes from: `6.0 m/s, as written in the
+PDF`, or `Equation (2.4): v = d / t, as written in the PDF` when it has a number. The student
+file says only that; a draft, made for the person who checks it, says `read from the PDF
+text; not checked` (audiences, below). Where layout saw fractions, roots,
 exponents or several lines in the region, the marker adds that the text may run them
 together (`v2 = v20 + 2ad` for v squared = v0 squared + 2ad), because the flat text layer
 loses their order and size; an inline equation's exponents are not always known, so
@@ -788,10 +806,12 @@ read fails, it is a page kept as an image as before ("Flagged items"). What the 
 for such a page:
 
 - **The notice and the original.** The page starts with a bordered note, labeled in words and
-  not by color alone: "**Converted from an image of the page.** Check it against the
-  original.", and under it a `<details>` whose summary reads "Show the original page N". Opened,
+  not by color alone: "**Note:** This page was read from a picture of the original, so small
+  errors are possible." (a draft says "**Converted from an image of the page.** Check it
+  against the original." instead: it is written to the person who checks, `assemble.CHECKER`),
+  and under it a `<details>` whose summary reads "Show the original page N". Opened,
   it shows the page's own picture (a JPEG at the student file's size, `figure_images`) with the
-  alt text "Original of page N, shown for checking the converted text." No script: the control
+  alt text "Original of page N." (a draft: "..., shown for checking the converted text."). No script: the control
   is the browser's own disclosure, so it works with the keyboard (Enter, Space) and a screen
   reader announces it as one. The element is the figure for the whole page
   (`IMAGE_PAGE_ORIGINAL_REASON`); it has no fix, because nothing is decided about it, and the

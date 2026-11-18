@@ -127,14 +127,16 @@ def test_every_failure_code_with_its_own_message_has_it_on_the_failed_section():
 
 
 def test_the_job_page_shows_no_model_cost(web):
-    """T1-11: what a conversion cost is for the admin page, not for an instructor."""
+    """T1-11, then WS10.9: the model's cost is for the admin page. The owner's page says one
+    thing about money, once the job is done: what the document has cost in all (`$0.50` here)."""
     job_id = convert(web)
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
         job.cost_usd = 0.5  # an earlier attempt was interrupted after spending
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert "Model cost" not in html and "$0.5" not in html and "$0.012" not in html
+    assert "Model cost" not in html and "$0.012" not in html
+    assert html.count("$0.50") == 1 and 'id="settled-cost"' in html
 
 
 def test_failed_checks_of_the_html_file_are_listed(web):

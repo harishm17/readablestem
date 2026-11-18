@@ -1144,13 +1144,37 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   that exact address, and see the document under "Shared with you" on My documents and at its
   address. A person who cannot sign in at all (not on the allowlist, in allowlist mode) cannot
   use a share.
-- **Rights.** `view`: the job page (without the owner's controls: delete, keep, retry, title,
-  contact line, language, revision, parts, sharing and the course), the student preview, the
-  crops, every download (HTML, Canvas, Common Cartridge, Word, EPUB), the review record and its
-  CSV, and the two optional questions. `review`: also the review screen, its list, the page and
+- **Rights.** `view`: the job page (a page of its own, `job_reader.html`, below), the student
+  preview, the crops, every download (HTML, Canvas, Common Cartridge, Word, EPUB), the review
+  record and its CSV, all only once the document can leave without a draft banner (below).
+  `review`: also the review screen, its list, the page and
   region images, bulk accept, the Symbols screen and every decision and edit, with Undo. The
   owner alone: delete, retry, title, contact, language, keep, a revised version, combining parts,
   "Download all", the course notation, and sharing.
+- **Three audiences of the job page** (`views.audience_of(role)`): `owner`, `reviewer` (a
+  `review` share) and `reader` (a `view` share). A reader gets `job_reader.html`: the title,
+  "Shared by Name", what they can do, when it will be deleted, Open, Listen and the download
+  formats (`_job_reader_body.html`, `_job_files.html`), and nothing about posting, Canvas,
+  decisions, checks, the record or the owner's course. State words come from `web/states.py`
+  (`being_checked` is the reader's `needs_decisions`: "The owner is still checking this
+  document.", no number). A reviewer keeps the owner's page without the owner-only blocks and
+  sees the same one total of open decisions (`job_page.open_decisions_line(count, audience)`).
+  A reader never gets a draft: `/view` and `/listen` ask the one export-state function
+  (`output.shown`, as the downloads ask `output.check`), so while a decision is open a reader
+  gets the 403 page there and a draft nowhere. Every partial starts with a comment naming its
+  audiences (`{# Audiences: owner, reviewer #}`); `tests/test_audit_authz.py` parses the
+  includes and fails when a partial is reached by an audience it does not name. Not built: the
+  "Tell the owner about a problem" and "Ask for the Review right" links (SW25) and the
+  version-id line (WS20.1).
+- **The settled cost** (WS10.9): once a job is done, its owner's job page says "Converting
+  this document has cost $x.xx in all." from `Job.cost_usd` (the total across a re-run, whose
+  caps start from `Job.cap_base_usd`), with the `usd` filter of the admin page. Nothing while
+  it runs, and no one it was shared with sees it.
+- **Drafts are made fresh in the checker's words.** The stored page is the student file. A
+  file that leaves as a draft (the owner's or a reviewer's preview, the HTML download, the
+  Canvas, Common Cartridge, Word and EPUB files made from a draft) is made again from the
+  stored result with `audience="checker"` (`routes.jobs.served_html`) and marked as a draft;
+  that page is not stored. See docs/output.md "Audiences of notices".
 - **One check.** Every route loads its job with `job_access(session, job_id, user, need)`,
   with `need` `"view"`, `"review"` or `"owner"` (it replaced `owned_job`). A stranger or someone
   whose share was removed gets the same 404 as for an id that does not exist; a shared person
@@ -2500,8 +2524,8 @@ image itself without script).
 description" for a figure, "Keep as image" for a table, "Make bold text" or "Make plain text" for a heading, "Keep the
 original" otherwise. A line under the buttons, tied to the button by
 `aria-describedby`, says what that means for students ("Keep as image: Students see a
-picture of the original; screen readers hear the PDF text of the equation, marked as not
-checked."; "Equation not converted" is what they hear only when the PDF has no text there),
+picture of the original; screen readers hear the PDF text of the equation, as written in the
+PDF."; "Equation not converted" is what they hear only when the PDF has no text there),
 and the notice after it and the item's state say the same in other words ("Kept as an image by
 you"). The action posted is still `reject`; stored results, ops counts and the output
 are unchanged.

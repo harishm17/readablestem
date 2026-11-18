@@ -321,7 +321,7 @@ def test_when_all_turns_are_taken_the_request_is_told_to_wait(web, monkeypatch):
 
 
 def test_a_failed_epub_export_is_a_plain_page(web):  # noqa: F811
-    job_id = finished_job(web)
+    job_id = ready_job(web)  # a draft's page is made again from the result, not read from here
     set_job(
         web,
         job_id,

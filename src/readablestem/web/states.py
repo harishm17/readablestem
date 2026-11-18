@@ -104,6 +104,8 @@ TABLE: dict[str, Row] = {
     "stopped_limit": Row("Stopped: too large for one conversion", FAILED, True),
     "stopped_unknown": Row("Stopped", FAILED, True),
     "needs_decisions": Row("Needs your decisions", NEEDS_YOU, True),
+    # What a reader sees of "needs_decisions": the decisions are the owner's (`views.audience_of`).
+    "being_checked": Row("Being checked", NEEDS_YOU, True),
     "partly_converted": Row("Partly converted", GAPS, True),
     "ready": Row("Ready to share", DONE, True),
     # Finished with no decision open, but a part is a picture, a page is left out or a
@@ -372,7 +374,8 @@ def state_of(
 ) -> State:
     """The state of a job from its stored facts. `counts` are a finished job's open
     decisions; `tries` the tries left (from `job.retries` when not given); `viewer` is
-    "owner", "review" or "view" (which steps they may take)."""
+    "owner", "reviewer" or "reader" (`views.audience_of`: which steps they may take and
+    whose words they are told in)."""
     ctx = context or Context()
     counts = counts or Counts()
     left = tries_left(job.retries) if tries is None else max(0, tries)
@@ -685,9 +688,10 @@ def _unanalysed_message(pages: int) -> str:
 
 def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | None = None) -> State:
     gaps = gaps_of(job, left, viewer, ctx)
-    review_ok = viewer in ("owner", "review")
     if counts.open:
-        steps = (Step("review", "Review", f"/jobs/{job.id}/review"),) if review_ok else ()
+        if viewer == "reader":  # a reader gets nothing of it until the owner is done (SW16)
+            return _make("being_checked", job_page.OWNER_STILL_CHECKING, (), gaps)
+        steps = (Step("review", "Review", f"/jobs/{job.id}/review"),)
         return _make(
             "needs_decisions", job_page.open_decisions_line(counts.open, viewer), steps, gaps
         )

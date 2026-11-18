@@ -39,6 +39,7 @@ from readablestem.web.routes.jobs import (
     head_reply,
     job_access,
     role_of,
+    served_html,
 )
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.seo import is_head
@@ -78,7 +79,7 @@ def _source(
         title = documents.document_title(job).text
         if job.user_id == user.id:  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
-        return output.marked(job.html or "", state), title, state, job.result_version or 0
+        return served_html(ctx, session, job, state), title, state, job.result_version or 0
 
 
 def _sessions(request: Request) -> export_store.Opener:

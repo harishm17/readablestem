@@ -1,3 +1,4 @@
+{# Audiences: owner, reviewer #}
 {# The finish line (BW1, MF9 of the UX review): no decision is open, so the file can go to
    students. The download is the main action; where to post it, and what to check first, follow.
    Plain text, no check marks or scores: it assists, it does not certify. The state is said once,
@@ -8,13 +9,14 @@
    one, and the checks before posting once, below. #}
 <section id="ready" aria-labelledby="ready-heading">
   <h2 id="ready-heading">{{ state.task if state is defined else "Download" }}</h2>
-  <p>{{ pg.finish.sentence }}</p>
+  <p>{{ pg.finish.line(job.audience) }}</p>
   <ul class="actions">
     <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
     <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
-    <li><a href="/jobs/{{ job.id }}/listen">Listen as a student</a></li>
+    <li><a href="/jobs/{{ job.id }}/listen">{{ "Listen as a student" if job.is_owner else "Listen to it" }}</a></li>
   </ul>
 
+  {% if job.is_owner %}
   <h3 id="post-heading">Where will you post it?</h3>
   <ul class="routes" aria-labelledby="post-heading">
     <li class="route route-recommended" id="route-web">
@@ -56,6 +58,11 @@
       <p><a class="button-secondary" href="/jobs/{{ job.id }}/download.epub">Download as EPUB</a></p>
     </li>
   </ul>
+  {% else %}
+  <ul class="actions" id="other-files">
+    {% include "_job_files.html" %}
+  </ul>
+  {% endif %}
   {# T3-3: one file from the finished parts of a long source (GET /jobs/{id}/combine,
      web/combine.py). Only on a part, and only when two or more finished parts are kept. #}
   {% if job.part_label and job.combinable > 1 and job.is_owner %}
@@ -66,6 +73,7 @@
     {% if word_export|default(false) %}<a href="/jobs/{{ job.id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job.id }}/combine?format=epub">EPUB</a>.</p>
   {% endif %}
 
+  {% if job.is_owner %}
   <h3 id="before-heading">Before you share</h3>
   <ul aria-labelledby="before-heading">
     <li>Read the student version and <a href="/jobs/{{ job.id }}/listen">listen to it</a>:
@@ -80,4 +88,5 @@
   {# ux-a's part under the download (the two questions); the posting link is in the
      recommended route above. #}
   {% with posting_link = false %}{% include "_after_download.html" %}{% endwith %}
+  {% endif %}
 </section>

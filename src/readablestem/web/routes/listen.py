@@ -1,7 +1,8 @@
 """Listen as a student: the transcript of what a screen reader says for a converted document.
 
 `GET /jobs/{job_id}/listen` is for the owner and anyone the document was shared with (access
-`view`, like the student preview), and `GET /demo/listen` is public, for the stored demo. Both
+`view`, like the student preview, and like it never read out as a draft to a person who may not
+take one: `output.shown`), and `GET /demo/listen` is public, for the stored demo. Both
 only read: no POST, nothing stored, nothing logged, and the transcript is made from the same
 HTML the student gets (`web.listen`), kept in memory per job result version.
 """
@@ -15,7 +16,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from readablestem.core.types import DocumentResult
-from readablestem.web import documents, listen
+from readablestem.web import documents, listen, output
 from readablestem.web.db import session_scope
 from readablestem.web.deps import UserDep, get_ctx, render
 from readablestem.web.routes.jobs import current_html, job_access, require_done
@@ -32,7 +33,9 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         require_done(job)
-        audience = audience_of(role_of(session, job, user))
+        role = role_of(session, job, user) or VIEW
+        audience = audience_of(role)
+        output.shown(job, role)  # a reader is not read a draft: the transcript is built from it
         html = current_html(ctx, session, job).html or ""
         title = documents.document_title(job).text
         result_json, version = job.result_json, job.result_version or 0

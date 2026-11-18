@@ -8,11 +8,15 @@ the running app: anonymous visitors, a second user (IDOR) and a non-admin.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 from sqlalchemy import func, select
 
 from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, csrf_from, job_id_from, login, upload
 from fixtures.web.support import make_pdf as pdf
+from readablestem import web as web_package
 from readablestem.web.db import (
     Course,
     CourseNotation,
@@ -397,3 +401,99 @@ def test_an_admin_is_not_an_owner(site):
         response = send(site.admin, method, real, token)
         assert response.status_code in {400, 404}, (method, template, response.status_code)
         assert "SECRET" not in response.text, (method, template)
+
+
+# --------------------------------------------------------------------------- partial audiences
+
+TEMPLATES = Path(web_package.__file__).parent / "templates"
+EVERYONE = frozenset({"owner", "reviewer", "reader"})
+# The pages that include partials, and who is ever given each (`views.audience_of`). A reader
+# never gets `job.html`; the review templates are for a Review right or more.
+AUDIENCE_ROOTS = {
+    "job.html": frozenset({"owner", "reviewer"}),
+    "job_reader.html": frozenset({"reader"}),
+    "listen.html": EVERYONE,
+    "_job_status.html": EVERYONE,  # the job page's poll answers, rendered by their own routes
+    "_job_progress.html": EVERYONE,
+    **{path.name: frozenset({"owner", "reviewer"}) for path in TEMPLATES.glob("review*.html")},
+}
+_TAG = re.compile(r"\{%-?\s*(if|elif|else|endif|include|from)\b(.*?)-?%\}", re.S)
+
+
+def _narrowed(condition: str, reach: frozenset[str]) -> frozenset[str] | None:
+    """The audiences an `if` keeps, when it says who is reading (None: it does not)."""
+    if " or " in f" {condition} ":
+        return None
+    kept = reach
+    known = False
+    if "not job.is_owner" in condition:
+        kept, known = kept & {"reviewer", "reader"}, True
+    elif "job.is_owner" in condition or re.search(r"\bowns\b", condition):
+        kept, known = kept & {"owner"}, True
+    if "not job.can_review" in condition:
+        kept, known = kept & {"reader"}, True
+    elif "job.can_review" in condition:
+        kept, known = kept & {"owner", "reviewer"}, True
+    if match := re.search(r'job\.audience (==|!=) "(\w+)"', condition):
+        same = frozenset({match.group(2)})
+        kept, known = (kept & same if match.group(1) == "==" else kept - same), True
+    return frozenset(kept) if known else None
+
+
+def _reached(name: str, reach: frozenset[str], found: dict[str, set[str]]) -> None:
+    """Add to `found` every partial that `name` includes, and the audiences that reach it:
+    those of the page, narrowed by the `if` around the include when that says who it is for."""
+    # Each open `if`: the audiences before it, whether it was a plain who-is-reading test,
+    # and the audiences it kept.
+    stack: list[tuple[frozenset[str], bool, frozenset[str]]] = []
+    here = reach
+    for tag in _TAG.finditer((TEMPLATES / name).read_text(encoding="utf-8")):
+        word, rest = tag.group(1), tag.group(2)
+        if word == "if":
+            kept = _narrowed(rest, here)
+            here_in = here if kept is None else kept
+            stack.append((here, kept is not None and " and " not in rest, here_in))
+            here = here_in
+        elif word == "elif" and stack:
+            before = stack[-1][0]
+            kept = _narrowed(rest, before)
+            here = before if kept is None else kept
+            stack[-1] = (before, False, here)
+        elif word == "else" and stack:
+            before, plain, kept = stack[-1]
+            here = before - kept if plain else before
+        elif word == "endif" and stack:
+            here = stack.pop()[0]
+        elif word in ("include", "from") and (target := re.match(r"\s*[\"']([^\"']+)[\"']", rest)):
+            partial = target.group(1)
+            if partial.startswith("components/"):  # building blocks that say nothing to anyone
+                continue
+            if not here <= found.get(partial, set()):
+                found.setdefault(partial, set()).update(here)
+                _reached(partial, here, found)
+
+
+def partial_audiences() -> dict[str, set[str]]:
+    """Every partial that the pages above include or import macros from, directly or through
+    another, with the audiences that are ever given it."""
+    found: dict[str, set[str]] = {}
+    for name, reach in AUDIENCE_ROOTS.items():
+        if name.startswith("_"):  # a partial that a route renders on its own
+            found.setdefault(name, set()).update(reach)
+        _reached(name, reach, found)
+    return found
+
+
+def test_a_partial_is_reached_only_by_the_audiences_it_names():
+    """SW16: each partial starts with `{# Audiences: owner, reviewer #}`, and the include
+    tree of the job page, the reader page, Listen and the review pages never gives it to
+    anyone it does not name. A partial written for the owner is not included, unguarded, in a
+    page that a reviewer or a reader gets."""
+    faults = []
+    for partial, reached in sorted(partial_audiences().items()):
+        first = (TEMPLATES / partial).read_text(encoding="utf-8").splitlines()[0]
+        named = re.fullmatch(r"\{#\s*Audiences:\s*([a-z, ]+?)\s*#\}", first)
+        said = set(re.split(r",\s*", named.group(1))) if named else set()
+        if not said <= EVERYONE or not reached <= said:
+            faults.append(f"{partial}: reached by {sorted(reached)}, names {sorted(said) or '-'}")
+    assert not faults, "\n".join(faults)

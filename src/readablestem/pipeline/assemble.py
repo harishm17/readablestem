@@ -107,7 +107,11 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # empty alt text only for decoration with evidence (WS6.4). 6: both together. 7: nothing is cut
 # on paper, long descriptions print open, every code block that can scroll is a tab stop, the
 # maths font stack (SW45, WS21.2, WS21.4) and the words of a part kept as a picture (WS21.9).
-RENDER_VERSION = 7
+# 8: authored notices carry an audience (SW16 part 4): the student file has no sentence
+# written to the person who checks it ("Check it against the original.", "not checked",
+# "Needs a description.", "Check it before students use it."), and the image-page note and the
+# equation alt text are said to a student; a draft is made in the checker's words.
+RENDER_VERSION = 8
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -122,19 +126,61 @@ def render_version(html: str) -> int:
     return int(match.group(1)) if match else 0
 
 
+# --------------------------------------------------------------------------- audiences
+#
+# Who an authored notice is written to. The student file (what a student gets, and every file
+# made from it: Word, EPUB, the Canvas zip, the cartridge, the Listen transcript and speech)
+# holds only `STUDENT` words: what is missing and whom to ask. A sentence written to the person
+# who checks the file ("Check it against the original.") is a `CHECKER` word: it is written
+# only into the draft and the owner's preview of one (`render_html(audience=CHECKER)`), and
+# never into a stored page. Every authored notice is built through `say`, so a notice has one
+# place that says who hears it.
+STUDENT = "student"
+CHECKER = "checker"
+
+
+@dataclass(frozen=True)
+class Words:
+    """An authored notice in the words of each audience: the student's, and, where the
+    checker is told something more or something else, the checker's."""
+
+    student: str
+    checker: str | None = None
+
+
+def say(words: Words, audience: str = STUDENT, **values: object) -> str:
+    """`words` for `audience` (the checker's when it has them, else the student's), with
+    `values` put in its `{placeholders}`."""
+    text = words.checker if audience == CHECKER and words.checker is not None else words.student
+    return text.format(**values) if values else text
+
+
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 # The alt text of an equation kept as an image, when its region has text in the PDF: that
 # text, said to be what the PDF holds and not checked ("v = d / t, read from the PDF
 # text; not checked"). Never a guess: it is the text layer or nothing, and nothing falls
 # back to the equation's number ("Equation (2.4), not converted") or the fixed words.
-EQUATION_TEXT_ALT_SUFFIX = ", read from the PDF text; not checked"
+# A student hears where the words are from ("as written in the PDF"); the checker is told
+# they were not compared with the page ("; not checked").
+EQUATION_TEXT_ALT_SUFFIX = ", as written in the PDF"
+EQUATION_TEXT_ALT_CHECK_SUFFIX = ", read from the PDF text; not checked"
 # ... and when the region has fractions, roots, exponents or several lines, whose order and
 # size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad):
-EQUATION_FLAT_ALT_SUFFIX = (
+EQUATION_FLAT_ALT_SUFFIX = ", as written in the PDF, where fractions and exponents may run together"
+EQUATION_FLAT_ALT_CHECK_SUFFIX = (
     ", read from the PDF text, where fractions and exponents may run together; not checked"
 )
-EQUATION_TEXT_ALT_SUFFIXES = (EQUATION_TEXT_ALT_SUFFIX, EQUATION_FLAT_ALT_SUFFIX)
+EQUATION_TEXT_ALT_WORDS = Words(EQUATION_TEXT_ALT_SUFFIX, EQUATION_TEXT_ALT_CHECK_SUFFIX)
+EQUATION_FLAT_ALT_WORDS = Words(EQUATION_FLAT_ALT_SUFFIX, EQUATION_FLAT_ALT_CHECK_SUFFIX)
+# Every suffix a page can carry (the student's and the checker's): what marks the tool's own
+# words in an alt text (`_FIXED_ALT_IMG`) and what the evaluations strip to get the PDF's text.
+EQUATION_TEXT_ALT_SUFFIXES = (
+    EQUATION_TEXT_ALT_SUFFIX,
+    EQUATION_FLAT_ALT_SUFFIX,
+    EQUATION_TEXT_ALT_CHECK_SUFFIX,
+    EQUATION_FLAT_ALT_CHECK_SUFFIX,
+)
 # Layout's reasons that say the text layer of an equation is not in reading order.
 _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
@@ -246,10 +292,19 @@ OMITTED_NOTE = (
 # A page converted from an image of it (ADR 0007): the note at its start and the toggle that
 # shows the original. The notice is the author's wording; it assists, it does not say the
 # conversion is right.
-IMAGE_PAGE_NOTICE = "Converted from an image of the page."
-IMAGE_PAGE_CHECK = "Check it against the original."
-IMAGE_PAGE_SHOW = "Show the original page {page}"
-IMAGE_PAGE_ORIGINAL_ALT = "Original of page {page}, shown for checking the converted text."
+# A student is told the page was read from a picture and that small errors are possible; the
+# checker is told to check it, with the label that goes with it.
+IMAGE_PAGE_NOTE = Words(
+    "This page was read from a picture of the original, so small errors are possible.",
+    "Check it against the original.",
+)
+IMAGE_PAGE_LABEL = Words("Note:", "Converted from an image of the page.")
+IMAGE_PAGE_SHOW = Words("Show the original page {page}")
+IMAGE_PAGE_ORIGINAL_ALT = Words(
+    "Original of page {page}.", "Original of page {page}, shown for checking the converted text."
+)
+# The label of a figure's note: to the student what is missing, to the checker what to do.
+FIGURE_LABEL = Words("No description.", "Needs a description.")
 IMAGE_PAGE_CSS = """\
 .image-page-note { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem;
   margin: 1.5em 0; }
@@ -520,7 +575,7 @@ def equation_number(label: str | None) -> str | None:
     return number or None
 
 
-def equation_alt(element: Element) -> str:
+def equation_alt(element: Element, audience: str = STUDENT) -> str:
     """The alt text of an equation that is shown as an image (not converted).
 
     Text the PDF holds for the equation's region (`Element.text`), marked as read from the
@@ -531,7 +586,8 @@ def equation_alt(element: Element) -> str:
     a character that is not text (a symbol font's glyph with no letter, `output_chars`), or
     is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
     exponents or several lines in the region, the marker says the text may run them
-    together (EQUATION_FLAT_ALT_SUFFIX).
+    together (EQUATION_FLAT_ALT_SUFFIX). The checker's marker says the words were not
+    compared with the page; the student's says only where they are from (`audience`).
     """
     number = equation_number(element.equation_label)
     named = f"Equation ({number})" if number else "Equation"
@@ -540,7 +596,8 @@ def equation_alt(element: Element) -> str:
     if text and len(text) <= EQUATION_ALT_MAX_CHARS and usable:
         lead = f"{named}: " if number else ""
         flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
-        return f"{lead}{text}{EQUATION_FLAT_ALT_SUFFIX if flat else EQUATION_TEXT_ALT_SUFFIX}"
+        suffix = say(EQUATION_FLAT_ALT_WORDS if flat else EQUATION_TEXT_ALT_WORDS, audience)
+        return f"{lead}{text}{suffix}"
     return f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
 
 
@@ -945,6 +1002,8 @@ class _Renderer:
     # Pages kept as a picture for unread content whose text is written too: page -> the
     # picture's element id, until the note that opens the page's text is written.
     unread_parts: dict[int, str] = field(default_factory=dict)
+    # Whom the authored notices speak to (`STUDENT`, or `CHECKER` for a draft's page).
+    audience: str = STUDENT
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -1317,7 +1376,10 @@ class _Renderer:
             css = ("equation equation-labelled" if label else "equation") + self.print_fit(mathml)
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
-        original = self.original(element, self.image_alt(element, equation_alt(element))) + label
+        original = (
+            self.original(element, self.image_alt(element, equation_alt(element, self.audience)))
+            + label
+        )
         note = EQUATION_NOTE if self.has_picture(element) else EQUATION_WRITTEN_NOTE
         return self.flag_block(element, reason, original, "Not converted.", note)
 
@@ -1345,7 +1407,7 @@ class _Renderer:
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
-            alt = _escape(self.image_alt(element, equation_alt(element)))
+            alt = _escape(self.image_alt(element, equation_alt(element, self.audience)))
             size = self.picture_size(element, self.crops.get(element.id))
             image = f'<img src="{src}" alt="{alt}"{size}>'
             label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
@@ -1435,7 +1497,8 @@ class _Renderer:
             )
             return html + details
         figure = f"<figure>{picture(FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
-        return self.flag_block(element, reason, figure, "Needs a description.", FIGURE_NOTE)
+        label = say(FIGURE_LABEL, self.audience)
+        return self.flag_block(element, reason, figure, label, FIGURE_NOTE)
 
     def image_page_note(self, element: Element) -> str:
         """The start of a page converted from an image (ADR 0007): the notice, and the
@@ -1443,14 +1506,16 @@ class _Renderer:
         control and says which page). Without the picture, the notice alone."""
         self.add_style("image_page", IMAGE_PAGE_CSS)
         page = element.page + 1
-        notice = f'<p><span class="flag-label">{IMAGE_PAGE_NOTICE}</span> {IMAGE_PAGE_CHECK}</p>'
+        label = say(IMAGE_PAGE_LABEL, self.audience)
+        body = say(IMAGE_PAGE_NOTE, self.audience)
+        notice = f'<p><span class="flag-label">{label}</span> {body}</p>'
         png = self.crops.get(element.id)
-        alt = IMAGE_PAGE_ORIGINAL_ALT.format(page=page)
+        alt = say(IMAGE_PAGE_ORIGINAL_ALT, self.audience, page=page)
         image = figure_images.img_html(png, alt, _size_attrs(element), "photo")
         if image is None:
             shown = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
         else:
-            summary = IMAGE_PAGE_SHOW.format(page=page)
+            summary = say(IMAGE_PAGE_SHOW, self.audience, page=page)
             shown = (
                 f'<details class="{AUTHORED_CLASS}"><summary>{summary}</summary>{image}</details>'
             )
@@ -1624,11 +1689,11 @@ def _checked_notice(summary: checked.CheckedSummary, places: Collection[str]) ->
     )
 
 
-def _summary_meta(summary: checked.CheckedSummary) -> list[str]:
+def _summary_meta(summary: checked.CheckedSummary, audience: str = STUDENT) -> list[str]:
     """The statement in the page's head, for the files made from the page (the EPUB's
     accessibility summary and `accessModeSufficient`, the Canvas README's first lines),
     which read the page and not the result."""
-    text = _escape(checked_words.export_summary(summary))
+    text = _escape(checked_words.export_summary(summary, audience == CHECKER))
     lines = [f'<meta name="{SUMMARY_META}" content="{text}">']
     if summary.text_sufficient:
         lines.append(f'<meta name="{SUFFICIENT_META}" content="textual">')
@@ -1912,8 +1977,14 @@ def render_html(
     pages: int | None = None,
     unread: tuple[int, int] = (0, 0),
     filename: str = "",
+    audience: str = STUDENT,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
+
+    `audience`: whom the authored notices speak to. `STUDENT` (the default) is the student
+    file, the only one that is stored and that every export is made from. `CHECKER` is the
+    draft's page, made fresh for the person who checks it and never stored: it adds what a
+    student must not be told ("Check it against the original.").
 
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
@@ -1968,6 +2039,7 @@ def render_html(
         mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
         origin=origin,
+        audience=audience,
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
@@ -2027,7 +2099,7 @@ def render_html(
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
             f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
-            *_summary_meta(summary),
+            *_summary_meta(summary, audience),
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",

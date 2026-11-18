@@ -1,0 +1,24 @@
+{# Audiences: reader #}
+{# What the reader page holds beneath its status box. A finished document with no decision open
+   has Open, Listen and the files (`job.exportable`: the same answer every download asks, so
+   the page never offers what the route would refuse). While the owner is still checking, or
+   while it converts, the status box says so and nothing is offered. The finished answer of a
+   job sends this out of band (web/poll.py, `_job_status.html`). #}
+{% if job.status == "done" and job.exportable %}
+<section id="ready" aria-labelledby="ready-heading">
+  <h2 id="ready-heading">Read it</h2>
+  <ul class="actions">
+    <li><a class="button" href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Open the document</a></li>
+    <li><a href="/jobs/{{ job.id }}/listen">Listen to it</a></li>
+  </ul>
+  <h3 id="files-heading">Download</h3>
+  <ul class="actions" aria-labelledby="files-heading">
+    <li><a class="button-secondary" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
+    {% include "_job_files.html" %}
+  </ul>
+</section>
+{% endif %}
+{% if not job.finished %}
+<p class="hint"><a href="/jobs/{{ job.id }}">Refresh the status</a></p>
+{% endif %}
+<p><a href="/app">Back to My documents</a></p>

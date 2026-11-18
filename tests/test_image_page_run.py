@@ -18,6 +18,7 @@ from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.ops.report import render_report
 from readablestem.pipeline import image_page, run
+from readablestem.pipeline.assemble import CHECKER, IMAGE_PAGE_NOTE, say
 
 
 def settings(**kw: Any) -> Settings:
@@ -136,11 +137,11 @@ def test_a_scanned_page_becomes_elements_and_fixes_with_a_tier_each():
 def test_the_output_page_has_the_notice_and_the_original_page_to_open():
     result = convert(scan_pdf())
     html = result.html
-    assert "Converted from an image of the page." in html
-    assert "Check it against the original." in html
+    assert IMAGE_PAGE_NOTE.student in html  # said to the student: small errors are possible
+    assert say(IMAGE_PAGE_NOTE, CHECKER) not in html  # what only the person who checks is told
     assert 'class="image-page-note' in html
     assert "<details" in html and "<summary>Show the original page 1</summary>" in html
-    assert 'alt="Original of page 1, shown for checking the converted text."' in html
+    assert 'alt="Original of page 1."' in html
     assert "data:image/jpeg;base64," in html
     assert "<script" not in html
     assert "Page 1 was converted from an image of the page" in html  # the note for students

@@ -147,7 +147,7 @@ def pictures_sentence(s: CheckedSummary) -> str:
         shown = "is shown as it was written" if k == 1 else "are shown as they were written"
         shown += " in the Word file" if s.origin == "docx" else " in LaTeX"
     return (
-        f"{parts} and {shown}, marked “Not converted” or “Needs a description”: ask your "
+        f"{parts} and {shown}, marked “Not converted” or “No description”: ask your "
         "instructor for a version you can read."
     )
 
@@ -264,16 +264,21 @@ def checks_ran(s: CheckedSummary) -> str:
     return f"{plural(s.checks_run, 'structure check')}."
 
 
-def finish_sentence(s: CheckedSummary) -> str:
-    """The owner's finish line: what people reviewed (never the optional notes nobody
-    opened) and when."""
+def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
+    """The finish line: what people reviewed (never the optional notes nobody opened) and
+    when. The owner is told "You reviewed"; a reviewer, who need not have, is told what was."""
     if not s.reviewed:
         if not s.flagged:
             return "The tool flagged nothing in this file for review, and nobody has reviewed it."
         text = "Nobody has reviewed this file yet."
     else:
         when = f", the last on {s.reviewed_on:%B} {s.reviewed_on.day}" if s.reviewed_on else ""
-        text = f"You reviewed {s.load.decided} of {plural(s.flagged, 'flagged part')}{when}."
+        flagged = plural(s.flagged, "flagged part")
+        text = (
+            f"You reviewed {s.load.decided} of {flagged}{when}."
+            if owner
+            else f"{s.load.decided} of {flagged} reviewed{when}."
+        )
         if k := s.accepted_failing:
             text += f" {plural(k, 'part')} kept with a check failing."
     if u := s.unopened:
@@ -371,21 +376,22 @@ ACTION_ROWS = {
 # --------------------------------------------------------------------------- exports
 
 SUMMARY_TOOL = "Made by ReadableSTEM, a tool that assists with accessibility."
-SUMMARY_UNKNOWN = (
-    f"{SUMMARY_TOOL} This file does not record what was converted or reviewed. Check it before "
-    "students use it."
-)
+SUMMARY_UNKNOWN = f"{SUMMARY_TOOL} This file does not record what was converted or reviewed."
+# Written to the person who checks a file, not to its readers: only a draft's page carries it
+# (`assemble.render_html(audience="checker")`), never the student file or an export of it.
+CHECK_BEFORE_USE = "Check it before students use it."
 
 
-def export_summary(s: CheckedSummary) -> str:
+def export_summary(s: CheckedSummary, for_checker: bool = False) -> str:
     """The plain-text statement an export carries (the EPUB's accessibilitySummary, the
     Canvas README's first lines): the tool, how many equations a screen reader can read,
-    and the student statement."""
+    and the student statement; for the checker (a draft) it ends with what to do."""
     c = s.converted
     parts = [SUMMARY_TOOL]
     if c.equations:
         verb = "is" if c.equations_mathml == 1 else "are"
         parts.append(f"{c.equations_mathml} of {plural(c.equations, 'equation')} {verb} MathML.")
     parts += statement(s)
-    parts.append("Check it before students use it.")
+    if for_checker:
+        parts.append(CHECK_BEFORE_USE)
     return " ".join(parts)

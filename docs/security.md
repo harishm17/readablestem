@@ -168,9 +168,12 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   domain rule, no `+tag` folding. Signing in is still the service's own gate (`users.is_allowed`,
   or open sign-up), so a share does not let anyone in who could not sign in. Nothing is emailed
   and there are no links that work without signing in.
-- **What.** Two rights. `view`: the job page, `/view` preview, `/listen` (the listening
-  transcript, a GET that only reads; no POST), the downloads, the crops and the
-  review record. `review`: also the review screen and every decision and edit. The owner alone
+- **What.** Two rights. `view`: the reader's job page (`job_reader.html`), `/view` preview,
+  `/listen` (the listening transcript, a GET that only reads; no POST), the downloads, the
+  crops and the review record. None of these hands a `view` sharee a draft: `/view`, `/listen`
+  and every download ask the one export-state function (`output.shown`, `output.check`), so
+  while a decision is open they refuse (a 403 page), and the page says only that the owner is
+  still checking. `review`: also the review screen and every decision and edit. The owner alone
   can delete, retry, change the title, contact line, language or retention, upload a revision,
   combine parts, use "Download all", add or change or remove a share, or read the course
   notation. A person who is shared a document cannot share it further.
