@@ -212,10 +212,14 @@ PEN_MARK_STROKES = 2
 PEN_MARK_OUT = 0.25
 PEN_MARK_COLOUR = 0.3  # a closed or filled mark differs from the text this much (sRGB)
 PEN_FILL_SHARE = 0.5  # a filled mark is a stroke's ribbon when it covers at most this of its box
-# A row the header/footer rules dropped is a figure's label (`_figure_labels`) when it is
-# at most this long and within LABEL_REACH x its font size of the figure or its labels.
-LABEL_MAX_CHARS = 40
-LABEL_REACH = 8.0
+# A row is a label of a figure (`_label_owners`) when it is at most LABEL_SHORT characters
+# and within LABEL_REACH x its font size of the figure's nearest stroke or of a label the
+# figure holds already: the one reach. A turned row (an axis title) is never a line of a
+# paragraph, and stands further off (LABEL_TURNED times as far) and may be longer.
+LABEL_SHORT = 25
+LABEL_SHORT_TURNED = 40
+LABEL_REACH = 1.0
+LABEL_TURNED = 2.5
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 MIN_BARS = 2  # a filled drawing of this many rectangles keeps them (`_Path.rects`) ...
 MAX_BAR_ITEMS = 1000  # ... unless it has more items than this
@@ -5358,6 +5362,10 @@ class _Path:
     # Painted as a fill with no stroke: how a glyph drawn as an outline is painted
     # (`_glyph_outlines`).
     fill_only: bool = False
+    # The straight lines (and the chords of the curves) of the path in display space, when
+    # it is drawn by lines alone and has few (MAX_EDGES): its strokes, which a label's
+    # distance is measured to (`_stroke_gap`). Empty: the path's box stands for it.
+    edges: tuple[tuple[float, float, float, float], ...] = ()
     # Pen evidence of an open stroke, set in `_page_paths`: the page type's pen tests at
     # any length (`page_type.pen_line`: a signature), or, for a short stroke of straight
     # lines, those lines (`_short_lines`: a tick, a bond), which `_hand_strokes` judges
@@ -5395,6 +5403,7 @@ def _page_paths(
         if box[2] < 0 or box[3] < 0 or box[0] > width_pt or box[1] > height_pt:
             continue  # outside the CropBox: not visible on the page
         segments = []
+        chords = []  # the ends of each curve
         curved = False
         straight = 0.0  # length of horizontal and vertical lines
         for item in items:
@@ -5407,6 +5416,7 @@ def _page_paths(
                     straight += abs(px - qx) + abs(py - qy)
             elif item[0] == "c":
                 curved = True
+                chords.append((*display.point(*item[1]), *display.point(*item[4])))
         width, height = box[2] - box[0], box[3] - box[1]
         if curved and straight >= 0.6 * 2 * (width + height):
             curved = False  # a rounded rectangle (a callout box): its corners are not a plot
@@ -5428,6 +5438,9 @@ def _page_paths(
         fill = filled and kind == "shape"
         path = _Path(box, kind, curved, fill, source, border, rules, open_stroke)
         path.fill_only = filled and not stroked
+        strokes = [*segments, *chords]
+        if strokes and len(strokes) <= MAX_EDGES and all(i[0] in ("l", "c") for i in items):
+            path.edges = tuple(strokes)
         # What later tests read, only for the paths they look at (a page of handwriting
         # has tens of thousands of strokes, and the ink budget runs while they are read).
         if curved and open_stroke:
@@ -6888,6 +6901,12 @@ class _Figure:
     equation: bool = False  # a picture of an equation (`_equation_pictures`)
     number: str | None = None  # ... and the equation number printed beside it
     fragments: bool = False  # a region of text fragments and short strokes (`_fragment_figures`)
+    members: list[_Path] = field(default_factory=list)  # the vector paths it is drawn with
+    # The box of what is drawn (the box before any label is added to it).
+    drawing: BBox = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.drawing = self.bbox
 
     @property
     def reasons(self) -> list[str]:
@@ -7284,7 +7303,13 @@ def _vector_figures(
         x0, y0, x1, y1 = _union(p.bbox for p in members)
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
         width, height = box[2] - box[0], box[3] - box[1]  # the visible part only
-        if width < MIN_DRAWING_PT or height < MIN_DRAWING_PT or width * height < 1200:
+        # A ruler (a timeline's line and ticks) is thin by nature: long enough, it is a figure
+        # with its labels, not a small drawing that a paragraph's block swallows (WS6.15). Its
+        # ticks stand out of the line: a line alone (a table's header rule) is a rule.
+        thin_ruler = ruler and max(width, height) >= 4 * MIN_DRAWING_PT and min(width, height) > 1.0
+        if not thin_ruler and (
+            width < MIN_DRAWING_PT or height < MIN_DRAWING_PT or width * height < 1200
+        ):
             small.append((box, members))
             continue
         fills_page = (
@@ -7315,7 +7340,7 @@ def _vector_figures(
                 continue
             # A plotted line or bars on axes (or on a ruler: an axis with ticks) with
             # evidence of a plot is a plot, not a decorated border, with one curve and
-            # with running text inside (which stays in the reading flow: `_absorb_labels`).
+            # with running text inside (which stays in the reading flow: `_label_owners`).
             plot = (curved or len(bars) >= 2) and any(p.plot or p.ruler for p in members)
             running = ctx is not None and bool(_running_text(inside, ctx))
             figure = plot or not ((len(curves) < 3 and len(bars) < 2) or running)
@@ -7367,14 +7392,17 @@ def _vector_figures(
                 continue
         if rule_only:  # a Fischer projection's bonds: the atom groups at their ends too
             box = _union([box, *(end for p in members for end in _bond_ends(p, index))])
-        figures.append(_Figure(box, paths=len(members)))
+        figures.append(_Figure(box, paths=len(members), members=list(members)))
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
-    # a legend's markers a little apart) are part of it: left out, its crop missed them.
+    # a legend's markers a little apart, the force arrows round a free-body diagram's box)
+    # are part of it, within LEFTOVER_REACH as `_leftover_drawings` groups them: left out,
+    # its crop missed them.
     for box, members in small:
         for figure in figures:
-            if _within(box, figure.bbox, FIGURE_PART_REACH):
-                figure.bbox = _union([figure.bbox, box])
+            if _within(box, figure.bbox, LEFTOVER_REACH):
+                figure.bbox = figure.drawing = _union([figure.drawing, box])
                 figure.paths += len(members)
+                figure.members += members
                 break
         else:
             if small_out is not None:
@@ -7400,16 +7428,17 @@ def _take_border_marks(figures: Sequence[_Figure], border: Sequence[_Path]) -> N
             if near is None:
                 rest.append(path)
                 continue
-            near.bbox = _union([near.bbox, path.bbox])
+            near.bbox = near.drawing = _union([near.drawing, path.bbox])
             near.paths += 1
+            near.members.append(path)
             grew = True
         marks = rest
 
 
 JOIN_PT = 1.5  # pt: line ends this close meet (a corner of a staircase, a connector's end)
+MAX_EDGES = 48  # a path with more lines than this stands for itself by its box (`_Path.edges`)
 MAX_DIAGRAM_BOXES = 200  # more box outlines in one cluster are a grid of cells, not a diagram
 ORIGIN_REACH = 4.0  # pt: a plotted line that starts this close to its axes' corner starts there
-AXIS_LABEL_REACH = 3.0  # x font size: a tick label or axis title is this close outside an axis
 
 
 def _answer_fields(paths: Sequence[_Path], rows: Sequence[_Row]) -> None:
@@ -7421,7 +7450,7 @@ def _answer_fields(paths: Sequence[_Path], rows: Sequence[_Row]) -> None:
     combs = [p for p in paths if p.comb]
     if not combs:
         return
-    labels = [r for r in rows if not r.vertical and len(r.clean) <= LABEL_MAX_CHARS]
+    labels = [r for r in rows if not r.vertical and len(r.clean) <= LABEL_SHORT]
     for group in _cluster([p.bbox for p in combs], JOIN_PT):
         members = [combs[i] for i in group]
         x0, y0, x1, y1 = _union(p.bbox for p in members)
@@ -7443,8 +7472,8 @@ def _mark_plots(paths: Sequence[_Path], rows: Iterable[_Row]) -> None:
     """Flag the paths that hold an L of axes (`_mark_axes`) with evidence of a plot
     (`_Path.plot`), not a frame's two sides or a template's accent: tick marks on it (a
     ruler), a curve starting at its corner (ORIGIN_REACH), two bars standing on it, or a
-    short row (a tick label, an axis title; LABEL_MAX_CHARS) just outside one of its lines
-    (AXIS_LABEL_REACH x its size), on the side away from the other line. `rows` are the
+    short row (a tick label, an axis title; LABEL_SHORT) just outside one of its lines
+    (LABEL_REACH x its size), on the side away from the other line. `rows` are the
     page's rows, the ones the header and footer rules dropped too (a full-page plot's tick
     labels are in the footer band). A title slide's L-shaped accent and the wave across it
     have none of these (2026-10-13: the slide became one figure whose labels were its
@@ -7455,7 +7484,7 @@ def _mark_plots(paths: Sequence[_Path], rows: Iterable[_Row]) -> None:
             owners.setdefault(pair, []).append(p)
     if not owners:
         return
-    labels = [r for r in rows if len(r.clean) <= LABEL_MAX_CHARS and not CAPTION.match(r.clean)]
+    labels = [r for r in rows if len(r.clean) <= LABEL_SHORT and not CAPTION.match(r.clean)]
     ends = [(x, y) for p in paths for x, y in p.ends]
     filled = [p for p in paths if p.filled]
     for (h, v), held in owners.items():
@@ -7491,7 +7520,7 @@ def _plot_evidence(
     if len(standing) >= 2:
         return True
     for row in labels:
-        reach = AXIS_LABEL_REACH * row.size
+        reach = LABEL_REACH * row.size
         mx, my = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
         below = row.y0 - h.c if up else h.c - row.y1  # outside the horizontal line
         if -0.5 * row.size <= below <= reach and h.lo - reach <= mx <= h.hi + reach:
@@ -7962,74 +7991,55 @@ def _merge_figures(figures: list[_Figure]) -> list[_Figure]:
             continue
         box = _union(f.bbox for f in members)
         images, paths = sum(f.images for f in members), sum(f.paths for f in members)
-        merged.append(_Figure(box, images=images, paths=paths))
+        parts = [p for f in members for p in f.members]
+        merged.append(_Figure(box, images=images, paths=paths, members=parts))
     return merged
 
 
-def _absorb_labels(
-    figure: _Figure, rows: list[_Row], ctx: _Context, doc: pymupdf.Document | None = None
-) -> bool:
-    """Give a figure its labels; False when the "figure" is a plain background.
+def _mostly_in(box: BBox, outer: BBox) -> bool:
+    """At least 60 % of `box` lies inside `outer`."""
+    area = max(1e-6, _area(box))
+    inter = max(0.0, min(box[2], outer[2]) - max(box[0], outer[0])) * max(
+        0.0, min(box[3], outer[3]) - max(box[1], outer[1])
+    )
+    return inter >= 0.6 * area
 
-    Short text inside a figure, and short labels just outside it, belong to it. Running
-    text never does: lines of a paragraph inside a figure's box (text set on a backdrop,
-    in a panel, over a watermark logo) stay in the reading flow, and so does a title-sized
-    line. A picture with such text on it (a slide's photo under its title, a caption box
-    over a photo) stays a figure: it was dropped as a background, with nothing to say so
-    (the silent-loss sweep, 2026-10-12). Only a plain one (`_plain_image`: a coloured
-    panel or a wash drawn as a picture) is a background: it is dropped, nothing absorbed,
-    and its text keeps its place in the outline. A picture covering the page is the
-    page's own (`_raster_figures`)."""
-    x0, y0, x1, y1 = figure.bbox
-    inside: list[_Row] = []
-    near: list[_Row] = []
-    for row in rows:
-        if row.absorbed or CAPTION.match(row.clean):
-            continue
-        rx0, ry0, rx1, ry1 = row.bbox
-        area = max(1e-6, (rx1 - rx0) * (ry1 - ry0))
-        inter = max(0.0, min(rx1, x1) - max(rx0, x0)) * max(0.0, min(ry1, y1) - max(ry0, y0))
-        # Display maths is not a label, but a lone variable is ("x" at the end of an axis).
-        short = len(row.clean) <= 25 and (row.kind != "math" or len(row.ink) <= 3)
-        reach = 0.6 * row.size
-        beside_y = min(ry1, y1) - max(ry0, y0) >= 0.5 * (ry1 - ry0)
-        beside_x = min(rx1, x1) - max(rx0, x0) >= 0.5 * (rx1 - rx0)
-        # Within reach of an edge, or across it (a tick label half inside the box).
-        near_x = beside_y and max(rx0 - x1, x0 - rx1) <= reach
-        near_y = beside_x and max(ry0 - y1, y0 - ry1) <= reach
-        if inter >= 0.6 * area:
-            inside.append(row)
-        elif short and (near_x or near_y):
-            near.append(row)
+
+def _backdrop(
+    figure: _Figure, rows: Sequence[_Row], ctx: _Context, doc: pymupdf.Document | None = None
+) -> bool:
+    """Is the "figure" no figure: a plain picture under running text, or a box round code?
+
+    A picture with text on it (a slide's photo under its title, a caption box over a photo)
+    stays a figure: it was dropped as a background, with nothing to say so (the silent-loss
+    sweep, 2026-10-12). Only a plain one (`_plain_image`: a coloured panel or a wash drawn
+    as a picture) under running text is a background: it is dropped, and its text keeps its
+    place in the outline. A box drawn round program code, with no label by it, is the
+    code's frame. A picture covering the page is the page's own (`_raster_figures`)."""
+    inside = [
+        r
+        for r in rows
+        if not r.absorbed and not CAPTION.match(r.clean) and _mostly_in(r.bbox, figure.drawing)
+    ]
     running = _running_text(inside, ctx)
     if running and figure.images == 1 and not figure.paths and _plain_image(doc, figure.xref):
+        return True
+    if figure.images or not inside or not all(r.code and id(r) in running for r in inside):
         return False
-    if (
-        inside
-        and not near
-        and not figure.images
-        and all(r.code and id(r) in running for r in inside)
-    ):
-        return False  # a box drawn round program code is its frame, not a figure
-    for row in [*inside, *near]:
-        if id(row) not in running:
-            row.absorbed = True
-            figure.labels.append(row)
-    if figure.labels:
-        figure.bbox = _union([figure.bbox, *(r.bbox for r in figure.labels)])
-    return True
+    return not any(  # a short row by the box is a label: the drawing is a figure
+        not r.absorbed
+        and r not in inside
+        and _short_label(r)
+        and _stroke_gap(r.bbox, figure) <= LABEL_REACH * r.size
+        for r in rows
+    )
 
 
-LABEL_PASSES = 3  # tick labels, then the axis title beyond them, then a title beyond that
 # The typical gap between the words of a row of tick or category labels, in font sizes:
 # the words of running text are a quarter of a font size apart, half in a justified line.
 LABEL_SPREAD = 0.8
 LABEL_SPREAD_MIN = 0.4  # ... and no gap of such a row is narrower than this
-LABEL_SHORT = 25  # characters: a short label (an axis title, a quantity, a category)
-# An axis title is centred on its axis: its middle within this share of the drawing's side
-# of the drawing's own middle.
-LABEL_CENTRED = 0.15
-LABEL_QUANTITY_GLYPHS = 12  # a quantity set half over a drawing ("N = 49 N") is this short
+LABEL_APART = 2.0  # font sizes: words this far apart are separate labels on one line
 
 
 def _spread_row(row: _Row) -> bool:
@@ -8053,6 +8063,181 @@ def _spread_row(row: _Row) -> bool:
         and statistics.median(gaps) >= LABEL_SPREAD * row.size
         and min(gaps) >= LABEL_SPREAD_MIN * row.size
     )
+
+
+def _label_groups(row: _Row) -> list[int]:
+    """The characters of each group of a row cut where two words stand LABEL_APART font
+    sizes apart or more (a justified line's spaces are half a font size at most)."""
+    counts: list[int] = []
+    last = None
+    for c in row.chars:
+        if c.blank:
+            if counts:
+                counts[-1] += 1  # the spaces inside a group count: it is a stretch of text
+            continue
+        if last is None or c.x0 - last.x1 >= LABEL_APART * row.size:
+            counts.append(0)
+        counts[-1] += 1
+        last = c
+    return counts
+
+
+def _short_label(row: _Row) -> bool:
+    """Short enough to be a label: LABEL_SHORT characters or fewer, the tick or category
+    labels of an axis set in one row (`_spread_row`: each word of it is short), or several
+    short labels far apart on one line (a timeline's events: `_label_groups`)."""
+    if len(row.clean) <= (LABEL_SHORT_TURNED if row.vertical else LABEL_SHORT) or _spread_row(row):
+        return True
+    groups = _label_groups(row)
+    return len(groups) >= 2 and max(groups) <= LABEL_SHORT
+
+
+def _edge_gap(edge: tuple[float, float, float, float], box: BBox) -> float:
+    """How far a straight stroke lies from a box (0 when it crosses or touches it)."""
+    x0, y0, x1, y1 = edge
+    dx, dy = x1 - x0, y1 - y0
+    enter, leave = 0.0, 1.0
+    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
+        if p == 0:
+            if q < 0:
+                enter, leave = 1.0, 0.0  # parallel to a side and outside it
+        elif p < 0:
+            enter = max(enter, q / p)
+        else:
+            leave = min(leave, q / p)
+    if enter <= leave:
+        return 0.0
+    length = dx * dx + dy * dy
+
+    def to_stroke(x: float, y: float) -> float:
+        t = 0.0 if length == 0 else max(0.0, min(1.0, ((x - x0) * dx + (y - y0) * dy) / length))
+        return math.hypot(x - (x0 + t * dx), y - (y0 + t * dy))
+
+    def to_box(x: float, y: float) -> float:
+        return math.hypot(max(box[0] - x, 0.0, x - box[2]), max(box[1] - y, 0.0, y - box[3]))
+
+    return min(
+        to_stroke(box[0], box[1]),
+        to_stroke(box[2], box[1]),
+        to_stroke(box[0], box[3]),
+        to_stroke(box[2], box[3]),
+        to_box(x0, y0),
+        to_box(x1, y1),
+    )
+
+
+def _box_gap(box: BBox, other: BBox) -> float:
+    """The straight distance between two boxes (0 when they touch or overlap)."""
+    return math.hypot(
+        max(0.0, other[0] - box[2], box[0] - other[2]),
+        max(0.0, other[1] - box[3], box[1] - other[3]),
+    )
+
+
+def _stroke_gap(box: BBox, figure: _Figure, labels: Sequence[BBox] = ()) -> float:
+    """How far `box` lies from the nearest drawn stroke of the figure, or from one of its
+    `labels` already found: not from the figure's box, which reaches over blank ground
+    where a diagonal or an L leaves the corner empty. A path drawn by a few straight lines
+    counts by those lines (`_Path.edges`), any other by its box. A picture has no stroke:
+    the text beside it is its own (a caption, a paragraph), and only text on it is a label
+    (infinite for a figure that is a picture alone)."""
+    if not figure.members:
+        return math.inf
+    best = min((_box_gap(box, b) for b in labels), default=math.inf)
+    for path in figure.members:
+        gap = _box_gap(box, path.bbox)
+        if gap >= best:
+            continue
+        if path.edges:
+            gap = min(_edge_gap(edge, box) for edge in path.edges)
+        best = min(best, gap)
+        if best <= 0:
+            break
+    return best
+
+
+def _label_owners(
+    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context
+) -> dict[int, _Figure]:
+    """The one rule for what a figure's labels are (SW40): the figure each row labels, by
+    the id of the row.
+
+    A row is a label of a figure when it lies within LABEL_REACH x its font size of the
+    figure's nearest drawn stroke (`_stroke_gap`), or when most of it is inside the
+    drawing's box (an inside row of any length: the text in a flowchart's boxes), and it is
+    no line of running text (`_running_text`: among the rows inside the drawing for an
+    inside row, among the page's for another: a paragraph that passes by a figure, a
+    title). Outside the drawing it is also short (`_short_label`) and no code (a program
+    listing in a box). Any kind of row counts, maths and rotated ones too: a part's name
+    on a circuit, an axis title, "R1 = 4 ohm". A caption never does (`_attach_captions`).
+    Found again and again from the figure and the labels it holds until nothing more is,
+    since an axis title stands a line beyond the tick labels; a row two figures could
+    claim goes to the nearer, by its distance to their strokes."""
+    owner: dict[int, _Figure] = {}
+    pending = [r for r in rows if not r.absorbed and not CAPTION.match(r.clean)]
+    if not figures or not pending:
+        return owner
+    on_page: set[int] | None = None  # the page's running text, found when a row is near
+    in_drawing: dict[int, set[int]] = {}  # and that of the rows inside each drawing
+    held: dict[int, list[BBox]] = {id(f): [] for f in figures}  # the labels found so far
+    while pending:
+        found: list[tuple[_Row, _Figure]] = []
+        left = []
+        for row in pending:
+            reach = LABEL_REACH * row.size * (LABEL_TURNED if row.vertical else 1.0)
+            best: tuple[float, _Figure, bool] | None = None
+            for figure in figures:
+                inside = _mostly_in(row.bbox, figure.drawing)
+                if not inside and not (
+                    _within(row.bbox, figure.drawing, reach)
+                    or any(_within(row.bbox, b, reach) for b in held[id(figure)])
+                ):
+                    continue
+                gap = _stroke_gap(row.bbox, figure, held[id(figure)])
+                if (inside or gap <= reach) and (best is None or gap < best[0]):
+                    best = (gap, figure, inside)
+            if best is None:
+                left.append(row)
+                continue
+            _, figure, inside = best
+            if inside:  # a line of a paragraph among the rows inside the drawing
+                if id(figure) not in in_drawing:
+                    in_drawing[id(figure)] = _running_text(
+                        [r for r in rows if not r.absorbed and _mostly_in(r.bbox, figure.drawing)],
+                        ctx,
+                    )
+                running = in_drawing[id(figure)]
+            else:  # ... or among the page's rows, where one runs on from a line above
+                if on_page is None:
+                    on_page = _running_text([r for r in rows if not r.absorbed], ctx)
+                running = on_page
+            if id(row) in running or not (
+                inside or (_short_label(row) and not (row.code and len(row.ink) >= CODE_MIN_GLYPHS))
+            ):
+                continue  # never a label, wherever it lies
+            found.append((row, figure))
+        for row, figure in found:
+            owner[id(row)] = figure
+            held[id(figure)].append(row.bbox)
+        pending = left if found else []
+    return owner
+
+
+def _claim_labels(figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context) -> None:
+    """Give each figure its labels (`_label_owners`) and grow its box, and so the picture
+    cut for the figure step, to hold them. Before, a chart's tick labels and category
+    names stayed in the body as stray paragraphs and its crop had none of them, so a model
+    estimated its values (F-399, accuracy round 2, 2026-11-11), and a circuit's part names,
+    an axis title or a part's name on a diagram became equations and one-letter paragraphs
+    (F-549, F-248)."""
+    owner = _label_owners(figures, rows, ctx)
+    for row in rows:
+        if figure := owner.get(id(row)):
+            row.absorbed = True
+            figure.labels.append(row)
+    for figure in figures:
+        if figure.labels:
+            figure.bbox = _union([figure.drawing, *(r.bbox for r in figure.labels)])
 
 
 REASON_DRAWING_FRAGMENTS = "drawing_fragments"
@@ -8119,73 +8304,9 @@ def _fragment_figures(
             continue
         for row in inside:
             row.absorbed = True
-        found.append(_Figure(box, paths=len(near), labels=inside, fragments=True))
+        found.append(_Figure(box, paths=len(near), labels=inside, fragments=True, members=near))
         held = [*held, box]
     return found
-
-
-def _absorb_outer_labels(figure: _Figure, drawing: BBox, rows: list[_Row], ctx: _Context) -> None:
-    """The labels of a vector drawing (`drawing`: its paths' box) beyond the ones
-    `_absorb_labels` took. Those join within 0.6 of a font size of the drawing, once, but
-    tick and category labels stand 6 to 13 pt off a chart's axes, and the axis title
-    stands a line beyond them: they stayed in the reading flow as stray paragraphs and
-    equations, and the picture cut for the figure step from the figure's box had no axis
-    values or category names, so its values were estimated (F-399, accuracy round 2,
-    2026-11-11). Looked for from the box as it grows, LABEL_PASSES times at most. A row
-    joins when it is
-    - a row of spread-out short words (`_spread_row`: tick or category labels) within
-      0.6 of its font size of the box, or
-    - a short row (LABEL_SHORT characters at most) within one font size of the box that is
-      vertical (a rotated axis title) or centred on the drawing (LABEL_CENTRED), and is no
-      line of the page's running text (`_running_text`), or
-    - a short quantity (LABEL_QUANTITY_GLYPHS glyphs of maths at most) set partly over the
-      drawing ("N = 49 N" beside a force arrow).
-    A caption, a line of code, a row larger than body text and display maths clear of the
-    drawing never join. The figure's box grows to what joined, so its crop holds them."""
-    dx0, dy0, dx1, dy1 = drawing
-    running: set[int] | None = None  # the lines of the page's paragraphs, found when needed
-    for _ in range(LABEL_PASSES):
-        x0, y0, x1, y1 = figure.bbox
-        added = []
-        for row in rows:
-            if row.absorbed or CAPTION.match(row.clean):
-                continue
-            if row.size > 1.05 * ctx.body or (row.code and len(row.ink) >= CODE_MIN_GLYPHS):
-                continue
-            rx0, ry0, rx1, ry1 = row.bbox
-            beside_y = min(ry1, y1) - max(ry0, y0) >= 0.5 * (ry1 - ry0)
-            beside_x = min(rx1, x1) - max(rx0, x0) >= 0.5 * (rx1 - rx0)
-            gap_x = max(rx0 - x1, x0 - rx1) if beside_y else math.inf  # to its left or right
-            gap_y = max(ry0 - y1, y0 - ry1) if beside_x else math.inf  # over or under it
-            if min(gap_x, gap_y) > row.size:
-                continue
-            if row.kind == "math" and len(row.ink) > 3:
-                over = min(rx1, dx1) > max(rx0, dx0) and min(ry1, dy1) > max(ry0, dy0)
-                if over and len(row.ink) <= LABEL_QUANTITY_GLYPHS:
-                    added.append(row)
-                continue
-            if _spread_row(row):
-                if min(gap_x, gap_y) <= 0.6 * row.size:
-                    added.append(row)
-                continue
-            if len(row.clean) > LABEL_SHORT:
-                continue
-            if running is None:  # a short line of a paragraph beside the drawing stays prose
-                running = _running_text([r for r in rows if not r.absorbed], ctx)
-            if id(row) in running:
-                continue
-            if gap_y <= row.size:  # over or under: centred across the drawing
-                mid, low, high = (rx0 + rx1) / 2, dx0, dx1
-            else:  # to one side: centred along its height
-                mid, low, high = (ry0 + ry1) / 2, dy0, dy1
-            if row.vertical or abs(mid - (low + high) / 2) <= LABEL_CENTRED * (high - low):
-                added.append(row)
-        if not added:
-            return
-        for row in added:
-            row.absorbed = True
-            figure.labels.append(row)
-        figure.bbox = _union([figure.bbox, *(r.bbox for r in added)])
 
 
 def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
@@ -8227,7 +8348,7 @@ def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
             if row.baseline - above.baseline > 2.0 * max(above.size, row.size):
                 break
             if (
-                id(above) in lines
+                (id(above) in lines or CAPTION.match(above.clean))  # a caption's tail is its own
                 and above.column == row.column
                 and _continues(above, row, _Run([above], "text", True), ctx)
             ):
@@ -9955,19 +10076,13 @@ def _page_blocks(
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     # A chart's tick labels in the footer band, or its axis title repeated on every slide,
     # are its labels, not running text.
-    restored = _figure_labels(dropped, figures, rows, page_rect.height, label_keys, margins)
+    restored = _figure_labels(dropped, figures, rows, page_rect.height, ctx, label_keys, margins)
     for row in restored:
         _classify_row(row)
     rows = [*rows, *restored]
-    drawings = {id(f): f.bbox for f in figures}  # each figure's own box, before its labels
-    figures = [f for f in figures if _absorb_labels(f, rows, ctx, page.parent)]
-    _take_labels(restored, figures, rows)
+    figures = [f for f in figures if not _backdrop(f, rows, ctx, page.parent)]
+    _claim_labels(figures, rows, ctx)
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
-    # Once every figure has the labels at its edges, a drawing's farther ones (tick and
-    # category labels, axis titles): the figure's box, and so its crop, grows to them.
-    for figure in figures:
-        if figure.paths and not figure.equation:
-            _absorb_outer_labels(figure, drawings[id(figure)], rows, ctx)
     figures += _fragment_figures(
         rows, loose, [f.bbox for f in figures] + [t.bbox for t in page_tables], ctx
     )
@@ -10104,32 +10219,31 @@ def _figure_labels(
     figures: Sequence[_Figure],
     rows: Sequence[_Row],
     height: float,
+    ctx: _Context,
     accepted: Collection[tuple] = frozenset(),
     margins: _MarginFilter | None = None,
 ) -> list[_Row]:
     """Rows the header and footer rules dropped (`_prepare_rows`) that label a figure: a
     chart's tick labels in the footer band (bare numbers, read as page numbers), its axis
     title repeated on every slide of a deck (a running footer), a rotated axis title
-    repeated at the same place (a watermark). A dropped row is a label when it is short
-    (LABEL_MAX_CHARS), not diagonal, and within LABEL_REACH x its size of a figure or of
-    the short rows just beside it (its tick labels), level with it for a rotated row and
-    under or over it otherwise (`_beside_figure`). Bare numbers count only two or more on
-    one baseline, or level with a figure when the document's page numbers are not there
-    (`margins.numbering`: an axis title "v" at the top of a full-page plot's y-axis, read
-    as a page number in roman numerals): a page number alone under a figure, or beside
-    one in the band where the other pages have theirs, is still a page number. Other text
-    counts only when its key is `accepted` (`_label_keys`: beside a figure wherever the
-    document repeats it), so a running footer that also runs under pages of text stays
-    dropped."""
+    repeated at the same place (a watermark). A dropped row is a label when the one rule
+    makes it one (`_label_owners`: short, not diagonal, near the figure's strokes or its
+    other labels). Bare numbers count only two or more on one baseline, or level with a
+    figure when the document's page numbers are not there (`margins.numbering`: an axis
+    title "v" at the top of a full-page plot's y-axis, read as a page number in roman
+    numerals): a page number alone under a figure, or beside one in the band where the
+    other pages have theirs, is still a page number. Other text counts only when its key is
+    `accepted` (`_label_keys`: beside a figure wherever the document repeats it), so a
+    running footer that also runs under pages of text stays dropped."""
     if not dropped or not figures:
         return []
-    extents = _figure_extents([f.bbox for f in figures], rows)
-    found = []
-    for row in _label_candidates(dropped, numbers=True):
-        if not _beside_figure(row, extents):
-            continue
-        if _is_number_row(row) or _label_key(row, height) in accepted:
-            found.append(row)
+    candidates = [
+        r
+        for r in _label_candidates(dropped, numbers=True)
+        if _is_number_row(r) or _label_key(r, height) in accepted
+    ]
+    owners = _label_owners(figures, [*rows, *candidates], ctx)
+    found = [r for r in candidates if id(r) in owners]
     numbers = [r for r in found if _is_number_row(r)]
     lone = {
         id(r)
@@ -10148,29 +10262,6 @@ def _gap(box: BBox, other: BBox) -> float:
     return max(0.0, other[0] - box[2], box[0] - other[2]) + max(
         0.0, other[1] - box[3], box[1] - other[3]
     )
-
-
-def _take_labels(
-    restored: Sequence[_Row], figures: Sequence[_Figure], rows: Sequence[_Row]
-) -> None:
-    """The rows `_figure_labels` took back from the header and footer bands are labels of
-    the figure they are beside, not text of their own, even beyond the reach of
-    `_absorb_labels` (a full-page plot's tick labels 6 pt under its x-axis in the footer
-    band were read as five paragraphs of one digit each)."""
-    for row in restored:
-        if row.absorbed:
-            continue
-        beside = [
-            (_gap(row.bbox, f.bbox), i)
-            for i, f in enumerate(figures)
-            if _beside_figure(row, _figure_extents([f.bbox], rows))
-        ]
-        if not beside:
-            continue
-        figure = figures[min(beside)[1]]
-        row.absorbed = True
-        figure.labels.append(row)
-        figure.bbox = _union([figure.bbox, row.bbox])
 
 
 def _is_number_row(row: _Row) -> bool:
@@ -10221,7 +10312,7 @@ def _label_candidates(dropped: Sequence[_Row], *, numbers: bool) -> list[_Row]:
     return [
         r
         for r in dropped
-        if not r.diagonal and len(r.clean) <= LABEL_MAX_CHARS and (numbers or not _is_number_row(r))
+        if not r.diagonal and _short_label(r) and (numbers or not _is_number_row(r))
     ]
 
 
@@ -10231,31 +10322,6 @@ def _label_key(row: _Row, height: float) -> tuple:
     if row.vertical:
         return ("rotated", *_rotated_key(row))
     return ("band", _margin_zone(row, height), _norm_margin(row.clean))
-
-
-def _figure_extents(boxes: Sequence[BBox], rows: Sequence[_Row]) -> list[BBox]:
-    """Each figure box grown by the short rows just beside it (its tick labels)."""
-    extents = []
-    for box in boxes:
-        near = [
-            r.bbox
-            for r in rows
-            if not r.vertical and len(r.clean) <= 25 and _within(r.bbox, box, 1.5 * r.size)
-        ]
-        extents.append(_union([box, *near]))
-    return extents
-
-
-def _beside_figure(row: _Row, extents: Sequence[BBox]) -> bool:
-    reach = LABEL_REACH * row.size
-    cx, cy = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
-    for x0, y0, x1, y1 in extents:
-        if row.vertical:
-            if y0 <= cy <= y1 and max(x0 - row.x1, row.x0 - x1) <= reach:
-                return True
-        elif x0 - reach <= cx <= x1 + reach and max(y0 - row.y1, row.y0 - y1) <= reach:
-            return True
-    return False
 
 
 def _label_keys(
@@ -10270,7 +10336,7 @@ def _label_keys(
     """Keys (`_label_key`) of the dropped repeated text that is beside a figure on every
     analysed page it was dropped from: an axis title repeated under each chart of a deck,
     not a running footer that also runs under pages of text. Only pages with such a
-    candidate pay for a first look at their figures (`_figure_boxes`). A page that raises
+    candidate pay for a first look at their figures (`_rough_figures`). A page that raises
     (`guard`) says nothing: the keys are those of the other pages."""
     near: set[tuple] = set()
     far: set[tuple] = set()
@@ -10285,28 +10351,26 @@ def _label_keys(
             if not candidates:
                 continue  # nothing, or only what a page of text already ruled out
             rows = prepared[n][0]
-            extents = _figure_extents(_figure_boxes(page, rows, paths[n], ctx, margins), rows)
-            here = [
-                (_label_key(row, page.rect.height), _beside_figure(row, extents))
-                for row in candidates
-            ]
+            figures = _rough_figures(page, rows, paths[n], ctx, margins)
+            owners = _label_owners(figures, [*rows, *candidates], ctx)
+            here = [(_label_key(row, page.rect.height), id(row) in owners) for row in candidates]
             near.update(key for key, beside in here if beside)
             far.update(key for key, beside in here if not beside)
     return near - far
 
 
-def _figure_boxes(
+def _rough_figures(
     page: pymupdf.Page,
     rows: list[_Row],
     paths: list[_Path],
     ctx: _Context,
     margins: _MarginFilter,
-) -> list[BBox]:
-    """The page's figure boxes as `_page_blocks` finds them, roughly (equation rules are
+) -> list[_Figure]:
+    """The page's figures as `_page_blocks` finds them, roughly (equation rules are
     not taken out first): for `_label_keys` only."""
     rect = page.rect
     figures = _merge_figures(_raster_figures(page, rect) + _vector_figures(paths, rows, rect, ctx))
-    return [f.bbox for f in figures if not margins.drops_figure(f.bbox, rect.height)]
+    return [f for f in figures if not margins.drops_figure(f.bbox, rect.height)]
 
 
 def _leftover_drawings(

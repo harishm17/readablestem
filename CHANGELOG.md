@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: one label rule by distance, and three vanishing shapes (branch fix/figure-labels-vanishing-shapes)
+
+`PIPELINE_VERSION` needs a bump at merge.
+
+- SW40 (with WS6.12's reaches): a figure's labels were found by five reaches that disagreed
+  (`LABEL_REACH`, `AXIS_LABEL_REACH`, `_absorb_labels`, `_absorb_outer_labels` and the dropped
+  rows' `_figure_labels` take, with a test by kind of row). `_label_owners` is now the one
+  rule: a short row of any kind and turning, within `LABEL_REACH` (1.0) x its font size of the
+  figure's nearest drawn stroke (`_stroke_gap`: the strokes, not the box), or of a label the
+  figure holds, or mostly inside its drawing, and no line of running text, a caption or code,
+  is its label. It runs until stable; a row two figures could claim goes to the nearer. Turned
+  rows reach 2.5 times as far (`LABEL_TURNED`) and hold 40 characters. A picture has no
+  strokes: only the rows on it are its labels. A triangle's sides and angle, a circuit's part
+  names, "R1 = 4 ohm" and a graph's tick labels are labels of their figure, not equations and
+  stray paragraphs.
+- WS6.15 step 1: a timeline's ruler (a thin line with ticks) fell under the 24 pt a figure
+  needs on both sides, so its drawing was dropped and its labels became a paragraph: a long
+  ruler with ticks is a figure (`thin_ruler`). A free-body diagram's force arrows, each thin
+  and 20 pt off the box, were lost: a small drawing joins a figure within `LEFTOVER_REACH`.
+  A circuit's parts are found by the label rule. Step 2 (a count of drawings no element
+  claims) is not built.
+
 ## Unreleased: a drawing set as glyphs is a figure (branch fix/glyph-drawn-figures)
 
 - WS6.11 (F-550): LaTeX's picture environment sets slanted lines, arrowheads and arcs as glyphs

@@ -97,7 +97,7 @@ STAGES = {
     "tables": (layout, "_claim_tables", _on_page, 1),
     "rows": (layout, "_prepare_rows", _on_page, 1),
     "list_markers": (layout, "_marker_candidate", _on_row, 1),
-    "label_keys": (layout, "_figure_boxes", _on_page, 0),
+    "label_keys": (layout, "_rough_figures", _on_page, 0),
     "blocks": (layout, "_page_blocks", _on_page, 1),
     "elements": (layout, "_whole_pieces", _on_block, 1),
     "safety_net": (layout, "_page_picture", _on_page, 1),
