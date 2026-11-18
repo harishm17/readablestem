@@ -1239,23 +1239,28 @@ def _group(
     )
 
 
-def _load(
-    request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, CropSizes]:
-    view, result, crops, _ = _load_versioned(request, job_id, user)
-    return view, result, crops
+def _load_result(request: Request, job_id: str, user: CurrentUser) -> DocumentResult:
+    """The job's result, for a route that needs the document and nothing else (a picture of
+    one item, the live check of a typed equation). Not `_load_versioned`: the job's summary
+    and the crop sizes are the screen's, and cost far more than what these routes use."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        refresh_readings(result)  # "Read aloud roughly as" says what the rules in force say
+    return result
 
 
-def _load_versioned(
-    request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, CropSizes, int]:
+def _load_versioned(request: Request, job_id: str, user: CurrentUser) -> Loaded:
     """`_load`, and the job's review version: what the page's forms carry (stale guard).
     The crops are the elements that have a stored crop, each with its size in pixels."""
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         role = shares.role_of(session, job, user) or REVIEW
-        view = job_view(session, job, with_summary=True, role=role)
+        # No summary: the review screens count from the result they just read, and only the
+        # job page shows the counts `job_view(with_summary=True)` makes (a second pass over it).
+        view = job_view(session, job, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
         refresh_readings(result)  # "Read aloud roughly as" says what the rules in force say
         crops = _crop_sizes(session, job.id)
@@ -1266,6 +1271,9 @@ def _load_versioned(
 # A PNG file holds its width and height as two 4-byte numbers at bytes 16 to 24: the
 # database hands back those 8 bytes, not the crop.
 CropSizes = dict[str, tuple[int, int] | None]
+
+# What `_load_versioned` reads: the job's view, its result, its crops and its review version.
+Loaded = tuple[JobView, DocumentResult, CropSizes, int]
 
 
 def _crop_sizes(session: Session, job_id: str) -> CropSizes:

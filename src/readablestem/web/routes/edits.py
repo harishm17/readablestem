@@ -368,9 +368,10 @@ def _page_size(
     request: Request, job_id: str, user: CurrentUser, number: str
 ) -> tuple[int, float, float]:
     """(0-based page, width, height in points) of a page of the user's job."""
-    from readablestem.web.routes.split import _load, resolve_page_sizes
+    from readablestem.web.routes.review import _load_result
+    from readablestem.web.routes.split import resolve_page_sizes
 
-    _, result, _ = _load(request, job_id, user)
+    result = _load_result(request, job_id, user)
     pages = page_edits.page_count(result, 0)
     page = page_number(number, pages)
     sizes = resolve_page_sizes(request, job_id, user, result)

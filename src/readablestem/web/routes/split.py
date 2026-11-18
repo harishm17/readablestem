@@ -121,11 +121,12 @@ from readablestem.web.routes.review import (
     HEADING_GROUP_FLASH,
     CheckView,
     HeadingGroupView,
+    Loaded,
     PageGroupView,
     ReviewItem,
     _heading_group,
     _item,
-    _load,
+    _load_result,
     _load_versioned,
     page_group_view,
     stale_notice,
@@ -614,10 +615,15 @@ class SplitBuilder:
         user: CurrentUser,
         *,
         show_accepted: bool,
+        loaded: Loaded | None = None,
     ) -> None:
         self.request = request
         self.user = user
-        self.view, self.result, self.crop_ids, self.version = _load_versioned(request, job_id, user)
+        # `loaded`: a caller that already read the job (`review_screen`) hands it over, so
+        # the result is parsed and summed up once for the screen, not twice.
+        self.view, self.result, self.crop_ids, self.version = loaded or _load_versioned(
+            request, job_id, user
+        )
         self.job_id = self.view.id
         self.show_accepted = show_accepted
         self.page_mode = False  # set by `split_page`: "Fix something on a page"
@@ -1560,11 +1566,12 @@ def split_page(
     after: str = "",
     before: str = "",
     page_mode: bool = False,
+    loaded: Loaded | None = None,
 ) -> Response:
     """`page_mode`: "Fix something on a page" (WS19.6): the page's tools are the first panel,
     under the heading "Page N", with no decision (so none of another page) before them; the
     optional checks of that page follow."""
-    builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted)
+    builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted, loaded=loaded)
     builder.page_mode = page_mode
     place = None if page_mode else builder.note(note)
     decision, fix = (None, None) if place is not None or page_mode else builder.select(item)
@@ -1598,11 +1605,14 @@ def split_page(
     page_view = builder.page_view(number, selected, current_key, place.key if place else None)
     # Stylesheets of mark positions: the page shown, and the page of the decision's equation
     # (its proposal is sized under its crop by a rule in that page's stylesheet).
-    mark_pages = [number]
+    shown = [number]
     if panel.item is not None and panel.item.kind == "equation":
         home = builder.elements.get(panel.item.element_id)
         if home is not None and home.page + 1 != number:
-            mark_pages.append(home.page + 1)
+            shown.append(home.page + 1)
+    # Each link carries the stylesheet's own tag (`marks_css`), so the browser keeps the file
+    # for as long as the page's marks are the same: a decision on the same page asks for nothing.
+    mark_pages = [(n, page_marks(builder.result, builder.sizes, n - 1).tag()) for n in shown]
     open_count = sum(d.open for d in builder.queue)
     optional = builder.optional_lines(number if page_mode else None)
     flashes = pop_flash(request)
@@ -1743,7 +1753,8 @@ def review_screen(
     `top`, `right`, `bottom` (or `after` and `before`, two lines of the page): the region being
     described for something to add."""
     shown = accepted == "1"
-    view, loaded, _ = _load(request, job_id, user)
+    read = _load_versioned(request, job_id, user)
+    view, loaded = read[0], read[1]
     if loaded.origin != "pdf":
         # A LaTeX source has no page to show beside its decisions: its list, at the item a
         # link asked for ("Decide it" on the job page), so the link does not lose its place.
@@ -1772,6 +1783,7 @@ def review_screen(
         after=after,
         before=before,
         page_mode=mode == "page" and not item and not note,
+        loaded=read,
     )
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "split")
@@ -1824,7 +1836,7 @@ def live_check(
         raise CsrfFailed()
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
-    _, result, _ = _load(request, job_id, user)
+    result = _load_result(request, job_id, user)
     element_id = element_ref(result, element_id)
     fix = result.fix_for(element_id)
     if fix is None or fix.kind is not Kind.EQUATION:
@@ -1892,7 +1904,7 @@ class PageMarks:
     notes: dict[str, marks.BBox]
     equations: list[Element]  # one for each fix of an equation on the page
 
-    def etag(self) -> str:
+    def tag(self) -> str:
         """Same inputs, same stylesheet, same tag (`marks.PLACEMENT_VERSION` changes it when
         the code that makes the stylesheet does)."""
         parts = [
@@ -1904,7 +1916,10 @@ class PageMarks:
             list(self.notes.items()),
             [(e.id, e.bbox, e.font_size, e.display) for e in self.equations],
         ]
-        return '"' + hashlib.sha256(json.dumps(parts).encode("utf-8")).hexdigest()[:32] + '"'
+        return hashlib.sha256(json.dumps(parts).encode("utf-8")).hexdigest()[:32]
+
+    def etag(self) -> str:
+        return f'"{self.tag()}"'
 
     def css(self) -> str:
         rules: list[str] = []
@@ -1975,7 +1990,9 @@ def page_marks(
 
 
 @router.get("/jobs/{job_id}/review/marks.css")
-def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> Response:
+def marks_css(
+    request: Request, job_id: str, user: UserDep, page: str = "", v: str = ""
+) -> Response:
     """Where each mark goes on one page image (`web.marks`: a frame round the element and a
     clickable area of at least 24 CSS px that overlaps no other), and the size the proposal of
     each equation on that page is drawn at under its crop. Element ids and numbers only.
@@ -1983,8 +2000,11 @@ def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> R
     The screen links the stylesheet of the page it shows. Its `ETag` is a hash of
     what it is made from (`PageMarks.etag`), so the browser asks again each time
     (`no-cache`) and gets a 304 when that has not changed, without a mark being placed. It is
-    asked only after the same checks as the screen itself."""
-    # Not `_load`: the job's summary and crops are the screen's, and cost far more than this.
+    asked only after the same checks as the screen itself. `v`, the tag the screen's link
+    carries, is the same as this page's tag only while the page's marks are unchanged: then the
+    file is kept without asking again, since a new page's marks are a new address. Without it,
+    or from a screen drawn before the marks moved, it is asked again each time."""
+    # Not `_load_versioned`: the job's summary and crops are the screen's and cost far more.
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
         require_done(job)
@@ -1995,7 +2015,8 @@ def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> R
     sizes = resolve_page_sizes(request, job_id, user, result)
     plan = page_marks(result, sizes, int(page) - 1)
     etag = plan.etag()
-    headers = {"Cache-Control": "private, no-cache", "ETag": etag}
+    keep = "private, max-age=31536000, immutable" if v == plan.tag() else "private, no-cache"
+    headers = {"Cache-Control": keep, "ETag": etag}
     if asked_for(request, etag):
         return Response(status_code=304, headers=headers)
     return Response(plan.css(), media_type="text/css; charset=utf-8", headers=headers)
@@ -2035,7 +2056,7 @@ def region_image(request: Request, job_id: str, element_id: str, user: UserDep) 
     differing symbol outlined), a heading with the lines around it, a figure."""
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
-    _, result, _ = _load(request, job_id, user)
+    result = _load_result(request, job_id, user)
     element_id = element_ref(result, element_id)
     element = next((e for e in result.elements if e.id == element_id), None)
     fix = result.fix_for(element_id)

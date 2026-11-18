@@ -60,6 +60,25 @@
   keeping the original of a PowerPoint or a PDF-route Word file (the reader cannot use it and
   it would hold the author's name and tracked changes longer than the notice says), a table of
   kinds, a new reader. No migration; no model request changed.
+## Unreleased: a review action is quick on a large document (branch perf/review-action-one-card)
+
+- PF3 (F-273, F-281), measured first, built as far as the numbers asked. On a generated 100-page
+  document with 350 decisions and 3,350 elements, in a real browser, click to paint for Accept
+  was 1,010 ms (worst 1,165) before, one-at-a-time view; next card 772 ms; saving an edit
+  1,353 ms. Where the time went: the screen read and summed up the whole result twice (once for
+  the origin check, once in the page builder) and its counts were never shown on it; the text
+  of each paragraph asked for the whole document's equation numbers (64 times a screen); the
+  picture and live-check routes loaded the job's summary and crop sizes they do not use; Python's
+  garbage collector, at its stock threshold, passed over the 100,000 small objects of the result
+  all through each write (115 of 250 ms of an Accept); and `marks.css` was asked for after every
+  action though it had not changed. Now: the screen loads once and without the summary
+  (`routes/review.py` `_load_versioned`, `_load_result`; `routes/split.py`), equation numbers are
+  made only for a text that has an inline equation (`web/page_edits.py`), the web process raises
+  the collector's threshold (`web/app.py`), and the stylesheet link carries the page's tag so a
+  decision on the same page asks for nothing (`marks.css?page=N&v=<tag>`, kept as immutable; a
+  link without the tag still revalidates). The answer to an action is still the screen, not one
+  card: with these the actions are inside 0.5 s, and a one-card answer would not remove the
+  load of the whole result that both the action and the next card need.
 
 ## Unreleased: the buttons that lose work or access ask first (branch fix/destructive-actions-confirm)
 
