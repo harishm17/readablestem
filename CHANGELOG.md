@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: links in Word and LaTeX documents, and a combined file's languages (branch fix/source-links-and-combined-language)
+
+- Documents made from a Word file or LaTeX get what the links work gave a PDF: an address typed
+  in the text with no link ("www.example.org", "name@host.edu") and a reference by number
+  ("Figure 2", "Table 1", "Equation (3)", "Section 3.2", "Theorem 2.1") become links, through
+  the same two functions (`text_pass.source_links`, called in `source.convert`). The links the
+  file itself has are kept as they were and never overlapped; nothing is linked inside math;
+  the job page's count of links kept still counts only the file's own. LaTeX leaves a heading's
+  and a caption's number out of their text, so its reader now hands the number over
+  (`Reading.printed`) for the targets; without it only equations and theorems would have been
+  found. A table's own caption now names a table in any document (`crossref_targets`). LaTeX's
+  `\ref` links are still not kept (the reference stays as text). Not a change to any model
+  request. Adds to the reasons for the one `PIPELINE_VERSION` bump owed at the pull request.
+- A combined file (`pipeline/combine.py`) now writes each part in its own language: a part in
+  another language than the file's has `lang` on its paragraphs, list items and headings, where
+  before they were read in the file's language. The file's language is the one most parts have,
+  by language subtag; a part whose language was assumed or mixed and not yet confirmed neither
+  votes nor is marked. The combine page says once when such a part exists or when no language
+  is held by most parts, however many parts there are. The combined file is stored nowhere
+  and has no language control; the language is changed on a part, and the next file follows.
 ## Unreleased: typed addresses and numbered references are links (branch feat/links-typed-and-references)
 
 - SW52 (F-517, F-518), as far as its triage line: a web address (`https://`, `http://`, `www.`)
