@@ -873,7 +873,7 @@ def test_the_link_page_has_no_cookie_and_the_headers_that_keep_it_private(ready_
     again = ready_site.who[OWNER].get(f"/jobs/{ready_site.job_id}/share")
     assert "2 times" in again.text and token not in again.text
     # Both pages say the rule: kept past the link's last day for the document's usual window.
-    assert "at least until the link's last day and then for 24 hours" in again.text
+    assert "to the link's last day and for 24 hours after that" in again.text
     job_page = ready_site.who[OWNER].get(f"/jobs/{ready_site.job_id}").text
     assert "its class link works until" in job_page and "kept for 24 hours after that" in job_page
 

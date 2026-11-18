@@ -141,16 +141,16 @@ def window_words(settings: Settings, mode: str) -> str:
 
 
 def after_link_words(settings: Settings, mode: str) -> str:
-    """What the document gets after its class link's last day, as a clause that follows "then"
-    or "after that": "for 24 hours"; for `dev`, a day, or the rest of its 30 days from upload
-    if that is longer."""
+    """What the document gets after its class link's last day, as the end of a sentence that
+    has just named that day: "for 24 hours after that"; for `dev`, a day, or the rest of its
+    30 days from upload if that is longer."""
     day = span_words(window(settings, "day"))
     if mode == "dev":
         return (
-            f"for {day}, or to the end of its {window_words(settings, mode)} from upload "
-            "if that is later"
+            f"for {day} after that, or to the end of its {window_words(settings, mode)} from "
+            "upload if that is later"
         )
-    return f"for {window_words(settings, mode)}"
+    return f"for {window_words(settings, mode)} after that"
 
 
 def kept_line(
@@ -168,7 +168,7 @@ def kept_line(
     if link_until is not None:
         return (
             f"Kept until {when}: its class link works until {format_when(link_until)}, "
-            f"and the document is kept {after_link_words(settings, mode)} after that."
+            f"and the document is kept {after_link_words(settings, mode)}."
         )
     if mode == "dev":
         return (

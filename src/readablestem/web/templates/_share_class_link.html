@@ -30,7 +30,7 @@
   </dl>
   {% if cl.link.kept %}
   {% if not cl.address %}<p class="hint">The address was shown once, when the link was made. If you lost it, make a new link.</p>{% endif %}
-  <p class="hint">This document is kept until {{ retain_until|utc }}, at least until the link's last day and then {{ cl.after }}.</p>
+  <p class="hint">This document is kept until {{ retain_until|utc }}. A link keeps its document to the link's last day and {{ cl.after }}.</p>
   {% if cl.out_of_date %}
   <p id="class-link-stale">The published copy is version {{ cl.published }}. Your document is now version {{ cl.current }}.{% if not cl.ready %} Finish checking it to publish the new version.{% endif %}</p>
   {% endif %}
