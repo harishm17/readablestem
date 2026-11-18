@@ -29,10 +29,11 @@ ElementKind = Literal["text", "image", "equation_candidate"]
 
 # Font families used only for maths: TeX (CM*, AMS MSAM/MSBM, txfonts/pxfonts, rsfs,
 # euler), OpenType maths fonts (Cambria Math, Latin Modern Math, STIX Two Math, Noto Sans
-# Math: all contain "Math"), Word/MathType (MT Extra, Euclid) and Symbol.
+# Math: all contain "Math"), Word/MathType (MT Extra, Euclid), MathTime Pro 2 (MT2MIT, MT2SYT,
+# MT2EXA, ...: "MT2" and three or four letters) and Symbol.
 MATH_FONT = re.compile(
     r"(CMMI|CMSY|CMEX|CMBSY|MSAM|MSBM|Math|Symbol|STIX|MTExtra|MT Extra|Euclid|"
-    r"rsfs|eufm|eurm|txmi|pxmi|txsy|pxsy|txex|pxex|MTMI|MTSY|esint)",
+    r"rsfs|eufm|eurm|txmi|pxmi|txsy|pxsy|txex|pxex|MTMI|MTSY|esint|MT2[A-Z]{3,4}\b)",
     re.I,
 )
 RELATIONS = set("=<>\u2264\u2265\u2260\u2248\u2261\u221d\u2192")  # <= >= != ~= == prop ->

@@ -632,6 +632,8 @@ def test_bullets_of_symbol_fonts_are_list_items_by_font_name(font, rows, differe
         ("AdvP4C4E74", "The sum a\\376b\\274c is small.", "", "a+b=c"),
         ("Wingdings", "The step \\001 follows it.", "1 /uniF0E0", "→"),  # maths, so an equation
         ("CMR10", "The e\\013ects are small.", "11 /uni000B", "effects"),
+        # MathTime Pro 2 draws its parentheses at the codes of "." and "/"
+        ("MT2MIT", "The value p.n/ is small.", "", "p(n)"),
     ],
 )
 def test_codes_are_read_as_what_their_font_draws(font, row, differences, word):

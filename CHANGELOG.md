@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: MathTime Pro 2 fonts are read as what they draw (branch fix/mathtime-font-tables)
+
+- Text: the MathTime Pro 2 fonts (MT2MIT, MT2MIS, MT2MIF, MT2BMIT, MT2SYT, MT2SYS, MT2SYF, MT2SYAT,
+  MT2EXA) have rows in `pipeline/font_codes.py`, keyed on the font and what its glyph is read as,
+  and on the glyph's name for a glyph the reader gives as U+FFFD (`glyph_names.recover` asks the
+  table first). Parentheses, "+" and "=", Greek letters, big delimiters, sums and the pieces of
+  built-up brackets are no longer other characters or gap marks. The fonts count as maths fonts
+  (`parse.MATH_FONT`, and layout's math italic, bold italic and maths symbol face tests). Element
+  text changes on documents with these fonts, so `PIPELINE_VERSION` needs a bump at merge.
+
 ## Unreleased: right-to-left text and run-together answer options are a decision (branch feat/text-decisions)
 
 - WS16.6 part 1: `rtl_text` and `option_labels` raise a decision on the paragraph or list
