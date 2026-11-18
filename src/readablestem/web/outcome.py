@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from readablestem.core.types import PageType
 from readablestem.pipeline import page_type
+from readablestem.pipeline.checked_words import source_noun
 
 if TYPE_CHECKING:
     from readablestem.config import Settings
@@ -139,8 +140,9 @@ def unread_message(result_json: dict[str, Any] | None) -> str:
     if not (words or pictures):
         return ""
     one = words + pictures == 1
+    noun = source_noun(str((result_json or {}).get("origin", "pdf")))
     return (
-        f"This tool could not read part of the LaTeX source: {unread_phrase(words, pictures)} "
+        f"This tool could not read part of the {noun}: {unread_phrase(words, pictures)} "
         f"from it {'is' if one else 'are'} not in the file, as listed under “Not handled in "
         f"this file” below. Check that the file reads well without {'it' if one else 'them'} "
         "before you share it, or upload the PDF instead."

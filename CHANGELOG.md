@@ -104,6 +104,31 @@
   are in D3 and D4 and its results rows are the table of criterion rows there). The links in
   `docs/README.md`, `docs/acr/` and `tests/fixtures/web/keyboard.py` point to it. No public claim
   changed.
+## Unreleased: the source's own words and front matter (branch feat/source-words-and-front-matter)
+
+- SW18.1, SW18.6, WS18.21 (F-129): one function says what the file is (`checked_words.source_noun`:
+  "PDF", "LaTeX source", "LaTeX slide deck", "Word file"). The job page, the review list, the
+  record's "Not checked" list, the "could not read part of the ..." lines, the equation hint and
+  the first sentence of the student note use it, so a LaTeX job no longer says "PDF" where the
+  file is the source. The note also says which file it is in: the EPUB, Word, Canvas and Common
+  Cartridge files say "an EPUB / a Word / a Canvas / a Common Cartridge version" and not "a web
+  version" (`assemble.with_medium`, on the finished page), and the EPUB drops the skip link as
+  the Word and Canvas files already did. A PDF job's note is unchanged. A `RENDER_VERSION` bump
+  is owed (the note's wording for stored LaTeX, slide-deck and Word documents).
+- SW18.4: a source whose conversion program ran out of its own time (a macro that calls itself, a
+  very large file) stops with `source_timeout` and says that trying again will not help, in place
+  of the shared `timeout` that offered "Try again" and advice about "splitting the PDF". It is
+  an error code, not a stored field. Memory or output limits are not told apart yet
+  (`source_too_large` is not built).
+- WS18.8 (F-471): "Upload a revised version" and the exam "Change" link are not offered on a source
+  job, and `/app?revises=` or an upload with `revises` for one is refused in words. Revising a
+  source stays held.
+- SW18.3, WS18.10: the title has no `\thanks` in it; each author is a line with where they work
+  and their own note; a table cell of words and a formula is read as math; `header_cols` comes
+  from LaTeXML's row heads; color set on words is kept as a color run. No new stored field.
+  Stored LaTeX documents render as before until they are converted again; a `PIPELINE_VERSION`
+  bump is owed because the same source now converts differently. No model call, no migration,
+  no prompt changed.
 
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 

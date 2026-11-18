@@ -22,6 +22,7 @@ import pytest
 import canvas_sanitizer as cs
 import readablestem
 from readablestem.pipeline import export_canvas as ec
+from readablestem.pipeline.assemble import with_medium
 from readablestem.pipeline.export_canvas import (
     CanvasExportError,
     build_zip,
@@ -130,7 +131,7 @@ def test_the_page_keeps_what_a_reader_needs(made):
     page = export.page_html or ""
     assert ("skip-link" in html) == export.notes.skip_link_left_out  # deliberately left out
     assert "skip-link" not in page and "main-content" not in page  # left out on purpose
-    source = cs.content(cs.parse(without_skip_link(html)))
+    source = cs.content(cs.parse(with_medium(without_skip_link(html), "Canvas")))
     got = cs.content(cs.sanitize(cs.parse(export.page_html or "")))
     # every image, with its alt text (an empty alt stays empty), at an address Canvas keeps
     assert [alt for _, alt in got.images] == [alt for _, alt in source.images]

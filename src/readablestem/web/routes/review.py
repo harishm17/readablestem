@@ -65,7 +65,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.pipeline import table_math
+from readablestem.pipeline import checked_words, table_math
 from readablestem.pipeline.layout import CROP_PAD, REASON_LARGER_FONT
 from readablestem.pipeline.notices import TEXT_NOTICE_OF
 from readablestem.pipeline.speech import refresh_readings
@@ -1030,7 +1030,11 @@ def _item(
         source_note=source_note,
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
         can_describe=describable,
-        describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "") if describable else "",
+        describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "").format(
+            source=checked_words.source_noun(origin)
+        )
+        if describable
+        else "",
         alt_guidance=ALT_GUIDANCE.get(fix.figure.figure_type, ALT_GUIDANCE["other"])
         if fix.figure is not None
         else "",
@@ -1070,7 +1074,7 @@ ALT_GUIDANCE = {
 
 # What a description in words replaces, by the kind of item kept as an image (T3-16).
 DESCRIBE_HINTS = {
-    "equation": "Students using a screen reader hear this instead of the PDF's own text of "
+    "equation": "Students using a screen reader hear this instead of the {source}'s own text of "
     "the equation. Say the equation in words, for example “v equals d over t”.",
     "table": "Students using a screen reader hear this instead of “table not converted”. "
     "Say what the table holds and what it shows.",
@@ -1741,6 +1745,9 @@ def _page(
         # A LaTeX source has no page pictures, so no review screen and no page tools (the
         # screen redirects here, `routes.split`): no link that leads back to this page.
         "has_pages": result.origin == "pdf",
+        # What the document was made from, for the words about it (`checked_words.source_noun`).
+        "source": checked_words.source_noun(result.origin),
+        "from_source": result.origin != "pdf",
         "job": view,
         "groups": list(groups.values()),
         "deciding": shown_groups,

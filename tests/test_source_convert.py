@@ -50,7 +50,7 @@ def test_amsmath_gives_exact_equations_with_no_decision():
     latex = [f.equation.latex for f in result.fixes if f.equation]
     assert any("vmatrix" in text for text in latex) and any(r"\int" in text for text in latex)
     assert "<math" in result.html and "<mtable" in result.html  # the matrix and the cases
-    assert "web version of a LaTeX document from your course" in result.html
+    assert "web version of a LaTeX source from your course" in result.html
     assert not [c for c in result.html_checks if not c.passed and c.severity == "error"]
 
 

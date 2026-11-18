@@ -42,7 +42,7 @@ from html.parser import HTMLParser
 from io import BytesIO
 
 from readablestem.pipeline import checked_words, navigation, output_chars, student_sheet
-from readablestem.pipeline.assemble import SUMMARY_META
+from readablestem.pipeline.assemble import SUMMARY_META, with_medium
 
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
@@ -470,6 +470,7 @@ def export_canvas(
     if course_number is not None and not valid_course_number(course_number):
         raise CanvasExportError("a course number is digits only")
 
+    html = with_medium(html, "Canvas")
     notes = Notes()
     standalone = _parse(html)
     statement = page_meta(standalone, SUMMARY_META) or ""

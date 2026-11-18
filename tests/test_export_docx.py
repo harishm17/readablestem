@@ -100,10 +100,15 @@ def test_every_equation_is_a_native_equation(made):
     assert len(equations) == count(html, "math") == export.equations
 
 
-@pytest.mark.parametrize("fixture", ["golden/sample", "golden/stored_demo_0_2_0"])
+@pytest.mark.parametrize(
+    "fixture",
+    ["golden/sample", "golden/stored_demo_0_2_0", "latex/tables.pdf", "latex/problem_set.pdf"],
+)
 def test_the_note_about_this_version_is_in_every_output_once(fixture):
     """One page, one note: the Word file, the EPUB, the Canvas page and Listen's transcript
-    each carry the note's facts, said once (pandoc reads only `<main>`, F-127)."""
+    each carry the note's facts, said once (pandoc reads only `<main>`, F-127). Its first
+    sentence names the file it is (a PDF, a LaTeX source) and the version it sits in: only
+    the web page says "a web version" (SW18.6)."""
     html = source_html(fixture)
     about = re.search(r'<section id="about-conversion".*?</section>', html, re.S)
     assert about is not None
@@ -112,6 +117,8 @@ def test_the_note_about_this_version_is_in_every_output_once(fixture):
         for p in re.findall(r"<p\b[^>]*>(.*?)</p>", about.group(0), re.S)
     ]
     assert lines[0] == ABOUT_TITLE and len(lines) >= 3
+    opening = lines[1]
+    assert opening.startswith("This is a web version of a ")
     word = open_docx(ed.export_docx(html).data)
     canvas = export_canvas(html, title="Doc", folder="doc-3f9a2b", course_number="12345")
     texts = {
@@ -120,9 +127,11 @@ def test_the_note_about_this_version_is_in_every_output_once(fixture):
         "canvas": plain(canvas.page_html or ""),
         "listen": [item.text for item in listen.build_transcript(html, {})],
     }
+    versions = {"word": "a Word", "epub": "an EPUB", "canvas": "a Canvas", "listen": "a web"}
     for name, text in texts.items():
         joined = " ".join(text) if isinstance(text, list) else text
-        assert all(line in joined for line in lines[1:]), name
+        assert all(line in joined for line in lines[2:]), name
+        assert opening.replace("a web", versions[name], 1) in joined, name
         assert joined.count(CONTACT) == 1, name
 
 

@@ -1285,7 +1285,12 @@ so it says no more than was done. It has no review screen's words ("needs review
 "rejected"). In order:
 
 - what this is: "This is a web version of a PDF from your course, made with ReadableSTEM, a
-  tool that assists with accessibility.", plus how many equations a screen reader can read:
+  tool that assists with accessibility." The noun is the source's (`checked_words.source_noun`,
+  the one function every surface that names the file uses): "PDF", "LaTeX source", "LaTeX
+  slide deck", "Word file". The medium is the file's: the EPUB, Word, Canvas and Common
+  Cartridge files say "an EPUB version", "a Word version", "a Canvas version", "a Common
+  Cartridge version" (`assemble.with_medium`, done on the finished page, so the page itself
+  is unchanged). Then how many equations a screen reader can read:
   "Its equations are written so that screen readers can read them aloud." when all are, "2
   of its 5 equations are written so that screen readers can read them aloud; the others are
   pictures." when some are, nothing when none is (the pictures sentence says so);

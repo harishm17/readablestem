@@ -63,7 +63,7 @@ RETRY_HINTS = {
     "budget_daily": "After 00:00 UTC, use “Try again”: what was already converted is kept.",
     "lease_expired": "Use “Try again”: what was already converted is kept.",
     "timeout": "You can use “Try again”: what was already converted is kept. If it stops "
-    "again, try splitting the PDF into smaller parts.",
+    "again, try splitting the document into smaller parts.",
     "conversion_unavailable": "Use “Try again” in a little while.",
     "store_failed": "Use “Try again”: what was already converted is kept.",
     "internal_error": "You can use “Try again”: what was already converted is kept.",
@@ -94,6 +94,9 @@ JOB_ERROR_MESSAGES = {
     # is kept.
     "source_failed": "This source file could not be converted. Upload the PDF instead.",
     "source_unreadable": "This source file could not be converted. Upload the PDF instead.",
+    "source_timeout": "This source file did not finish in the time one conversion may take, "
+    "which usually means a macro that calls itself or a file that is very large. Trying again "
+    "will not change that. Fix it, or compile it and upload the PDF.",
     "source_refused": "This source file uses something this tool will not run. Remove it, "
     "or upload the PDF instead.",
     "source_busy": "The server is busy right now and could not start converting this source "
