@@ -1,0 +1,68 @@
+{# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
+{# Who can open every document of this course (routes/courses.py add_person, web/shares.py;
+   FEATURE_COURSE_GRANTS). The share page's form and words, for a whole course. Needs course,
+   people (rows, roles, role_words, max), people_typed, people_typed_role and the page's
+   field_errors. Plain forms: no script is needed. Nothing is emailed; the owner tells the
+   person. #}
+<section aria-labelledby="people-heading" id="people">
+  <h2 id="people-heading">People</h2>
+  <p>Give a person access to every document in this course, including the ones you add later. Nothing is emailed from here: tell them yourself. They must sign in with the address you enter.</p>
+  {% set email_error = field_errors.get("people-email") if field_errors else none %}
+  {% set role_error = field_errors.get("people-role") if field_errors else none %}
+  <h3 id="people-add-heading">Add a person</h3>
+  {% call form("people.add", "/courses/" ~ course.id ~ "/people", {"novalidate": true, "aria-labelledby": "people-add-heading"}) %}
+    <div class="field{% if email_error %} field-error{% endif %}">
+      <label for="people-email">Their email address</label>
+      <p class="hint" id="people-email-hint">The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.</p>
+      {% if email_error %}<p class="error-message" id="people-email-error"><span class="visually-hidden">Error: </span>{{ email_error.message }}</p>{% endif %}
+      <input type="email" id="people-email" name="email" maxlength="320" autocomplete="off" spellcheck="false"
+             value="{{ people_typed }}" aria-describedby="people-email-hint{% if email_error %} people-email-error{% endif %}"{% if email_error %} aria-invalid="true"{% endif %}>
+    </div>
+    <fieldset class="field{% if role_error %} field-error{% endif %}" id="people-role">
+      <legend>What they can do</legend>
+      {% if role_error %}<p class="error-message" id="people-role-error"><span class="visually-hidden">Error: </span>{{ role_error.message }}</p>{% endif %}
+      <div class="role-list">
+      {% for value, label, help in people.roles %}
+      <label class="role-row" for="people-role-{{ value }}">
+        <input type="radio" id="people-role-{{ value }}" name="role" value="{{ value }}"
+               aria-labelledby="people-role-{{ value }}-name" aria-describedby="people-role-{{ value }}-help"{% if people_typed_role == value %} checked{% endif %}>
+        <span class="role-text">
+          <span class="role-name" id="people-role-{{ value }}-name">{{ label }}</span>
+          <span class="role-help" id="people-role-{{ value }}-help">{{ help }}</span>
+        </span>
+      </label>
+      {% endfor %}
+      </div>
+    </fieldset>
+    <div class="share-submit">
+      <button type="submit" class="button">Give access</button>
+    </div>
+  {% endcall %}
+
+  <h3 id="people-list-heading">People with access</h3>
+  <p class="hint" id="people-count">{{ people.rows|length }} of {{ people.max }} people.{% if people.rows|length >= people.max %} To add someone else, remove a person first.{% endif %}</p>
+  {% if people.rows %}
+  <ul class="share-list">
+    {% for row in people.rows %}
+    <li>
+      <p class="share-person"><strong>{{ row.email }}</strong>: {{ people.role_words[row.role] }}</p>
+      <div class="share-actions">
+      {% call form("people.add", "/courses/" ~ course.id ~ "/people", {"class": "inline-form"}) %}
+        <input type="hidden" name="email" value="{{ row.email }}">
+        <input type="hidden" name="role" value="{{ 'review' if row.role == 'view' else 'view' }}">
+        <button type="submit" class="button-secondary">Change {{ row.email }} to {{ people.role_words['review' if row.role == 'view' else 'view']|lower }}</button>
+      {% endcall %}
+      {% call form("people.remove", "/courses/" ~ course.id ~ "/people/" ~ row.id ~ "/remove", {"class": "inline-form"}) %}
+        <button type="submit" class="button-danger-outline">Remove {{ row.email }}</button>
+      {% endcall %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="hint">Each can open every document in this course, including documents you add later. A document you take out of the course, or delete, stops being open to them. A document is deleted on its own schedule, and their access ends then.</p>
+  {% else %}
+  <p>Nobody yet.</p>
+  {% endif %}
+  <p class="hint">They cannot delete, change or share a document, and they cannot open this page. Review lets a person make review decisions, each recorded under their name.</p>
+</section>

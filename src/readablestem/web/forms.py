@@ -186,6 +186,12 @@ FORMS: dict[str, FormRow] = {
                 "a second click said 'Saved' again for access already given"),
         FormRow("share.revoke", "POST /jobs/{job_id}/share/{share_id}/revoke", Kind.STATE,
                 "removing", "a second click answered 'Page not found'"),
+        # People with access to a whole course (`web.shares`, WS27.1, behind FEATURE_COURSE_GRANTS).
+        # The remove form is drawn twice: the button asks, the question's button removes.
+        FormRow("people.add", "POST /courses/{course_id}/people", Kind.CREATE, "saving",
+                "a second click said 'No change' for access already given"),
+        FormRow("people.remove", "POST /courses/{course_id}/people/{grant_id}/remove",
+                Kind.STATE, "removing", "none: removing again changes nothing"),
         # The class link (`web.links`). The answer to making one holds its address, shown once,
         # so a repeat (a reload of that answer) is not given that answer: it is the redirect
         # to the share page, which says a link exists and never holds the address.

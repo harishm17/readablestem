@@ -65,6 +65,7 @@ from readablestem.web.db import (
     AuthIdentity,
     Blob,
     Course,
+    CourseGrant,
     CourseNotation,
     DeletedAccount,
     ErasureLedger,
@@ -321,10 +322,10 @@ def erase_user(
 
     Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
     before parents and without relying on ON DELETE CASCADE (see the module docstring):
-    review edits they made on any job, shares of other people's documents that name their
-    address, their courses' notation entries, their courses, their usage events, their
-    problem reports, sign-in identities, linked Google addresses, email sign-in links and daily
-    page counts, and the user row.
+    review edits they made on any job, shares of other people's documents and course grants
+    that name their address, their courses' notation entries and grants, their courses, their
+    usage events, their problem reports, sign-in identities, linked Google addresses, email
+    sign-in links and daily page counts, and the user row.
     With `tombstone_key`, what the account used today is first recorded under a hash of its
     address (`web.tombstones`), so that signing up again today does not reset the day's limits.
     The erasure is also written to the ledger (`erasure_ledger`: a hash of the user id and the
@@ -348,9 +349,14 @@ def erase_user(
     person_email = session.scalar(select(User.email).where(User.id == user_id))
     if person_email is not None:
         session.execute(delete(JobShare).where(JobShare.email == person_email.strip().lower()))
+        # and course grants that name it (the grants of their own courses go with the courses)
+        session.execute(
+            delete(CourseGrant).where(CourseGrant.email == person_email.strip().lower())
+        )
     session.execute(delete(PendingUpload).where(PendingUpload.user_id == user_id))
     session.execute(delete(UploadResult).where(UploadResult.user_id == user_id))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))
+    session.execute(delete(CourseGrant).where(CourseGrant.course_id.in_(courses)))
     session.execute(delete(Course).where(Course.user_id == user_id))
     session.execute(delete(Event).where(Event.user_id == user_id))
     session.execute(delete(Report).where(Report.from_user_id == user_id))

@@ -23,9 +23,9 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
-    CheckConstraint,
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -678,9 +678,7 @@ class CourseGrant(Base):
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    course_id: Mapped[str] = mapped_column(
-        ForeignKey("courses.id", ondelete="CASCADE"), index=True
-    )
+    course_id: Mapped[str] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
     email: Mapped[str] = mapped_column(String(320), index=True)
     role: Mapped[str] = mapped_column(String(8))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

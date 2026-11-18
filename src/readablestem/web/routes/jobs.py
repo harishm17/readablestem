@@ -461,7 +461,9 @@ def job_access(
     `"owner"` is everything else (delete, retry, settings, sharing, a revision, combining
     parts). The owner has every right. Someone the owner shared the document with by email
     has the right they were given (`web.shares`), read from the database on every request,
-    so a share that was removed stops working at once. Anyone else gets the **same** 404 as
+    so a share that was removed stops working at once; with `FEATURE_COURSE_GRANTS` on, so
+    does a right the owner of the document's course gave them for the whole course
+    (`shares.role_of` is the one place that reads either). Anyone else gets the **same** 404 as
     for an id that does not exist, so job ids cannot be probed. A shared person asking for
     more than they have gets a 403 page that says what they can do.
 
@@ -475,10 +477,12 @@ def job_access(
     job = session.get(Job, job_id, with_for_update=lock or None)
     if job is None:
         raise _missing(session, job_id, user, job)
+    if expired(job):  # before any share or course grant is read
+        raise _missing(session, job_id, user, job)
     role = shares.role_of(session, job, user)
-    if role is None and not expired(job) and shares.names_unproved(session, job, user):
+    if role is None and shares.names_unproved(session, job, user):
         raise PageError(403, *SIGN_IN_AGAIN)
-    if role is None or expired(job):
+    if role is None:
         raise _missing(session, job_id, user, job)
     if shares.RANK[role] < shares.RANK[need]:
         raise PageError(403, *_TOO_LITTLE[need], context={"job_id": job.id})
@@ -671,9 +675,17 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
                 ),
                 "role": shares.ROLE_WORDS.get(item.role, item.role),
                 "owner": item.owner,
+                "course": item.course,
             }
             for item in shares.shared_with(session, user, now)
         ]
+        # Those reached through a course grant are listed under the course (and its owner, so
+        # two courses with one name stay apart); the rest are listed as before.
+        shared_courses: dict[tuple[str, str], list[dict]] = {}
+        for row in shared:
+            if row["course"]:
+                shared_courses.setdefault((row["course"], row["owner"]), []).append(row)
+        shared = [row for row in shared if not row["course"]]
         # Large files waiting for their pages to be chosen (T3-3).
         waiting = [
             {
@@ -689,6 +701,10 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     return {
         "documents": listing,
         "shared_documents": shared,
+        "shared_courses": [
+            {"name": name, "owner": owner, "items": items}
+            for (name, owner), items in shared_courses.items()
+        ],
         "pages_left": left,
         "page_quota": quota,
         # A new account (open tier) is told its limits are the ones for new accounts.

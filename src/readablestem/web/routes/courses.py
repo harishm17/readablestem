@@ -1,7 +1,10 @@
 """Courses and their notation: /courses, a course's page, and "remember for this course".
 
 Only with `FEATURE_NOTATION_MEMORY` on; otherwise every route here is a 404, like any
-address that does not exist. Each course belongs to one user: `_course` answers 404 for
+address that does not exist. With `FEATURE_COURSE_GRANTS` also on, the course page has a
+"People" section and two more owner-only POSTs (add or change a person, remove one) that give
+a person the right to view or review every document of the course (`web.shares`); with it off
+those two are 404 for everyone. The course pages themselves are the owner's alone either way. Each course belongs to one user: `_course` answers 404 for
 a course that does not exist *or* is someone else's, so ids cannot be probed. Every
 change is a normal form POST with the CSRF token, answered with a redirect (or the form
 again with its errors), so it all works without JavaScript. Deleting a course asks
@@ -25,7 +28,7 @@ from readablestem.core.notation import canonical_symbol
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import export_docx
 from readablestem.pipeline.notation_memory import describe, phrase
-from readablestem.web import documents, notation
+from readablestem.web import documents, notation, shares
 from readablestem.web.db import Course, CourseNotation, Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -42,7 +45,7 @@ from readablestem.web.deps import (
 from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access
-from readablestem.web.shares import OWNER, REVIEW
+from readablestem.web.shares import OWNER, REVIEW, ShareError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -182,8 +185,27 @@ def _course_page(
             "starter": notation.STARTER if not course.notation else (),
             "attachable": _attachable(session, user, course),
             "attach_cap": notation.MAX_ATTACH,
+            "people": _people(ctx.settings, session, course),
+            "people_typed": "",
+            "people_typed_role": shares.VIEW,
         }
     return render(request, "course.html", context | (extra or {}), status_code=status)
+
+
+def _people(settings, session: Session, course: Course) -> dict[str, Any] | None:
+    """What the "People" section prints (WS27.1): who has a grant on this course and with what
+    right, the form's rights and the limit. None, so no section, while course grants are off."""
+    if not notation.course_grants_enabled(settings):
+        return None
+    return {
+        "rows": [
+            {"id": g.id, "email": g.email, "role": g.role}
+            for g in shares.grants_of(session, course.id)
+        ],
+        "roles": [(r, shares.ROLE_WORDS[r], shares.ROLE_HELP[r]) for r in shares.ROLES],
+        "role_words": shares.ROLE_WORDS,
+        "max": shares.MAX_GRANTS_PER_COURSE,
+    }
 
 
 def _attachable(session: Session, user: CurrentUser, course: Course) -> list[documents.DocumentRow]:
@@ -256,6 +278,94 @@ def delete_course(request: Request, course_id: str, user: UserDep, confirm: Fiel
     log_event(logger, "course_deleted", course_id=course_id)
     flash(request, "The course and its notation have been deleted.")
     return RedirectResponse("/courses", status_code=303)
+
+
+# --------------------------------------------------------------------------- people (WS27.1)
+
+# What the owner is told, by what happened. No address is in a notice (the session cookie holds
+# it). Nobody is told anything by the service: the owner must.
+GRANT_OUTCOME = {
+    shares.ADDED: (
+        "Added with the right to {right} on every document in this course, now and later. "
+        "Nothing was sent: tell the person yourself. They must sign in with that address."
+    ),
+    shares.CHANGED: "Changed. Their right is now {right}. Nothing was sent.",
+    shares.UNCHANGED: "No change: that person already has the right to {right}.",
+}
+
+
+def _require_people(request: Request) -> None:
+    """404 for everyone, as for any address that is not there, while course grants are off.
+    Asked before the course, so the answer does not say whether the course exists."""
+    if not notation.course_grants_enabled(get_ctx(request).settings):
+        raise PageError(404, *COURSE_NOT_FOUND)
+
+
+@router.post("/courses/{course_id}/people", dependencies=[Depends(require_csrf)])
+@submit_once("people.add")
+def add_person(
+    request: Request, course_id: str, user: UserDep, email: Field = "", role: Field = ""
+) -> Response:
+    """Give a person access to every document of the course, or change their right. Only the
+    course's owner (`_course` answers 404 for anyone else). A mistake is the course page again
+    (422) with the reason beside the field and what was typed kept."""
+    _require_people(request)
+    refused: dict[str, Any] | None = None
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        owned_id = course.id  # redirects are built from the owned row, not the request
+        try:
+            row, outcome = shares.grant(session, course, user.email, email, role)
+            kept_role = row.role
+        except ShareError as exc:
+            log_event(logger, "course_grant_refused", course_id=owned_id, code=exc.code)
+            field = "people-role" if exc.code == "bad_role" else "people-email"
+            refused = {
+                "errors": [{"field_id": field, "message": exc.message}],
+                "field_errors": {field: {"field_id": field, "message": exc.message}},
+                "people_typed": email[:320],
+                "people_typed_role": role if role in shares.ROLES else shares.VIEW,
+            }
+    if refused is not None:
+        return _course_page(request, owned_id, user, refused, status=422)
+    log_event(logger, "course_grant_set", course_id=owned_id, role=kept_role)
+    flash(request, GRANT_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]), undo=False)
+    return RedirectResponse(f"/courses/{owned_id}#people-heading", status_code=303)
+
+
+@router.post("/courses/{course_id}/people/{grant_id}/remove", dependencies=[Depends(require_csrf)])
+@submit_once("people.remove")
+def remove_person(
+    request: Request, course_id: str, grant_id: str, user: UserDep, confirm: Field = ""
+) -> Response:
+    """Take a person's access to the course away; it stops on their next request. Only with
+    `confirm=yes`: the "Remove" button gets the question first, as the answer to this POST (as
+    the admin page's Block does), so the person's address is never in a URL."""
+    _require_people(request)
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        owned_id = course.id
+        row = next((g for g in shares.grants_of(session, owned_id) if g.id == grant_id), None)
+        if row is not None and confirm != "yes":
+            context = {
+                "course_id": owned_id,
+                "name": course.name,
+                "grant_id": row.id,
+                "email": row.email,
+                "role": shares.ROLE_WORDS[row.role],
+            }
+            return render(request, "course_person_remove_confirm.html", context)
+        removed = row is not None and shares.revoke_grant(session, owned_id, row.id)
+    if removed:
+        log_event(logger, "course_grant_removed", course_id=owned_id)
+    # Not there (often a second click on Remove): the access is gone either way.
+    flash(
+        request,
+        "Access removed. They cannot open this course's documents any more, unless you "
+        "shared a document with them by itself.",
+        undo=False,
+    )
+    return RedirectResponse(f"/courses/{owned_id}#people-heading", status_code=303)
 
 
 # --------------------------------------------------------------------------- entries
