@@ -181,43 +181,50 @@ EQUATION_WRITTEN_NOTE = (
 FIGURE_NOTE = (
     "This figure has no text description yet. Ask your instructor for a description of it."
 )
-# Pages and handwriting kept as images (pipeline.page_type: there is no handwriting or
-# scan conversion): their alt text ("{page}" is the page number) and the note students
-# see, by the fix's reason. Rendered from the stored reason, so a stored result renders
-# the same. These words are the beta wording (handwriting design, section 3.3).
+# Pages and pictures kept as images (pipeline.page_type: there is no handwriting or scan
+# conversion): by the fix's reason, ONE table of the picture's alt text ("{page}" is the page
+# number), the label of its note and the note students see. Rendered from the stored reason,
+# so a stored result renders the same. A reason that names what the picture is (a handwritten
+# page, a scanned page) is a page-level finding; `handwriting_on_page` is also what a box of
+# vector lines got named before the reader had pen evidence (WS6.10, WS3.5), so it says only
+# that the part is a picture and never names handwriting (WS21.9). A drawing has no reason
+# of its own yet (P1 and P3 record it); it is added to this table then.
 KEPT_IMAGE_LABEL = "Not converted."
+KEPT_PICTURE_LABEL = "Shown as a picture, not converted to text."
+_ASK = "Ask your instructor for a text version."
 KEPT_IMAGE_WORDS = {
     "handwritten_page": (
         "Page {page}: handwritten notes, not converted to text.",
-        "This page is a picture of handwritten notes, so a screen reader cannot read it. "
-        "Ask your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This page is a picture of handwritten notes, so a screen reader cannot read it. {_ASK}",
     ),
     "scanned_page": (
         "Page {page}: a scanned page, not converted to text.",
-        "This page is a picture of a scanned page, so a screen reader cannot read it. Ask "
-        "your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This page is a picture of a scanned page, so a screen reader cannot read it. {_ASK}",
     ),
     "unread_page": (
         "Page {page}: not converted to text.",
-        "This page is shown as a picture, so a screen reader cannot read it. Ask your "
-        "instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This page is shown as a picture, so a screen reader cannot read it. {_ASK}",
     ),
     "page_read_failed": (
         "Page {page}: this page could not be read.",
+        KEPT_IMAGE_LABEL,
         "This page could not be read, so it is shown as a picture and a screen reader cannot "
-        "read it. Ask your instructor for a text version.",
+        f"read it. {_ASK}",
     ),
     "handwriting_on_page": (
-        "Handwriting on page {page}, not converted to text.",
-        "This is a picture of handwriting on the page, so a screen reader cannot read it. "
-        "Ask your instructor for a text version.",
+        "Part of page {page}, shown as a picture, not converted to text.",
+        KEPT_PICTURE_LABEL,
+        f"A screen reader cannot read this picture. {_ASK}",
     ),
     # A block of a page converted from an image that the instructor chose to keep as the
     # picture (`_kept_prose`): not a page, and not a whole-page reason either.
     "image_page_text": (
         "Text on page {page}, not converted to text.",
-        "This is a picture of text on the page, so a screen reader cannot read it. Ask your "
-        "instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This is a picture of text on the page, so a screen reader cannot read it. {_ASK}",
     ),
 }
 # A page kept as a picture because something painted on it was read into nothing (an
@@ -1304,10 +1311,10 @@ class _Renderer:
             )  # fmt: skip
         if fix is not None and fix.status in NOT_CONVERTED and fix.reason in KEPT_IMAGE_WORDS:
             # A page (or handwriting) kept as an image: what it is, never "a figure".
-            alt, note = KEPT_IMAGE_WORDS[fix.reason]
+            alt, label, note = KEPT_IMAGE_WORDS[fix.reason]
             alt = self.image_alt(element, alt.format(page=element.page + 1))
             figure = f"<figure>{picture(alt)}</figure>"
-            return self.flag_block(element, fix.reason, figure, KEPT_IMAGE_LABEL, note)
+            return self.flag_block(element, fix.reason, figure, label, note)
         if fix is None:
             reason = "no_fix"
         elif fix.status in NOT_CONVERTED:
@@ -1709,7 +1716,7 @@ _FIXED_ALT_IMG = re.compile(
             # A kept page's alt names its page: any number in its place.
             *(
                 re.escape(alt).replace(re.escape("{page}"), r"\d+")
-                for alt, _ in KEPT_IMAGE_WORDS.values()
+                for alt, *_ in KEPT_IMAGE_WORDS.values()
             ),
         ]
     )

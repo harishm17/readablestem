@@ -57,6 +57,12 @@ KIND_WORDS = {
 }
 
 
+# The student's words for a kind where the owner's would say more than the result can back: a
+# part kept as a picture is named "handwriting" for a box of vector lines too (WS21.9), so a
+# student is told only that it is a picture.
+STUDENT_KIND_WORDS = {"handwriting": "picture"}
+
+
 def kinds_phrase(counts: Mapping[str, int]) -> str:
     """ "1 equation and 2 figures" (in a fixed order)."""
     parts = [
@@ -193,7 +199,7 @@ def statement(s: CheckedSummary) -> list[str]:
 
 def picture_link(number: int, kind: str, page: int) -> str:
     """The words of the notice's link to one picture: numbered, so no two are the same."""
-    one = KIND_WORDS.get(kind, (kind, kind))[0]
+    one = STUDENT_KIND_WORDS.get(kind) or KIND_WORDS.get(kind, (kind, kind))[0]
     return f"Part {number} not converted: {one}, page {page}"
 
 

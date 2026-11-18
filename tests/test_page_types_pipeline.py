@@ -27,6 +27,7 @@ from readablestem.core.types import Kind, Status
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout
+from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.run import convert_pdf
 from readablestem.web import states
 from readablestem.web.db import Job, User, session_scope
@@ -74,6 +75,37 @@ def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     assert len(paragraphs) == 3
     assert all(p.bbox[3] <= ink[0].bbox[1] + 1 for p in paragraphs)  # the ink is below
     assert doc.kept_pages == {}
+
+
+def test_a_part_kept_as_a_picture_never_says_handwriting_and_a_persons_words_win():
+    """WS21.9: a box of lines was named handwriting before the reader had pen evidence, so a
+    result that records `handwriting_on_page` tells the student only that the part is a
+    picture, in its note, its alt text and its link in the statement. The alt text is never
+    made at render: what a person wrote for it replaces our words, and nothing else does."""
+    result = convert("typed_with_ink.pdf").result
+    kept = [f for f in result.fixes if f.reason == "handwriting_on_page"]
+    assert len(kept) == 1
+
+    def visible(html: str) -> str:
+        """What a student can read: the text and the alt texts, not the stored reason."""
+        alts = " ".join(re.findall(r'alt="([^"]*)"', html))
+        return f"{text_of(html)} {alts}".lower()
+
+    html = result.html
+    assert "handwrit" not in visible(html)
+    assert "Shown as a picture, not converted to text" in html
+    alt = re.search(
+        r'<img[^>]* alt="([^"]*)"', html[html.index('data-reason="handwriting_on_page"') :]
+    )
+    assert alt is not None and alt.group(1).strip()
+
+    kept[0].described = "A sketch of a spring with the mass hanging from it"
+    again = render_html(
+        title=result.title, lang=result.lang, elements=result.elements, fixes=result.fixes,
+        crops=convert("typed_with_ink.pdf").crops,
+    )  # fmt: skip
+    assert 'alt="A sketch of a spring with the mass hanging from it"' in again
+    assert "handwrit" not in visible(again)
 
 
 def test_a_stroke_off_the_page_is_never_loose_ink():

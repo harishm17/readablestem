@@ -253,7 +253,7 @@ no network, no model.
 |---|---|
 | `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
 | `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
-| `EPUB/fonts/latinmodern-math-1.959.woff2` | The maths font, in a book that has maths, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
+| `EPUB/fonts/latinmodern-math-1.959.woff2` | The math font, in a book that has math, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
 
@@ -322,7 +322,7 @@ no network, no model.
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |
-| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text."; for `handwriting_on_page`, "Part of page 3, shown as a picture, not converted to text.", the label "Shown as a picture, not converted to text." and the note "A screen reader cannot read this picture. Ask your instructor for a text version."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
 | Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
 | Decorative figure (with evidence, see "Decoration") | `<div class="decorative"><img alt="">` (a `<figure class="decorative">` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
@@ -681,7 +681,7 @@ the print build waits for WS21.1):
 - A figure's long description prints open (`details.figure-description`); where the browser
   has no `::details-content`, its summary says "open this description before printing".
 
-The estimate is not calibrated (A23); a table cell with maths that is wider than its column
+The estimate is not calibrated (A23); a table cell with math that is wider than its column
 is not scaled. Canvas has no style block, so none of this is in it; Word and the EPUB
 reader's own pagination do not use these rules.
 
@@ -716,8 +716,16 @@ and label are unchanged. In a document in another language the alt text is marke
   original image is not available."
 - A page (or handwriting) kept as an image is never called a figure: its alt text names
   the page and what it is, and its note says a screen reader cannot read it and to ask
-  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, by the fix's reason,
-  so a stored result renders the same; the design's draft wording is the beta wording).
+  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, one table of alt text,
+  label and note by the fix's reason, so a stored result renders the same; the design's
+  draft wording is the beta wording). `handwriting_on_page` is also what a box of vector
+  lines was named before the reader had pen evidence, so it never says "handwriting": the
+  part is "shown as a picture, not converted to text" in its alt text, label and note, and
+  in its link in the statement ("Part 2 not converted: picture, page 1",
+  `checked_words.STUDENT_KIND_WORDS`). The review screen and the job page keep their own
+  words for it. A drawing has no reason of its own yet and joins the table when it has.
+  Alt text is never made at render: it is the instructor's own description, the stored
+  proposal's text, or these fixed words, in that order.
   Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note

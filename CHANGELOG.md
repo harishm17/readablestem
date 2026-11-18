@@ -28,6 +28,20 @@
   WS21.1), the face comparison, the chemistry attribute, the prime, the spoken fallback. The
   downloaded HTML and `/view` get the stack only; Canvas cannot carry a font; Word uses
   Office's.
+- WS21.9 parts 1 and 4: the words of a picture kept from a page are one table
+  (`assemble.KEPT_IMAGE_WORDS`: alt text, label and note by the fix's reason). A part kept as
+  `handwriting_on_page` (which a box of vector lines was also named, before the reader had pen
+  evidence) said "This is a picture of handwriting on the page" to a student; every stored
+  result now says "Shown as a picture, not converted to text" there, in the note, the alt text
+  and the statement's link ("Part 2 not converted: picture, page 1"), and never "handwriting",
+  in the downloaded HTML, Word, EPUB and Canvas alike, since all are made from that page. A
+  stored page is re-rendered by `RENDER_VERSION`. Alt text is never made at render, and what
+  a person wrote for a picture still replaces ours (checked in
+  `test_a_part_kept_as_a_picture_never_says_handwriting_and_a_persons_words_win`). Not built:
+  a drawing's own reason and words, labels said once, the larger picture, checked and
+  estimated chart values (WS21.9 parts 2, 3, 5), the short label with the full text once in the
+  top notice (WS11.5). The review screen's and the job page's "handwriting" words wait for P1
+  and P5.
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 
