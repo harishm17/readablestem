@@ -67,6 +67,31 @@
   where it waits. One count (`ImagePageCount`), one wording (`scans_note`).
 - No stored document, recording, hash or prompt changes; `PIPELINE_VERSION` and
   `RENDER_VERSION` are not bumped. A bump is not owed by this branch.
+## Unreleased: the upload door says the same thing everywhere (branch feat/upload-door-and-documents-list)
+
+- SW12, SW23: the two upload sizes are named once and read from the settings and the zip's own limits
+  (`uploads.one_document`, `one_file`, `zip_limits`), so no page or refusal types a limit: "one document
+  is up to 100 pages and 50 MB", "one file is up to 500 pages and 100 MB". The zip refusal's stale
+  "80 MB unpacked" now says what the intake enforces.
+- WS11.1d, SW23 (F-332): one `quota.retry_after()` makes the words and the `Retry-After` header of every refusal
+  that says to come back. The daily page allowance, the daily spend pause and "sign-ups full" sent
+  `Retry-After: 3600` while saying "midnight UTC"; they now send the seconds to the next midnight UTC.
+- WS11.1c (F-010, F-011, F-320): parts. The suggestion is sized to the pages left today and cut at the PDF's
+  chapter bookmarks when it has them; the preview is whole sentences ("Part 1 (pages 1 to 60) starts now. Parts 2
+  and 3 can start after <time>, when your pages reset."); each part is one label in the list; a single typed part's
+  errors no longer start "The pages:"; the button follows the list. `GET /jobs/{id}/combine/parts` always
+  answers with a row per part and a Review link to its first open decision, and `/combine` with fewer than two
+  ready parts shows it instead of a 409. The job page's own Combine line is not changed here.
+- WS11.2: the documents list's zip link counts what the zip holds ("Download 25 of 34 ready documents (zip)"),
+  says the limit and the documents left out and lists the others; the Word link likewise; one delete partial
+  (`_delete_notes.html`) gives the document, waiting-file, course and account delete pages the same two sentences
+  (backups, the model provider's retention); a row's controls say the file's title as well (F-096, F-325, F-328).
+- WS25.7: the upload form and `/limits` say to upload the LaTeX source when there is one (only where the source
+  upload is on). SW2: the closed-allowance and pages-left lines read `allowance()` and `PAGES_RULE`.
+- F-329, F-102: the course pages say only the owner sees the list and that its symbols and meanings go to the model
+  provider with each equation; the upload form's course hint says the same; the job page's course line says which
+  symbols were used (those the course had at conversion) and that later ones are not applied.
+- No migration, no pipeline or render version change, no prompt or request change, no limiter change.
 
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 

@@ -841,6 +841,94 @@ def part_links(session: Session, job: Job, context: states.Context | None = None
     ]
 
 
+@dataclass
+class CombineRow:
+    """One part on the combine page: its pages, its state (SW1), how many decisions are open,
+    where to make the first one, and whether the combined file would hold it."""
+
+    id: str
+    label: str
+    state: states.State | None
+    open: int
+    review_href: str
+    ready: bool
+
+
+@dataclass
+class CombineView:
+    """The combine page's facts for one source: a row per part the person keeps, in page
+    order, what the file would hold (`ready`, `left_out`) and, when it could not yet be made,
+    what is still needed (`needed`)."""
+
+    rows: list[CombineRow]
+    ready: int
+    left_out: int
+    needed: str
+
+
+def combine_view(session: Session, job: Job) -> CombineView:
+    """The rows of the combine page, for the owner of `job`, a part of a larger file. Every
+    part is a row, whatever its state: the page answers even when nothing can be joined yet.
+    The state and the order are `part_links`'; the decisions of a part that needs some are
+    counted from its stored count, and the first one is the review screen's own queue."""
+    from readablestem.web import queue
+
+    links = part_links(session, job)
+    ready_ids = {k.job.id for k in combine_rules.kept_parts(session, job)}
+    waiting = [p.id for p in links if p.state is not None and p.state.key == "needs_decisions"]
+    first: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    if waiting:
+        for row in session.execute(
+            select(Job.id, Job.open_decisions, Job.result_json).where(Job.id.in_(waiting))
+        ):
+            counts[row.id] = int(row.open_decisions or 0)
+            if row.result_json:
+                found = queue.first_open(
+                    queue.decisions(DocumentResult.model_validate(row.result_json))
+                )
+                if found is not None:
+                    first[row.id] = found.key
+    rows = [
+        CombineRow(
+            p.id,
+            p.label,
+            p.state,
+            counts.get(p.id, 0),
+            f"/jobs/{p.id}/review" + (f"?item={first[p.id]}" if p.id in first else "")
+            if p.id in counts
+            else "",
+            p.id in ready_ids,
+        )
+        for p in links
+    ]
+    ready = sum(1 for r in rows if r.ready)
+    return CombineView(rows, ready, len(rows) - ready, _still_needed(rows))
+
+
+def _still_needed(rows: list[CombineRow]) -> str:
+    """What the parts that are not ready still need, in one sentence ("" when none is
+    missing): decisions to make, conversions still running, stopped parts."""
+    from readablestem.pipeline.checked_words import plural
+
+    left = [r for r in rows if not r.ready]
+    decisions = sum(1 for r in left if r.state is not None and r.state.key == "needs_decisions")
+    working = sum(1 for r in left if r.state is not None and r.state.group == states.WORK)
+    stopped = sum(1 for r in left if r.state is not None and r.state.tone == states.FAILED)
+    needs = []
+    if decisions:
+        needs.append(f"make the decisions in {plural(decisions, 'part')}")
+    if working:
+        needs.append(f"wait for {plural(working, 'part')} still converting")
+    if stopped:
+        needs.append(f"look at {plural(stopped, 'stopped part')}")
+    if not needs and left:
+        needs.append("open each part that is not ready to see what it needs")
+    return (
+        (needs[0].capitalize() + "".join(f"; then {n}" for n in needs[1:]) + ".") if needs else ""
+    )
+
+
 def sample_view() -> SampleView | None:
     """The sample's attribution, or None when its files are not in this build."""
     from readablestem.web import sample

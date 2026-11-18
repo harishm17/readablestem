@@ -141,7 +141,7 @@ def test_upload_rejects_encrypted_pdfs(web):
 def test_upload_rejects_too_many_pages(web):
     response = upload(web.browser, make_pdf(6))  # max_pages_per_job=5 in tests
     assert response.status_code == 422
-    assert "notes.pdf has 6 pages; the limit is 5 per upload" in response.text
+    assert "notes.pdf has 6 pages; one file is up to 5 pages" in response.text
     assert count(web, Job) == 0
 
 
@@ -254,6 +254,32 @@ def test_daily_page_quota_returns_429_and_changes_nothing(web):
     page = web.browser.get("/app")
     assert "You have converted all 20 pages you can today" in page.text
     assert 'action="/jobs"' not in page.text
+
+
+@pytest.mark.parametrize("hour", [3, 22])
+def test_a_refusal_that_says_to_come_back_sends_the_time_it_says(web, monkeypatch, hour):
+    """The daily allowance and the day's spend pause both start again at midnight UTC: the
+    words say so and `Retry-After` is the time left to it, whatever the time of day (it
+    was an hour, always)."""
+    from readablestem.web import quota
+
+    class At(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 18, hour, 30, tzinfo=UTC)
+
+    monkeypatch.setattr(quota, "datetime", At)
+    left = int(timedelta(hours=24 - hour, minutes=-30).total_seconds())
+    for _ in range(4):
+        assert upload(web.browser, make_pdf(5)).status_code == 303
+    response = upload(web.browser, make_pdf(1))
+    assert response.status_code == 429 and "starts again at midnight UTC" in response.text
+    assert int(response.headers["retry-after"]) == left
+    with session_scope(web.ctx.factory) as session:
+        session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))  # cap is $5
+    paused = upload(web.browser, make_pdf(1))
+    assert paused.status_code == 503 and "open again at midnight UTC" in paused.text
+    assert int(paused.headers["retry-after"]) == left
 
 
 def test_quota_is_per_user(web):

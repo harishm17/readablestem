@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{# The parts of one file converted in parts, and what joining them needs (GET
+   /jobs/{id}/combine/parts, routes/jobs.py `_combine_page`, views.py `combine_view`). Always
+   answers for the owner: a row per part with its state (web/states.py), its open decisions
+   and a link to the first one, then either the button that joins the ready parts or what is
+   still needed. The file itself is GET /jobs/{id}/combine (web/combine.py). #}
+{% block title %}Combine the parts of {{ name }}{% endblock %}
+{% block content %}
+<h1>Combine the parts of {{ name }}</h1>
+<p>Each part is its own document. Combining joins the ready parts into one file in page
+  order. A part with a decision still open, or one that has not finished, is left out, and
+  the file names the pages that are missing.</p>
+<ul class="parts-list" aria-label="Parts of this file">
+  {% for row in view.rows %}
+  <li class="parts-row">
+    <span class="parts-name">Pages {{ row.label }}:
+      {% if row.ready %}ready to combine{% elif row.state %}{{ row.state.label|lower }}{% else %}not available{% endif %}
+      {%- if row.open %} ({{ row.open }} {{ "decision" if row.open == 1 else "decisions" }} to make){% endif %}</span>
+    {% if row.review_href %}<a href="{{ row.review_href }}">Review<span class="visually-hidden"> the {{ row.open }} {{ "decision" if row.open == 1 else "decisions" }} in pages {{ row.label }}</span></a>{% endif %}
+    <a href="/jobs/{{ row.id }}">Open<span class="visually-hidden"> pages {{ row.label }}</span></a>
+  </li>
+  {% endfor %}
+</ul>
+{% if view.ready >= 2 %}
+<p><a class="button" href="/jobs/{{ job_id }}/combine">Combine the {{ view.ready }} ready parts{% if view.left_out %} (leaves out {{ view.left_out }}){% endif %}</a></p>
+<p>The same file as {% if word_export %}<a href="/jobs/{{ job_id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job_id }}/combine?format=epub">EPUB</a>.</p>
+{% else %}
+<p id="combine-needed">Combining needs at least two ready parts; {{ view.ready }} {{ "is" if view.ready == 1 else "are" }} ready now. {{ view.needed }}</p>
+{% endif %}
+<p><a href="/jobs/{{ job_id }}">Back to this document</a></p>
+{% endblock %}

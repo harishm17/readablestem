@@ -45,8 +45,8 @@ def web(tmp_path):
 
 def test_the_limits_page_names_the_configured_limits(web):
     text = flat(web.alice.get("/limits").text)
-    assert "Up to 77 pages and 66 MB per upload." in text
-    assert "up to 333 pages and 88 MB, is kept" in text
+    assert "One document is up to 77 pages and 66 MB" in text
+    assert "One file is up to 333 pages and 88 MB" in text
     assert "can convert 111 pages and start" in text
     assert "an invited account can convert 222 pages a day" in text
     for old in OLD:
@@ -56,8 +56,8 @@ def test_the_limits_page_names_the_configured_limits(web):
 def test_the_upload_form_names_the_configured_limits(web):
     text = flat(web.alice.get("/app").text)
     # the site copy (content/site-rewrite) states each limit once, from the settings
-    assert "up to 77 pages and 66 MB." in text
-    assert "up to 333 pages, 88 MB) are kept" in text
+    assert "each up to 333 pages and 88 MB" in text
+    assert "bigger than one document (77 pages and 66 MB) is kept" in text
     for old in OLD:
         assert old not in text, old
     page = web.alice.get("/app").text
@@ -82,8 +82,7 @@ def test_the_parts_page_and_its_errors_do_not_show_the_old_limit_as_an_example(w
     assert response.status_code == 303, response.text[:300]
     page = web.alice.get(response.headers["location"])
     text = flat(page.text)
-    assert "80 pages" in text and "up to 77 pages" in text
-    assert "of up to 77 pages" in text
+    assert "80 pages" in text and "its own document, up to 77 pages and 66 MB" in text
     for old in OLD:
         assert old not in text, old
     with pytest.raises(ranges.PartsError) as error:

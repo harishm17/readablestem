@@ -20,16 +20,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
+from markupsafe import Markup
 
 from readablestem.web import access, events, pending, poll, ranges
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import utc_today
+from readablestem.web.dates import time_tag
 from readablestem.web.db import PendingUpload, session_scope, utcnow
 from readablestem.web.deps import (
     JOB_ID,
@@ -53,13 +56,14 @@ from readablestem.web.intake import (
     store_job,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import next_day_start, pages_left, retry_after
 from readablestem.web.uploads import (
     ExtractFailed,
     UploadRejected,
     extract_part_isolated,
     inspect_pdf_detail,
     inspect_pdf_isolated,
+    outline_starts_isolated,
     safe_filename,
 )
 
@@ -113,7 +117,11 @@ def chooser_context(
     shrink: bool | None = None,
     errors: list[dict[str, str]] | None = None,
     started: list[dict[str, str]] | None = None,
+    fragment: bool = False,
 ) -> dict[str, Any]:
+    """What the chooser page shows. `fragment`: only the preview is wanted (it is fetched
+    while the person types), so the suggestion, which reads the file's outline in a child
+    process, is not made."""
     s = ctx.settings
     now = utcnow()
     from readablestem.pipeline.page_type import ImagePageCount
@@ -127,7 +135,14 @@ def chooser_context(
         session.expunge(row)
     done = {p for p in (row.done_pages or []) if isinstance(p, int)}
     remaining = row.pages - len(done)
-    suggested = ranges.suggest_parts(row.pages, s.max_pages_per_job, done)
+    chapters = [] if fragment else outline_starts_isolated(bytes(row.content))
+    suggested = (
+        []
+        if fragment
+        else ranges.suggest_parts(
+            row.pages, s.max_pages_per_job, done, left=left, chapters=chapters
+        )
+    )
     left_out_pages = ranges.left_out(row.pages, done, suggested)
     heavy = row.size_bytes > s.max_upload_mb * 1024 * 1024
     shown_text = ranges.suggestion_text(suggested) if typed is None else typed
@@ -144,7 +159,7 @@ def chooser_context(
         "scans_note": note,
         "scans_choice": choice,
         "preview_rows": rows,
-        "preview_summary": preview_summary(rows, left),
+        "preview_summary": preview_summary(rows, left, next_day_start(now)),
         "pending": row,
         "size_text": pending.size_text(row.size_bytes),
         "examples": ranges.examples(s.max_pages_per_job, row.pages),
@@ -172,32 +187,46 @@ def chooser_context(
     return context
 
 
-def preview_summary(rows: list[ranges.PreviewRow], left: int | None) -> str:
-    """The preview in one line: how many parts and pages, what needs fixing, and where today's
-    pages run out ("Parts that do not fit today are not started" is what `_start_parts` does:
-    it stops at the first part that does not fit and the file stays)."""
+def preview_summary(rows: list[ranges.PreviewRow], left: int | None, resets_at: datetime) -> Markup:
+    """The preview in whole sentences, from `ranges.schedule`: which parts start now and which
+    can start after the day's pages reset ("Part 1 (pages 1 to 80) starts now. Parts 2 and 3
+    can start after Nov 19, 2026, 00:00 UTC, when your pages reset."). The parts that wait are
+    not started by the page: `_start_parts` stops at the first part today's pages cannot start
+    and the file stays, so the person sends them again after the reset."""
     if not rows:
-        return "No parts yet."
-    good = [r for r in rows if not r.error]
-    bad = len(rows) - len(good)
-    pages = sum(r.count for r in good)
-    parts_word = "part" if len(good) == 1 else "parts"
-    text = f"{len(good)} {parts_word}, {pages} {'page' if pages == 1 else 'pages'}."
-    if bad:
-        text += f" Fix {bad} before converting."
-    elif left is not None and pages > left:
-        fits, used = 0, 0
-        for r in good:
-            if used + r.count > left:
-                break
-            used += r.count
-            fits += 1
-        text += f" Only {left} pages are left today: " + (
-            f"the first {fits} {'part starts' if fits == 1 else 'parts start'}, the rest wait here."
-            if fits
-            else "none starts today; they wait here."
+        return Markup("No parts yet.")
+    plan = ranges.schedule(rows, left)
+    if plan.bad:
+        return Markup("Fix {} before converting.").format(
+            "the part marked below" if plan.bad == 1 else f"the {plan.bad} parts marked below"
         )
-    return text
+    sentences = []
+    if plan.now:
+        pages = sum(r.count for r in plan.now)
+        if len(plan.now) == 1:
+            row = plan.now[0]
+            what = f"Part {row.number} ({'page' if row.count == 1 else 'pages'} "
+            sentences.append(f"{what}{ranges.spoken(row.label)}) starts now.")
+        elif not plan.later:
+            sentences.append(f"All {len(plan.now)} parts ({pages} pages) start now.")
+        else:
+            sentences.append(f"{_numbers(plan.now)} ({pages} pages) start now.")
+    elif plan.later:
+        sentences.append("No part starts today.")
+    text = Markup(" ".join(sentences))
+    if plan.later:
+        text = Markup("{} {} {} after {}, when your pages reset.").format(
+            text, _numbers(plan.later), "can start", time_tag(resets_at)
+        )
+    return Markup(text.strip())
+
+
+def _numbers(rows: tuple[ranges.PreviewRow, ...]) -> str:
+    """ "Part 3", "Parts 2 and 3", "Parts 2 to 5": the parts a sentence is about."""
+    first, last = rows[0].number, rows[-1].number
+    if first == last:
+        return f"Part {first}"
+    return f"Parts {first} and {last}" if len(rows) == 2 else f"Parts {first} to {last}"
 
 
 @router.get("/uploads/{upload_id}")
@@ -209,7 +238,7 @@ def choose(request: Request, upload_id: str, user: UserDep) -> Response:
 def preview(request: Request, upload_id: str, user: UserDep, parts: str = "") -> Response:
     """The parts as typed, with their page counts: what the chooser's preview swaps in while
     the person types (htmx). Only page numbers are sent; nothing is stored or logged."""
-    context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000])
+    context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000], fragment=True)
     if redirect := poll.fragment_or_redirect(
         request, f"/uploads/{upload_id}"
     ):  # after the owner check
@@ -334,15 +363,17 @@ def _start_parts(
             out.status, out.retry_after = 413, ""
             break
         except stored_bytes.StorageFull:
+            wait = retry_after(stored_bytes.FULL_WAIT_S)
             out.error = (
                 "The service holds as much uploaded material as it can for now, so "
-                f"{named} was not started. Room frees up through the day: choose it again in "
-                "an hour. This file is kept."
+                f"{named} was not started. Room frees up through the day: choose it again "
+                f"{wait.words}. This file is kept."
             )
-            out.status, out.retry_after = 503, "3600"
+            out.status, out.retry_after = 503, wait.header
             break
         except QuotaRefused as exc:
             left = exc.left
+            wait = retry_after()
             limit = access.page_quota(s, user.access_tier)
             of_today = (
                 f"the {limit} pages a new account can convert today"
@@ -352,10 +383,10 @@ def _start_parts(
             out.error = (
                 f"{named} has {exc.pages} {'page' if exc.pages == 1 else 'pages'}, but you have "
                 f"{left} of {of_today} left. It was not started. "
-                "The count starts again at midnight UTC; this file is kept so you can choose it "
+                f"The count starts again {wait.words}; this file is kept so you can choose it "
                 "then."
             )
-            out.status, out.retry_after = 429, "3600"
+            out.status, out.retry_after = 429, wait.header
             break
         ctx.wake_worker()
         out.started.append({"id": job_id, "label": part.label})
@@ -393,12 +424,12 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
         from readablestem.web.routes.jobs import conversions_paused
 
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
-        raise PageError(*conversions_paused(closed, kept=True), headers={"Retry-After": "3600"})
+        raise conversions_paused(closed, kept=True)
     if (refused := ctx.uploads.enter(user.id)) is not None:
-        from readablestem.web.routes.jobs import UPLOAD_BUSY
+        from readablestem.web.routes.jobs import upload_busy
 
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
-        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+        raise upload_busy(refused)
     try:
         enforce(request, "upload_user", user.id)
         counted[0] = 1

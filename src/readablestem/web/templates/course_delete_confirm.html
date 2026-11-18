@@ -5,6 +5,7 @@
 {% block content %}
 <h1>Delete “{{ name }}”?</h1>
 <p>Deletes the course and its {{ entries }} {{ "symbol" if entries == 1 else "symbols" }}. Its documents keep their results.</p>
+{% include "_delete_notes.html" %}
 <div class="confirm-actions">
   <form method="post" action="/courses/{{ course_id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

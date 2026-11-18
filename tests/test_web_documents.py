@@ -194,3 +194,41 @@ def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
     reads = Reads(web)
     web.browser.get("/app/documents", headers={"HX-Request": "true"})
     assert not any("result_json" in s for s in reads.stop())  # read once, not every poll
+
+
+def test_the_zip_link_says_how_many_documents_the_zip_holds_and_names_the_rest(web, monkeypatch):
+    """F-325: with more ready documents than one zip holds, the link counts what the zip has
+    (the number the route returns) and the others are listed with the held-back one named."""
+    import io
+    import zipfile
+
+    from readablestem.web import bundle
+
+    monkeypatch.setattr(bundle, "MAX_DOCUMENTS", 3)
+    for number in range(5):
+        finish(web, filename=f"ready{number}.pdf", title=f"Ready {number}", decided=True)
+    finish(web, filename="draft.pdf", title="Draft")  # decisions still open
+    page = web.browser.get("/app").text
+    words = text(page)
+    assert "Download 3 of 5 ready documents (zip)" in words
+    assert "One zip holds at most 3 documents" in words
+    assert "1 document with decisions still to make is not in it" in words
+    rest = page[page.index('id="zip-rest"') : page.index("</details>", page.index('id="zip-rest"'))]
+    assert len(re.findall(r'href="/jobs/', rest)) == 2
+    members = zipfile.ZipFile(io.BytesIO(web.browser.get("/app/download").content)).namelist()
+    assert len([n for n in members if n.endswith(".html")]) == 3
+    # The five share a title (the same first heading): the file in each control's name keeps
+    # two rows from being the same words.
+    assert all(f", file ready{number}.pdf" in words for number in range(5))
+
+
+def test_every_delete_page_says_what_deleting_does_not_reach(web):
+    """F-328: the two sentences account deletion has (backups, the model provider's own
+    retention) are on the document's delete page too (the waiting file's and the course's
+    pages include the same partial, `templates/_delete_notes.html`)."""
+    job_id = finish(web)
+    pages = [web.browser.get(f"/jobs/{job_id}/delete").text]
+    pages.append(web.browser.get("/account/delete").text)
+    for html in pages:
+        words = text(html)
+        assert "Backups keep a copy for about a week." in words and "stay under" in words

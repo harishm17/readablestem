@@ -56,7 +56,7 @@
   {# The same for this person's daily page limit (MF20): no form that can only fail. #}
   <div class="notice" id="upload-closed" tabindex="-1">
     <p><strong>You have converted all {{ page_quota }} pages {% if new_account %}a new account can convert{% else %}you can{% endif %} today.</strong>
-      Uploads open again at {{ next_reset|utc }}.</p>
+      {{ allowance(page_quota, page_quota, "page", next_reset) }} {{ PAGES_RULE }}</p>
   </div>
   {% else %}
   {% set pdf_error = field_errors.get("pdf") %}
@@ -68,10 +68,15 @@
       <div class="hint" id="pdf-hint">
         <ul>
           <li>{% with accepted_types = acc %}{% include "_accepted_types.html" %}{% endwith %}</li>
-          <li>{% if not revising %}Up to {{ max_files }} files, each {% endif %}up to {{ max_pages }} pages and {{ max_upload_mb }} MB.</li>
+          <li>{% if revising %}One file, up to {{ one_document }}.{% else %}Up to {{ max_files }} files at a time, each up to {{ one_file }}.{% endif %}</li>
           {% if pages_left is not none %}
-          <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
-            (a new account can convert {{ page_quota }} pages a day){% endif %}; resets at {{ next_reset|utc }}.</li>
+          <li>{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% if new_account %}
+            That is the limit for a new account.{% endif %} {{ PAGES_RULE }}</li>
+          {% endif %}
+          {% if latex_source and not revising %}
+          <li>Have the LaTeX file this PDF was made from? Upload that instead: its headings, lists, tables
+            and equations are then read from the file itself. From a PDF they have to be worked out
+            from how the page looks.</li>
           {% endif %}
           <li>Your own materials only, with no student records.</li>
         </ul>
@@ -80,7 +85,7 @@
         <summary>More about file types and size</summary>
         <ul>
           {% if not revising %}
-          <li>Larger files (up to {{ source_pages }} pages, {{ upload_limit_mb }} MB) are kept so you choose the pages.</li>
+          <li>A file bigger than one document ({{ one_document }}) is kept so you choose the pages; each part becomes a document.</li>
           {% endif %}
           {% if office_kinds %}
           <li>Word and PowerPoint become a PDF first; its page count applies.</li>
@@ -89,8 +94,8 @@
           <li>A zip of PDFs and LaTeX projects works: each becomes a document ({{ max_files }} at a time).</li>
           {% endif %}
           {% if latex_source and not revising %}
-          <li>A LaTeX file (.tex) or project zip (up to 100 MB unpacked, 500 files) also works; every
-            3,000 characters or figure count as one page. Upload Beamer decks, and sources that
+          <li>A LaTeX file (.tex) or project zip (up to {{ project_zip }}) also works; every
+            {{ chars_per_page }} characters or figure count as one page. Upload Beamer decks, and sources that
             use the {{ refused_classes }} class or the {{ refused_packages }} package, as PDF.</li>
           {% endif %}
         </ul>

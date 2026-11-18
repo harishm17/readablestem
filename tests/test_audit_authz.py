@@ -116,6 +116,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download.docx"): USER,  # W3: the same file as Word
     ("GET", "/jobs/{job_id}/download.epub"): USER,  # W3: the same file as an EPUB
     ("GET", "/jobs/{job_id}/combine"): USER,  # T3-3: the finished parts of a source, joined
+    ("GET", "/jobs/{job_id}/combine/parts"): USER,  # the parts of a source and what each needs
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("POST", "/jobs/{job_id}/draft"): USER,  # SW21: the draft page's confirm
     ("GET", "/jobs/{job_id}/feedback"): USER,

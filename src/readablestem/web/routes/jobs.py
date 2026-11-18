@@ -52,6 +52,7 @@ from readablestem.web import (
     access,
     analytics,
     batch_intake,
+    bundle,
     documents,
     events,
     notation,
@@ -101,8 +102,15 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.pdf_probe import MAX_PAGE_SIDE_PT
 from readablestem.web.pending import MAX_PENDING_PER_USER
-from readablestem.web.quota import give_back_pages, next_day_start, pages_left, try_consume_pages
+from readablestem.web.quota import (
+    give_back_pages,
+    next_day_start,
+    pages_left,
+    retry_after,
+    try_consume_pages,
+)
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
@@ -116,9 +124,11 @@ from readablestem.web.uploads import (
     inspect_pdf_isolated,
     is_office_upload,
     max_upload_bytes,
+    one_file,
     read_upload_form,
+    zip_limits,
 )
-from readablestem.web.views import JobView, job_view, last_decision
+from readablestem.web.views import JobView, combine_view, job_view, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -175,8 +185,12 @@ STORAGE_FULL_TITLE = "Uploads are paused while storage catches up"
 STORAGE_FULL_MESSAGE = (
     "The service holds as much uploaded material as it can for now. Documents are deleted "
     "{hours} hours after their owners last work on them, so room frees up through the day. "
-    "Try again in an hour. Nothing was uploaded."
+    "Try again {wait}. Nothing was uploaded."
 )
+# What a busy conversion and a busy gate ask a person to wait: said and sent as one number
+# (`quota.retry_after`; a full store's is `storage.FULL_WAIT_S`).
+OFFICE_BUSY_WAIT_S = 60
+UPLOAD_BUSY_WAIT_S = 10
 # A refused upload costs nothing: the probe runs before the daily page count.
 PDF_ADVICE = " Save a copy as a PDF first."
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
@@ -201,6 +215,7 @@ def upload_error_message(
     name = filename or "This file"
     limit = s.source_page_limit
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
+    side = MAX_PAGE_SIDE_PT / 72 * 0.0254  # the longest side a page may have, in meters
     if code == "page_quota":
         return _quota_message(
             name, pages, left, access.page_quota(s, tier), new_account=access.is_open(tier)
@@ -216,8 +231,8 @@ def upload_error_message(
         "bad_form": "The upload did not arrive complete. Please try again.",
         "empty": f"{name} is empty. Choose a file that has content.",
         "not_pdf": not_accepted,
-        "too_large": f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
-        "files and upload each one.",
+        "too_large": f"{name} is larger than {s.upload_limit_mb} MB, the most one file can be. "
+        "Split it into smaller files and upload each one.",
         "too_many_files": f"You chose more than {access.files_per_upload(tier)} files. Upload "
         f"{access.files_per_upload(tier)} or fewer at a time.",
         "revise_one_file": "A revised version replaces one document: choose one file. To "
@@ -242,7 +257,8 @@ def upload_error_message(
         "office_failed": f"{name} could not be turned into a PDF. It may be damaged or too "
         "complicated. Open it in Word or PowerPoint, save it as a PDF, and upload that.",
         "office_busy": "Another Word or PowerPoint file is being converted at the moment. "
-        f"Wait a minute, then upload {name} again. Nothing was uploaded.",
+        f"Try again {retry_after(OFFICE_BUSY_WAIT_S).words}: upload {name} again. Nothing was "
+        "uploaded.",
         "office_budget": f"{name} was not converted: Word and PowerPoint files take a while, "
         "and this upload had used up its time. Upload it again on its own. Nothing was "
         "uploaded.",
@@ -253,14 +269,14 @@ def upload_error_message(
         f"downloading. {FRESH_COPY}",
         "no_pages": f"{name} has no pages. Check that you chose the right file.",
         "too_many_pages": f"{too_many} once it is made into a PDF (the count can differ from "
-        f"Word's or PowerPoint's); the limit is {limit} per upload. Split it into parts of "
-        f"up to {limit} pages and upload each part."
+        f"Word's or PowerPoint's); one file is up to {one_file(s)}. Split it into parts of "
+        f"up to {s.max_pages_per_job} pages and upload each part."
         if office
-        else f"{too_many}; the limit is {limit} per upload. Split it into parts "
-        f"of up to {limit} pages (in Acrobat: Organize Pages, then Split) and upload each "
-        "part.",
-        "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
-        "large to convert. Course documents are usually Letter or A4 size.",
+        else f"{too_many}; one file is up to {one_file(s)}. Split it into parts "
+        f"of up to {s.max_pages_per_job} pages (in Acrobat: Organize Pages, then Split) and "
+        "upload each part.",
+        "page_too_large": f"{name} has a page larger than {side:.2f} meters on a side, which "
+        "is too large to convert. Course documents are usually Letter or A4 size.",
         "image_too_large": f"{name} has a picture that is too large to read. Export the PDF "
         "again with its pictures at a normal size (300 dpi is plenty) and upload that.",
         "content_too_large": f"{name} is too large to read: a page of it, or the file as a "
@@ -294,7 +310,7 @@ def upload_error_message(
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
         **source_messages(name, s.max_pages_per_job),
-        **batch_messages(name, access.files_per_upload(tier)),
+        **batch_messages(name, access.files_per_upload(tier), zip_words(s)),
         "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
@@ -302,7 +318,9 @@ def upload_error_message(
         "storage_user": f"You are storing {pages or 0} MB of the {left or 0} MB you can keep, "
         f"and {name} would go over it. Delete documents you no longer need (My documents, "
         f"then Delete), then upload {name} again. Nothing was uploaded.",
-        "storage_full": STORAGE_FULL_MESSAGE.format(hours=s.retention_hours),
+        "storage_full": STORAGE_FULL_MESSAGE.format(
+            hours=s.retention_hours, wait=retry_after(stored_bytes.FULL_WAIT_S).words
+        ),
     }.get(code, f"{name} cannot be converted.")
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
         # Not "cannot convert it": the pages are read when asked for, and this upload did not.
@@ -325,8 +343,8 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
         "source_bad_zip": f"{name} could not be opened as a zip file. It may be damaged or "
         f"protected with a password. Zip the project again without a password, or {pdf}",
         "source_zip_limits": f"{name} is too big or has too many files. A project zip may be up "
-        "to 20 MB, 100 MB unpacked and 500 files. Remove what the document does not use, or "
-        f"{pdf}",
+        f"to {zip_limits()}. Remove what the document "
+        f"does not use, or {pdf}",
         "source_unsafe_zip": f"{name} has a file with a path or a link this tool will not open. "
         f"Zip the project again with plain files only, or {pdf}",
         "source_unsupported_file": f"{name} has a kind of file this tool does not read (such as "
@@ -354,13 +372,22 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
     }
 
 
-def batch_messages(name: str, limit: int) -> dict[str, str]:
+def zip_words(settings: Settings) -> str:
+    """The limits of a zip of documents: what one request may unpack is the budget its intake
+    makes (`batch_intake.RequestBudget.for_upload_limit`)."""
+    budget = batch_intake.RequestBudget.for_upload_limit(
+        settings.upload_limit_bytes, max_upload_bytes(settings.max_upload_mb)
+    )
+    return zip_limits(budget.total)
+
+
+def batch_messages(name: str, limit: int, zip_limits: str) -> dict[str, str]:
     """What went wrong with a zip of documents (`web.batch_intake`) or one of its documents."""
     return {
         "zip_bad": f"{name} could not be opened as a zip file. It may be damaged or protected "
         "with a password. Zip the files again without a password, or upload them one by one.",
-        "zip_limits": f"{name} is too big or has too many files. A zip may be up to 20 MB, "
-        "80 MB unpacked and 500 files. Split it into smaller zips, or upload the files one by one.",
+        "zip_limits": f"{name} is too big or has too many files. A zip may be up to "
+        f"{zip_limits}. Split it into smaller zips, or upload the files one by one.",
         "zip_unsafe": f"{name} has a file with a path or a link this tool will not open. Zip the "
         "files again as plain files, or upload them one by one.",
         "zip_unsupported": f"{name} has a kind of file this tool does not read (such as another "
@@ -394,16 +421,17 @@ def _quota_message(
     for new accounts, not a fault."""
     has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
     whose = "a new account can convert" if new_account else "you can convert"
+    again = retry_after().words  # the same time the refusal's `Retry-After` counts down to
     if not left:
         return (
             f"{has}, and you have used all {quota} pages {whose} today. Upload it "
-            "again after the count starts again at midnight UTC. Nothing was uploaded."
+            f"again after the count starts again {again}. Nothing was uploaded."
         )
     limit = f"the {quota} pages {whose} today" if new_account else f"today's {quota} pages"
     return (
         f"{has}, but you have {left} of {limit} left. Upload a part of up "
         f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
-        "count starts again at midnight UTC. Nothing was uploaded."
+        f"count starts again {again}. Nothing was uploaded."
     )
 
 
@@ -582,6 +610,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         # My documents as a to-do list (web/documents.py); expired jobs count as deleted.
         listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
         left = pages_left(session, user.id, quota=quota, day=utc_today())
+        ready = documents.ready_newest_first(listing.rows)
         # The upload form's course choice (notation memory); None hides it.
         courses = (
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
@@ -637,9 +666,12 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "max_files": access.files_per_upload(user.access_tier),
         "batch_zip": ctx.settings.feature_batch_zip,
         "upload_limit_mb": ctx.settings.upload_limit_mb,
-        "source_pages": ctx.settings.source_page_limit,
-        "ready_documents": sum(
-            1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
+        "ready_documents": len(ready),
+        # What "Download all" holds: the newest `bundle.limit` ready documents (routes/bundle.py
+        # takes them in this order); the others are named on the page.
+        "zip_rest": ready[bundle.limit("html") :],
+        "zip_held_back": sum(
+            1 for row in listing.rows if row.status == JobStatus.DONE and row.open_decisions
         ),
         "word_export": export_docx.available(),  # "Download all as Word" needs pandoc
         # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.
@@ -791,18 +823,19 @@ async def create_job(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
-        raise PageError(*conversions_paused(closed, kept=False), headers={"Retry-After": "3600"})
+        raise conversions_paused(closed, kept=False)
     if await run_in_threadpool(_storage_full, ctx):  # before the body is read
         log_event(logger, "upload_rejected", code="storage_full")
+        wait = retry_after(stored_bytes.FULL_WAIT_S)
         raise PageError(
             503,
             STORAGE_FULL_TITLE,
-            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours),
-            headers={"Retry-After": "3600"},
+            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours, wait=wait.words),
+            headers={"Retry-After": wait.header},
         )
     if (refused := ctx.uploads.enter(user.id)) is not None:
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
-        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+        raise upload_busy(refused)
     try:
         enforce(request, "upload_user", user.id)  # before anything is read or any process starts
         request.state.upload_counted, request.state.upload_accepted = 1, 0
@@ -820,43 +853,54 @@ def _storage_full(ctx: AppContext) -> bool:
         return stored_bytes.global_full(session, ctx.settings)
 
 
-def conversions_paused(closed: str, *, kept: bool) -> tuple[int, str, str]:
-    """Status, title and message of the page for an upload turned away because no model
-    spend is left today (`deps.conversions_closed`): the day's cap, or the pool for new
-    accounts. `kept`: the file is still waiting for its pages to be chosen."""
+def conversions_paused(closed: str, *, kept: bool) -> PageError:
+    """The page for an upload turned away because no model spend is left today
+    (`deps.conversions_closed`): the day's cap, or the pool for new accounts. `kept`: the
+    file is still waiting for its pages to be chosen. Both reset at the day's start, so the
+    words and `Retry-After` are the time left to it."""
     nothing = "Nothing was started; this file is kept." if kept else "Nothing was uploaded."
+    wait = retry_after()
+    headers = {"Retry-After": wait.header}
     if closed == "open":
-        return (
+        return PageError(
             503,
             "Conversions for new accounts are paused for today",
             "The share of today's budget set aside for new accounts has been used up. "
-            f"Uploads from new accounts open again after midnight UTC. {nothing} "
+            f"Uploads from new accounts open again {wait.words}. {nothing} "
             "Accounts that were invited are not affected.",
+            headers=headers,
         )
-    return (
+    return PageError(
         503,
         "Conversions are paused for today",
-        "Today's budget for conversions has been used up. New uploads open again "
-        f"after midnight UTC. {nothing}",
+        f"Today's budget for conversions has been used up. New uploads open again {wait.words}. "
+        f"{nothing}",
+        headers=headers,
     )
 
 
-# Status, title and message when the upload gate (web/uploads.py) turns someone away.
-UPLOAD_BUSY = {
-    "busy": (
+def upload_busy(refused: str) -> PageError:
+    """The page when the upload gate (web/uploads.py) turns someone away: `"busy"` (the
+    server is taking as many as it will) or `"own_upload"` (one of theirs is still being
+    checked)."""
+    wait = retry_after(UPLOAD_BUSY_WAIT_S)
+    headers = {"Retry-After": wait.header}
+    if refused == "own_upload":
+        return PageError(
+            429,
+            "Another upload of yours is still being checked",
+            "A document you uploaded a moment ago, perhaps in another tab, is still being "
+            f"checked. Try again {wait.words}: go back and upload this one again. Nothing was "
+            "uploaded this time.",
+            headers=headers,
+        )
+    return PageError(
         503,
         "Too many uploads right now",
-        "Several documents are being uploaded at this moment. Wait a few seconds, then "
-        "go back and upload again. Nothing was uploaded.",
-    ),
-    "own_upload": (
-        429,
-        "Another upload of yours is still being checked",
-        "A document you uploaded a moment ago, perhaps in another tab, is still being "
-        "checked. Wait a few seconds, then go back and upload this one again. Nothing was "
-        "uploaded this time.",
-    ),
-}
+        "Several documents are being uploaded at this moment. Try again "
+        f"{wait.words}: go back and upload again. Nothing was uploaded.",
+        headers=headers,
+    )
 
 
 @dataclass
@@ -1043,7 +1087,9 @@ def _place_files(
                     exc.pages or 0,
                     code=exc.code,
                     status=exc.status_code,
-                    retry_after="10" if exc.code == "office_busy" else "",
+                    retry_after=retry_after(OFFICE_BUSY_WAIT_S).header
+                    if exc.code == "office_busy"
+                    else "",
                     office=office,
                 )
             )
@@ -1131,7 +1177,7 @@ def _place_files(
                     file.filename,
                     code="storage_full",
                     status=503,
-                    retry_after="3600",
+                    retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
                     office=office,
                 )
             )
@@ -1144,7 +1190,7 @@ def _place_files(
                     code="page_quota",
                     status=429,
                     left=exc.left,
-                    retry_after="3600",
+                    retry_after=retry_after().header,
                     office=office,
                 )
             )
@@ -1298,7 +1344,7 @@ def _place_source(
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
-            retry_after="3600",
+            retry_after=retry_after().header,
         )  # fmt: skip
     ctx.wake_worker()
     log_event(
@@ -1421,7 +1467,12 @@ def _keep_for_parts(
         )
     except stored_bytes.StorageFull:
         log_event(logger, "upload_rejected", code="storage_full")
-        return Placed(file.filename, code="storage_full", status=503, retry_after="3600")
+        return Placed(
+            file.filename,
+            code="storage_full",
+            status=503,
+            retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
+        )
     log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
     return Placed(file.filename, pages, pending_id=pending_id, scans=scans)
 
@@ -2143,6 +2194,41 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     )
 
 
+def _combine_page(request: Request, session: Session, job: Job) -> Response:
+    """The combine page for `job`'s source: a row per part with its state and what it still
+    needs, and the button to join the ready ones when there are two or more."""
+    if not job.part_group:
+        raise PageError(
+            404,
+            "This document is not a part of a larger file",
+            "Only the parts of a file converted in parts can be combined.",
+            context={"job_id": job.id},
+        )
+    view = combine_view(session, job)
+    first = combine_rules.kept_parts(session, job)
+    return render(
+        request,
+        "combine.html",
+        {
+            "job_id": job.id,
+            "name": combine_rules.title_of(first[0].job if first else job),
+            "view": view,
+            "word_export": export_docx.available(),
+            "active": "app",
+        },
+    )
+
+
+@router.get("/jobs/{job_id}/combine/parts")
+def combine_page(request: Request, job_id: str, user: UserDep) -> Response:
+    """The parts of this document's source and what each needs before they can be joined.
+    Always answers for the owner of a part, even with nothing ready: it is where "Combine
+    parts" starts, and where a part with decisions open is sent for them."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, OWNER)
+        return _combine_page(request, session, job)
+
+
 @router.get("/jobs/{job_id}/combine")
 def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "html") -> Response:
     """One HTML file from the finished parts of this document's source that the owner still
@@ -2161,15 +2247,8 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
         job = job_access(session, job_id, user, OWNER)
         require_done(job)
         kept = combine_rules.kept_parts(session, job)
-        if len(kept) < 2:
-            raise PageError(
-                409,
-                "Nothing to combine yet",
-                "Combining needs at least two finished parts of this file that you still "
-                "have. A part you deleted, or one that has not finished or still has a "
-                "decision to make, cannot be joined.",
-                context={"job_id": job.id},
-            )
+        if len(kept) < 2:  # nothing to join yet: the page says what each part still needs
+            return _combine_page(request, session, job)
         if is_head(request):  # the name and type only: nothing joined, no clock restarted
             head_name = download_filename(
                 f"{combine_rules.title_of(kept[0].job)} combined", job.part_group or job.id

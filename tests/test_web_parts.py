@@ -117,7 +117,7 @@ def test_a_file_over_the_page_limit_is_kept_not_turned_away_and_costs_nothing(we
 def test_a_file_over_the_hard_limits_is_still_refused_with_the_reason(web):
     too_many = post_file(web.alice, "huge.pdf", make_pdf(41))
     assert too_many.status_code == 422
-    assert "huge.pdf has 41 pages; the limit is 40 per upload" in text_of(too_many.text)
+    assert "huge.pdf has 41 pages; one file is up to 40 pages" in text_of(too_many.text)
     too_big = post_file(web.alice, "big.pdf", make_pdf(1) + b"\0" * 5_300_000)
     assert too_big.status_code == 413 and "larger than 5 MB" in text_of(too_big.text)
     assert pending_rows(web) == [] and jobs_of(web) == []
@@ -188,7 +188,7 @@ def test_a_page_cannot_be_converted_twice(web):
     upload_id = keep_big(web, 12)
     choose(web, upload_id, "1-4")
     response = choose(web, upload_id, "3-6")
-    assert response.status_code == 400 and "page 3 was already converted" in text_of(response.text)
+    assert response.status_code == 400 and "Page 3 was already converted" in text_of(response.text)
     assert len(jobs_of(web)) == 1
 
 

@@ -318,7 +318,7 @@ def test_the_page_for_choosing_pages_passes_axe_in_each_state(site, browser, axe
     # Script shows the page fields and the parts as a list; the typed box is folded away.
     expect(page.get_by_label("First page")).to_be_visible()
     expect(page.locator(".parts-row")).to_have_count(3)
-    expect(page.locator("#parts-summary")).to_have_text("3 parts, 12 pages.")
+    expect(page.locator("#parts-summary")).to_have_text("All 3 parts (12 pages) start now.")
     expect(page.get_by_label("Pages for each part")).to_be_hidden()
     page.get_by_text("Type the pages instead").click()
     expect(page.get_by_label("Pages for each part")).to_have_value("1-4\n5-8\n9-12")
@@ -363,7 +363,7 @@ def test_the_parts_are_chosen_and_started_from_the_keyboard(site, browser):
         page.keyboard.type(last)
         page.keyboard.press("Enter")  # adds the part; it does not send the form
         page.wait_for_timeout(500)
-    expect(page.locator("#parts-summary")).to_have_text("2 parts, 8 pages.")
+    expect(page.locator("#parts-summary")).to_have_text("All 2 parts (8 pages) start now.")
     page.get_by_role("button", name="Convert these parts").focus()
     page.keyboard.press("Enter")
     page.wait_for_url(f"{site.base}/app")
@@ -391,10 +391,10 @@ def test_add_part_and_the_preview_say_what_is_wrong_before_anything_is_sent(site
     page.get_by_label("Last page").fill("2")
     page.get_by_role("button", name="Add part").click()  # overlaps the suggestion's part 1
     expect(note).to_contain_text("Part 4 added")
-    expect(page.locator("#parts-summary")).to_contain_text("Fix 1 before converting", timeout=5000)
+    expect(page.locator("#parts-summary")).to_contain_text("before converting", timeout=5000)
     expect(page.locator(".parts-row-error")).to_contain_text("Page 1 is in part 1 and part 4")
     page.get_by_role("button", name="Remove part 4").click()
-    expect(page.locator("#parts-summary")).to_have_text("3 parts, 12 pages.", timeout=5000)
+    expect(page.locator("#parts-summary")).to_have_text("All 3 parts (12 pages) start now.", timeout=5000)
     # What the preview shows is what is in the box (the form still sends the box).
     page.get_by_text("Type the pages instead").click()
     expect(page.get_by_label("Pages for each part")).to_have_value("1-4\n5-8\n9-12")

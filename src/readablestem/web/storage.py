@@ -32,6 +32,9 @@ from readablestem.web import access
 from readablestem.web.db import Blob, Job, JobStatus, PendingUpload, StepRecord, User, utcnow
 
 MB = 1024 * 1024
+# How long a refusal for a full store asks a person to wait: purges run hourly, so room is
+# expected within the hour. Said and sent by `quota.retry_after`.
+FULL_WAIT_S = 3600
 
 # What a stored document is counted as, by every figure here (`user_bytes`, `total_bytes`
 # and `finished_job_bytes`). Text lengths are characters, near enough to bytes for a cap in

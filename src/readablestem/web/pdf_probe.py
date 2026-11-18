@@ -54,6 +54,9 @@ The review screen uses the same child, with the same memory cap, for two more th
   page of the part, so the output's page markers can say it. Unused objects of the pages
   left out are dropped, so the part is smaller than the file in proportion. On any failure
   it writes nothing and exits with status 2.
+- `python -m readablestem.web.pdf_probe outline` prints {"ok": true, "starts": [P, ...]}: the
+  0-based pages where the PDF's top-level bookmarks point (chapter starts), for suggesting
+  where to cut a large file in parts.
 - `python -m readablestem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 - `python -m readablestem.web.pdf_probe text PAGE X0,Y0,X1,Y1` prints {"ok": true, "text": "..."}:
@@ -277,6 +280,19 @@ def page_sizes(data: bytes) -> list[tuple[float, float]]:
             turn_page(p)
             sizes.append((round(p.rect.width, 2), round(p.rect.height, 2)))
         return sizes
+    finally:
+        doc.close()
+
+
+def outline_starts(data: bytes) -> list[int]:
+    """The 0-based pages where a top-level outline (bookmark) entry of the PDF points, ascending,
+    without the first page and without repeats: where a chapter starts, for cutting a large
+    file in parts at chapter boundaries. Empty when the file has no outline."""
+    doc = _open(data)
+    try:
+        total = doc.page_count
+        entries = [e for e in doc.get_toc(simple=True) if len(e) >= 3 and e[0] == 1]
+        return sorted({int(e[2]) - 1 for e in entries if 1 < int(e[2]) <= total})
     finally:
         doc.close()
 
@@ -560,7 +576,7 @@ def main(argv: list[str] | None = None) -> int:
             return RENDER_FAILED
         sys.stdout.buffer.write(part)
         return 0
-    if args and args[0] in {"render", "sizes", "text"}:
+    if args and args[0] in {"render", "sizes", "text", "outline"}:
         data = sys.stdin.buffer.read()
         try:
             if args[0] == "render":
@@ -568,6 +584,9 @@ def main(argv: list[str] | None = None) -> int:
             if args[0] == "text":
                 said = region_text(data, page=int(args[1]), clip=_rect(args[2]))
                 sys.stdout.write(json.dumps({"ok": True, "text": said}) + "\n")
+                return 0
+            if args[0] == "outline":
+                sys.stdout.write(json.dumps({"ok": True, "starts": outline_starts(data)}) + "\n")
                 return 0
             sizes = page_sizes(data)
         except Exception:  # ProbeRejected, bad arguments, anything MuPDF raises

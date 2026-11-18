@@ -1,4 +1,4 @@
-{# The parts as they will be converted, one row each with its page count (web/ranges.py
+{# The parts as they will be converted, one row each with one label ("Part 2: pages 5 to 8 (4 pages)") (web/ranges.py
    `preview`). Drawn with the page and, while the person types, fetched again by htmx
    (GET /uploads/{id}/preview, routes/parts.py) and swapped in place; the summary line is a
    live region that is never replaced, updated out of band like the batch page's. Without
@@ -10,12 +10,10 @@
   <ol class="parts-list" aria-label="Parts to convert">
     {% for row in preview_rows %}
     <li class="parts-row{% if row.error %} parts-row-error{% endif %}">
-      <span class="parts-name">Part {{ row.number }}</span>
       {% if row.error %}
-      <span class="parts-problem"><span class="visually-hidden">Problem: </span>{{ row.error }}</span>
+      <span class="parts-problem"><span class="visually-hidden">Problem with part {{ row.number }}: </span>{{ row.error }}</span>
       {% else %}
-      <span class="parts-pages">{{ row.label }}</span>
-      <span class="parts-count">{{ row.count }} {{ "page" if row.count == 1 else "pages" }}</span>
+      <span class="parts-name">Part {{ row.number }}: {{ "page" if row.count == 1 else "pages" }} {{ row.words }} ({{ row.count }} {{ "page" if row.count == 1 else "pages" }})</span>
       {% endif %}
       {% if row.number <= max_parts %}<button type="button" class="link-button" data-remove-part="{{ row.number }}" hidden>Remove<span class="visually-hidden"> part {{ row.number }}</span></button>{% endif %}
     </li>

@@ -47,8 +47,9 @@ from readablestem.web import analytics, dev_only, forms, output, poll, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
+from readablestem.web.bundle import limit as zip_limit
 from readablestem.web.database import prepare_database
-from readablestem.web.dates import format_when, machine_date
+from readablestem.web.dates import format_when, time_tag
 from readablestem.web.db import make_engine, make_sessionmaker
 from readablestem.web.deps import (
     AppContext,
@@ -176,15 +177,9 @@ def _speakable(text: str | None) -> str:
 
 
 def _utc(value: datetime | None) -> Markup:
-    """A time for the page body: `<time datetime>` saying it in UTC, which app.js rewrites
-    in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
-    JavaScript the UTC text stays (UX review MF16). Not for <title> or attributes: use
-    `utc_text` there."""
-    if value is None:
-        return Markup("")
-    return Markup('<time class="local-time" datetime="{}">{}</time>').format(
-        machine_date(value), format_when(value, "short")
-    )
+    """The `utc` template filter: a time for the page body as a `<time>` (`web.dates`)
+    (UX review MF16)."""
+    return time_tag(value)
 
 
 _BREAK_AFTER = re.compile(r"([@._-])")
@@ -209,6 +204,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.globals["zip_limit"] = zip_limit  # ty: ignore[invalid-assignment]
     env.globals["allowance"] = _allowance  # ty: ignore[invalid-assignment]
     env.globals["PAGES_RULE"] = PAGES_RULE  # ty: ignore[invalid-assignment]
     env.filters["utc_text"] = _utc_text

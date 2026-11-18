@@ -25,7 +25,19 @@
   <p class="hint">This list updates by itself. <a href="/app">Refresh the list</a></p>
   {% endif %}
   {% if ready_documents >= 2 %}{# one ready document is downloaded from its own page #}
-  <p><a id="download-all" href="/app/download">Download all {{ ready_documents }} ready documents (zip)</a></p>
+  <p><a id="download-all" href="/app/download">Download {% if zip_rest %}{{ zip_limit("html") }} of {{ ready_documents }}{% else %}all {{ ready_documents }}{% endif %} ready documents (zip)</a></p>
+  {% if zip_rest or zip_held_back %}
+  <p class="hint">One zip holds at most {{ zip_limit("html") }} documents{% if zip_rest %}: the newest first{% endif %}.
+    {% if zip_held_back %}{{ zip_held_back }} {{ "document with decisions" if zip_held_back == 1 else "documents with decisions" }} still to make {{ "is" if zip_held_back == 1 else "are" }} not in it (listed under Needs you above).{% endif %}</p>
+  {% endif %}
+  {% if zip_rest %}
+  <details id="zip-rest">
+    <summary>The other {{ zip_rest|length }} ready {{ "document" if zip_rest|length == 1 else "documents" }}, not in the zip</summary>
+    <ul>
+      {% for row in zip_rest %}<li><a href="/jobs/{{ row.id }}">{{ row.name }}</a>: download it from its page</li>{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
   {% set download_all_url = "/app/download" %}{% include "_download_all_formats.html" %}
   {% endif %}
 </section>
