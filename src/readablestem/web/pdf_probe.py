@@ -318,6 +318,8 @@ def _ink_lines(page: pymupdf.Page) -> list[pymupdf.Rect]:
     other overlap there, and no edge between them would cut neither."""
     import pymupdf
 
+    from readablestem.pipeline.page_type import drawn_size
+
     out = []
     for block in page.get_text("dict", flags=pymupdf.TEXT_MEDIABOX_CLIP).get("blocks", []):
         for line in block.get("lines", []):
@@ -325,8 +327,8 @@ def _ink_lines(page: pymupdf.Page) -> list[pymupdf.Rect]:
             if not spans:
                 continue
             x0, _, x1, _ = line["bbox"]
-            y0 = min(s["origin"][1] - INK_ABOVE * s["size"] for s in spans)
-            y1 = max(s["origin"][1] + INK_BELOW * s["size"] for s in spans)
+            y0 = min(s["origin"][1] - INK_ABOVE * drawn_size(s) for s in spans)
+            y1 = max(s["origin"][1] + INK_BELOW * drawn_size(s) for s in spans)
             out.append(pymupdf.Rect(x0, y0, x1, y1))
     return out
 

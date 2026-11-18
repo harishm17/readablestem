@@ -524,3 +524,36 @@ def test_strokes_under_a_hidden_layer_and_a_title_are_handwriting_not_a_scan():
 
 
 # --------------------------------------------------------------------------- end to end
+
+
+def test_a_page_set_in_bitmap_tex_fonts_is_read_and_not_blank():
+    # dvips writes each bitmap font as a Type 3 font measured in pixels and sets it at 72
+    # over the printer's resolution: 10 pt text states a size of 0.24 pt. Two such pages of
+    # the public parsing benchmark were typed blank and came out empty with no flag.
+    doc = pymupdf.open()
+    page = _page(doc, LETTER)
+    glyph = doc.get_new_xref()
+    doc.update_object(glyph, "<<>>")
+    doc.update_stream(glyph, b"20 0 2 -31 18 10 d1 2 -31 16 41 re f")
+    font = doc.get_new_xref()
+    doc.update_object(
+        font,
+        "<< /Type /Font /Subtype /Type3 /Name /T1 /FontBBox [2 -31 18 10]"
+        " /FontMatrix [1 0 0 -1 0 0] /FirstChar 97 /LastChar 99 /Widths [20 20 20]"
+        " /Encoding << /Type /Encoding /Differences [97 /a /b /c] >>"
+        f" /CharProcs << /a {glyph} 0 R /b {glyph} 0 R /c {glyph} 0 R >> >>",
+    )
+    doc.xref_set_key(page.xref, "Resources", f"<< /Font << /T1 {font} 0 R >> >>")
+    words = [
+        f"1 0 0 1 {72 + 40 * column} {700 - 14 * row} Tm (abcab) Tj"
+        for row in range(10)
+        for column in range(8)
+    ]
+    text = doc.get_new_xref()
+    doc.update_object(text, "<<>>")
+    doc.update_stream(text, ("BT /T1 0.24 Tf " + " ".join(words) + " ET").encode())
+    doc.xref_set_key(page.xref, "Contents", f"{text} 0 R")
+    out = layout.analyze(doc.tobytes())
+    assert out.page_types[0].kind == "born_digital"
+    read = "".join(element.text or "" for element in out.elements)
+    assert read.count("abcab") == 80

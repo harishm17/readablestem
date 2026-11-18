@@ -1646,7 +1646,12 @@ the pass cannot read stays a kept image exactly as described here.
 **What is never content** (`_page_rows`, the same extraction as before, no second one):
 
 - a span in render mode 3 (MuPDF's char flags show neither fill nor stroke);
-- a span under 2 pt (`page_type.TINY_PT`);
+- a span drawn under 2 pt (`page_type.TINY_PT`). The size is the one the glyphs are drawn at
+  (`page_type.drawn_size`): dvips writes a bitmap TeX font as a Type 3 font measured in
+  pixels and sets 10 pt text at a stated 0.24 pt (300 dpi) or 0.12 pt (600 dpi), so the
+  stated size times the font's height in its own units is used, and layout reads that size
+  everywhere (`layout._text_blocks`). Before 2026-11-18 such a page was typed blank and came
+  out empty;
 - a span at 5 % opacity or less (rawdict `alpha` <= 13), unless it is text used as a
   clip (render mode 7, a gradient- or picture-filled title: MuPDF gives it alpha 0 with
   the CLIPPED flag), `page_type.span_hidden`. Clip text is visible only when something

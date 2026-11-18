@@ -1745,10 +1745,15 @@ def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
     """`page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]` with the codes of
     symbol and TeX fonts read as what they draw (`font_codes`) and each ligature's
     characters given their own share of the glyph's width (`_spread_ligatures`), and the
-    glyphs of drawing fonts taken out of the text (`glyph_strokes`). Every place layout reads
+    glyphs of drawing fonts taken out of the text (`glyph_strokes`), and each span's size
+    the size its glyphs are drawn at (`page_type.drawn_size`). Every place layout reads
     characters from the PDF goes through here (rows, line glyphs, the text pass's glyphs), so
     no path sees the zero-width boxes ligatures come out with, or a line set as glyphs."""
     blocks = page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]
+    for block in blocks:  # before anything measures by a span's size
+        for line in block.get("lines", ()):
+            for span in line["spans"]:
+                span["size"] = page_type.drawn_size(span)
     glyph_strokes.take(blocks)  # the glyphs of drawing fonts are strokes, not text
     glyph_names.recover(page, blocks)
     font_codes.remap(blocks)

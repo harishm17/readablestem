@@ -94,12 +94,13 @@ BBox = tuple[float, float, float, float]
 # 0, but it carries the CLIPPED flag and is visible, so alpha alone never hides it.
 INVISIBLE_OPACITY = 0.05  # alpha at or under this paints nothing a reader can see
 INVISIBLE_ALPHA = round(INVISIBLE_OPACITY * 255)  # 13 on rawdict's 0-255 scale
-# Text a sighted reader cannot see although it is painted (WS14.2): a span under TINY_PT
-# points, or one whose box on the rendered page is flat, its lightest and darkest pixels
-# under FLAT_CONTRAST (WCAG contrast ratio) apart: white on white, navy on navy, black on a
-# black box. Visible text leaves glyph-coloured pixels beside background ones. The render
-# is made only for a page with a span that could be flat (`_may_be_flat`): light text, or
-# text over an image or an opaque fill; dark text on the bare page is seen without one.
+# Text a sighted reader cannot see although it is painted (WS14.2): a span drawn under
+# TINY_PT points (`drawn_size`: a bitmap TeX font states a size far under what it draws),
+# or one whose box on the rendered page is flat, its lightest and darkest pixels under
+# FLAT_CONTRAST (WCAG contrast ratio) apart: white on white, navy on navy, black on a black
+# box. Visible text leaves glyph-coloured pixels beside background ones. The render is made
+# only for a page with a span that could be flat (`_may_be_flat`): light text, or text over
+# an image or an opaque fill; dark text on the bare page is seen without one.
 TINY_PT = 2.0
 FLAT_CONTRAST = 1.25
 FLAT_DPI = 100
@@ -298,11 +299,26 @@ HANDWRITING_REGION = "handwriting"
 # ---------------------------------------------------------------------------- visibility
 
 
+def drawn_size(span: dict[str, Any]) -> float:
+    """The size a span's glyphs are drawn at, in points. It is the span's stated size, except
+    for a font whose glyphs are measured in pixels: dvips writes each bitmap font as a Type 3
+    font with the matrix [1 0 0 -1 0 0] and sets it at 72 over the printer's resolution, so
+    10 pt text is stated as 0.24 pt (300 dpi) or 0.12 pt (600 dpi). There the font's height in
+    its own units times the stated size is what the reader sees. Layout writes this over the
+    span's `size` where it reads the text (`layout._text_blocks`)."""
+    size = float(span.get("size", TINY_PT))
+    if size >= TINY_PT:
+        return size
+    height = float(span.get("ascender", 1.0)) - float(span.get("descender", 0.0))
+    return size * height if size * height >= TINY_PT else size
+
+
 def span_hidden(span: dict[str, Any]) -> bool:
-    """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), a size under
-    TINY_PT points, or an alpha of 5 % or less, unless it is text used as a clip (C1.4).
-    Text in the colour of what is behind it needs the rendered page (`_flat_spans`)."""
-    return _unpainted(span) or float(span.get("size", TINY_PT)) < TINY_PT
+    """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), drawn under
+    TINY_PT points (`drawn_size`), or an alpha of 5 % or less, unless it is text used as a
+    clip (C1.4). Text in the colour of what is behind it needs the rendered page
+    (`_flat_spans`)."""
+    return _unpainted(span) or drawn_size(span) < TINY_PT
 
 
 def _unpainted(span: dict[str, Any]) -> bool:
