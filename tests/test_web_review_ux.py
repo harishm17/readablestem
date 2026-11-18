@@ -482,6 +482,21 @@ def test_only_pages_of_this_app_are_come_back_to(ux, path, kept):
     assert safe_return(request, path) == (path if kept else None)  # ty: ignore[invalid-argument-type]
 
 
+def test_signing_in_comes_back_to_the_page_and_not_to_one_of_its_pictures(ux):
+    """A page whose session ended still asks for its pictures and stylesheet: they are not
+    where signing in goes."""
+    ux.browser.cookies.clear()
+    page = f"/jobs/{ux.job_id}/review"
+    assert ux.browser.get(page, follow_redirects=False).status_code == 303
+    picture = ux.browser.get(
+        f"/jobs/{ux.job_id}/pages/1.png",
+        headers={"Sec-Fetch-Dest": "image"},
+        follow_redirects=False,
+    )
+    assert picture.status_code == 303
+    assert login(ux.browser, ALICE).headers["location"] == page
+
+
 def test_a_form_posted_after_the_cookie_expired_gets_the_signed_out_page(ux):
     """Not only a decision: any form posted when nobody is signed in says the session ended
     (the cookie, and the form's token with it, were gone)."""

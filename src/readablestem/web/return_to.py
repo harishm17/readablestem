@@ -15,7 +15,9 @@ admin user (`build_pages`, run once when the app is made), so a page added later
 remembered without anyone adding it to a list. The path must also be plain (letters,
 digits, `_ - . /`), with a query of ids and numbers. Anything else (an image, a
 stylesheet, `//elsewhere.example`, `/\\elsewhere`) is never remembered or followed, so
-this cannot become an open redirect. It is ids only, never document
+this cannot become an open redirect. A request the browser makes for a page's picture,
+stylesheet or status (`Sec-Fetch-Dest` other than `document`) is not remembered either:
+signing in would land on a picture. It is ids only, never document
 content, and it lives in the signed session cookie, which signing in clears. What was
 typed is kept by the browser itself (`static/app.js`: a draft in this tab's
 `sessionStorage`), never by the server.
@@ -80,6 +82,10 @@ def return_path(request: Request) -> str | None:
     the decision on the review screen for a decision's POST (from either view)."""
     path = request.url.path
     if request.method in {"GET", "HEAD"}:
+        # Only a page the person opened: a picture, a stylesheet or a status poll of a page
+        # whose session ended says what it is fetched for, and is not somewhere to land.
+        if request.headers.get("sec-fetch-dest", "document") != "document":
+            return None
         query = request.url.query
         return safe_return(request, f"{path}?{query}" if query else path)
     if request.method != "POST":

@@ -2562,7 +2562,9 @@ always went to My documents. Now:
   (`auth.finish_login`), so a deep link to a decision survives sign-in. The pages are the GET
   routes whose function takes the signed-in or the admin user, collected from the routers
   when the app is made (`return_to.build_pages`), so a new page is covered with no list to
-  update;
+  update. A request the browser makes for a page's picture, stylesheet or status poll
+  (`Sec-Fetch-Dest` other than `document`) is not remembered, so signing in never lands on
+  a picture;
 - a decision (or Undo) posted while signed out answers "Please sign in again. Your session
   ended, so this was not saved. … Sign in again to come back to the same decision.", with
   the sign-in buttons on the page; signing in lands on that decision. When the cookie
