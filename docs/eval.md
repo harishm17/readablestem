@@ -43,12 +43,25 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-figures.json` | 2026-10-14 | 0.5.0 | same |
-| `latest-headings.json` | 2026-11-02 | 0.5.1 | same (the task calls no model; run with the fake client, model fields kept from the earlier run; `baseline-headings.json` stays the 2026-10-14 file) |
-| `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-18 | 0.5.11 | headings: claude-opus-5-5, claude-haiku-5-5 (the task calls no model; run with a placeholder key and no call made); tables local: no model. Made by `eval pipeline` and kept with `eval promote --as latest --out-dir data/eval` |
+| `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
+| `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
+
+**What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
+report is held to its baseline only when this pipeline version made it (`eval gate
+--require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
+so CI's `eval-gate` job gates those two, re-made at 0.5.11. Equations, figures and document
+need a paid run: their latest and baseline reports are historical records of the 0.5.0
+system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
+the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
+answered). `eval-live.yml` re-measures them weekly on the current code and compares them
+with the baselines; a paid recording of the three is owed before they can gate a pull
+request again. The same job replays the corpus against the committed record (`eval burden
+--same`, "The replay record, and CI" under `eval burden`) when a change touches the package,
+which finds a change of behaviour that a version number alone would not.
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
-latest report from going stale is the gate's `--require-current` check on prompt versions and
+latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions and
 model ids, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
