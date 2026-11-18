@@ -912,6 +912,7 @@ NOTICE_CODES = frozenset(
         "word_headers_footers",  # running headers and footers, not part of the text
         "word_objects",  # SmartArt, charts or embedded objects: not read
         "word_tracked_changes",  # tracked changes: the reader took the accepted text
+        "word_rtl_text",  # right-to-left paragraphs: words in reading order, no direction kept
     }
 )
 

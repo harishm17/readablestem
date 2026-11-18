@@ -106,6 +106,7 @@ _PSTYLE, _RSTYLE = f"{{{W}}}pStyle", f"{{{W}}}rStyle"
 _TXBX = f"{{{W}}}txbxContent"
 _BLIP = "{http://schemas.openxmlformats.org/drawingml/2006/main}blip"
 _FALLBACK = f"{{{MC}}}Fallback"
+_FLDSIMPLE, _INSTR = f"{{{W}}}fldSimple", f"{{{W}}}instr"
 _OMATH = f"{{{M}}}oMath"
 _DELETED = (f"{{{W}}}del", f"{{{W}}}moveFrom")
 _BREAKS = (f"{{{W}}}tab", f"{{{W}}}br", f"{{{W}}}cr")
@@ -198,6 +199,7 @@ class Facts:
     charts: int = 0
     embedded: int = 0  # embedded objects and packages
     rtl_paragraphs: int = 0
+    simple_fields: int = 0  # `w:fldSimple`, written as their runs (pandoc drops their results)
     equations: int = 0  # `m:oMath` in the body, notes included (a Fallback copy once)
     tables: int = 0
     marked_tables: int = 0  # tables with at least one row marked "repeat as header row"
@@ -406,6 +408,17 @@ def _hide(root: ET.Element, hidden_styles: set[str], facts: Facts) -> None:
                 facts.hidden_runs += 1
                 facts.hidden_words += len(_text_of(child).split())
                 parent.remove(child)
+            elif child.tag == _FLDSIMPLE and not child.get(_INSTR, "").lstrip().upper().startswith(
+                "HYPERLINK"
+            ):
+                # pandoc drops the result of a simple field (a page number, a reference, a merge
+                # field) and keeps that of a complex one: the same field is written the second way
+                facts.simple_fields += 1
+                at = list(parent).index(child)
+                parent.remove(child)
+                for offset, inner in enumerate(list(child)):
+                    parent.insert(at + offset, inner)
+                    stack.append(inner)
             else:
                 stack.append(child)
 

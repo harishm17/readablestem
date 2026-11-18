@@ -96,7 +96,15 @@ BOXES_NOTICE = "word_text_boxes"  # optional: text boxes read where they are anc
 HEADERS_NOTICE = "word_headers_footers"  # optional: running heads left out
 OBJECTS_NOTICE = "word_objects"  # required: SmartArt, charts, embedded objects: not in the file
 CHANGES_NOTICE = "word_tracked_changes"  # required: changes were read as accepted
-NOTICE_CODES = (HIDDEN_NOTICE, BOXES_NOTICE, HEADERS_NOTICE, OBJECTS_NOTICE, CHANGES_NOTICE)
+RTL_NOTICE = "word_rtl_text"  # optional: right-to-left paragraphs, in reading order, shown as LTR
+NOTICE_CODES = (
+    HIDDEN_NOTICE,
+    BOXES_NOTICE,
+    HEADERS_NOTICE,
+    OBJECTS_NOTICE,
+    CHANGES_NOTICE,
+    RTL_NOTICE,
+)
 FLAT_CHECK = "source.flat_equation"
 HEADER_CHECK = "source.header_unmarked"
 _FLAT = re.compile(r"[A-Za-z]\d")
@@ -946,6 +954,8 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
         out.notices.append(Notice(code=BOXES_NOTICE, count=facts.text_boxes))
     if facts.headers_footers:
         out.notices.append(Notice(code=HEADERS_NOTICE, count=facts.headers_footers))
+    if facts.rtl_paragraphs:
+        out.notices.append(Notice(code=RTL_NOTICE, count=facts.rtl_paragraphs))
     objects = facts.smartart + facts.charts + facts.embedded
     if objects:
         out.notices.append(Notice(code=OBJECTS_NOTICE, count=objects, review="required"))

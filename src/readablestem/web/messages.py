@@ -547,6 +547,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "not in this file.",
     "word_objects": "Diagrams, charts or embedded objects in the Word file: {count}. They "
     "are not in this file, so describe them or add them again as pictures.",
+    "word_rtl_text": "Right-to-left paragraphs in the Word file: {count}. Their words are in "
+    "reading order, but this file shows them left to right.",
     "word_tracked_changes": "Tracked changes (insertions and deletions) that nobody accepted "
     "or rejected in this Word file: {count}. This file has the text as if all were accepted. "
     "Accept or reject them in Word, then upload the file again, before you give this to "
