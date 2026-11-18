@@ -145,6 +145,17 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",
+    # The reading was not compared with the PDF's own text, and why (`equation_step.not_compared`).
+    ("equation.not_compared", "no_characters"): "The PDF holds no text for this equation, so "
+    "the reading was not checked against it: compare it with the picture symbol by symbol.",
+    ("equation.not_compared", "unmapped_characters"): "The PDF's font does not say which "
+    "characters these are, so the reading was not checked against the PDF's text: compare it "
+    "with the picture symbol by symbol.",
+    ("equation.not_compared", "no_usable_characters"): "The PDF's text for this equation holds "
+    "only signs and punctuation, so the reading was not checked against it: compare it with "
+    "the picture symbol by symbol.",
+    ("equation.not_compared", "bold_letter"): "This bold letter was written from the PDF's own "
+    "text and no reading of the picture was made, so there was nothing to compare.",
     # A page converted from an image (pipeline.image_page, ADR 0007)
     ("image_page.no_text_layer", "image_page"): "This was read from an image of the page, so "
     "nothing in the PDF can confirm it: compare it with the original page.",
