@@ -13,7 +13,7 @@
   </div>
   <label for="class-link-address">Class link</label>
   <div class="copy-row">
-    <input type="text" id="class-link-address" readonly value="{{ cl.address }}">
+    <textarea id="class-link-address" readonly rows="3" spellcheck="false">{{ cl.address }}</textarea>
     <button type="button" class="button-secondary" data-copy-target="class-link-address" data-copy-state="class-link-copy-state" hidden>Copy link</button>
   </div>
   <p class="hint" id="class-link-copy-state" role="status"></p>

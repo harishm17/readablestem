@@ -1187,9 +1187,11 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   one-line "add a person, copy the link, send it yourself", a form (email address; View or
   Review as whole-row choices, each with what it allows; the Share button has when access ends
   beside it), the people with access with "Change ... to" and "Remove ..." (a danger button)
-  per person, the document's address to copy: a selectable field, plus a "Copy link" button
-  that `static/copy-link.js` shows (with a polite confirmation; without script the field is
-  copied by hand). Beside the address the page says when the document is deleted (every share
+  per person, the document's address to copy: a selectable read-only box that wraps, so the
+  whole address shows at any width (the class link's address is the same), plus a "Copy link"
+  button that `static/copy-link.js` shows (with a polite confirmation; without script the box is
+  copied by hand). In forced colors "Remove ..." keeps a thick double edge, so it does not
+  look like the "Change ... to" button. Beside the address the page says when the document is deleted (every share
   ends then) and links to the job page's keep controls. The sign-in wording names only the
   providers this server has (`routes.sharing.sign_in_words`); the exact-address rule is under
   "Help with sharing", and an error summary sits directly above the form. Nothing is emailed; the

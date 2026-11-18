@@ -75,7 +75,7 @@
   <p class="hint" id="address-hint">Opens only for the people above, after they sign in.</p>
   <label for="share-address" class="visually-hidden">Address of this document</label>
   <div class="copy-row">
-    <input type="text" id="share-address" readonly value="{{ address }}" aria-describedby="address-hint">
+    <textarea id="share-address" readonly rows="3" spellcheck="false" aria-describedby="address-hint">{{ address }}</textarea>
     {# Shown by static/copy-link.js; without script the field above is selected by hand. #}
     <button type="button" class="button-secondary" data-copy-target="share-address" data-copy-state="share-copy-state" hidden>Copy link</button>
   </div>

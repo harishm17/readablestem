@@ -16,6 +16,19 @@
   notices, three levels of buttons, sorting symbols by first use. Unlinking an address,
   unblocking and removing a person's access to one document stay as they were: each is put back
   in one step.
+## Unreleased: modes: forced colors and dark (branch fix/modes-forced-colors-dark)
+
+- WS24.8 and WS13.11, as far as the triage: the job status box (F-431), a boxed summary row, the
+  MathML preview, the alt-text and heading proposals, the review's table of contents, the compare
+  box, the optional-checks box, the count chip and the page frame had only a background, so in
+  forced colors they vanished; each now has a border in the forced-colors block next to its rule.
+  An invalid field (F-432) gets a thick double edge besides its red, and the filled danger button
+  a thick double edge, so neither depends on color or fill. The parts list rows (F-433) put the
+  action at the right edge on a 320px screen, the label wrapping in its own space. The share
+  link and the class link (F-434) are read-only boxes that wrap, not one-line inputs. The review
+  legend's keys (F-300) use the page's own `--pmark-*` colors on paper, so they match the marks
+  in dark mode. F-301 and F-338 no longer reproduce: the paper rule already keeps those elements
+  light with a frame. DESIGN.md has the four rules in its Do's.
 
 ## Unreleased: typed addresses and numbered references are links (branch feat/links-typed-and-references)
 
