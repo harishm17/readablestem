@@ -506,7 +506,7 @@ def test_the_list_view_keeps_the_group_and_refuses_anything_but_keep(env):
     assert "these images have nothing else to accept" in text_of(refused.text)
     assert 'href="#group-actions-pg-p2-e0"' in refused.text  # the error summary's link
     kept = _post(env, job_id, "pg-p4-e0", "reject", "list")
-    assert kept.status_code == 303 and "/review/list#" in kept.headers["location"]
+    assert kept.status_code == 303 and "/review/list?at=" in kept.headers["location"]
     listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "Needs your decision (1)" in listing
     assert "Kept by you" in listing  # the scanned page, in "Your decisions"

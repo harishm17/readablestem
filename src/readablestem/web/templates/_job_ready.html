@@ -71,7 +71,7 @@
     <li>Read the student version and <a href="/jobs/{{ job.id }}/listen">listen to it</a>:
       {{ checked_words.CHECKS_NOT_MEANING }} Open Word and EPUB files in their own app.</li>
     {% if pg.finish.notes %}
-    <li>{{ pg.finish.notes_line }}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}.</li>
+    <li>{{ pg.finish.notes_line }}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list?at=optional-checks#optional-checks">see the notes</a>{% endif %}.</li>
     {% endif %}
     {% if pg.finish.not_handled %}
     <li>Not handled in this file: see <a href="#not-handled-heading">the list</a>.</li>

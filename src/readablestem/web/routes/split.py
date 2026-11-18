@@ -1488,9 +1488,11 @@ def review_screen(
         # A LaTeX source has no page to show beside its decisions: its list, at the item a
         # link asked for ("Decide it" on the job page), so the link does not lose its place.
         fix = loaded.fix_for(item) if item else None
-        anchor = f"#item-{quote(fix.element_id, safe='')}" if fix is not None else ""
+        anchor = f"item-{quote(fix.element_id, safe='')}" if fix is not None else ""
         # Built from the row and the stored item the check returned, not from the address.
-        return RedirectResponse(f"/jobs/{view.id}/review/list{anchor}", status_code=303)
+        # `at` names the item: the list shows the part that holds it.
+        where = f"?at={anchor}#{anchor}" if anchor else ""
+        return RedirectResponse(f"/jobs/{view.id}/review/list{where}", status_code=303)
     response = split_page(
         request,
         job_id,

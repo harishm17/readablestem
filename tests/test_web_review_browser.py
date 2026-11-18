@@ -151,13 +151,13 @@ def walk_states(page, site, job: str, check) -> None:
 
     page.get_by_label("LaTeX for equation 3").fill("\\frac{a}{b}")
     page.get_by_role("button", name="Save edit to equation 3").click()
-    page.wait_for_url(f"{url}#item-*")
+    page.wait_for_url(f"{url}?at=item-*#item-*")
     assert "Your edit passed the required checks" in page.locator("#review-progress").inner_text()
     check("just edited")
 
     page.locator("#acknowledge-p1-e2").check()  # what it means for students
     page.get_by_role("button", name="Keep without a description (figure 1)", exact=True).click()
-    page.wait_for_url(f"{url}#item-*")
+    page.wait_for_url(f"{url}?at=item-*#item-*")
     check("just rejected")
 
     page.get_by_label("LaTeX for equation 1").fill("\\input{secret}")
@@ -168,10 +168,10 @@ def walk_states(page, site, job: str, check) -> None:
 
     page.goto(url)
     page.get_by_role("button", name="Accept equation 1", exact=True).click()
-    page.wait_for_url(f"{url}#item-*")
+    page.wait_for_url(f"{url}?at=item-*#item-*")
     page.goto(url)
     page.get_by_role("button", name="Accept heading 2", exact=True).click()
-    page.wait_for_url(f"{url}#item-*")
+    page.wait_for_url(f"{url}?at=item-*#item-*")
     check("after more decisions")
     unfold_everything(page)
     check("after more decisions, unfolded")
@@ -248,13 +248,13 @@ def test_a_decision_lands_on_the_next_fix_with_a_link_back(site, browser, job):
     url = review_url(site, job)
     page.goto(url)
     page.get_by_role("button", name="Accept equation 1", exact=True).click()
-    page.wait_for_url(f"{url}#item-p2-e1")
+    page.wait_for_url(f"{url}?at=item-p2-e1#item-p2-e1")
     # The landing item has focus, so the next Tab reaches the link back to the change.
     assert page.evaluate("document.activeElement.id") == "item-p2-e1"
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.textContent") == "Equation 1 on page 1"
     page.keyboard.press("Enter")
-    page.wait_for_url(f"{url}#item-p1-e1")
+    page.wait_for_url(re.compile(r"#item-p1-e1$"))  # in this view: a link within the page
     changed = page.locator("#item-p1-e1")
     assert changed.is_visible() and "Just changed: Accepted." in changed.inner_text()
     context.close()
@@ -270,7 +270,7 @@ def test_decisions_work_without_javascript(site, browser, job):
     page.locator("#fix-p3-e1").get_by_role(
         "button", name="Keep without a description (figure 2)"
     ).click()
-    assert page.url == f"{url}#item-p3-e2"
+    assert page.url == f"{url}?at=item-p3-e2#item-p3-e2"
     context.close()
 
 

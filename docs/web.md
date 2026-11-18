@@ -166,7 +166,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
-| GET `/jobs/{id}/review/list?kind=&page=` | review | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
+| GET `/jobs/{id}/review/list?kind=&page=&part=&at=` | review | "All items as a list": every fix, grouped by kind, 25 cards a view; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below); `part` (1-based) picks the view and `at` (an item, heading group or section id) picks the view that holds it |
 | GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/symbols?view=` | review | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
@@ -2967,6 +2967,21 @@ links are one folded disclosure at the top of that section ("Sections, filter an
 at once"; open while a filter is in use; "Review at scale" below). With more than one decision
 in a kind each is a compact row and the first is open.
 
+**Parts.** The list is one sequence (decisions by kind, optional checks and their notes, "Your
+decisions", "Accepted automatically", the page links) cut into views of 25 cards
+(`routes/review.py` `PART_CARDS`; a heading group counts as its copies, a note or page link as a
+fifth). A view is about 130 KB and 4,100 DOM nodes on a document of 300 items (it was 1.3 MB and
+40,000 nodes). The links are plain GETs: `?part=N` and "Previous part", "Next part" and "Skip to the
+next part of the list" (the filter is kept), and `?at=<id>` shows the view that holds an item
+(`item-<id>`), a heading group (`group-card-<key>`) or a section (`optional-checks`, `decided`,
+`accepted`, `group-<kind>`): every redirect after a decision, the notices, the job page and the
+review screen link that way, so a link lands on the item. The line "Showing items 26 to 50 of 305.
+Part 2 of 13." says which items the view shows; the counts in the headings and the sections' summary
+lines stay whole-document counts. The order of the items and of the tab stops inside a view does not
+change. Crop pictures carry their width and height (read from the PNG) and `loading="lazy"`, and sit
+in folded rows, so a picture is asked for only when its row is open and on screen. Every bulk action
+works on the whole document, not on the view (below).
+
 **Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
 1. **Needs your decision (N)**: equations, then figures, then tables, then headings (a
@@ -3106,7 +3121,7 @@ the field; nothing is saved.
   headings.
 
 After a decision on the list view the browser is redirected (303) to
-`/jobs/{id}/review/list#item-<id>` of the next fix still waiting, after this one in review
+`/jobs/{id}/review/list?at=item-<id>#item-<id>` of the next fix still waiting, after this one in review
 order and wrapping round to the first, or to `#review-progress` when none are left. A one-time notice there links back to the fix
 that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
 The landing item has `tabindex="-1"`, so the next Tab reaches that link.
