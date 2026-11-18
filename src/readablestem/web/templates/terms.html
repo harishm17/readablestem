@@ -27,8 +27,8 @@
 <h2>The service</h2>
 <p>ReadableSTEM is a free beta built and maintained by Harish Manoharan.
   <a href="/for-accessibility-offices#continuity">Support and continuity</a>.
-  {% if signup_open %}It is open to anyone with a Google account{% if microsoft_on %} (or a Microsoft school
-  or work account from a university that is set up for it){% endif %}.{% else %}It is open by invitation to a small group of instructors.{% endif %}
+  {% if signup_open %}It is open to anyone who signs in with {{ signup_words or "Google" }}{% if microsoft_on %} (a Microsoft school
+  or work account must be from a university that is set up for it){% endif %}.{% else %}It is open by invitation to a small group of instructors.{% endif %}
   It may change, pause or stop at any time. Daily limits apply to pages and uploads, and the
   service pauses for the day when its budget for AI model calls is used up.
   {% if signup_open %}New accounts have lower daily limits than invited ones and their own share of
@@ -63,14 +63,12 @@
 
 <h2>Accounts</h2>
 {% if signup_open %}
-<p>Anyone can make an account by signing in with their own Google account{% if microsoft_on %} or their
-  Microsoft school or work account{% endif %}. Do not share your session or let others use
+<p>Anyone can make an account by signing in with their own {{ signup_words or "Google" }} account. Do not share your session or let others use
   your account. You can delete your account yourself at any time, from the Account page;
   that deletes your documents too. An account can be blocked, and access removed, at any time,
   for example if the service is misused or its limits are being got around.</p>
 {% else %}
-<p>Access is by invitation. You sign in with your own Google account{% if microsoft_on %} or your
-  Microsoft school or work account{% endif %}. Do not
+<p>Access is by invitation. You sign in as yourself, with {{ sign_in_words or "Google" }}. Do not
   share your session or let others use your access. Access can be removed at any time.</p>
 {% endif %}
 

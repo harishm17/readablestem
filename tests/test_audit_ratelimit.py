@@ -107,7 +107,7 @@ def web(tmp_path):
 
 
 def test_sign_in_attempts_are_limited_per_address(web):
-    rule = web.ctx.limiter.rules["login"]
+    rule = web.ctx.limiter.rules["login_dev"]
     page = web.browser.get("/dev-login").text
     statuses = [
         web.browser.post(
@@ -120,8 +120,25 @@ def test_sign_in_attempts_are_limited_per_address(web):
     refused = web.browser.post("/dev-login", data={"csrf_token": csrf_from(page), "email": ALICE})
     assert refused.status_code == 429
     assert int(refused.headers["retry-after"]) > 0
-    assert "Too many attempts" in refused.text
+    assert "Too many sign-in attempts" in refused.text
     assert web.browser.get("/app").status_code == 303  # still signed out
+
+
+def test_a_refused_form_is_not_an_attempt_and_the_wait_page_says_what_and_where_next(web):
+    """The sign-in rule is counted after the form's CSRF check, so an expired form does not
+    use an attempt; when the allowance is used up the page names it and links back."""
+    rule = web.ctx.limiter.rules["login_dev"]
+    page = web.browser.get("/dev-login").text
+    for _ in range(rule.limit + 3):
+        expired = web.browser.post("/dev-login", data={"csrf_token": "old", "email": ALICE})
+        assert expired.status_code == 403  # the expired form, not the limit
+    good = {"csrf_token": csrf_from(page), "email": "nobody@example.org"}
+    assert web.browser.post("/dev-login", data=good).status_code == 403  # still has attempts
+    for _ in range(rule.limit - 1):
+        web.browser.post("/dev-login", data=good)
+    limited = web.browser.post("/dev-login", data=good)
+    assert limited.status_code == 429
+    assert "sign-in attempts" in limited.text and 'href="/login"' in limited.text
 
 
 def test_google_and_microsoft_callbacks_are_limited(web):

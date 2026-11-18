@@ -445,8 +445,7 @@ def job_access(
 SIGN_IN_AGAIN = (
     "Sign in again to open this document",
     "This document was shared with your email address, but this sign-in did not confirm the "
-    "address. Sign out, then sign in again with Google or your university's Microsoft "
-    "account, using that address.",
+    "address. Sign out, then sign in again using that address.",
 )
 
 _TOO_LITTLE = {
@@ -2132,9 +2131,12 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
 def after_download_state(
     request: Request, job_id: str, user: CurrentUser
 ) -> feedback_questions.AfterDownload:
-    """What `_after_download.html` shows under the download link (web/feedback.py)."""
+    """What `_after_download.html` shows under the download link (web/feedback.py). The two
+    questions are about the owner's own plans to post the file, so only the owner is asked."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
+        if session.scalar(select(Job.user_id).where(Job.id == job_id)) != user.id:
+            return feedback_questions.AfterDownload()
         return feedback_questions.after_download(session, ctx.settings, user.id, job_id)
 
 

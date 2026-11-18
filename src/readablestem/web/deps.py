@@ -22,7 +22,15 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
-from readablestem.web import analytics, dev_only, office_convert, recipients, report_item, seo
+from readablestem.web import (
+    analytics,
+    dev_only,
+    office_convert,
+    recipients,
+    report_item,
+    seo,
+    signin_words,
+)
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
@@ -221,6 +229,18 @@ def csrf_token(request: Request) -> str:
     return token
 
 
+class LazyCsrfToken:
+    """The page's CSRF token, made only when a template prints it. A page with no form never
+    asks, so it makes no session and sets no cookie (the second cookie of the site is the
+    time zone's)."""
+
+    def __init__(self, request: Request) -> None:
+        self._request = request
+
+    def __str__(self) -> str:
+        return csrf_token(self._request)
+
+
 def csrf_valid(request: Request, submitted: object) -> bool:
     expected = request.session.get(SESSION_CSRF)
     if not isinstance(expected, str) or not expected or not isinstance(submitted, str):
@@ -267,13 +287,40 @@ def enforce(request: Request, rule_name: str, key: str | None = None) -> None:
         return
     log_event(logger, "rate_limited", logging.WARNING, rule=rule_name)
     minutes = max(1, round(wait / 60))
+    title, what, context = REFUSAL_WORDS.get(
+        rule_name, ("Too many attempts", "There have been too many attempts.", {})
+    )
     raise PageError(
         429,
-        "Too many attempts",
-        f"Please wait about {minutes} minute{'' if minutes == 1 else 's'} and try again. "
+        title,
+        f"{what} Try again in about {minutes} minute{'' if minutes == 1 else 's'}. "
         "Nothing was changed.",
+        context=context,
         headers={"Retry-After": str(wait)},
     )
+
+
+# What each limited action says when its allowance is used up, so a person knows which one
+# they hit and when it clears. The sign-in rules link back to /login.
+_SIGN_IN_BACK = {"back_href": "/login", "back_label": "Back to sign-in"}
+_SIGN_IN_LIMITED = (
+    "Too many sign-in attempts",
+    "There have been several sign-in attempts from this network.",
+    _SIGN_IN_BACK,
+)
+REFUSAL_WORDS: dict[str, tuple[str, str, dict[str, Any]]] = {
+    "login_google": _SIGN_IN_LIMITED,
+    "login_microsoft": _SIGN_IN_LIMITED,
+    "login_email": _SIGN_IN_LIMITED,
+    "login_dev": _SIGN_IN_LIMITED,
+    "callback": _SIGN_IN_LIMITED,
+    "signup": (
+        "Too many new accounts",
+        "This network has made several new accounts in the last hour. An existing account "
+        "can still sign in.",
+        _SIGN_IN_BACK,
+    ),
+}
 
 
 def limited(rule_name: str) -> Any:
@@ -321,7 +368,7 @@ def render(
     ctx = get_ctx(request)
     base: dict[str, Any] = {
         "user": current_user(request),
-        "csrf_token": csrf_token(request),
+        "csrf_token": LazyCsrfToken(request),
         "csrf_field": CSRF_FIELD,
         "flash": pop_flash(request),
         "source_url": ctx.settings.source_url,
@@ -334,6 +381,16 @@ def render(
         "dev_login": ctx.dev_login_enabled,
         "email_login": ctx.settings.email_login_enabled,
         "email_link_minutes": ctx.settings.email_link_minutes,
+        # The methods in words, from one place (`web.signin_words`).
+        "sign_in_words": signin_words.sign_in_words(
+            google=ctx.sign_in_client("google") is not None,
+            microsoft=ctx.sign_in_client("microsoft") is not None,
+            email_link=ctx.settings.email_login_enabled,
+        ),
+        "signup_words": signin_words.account_making_words(
+            google=ctx.sign_in_client("google") is not None,
+            microsoft=ctx.sign_in_client("microsoft") is not None,
+        ),
         # One statement of what is accepted, and who receives the pictures (the upload form,
         # the landing page, /limits and the guides read these).
         "accepted": ctx.accepted_types(),

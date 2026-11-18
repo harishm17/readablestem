@@ -194,8 +194,9 @@ def _xml_text(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def llms_txt(site: str, showcase: bool) -> str:
-    """llms.txt (llmstxt.org): what the site is and where its readable pages are."""
+def llms_txt(site: str, showcase: bool, sign_in: str) -> str:
+    """llms.txt (llmstxt.org): what the site is and where its readable pages are. `sign_in`:
+    the methods that make an account, in words (`web.signin_words`)."""
     lines = [
         f"# {SITE_NAME}",
         "",
@@ -210,7 +211,7 @@ def llms_txt(site: str, showcase: bool) -> str:
         "It assists; it does not certify. Nothing here establishes conformance with WCAG, the "
         "ADA or any other standard, and the output still needs a person to look at it. "
         f"It is a free, open-source beta built and maintained by {AUTHOR}; anyone "
-        "with a Google account can sign in, and the demo needs no sign-in.",
+        f"with a {sign_in} account can sign in, and the demo needs no sign-in.",
         "",
         "## The service",
         "",

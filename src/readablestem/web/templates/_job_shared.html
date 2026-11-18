@@ -4,5 +4,6 @@
   <p>{% if job.shared_by %}<strong>{{ job.shared_by }}</strong> shared this document with you.{% else %}This document was shared with you.{% endif %}
     {{ " " }}{% if job.role == "review" %}You can read it, download it, and make review decisions and edits; each one is recorded under your name.
     {% else %}You can read it and download it.{% endif %}
-    Only {{ job.shared_by or "the owner" }} can delete it, change its settings, upload a new version or share it.</p>
+    Only {{ job.shared_by or "the owner" }} can delete it, change its settings, upload a new version or share it.
+    {% if job.retain_until %}It is deleted automatically on {{ job.retain_until|utc }}, and your access ends then.{% endif %}</p>
 </div>

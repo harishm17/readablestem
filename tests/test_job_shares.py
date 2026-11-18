@@ -26,10 +26,12 @@ from fixtures.web.support import (
     make_pdf,
     upload,
 )
+from readablestem.core.types import Status
 from readablestem.ops import retention as purge
 from readablestem.web import shares
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobShare, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.views import audience_of
 from test_audit_authz import ROUTES
 
 CAROL = "carol@example.org"  # a viewer
@@ -58,8 +60,8 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download.docx"): "review",
     ("GET", "/jobs/{job_id}/download.epub"): "review",
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): "view",
-    ("GET", "/jobs/{job_id}/feedback"): "view",
-    ("POST", "/jobs/{job_id}/feedback"): "view",
+    ("GET", "/jobs/{job_id}/feedback"): "owner",
+    ("POST", "/jobs/{job_id}/feedback"): "owner",
     ("GET", "/jobs/{job_id}/combine"): "owner",
     ("GET", "/jobs/{job_id}/delete"): "owner",
     ("POST", "/jobs/{job_id}/delete"): "owner",
@@ -94,8 +96,25 @@ NEEDS: dict[tuple[str, str], str] = {
 RANK = shares.RANK
 
 
+def _settled(env) -> None:
+    """Leave nothing to decide, so the document is ready and every download is open."""
+    for fix in env.converter.output.result.fixes:
+        if fix.pending:
+            fix.status = Status.REJECTED if fix.status is Status.ABSTAINED else Status.ACCEPTED
+            fix.reviewed = True
+
+
 @pytest.fixture
 def site(tmp_path):
+    yield from _site(tmp_path, ready=False)
+
+
+@pytest.fixture
+def ready_site(tmp_path):
+    yield from _site(tmp_path, ready=True)
+
+
+def _site(tmp_path, *, ready: bool):
     env = WebEnv(tmp_path)
     with env.running() as owner:
         for email in (ALICE, BOB, CAROL, DAVE, ERIN):
@@ -107,6 +126,8 @@ def site(tmp_path):
             login(client, email)
             env.who[actor] = client
         env.job_id = job_id_from(upload(owner, make_pdf(2)))
+        if ready:
+            _settled(env)
         assert env.run_worker() == env.job_id
         give(env, CAROL, "view")
         give(env, DAVE, "review")
@@ -244,6 +265,53 @@ def test_the_get_routes_answer_each_person_by_their_right(site):
             assert "SECRET-DOC-TEXT" not in answers[actor].text, (path, actor)
 
 
+def test_a_ready_document_opens_for_a_viewer_and_stops_for_a_stranger_and_after_its_time(
+    ready_site,
+):
+    """The same rule on a document with nothing left to decide, where a viewer may download:
+    the reading and downloading routes open for a viewer, the review ones do not, a stranger
+    gets the 404 of an id that is not there, and past its deletion time nobody gets in."""
+    job = ready_site.job_id
+    paths = {
+        "page": f"/jobs/{job}",
+        "student": f"/jobs/{job}/view",
+        "record": f"/jobs/{job}/record.csv",
+        "zip": f"/jobs/{job}/download/canvas",
+        "review": f"/jobs/{job}/review",
+    }
+    for name, path in paths.items():
+        answers = {actor: send(ready_site, actor, "GET", path) for actor in ACTORS}
+        assert answers[OWNER].status_code == 200, name
+        assert answers[VIEWER].status_code == (403 if name == "review" else 200), name
+        assert answers[REVIEWER].status_code == 200, name
+        assert answers[STRANGER].status_code == answers[REVOKED].status_code == 404, name
+    with session_scope(ready_site.ctx.factory) as session:
+        session.get(Job, job).retain_until = utcnow() - timedelta(minutes=1)
+    for name, path in paths.items():
+        for actor in (OWNER, VIEWER, REVIEWER):
+            assert send(ready_site, actor, "GET", path).status_code == 404, (name, actor)
+
+
+def test_words_written_to_the_owner_do_not_reach_a_person_the_document_was_shared_with(
+    ready_site,
+):
+    """Listen is titled and worded for what a reader does (listen), not for what the owner
+    does (test with their own screen reader), and the owner's two questions about posting
+    the file are asked of nobody else."""
+    job = ready_site.job_id
+    owner = send(ready_site, OWNER, "GET", f"/jobs/{job}/listen").text
+    assert "Listen as a student" in owner and "test with yours" in owner
+    for actor in (VIEWER, REVIEWER):
+        listen = send(ready_site, actor, "GET", f"/jobs/{job}/listen").text
+        assert "Listen to this document" in listen
+        assert "Listen as a student" not in listen and "test with yours" not in listen
+        page = send(ready_site, actor, "GET", f"/jobs/{job}").text
+        assert "Two quick questions" not in page
+        assert send(ready_site, actor, "GET", f"/jobs/{job}/feedback").status_code == 403
+    assert audience_of("owner") == "owner" and audience_of("review") == "reviewer"
+    assert audience_of("view") == audience_of("anything else") == audience_of(None) == "reader"
+
+
 def test_the_post_routes_refuse_everyone_without_the_right_and_change_nothing(site):
     before = snapshot(site)
     for (method, template), need in NEEDS.items():
@@ -358,6 +426,21 @@ def test_the_owner_cannot_share_with_themselves_or_with_a_bad_right(site):
     assert give(site, "grace@example.org", "owner").status_code == 422
     assert give(site, "grace@example.org", "").status_code == 422
     assert ("grace@example.org", "view") not in stored_shares(site)
+
+
+def test_the_owner_is_told_what_the_share_did(site):
+    """Added, changed and already so are three different answers, and none holds the address."""
+    owner = site.who[OWNER]
+
+    def told(email: str, role: str) -> str:
+        assert give(site, email, role).status_code == 303
+        return owner.get(f"/jobs/{site.job_id}/share").text
+
+    assert "Nothing was sent: copy the link" in told("hana@example.org", "view")
+    again = told("hana@example.org", "view")
+    assert "already has the right to View" in again and "Nothing was sent: copy" not in again
+    changed = told("hana@example.org", "review")
+    assert "Their right is now Review" in changed and "hana@example.org</strong>: Review" in changed
 
 
 def test_at_most_ten_people(site):

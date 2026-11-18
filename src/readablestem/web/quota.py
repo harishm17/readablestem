@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, date, datetime, time, timedelta
 
+from markupsafe import Markup
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,29 @@ from readablestem.web.db import QuotaDay, SignupDay
 from readablestem.web.logsafe import log_event
 
 logger = logging.getLogger(__name__)
+
+
+# The rule, in one sentence for every page that shows an allowance. The clause "A document
+# you cancel before it starts does" joins it when cancelling gives pages back (WS11.3a): a
+# sentence that says more than the code does would be untrue.
+PAGES_RULE = "Pages count when you upload. A failed or deleted document does not give them back."
+
+
+def allowance_phrase(
+    used: int, total: int | None, unit: str, resets_at: str | Markup | None = None
+) -> str:
+    """One allowance in one order, used then total then left: "0 of 150 pages used today,
+    150 left. Resets at 4:00 PM." `unit` is the singular ("page", "model read"); `resets_at`
+    is the time already written for the page (the `utc` filter's `<time>` or plain text).
+    With no total: "12 pages used today, no limit set." Never "left of total"."""
+    plural = unit if total == 1 else f"{unit}s"
+    if total is None:
+        text = f"{used} {unit if used == 1 else unit + 's'} used today, no limit set."
+    else:
+        text = f"{used} of {total} {plural} used today, {max(0, total - used)} left."
+    if resets_at:
+        return Markup("{} Resets {}.").format(text, resets_at)
+    return text
 
 
 def try_consume_pages(

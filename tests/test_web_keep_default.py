@@ -48,7 +48,7 @@ def save(env, on: bool):
 
 def test_turning_it_on_ticks_the_box_and_is_remembered(web):
     response = save(web, on=True)
-    assert response.status_code == 303 and response.headers["location"] == "/account#account-keep"
+    assert response.status_code == 303 and response.headers["location"] == "/account"
     assert stored(web) is True
     assert KEEP_ON in web.browser.get("/account").text  # the notice, once
     app = web.browser.get("/app").text

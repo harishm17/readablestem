@@ -43,7 +43,7 @@ from readablestem.web.database import rowcount, utc_today
 from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.deps import get_ctx
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.quota import try_consume_reread
+from readablestem.web.quota import allowance_phrase, try_consume_reread
 
 logger = logging.getLogger(__name__)
 
@@ -179,12 +179,11 @@ def reread_allowance_message(allowance: int) -> str:
     """What the reviewer is told when an open-tier account has started all the reads it may
     today (the number is the setting; a read is counted when it starts; the count starts
     again at midnight UTC)."""
-    reads = "read" if allowance == 1 else "reads"
+    used_up = allowance_phrase(allowance, allowance, "read", "at midnight UTC")
     return (
-        f"You have started {allowance} {reads} with the model today, the most a new account "
-        "can start (a read counts when it starts, whether or not it worked). So this could "
-        "not be read. The count starts again at midnight UTC. Type it yourself, or try "
-        "again then."
+        f"Model reads from the review screen: {used_up} "
+        "That is the most a new account can start, and a read counts when it starts, whether "
+        "or not it worked. So this could not be read. Type it yourself, or try again then."
     )
 
 

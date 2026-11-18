@@ -120,10 +120,16 @@ def shares_of(session: Session, job_id: str) -> list[JobShare]:
     )
 
 
-def share(session: Session, job: Job, owner_email: str, raw_email: str, role: str) -> JobShare:
-    """Give `raw_email` the right `role` on `job` (or change theirs). Raises `ShareError`
-    for an address that is not one, the owner's own address, a right that does not exist, a
-    document that cannot be shared, or too many people."""
+ADDED, CHANGED, UNCHANGED = "added", "changed", "unchanged"
+
+
+def share(
+    session: Session, job: Job, owner_email: str, raw_email: str, role: str
+) -> tuple[JobShare, str]:
+    """Give `raw_email` the right `role` on `job` (or change theirs). Returns the share and
+    what happened (`ADDED`, `CHANGED` or `UNCHANGED`: the page says which). Raises
+    `ShareError` for an address that is not one, the owner's own address, a right that does
+    not exist, a document that cannot be shared, or too many people."""
     email = normalise_email(raw_email)
     if email is None or not _ADDRESS.fullmatch(email):
         raise ShareError("bad_email", "Enter the person's full email address.")
@@ -139,8 +145,10 @@ def share(session: Session, job: Job, owner_email: str, raw_email: str, role: st
         select(JobShare).where(JobShare.job_id == job.id, JobShare.email == email)
     )
     if existing is not None:
+        if existing.role == role:
+            return existing, UNCHANGED
         existing.role = role
-        return existing
+        return existing, CHANGED
     if len(shares_of(session, job.id)) >= MAX_SHARES_PER_JOB:
         raise ShareError(
             "too_many", f"A document can be shared with at most {MAX_SHARES_PER_JOB} people."
@@ -148,7 +156,7 @@ def share(session: Session, job: Job, owner_email: str, raw_email: str, role: st
     row = JobShare(job_id=job.id, email=email, role=role, created_at=utcnow())
     session.add(row)
     session.flush()
-    return row
+    return row, ADDED
 
 
 def revoke(session: Session, job_id: str, share_id: str) -> bool:

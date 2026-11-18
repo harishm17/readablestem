@@ -38,26 +38,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# What the owner is told, by what happened. No address is in a notice (the session cookie
+# holds it). "Nothing was sent" is said only when a person was added: the one case where the
+# owner has something to do next.
+SHARE_OUTCOME = {
+    shares.ADDED: (
+        "Added with the right to {right}. Nothing was sent: copy the link below and give it "
+        "to the person yourself."
+    ),
+    shares.CHANGED: "Changed. Their right is now {right}. Nothing was sent.",
+    shares.UNCHANGED: "No change: that person already has the right to {right}.",
+}
+
+
 def _title(job: Job) -> str:
     return documents.display_title(documents.stored_title(job), job.filename, job.title_override)
-
-
-def sign_in_words(*, google: bool, microsoft: bool, email_link: bool) -> str:
-    """The ways a person can sign in on this server, for the sharing page: "Google", "Google
-    or Microsoft", "Google, Microsoft or an emailed sign-in link". Empty when none is on
-    (development sign-in only), so the page does not name a provider that is not there."""
-    names = [
-        name
-        for name, on in (
-            ("Google", google),
-            ("Microsoft", microsoft),
-            ("an emailed sign-in link", email_link),
-        )
-        if on
-    ]
-    if len(names) < 2:
-        return "".join(names)
-    return ", ".join(names[:-1]) + " or " + names[-1]
 
 
 def _page(
@@ -86,11 +81,6 @@ def _page(
         "shares": listed,
         "address": f"{ctx.settings.base_url.rstrip('/')}/jobs/{job_id}",
         "roles": [(role, shares.ROLE_WORDS[role], shares.ROLE_HELP[role]) for role in shares.ROLES],
-        "sign_in_words": sign_in_words(
-            google=ctx.sign_in_client("google") is not None,
-            microsoft=ctx.sign_in_client("microsoft") is not None,
-            email_link=ctx.settings.email_login_enabled,
-        ),
         "retain_until": retain_until,
         "retention_mode": retention_mode,
         "max_shares": shares.MAX_SHARES_PER_JOB,
@@ -141,7 +131,7 @@ def add_share(
         owned_id = job.id  # redirects are built from the owned row, not the request
         title = _title(job)
         try:
-            row = shares.share(session, job, user.email, email, role)
+            row, outcome = shares.share(session, job, user.email, email, role)
             kept_role = row.role
         except shares.ShareError as exc:
             log_event(logger, "share_refused", job_id=owned_id, code=exc.code)
@@ -156,11 +146,7 @@ def add_share(
                 status_code=422,
             )
     log_event(logger, "share_set", job_id=owned_id, role=kept_role)
-    flash(
-        request,
-        "Saved. Nothing was sent: copy the document's address below and give it to the person.",
-        undo=False,
-    )
+    flash(request, SHARE_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]), undo=False)
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
 
 

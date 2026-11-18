@@ -20,6 +20,7 @@ list.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -64,8 +65,18 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
             if allowance is None
             else max(0, allowance - rereads_used(session, user.id, utc_today(now)))
         )
+        # The same documents storage counts: not the sample, not one past its deletion time.
         documents = int(
-            session.scalar(select(func.count()).select_from(Job).where(Job.user_id == user.id)) or 0
+            session.scalar(
+                select(func.count())
+                .select_from(Job)
+                .where(
+                    Job.user_id == user.id,
+                    Job.retain_until > now,
+                    Job.is_sample.is_(False),
+                )
+            )
+            or 0
         )
         row = session.get(User, user.id)
         joined = as_utc(row.created_at) if row is not None else None
@@ -80,6 +91,7 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
         "reread_allowance": allowance,
         "rereads_left": rereads_left,
         "documents": documents,
+        "name": user.name or "",
         "is_admin": user.is_admin,
         "recipients": recipients(s),
         "signup_open": s.signup_open,
@@ -109,7 +121,26 @@ def save_keep_default(
         if row is not None:
             row.keep_week_default = on
     flash(request, KEEP_ON if on else KEEP_OFF, undo=False)
-    return RedirectResponse("/account#account-keep", status_code=303)
+    return RedirectResponse("/account", status_code=303)  # no fragment: the notice takes focus
+
+
+MAX_NAME = 200
+NAME_SAVED = "Your name is saved."
+NAME_CLEARED = "Your name is removed."
+
+
+@router.post("/account/name", dependencies=[Depends(require_csrf)])
+def save_name(request: Request, user: UserDep, name: Annotated[str, Form()] = "") -> Response:
+    """The name people you share a document with see beside your address (`web.views`). One
+    line, at most 200 characters, no control characters; empty removes it."""
+    cleaned = " ".join("".join(ch for ch in name if unicodedata.category(ch)[0] != "C").split())
+    cleaned = cleaned[:MAX_NAME]
+    with session_scope(get_ctx(request).factory) as session:
+        row = session.get(User, user.id)
+        if row is not None:
+            row.name = cleaned or None
+    flash(request, NAME_SAVED if cleaned else NAME_CLEARED, undo=False)
+    return RedirectResponse("/account", status_code=303)
 
 
 def _ready_documents(request: Request, user: CurrentUser) -> int:

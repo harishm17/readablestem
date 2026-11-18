@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import re
 import secrets
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
@@ -46,7 +47,8 @@ from readablestem.web import analytics, dev_only, forms, output, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
-from readablestem.web.database import as_utc, prepare_database
+from readablestem.web.database import prepare_database
+from readablestem.web.dates import format_when, machine_date
 from readablestem.web.db import make_engine, make_sessionmaker
 from readablestem.web.deps import (
     AppContext,
@@ -60,6 +62,7 @@ from readablestem.web.exam import EXAM_WORDS
 from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.quota import PAGES_RULE, allowance_phrase
 from readablestem.web.return_to import decision_link, remember_return, signed_out_page
 from readablestem.web.routes import (
     account,
@@ -149,8 +152,14 @@ ERROR_TEXT = {
 
 
 def _utc_text(value: datetime | None) -> str:
-    value = as_utc(value)
-    return f"{value:%b} {value.day}, {value.year}, {value:%H:%M} UTC" if value else ""
+    return format_when(value, "short")
+
+
+def _allowance(
+    used: int, total: int | None, unit: str, resets_at: datetime | None = None
+) -> Markup:
+    """`quota.allowance_phrase` for a template: the reset is written as a `<time>`."""
+    return Markup(allowance_phrase(used, total, unit, _utc(resets_at) if resets_at else None))
 
 
 def _speakable(text: str | None) -> str:
@@ -165,13 +174,20 @@ def _utc(value: datetime | None) -> Markup:
     in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
     JavaScript the UTC text stays (UX review MF16). Not for <title> or attributes: use
     `utc_text` there."""
-    value = as_utc(value)
     if value is None:
         return Markup("")
-    stamp = value.strftime("%Y-%m-%dT%H:%M:%SZ")
     return Markup('<time class="local-time" datetime="{}">{}</time>').format(
-        stamp, _utc_text(value)
+        machine_date(value), format_when(value, "short")
     )
+
+
+_BREAK_AFTER = re.compile(r"([@._-])")
+
+
+def _breakable(text: str | None) -> Markup:
+    """A long value (an address, a file name) with places it may wrap, after the characters
+    @ . _ and -, so it never breaks in the middle of a word."""
+    return Markup(_BREAK_AFTER.sub(r"\1<wbr>", str(Markup.escape(text or ""))))
 
 
 def _usd(value: float | None) -> str:
@@ -187,7 +203,10 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.globals["allowance"] = _allowance  # ty: ignore[invalid-assignment]
+    env.globals["PAGES_RULE"] = PAGES_RULE  # ty: ignore[invalid-assignment]
     env.filters["utc_text"] = _utc_text
+    env.filters["breakable"] = _breakable
     env.filters["usd"] = _usd
     env.filters["speakable"] = _speakable
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)

@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from readablestem.web import seo
+from readablestem.web import seo, signin_words
 from readablestem.web.assets import STATIC_DIR, cached_html, static_url
 from readablestem.web.deps import get_ctx
 from readablestem.web.security import VIEW_CSP
@@ -39,7 +39,15 @@ def sitemap(request: Request) -> Response:
 
 @router.get("/llms.txt")
 def llms(request: Request) -> Response:
-    body = seo.llms_txt(_site(request), showcase=bool(seo.showcase_pages()))
+    ctx = get_ctx(request)
+    words = signin_words.sign_in_words(
+        google=ctx.sign_in_client("google") is not None,
+        microsoft=ctx.sign_in_client("microsoft") is not None,
+        email_link=False,  # the link signs in an account that exists; it makes none
+    )
+    body = seo.llms_txt(
+        _site(request), showcase=bool(seo.showcase_pages()), sign_in=words or "Google"
+    )
     return PlainTextResponse(body, headers={"Cache-Control": CRAWL_CACHE})
 
 

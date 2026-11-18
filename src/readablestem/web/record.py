@@ -42,6 +42,7 @@ from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import exam, job_page
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_when, machine_date
 from readablestem.web.messages import explain_check, explain_reason, severity_label
 from readablestem.web.review import (
     BULK_KEY,
@@ -203,15 +204,8 @@ class Record:
     gaps: list[tuple[str, str]] = field(default_factory=list)
 
 
-def long_when(value: datetime | None) -> str:
-    """ "October 9, 2026, 14:03 UTC"."""
-    if value is None:
-        return ""
-    return f"{value:%B} {value.day}, {value.year}, {value:%H:%M} UTC"
-
-
-def iso_when(value: datetime | None) -> str:
-    return value.strftime("%Y-%m-%dT%H:%M:%SZ") if value is not None else ""
+long_when = format_when  # "October 9, 2026, 14:03 UTC" (`web.dates`)
+iso_when = machine_date  # the CSV keeps ISO UTC: it is a file for machines
 
 
 def _page_of(elements: dict[str, Element], element_id: str) -> int | None:

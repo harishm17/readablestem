@@ -22,7 +22,7 @@
 {% endif %}
 <p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages ({{ size_text }}). Each part is its own document of up to
   {{ limit }} pages. Nothing is converted or counted yet.
-  {% if pages_left is not none %}{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today (resets {{ next_reset|utc }}).{% endif %}</p>
+  {% if pages_left is not none %}{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% endif %}</p>
 {% if done_label %}
 <p id="parts-done">Pages {{ done_label }} {{ "is" if done_count == 1 else "are" }} already sent.</p>
 {% endif %}

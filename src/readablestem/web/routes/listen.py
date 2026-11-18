@@ -20,7 +20,8 @@ from readablestem.web.db import session_scope
 from readablestem.web.deps import UserDep, get_ctx, render
 from readablestem.web.routes.jobs import current_html, job_access, require_done
 from readablestem.web.routes.pages import DEMO_DIR, DEMO_PAGE
-from readablestem.web.shares import VIEW
+from readablestem.web.shares import VIEW, role_of
+from readablestem.web.views import audience_of
 
 router = APIRouter()
 
@@ -31,6 +32,7 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         require_done(job)
+        audience = audience_of(role_of(session, job, user))
         html = current_html(ctx, session, job).html or ""
         title = documents.display_title(
             (job.result_json or {}).get("title"), job.filename, job.title_override
@@ -47,8 +49,9 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
         {
             "items": items,
             "title": title,
+            "audience": audience,
             "back_url": f"/jobs/{job_id}",
-            "back_label": "Back to the results",
+            "back_label": "Back to the results" if audience == "owner" else "Back to the document",
             "student_url": f"/jobs/{job_id}/view",
         },
     )

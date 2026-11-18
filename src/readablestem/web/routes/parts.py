@@ -141,6 +141,7 @@ def chooser_context(
         "done_label": ranges.label(sorted(done)) if done else "",
         "done_count": len(done),
         "pages_left": left,
+        "page_quota": access.page_quota(s, user.access_tier),
         "next_reset": next_day_start(now),
         "typed_parts": shown_text,
         "suggestion_lines": len(suggested),

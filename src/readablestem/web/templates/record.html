@@ -17,7 +17,7 @@
   <h2 id="record-document">The document</h2>
   <dl class="summary-list">
     <div><dt>Title</dt><dd>{{ record.title }}</dd></div>
-    <div><dt>File name</dt><dd>{{ record.filename }}</dd></div>
+    <div class="summary-long"><dt>File name</dt><dd>{{ record.filename|breakable }}</dd></div>
     <div><dt>Pages</dt><dd>{{ record.pages }}</dd></div>
     <div><dt>Converted on</dt><dd>{{ long_when(record.converted_at) or "Not recorded" }}</dd></div>
     <div><dt>Converted by</dt><dd>{{ record.owner }}</dd></div>

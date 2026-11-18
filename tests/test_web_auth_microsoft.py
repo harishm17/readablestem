@@ -130,6 +130,10 @@ def test_microsoft_alone_offers_no_google_button(tmp_path):
         token = csrf_from(page)
         assert client.post("/login", data={"csrf_token": token}).status_code == 503
         assert client.get("/auth/callback").status_code == 404
+        # The pages that name the ways in say the same as the buttons.
+        assert "You sign in with Microsoft" in client.get("/privacy").text
+        assert "sign in with Google" not in client.get("/terms").text
+        assert "with a Microsoft account" in client.get("/llms.txt").text
 
 
 def test_the_button_goes_to_microsoft_with_pkce_state_and_nonce(ms):

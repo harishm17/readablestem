@@ -52,7 +52,13 @@ class Rule:
 # Rule name -> allowance. Generous for people, tight for scripts: a shared university
 # address (a whole department behind one NAT) still has room.
 RULES: dict[str, Rule] = {
-    "login": Rule(10, 300),  # starting a sign-in: the buttons on /login
+    # Starting a sign-in, one rule for each way in, so ten emailed-link requests do not block
+    # the Google button. Each is counted after the form's CSRF check: an expired form is not
+    # an attempt.
+    "login_google": Rule(10, 300),
+    "login_microsoft": Rule(10, 300),
+    "login_email": Rule(10, 300),
+    "login_dev": Rule(10, 300),
     "callback": Rule(20, 300),  # coming back from Google or Microsoft
     # New accounts made by open sign-up (SIGNUP_MODE=open), per address: counted when a
     # sign-in is about to create one, not on every sign-in. A shared university or office
