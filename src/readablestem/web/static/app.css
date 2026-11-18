@@ -400,7 +400,7 @@ math[intent] mi { text-transform: none; }
 
 /* ===================================================================== review screen
    One decision at a time beside the page it is on (templates/review_split.html).
-   Marks on the page image: the position of each comes from /jobs/{id}/review/marks.css
+   Marks on the page image: the position of each comes from /jobs/{id}/review/marks.css?page=N
    (the CSP allows no inline styles). Every mark is a link of at least 24 x 24 CSS px
    (WCAG 2.5.8), and status is in its number, shape and text, never its colour alone:
    a decision is a numbered disc and a solid frame, an optional check a "Note" label and

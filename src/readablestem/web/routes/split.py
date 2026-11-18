@@ -133,7 +133,7 @@ from readablestem.web.routes.review import (
 )
 from readablestem.web.shares import REVIEW
 from readablestem.web.speech_diff import SpokenDiff, spoken_diff
-from readablestem.web.views import KIND_LABELS, JobView, last_decision
+from readablestem.web.views import KIND_LABELS, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -428,8 +428,9 @@ def _label(fix: Fix, labels: dict[str, str]) -> str:
     return labels.get(fix.element_id) or KIND_LABELS.get(fix.kind, fix.kind.value.title())
 
 
-def _page_count(view: JobView, result: DocumentResult) -> int:
-    pages = [view.page_count, result.stats.pages, *(e.page + 1 for e in result.elements)]
+def _page_count(stored: int, result: DocumentResult) -> int:
+    """The pages of the document: what the job row says, or the result (an older one) shows."""
+    pages = [stored, result.stats.pages, *(e.page + 1 for e in result.elements)]
     return max(1, *pages)
 
 
@@ -580,7 +581,7 @@ class SplitBuilder:
         self.places = heading_places(self.result)
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
-        self.page_count = _page_count(self.view, self.result)
+        self.page_count = _page_count(self.view.page_count, self.result)
         self.omitted = set(self.result.omitted_pages)
         self.items: dict[str, ReviewItem] = {}
         # A source's items are not read again from a picture (`review._own_equation`).
@@ -1728,8 +1729,13 @@ def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> R
     what it is made from (`PageMarks.etag`), so the browser asks again each time
     (`no-cache`) and gets a 304 when that has not changed, without a mark being placed. It is
     asked only after the same checks as the screen itself."""
-    view, result, _ = _load(request, job_id, user)
-    if not (page.isdigit() and 1 <= int(page) <= _page_count(view, result)):
+    # Not `_load`: the job's summary and crops are the screen's, and cost far more than this.
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        stored = int(job.page_count or 0)
+    if not (page.isdigit() and 1 <= int(page) <= _page_count(stored, result)):
         raise PageError(404, *NOT_FOUND)
     sizes = resolve_page_sizes(request, job_id, user, result)
     plan = page_marks(result, sizes, int(page) - 1)

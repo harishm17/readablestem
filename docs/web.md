@@ -171,7 +171,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/symbols?view=` | review | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
 | POST `/jobs/{id}/symbols` | review | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form checked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
-| GET `/jobs/{id}/review/marks.css` | review | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
+| GET `/jobs/{id}/review/marks.css?page=N` | review | Where each mark and its frame go on page `N` (1-based; 404 when there is no such page), and the compare sizes of the equations on it (element ids and numbers only). `Cache-Control: private, no-cache` with an `ETag` made from what the page's marks are made of (see "Marks stylesheet" below): a repeat request that names it gets a 304 with no body, after the same access checks as the screen |
 | GET `/jobs/{id}/pages/{n}.png` | review | Page `n` (1-based) of the upload, rendered at 144 dpi and kept only in the web process's memory (`PAGE_IMAGE_CACHE_MB`, default 32; emptied with the job), `no-store` for the browser; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | review | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
 | POST `/jobs/{id}/review/{element_id}` | review | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers`, `use_local` or `not_a_table`; `action=add_data_table` adds a chart's data table read from the image; `action=describe` with `description` gives an item kept as an image its alt text, T3-16; `action=reread` reads a waiting equation's own picture again on the main model and replaces its proposal (WS8.5; rate limited as `reread`, one write that Undo puts back whole, an empty read leaves the day's count as it was and says so); `action=not_equation` gives a waiting equation's glyphs back to the text, a paragraph where it stands or the words back in their line (WS4.5; refused for a table's cell or an equation with no text from the PDF, recorded as `removed`, Undo puts the element, paragraph and fix back, and a revised file gets the same choice for the same picture and words, `carry_edits`)); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
@@ -2820,12 +2820,31 @@ shown) links that size would overlap, and a click in the overlap would go to the
 item: overlapping links are pushed apart, each by part of the overlap, never so far that
 a link stops covering the middle of its own item (pairs squeezed along one axis are
 tried along the other). The frames stay put. The layout covers every fix of the page,
-shown or not, so no subset a view shows overlaps. A mark's number sits left of its
+shown or not, so no subset a view shows overlaps. Only links that can ever touch are compared,
+in the order all pairs would have been, and the work is bounded (`marks.TRIES_PER_MARK` pairs
+tried for each mark): 200 marks that can be separated take about 12 ms, and a page whose
+elements overlap each other, which cannot be separated whatever is done, stops at the bound
+with those links still overlapping, as it did before after about 2.7 s of rounds. A mark's number sits left of its
 frame, or for an equation in a line of text in the page margin on the same line (its
 "Note" label and check mark too), so it covers no word. The marks keep their own colors in forced-colors mode
 (`forced-color-adjust: none` on the page frame): the page image stays white whatever the
 theme, and system colors would make them white on white. The page itself never scrolls
 sideways (320 CSS px included).
+
+**Marks stylesheet.** One per page, `marks.css?page=N`, and the screen links the one of the
+page it shows (and, for an equation's card, that equation's page when it is another, where its
+proposal is sized under its crop). The stylesheet is a pure function of the page's inputs:
+the boxes of the fixes and of the notices that get a mark, which of them are inline, how far
+the page's content reaches, the page's size, the font size and box of each equation on it, and
+`marks.PLACEMENT_VERSION` (bump it when `place` or the rules written from its marks change).
+The `ETag` is a hash of exactly those (`PageMarks.etag` in `routes/split.py`), so it is
+computed without placing a mark, and a decision does not change it: a mark's state (open,
+accepted, current) is a class on its link, not geometry. What can change it is what moves or adds a
+mark: an element's box, a page edit, a notice that appears or goes with a decision on text.
+The answer is `private, no-cache`: the browser asks every time, and gets a 304 when the tag
+still holds. The stylesheet blocks the first paint on purpose: it is one small file (about 11 KB
+raw, 2.7 KB sent, for a page of 43 marks) and a mark without its rule would show at the top of
+the page image, and `app.js` reads a mark's place to scroll it into view.
 
 **Page images.** Rendered when the browser asks, from the job's own upload, in the
 upload probe's child process (`python -m readablestem.web.pdf_probe render ...`, 768 MB
@@ -3477,8 +3496,9 @@ X-Frame-Options: DENY
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Resource-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-Cache-Control: no-store            (everything except /static/; page images and
-                                    marks.css: private, no-store)
+Cache-Control: no-store            (everything except /static/; page images:
+                                    private, no-store; marks.css: private, no-cache
+                                    with an ETag)
                                    (/static/: public, max-age=31536000, immutable for
                                     hashed names and vendor/ files, public, max-age=3600
                                     with an ETag otherwise; /demo and /showcase/ pages:
@@ -3541,7 +3561,7 @@ the reader's time zone ("Times"), checks a chosen upload before it is sent ("Upl
 limits"), shows the questions after a download, and adds the review screen's
 enhancements (scrolling the page image to the selected mark, keyboard shortcuts that can be turned off,
 drafts kept in the tab; see "Review screen"). The review screen's per-job geometry comes as
-a stylesheet from our origin (`marks.css`), not as inline styles.
+a stylesheet from our origin (`marks.css`, one per page), not as inline styles.
 
 ## Accessibility of the app itself
 
