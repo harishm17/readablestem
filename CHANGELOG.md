@@ -108,6 +108,20 @@
   from that page. No stored record, model request, `PIPELINE_VERSION` or golden file changes
   (`RENDER_VERSION` 8 is already unshipped). Not tested with a screen reader: row 21 of
   `docs/device-checks.md`.
+## Unreleased: one footer and the current page from the path (branch refactor/site-frame-and-icons)
+
+- WS13.9a, as far as its triage line: the three footers in `base.html` are one partial
+  (`_footer.html`) with one list of links; the note under the full footer now labels the link to
+  the source code "Source code" (it said "Open source", which is also the label of the link to
+  the terms' open-source section). The navigation's current item comes from the path
+  (`deps.current_section`), not from a value each route passes, so the pages of a document (its
+  page, review, share, Listen, record, draft, delete, report, symbols, feedback) now mark "My
+  documents"; they marked nothing. About 26 `active` values in the routes are gone.
+- WS24.9, as far as its triage line: `/site.webmanifest` (name, start URL, the 192 and 512 px
+  icons, theme and background from `--bg`), `<meta name="theme-color">` for light and dark, and
+  `/apple-touch-icon.png` at the root (it answered 404). The 500 and 503 pages link the touch
+  icon. No icon file changed. Held: a new mark, a build script for the icons, the showcase's icon
+  links (its build test allows no link to another address).
 
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 

@@ -229,7 +229,6 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
         "ready": ready,
         "held_back": sum(r["state"] == "decide" for r in rows),
         "version": version,
-        "active": "app",
     }
 
 

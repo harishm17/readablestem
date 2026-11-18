@@ -72,7 +72,7 @@ def _demo_items() -> list[listen.Item]:
 @router.get("/demo/listen")
 def demo_listen(request: Request) -> Response:
     if not DEMO_PAGE.is_file():
-        return render(request, "demo_pending.html", {"active": "demo"})
+        return render(request, "demo_pending.html")
     return render(
         request,
         "listen.html",
@@ -84,6 +84,5 @@ def demo_listen(request: Request) -> Response:
             "student_url": "",
             "listen_doc": "demo",
             "listen_version": "demo",
-            "active": "demo",
         },
     )

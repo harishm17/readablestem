@@ -111,7 +111,6 @@ def _courses_page(
         "courses": courses,
         "values": {},
         "max_courses": notation.MAX_COURSES,
-        "active": "courses",
     }
     return render(request, "courses.html", context | (extra or {}), status_code=status)
 

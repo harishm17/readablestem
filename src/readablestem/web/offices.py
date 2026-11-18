@@ -132,7 +132,6 @@ def offices_context(settings: Settings, *, tracer_on: bool = False) -> dict[str,
     recipients = context["recipients"]
     model_companies = [r.name for r in recipients if r.gets_documents]
     context |= {
-        "active": "offices",
         "page_path": PAGE_PATH,
         "summary_path": SUMMARY_PATH,
         "summary_filename": SUMMARY_FILENAME,

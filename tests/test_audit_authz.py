@@ -62,6 +62,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/llms.txt"): PUBLIC,
     ("GET", "/18149cf3a15bfa791042a3df7fdc0388.txt"): PUBLIC,  # IndexNow key
     ("GET", "/favicon.ico"): PUBLIC,
+    ("GET", "/apple-touch-icon.png"): PUBLIC,
+    ("GET", "/site.webmanifest"): PUBLIC,
     ("GET", "/showcase"): PUBLIC,
     ("GET", "/showcase/{rel:path}"): PUBLIC,
     ("GET", "/login"): PUBLIC,
@@ -308,6 +310,22 @@ def test_every_route_is_classified(site):
         if method not in {"HEAD", "OPTIONS"}
     }
     assert actual == set(ROUTES), "classify new routes in ROUTES (and docs/security.md)"
+
+
+def test_every_signed_in_page_marks_one_place_in_the_nav(site):
+    """The nav names where you are: once on every page of a section (a document's pages mark
+    "My documents"), never twice."""
+    sections = ("/app", "/jobs/", "/uploads/", "/courses", "/account", "/admin")
+    for (method, template), who in ROUTES.items():
+        if method != "GET" or who not in {USER, ADMIN_ONLY}:
+            continue
+        path = fill(site, template)
+        response = (site.admin if who == ADMIN_ONLY else site.alice).get(path)
+        nav = re.search(r'<nav aria-label="Main">.*?</nav>', response.text, re.S)
+        if response.status_code != 200 or nav is None:
+            continue  # a redirect, a file, or a page with its own frame
+        marks = nav.group(0).count('aria-current="page"')
+        assert marks == (1 if path.startswith(sections) else 0), (path, marks)
 
 
 def anonymous_response(env, method: str, path: str):

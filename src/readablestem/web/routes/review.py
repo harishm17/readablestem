@@ -1781,8 +1781,6 @@ def _page(
             list_url(view.id, _stale_anchor(result, stale)),
             changed=stale_changed,
         ),
-        # No `active` nav item: this page is not "My documents" itself, so the link
-        # must not be announced as the current page (aria-current="page").
     }
     return render(request, "review.html", context, status_code=status_code)
 

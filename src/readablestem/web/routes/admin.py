@@ -197,7 +197,6 @@ def admin_context(request: Request) -> dict[str, Any]:
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,
         "ops": ops_report(ctx)[1],
-        "active": "admin",
         "errors": [],
         "email_error": "",
         "email_value": "",
@@ -241,7 +240,6 @@ def admin_reports(request: Request, user: AdminDep) -> Response:
         "open_count": sum(1 for row in rows if row["open"]),
         "closed_days": reports.CLOSED_DAYS,
         "max_days": reports.MAX_DAYS,
-        "active": "admin",
     }
     return render(request, "admin_reports.html", context)
 

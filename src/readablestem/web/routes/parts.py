@@ -180,7 +180,6 @@ def chooser_context(
         "shrink_from": SHRINK_FROM_DPI,
         "shrink_to": SHRINK_TO_DPI,
         "started": started or [],
-        "active": "app",
     }
     if errors:
         context |= {"errors": errors, "field_errors": {"parts": errors[0]}}

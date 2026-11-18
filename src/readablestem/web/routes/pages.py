@@ -97,7 +97,7 @@ def landing(request: Request) -> Response:
     return public_page(
         request,
         "landing.html",
-        {"active": "home", "hero": _hero(), "proof_facts": proof_facts.load()} | _features(request),
+        {"hero": _hero(), "proof_facts": proof_facts.load()} | _features(request),
     )
 
 
@@ -136,7 +136,7 @@ def demo(request: Request) -> Response:
             headers={"Content-Security-Policy": VIEW_CSP},
             background=noted,
         )
-    return render(request, "demo_pending.html", {"active": "demo"})
+    return render(request, "demo_pending.html")
 
 
 # The demo is the same bytes for everyone until a deploy (688 KB): kept an hour, then the
@@ -209,7 +209,7 @@ def privacy(request: Request) -> Response:
 @router.get("/terms")
 def terms(request: Request) -> Response:
     ms_on = get_ctx(request).settings.ms_sign_in_enabled
-    return render(request, "terms.html", {"active": "terms", "microsoft_on": ms_on})
+    return render(request, "terms.html", {"microsoft_on": ms_on})
 
 
 @router.get(offices.PAGE_PATH)
@@ -255,7 +255,6 @@ def limits_context(request: Request) -> dict[str, object]:
     routes enforce."""
     settings = get_ctx(request).settings
     return {
-        "active": "limits",
         # A bigger file is kept so its pages can be chosen and converted in parts (T3-3).
         "in_parts": settings.upload_limit_mb > settings.max_upload_mb
         or settings.source_page_limit > settings.max_pages_per_job,
@@ -273,7 +272,7 @@ def limits_context(request: Request) -> dict[str, object]:
 @router.get("/pricing")
 def pricing(request: Request) -> Response:
     """The beta is free, with the limits `/limits` lists; no prices are set (WS25.1). Public."""
-    return render(request, "pricing.html", limits_context(request) | {"active": "pricing"})
+    return render(request, "pricing.html", limits_context(request))
 
 
 @router.get("/security")
@@ -284,42 +283,41 @@ def security_page(request: Request) -> Response:
     ctx = get_ctx(request)
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
-    return render(request, "security.html", context | {"active": "security"})
+    return render(request, "security.html", context)
 
 
 @router.get("/help")
 def help_index(request: Request) -> Response:
     """The help pages and what each answers (WS25.4). Public, like each of them."""
-    return render(request, "help_index.html", {"active": "help"})
+    return render(request, "help_index.html")
 
 
 @router.get("/help/review")
 def review_help(request: Request) -> Response:
     """How to review a converted document: what each decision, button and shortcut does and
     when a document is ready to post (WS25.4). Public, so a colleague can read it first."""
-    return render(request, "help_review.html", {"active": "help-review"})
+    return render(request, "help_review.html")
 
 
 @router.get("/help/latex")
 def latex_help(request: Request) -> Response:
     """What a LaTeX file or zip may hold and what each message about one means (WS25.4).
     Public. It reads the same limits and lists the upload checks use."""
-    return render(request, "help_latex.html", {"active": "help-latex"} | _features(request))
+    return render(request, "help_latex.html", _features(request))
 
 
 @router.get("/help/posting")
 def posting_help(request: Request) -> Response:
     """How to put the file in front of students (UX review MF11): upload it and link it,
     never paste it into an LMS page. Public, so an accessibility office can read it."""
-    return render(request, "help_posting.html", {"active": "posting"} | _features(request))
+    return render(request, "help_posting.html", _features(request))
 
 
-def _guide_context(path: str, active: str) -> dict[str, object]:
+def _guide_context(path: str) -> dict[str, object]:
     """The dates a guide shows. They come from seo.PUBLIC_PAGES, which also feeds the
     sitemap and the Article in the page's structured data, so the three cannot differ."""
     page = next(page for page in seo.PUBLIC_PAGES if page.path == path)
     return {
-        "active": active,
         "updated": page.updated,
         "updated_text": _long_date(page.updated),
         "published": page.published or page.updated,
@@ -340,7 +338,7 @@ def guides_index(request: Request) -> Response:
         guides.append(
             {"guide": guide, "updated": page.updated, "updated_text": _long_date(page.updated)}
         )
-    return render(request, "guides.html", {"active": "guides", "guides": guides})
+    return render(request, "guides.html", {"guides": guides})
 
 
 @router.get(seo.ADA_GUIDE)
@@ -348,7 +346,7 @@ def guide_ada_title_ii(request: Request) -> Response:
     """What the Justice Department's web rule asks of STEM course materials, with sources
     and the dates as checked on the day it was written. Public, like /help/posting."""
     path = seo.ADA_GUIDE
-    context = _guide_context(path, "guide-ada") | _features(request)
+    context = _guide_context(path) | _features(request)
     return render(request, "guide_ada_title_ii.html", context)
 
 
@@ -356,11 +354,7 @@ def guide_ada_title_ii(request: Request) -> Response:
 def guide_compare(request: Request) -> Response:
     """ReadableSTEM beside Mathpix, Aelira, chatbots and LaTeXML, each fact with source and date."""
     path = seo.COMPARE_GUIDE
-    context = (
-        _guide_context(path, "guide-compare")
-        | _features(request)
-        | {"proof_facts": proof_facts.load()}
-    )
+    context = _guide_context(path) | _features(request) | {"proof_facts": proof_facts.load()}
     return render(request, "guide_compare.html", context)
 
 
@@ -375,7 +369,6 @@ def status(request: Request) -> Response:
     database_ok = ping(ctx.engine)
     provider = ctx.provider_health()
     context: dict[str, object] = {
-        "active": "status",
         "database_ok": database_ok,
         "conversions_open": None,
         "waiting": None,
