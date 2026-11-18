@@ -94,6 +94,7 @@ value and where that value came from. This page does not repeat those values.
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval (an upload or a new part wakes the worker at once, so this is only the wait between looks at an idle queue) |
+| `WORKER_MODE`, `WORKER_SLOTS` | `inline` (the default): the web process starts the worker thread, as above. `service`: the web process starts none and only `readablestem worker` converts, `WORKER_SLOTS` jobs at once (default 1; the web process's own thread is always one). The web process then reads the worker's liveness, the AI service's health and the sandbox probe from `ops_heartbeat` rows. docs/deploy-railway.md, "The worker as its own service" |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer "Source code" link (the AGPL source offer; the license sentence is on /terms, ADR 0003 addendum); contact on the 403, privacy and terms pages |
 
 ## Routes
@@ -1912,7 +1913,17 @@ conservative. A model call now costs one more INSERT to hold and a SELECT and a 
 
 ## Worker (`web/worker.py`)
 
-A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
+A thread started and stopped with the app's lifespan when `RUN_WORKER=true` and `WORKER_MODE=inline`
+(the defaults). With `WORKER_MODE=service` the same `Worker` runs in `readablestem worker`
+(`web/worker_service.py`): `WORKER_SLOTS` of them in one process, no web server. Several workers
+on one database are safe: a job is claimed by one conditional UPDATE (`WHERE status = 'queued'`,
+after `SELECT ... FOR UPDATE SKIP LOCKED` on Postgres), so a job goes to one of them, and a job
+whose worker died is requeued when its lease runs out, whichever worker notices first. What the
+web process reads from the worker (`web/worker_rows.py`): rows `worker.<slot>` (written every
+10 seconds: the slot's state and how long since its loop last showed life), `provider` (the AI
+service's recent requests, `web/provider_health.py`) and `sandbox` (the probe's result,
+`web/sandbox_status.py`) of `ops_heartbeat`; they hold words, numbers and times, nothing from a
+document.
 
 - **Claiming.** Fewest attempts first, so a retried job goes behind fresh ones; within
   that, people take turns (`web/fair_queue.py`): the owner whose latest job started

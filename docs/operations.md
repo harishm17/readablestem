@@ -556,6 +556,42 @@ neither the loop nor a running conversion has shown life for six minutes; `not_s
 `fake` with `FAKE_MODELS`). A spent daily cap is not "not ready": the service is working
 and says so on `/status`.
 
+**The worker as its own service (`WORKER_MODE=service`).** Off by default (`inline`: the web
+process runs the worker thread, and everything above is as it was). With `WORKER_MODE=service`
+on `web` and a `worker` service running `readablestem worker` (docs/deploy-railway.md, "The
+worker as its own service"):
+
+- The web process starts no worker, so an upload waits in the queue until the `worker` service
+  claims it (within `WORKER_POLL_S`, 2 seconds, since the web process cannot wake a worker that is
+  another process). With no `worker` service running, nothing converts: `/readyz` says
+  `"worker": "not_started"` (or `stopped` once the rows are old) and the job page keeps saying
+  "waiting".
+- The worker beats a row `worker.<slot>` of `ops_heartbeat` every 10 seconds for each of
+  `WORKER_SLOTS`, and the web process's `/readyz` and `/admin` read them. `worker` is `ok` when a
+  slot has beaten in the last 30 seconds and its loop is moving; `stalled` when the beating slots
+  have shown no life for six minutes (as inline); `stopping` after SIGTERM; `stopped` when every
+  row is older than 30 seconds (the process is gone or cannot write to the database);
+  `not_started` when there is no row. Any one healthy slot makes it `ok`.
+- `/status` and the job page's "AI service not answering" line read the row `provider` (the
+  worker's last requests, written with the beat); `/admin` and `/admin/health` show the sandbox
+  probe from the row `sandbox`, which the worker writes after it ran the probe at start-up (the
+  web process runs none). LaTeX source stays switched off in effect until that row says `pass`.
+- **Stopping.** SIGTERM or SIGINT: no new job is claimed, the running conversions are cancelled
+  and their leases end at once, and the process exits within 20 seconds (`DRAIN_S`; the host's
+  draining window must be longer, 30 on `worker`). The job goes back to the queue when a worker
+  next looks (the lease is already over), and runs again from its start: the attempt counts, and
+  three attempts end in `lease_expired`, as when the worker was a thread. A worker that is killed
+  instead leaves the job to the same rule when its lease (two minutes) runs out. Look for
+  `worker_service_started`, `worker_service_stopping`, `job_cancelled reason=shutdown` and
+  `worker_service_stopped`.
+- **Rolling back** is one setting: set `WORKER_MODE=inline` on `web` and redeploy it (the web
+  process runs its own worker again; stop or scale down the `worker` service so that it does not
+  keep claiming, though two claimers are safe). Nothing is migrated: the rows are ordinary rows of
+  `ops_heartbeat` and the table was there before.
+- Memory: a slot is a worker process of about 0.3 GB plus the conversion child it runs (0.4 to
+  0.9 GB, "The conversion child"), so allow 2 GB for one slot and 1 GB more for each further one.
+  The web service no longer holds conversion memory.
+
 `/healthz/ops` says the scheduled tasks ran. The `backup` service and `readablestem ops cron`
 each upsert one row of `ops_heartbeat` (name, `last_ok_at`, a short note of counts) when they
 finish well; the endpoint answers 200 while the backup is fresher than 26 hours (a day and two

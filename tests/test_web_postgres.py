@@ -191,6 +191,32 @@ def test_two_workers_claim_every_job_exactly_once(factory, tmp_path):
     assert sorted(claimed) == sorted(ids)
 
 
+def test_two_worker_loops_convert_every_job_exactly_once(factory, tmp_path):
+    """The worker as its own service (`WORKER_MODE=service`, WS9.4): two workers whose loops
+    run at once on one database convert each of 30 jobs once, on their first attempt."""
+    ids = queue_jobs(factory, 30)
+    converter = FakeConverter()
+    settings = make_settings(tmp_path, database_url="postgresql+psycopg://unused")
+    workers = [
+        Worker(settings, factory, converter=converter, client_factory=fake_client_factory)
+        for _ in range(2)
+    ]
+    turn = iter(workers)
+    lock = threading.Lock()
+
+    def loop() -> None:
+        with lock:
+            worker = next(turn)
+        while worker.run_once() is not None:
+            pass
+
+    run_threads(2, loop)
+    assert len(converter.calls) == len(ids)
+    with db.session_scope(factory) as session:
+        rows = session.execute(select(db.Job.status, db.Job.attempts)).all()
+    assert sorted(rows) == [("done", 1)] * len(ids)
+
+
 def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_path):
     """Every reservation adds its hold to the job's row in one conditional UPDATE, so 20
     step threads (or a dead attempt plus a retry) cannot pass the job's cap together."""

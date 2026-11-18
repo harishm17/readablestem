@@ -35,7 +35,13 @@ from readablestem.web.db import make_engine, make_sessionmaker
 from readablestem.web.logsafe import log_event
 from readablestem.web.sandbox_status import SandboxStatus, run_probe
 from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
-from readablestem.web.worker import Worker, default_client_factory, default_converter
+from readablestem.web.worker import (
+    ClientFactory,
+    Converter,
+    Worker,
+    default_client_factory,
+    default_converter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +50,16 @@ logger = logging.getLogger(__name__)
 DRAIN_S = 20.0
 
 
-def run(settings: Settings, *, stop: threading.Event | None = None) -> int:
+def run(
+    settings: Settings,
+    *,
+    stop: threading.Event | None = None,
+    converter: Converter | None = None,
+    client_factory: ClientFactory | None = None,
+) -> int:
     """Run `settings.worker_slots` workers until `stop` is set (or SIGTERM / SIGINT arrives
-    when `stop` is not given). Returns the exit status."""
+    when `stop` is not given). Returns the exit status. Tests pass a fake converter and client
+    factory, as they do to `create_app`."""
     configure_logging(settings)
     settings.check_production()
     engine = make_engine(settings.database_url)
@@ -70,8 +83,8 @@ def run(settings: Settings, *, stop: threading.Event | None = None) -> int:
         Worker(
             settings,
             factory,
-            converter=default_converter(),
-            client_factory=default_client_factory,
+            converter=converter or default_converter(),
+            client_factory=client_factory or default_client_factory,
             guard=guard,
             headroom_usd=headroom,
             tracer=tracer,

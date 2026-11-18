@@ -601,6 +601,63 @@ same order, so **read the real before and after sizes from the first Railway bui
 pandoc 3.7; the web service lets two run at once and caps each at 2 GB of heap, so allow for about 0.5 GB
 more while two Word files are made. Check the build log for the pandoc version line.
 
+## The worker as its own service
+
+By default (`WORKER_MODE=inline`) the worker is a thread of `web`: a conversion and a request
+share one process. With `WORKER_MODE=service` a second Railway service, `worker`, runs
+`readablestem worker` (the same image; no web server) and `web` starts no worker. Measured on the
+development box with replayed 10-page documents (no model calls), four readers loading one
+review page while four conversions ran: the web process held 289 MB before and 364 MB after
+inline, and 220 MB before and 257 MB after in `service` mode; the review page's median went from
+291 to 312 ms inline (95th percentile 334 to 380) and from 252 to 273 ms (284 to 320) with the
+worker apart. The conversion itself was already a child process, so the gain is the web
+process's memory and the worker's share of its CPU, not a faster page.
+
+**Not in `railway.ts` yet.** Adding the service to the file would make the next `railway config
+apply` create and start a second service whatever `WORKER_MODE` says, so it is written here, as
+the step an operator takes, and not there. Two claimers are safe (a job is claimed by one
+conditional update, docs/web.md "Worker"), so the order is: add the service, check it, then
+switch `web`.
+
+1. Add this to `.railway/railway.ts` (next to `cron`), and `worker` to the `resources` list:
+
+   ```ts
+   // Conversions, apart from the web process (WORKER_MODE=service on web). Same image; no
+   // domain, no health check. SIGTERM to SIGKILL: the worker stops claiming and ends its
+   // running jobs' leases within 20 s (web/worker_service.py DRAIN_S), so 30 here.
+   const worker = service("worker", {
+     build: { buildEnvironment: "V3", builder: "RAILPACK" },
+     start: "readablestem worker",
+     replicas: { iad: 1 },
+     deploy: {
+       drainingSeconds: 30,
+       limitOverride: { containers: { memoryBytes: 2 * 1024 ** 3 } }, // one slot; +1 GB a slot
+     },
+     env: preserved(...appVariables, ...profileVariables, "WORKER_SLOTS"),
+   });
+   ```
+
+   Its variables are references to `web`'s (`${{web.NAME}}`), as `cron`'s are; `WORKER_MODE` and
+   the settings of `webOnlyVariables` that conversions read (the feature switches, the
+   `MAX_USD_*` caps, `CONTENT_RUNS`, `EQUATION_*`, `IMAGE_PAGES_*`, `PAGE_WITNESS_MODEL`, ...) must
+   reach it too, so reference every name of `webOnlyVariables` except `PORT` and `MS_*`. No
+   pre-deploy command (two services migrating at once would race). Run `railway config plan`,
+   review, `railway config apply`, then `railway up --service worker`.
+2. With `web` still inline, the new service starts claiming jobs beside it. Look at its logs for
+   `worker_service_started`, and at `/readyz` after step 3.
+3. Set `WORKER_MODE=service` on `web` (`railway variable set WORKER_MODE=service --service
+   web`) and redeploy it. `/readyz` should say `"worker": "ok"` within a minute, and a test
+   upload should convert.
+
+**Rolling back is one setting:** `WORKER_MODE=inline` on `web`, then redeploy `web`; it runs its
+own worker thread again. Scale `worker` to zero or remove it afterwards so that it does not keep
+claiming (two claimers are safe, only needlessly costly).
+
+**Cost.** A second service: its memory is billed by use, about 0.3 GB resident while idle
+(about $3 a month at $10 per GB-month) and more while a conversion runs, which `web` no longer
+holds. `WORKER_SLOTS` above 1 runs that many conversions at once in the one service and needs 1 GB
+more memory for each.
+
 ## Ship a new version
 
 Production is deployed from a checkout; none of its services is connected to GitHub (`source` is empty
