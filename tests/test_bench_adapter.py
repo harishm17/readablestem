@@ -1,5 +1,5 @@
 """The olmOCR-Bench adapter (`eval.olmocr_bench`): the student page as the markdown the
-benchmark's own checker reads. Five hand-made pages with known checks, scored by the real
+benchmark's own checker reads. Six hand-made pages with known checks, scored by the real
 checker when this machine has its environment (`readablestem eval parsing-bench --fetch`)."""
 
 from __future__ import annotations
@@ -70,6 +70,21 @@ PAGES = {
         },
         True,
     ),
+    "numbered": (
+        page(
+            '<h1 id="a">T</h1><ol start="9"><li>Chang RJ, Nakamura RM, Judd HI.</li>'
+            "<li>Coviello AD, Legro RS, and so on…</li></ol>"
+        ),
+        {
+            "type": "present",
+            "text": "10. Coviello AD, Legro RS, and so on...",
+            "max_diffs": 0,
+            "case_sensitive": True,
+            "first_n": None,
+            "last_n": None,
+        },
+        True,
+    ),
     "table": (
         page(
             "<table><tr><th>Name</th><th>Mass</th></tr><tr><td>Iron</td><td>55.8</td></tr></table>"
@@ -118,4 +133,4 @@ def test_the_checker_scores_the_five_pages_as_built(tmp_path: Path) -> None:
     )
     got = {row["id"]: row["passed"] for row in rows if row["type"] != "baseline"}
     assert got == {name: wanted for name, (_, _, wanted) in PAGES.items()}
-    assert sum(got.values()) == 3
+    assert sum(got.values()) == 4

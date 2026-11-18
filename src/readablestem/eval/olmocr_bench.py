@@ -235,10 +235,15 @@ _MATH_WORDS = frozenset({"mtext", "ms"})
 
 def clean_text(text: str) -> str:
     """Text as the checker compares it: ligature letters spelled out, invisible characters
-    gone, every kind of space one space. The checker folds quotes and dashes itself."""
+    gone, every kind of space one space, the ellipsis and the typewriter-style double quote
+    (two single quotes, as older fonts print it) in the ASCII forms the benchmark's files use.
+    The checker folds single and curly quotes and dashes itself."""
     text = unicodedata.normalize("NFC", text)
     for ligature, letters in _LIGATURES.items():
         text = text.replace(ligature, letters)
+    text = text.replace("…", "...")
+    for pair in ("‘‘", "’’", "''"):
+        text = text.replace(pair, '"')
     return re.sub(r"\s+", " ", text.translate(_INVISIBLE)).strip()
 
 
@@ -255,14 +260,14 @@ class _Markdown(html.parser.HTMLParser):
         self.blocks: list[str] = []
         self.in_main = False
         self.skipping = 0
-        self.open: list[list] = []  # [tag, texts] of the block being read
+        self.open: list[list] = []  # [tag, texts, marker] of the block being read
         self.loose: list[str] = []  # text outside a block
         self.table: list[list[tuple[str, str, int, int]]] | None = None
         self.depth = 0  # tables inside the first
         self.cell: list[Any] | None = None  # [tag, texts, rowspan, colspan]
         self.math = 0
         self.tag = ""
-        self.lists: list[str] = []
+        self.lists: list[list] = []  # [tag, number of the last item] per open list
 
     def _text(self, data: str) -> None:
         if self.cell is not None:
@@ -317,10 +322,10 @@ class _Markdown(html.parser.HTMLParser):
             elif tag in ("td", "th") and self.depth == 1:
                 self.cell = [tag, [], _span(given, "rowspan"), _span(given, "colspan")]
         elif tag in ("ul", "ol"):
-            self.lists.append(tag)
+            self.lists.append([tag, _span(given, "start") - 1])
         elif tag in _BLOCKS:
             self._flush_loose()
-            self.open.append([tag, []])
+            self.open.append([tag, [], _marker(tag, self.lists)])
 
     @staticmethod
     def _unconverted_equation(alt: str) -> str:
@@ -363,10 +368,10 @@ class _Markdown(html.parser.HTMLParser):
         elif tag in _BLOCKS:
             for at in range(len(self.open) - 1, -1, -1):
                 if self.open[at][0] == tag:
-                    _, texts = self.open.pop(at)
+                    _, texts, marker = self.open.pop(at)
                     text = clean_text(" ".join(texts) if tag == "pre" else "".join(texts))
                     if text:
-                        self.blocks.append(_prefix(tag, self.lists) + text)
+                        self.blocks.append(marker + text)
                     break
 
     def handle_data(self, data: str) -> None:
@@ -384,12 +389,18 @@ def _span(given: dict, name: str) -> int:
         return 1
 
 
-def _prefix(tag: str, lists: list[str]) -> str:
+def _marker(tag: str, lists: list[list]) -> str:
+    """What starts a block: `#`s for a heading; for a list item its place in the list, which
+    for an ordered list is the printed number (the product keeps it as the list's `start`)."""
     if tag.startswith("h") and len(tag) == 2:
         return "#" * int(tag[1]) + " "
-    if tag == "li":
-        return "  " * max(0, len(lists) - 1) + "- "
-    return ""
+    if tag != "li":
+        return ""
+    indent = "  " * max(0, len(lists) - 1)
+    if not lists or lists[-1][0] != "ol":
+        return indent + "- "
+    lists[-1][1] += 1
+    return f"{indent}{lists[-1][1]}. "
 
 
 def _table_html(rows: list[list[tuple[str, str, int, int]]]) -> str:
@@ -445,7 +456,7 @@ def _page_facts(result: Any, facts: Any) -> dict[str, Any]:
 
 def convert_page(pdf: bytes) -> dict[str, Any]:
     """One one-page PDF through the product's conversion with no model: what it came to, as
-    plain data (`markdown` is the page's text and stays out of any record)."""
+    plain data (`html` is the page's text and stays out of any record)."""
     from readablestem.core.types import ConversionOptions, StepFacts
     from readablestem.eval import order_report
     from readablestem.models.fake import FakeVisionClient
@@ -474,7 +485,9 @@ def convert_page(pdf: bytes) -> dict[str, Any]:
         "asked": dict(Counter(request.step for request in client.requests)),
         "stopped": [stop.step for stop in (output.facts or StepFacts()).not_finished],
         "seconds": round(time.monotonic() - started, 2),
-        "markdown": html_to_markdown(result.html),
+        # The student page itself, kept so the adapter can change and the run be scored again
+        # without converting; the markdown is made from it when the run is scored.
+        "html": result.html,
     }
 
 
@@ -541,7 +554,7 @@ def write_markdown(run_dir: Path) -> int:
             target.unlink(missing_ok=True)
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(done["markdown"], encoding="utf-8")
+        target.write_text(html_to_markdown(done["html"]), encoding="utf-8")
         count += 1
     return count
 
