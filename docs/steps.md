@@ -853,11 +853,13 @@ applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md)
 4. Converts with latex2mathml.
 5. Parses the result with defusedxml, sets `display`, and unescapes `\%`, `\_`, `\#`,
    `\$` in `<mtext>` (latex2mathml leaves the backslash in text mode).
-   Then, on the tree, the repairs a reader needs: bold letters (`bake_bold_variants`), a charge
+   Then, on the tree, the repairs a reader needs: a charge
    or a count on its element symbol, arrows as operators, and the screen-reader shape
    (`mathml_shape.shape_general`: the degree sign, overline and underline, labeled arrows;
    `chem_mathml.shape_chemistry`: one `mi` per element symbol, states, nuclides, and
-   `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape").
+   `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape"),
+   then `mathml_shape.normal_form` as the last step: bold letters, function names, plain digits,
+   the prime, the aligned-rows mark (docs/mathml-alttext.md).
 6. Re-serialises with `serialize_mathml`, which writes one MathML `xmlns` on the root and
    refuses (`UnsafeMathMLError`, message = the code) any tree that fails the allowlist
    rules of `check_mathml`: an unknown element or attribute, markup inside a token, a

@@ -57,6 +57,22 @@ the measurements are in docs/chemistry.md, "MathML shape"):
 - Matrices, determinants, `cases`, aligned lines, limits and sums are `mtable`, `munder` and `msub`
   elements that MathCAT and Speech Rule Engine already read as rows, columns and limits.
 
+One normal form, `pipeline/mathml_shape.normal_form`, is applied by the LaTeX writer, by the page
+writer (`safe_html.sanitize_mathml`, so MathML stored earlier is also written clean) and to the
+LaTeXML source MathML at ingest:
+
+- A function name is one identifier: `sin`, `cos`, `max` and `gcd` are one `mi` (a limit
+  operator such as `lim` is one `mo`), never `s` `⁢` `i` `⁢` `n`, which a reader spells. An italic
+  run such as `Pr` stays letters (the Prandtl number is not the probability).
+- Digits are never styled: no `𝟏𝟎` and no `mathvariant="bold"` on `mn` (the double-struck digit
+  symbol stays).
+- A converter attribute that no engine or MathML Core uses is dropped (`mathvariant` on `mo`).
+- A prime is an operator in the superscript, `<msup><mi>f</mi><mo>′</mo></msup>`, not an `mi`.
+- A table that is the aligned rows of one equation carries `data-aligned-rows="true"`; a matrix
+  does not.
+
+The stored speech of a document made before this is not rewritten; the page's MathML is.
+
 Both engines are run offline by `scripts/screenreader_speech.py` (`docs/eval.md`, "Speech under
 screen-reader engines"). That is not a listening test: VoiceOver is not covered, and the
 engines' settings are the defaults. Add chemistry to the manual test below: a formula with a

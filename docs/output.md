@@ -1158,13 +1158,16 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
    other element, is dropped here and refused by `check_mathml` (`unsafe_attribute`).
 3. **Bold letters.** MathML Core (Chromium) draws only `mathvariant="normal"`, so a bold or
    bold-italic token is written as Unicode mathematical bold letters instead
-   (`core.mathchars.bake_bold_variants`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`
+   (`mathml_shape.normal_form`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`
    U+1D6DA, the way `\mathbf{d}` was already U+1D41D, and the attribute (also inherited from
    an `mstyle`) is removed from the tokens that could be written so. The converter does it
    when it makes the MathML (`validate.safe_latex_to_mathml`) and the sanitiser does it
    again for MathML stored before, so every screen reader says "bold omega" and every
    browser draws it bold (`tests/test_math_bold_greek.py`, Chromium). Other variants are
-   left as they were.
+   left as they were. Digits are not styled (`\mathbf{3}` is a plain 3). `normal_form` also
+   joins a spelled function name into one `mi`, writes a prime as `<mo>′</mo>`, drops
+   `mathvariant` from operators and marks the aligned rows of one equation
+   (`data-aligned-rows`, kept by the sanitiser); docs/mathml-alttext.md.
 4. `semantics` and `maction` are replaced by their first child, which is what a browser
    shows anyway; annotations and alternatives are dropped.
 5. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
