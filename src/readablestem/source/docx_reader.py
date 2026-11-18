@@ -124,6 +124,7 @@ class Report:
     math_held: int = 0  # `m:oMath` in the file
     math_read: int = 0  # equations pandoc gave (the ones below are of these)
     math_converted: int = 0
+    math_in_headings: int = 0  # written as TeX in the heading, a decision (nothing to speak)
     math_failed: int = 0
     math_failures: Counter[str] = field(default_factory=Counter)  # failing check -> equations
     failed_commands: Counter[str] = field(default_factory=Counter)  # command not allowed -> n
@@ -265,6 +266,7 @@ class _Reader:
         element.text = text
         self._heading_fix(element, level, text)
         if formulas:  # a formula in a heading is written as its TeX: a decision
+            self.report.math_in_headings += formulas
             self.out.unread_formulas.add(element.id)
             self.out.fixes[element.id] = needs_decision(self.out.fixes[element.id], FORMULA_UNREAD)
         self.chars += len(text)
