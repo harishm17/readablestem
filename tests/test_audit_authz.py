@@ -236,6 +236,10 @@ def site(tmp_path):
         )
         assert several.status_code == 303 and "/app/batch/" in several.headers["location"]
         result_id = several.headers["location"].rsplit("/", 1)[-1]
+        # The old address of that page still leads its owner to it.
+        assert alice.get(f"/app/upload/{result_id}").headers["location"] == (
+            f"/app/batch/{result_id}"
+        )
         env.ids = {
             "upload_id": upload_id,
             "result_id": result_id,

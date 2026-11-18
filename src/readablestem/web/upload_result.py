@@ -58,10 +58,26 @@ def load(
 ) -> list[dict[str, Any]] | None:
     """The outcomes stored under `result_id` when they are this person's and not past their
     time; else None (the same answer for someone else's, a missing and an old one)."""
+    row = _row(session, user_id, result_id, now)
+    return None if row is None else [dict(item) for item in row.items]
+
+
+def stored_id(
+    session: Session, user_id: str, result_id: str, now: datetime | None = None
+) -> str | None:
+    """The id of the row `load` would read, as the row has it; None where `load` gives None.
+    For a redirect, which is built from what is stored and not from the address asked for."""
+    row = _row(session, user_id, result_id, now)
+    return None if row is None else row.id
+
+
+def _row(
+    session: Session, user_id: str, result_id: str, now: datetime | None
+) -> UploadResult | None:
     row = session.get(UploadResult, result_id)
     if row is None or row.user_id != user_id:
         return None
     until = as_utc(row.retain_until)
     if until is None or until <= (now or utcnow()):
         return None
-    return [dict(item) for item in row.items]
+    return row

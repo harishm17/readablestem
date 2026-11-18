@@ -1335,11 +1335,13 @@ def upload_results_page(request: Request, result_id: str, user: UserDep) -> Resp
     """The old address of the answer to an upload of several files (before the batch page):
     the same page, now `/app/batch/{id}` (`routes/batch.py`). Someone else's, a stale and a
     malformed id answer the same 404 as there."""
+    known = JOB_ID.match(result_id) is not None
     with session_scope(get_ctx(request).factory) as session:
-        found = JOB_ID.match(result_id) and upload_result.load(session, user.id, result_id)
-    if not found:
+        # The redirect is built from the stored row's id, not from the address asked for.
+        found = upload_result.stored_id(session, user.id, result_id) if known else None
+    if found is None:
         raise PageError(404, *UPLOAD_RESULT_GONE)
-    return RedirectResponse(f"/app/batch/{result_id}", status_code=303)
+    return RedirectResponse(f"/app/batch/{found}", status_code=303)
 
 
 UPLOAD_RESULT_GONE = (
