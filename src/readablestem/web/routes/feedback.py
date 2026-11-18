@@ -26,7 +26,7 @@ from readablestem.web.deps import (
 )
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access
-from readablestem.web.shares import VIEW
+from readablestem.web.shares import OWNER
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,7 +47,7 @@ def _page(
     status_code: int = 200,
 ) -> Response:
     with session_scope(get_ctx(request).factory) as session:
-        job = job_access(session, job_id, user, VIEW)
+        job = job_access(session, job_id, user, OWNER)
         title = documents.display_title(documents.stored_title(job), job.filename)
         already = events.answered(session, user.id, job.id)
     errors = errors or []
@@ -83,7 +83,7 @@ def save_feedback(
         values = {"will_post": will_post, "minutes": minutes[:20]}
         return _page(request, job_id, user, values=values, errors=errors, status_code=422)
     with session_scope(get_ctx(request).factory) as session:
-        job = job_access(session, job_id, user, VIEW)
+        job = job_access(session, job_id, user, OWNER)
         owned_id = job.id  # the redirect is built from the owned row, not the request
         if events.answered(session, user.id, job.id):
             message = "You had already answered for this document, so your first answers are kept."

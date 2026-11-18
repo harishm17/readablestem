@@ -2094,9 +2094,12 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
 def after_download_state(
     request: Request, job_id: str, user: CurrentUser
 ) -> feedback_questions.AfterDownload:
-    """What `_after_download.html` shows under the download link (web/feedback.py)."""
+    """What `_after_download.html` shows under the download link (web/feedback.py). The two
+    questions are about the owner's own plans to post the file, so only the owner is asked."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
+        if session.scalar(select(Job.user_id).where(Job.id == job_id)) != user.id:
+            return feedback_questions.AfterDownload()
         return feedback_questions.after_download(session, ctx.settings, user.id, job_id)
 
 

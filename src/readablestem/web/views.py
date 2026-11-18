@@ -765,6 +765,16 @@ def job_view(
     return view
 
 
+def audience_of(role: str | None) -> str:
+    """Who is reading a document's pages, from what they are to it (`web.shares`): `owner`
+    (words written to the person who converted it: where to post it, what they decided),
+    `reviewer` (a Review right: reads it and checks it with the owner) or `reader` (a View
+    right, or a role this function does not know: the stricter reading). A page or notice
+    written for the owner is shown only to the `owner` audience. The fourth audience, the
+    student, is the one the student file and its exports are written for."""
+    return {"owner": "owner", "review": "reviewer"}.get(role or "", "reader")
+
+
 def _owner_name(session: Session, job: Job) -> str:
     """Who owns the document, for the person it was shared with: their name only (an address
     is for the owner to see), else "" (the pages then say "the owner" or "shared with you",

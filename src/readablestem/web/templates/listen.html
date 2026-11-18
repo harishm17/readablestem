@@ -1,5 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Listen as a student{% endblock %}
+{# `audience` (web.views.audience_of): the owner is testing what a student hears; anyone the
+   document was shared with is just listening to it. The demo has none: it is the owner's view. #}
+{% set for_owner = audience|default("owner") == "owner" %}
+{% block title %}{% if for_owner %}Listen as a student{% else %}Listen to {{ title }}{% endif %}{% endblock %}
 {% block description %}Roughly what a screen reader says for a converted document, so you can hear it before you share it.{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ static_url('listen.css') }}">
@@ -10,9 +13,9 @@
    built from the same HTML the student gets (web/listen.py); the player is optional. #}
 <div id="listen-page">
 <p class="crumb"><a href="{{ back_url }}">{{ back_label }}</a></p>
-<h1>Listen as a student</h1>
+<h1>{% if for_owner %}Listen as a student{% else %}Listen to this document{% endif %}</h1>
 <p class="listen-doc"><strong>{{ title }}</strong></p>
-<p class="notice listen-honest"><strong>Roughly what a screen reader says.</strong> Each one speaks differently: test with yours.{% if student_url %} <a href="{{ student_url }}">Open the student version</a>.{% endif %}</p>
+<p class="notice listen-honest"><strong>Roughly what a screen reader says.</strong> Each one speaks differently{% if for_owner %}: test with yours{% endif %}.{% if student_url %} <a href="{{ student_url }}">Open the student version</a>.{% endif %}</p>
 {% include "_listen_player.html" %}
 </div>
 {% endblock %}

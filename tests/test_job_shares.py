@@ -31,6 +31,7 @@ from readablestem.ops import retention as purge
 from readablestem.web import shares
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobShare, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.views import audience_of
 from test_audit_authz import ROUTES
 
 CAROL = "carol@example.org"  # a viewer
@@ -59,8 +60,8 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download.docx"): "review",
     ("GET", "/jobs/{job_id}/download.epub"): "review",
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): "view",
-    ("GET", "/jobs/{job_id}/feedback"): "view",
-    ("POST", "/jobs/{job_id}/feedback"): "view",
+    ("GET", "/jobs/{job_id}/feedback"): "owner",
+    ("POST", "/jobs/{job_id}/feedback"): "owner",
     ("GET", "/jobs/{job_id}/combine"): "owner",
     ("GET", "/jobs/{job_id}/delete"): "owner",
     ("POST", "/jobs/{job_id}/delete"): "owner",
@@ -289,6 +290,26 @@ def test_a_ready_document_opens_for_a_viewer_and_stops_for_a_stranger_and_after_
     for name, path in paths.items():
         for actor in (OWNER, VIEWER, REVIEWER):
             assert send(ready_site, actor, "GET", path).status_code == 404, (name, actor)
+
+
+def test_words_written_to_the_owner_do_not_reach_a_person_the_document_was_shared_with(
+    ready_site,
+):
+    """Listen is titled and worded for what a reader does (listen), not for what the owner
+    does (test with their own screen reader), and the owner's two questions about posting
+    the file are asked of nobody else."""
+    job = ready_site.job_id
+    owner = send(ready_site, OWNER, "GET", f"/jobs/{job}/listen").text
+    assert "Listen as a student" in owner and "test with yours" in owner
+    for actor in (VIEWER, REVIEWER):
+        listen = send(ready_site, actor, "GET", f"/jobs/{job}/listen").text
+        assert "Listen to this document" in listen
+        assert "Listen as a student" not in listen and "test with yours" not in listen
+        page = send(ready_site, actor, "GET", f"/jobs/{job}").text
+        assert "Two quick questions" not in page
+        assert send(ready_site, actor, "GET", f"/jobs/{job}/feedback").status_code == 403
+    assert audience_of("owner") == "owner" and audience_of("review") == "reviewer"
+    assert audience_of("view") == audience_of("anything else") == audience_of(None) == "reader"
 
 
 def test_the_post_routes_refuse_everyone_without_the_right_and_change_nothing(site):
