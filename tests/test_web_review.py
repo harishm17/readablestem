@@ -731,7 +731,7 @@ def test_every_review_write_records_a_content_free_outcome(tmp_path):
                 assert not any(w.lower() in held.lower() for w in words), (column.name, held)
 
 
-# --------------------------------------------------------------------------- a card with no proposal (WS8.5, WS4.5)
+# --------------------------------------------------------------------------- no proposal
 
 
 def _give_text(env, element_id: str, text: str) -> None:
@@ -747,6 +747,21 @@ def _give_text(env, element_id: str, text: str) -> None:
                 element.text = text
         job.result_json = data.model_dump(mode="json")
         flag_modified(job, "result_json")
+
+
+def standing(env) -> dict:
+    """What the reviewer's writes stand for (the outcome events, net of Undo)."""
+    from readablestem.web import events
+    from readablestem.web.db import Event
+
+    key = (Event.kind, Event.outcome, Event.write_mode)
+    with session_scope(env.ctx.factory) as session:
+        sums = session.execute(
+            select(*key, func.sum(Event.value))
+            .where(Event.name == events.DECISION_OUTCOME)
+            .group_by(*key)
+        ).all()
+    return {(k, o, w): n for k, o, w, n in sums if n}
 
 
 def _undo(env):
@@ -767,6 +782,7 @@ def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(w
         budget=budget,
         defaults={"equation": {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}},
     )
+
     def held() -> dict:
         """What the review decides: the elements and their fixes, as stored."""
         stored = result(web).model_dump(mode="json")
@@ -788,7 +804,10 @@ def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(w
     assert held() == before
 
     # A picture with the reviewer's description.
-    assert post(web, "p1-e5", action="describe", description="A fraction one over two").status_code == 303
+    assert (
+        post(web, "p1-e5", action="describe", description="A fraction one over two").status_code
+        == 303
+    )
     kept = result(web).fix_for("p1-e5")
     assert kept is not None and kept.status is Status.REJECTED and kept.described
     assert "p1-e5:rejected" in fetch(web.browser, f"/jobs/{web.job_id}/download").text
@@ -802,5 +821,7 @@ def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(w
     assert "p1-e5:" not in fetch(web.browser, f"/jobs/{web.job_id}/download").text
     element = next(e for e in after.elements if e.id == "p1-e5")
     assert element.kind is Kind.PARAGRAPH and element.text == "x = 1"
+    assert standing(web) == {("equation", "removed", "structure"): 1}  # recorded, no words
     assert _undo(web).status_code == 303
     assert held() == before
+    assert standing(web) == {}  # net of Undo

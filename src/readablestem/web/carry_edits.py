@@ -16,6 +16,8 @@ here, and only onto an item that is the same as the one they were made on:
   region, looks exactly as it did (the caller compares the two PDFs: `Unchanged`), the
   same page, and where the tool has found nothing in that place this time. A picture the
   tool now finds itself is its own item, and the hand-made one is not added twice.
+- **"Not an equation"** is made again on the equation that has the same picture and the
+  same words under it, when exactly one waiting equation of the new file does.
 - **Pages left out** are left out again only when the page looks exactly as it did.
 
 Anything else is counted as not carried (`EditsCarried.dropped`) and the instructor is told
@@ -54,7 +56,8 @@ HEADING = "heading"
 PICTURE = "picture"
 EQUATION = "equation"
 PAGE_LEFT_OUT = "page_left_out"
-KINDS = (TEXT, HEADING, PICTURE, EQUATION, PAGE_LEFT_OUT)
+NOT_EQUATION = "not_equation"
+KINDS = (TEXT, HEADING, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
 CARRIED_KEY = "carried_edit"
 
 # `ReviewEdit.action` values of the edits that change the text or the kind of an element.
@@ -381,6 +384,59 @@ def _carry_added(
     return out
 
 
+# --------------------------------------------------------------------------- not an equation
+
+
+def _held_element(row: EditRow) -> Element | None:
+    """The equation as it was when it was given back to the text (the row's `before`)."""
+    structure = (row.before or {}).get(STRUCTURE_KEY)
+    held = ((structure or {}).get("elements") or {}).get(row.element_id)
+    if not isinstance(held, dict):
+        return None
+    try:
+        element = Element.model_validate(held)
+    except ValueError:
+        return None
+    return element if element.kind is Kind.EQUATION else None
+
+
+def _carry_not_equation(
+    old_crops: dict[str, bytes],
+    new: DocumentResult,
+    new_crops: dict[str, bytes],
+    rows: list[EditRow],
+) -> EditsCarried:
+    out = EditsCarried()
+    for row in rows:
+        if row.action != NOT_EQUATION:
+            continue
+        held = _held_element(row)
+        png = old_crops.get(row.element_id)
+        if held is None or not png:
+            out.dropped += 1
+            continue
+        print_ = carry.fingerprint(held, {held.id: png})
+        waiting = {f.element_id for f in new.fixes if f.kind is Kind.EQUATION and f.pending}
+        found = [
+            e
+            for e in new.elements
+            if e.id in waiting
+            and e.kind is Kind.EQUATION
+            and (e.text or "") == (held.text or "")
+            and carry.fingerprint(e, new_crops) == print_
+        ]
+        if len(found) != 1:
+            out.dropped += 1
+            continue
+        try:
+            page_edits.not_an_equation(new, found[0].id)
+        except (ReviewInvalid, LookupError):
+            out.dropped += 1
+            continue
+        out.items.append((NOT_EQUATION, found[0].id))
+    return out
+
+
 # --------------------------------------------------------------------------- the whole
 
 
@@ -402,6 +458,7 @@ def carry_structure(
     out = _carry_words(old, old_crops, new, new_crops, rows)
     added = _carry_added(old, old_crops, new, unchanged, job_pages)
     out.extend(added)
+    out.extend(_carry_not_equation(old_crops, new, new_crops, rows))
     return out
 
 
