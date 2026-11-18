@@ -31,7 +31,7 @@ from readablestem.pipeline import export_docx, export_epub
 from readablestem.web import bundle, documents, events, notation, output, retention
 from readablestem.web.dates import machine_date
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
-from readablestem.web.deps import JOB_ID, PageError, UserDep, get_ctx
+from readablestem.web.deps import JOB_ID, PageError, UserDep, enforce, get_ctx
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes import exports
 from readablestem.web.routes.jobs import (
@@ -151,6 +151,7 @@ def _zip_response(
         # The zip's name and type; whether anything is ready is known only by going through
         # the documents, which a HEAD does not do (nothing is built, restarted or recorded).
         return head_reply("application/zip", zip_name(label, file_type))
+    enforce(request, "zip_user", user.id)  # building a zip is the cost; a HEAD builds none
     ready = _ready_files(request, user, course_id, file_type, job_ids)
     made = bundle.build(
         ready.items,
@@ -247,6 +248,7 @@ def download_everything(request: Request, user: UserDep) -> Response:
     like it. A document with a decision still open is left out and counted in `contents.txt`."""
     if is_head(request):
         return head_reply("application/zip", EVERYTHING_NAME)
+    enforce(request, "zip_user", user.id)
     files: list[tuple[str, bytes]] = []
     notes: list[str] = []
     record_ids: list[str] = []

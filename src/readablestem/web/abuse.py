@@ -80,6 +80,12 @@ RULES: dict[str, Rule] = {
     # for a script; the job's spend caps are the other bound.
     "edit_region": Rule(60, 600),
     "reread": Rule(20, 600),
+    # A zip of the person's documents (`/app/download`, a course's, a batch's and
+    # `/account/export`): each builds every ready document's files in one request, and
+    # `/account/export` three file types of each. A person fetching their term's courses
+    # in turn, in each file type, is a dozen builds that take a minute each, so 15 in ten
+    # minutes is out of reach for a person and a stop for a script. Per signed-in person.
+    "zip_user": Rule(15, 600),
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound
 

@@ -3245,6 +3245,26 @@ Cache-Control: no-store            (everything except /static/; page images and
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
+Three public pages (`/`, `/privacy`, `/limits`) are the exception to `no-store` for a visitor
+who is signed out, has no flash message and no queued analytics events: they answer
+`Cache-Control: public, no-cache` with an `ETag` (`cached_html` in `web/assets.py`, called
+from `public_page` in `routes/pages.py`) and a 304 with no body for a matching
+`If-None-Match`. Any other visitor, or a page that printed the CSRF token, gets the normal
+`no-store` render. `/favicon.ico` and `/demo/source.pdf` answer 304 from the file's own
+validators (`fixed_file`).
+
+**Compression** (`CompressionMiddleware`, outermost): gzip for text types (HTML, CSS, JS, JSON,
+XML, SVG) between 1 KB and 8 MiB with a known length, when the browser sends
+`Accept-Encoding: gzip`; the answer carries `Vary: Accept-Encoding`, and an `ETag` becomes weak
+(`W/`). Fonts, images, PDFs, downloads, streamed answers and pages that printed the CSRF token
+are left alone (the BREACH rule in [security.md](security.md)). On the landing page: 19,195 to
+5,408 bytes; `app.css` 108,117 to 23,542.
+
+**Image sizes.** A stored crop is drawn with `width` and `height` read from the PNG header
+(`routes/review.py` `_crop_sizes`, `inventory.Place.crop_size`), so the page does not move
+when it loads. Images cut on request (region images, the job card's example) have no known
+size until the render child makes them and are not sized.
+
 `form-action` names Google's and Microsoft's sign-in hosts because the sign-in buttons
 are forms whose answer redirects there, and browsers check `form-action` on that
 redirect too.

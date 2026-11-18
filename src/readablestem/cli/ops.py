@@ -1,6 +1,6 @@
 """CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
-report|export-opted-in|decisions-canary|claude-canary|replay-erasures|sandbox-probe|
-profile-check|image-facts|accuracy|lookup.
+report|storage-report|export-opted-in|decisions-canary|claude-canary|replay-erasures|
+sandbox-probe|profile-check|image-facts|accuracy|lookup.
 
 The same tasks the web app runs on its hourly cron call, for running by hand or as the
 Railway `cron` service (`readablestem ops cron`). Output is counts only, as `key=value` pairs on
@@ -109,6 +109,15 @@ def register(
     )
     report.add_argument("--days", type=int, default=7, help="UTC days back, today included")
     report.set_defaults(func=_cmd_report)
+    stored = sub.add_parser(
+        "storage-report",
+        help="bytes stored per table and per finished document, beside the database's own "
+        "size figure (no content)",
+    )
+    stored.add_argument(
+        "--largest", type=int, default=10, help="list this many of the largest documents"
+    )
+    stored.set_defaults(func=_cmd_storage_report)
     steps = sub.add_parser(
         "step-report",
         help="model calls, tokens, dollars and seconds of finished jobs, by step and by "
@@ -416,6 +425,54 @@ def _cmd_report(args: argparse.Namespace) -> int:
     except SQLAlchemyError as exc:
         return _db_error(exc)
     print(text, end="")
+    return 0
+
+
+def _cmd_storage_report(args: argparse.Namespace) -> int:
+    """Bytes stored per table and per finished document, from the database itself (counts
+    and random ids only). The tables' total is set beside the database's own size figure:
+    the rest is its catalogs and free pages."""
+    import statistics
+
+    from readablestem.web import storage
+    from readablestem.web.db import session_scope
+
+    try:
+        with session_scope(_factory()) as session:
+            tables, database = storage.table_bytes(session)
+            jobs = storage.finished_job_bytes(session)
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    lines = ["Bytes stored per table (with its indexes and large values)"]
+    for name, size in sorted(tables.items(), key=lambda item: (-item[1], item[0])):
+        lines.append(f"  {name:<22}{size:>14,}")
+    if tables:
+        lines.append(f"  {'tables together':<22}{sum(tables.values()):>14,}")
+    if database is not None:
+        share = f" ({sum(tables.values()) / database:.1%} of it)" if tables and database else ""
+        lines.append(f"  {'the database itself':<22}{database:>14,}{share}")
+    lines.append("")
+    lines.append(f"Finished documents: {len(jobs)}")
+    if jobs:
+        totals = sorted(job.total for job in jobs)
+        lines.append(
+            f"  bytes per document: median {int(statistics.median(totals)):,}, "
+            f"p90 {totals[int(0.9 * (len(totals) - 1))]:,}, largest {totals[-1]:,}, "
+            f"all together {sum(totals):,}"
+        )
+        for part in ("upload", "crops", "html", "result", "steps"):
+            sizes = [getattr(job, part) for job in jobs]
+            lines.append(
+                f"  {part:<8} median {int(statistics.median(sizes)):>12,}  "
+                f"all together {sum(sizes):>14,}"
+            )
+        lines.append(f"The {min(args.largest, len(jobs))} largest:")
+        for job in sorted(jobs, key=lambda j: -j.total)[: args.largest]:
+            lines.append(
+                f"  {job.job_id}  {job.total:>12,}  (upload {job.upload:,}, crops {job.crops:,}, "
+                f"html {job.html:,}, result {job.result:,}, steps {job.steps:,})"
+            )
+    print("\n".join(lines))
     return 0
 
 

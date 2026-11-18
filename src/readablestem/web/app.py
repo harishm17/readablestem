@@ -97,6 +97,7 @@ from readablestem.web.routes import (
 )
 from readablestem.web.sandbox_status import run_probe
 from readablestem.web.security import (
+    CompressionMiddleware,
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
     SecurityHeadersMiddleware,
@@ -524,8 +525,8 @@ def create_app(
     )
     app.state.ctx = ctx
 
-    # Added inner-first: SecurityHeaders > SafeError > RequestSizeLimit > Session >
-    # CrawlerRequests (HEAD, www and trailing-slash redirects) > routes.
+    # Added inner-first: Compression > SecurityHeaders > SafeError > RequestSizeLimit >
+    # Session > CrawlerRequests (HEAD, www and trailing-slash redirects) > routes.
     app.add_middleware(CrawlerRequestsMiddleware, base_url=settings.base_url)
     app.add_middleware(
         RotatingSessionMiddleware,
@@ -539,6 +540,7 @@ def create_app(
     app.add_middleware(RequestSizeLimitMiddleware)
     app.add_middleware(SafeErrorMiddleware, error_page=_plain_500_page_for(settings.contact_email))
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.env == "prod")
+    app.add_middleware(CompressionMiddleware)
     # Outermost: logs method, route template, status and latency only (no query, headers).
     app.middleware("http")(request_logging_middleware)
 

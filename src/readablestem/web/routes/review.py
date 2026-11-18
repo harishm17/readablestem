@@ -43,6 +43,7 @@ the one just changed.
 from __future__ import annotations
 
 import logging
+import struct
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
@@ -51,7 +52,7 @@ from urllib.parse import parse_qsl, urlencode
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
@@ -464,6 +465,9 @@ class ReviewItem:
     heading_in_document: bool
     can_accept: bool
     values: dict[str, str]
+    # The stored crop's size in pixels (read from the file's header), so the page keeps room
+    # for it before it loads; None when there is no crop.
+    crop_size: tuple[int, int] | None = None
     optional: bool = False  # accepted automatically with optional notes (`checks`)
     second_check: bool = False  # ... one of them the second automated check's
     errors: dict[str, str] = field(default_factory=dict)  # field prefix -> message
@@ -873,7 +877,7 @@ def _item(
     element: Element | None,
     number: int,
     job_id: str,
-    crop_ids: set[str],
+    crop_ids: CropSizes,
     place: HeadingPlace | None = None,
     label: str | None = None,
     source_note: str = "",
@@ -921,6 +925,7 @@ def _item(
         crop_url=f"/jobs/{job_id}/crops/{fix.element_id}.png"
         if fix.element_id in crop_ids
         else None,
+        crop_size=crop_ids.get(fix.element_id),
         mathml=try_sanitize_mathml(fix.equation.mathml) if fix.equation else None,
         speech=fix.equation.speech if fix.equation else None,
         alt=fix.figure.alt if fix.figure else None,
@@ -1173,28 +1178,45 @@ def _group(
 
 def _load(
     request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, set[str]]:
-    view, result, crop_ids, _ = _load_versioned(request, job_id, user)
-    return view, result, crop_ids
+) -> tuple[JobView, DocumentResult, CropSizes]:
+    view, result, crops, _ = _load_versioned(request, job_id, user)
+    return view, result, crops
 
 
 def _load_versioned(
     request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, set[str], int]:
-    """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
+) -> tuple[JobView, DocumentResult, CropSizes, int]:
+    """`_load`, and the job's review version: what the page's forms carry (stale guard).
+    The crops are the elements that have a stored crop, each with its size in pixels."""
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         role = shares.role_of(session, job, user) or REVIEW
         view = job_view(session, job, with_summary=True, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
-        crop_ids = set(
-            session.scalars(
-                select(Blob.element_id).where(Blob.job_id == job.id, Blob.kind == "crop")
-            ).all()
-        )
+        crops = _crop_sizes(session, job.id)
         version = job.result_version or 0
-    return view, result, {c for c in crop_ids if c}, version
+    return view, result, crops, version
+
+
+# A PNG file holds its width and height as two 4-byte numbers at bytes 16 to 24: the
+# database hands back those 8 bytes, not the crop.
+CropSizes = dict[str, tuple[int, int] | None]
+
+
+def _crop_sizes(session: Session, job_id: str) -> CropSizes:
+    rows = session.execute(
+        select(Blob.element_id, func.substr(Blob.content, 17, 8)).where(
+            Blob.job_id == job_id, Blob.kind == "crop"
+        )
+    ).all()
+    sizes: CropSizes = {}
+    for element_id, header in rows:
+        if not element_id:
+            continue
+        width, height = struct.unpack(">II", bytes(header)) if len(header or b"") == 8 else (0, 0)
+        sizes[element_id] = (width, height) if width and height else None
+    return sizes
 
 
 def _place_flashes(

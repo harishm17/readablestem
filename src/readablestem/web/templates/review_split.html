@@ -235,7 +235,7 @@
 {% set eid = item.element_id %}
 <figure class="figure-view">
   {% if item.crop_url %}
-  <img src="{{ item.crop_url }}" alt="{{ item.label }} as it is in the PDF.">
+  <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} alt="{{ item.label }} as it is in the PDF.">
   {{ enlarge(item.crop_url, item.label|lower) }}
   {% else %}
   <p>No image of the original is available.</p>

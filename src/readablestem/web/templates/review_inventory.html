@@ -30,7 +30,7 @@
 <ul class="places">
   {% for p in row.places %}
   <li class="place">
-    {% if p.crop %}<img class="place-crop" loading="lazy" src="/jobs/{{ job.id }}/crops/{{ p.element_id }}.png" alt="{{ p.label }}, page {{ p.page }}, as it is written in the PDF">{% endif %}
+    {% if p.crop %}<img class="place-crop" loading="lazy" src="/jobs/{{ job.id }}/crops/{{ p.element_id }}.png"{% if p.crop_size %} width="{{ p.crop_size[0] }}" height="{{ p.crop_size[1] }}"{% endif %} alt="{{ p.label }}, page {{ p.page }}, as it is written in the PDF">{% endif %}
     <div class="place-text">
       <p class="place-where"><a href="/jobs/{{ job.id }}/review?item={{ p.element_id }}">{{ p.label }}<span class="visually-hidden">, on the review screen</span></a>, page {{ p.page }}{% if p.which %}, {{ p.which }}{% endif %}</p>
       <p class="place-latex"><span class="visually-hidden">In the LaTeX: </span><code class="latex">{{ p.before }}<mark class="said-diff">{{ row.key }}</mark>{{ p.after }}</code></p>

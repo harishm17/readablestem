@@ -35,6 +35,7 @@ from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
 from readablestem.web.sandbox_status import SandboxStatus
+from readablestem.web.security import CARRIES_SECRET
 from readablestem.web.spend import DbSpendGuard
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import ClientFactory, Converter, Worker
@@ -222,6 +223,9 @@ def start_session(
 
 
 def csrf_token(request: Request) -> str:
+    # The page that prints this is never compressed (`security.CompressionMiddleware`) and
+    # never cached for everyone (`routes/pages.py`, `public_page`).
+    setattr(request.state, CARRIES_SECRET, True)
     token = request.session.get(SESSION_CSRF)
     if not isinstance(token, str) or not token:
         token = secrets.token_urlsafe(32)
@@ -327,6 +331,11 @@ REFUSAL_WORDS: dict[str, tuple[str, str, dict[str, Any]]] = {
         "This network has made several new accounts in the last hour. An existing account "
         "can still sign in.",
         _SIGN_IN_BACK,
+    ),
+    "zip_user": (
+        "Too many zip downloads",
+        "Several zip files of your documents were made in the last few minutes.",
+        {},
     ),
 }
 
