@@ -31,6 +31,10 @@
   <link rel="icon" href="/favicon.ico" sizes="48x48">
   <link rel="icon" href="{{ static_url('icon-192.png') }}" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="{{ static_url('apple-touch-icon.png') }}">
+  <link rel="manifest" href="/site.webmanifest">
+  {# The page background (--bg in tokens.css), for the browser's own bar. #}
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
   <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-700.woff2" as="font" type="font/woff2" crossorigin>
   {% block font_preload %}{% endblock %}

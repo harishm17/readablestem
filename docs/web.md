@@ -122,8 +122,9 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labeled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
 | GET `/pricing` | anyone | Free during the beta, the limits that apply (`_upload_limits.html`, shared with `/limits`), no prices, and that pricing for offices is not set |
 | GET `/security` | anyone | What is stored and who receives it (the data matrix, then the same data by company, `recipients-table`), how long it is kept, sign-in and who can see a document, how uploaded files are handled, what has and has not been tested, that no data agreement is offered, how to report a problem. Everything depends on the settings (`offices.offices_context`) |
+| GET `/favicon.ico`, `/apple-touch-icon.png`, `/site.webmanifest` | anyone | The icons browsers and phones ask for at the root (the files in `static/`, served by `fixed_file`) and the web app manifest (name, start URL `/`, `display: minimal-ui`, the 192 and 512 px icons, theme and background color from `--bg` in `tokens.css`; `base.html` links it and gives the light and dark `theme-color`) |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer). It says when it was checked (a local-time `<time>`), links to itself as "Check again", and says that the AI service line is the last 10 minutes of this server's own requests: with none it reads "No recent requests; availability untested", with some "Recent requests were answered" and their number and last time (`provider_health.observed`). `?refresh=1` reloads the page every minute (a `<meta http-equiv="refresh">`, off unless asked for, with a link to stop it) |
-| GET `/login` | anyone | Sign-in page; when sign-up is open, the consent ("signing in makes an account", terms and privacy notice) is plain text under the buttons. Sign-in pages use the short footer (`footer_mode = "minimal"` in `base.html`) |
+| GET `/login` | anyone | Sign-in page; when sign-up is open, the consent ("signing in makes an account", terms and privacy notice) is plain text under the buttons. Sign-in pages use the short footer (`footer_mode = "minimal"`, read by `base.html` and `_footer.html`) |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; with open sign-up a new verified address gets an account (303 to `/app`); 403 page if not allowlisted (allowlist mode), blocked (open mode) or email not verified; 503 "Sign-ups are full for today" when the day's new accounts are used up; 429 when one address has made too many accounts |
 | POST `/login/email`, GET and POST `/login/email/confirm` | anyone | The emailed sign-in link (404 unless `EMAIL_LOGIN_ENABLED`): the form answers with the same page for every address; the link opens a page with a button, and only the button's POST (CSRF-checked) uses the link up. See "Sign-in, sessions and CSRF" |
@@ -224,6 +225,16 @@ case (check the address and the signed-in account, ask the sender; it may also h
 deleted), so a revoked share, an expired document and an id that never existed read the
 same. It is a 404 either way. The
 `/courses/*` routes do the same for courses.
+
+**The page frame.** `base.html` draws the header and, through `_footer.html`, the footer. The
+footer partial holds the one list of footer links (each target has one label) and three
+arrangements: the full one for public pages, a compact one for signed-in pages and a short one
+for the sign-in pages. The mark `aria-current="page"` in the main navigation and the footer
+comes from the path alone: `deps.current_section` maps it to a section (`deps.SECTIONS`, the
+longest matching prefix), so a document's pages (`/jobs/...`, `/uploads/...`, review, share,
+Listen, record, draft) mark "My documents", `/courses...` Courses, `/account...` Account,
+`/admin...` Admin, and a path in no section marks nothing. A route does not pass `active`; a new
+page is added to `SECTIONS` when it belongs to a section the frame names.
 
 ## Sign-in, sessions and CSRF
 
@@ -3647,7 +3658,7 @@ who is signed out, has no flash message and no queued analytics events: they ans
 `Cache-Control: public, no-cache` with an `ETag` (`cached_html` in `web/assets.py`, called
 from `public_page` in `routes/pages.py`) and a 304 with no body for a matching
 `If-None-Match`. Any other visitor, or a page that printed the CSRF token, gets the normal
-`no-store` render. `/favicon.ico` and `/demo/source.pdf` answer 304 from the file's own
+`no-store` render. `/favicon.ico`, `/apple-touch-icon.png` and `/demo/source.pdf` answer 304 from the file's own
 validators (`fixed_file`).
 
 **Compression** (`CompressionMiddleware`, outermost): gzip for text types (HTML, CSS, JS, JSON,

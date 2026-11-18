@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import functools
 import html
+import json
 import re
 from pathlib import Path
 
@@ -60,6 +61,44 @@ def indexnow_key() -> Response:
 @router.get("/favicon.ico")
 def favicon(request: Request) -> Response:
     return fixed_file(request, STATIC_DIR / "favicon.ico", cache_control="public, max-age=86400")
+
+
+@router.get("/apple-touch-icon.png")
+def apple_touch_icon(request: Request) -> Response:
+    """iOS and some browsers ask for the home-screen icon at the root whatever the page links."""
+    return fixed_file(
+        request, STATIC_DIR / "apple-touch-icon.png", cache_control="public, max-age=86400"
+    )
+
+
+# The page background in light and dark mode: `--bg` in static/tokens.css (the manifest has one
+# color for each, so it takes the light one; `base.html` gives the browser both).
+THEME_LIGHT = "#ffffff"
+THEME_DARK = "#0f1115"
+
+
+@router.get("/site.webmanifest")
+def web_manifest() -> Response:
+    """The web app manifest: the name and icons a browser or phone offers when a person adds the
+    site to the home screen. It opens as a normal page (`display` is not `standalone`)."""
+    manifest = {
+        "name": "ReadableSTEM",
+        "short_name": "ReadableSTEM",
+        "start_url": "/",
+        "scope": "/",
+        "display": "minimal-ui",
+        "theme_color": THEME_LIGHT,
+        "background_color": THEME_LIGHT,
+        "icons": [
+            {"src": static_url("icon-192.png"), "sizes": "192x192", "type": "image/png"},
+            {"src": static_url("icon-512.png"), "sizes": "512x512", "type": "image/png"},
+        ],
+    }
+    return Response(
+        json.dumps(manifest),
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 # --------------------------------------------------------------------------- showcase
