@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
 
 from readablestem.pipeline import export_docx, export_epub
 from readablestem.web import bundle, documents, events, notation, output, retention
@@ -86,14 +87,31 @@ def _ready_files(
     cap = bundle.limit(file_type)
     ready = _Ready()
     with session_scope(ctx.factory) as session:
-        ids = session.scalars(
-            select(Job.id)
+        # One query for the summary columns `output.export_state` reads (the result and the
+        # page are deferred): which are ready, held back or over the cap is known before any
+        # document is loaded. Only a document taken is read further, one at a time.
+        rows = session.scalars(
+            select(Job)
+            .options(
+                load_only(
+                    Job.id,
+                    Job.status,
+                    Job.html_stale,
+                    Job.html_version,
+                    Job.open_decisions,
+                    # What a document taken reads next: its title, name and deletion clock.
+                    Job.filename,
+                    Job.title_override,
+                    Job.result_title,
+                    Job.retention_mode,
+                    Job.retain_until,
+                )
+            )
             .where(*documents._live(user.id, now, course_id, job_ids), Job.status == JobStatus.DONE)
             .order_by(Job.created_at.desc(), Job.id)
         ).all()
-        for job_id in ids:
-            job = session.get(Job, job_id)
-            if job is None or not (job.html_stale or job.has_html):
+        for job in rows:
+            if not (job.html_stale or job.has_html):
                 continue
             if output.export_state(job).key != output.READY:  # a draft stays out (SW21)
                 ready.held_back += 1

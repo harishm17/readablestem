@@ -413,3 +413,72 @@ def test_a_document_has_one_title_in_every_place_and_file(web):  # noqa: F811
         found = _titles_of(web, job_id)
         assert set(found.values()) == {wanted}, found
         assert download_filename(wanted, job_id) in zipped
+
+
+# --------------------------------------------------------------------------- download all
+
+
+def _statements(env, url: str) -> tuple[int, list[str]]:
+    from sqlalchemy import event
+
+    engine = env.ctx.factory.kw["bind"]
+    seen: list[str] = []
+
+    def spy(conn, cursor, statement, *rest):
+        seen.append(statement)
+
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        status = env.browser.get(url).status_code
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+    return status, seen
+
+
+def test_download_all_reads_what_is_ready_from_one_query_however_many_documents(
+    web,  # noqa: F811
+    monkeypatch,
+):
+    """F-283: which documents are ready, held back or over the zip's cap is read from the jobs'
+    summary columns in one query, so the statements do not grow with the documents, and a 409
+    (nothing ready) loads no document."""
+    from sqlalchemy import delete, select
+
+    from readablestem.web import bundle
+
+    first = ready_job(web)
+    monkeypatch.setattr(bundle, "MAX_DOCUMENTS", 2)
+
+    def copies(count: int, open_decisions: int) -> None:
+        with session_scope(web.ctx.factory) as session:
+            source = session.get(Job, first)
+            assert source is not None
+            for i in range(count):
+                copy = Job(
+                    user_id=source.user_id,
+                    status=source.status,
+                    filename=f"copy{i}.pdf",
+                    page_count=source.page_count,
+                    retain_until=source.retain_until,
+                )
+                copy.result_json = source.result_json
+                copy.html = source.html
+                session.add(copy)
+        with session_scope(web.ctx.factory) as session:
+            for job in session.scalars(select(Job)):
+                job.open_decisions = open_decisions
+
+    def drop_copies() -> None:
+        with session_scope(web.ctx.factory) as session:
+            session.execute(delete(Job).where(Job.id != first))
+
+    for open_decisions, expected in ((3, 409), (0, 200)):  # all held back, then all ready
+        copies(1, open_decisions)  # 2 documents
+        status, few = _statements(web, "/app/download")
+        copies(48, open_decisions)  # 50 documents
+        status_many, many = _statements(web, "/app/download")
+        assert (status, status_many) == (expected, expected)
+        assert len(many) == len(few)  # ready: the two the cap takes, the rest cost nothing
+        if open_decisions:
+            assert not any("WHERE jobs.id = ?" in sql for sql in many)  # no document loaded
+        drop_copies()
