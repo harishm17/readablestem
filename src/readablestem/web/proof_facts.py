@@ -15,8 +15,21 @@ tables in `PROOF.md`, so the pages draw their bars and counts from the reports a
 from them (`tests/test_proof_facts.py` compares the snapshot with both).
 
 Every fact names its set, its date, that it is a registered result, its count, and a link to how
-it was measured. Nothing here says one tool beats another: each fact gives the chatbot's number
-beside ReadableSTEM's and says where a goal registered before the run was not met.
+it was measured. Nothing here says one tool beats another.
+
+Two rules for what a public page may show (SW26):
+
+- The stamp. A result file may carry `profile_sha256`, the hash of the production profile the run
+  used (`ops/profile.py`). A file whose hash is not the repository's profile is refused (a page
+  cannot show a number the live service's settings did not earn). The fresh5 file predates the
+  stamp: it is kept, labeled with its date and version, and `settings_line` says that its settings
+  were not recorded. The words "the settings the live service uses" appear only for a file whose
+  stamp equals the profile.
+- The retired scoring. The silent-error rate, the flag recall and the unseen loss count wrong
+  equations by a scorer that counted notation differences as errors (a hand check of 86 errors
+  found 55 harmless, AQ1). They are not in `facts`, in the chart or on any page until a stamped
+  report under the corrected scorer exists; `RETIRED` names them and `tests/test_proof_facts.py`
+  fails if a page shows one.
 """
 
 from __future__ import annotations
@@ -82,6 +95,8 @@ class ProofFacts:
     facts: list[Fact]
     chart: list[ChartRow]
     first_test: FirstTest
+    settings_line: str  # what the run's settings were, in a sentence
+    numbers: dict[str, str]  # figures the pages' prose states, read from the run's files
 
 
 SYSTEMS = (
@@ -89,12 +104,22 @@ SYSTEMS = (
     ("Chatbot, Opus", "Chatbot on Opus"),
     ("Chatbot, Haiku", "Chatbot on Haiku"),
 )
-# The two measures the landing page's compact chart shows: what a listener hears, and the wrong
-# equations nobody is asked about. The rest stay on the comparison guide and the offices page.
+# The two measures the landing page's compact chart shows. The rest stay on the comparison guide
+# and the offices page.
 HEADLINE = (
     "spoken-equal, end to end (primary)",
-    "silent errors per 100 gold (wrong under the primary, not asked)",
+    "exact_lenient (secondary)",
 )
+# Counted by the scorer AQ1 found wrong (see the module docstring). Not drawn, not stated.
+RETIRED_MEASURES = (
+    "silent errors per 100 gold (wrong under the primary, not asked)",
+    "unseen loss per 100 gold (silent plus undetected)",
+    "flag recall (symbols-wrong aligned equations that were a required decision)",
+)
+# Figures of the retired measures, as the report and the earlier pages wrote them. A public page
+# that shows one fails `tests/test_proof_facts.py`.
+RETIRED = ("5.0 per 100", "5.02", "9.56", "9.6 for", "46%", "0.461", "0.46 ", "11.02")
+PROFILE_KEY = "profile_sha256"
 # (key in the results file, plain words, direction, the axis the bars are drawn against, format)
 MEASURES = (
     (
@@ -105,28 +130,7 @@ MEASURES = (
         "{:.3f}",
     ),
     ("exact_lenient (secondary)", "Exactly right, symbol for symbol", True, 1.0, "{:.3f}"),
-    (
-        "silent errors per 100 gold (wrong under the primary, not asked)",
-        "Wrong, and nobody is asked, per 100 equations",
-        False,
-        20.0,
-        "{:.1f}",
-    ),
-    (
-        "unseen loss per 100 gold (silent plus undetected)",
-        "Wrong and not flagged, or not found at all, per 100 equations",
-        False,
-        20.0,
-        "{:.1f}",
-    ),
     ("cost per PDF page (USD)", "Cost per page", False, 0.08, "${:.3f}"),
-    (
-        "flag recall (symbols-wrong aligned equations that were a required decision)",
-        "Wrong equations the tool asks you about",
-        True,
-        1.0,
-        "{:.2f}",
-    ),
 )
 
 
@@ -135,6 +139,7 @@ def parse_chart(results: dict) -> list[ChartRow]:
     system). A chatbot never asks: its flag recall is 0 and the page says so in words."""
     rows = []
     for key, words, higher, axis, fmt in MEASURES:
+        assert key not in RETIRED_MEASURES
         lines = []
         for arm, name in SYSTEMS:
             point = float(results["arms"][arm][key]["point"])
@@ -193,6 +198,78 @@ def _found(text: str, pattern: str, flags: int = 0) -> re.Match[str]:
     return match
 
 
+def settings_line(
+    results: dict, pipeline: str, date: str, profile_sha256: str | None = None
+) -> str:
+    """What the run's settings were. Only a result file stamped with the production profile's
+    hash may say the run used the live service's settings; a stamp that differs is refused."""
+    from readablestem.ops import profile
+
+    stamp = results.get(PROFILE_KEY)
+    if stamp is None:
+        return (
+            f"It ran on {date} with version {pipeline}. The file did not record its settings, "
+            "and some of the live service's settings have changed since, so these numbers "
+            "describe that run, not today's service."
+        )
+    if stamp != (profile_sha256 or profile.load().sha256):
+        raise ValueError(
+            "the result file was run under settings that are not the production profile's: "
+            "it cannot go on a public page"
+        )
+    return f"It ran on {date} with version {pipeline} and the settings the live service uses."
+
+
+def parse_numbers(report: str, results: dict) -> dict[str, str]:
+    """The figures the pages' prose states about the newest run, each read from the report or
+    its results file."""
+    arms = results["arms"]
+    ours, opus = arms["Candidate"], arms["Chatbot, Opus"]
+    primary = "spoken-equal, end to end (primary)"
+    paired = next(
+        p
+        for p in results["paired"]
+        if p["other"] == "Chatbot, Opus" and p["metric"] == primary and p["units"] == 26
+    )
+    strata = _found(
+        report,
+        r"strata A \((\d+) arXiv papers, (\d+) pages\), B \((\d+) OpenStax sections, (\d+) "
+        r"pages\), C \((\d+) course LaTeX documents",
+    ).groups()
+    chem = results["stratum_d"]["Candidate"]
+    chem_goal = _found(report, r"D1 \(at least ([0-9.]+)\)").group(1)
+    size = _found(report, r"(\d+) units, (\d+) pages, ([\d,]+) gold equations")
+    margin = _found(report, r"(\d+) points; every primary difference").group(1)
+
+    def signed(value: float) -> str:
+        return f"{value:+.3f}".replace("-", "\u2212")
+
+    return {
+        "units": size.group(1),
+        "pages": size.group(2),
+        "gold": size.group(3),
+        "papers": strata[0],
+        "sections": strata[2],
+        "course_docs": strata[4],
+        "difference": signed(paired["estimate"]),
+        "difference_low": signed(paired["low_975"]).removeprefix("+"),
+        "difference_high": signed(paired["high_975"]),
+        "margin": margin,
+        "decisions_per_page": f"{ours['required decisions per PDF page']['point']:.1f}",
+        "cost_ours": f"{results['cost_per_page_all_units']['Candidate']:.2f}",
+        "cost_opus": f"{results['cost_per_page_all_units']['Chatbot, Opus']:.2f}",
+        "kind_papers": f"{ours['A'][primary]['point']:.3f}",
+        "kind_sections": f"{ours['B'][primary]['point']:.3f}",
+        "kind_course": f"{ours['C'][primary]['point']:.3f}",
+        "chem_sections": str(results["stratum_d"]["Candidate"]["units"]),
+        "chem_gold": str(chem["gold"]),
+        "chem_right": f"{chem['chem_right_excl_times']['rate']:.2f}",
+        "chem_goal": chem_goal,
+        "ours_exact": f"{ours['exact_lenient (secondary)']['point']:.3f}",
+        "opus_exact": f"{opus['exact_lenient (secondary)']['point']:.3f}",
+    }
+
+
 def parse(report: str, results: dict | None = None, proof: str | None = None) -> ProofFacts:
     if results is None:
         results = json.loads(RESULTS.read_text(encoding="utf-8"))
@@ -205,13 +282,13 @@ def parse(report: str, results: dict | None = None, proof: str | None = None) ->
     pipeline = _found(report, r"\(pipeline ([0-9.]+),").group(1)
     size = _row(section, "units / gold / pages")[1]
     units, gold, _pages = (part.strip() for part in size.split("/"))
-    goal_silent = _found(report, r"silent errors at most ([0-9.]+) per 100").group(1)
-    goal_recall = _found(report, r"flag recall at least ([0-9.]+)").group(1)
     primary = _row(section, "spoken-equal, end to end (primary)")
     exact = _row(section, "exact_lenient (secondary)")
-    silent = _row(section, "silent errors per 100 gold")
-    recall = _row(section, "flag recall")
+    decisions = _row(section, "required decisions per page")
     count = f"{gold} gold equations in {units} documents"
+    numbers = parse_numbers(report, results)
+    chart = parse_chart(results)
+    first_test = parse_first_test(proof)
     return ProofFacts(
         set_label=f"fresh5 set, {units} documents",
         date=date,
@@ -234,24 +311,17 @@ def parse(report: str, results: dict | None = None, proof: str | None = None) ->
                 HREF,
             ),
             Fact(
-                f"{float(_number(silent[1])):.1f}",
-                "wrong equations nobody is asked about, per 100",
+                f"{float(_number(decisions[1])):.1f}",
+                "decisions it asks the instructor for, per page",
                 count,
-                f"The chatbot on Opus: {float(_number(silent[3])):.1f}. The goal registered "
-                f"before the run was {goal_silent} or fewer, so it was not met.",
-                HREF,
-            ),
-            Fact(
-                f"{float(_number(recall[1])):.2f}",
-                "of wrong equations the review screen asks about",
-                count,
-                f"The goal registered before the run was {goal_recall}, so it was not met. "
                 "A chatbot asks nothing.",
                 HREF,
             ),
         ],
-        chart=parse_chart(results),
-        first_test=parse_first_test(proof),
+        chart=chart,
+        first_test=first_test,
+        settings_line=settings_line(results, pipeline, date),
+        numbers=numbers,
     )
 
 
@@ -281,6 +351,8 @@ def load() -> ProofFacts:
             for r in data["chart"]
         ],
         first_test=FirstTest(**data["first_test"]),
+        settings_line=data["settings_line"],
+        numbers=data["numbers"],
     )
 
 

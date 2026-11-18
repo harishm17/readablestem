@@ -224,6 +224,8 @@ PAGES = [
     ("privacy", "/privacy", None, DESKTOP, False),
     ("terms", "/terms", None, DESKTOP, False),
     ("known limits", "/limits", None, DESKTOP, False),
+    ("pricing", "/pricing", None, DESKTOP, False),
+    ("security", "/security", None, DESKTOP, False),
     ("service status", "/status", None, DESKTOP, False),
     ("posting in your course", "/help/posting", None, DESKTOP, False),
     ("guides", "/guides", None, DESKTOP, False),

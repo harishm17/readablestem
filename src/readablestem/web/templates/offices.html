@@ -87,44 +87,8 @@
 </details>
 
 <h2 id="subprocessors">Who receives what</h2>
-<details>
-  <summary>The same data, by company</summary>
-  {# One row per recipient, from web/recipients.py; what each receives is read from the same
-     `data_items` list as the first table. #}
-  {% call table_scroll("Companies that receive data from a conversion") %}
-  <table class="recipients-table">
-    <caption>Companies that receive data from a conversion</caption>
-    <thead>
-      <tr><th scope="col">Company</th><th scope="col">What it receives</th><th scope="col">What it says about training and retention</th></tr>
-    </thead>
-    <tbody>
-      {% for r in recipients %}
-      <tr>
-        <th scope="row">{{ r.name }}</th>
-        <td>
-          {% if "hosting" in r.purposes %}
-          Hosts the app and its database, in its United States region. It holds every row of the
-          first table that goes to Railway.
-          {% else %}
-          <ul class="cell-list">
-            {% for what in received_by(r.name) %}<li>{{ what }}</li>{% endfor %}
-          </ul>
-          {% endif %}
-        </td>
-        {% if r.gets_documents %}
-        <td>{{ retention(r.name) }}</td>
-        {% elif "hosting" in r.purposes %}
-        <td>Daily database backups are kept about {{ backup_days }} days.</td>
-        {% elif "tracing" in r.purposes %}
-        <td>Set in the Langfuse project; see the privacy notice.</td>
-        {% endif %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endcall %}
-  <p>The <a href="/privacy">privacy notice</a> lists the same companies and is the page to cite.</p>
-</details>
+<p>The table above lists what each company receives. <a href="/security#by-company">The same data by company</a>,
+  with what each company says about training and retention, is on the security page.</p>
 
 <h2 id="retention">How long it is kept</h2>
 {% set retention_voice = "instructor" %}
@@ -134,18 +98,8 @@
 
 <h2 id="training">No training, and what is stored by the model company</h2>
 <p>ReadableSTEM does not use uploads to train any model, and does not sell or share them
-  beyond the companies in the table.</p>
-<details>
-  <summary>What the model company keeps</summary>
-  <p>{% if model_company == "OpenAI" %}Requests to OpenAI are sent with the <code>store</code>
-    setting off, so OpenAI does not keep the response for later retrieval. See OpenAI's own
-    API data policies for how long it keeps requests.
-    {% else %}This server sends its model requests to {{ model_company }}. The
-    <code>store</code> setting belongs to the OpenAI path only and is not used here: for
-    {{ model_company }}, the retention statement in the table applies. No zero-retention
-    agreement is in place.{% endif %}
-    What the model companies say is their own statement; ReadableSTEM cannot check it.</p>
-</details>
+  beyond the companies listed <a href="/security#by-company">by company</a>.</p>
+<p>What the model company keeps is on <a href="/security#by-company">the security page</a>.</p>
 
 <h2 id="ferpa">Student records (FERPA)</h2>
 <p><strong>No data agreement is offered.</strong> ReadableSTEM does not sign a school-official
@@ -173,7 +127,7 @@
   <ul>
     <li>Its proposals can be wrong: the chart above is the measured result, and
       <a href="/limits#accuracy">the evidence page</a> has all of it, including earlier tests.
-      In 3 chemistry sections, 0.33 of the equations were right as chemistry. The tool asks the
+      In {{ proof_facts.numbers.chem_sections }} chemistry sections, {{ proof_facts.numbers.chem_right }} of the equations were right as chemistry. The tool asks the
       instructor about the parts it is unsure about and accepts the rest on its own checks.</li>
     <li>The automatic checks look at structure (language, title, headings, lists, tables, links,
       the alt attribute of images), not at whether a description or an equation reading is
@@ -183,7 +137,8 @@
     <li>There is no accessibility conformance report (VPAT) published for the ReadableSTEM web
       application itself. A report in the VPAT 2.5 layout (WCAG 2.2, levels A and AA) is in
       preparation; it will say what has been tested and claim nothing more. Automated tests walk
-      every page of the app with the keyboard alone and run axe-core on the main screens.</li>
+      the pages listed in <a href="{{ source_url }}/blob/main/tests/test_web_keyboard_browser.py">the keyboard test</a>
+      with the Tab key alone and run axe-core on the main screens.</li>
     <li>There has been no independent security test.</li>
     <li>Scanned and handwritten pages are converted only when the instructor asks, and a person
       must check each converted equation and table. Chemistry is the weakest area.

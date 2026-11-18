@@ -89,6 +89,31 @@
   posting the file and the feedback page are the owner's alone (they were open to View).
 - SW9: `web/dates.py` (`format_when`, `machine_date`): server-built dates say UTC; no stored zone.
 - No migration, no `PIPELINE_VERSION` or `RENDER_VERSION` change, no change to a stored document.
+## Unreleased: public pages read their claims from the run record (branch feat/public-pages-and-claims)
+
+- SW26 / WS13.9b: every number on a public page now comes from the registered fresh5 report,
+  `data/realworld/results-fresh5.json` or the code (`web/proof_facts.py`, committed as
+  `proof_facts.json`; regenerate with `uv run python -m readablestem.web.proof_facts`). The
+  silent-error rate, flag recall and unseen loss came from a scorer that counted notation
+  differences as errors (AQ1: 55 of 86 errors were harmless). They are gone from the landing,
+  limits, comparison, offices and privacy pages, the offices summary, the README and
+  `docs/vendor-information.md`, and the pages say they are being scored again, with no figure.
+  A result file is "the settings the live service uses" only when its `profile_sha256` equals the
+  production profile's; fresh5 has no stamp and is labelled "did not record its settings".
+- `tests/test_proof_facts.py` fails when a retired figure returns to a public page, the README
+  summary or `docs/vendor-information.md`.
+- WS12.7: the sitemap, `llms.txt` and the structured-data dates come from one list
+  (`seo.PUBLIC_PAGES`) with a date per page from `git log` (`web/page_dates.json`,
+  `scripts/page_dates.py`, checked by `tests/test_web_seo.py`). `/status` is listed. `/showcase`
+  answers 404 where the folder is absent, not a redirect to a 404.
+- WS25.1: `/pricing` (free beta, the limits, no prices). WS25.3: `/security` (what is stored, who
+  receives it, retention, access, file handling, what was and was not tested, no agreement
+  offered, how to report). The by-company table moved from the offices page to `/security`.
+- Plainer public copy: the landing page's two "screen reader says" labels say where each reading
+  comes from; the terms summary keeps what the full text does not repeat; the privacy notice
+  names what restarts the delete clock and the steps that write a temporary copy.
+- No stored documents, recordings, hashes or costs change. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` bump and no migration.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

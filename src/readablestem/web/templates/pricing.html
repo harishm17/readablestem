@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block body_class %}mode-read{% endblock %}
+{% block title %}Pricing{% endblock %}
+{% block description %}ReadableSTEM is free during the beta, with daily limits. No prices are set.{% endblock %}
+{% block content %}
+{# WS25.1, the free-beta page: what is free, the limits, and how to ask for more. No prices, no
+   cost per page (the cost model has no figure under the production profile), no plan table
+   beyond the limits list that /limits shows and the upload routes enforce. #}
+<h1>Pricing</h1>
+<p class="lede">ReadableSTEM is a free beta. There are no prices, and nothing to buy yet.</p>
+
+<h2 id="free">What is free</h2>
+<p>Everything the service does: converting course files, the review screen, the downloads and
+  the review record. The beta has limits on how much you can upload and keep.</p>
+{% include "_upload_limits.html" %}
+<p>The same limits are on <a href="/limits">Known limits</a>, with what the tool does not do.</p>
+
+<h2 id="offices">For an office or a department</h2>
+<p>Pricing for offices is not set. There is no contract, no service-level agreement and no data
+  processing agreement. <a href="/security#agreement">Why, and what the security page covers</a>.
+  If your office wants to plan a pilot or to ask for more than the limits allow,
+  {% if contact_email %}write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}use the feedback link in the footer{% endif %}.
+  The <a href="/for-accessibility-offices">page for accessibility offices</a> has a pilot checklist.</p>
+
+<h2 id="change">What can change</h2>
+<p>The beta can change, pause or stop. The <a href="/terms">terms</a> say so, and say there is no
+  warranty.</p>
+{% endblock %}

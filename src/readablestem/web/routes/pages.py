@@ -213,6 +213,7 @@ def for_accessibility_offices_summary(request: Request) -> Response:
     ctx = get_ctx(request)
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
+    context["proof_facts"] = proof_facts.load()
     context["as_of"] = utcnow().date().isoformat()
     context["style_tag"] = offices.summary_style_tag()
     return render(
@@ -228,8 +229,14 @@ def for_accessibility_offices_summary(request: Request) -> Response:
 
 @router.get("/limits")
 def limits(request: Request) -> Response:
+    return render(request, "limits.html", limits_context(request))
+
+
+def limits_context(request: Request) -> dict[str, object]:
+    """What /limits and /pricing both state about uploads, from the settings the upload
+    routes enforce."""
     settings = get_ctx(request).settings
-    context = {
+    return {
         "active": "limits",
         # A bigger file is kept so its pages can be chosen and converted in parts (T3-3).
         "in_parts": settings.upload_limit_mb > settings.max_upload_mb
@@ -243,7 +250,23 @@ def limits(request: Request) -> Response:
         "storage_mb": settings.storage_per_user_mb,
         "open_storage_mb": settings.storage_open_tier_mb,
     } | _features(request)
-    return render(request, "limits.html", context)
+
+
+@router.get("/pricing")
+def pricing(request: Request) -> Response:
+    """The beta is free, with the limits `/limits` lists; no prices are set (WS25.1). Public."""
+    return render(request, "pricing.html", limits_context(request) | {"active": "pricing"})
+
+
+@router.get("/security")
+def security_page(request: Request) -> Response:
+    """What is stored, who receives it, how long, how it is protected, what was and was not
+    tested, how to report a problem (WS25.3). Written from the same settings as the offices
+    page and the privacy notice (web.offices), and from docs/security.md."""
+    ctx = get_ctx(request)
+    context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["latex_source"] = _features(request)["latex_source"]
+    return render(request, "security.html", context | {"active": "security"})
 
 
 @router.get("/help/posting")

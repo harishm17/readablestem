@@ -55,7 +55,8 @@ numbers and the re-measurement below are neither, and say so where they appear.
 The newest held-out result is the fifth fresh split, run once on 2026-11-04 under
 [`data/realworld/PREREGISTRATION-FRESH5.md`](data/realworld/PREREGISTRATION-FRESH5.md) (hash in
 `data/realworld/REGISTRATION-fresh5.sha256`, merged to `main` before the first request). It tests
-equations only, on ReadableSTEM pipeline 0.5.9 with the settings the live service uses: 26
+equations only, on ReadableSTEM pipeline 0.5.9 (the result file did not record its settings, and
+some of the live service's settings have changed since): 26
 documents (12 arXiv papers, 6 OpenStax sections, 8 course LaTeX documents, 3 of them Beamer
 decks), 131 pages, 1,715 gold equations. Report: [docs/eval-equation-fresh5.md](docs/eval-equation-fresh5.md);
 [PROOF.md](PROOF.md) is the replayed report of the first registered result, below.
@@ -64,15 +65,15 @@ decks), 131 pages, 1,715 gold equations. Report: [docs/eval-equation-fresh5.md](
 |---|---|---|---|
 | Spoken-equal, end to end (primary) | 0.840 [0.791, 0.876] | 0.836 [0.778, 0.878] | 0.816 [0.750, 0.860] |
 | Exact match (secondary) | 0.793 [0.736, 0.834] | 0.770 [0.704, 0.824] | 0.732 [0.657, 0.793] |
-| Wrong equations nobody is asked about, per 100 gold | 5.02 [3.55, 6.39] | 9.56 [5.86, 14.55] | 11.90 [8.36, 16.07] |
-| Flag recall (share of wrong equations the review screen asks about) | 0.461 [0.309, 0.613] | 0 (asks nothing) | 0 |
 | Cost per page | $0.0222 | $0.0681 | $0.0017 |
 
 **Verdict, as registered:** on the primary score ReadableSTEM and the Opus chatbot show **no
 difference this set can detect** (+0.004, 97.5% interval [-0.023, +0.036]); the set was powered
 for about 3 points. The registered claim that ReadableSTEM beats the chatbot baseline on
-equations is **not made**: silent errors are above the registered 4.0 per 100 gold (5.02) and flag
-recall is below 0.60 (0.461). The unseen-loss and cost criteria are met. Stratum D (3 OpenStax
+equations is **not made**. How many wrong equations pass without a decision is being scored
+again: the first scoring counted differences in notation that do not change what is read (a hand
+check of the 86 errors found 55 of that kind), so this page states no figure for it; the report
+keeps the first scoring as a record. Stratum D (3 OpenStax
 chemistry sections, 123 gold equations) is not a success (0.333 chemically right against 0.80),
 and its comparison with the chatbots is not measured. One run per arm; the speech is
 ReadableSTEM's own rules, not a particular screen reader's; nothing here covers scans,
@@ -450,9 +451,9 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 - **Equations are the hard part.** On the newest registered test (fresh5: 26 documents, 1,715
   equations, version 0.5.9) 0.840 of equations were spoken the same as the original end to end and
   0.793 matched exactly; the Opus chatbot scored 0.836 and 0.770, which is no difference this
-  set can detect. 5.0 in every 100 equations were wrong and not flagged for review (the
-  chatbot's 9.6), and the review screen asked about 0.46 of the wrong ones; chemistry was 0.33
-  right as chemistry in 3 sections. On the first held-out sections 1,379 of 2,738 (two runs,
+  set can detect. How many wrong equations pass without a decision is being scored again (the
+  first scoring counted differences in notation that do not change what is read); chemistry was
+  0.33 right as chemistry in 3 sections. On the first held-out sections 1,379 of 2,738 (two runs,
   0.504, version 0.4.0) matched through the whole pipeline, and about 23 of every 100 equations
   were wrong and not flagged for review (re-measured on the same sections, which is not a blind
   result: 0.596 and 22 of 100). On the development sample 23 of 30 equations match the answer key

@@ -322,6 +322,8 @@ PUBLIC = (
     "/privacy",
     "/terms",
     "/limits",
+    "/pricing",
+    "/security",
     "/for-accessibility-offices",
     "/status",
     "/login",
