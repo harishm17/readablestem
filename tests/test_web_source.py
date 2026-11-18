@@ -15,12 +15,14 @@ import zipfile
 import pytest
 from sqlalchemy import select
 
+from fixtures import office
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login
 from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.pipeline.checked_words import READY_ALL
 from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
+from readablestem.source import pandoc as pandoc_step
 from readablestem.source.convert import SourceFailed
 from readablestem.web.db import Blob, Job, JobStatus, QuotaDay, session_scope
 from source_support import LOSSES, fixture, loss_upload, make_zip, needs_latexml, png_bytes
@@ -404,3 +406,37 @@ class TestRealConversion:
         assert after.fix_for(formula.element_id).status is Status.REJECTED  # ty: ignore[possibly-missing-attribute]
         student = env.browser.get(f"/jobs/{job_id}/view").text
         assert "not available" not in student and "\\badmacro" in student
+
+
+# ------------------------------------------------------- Word read from the file (WS18.14, 18.15)
+
+
+@pytest.mark.skipif(
+    not (pandoc_step.installed() and sandbox.available()),
+    reason="needs pandoc and a working sandbox (bubblewrap or Landlock)",
+)
+def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_a_pdf(tmp_path):
+    env = WebEnv(tmp_path, feature_word_source=True)
+    env.converter = convert_pdf  # ty: ignore[invalid-assignment]
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        response = send(client, office.docx_with_equation(), "notes.docx")
+        assert response.status_code == 303
+        job_id = job_id_from(response)
+        [job] = jobs(env)
+        blob = stored(env, job_id)
+        assert blob.media_type == "application/x-readablestem-docx"
+        assert envelope.unwrap(bytes(blob.content))[0] == "docx" and job.office_json is not None
+        assert env.run_worker() == job_id
+        done = env.job(job_id)
+        assert done.status == JobStatus.DONE and done.result_json is not None
+        result = DocumentResult.model_validate(done.result_json)
+        # no model call: the maths and the picture's description are the file's own
+        assert result.origin == "docx" and result.stats.model_calls == 0
+        equation = next(f for f in result.fixes if f.kind is Kind.EQUATION)
+        assert equation.status is Status.ACCEPTED and equation.equation is not None
+        assert "web version of a Word document" in (done.html or "")
+        page = client.get(f"/jobs/{job_id}").text
+        assert "was read from the file itself" in page and "turned into a tagged PDF" not in page
+        assert client.get(f"/jobs/{job_id}/review/list").status_code == 200
