@@ -92,14 +92,14 @@ extra, the development tools, the browser checks.
 | `numpy` | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | image | image arrays for the table models; required by py3langid |
 | `onnxruntime` | 1.31.0 | MIT License | image | runs the layout models, SLANet-plus and the optional local math reader on the CPU |
 | `openai` | 3.35.1 | Apache-2.0 | image | the client for OpenAI models (models/openai_client.py) |
-| `opentelemetry-api` | 1.45.1 | Apache-2.0 | image | needed by anthropic, fastapi, langfuse and 4 more |
+| `opentelemetry-api` | 1.45.2 | Apache-2.0 | image | needed by anthropic, fastapi, langfuse and 4 more |
 | `opentelemetry-exporter-http-transport` | 0.66b1 | Apache-2.0 | image (tracing) | needed by opentelemetry-exporter-otlp-proto-http |
 | `opentelemetry-exporter-otlp-common` | 0.66b1 | Apache-2.0 | image (tracing) | needed by opentelemetry-exporter-otlp-proto-http |
 | `opentelemetry-exporter-otlp-proto-common` | 1.45.1 | Apache-2.0 | image (tracing) | needed by opentelemetry-exporter-otlp-proto-http |
 | `opentelemetry-exporter-otlp-proto-http` | 1.45.1 | Apache-2.0 | image (tracing) | needed by langfuse |
 | `opentelemetry-proto` | 1.45.1 | Apache-2.0 | image (tracing) | needed by opentelemetry-exporter-otlp-proto-common, opentelemetry-exporter-otlp-proto-http |
-| `opentelemetry-sdk` | 1.45.1 | Apache-2.0 | image (tracing) | needed by langfuse, opentelemetry-exporter-otlp-common, opentelemetry-exporter-otlp-proto-http |
-| `opentelemetry-semantic-conventions` | 0.66b1 | Apache-2.0 | image (tracing) | needed by opentelemetry-sdk |
+| `opentelemetry-sdk` | 1.45.2 | Apache-2.0 | image (tracing) | needed by langfuse, opentelemetry-exporter-otlp-common, opentelemetry-exporter-otlp-proto-http |
+| `opentelemetry-semantic-conventions` | 0.66b2 | Apache-2.0 | image (tracing) | needed by opentelemetry-sdk |
 | `packaging` | 26.3 | Apache-2.0 OR BSD-2-Clause | image | needed by langfuse, onnxruntime, pytest |
 | `pgserver` | 0.1.4 | not stated | development | an embedded PostgreSQL for local tests |
 | `pillow` | 13.0.0 | MIT-CMU | image | page and figure pictures: decode, crop, encode |
