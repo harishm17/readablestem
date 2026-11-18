@@ -7,7 +7,7 @@ changes. A large file kept for its parts carries it to every part. Additive; exi
 every PDF upload get NULL; the downgrade drops the columns.
 
 Revision ID: 4e8a1c7d9b35
-Revises: 7b1d3e9a4c28
+Revises: 8b1d5f3a9e04
 Create Date: 2026-11-17 12:00:00.000000+00:00
 """
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "4e8a1c7d9b35"
-down_revision: str | Sequence[str] | None = "7b1d3e9a4c28"
+down_revision: str | Sequence[str] | None = "8b1d5f3a9e04"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
