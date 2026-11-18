@@ -8,7 +8,7 @@ detection. Additive; existing rows and an older release that inserts a row witho
 read as "Detect it"; the downgrade drops the columns.
 
 Revision ID: c5d9e1a3b7f4
-Revises: a9c3e5b7d1f2
+Revises: b7d2f4a8c613
 Create Date: 2026-11-18 20:00:00.000000+00:00
 """
 
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c5d9e1a3b7f4"
-down_revision: str | Sequence[str] | None = "a9c3e5b7d1f2"
+down_revision: str | Sequence[str] | None = "b7d2f4a8c613"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
