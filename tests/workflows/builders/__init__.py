@@ -28,7 +28,16 @@ from pathlib import Path
 RECORD = Path(__file__).with_name("recorded.json")
 
 # The modules that register fixtures, in the order the files are listed.
-MODULES = ("hostile", "hostile_sources", "edge", "archives", "pages", "forms", "latex")
+MODULES = (
+    "hostile",
+    "hostile_sources",
+    "hostile_office",
+    "edge",
+    "archives",
+    "pages",
+    "forms",
+    "latex",
+)
 
 
 @dataclass(frozen=True)

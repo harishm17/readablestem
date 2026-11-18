@@ -51,7 +51,8 @@ class Case:
     as_text: tuple[str, ...] = ()
     # Model answers the conversion asks for and the recording does not hold.
     unanswered: int = 0
-    # A LaTeX source: run once on each sandbox the machine can start.
+    # A LaTeX source or a Word file the reader takes: run once on each sandbox the machine can
+    # start.
     source: bool = False
     # The builder takes long: run under the `slow` marker.
     slow: bool = False
@@ -132,4 +133,18 @@ CASES: tuple[Case, ...] = (
     failed("hostile-read-built-name.tex", "source_undefined", source=True, never=(HOST_FILE,)),
     failed("hostile-grows.tex", "source_failed", source=True),
     failed("hostile-loop.tex", "source_failed", source=True),
+    # ------------------------------------------------- Word, read from the file (WS18.14)
+    # Each is refused at the upload by the Word gate (`source.docx_package.check`), before
+    # pandoc or LibreOffice sees it. The first and last two are the gate's own rules (a ratio,
+    # a member name, a nesting depth); the rest are the Office preflight's.
+    refused("docx-inflating-part.docx", "office_unsafe"),
+    refused("docx-member-leaves-package.docx", "office_unsafe"),
+    refused("docx-macro-part.docx", "office_unsafe"),
+    refused("docx-linked-picture.docx", "office_unsafe"),
+    refused("docx-entity.docx", "office_unsafe", never=(HOST_FILE,)),
+    refused("docx-nested-deep.docx", "office_unsafe"),
+    # An embedded object passes the gate and is made inert: the working copy has no embeddings,
+    # so pandoc never sees it, and the file says it was left out. The picture it carries has no
+    # description of the author's, so a model is asked twice about it (nothing is recorded).
+    done("docx-embedded-object.docx", never=("EMBEDDED-SECRET-MARKER",), source=True, unanswered=2),
 )

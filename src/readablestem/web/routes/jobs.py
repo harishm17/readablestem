@@ -1263,8 +1263,9 @@ def _place_word(
 ) -> Placed | None:
     """A `.docx` the Word reader takes, queued as a source job (`source.docx_reader`), or None:
     the file goes the PDF route instead (a revision, a file that is not a Word file, no sandbox
-    or pandoc here, one the reader's gate refuses, or one longer than a job takes; the PDF route
-    has its own gate and says why when it refuses too). Pages are counted from the file's
+    or pandoc here, one the reader's gate cannot read, or one longer than a job takes; the PDF route
+    has its own gate and says why when it refuses too). A file the gate calls unsafe is refused
+    here and does not go on to LibreOffice. Pages are counted from the file's
     characters and pictures (`docx_package.Facts.pages`)."""
     s = ctx.settings
     if (
@@ -1275,7 +1276,9 @@ def _place_word(
         return None
     try:
         census, pages = check_word_isolated(file.data)
-    except UploadRejected:
+    except UploadRejected as exc:
+        if exc.code == "office_unsafe":  # unsafe for the reader is unsafe for LibreOffice too
+            return Placed(file.filename, code=exc.code, status=exc.status_code, office=True)
         return None
     if census.kind != "docx" or pages > s.max_pages_per_job:
         return None  # a long file is split into parts by pages, which only the PDF route can do

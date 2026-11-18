@@ -687,11 +687,13 @@ def _check_main(out: BinaryIO) -> int:
     process. One JSON line: the census and the pages the file will count as, or the refusal."""
     from readablestem.source import docx_package
 
+    # Run as `-m`, this module is `__main__`: the gate raises the class of the imported module.
+    rejected_type = docx_package.OfficeRejected
     try:
         data = sys.stdin.buffer.read()
         census = docx_package.check(data)
         pages = docx_package.prepare(data, census).facts.pages()
-    except OfficeRejected as rejected:
+    except rejected_type as rejected:
         out.write(json.dumps({"ok": False, "code": rejected.code}).encode() + b"\n")
         return 0
     except Exception:  # fails closed, with no message that could carry file content

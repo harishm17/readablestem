@@ -57,6 +57,7 @@ value and where that value came from. This page does not repeat those values.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
+| `FEATURE_WORD_SOURCE` | Off by default. Reads a `.docx` from the file itself with pandoc in the sandbox, in place of a LibreOffice PDF; the PDF route stays the fallback for what the reader does not take. See "Word files read from the file" |
 | `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default in code; which are on in production is in the production profile |
 | `CONTENT_RUNS` | Struck text (WS16.1, F-509) stored and written as a `deleted` run (docs/output.md "Struck, bold and other marked text"). Off by default: the shadow rollout, where struck runs are found and counted in the trace but not written |
@@ -675,6 +676,61 @@ that would send the whole file to be refused (UX review MF20). The same goes for
 person's daily page limit once no page is left ("You have converted all 150 pages you can
 today. Uploads open again at ..."); before that, the hint under the file field says how
 many pages are left and when the count starts again.
+
+### Word files read from the file (`FEATURE_WORD_SOURCE`, WS18.14 and WS18.15)
+
+Off by default. With the switch on, a `.docx` upload is not turned into a PDF: its own structure
+is read (`source/docx_reader.py`) and goes through the source path that LaTeX uses (the envelope
+kind `docx`, `source.convert`, origin `docx`). The route (`routes/jobs._place_word`) runs the
+Word gate in a child process (`uploads.check_word_isolated`, `office_convert --check`), and falls
+back to the PDF route above for anything it does not take: a revision, a file the gate refuses
+(the PDF route has its own gate and says why), a file over the pages one job takes (only the PDF
+route splits a long file into parts), a file that is not a Word document, and a server with no
+pandoc or no passing sandbox probe (the same condition as LaTeX source).
+
+- **Gate** (`source/docx_package.check`): the Office preflight (`office_convert.preflight`) and
+  more: a member name with `..`, an absolute path, a backslash or a drive letter, a name twice,
+  a folder with a size, an unpacked part over 80 MB (20 MB for the small parts), a ratio over 400
+  above 4 MB, and an XML nesting over 300 deep. Refusals use the Office codes (`office_unsafe`,
+  `office_unsupported`).
+- **Working copy** (`docx_package.prepare`): pandoc is not given the upload. It is given a new
+  package of the parts it needs (document, footnotes, endnotes, styles, numbering), with the
+  relationships filtered to styles, numbering, notes, hyperlinks and pictures; each picture
+  replaced by a 1x1 PNG of the same name (the reader takes the real picture from the upload
+  later); no embeddings, macros, headers, footers, comments, settings or themes. External
+  targets (`TargetMode="External"` pictures, templates, OLE) are never copied, so nothing is
+  fetched. Hidden runs and paragraphs are taken out here, and each table's style id is replaced
+  by a mark that carries whether the author marked a header row.
+- **pandoc step** (`source/pandoc.py`): one sandboxed run (`--sandbox`, no network, the working
+  copy read-only, output to the JSON tree, a heap cap), under the lock LaTeXML uses
+  (`source.convert.GATE_NAME`), with limits of its own (pandoc needs 2 GB of address space and
+  six tasks, which LaTeXML's limits do not give it).
+- **What the reader takes from the file** (`docx_reader.read`): headings, lists with levels and
+  start numbers, tables with spans and a header row only when the author marked one (an unmarked
+  first row is a proposal with a check), pictures with the author's alt text (accepted without
+  a model; a picture without text goes to the figure step), footnotes (in the text, as a note),
+  links, super- and subscripts, the title style, captions, and every equation typed in Word
+  (`m:oMath`): pandoc writes LaTeX, which goes through `read_latex`, `check_latex` and
+  `safe_latex_to_mathml` and then to the same fix a LaTeX equation gets. One that cannot be
+  converted is counted and stays what the PDF route would have made of it (a figure for the
+  model step).
+- **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
+  copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
+  `w:lang`, the document language is the most common one; headers and footers (dropped) are
+  counted (`word_headers_footers`); a default table style (read as a header row by pandoc) is told
+  from a marked header row; SmartArt, charts and embedded objects (silent) are counted as the
+  required notice `word_objects`; a title in the document properties is not read, the Title
+  style is. Text in text boxes is read only when pandoc finds it in the flow and is otherwise
+  counted by the coverage rule: every word of the file is in pandoc's tree or counted as
+  `source_unread` (a required notice) so nothing is left out without a number. Tracked changes
+  are read as accepted, and say so (`word_tracked_changes`, required).
+- **What it changes** (the switch on, against off): no LibreOffice conversion and no PDF are
+  made for a `.docx` the reader takes; the document has no page images and its original is its
+  own text (as a LaTeX source); the pages counted are one per 3,000 characters of the file's text
+  or one per picture, whichever is larger (a PDF's real pages differ); typed equations cost no
+  model call and are not read from a picture; the job page says the file was read from the
+  Word file itself. A file the reader cannot take, or that fails to read, is not tried again as
+  a PDF.
 
 ### LaTeX source (`FEATURE_LATEX_SOURCE`, ADR 0008)
 
