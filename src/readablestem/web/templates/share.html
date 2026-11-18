@@ -70,9 +70,21 @@
   {% endif %}
 </section>
 
+{% if course_people %}
+<section aria-labelledby="course-people-heading">
+  <h2 id="course-people-heading">Through the course {{ course_people.course_name }}</h2>
+  <p class="hint">These people can open this document too, because you gave them access to the whole course. You change that in the course's <a href="/courses/{{ course_people.course_id }}#people-heading">People</a> section, not here.</p>
+  <ul class="share-list">
+    {% for email, right in course_people.people %}
+    <li><p class="share-person"><strong>{{ email }}</strong>: {{ role_words[right] }}</p></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section aria-labelledby="address-heading">
   <h2 id="address-heading">Link</h2>
-  <p class="hint" id="address-hint">Opens only for the people above, after they sign in.</p>
+  <p class="hint" id="address-hint">Opens only for the people listed above, after they sign in.</p>
   <label for="share-address" class="visually-hidden">Address of this document</label>
   <div class="copy-row">
     <textarea id="share-address" readonly rows="3" spellcheck="false" aria-describedby="address-hint">{{ address }}</textarea>

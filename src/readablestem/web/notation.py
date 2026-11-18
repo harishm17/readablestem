@@ -46,7 +46,15 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline import notation_memory, notation_suggest
-from readablestem.web.db import Course, CourseNotation, Job, JobStatus, ReviewEdit, utcnow
+from readablestem.web.db import (
+    Course,
+    CourseGrant,
+    CourseNotation,
+    Job,
+    JobStatus,
+    ReviewEdit,
+    utcnow,
+)
 
 MAX_NAME_CHARS = 200  # courses.name
 MAX_NOTE_CHARS = 200  # notation_entries.note
@@ -85,6 +93,12 @@ _REMEMBERED_MEANING = {"bold": "vector", "double-struck": "set"}
 
 def enabled(settings: Settings) -> bool:
     return settings.feature_notation_memory
+
+
+def course_grants_enabled(settings: Settings) -> bool:
+    """Whether course grants exist at all (WS27.1): the setting, and the courses it hangs
+    from. Off: the People routes are 404 and no grant row gives any right."""
+    return settings.feature_course_grants and settings.feature_notation_memory
 
 
 # --------------------------------------------------------------------------- errors
@@ -298,10 +312,12 @@ def _refuse_same_name(
 
 
 def delete_course(session: Session, course: Course) -> None:
-    """The course and its entries. Jobs that used it keep their results and lose only
-    the link (as the foreign key's ON DELETE SET NULL does, done here explicitly)."""
+    """The course, its entries and the people it was open to. Jobs that used it keep their
+    results and lose only the link (as the foreign key's ON DELETE SET NULL does, done here
+    explicitly), so no grant covers them any more."""
     session.execute(update(Job).where(Job.course_id == course.id).values(course_id=None))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id == course.id))
+    session.execute(delete(CourseGrant).where(CourseGrant.course_id == course.id))
     session.delete(course)
 
 

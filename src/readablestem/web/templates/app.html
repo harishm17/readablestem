@@ -44,14 +44,25 @@
 {% endif %}
 
 {# Documents other people shared with this address (web/shares.py): a plain list of links. #}
-{% if shared_documents|default([]) %}
+{% if shared_documents|default([]) or shared_courses|default([]) %}
 <section aria-labelledby="shared-heading">
   <h2 id="shared-heading">Shared with you</h2>
+  {% if shared_documents %}
   <ul>
     {% for item in shared_documents %}
     <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: {% if item.owner %}shared by {{ item.owner }}{% else %}shared with you{% endif %}, you can {{ "review" if item.role == "Review" else "view" }} it.</li>
     {% endfor %}
   </ul>
+  {% endif %}
+  {# Documents reached through a course the owner gave access to (FEATURE_COURSE_GRANTS), under its name. #}
+  {% for group in shared_courses|default([]) %}
+  <h3>Course: {{ group.name }}{% if group.owner %}, shared by {{ group.owner }}{% endif %}</h3>
+  <ul>
+    {% for item in group["items"] %}
+    <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: you can {{ "review" if item.role == "Review" else "view" }} it.</li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
 </section>
 {% endif %}
 

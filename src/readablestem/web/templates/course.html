@@ -112,6 +112,7 @@
   {% if attachable %}
   <details class="attach-documents" id="attach-documents">
     <summary>Add converted documents ({{ attachable|length }})</summary>
+    {% if people and people.rows %}<p><strong>People with access to this course can open a document as soon as you add it.</strong></p>{% endif %}
     <p>Lists the document here and shows this notation on its review screen. It is not converted again: to read the PDF with this notation, upload it again for this course.</p>
     {% call form("course.attach", "/courses/" ~ course.id ~ "/documents") %}
       <fieldset class="field">
@@ -130,6 +131,8 @@
   </details>
   {% endif %}
 </section>
+
+{% if people %}{% include "_course_people.html" %}{% endif %}
 
 <section aria-labelledby="settings-heading" class="course-settings">
   <h2 id="settings-heading">Rename or delete</h2>

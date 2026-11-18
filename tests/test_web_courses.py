@@ -27,7 +27,7 @@ REALS = chr(0x211D)  # DOUBLE-STRUCK CAPITAL R
 
 @pytest.fixture
 def web(tmp_path):
-    env = WebEnv(tmp_path, feature_notation_memory=True)
+    env = WebEnv(tmp_path, feature_notation_memory=True, feature_course_grants=True)
     with env.running() as client:
         env.allow(ALICE)
         env.allow(BOB)
@@ -315,6 +315,31 @@ def test_a_job_lists_the_symbols_it_was_read_with_for_its_owner_and_a_reviewer_n
     assert "Physics 201" in job_page_for(web, BOB)
     reader = job_page_for(web, CAROL)
     assert "bold v" not in reader and "Physics 201" not in reader
+
+
+def test_a_course_reviewer_gets_what_a_reviewer_of_the_document_gets_and_no_more(web):
+    """A person given the course to review reads the course's symbols on its documents as a
+    document's reviewer does; the course's own pages, and keeping a letter for the course, stay
+    the owner's."""
+    job_id = read_for_course(web)
+    ta, reader = "ta@example.org", "reader@example.org"
+    for email in (ta, reader):
+        web.allow(email)
+    with session_scope(web.ctx.factory) as session:
+        course = session.get(Course, web.course_id)
+        shares.grant(session, course, ALICE, ta, "review")
+        shares.grant(session, course, ALICE, reader, "view")
+    page = job_page_for(web, ta)
+    assert "bold v is a vector" in page and "Physics 201" in page
+    assert "bold v" not in job_page_for(web, reader)
+    client = web.client()
+    login(client, ta)
+    assert client.get(f"/jobs/{job_id}/review").status_code == 200
+    assert client.get(f"/courses/{web.course_id}").status_code == 404
+    fields = {"job": job_id, "item": "p1-e2", "symbol": BOLD_OMEGA, "meaning": "vector"}
+    remember = post(client, f"/courses/{web.course_id}/remember", "/app", **fields)
+    assert remember.status_code == 403  # the document is theirs to review, not the course's
+    assert not any(e.canonical == BOLD_OMEGA for e in rows(web, CourseNotation))
 
 
 def test_a_job_with_no_record_says_the_course_notation_was_applied_and_lists_nothing(web):

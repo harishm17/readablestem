@@ -261,6 +261,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/courses/{course_id}/entries",
         "/courses/{course_id}/entries/{entry_id}",
         "/courses/{course_id}/entries/{entry_id}/delete",
+        "/courses/{course_id}/people",  # a person's access to every document of a course (WS27.1)
+        "/courses/{course_id}/people/{grant_id}/remove",
         "/courses/{course_id}/remember",
         "/courses/{course_id}/rename",
         "/courses/{course_id}/starter",  # add the ticked starter symbols
@@ -312,6 +314,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
             url.replace("{upload_id}", JOB)
             .replace("{slug}", "equations")
             .replace("{share_id}", JOB)
+            .replace("{grant_id}", JOB)
             .replace("{report_id}", JOB)
         )
         if path == "/jobs":

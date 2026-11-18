@@ -558,6 +558,13 @@ class Settings(BaseSettings):
     # a link holder can see and the service has terms for publishing and a takedown contact
     # (docs/deploy-railway.md, "Before FEATURE_CLASS_LINK is turned on").
     feature_class_link: bool = False
+    # Course grants (`web.shares`, WS27.1): the owner of a course gives a person (by the address
+    # they sign in with) the right to view or review every document in it, now and later, from
+    # the course page's "People" section. Needs `FEATURE_NOTATION_MEMORY` (the course pages).
+    # OFF: no People section, its routes answer 404 for everyone, and a grant row gives no right
+    # even if one exists. Not to be turned on until the public pages say who can see a document
+    # (docs/deploy-railway.md, "Before FEATURE_COURSE_GRANTS is turned on").
+    feature_course_grants: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).

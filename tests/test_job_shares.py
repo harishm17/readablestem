@@ -1,16 +1,20 @@
 """G1: sharing a document with named, signed-in people (web/shares.py, routes/sharing.py,
-`routes.jobs.job_access`).
+`routes.jobs.job_access`), and WS27.1: the same two rights given for a whole course.
 
-The matrix test runs every route that names a job against five people: the owner, someone it was
-shared with to view, someone it was shared with to review, someone whose share was removed, and a
-stranger. The rest check the rules one by one: the exact, case-insensitive address match, that a
-removed share works at once, that a shared person cannot share further or delete, who is
-recorded for a review edit, and what the owner's quota, clock and deletion do."""
+The matrix test runs every route that names a job against eight people: the owner, someone it was
+shared with to view, someone it was shared with to review, someone whose share was removed, a
+stranger, and three people the owner of the document's course gave access to the whole course (to
+view, to review, and one whose sign-in did not prove the address). A course grant must answer
+exactly as the share of the same right does. The rest check the rules one by one: the exact,
+case-insensitive address match, that a removed share works at once, that a shared person cannot
+share further or delete, who is recorded for a review edit, and what the owner's quota, clock
+and deletion do."""
 
 from __future__ import annotations
 
 import re
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import func, select
@@ -29,9 +33,11 @@ from fixtures.web.support import (
 from readablestem.core.types import Status
 from readablestem.ops import retention as purge
 from readablestem.pipeline import export_docx
-from readablestem.web import shares
+from readablestem.web import auth, shares
 from readablestem.web.database import as_utc
 from readablestem.web.db import (
+    Course,
+    CourseGrant,
     Job,
     JobLink,
     JobShare,
@@ -48,9 +54,18 @@ from test_audit_authz import ROUTES
 CAROL = "carol@example.org"  # a viewer
 DAVE = "dave@example.org"  # a reviewer
 ERIN = "erin@example.org"  # shared, then removed
+FRANK = "frank@example.org"  # given the whole course, to view
+GINA = "gina@example.org"  # given the whole course, to review
+HANK = "hank@example.org"  # given the whole course, to review, but signs in without proof
 ANSWER = {"is_equation": True, "latex": "x^2", "confidence": 0.99}
 OWNER, VIEWER, REVIEWER, REVOKED, STRANGER = "owner", "viewer", "reviewer", "revoked", "stranger"
-ACTORS = (OWNER, VIEWER, REVIEWER, REVOKED, STRANGER)
+COURSE_VIEW, COURSE_REVIEW, COURSE_UNPROVEN = "course_view", "course_review", "course_unproven"
+ACTORS = (OWNER, VIEWER, REVIEWER, REVOKED, STRANGER, COURSE_VIEW, COURSE_REVIEW, COURSE_UNPROVEN)
+# What each person who has a right has, and who has none (a course grant is as good as the
+# share of the same right, and a grant on an unproved sign-in is as good as nothing).
+RIGHT = {VIEWER: "view", REVIEWER: "review", COURSE_VIEW: "view", COURSE_REVIEW: "review"}
+NOBODY = (REVOKED, STRANGER, COURSE_UNPROVEN)
+SAME_AS = {COURSE_VIEW: VIEWER, COURSE_REVIEW: REVIEWER, COURSE_UNPROVEN: STRANGER}
 
 # What each route that names a job needs (`job_access`). Every such route in the app is here:
 # `test_every_job_route_has_a_stated_need` fails for one that is not.
@@ -137,16 +152,33 @@ def ready_site(tmp_path):
 
 
 def _site(tmp_path, *, ready: bool):
-    env = WebEnv(tmp_path, feature_class_link=True)
+    env = WebEnv(
+        tmp_path,
+        feature_class_link=True,
+        feature_notation_memory=True,
+        feature_course_grants=True,
+    )
     with env.running() as owner:
-        for email in (ALICE, BOB, CAROL, DAVE, ERIN):
+        for email in (ALICE, BOB, CAROL, DAVE, ERIN, FRANK, GINA, HANK):
             env.allow(email)
         login(owner, ALICE)
         env.who = {OWNER: owner}
-        for actor, email in ((VIEWER, CAROL), (REVIEWER, DAVE), (REVOKED, ERIN), (STRANGER, BOB)):
+        people = (
+            (VIEWER, CAROL),
+            (REVIEWER, DAVE),
+            (REVOKED, ERIN),
+            (STRANGER, BOB),
+            (COURSE_VIEW, FRANK),
+            (COURSE_REVIEW, GINA),
+        )
+        for actor, email in people:
             client = env.client()
             login(client, email)
             env.who[actor] = client
+        client = env.client()
+        with patch.object(auth, "_is_account_address", return_value=False):
+            login(client, HANK)  # a sign-in that did not prove the address (as an older session)
+        env.who[COURSE_UNPROVEN] = client
         env.job_id = job_id_from(upload(owner, make_pdf(2)))
         if ready:
             _settled(env)
@@ -155,6 +187,7 @@ def _site(tmp_path, *, ready: bool):
         give(env, DAVE, "review")
         give(env, ERIN, "review")
         remove(env, ERIN)
+        make_course(env)
         yield env
         for actor, client in env.who.items():
             if actor != OWNER:
@@ -175,6 +208,42 @@ def give(env, email: str, role: str, *, raw: str | None = None):
             "role": role,
         },
     )
+
+
+def make_course(env, name: str = "Physics 1") -> None:
+    """The owner's course holding the document, with FRANK (view), GINA and HANK (review)."""
+    owner = env.who[OWNER]
+    made = owner.post("/courses", data={"csrf_token": page_token(owner, "/courses"), "name": name})
+    assert made.status_code == 303
+    env.course_id = made.headers["location"].rsplit("/", 1)[-1]
+    add_to_course(env, env.job_id)
+    for email, role in ((FRANK, "view"), (GINA, "review"), (HANK, "review")):
+        assert grant_to(env, email, role).status_code == 303
+
+
+def add_to_course(env, job_id: str, course_id: str | None = None) -> None:
+    owner = env.who[OWNER]
+    course_id = course_id or env.course_id
+    response = owner.post(
+        f"/courses/{course_id}/documents",
+        data={"csrf_token": page_token(owner, f"/courses/{course_id}"), "job": job_id},
+    )
+    assert response.status_code == 303
+    assert env.job(job_id).course_id == course_id
+
+
+def grant_to(env, email: str, role: str, course_id: str | None = None):
+    owner = env.who[OWNER]
+    path = f"/courses/{course_id or env.course_id}"
+    return owner.post(
+        f"{path}/people",
+        data={"csrf_token": page_token(owner, path), "email": email, "role": role},
+    )
+
+
+def stored_grants(env) -> list[tuple[str, str]]:
+    with session_scope(env.ctx.factory) as session:
+        return sorted((r.email, r.role) for r in session.scalars(select(CourseGrant)))
 
 
 def stored_shares(env) -> list[tuple[str, str]]:
@@ -254,6 +323,8 @@ def snapshot(env) -> dict:
             ),
             "edits": session.scalar(select(func.count()).select_from(ReviewEdit)),
             "shares": sorted((r.email, r.role) for r in session.scalars(select(JobShare)).all()),
+            "grants": sorted((r.email, r.role) for r in session.scalars(select(CourseGrant))),
+            "courses": sorted((c.name, c.user_id) for c in session.scalars(select(Course))),
             "jobs": session.scalar(select(func.count()).select_from(Job)),
             "links": session.scalar(select(func.count()).select_from(JobLink)),
         }
@@ -277,15 +348,15 @@ def test_the_get_routes_answer_each_person_by_their_right(site):
         answers = {actor: send(site, actor, "GET", path) for actor in ACTORS}
         control = answers[OWNER].status_code
         assert control not in {403}, path
-        for actor in (VIEWER, REVIEWER):
-            role = "review" if actor == REVIEWER else "view"
+        for actor, role in RIGHT.items():
             expected = control if RANK[role] >= RANK[need] else 403
             assert answers[actor].status_code == expected, (path, actor)
-        for actor in (REVOKED, STRANGER):
+        for actor in NOBODY:
             assert answers[actor].status_code == 404, (path, actor)
-            assert heading(answers[actor]) == heading(answers[STRANGER])  # the same page for both
-        for actor in (REVOKED, STRANGER):
+            assert heading(answers[actor]) == heading(answers[STRANGER])  # the same page for all
             assert "SECRET-DOC-TEXT" not in answers[actor].text, (path, actor)
+        for actor, like in SAME_AS.items():  # a course grant answers as the share would
+            assert heading(answers[actor]) == heading(answers[like]), (path, actor)
 
 
 def test_a_ready_document_opens_for_a_viewer_and_stops_for_a_stranger_and_after_its_time(
@@ -305,13 +376,16 @@ def test_a_ready_document_opens_for_a_viewer_and_stops_for_a_stranger_and_after_
     for name, path in paths.items():
         answers = {actor: send(ready_site, actor, "GET", path) for actor in ACTORS}
         assert answers[OWNER].status_code == 200, name
-        assert answers[VIEWER].status_code == (403 if name == "review" else 200), name
-        assert answers[REVIEWER].status_code == 200, name
-        assert answers[STRANGER].status_code == answers[REVOKED].status_code == 404, name
+        for actor in (VIEWER, COURSE_VIEW):
+            assert answers[actor].status_code == (403 if name == "review" else 200), (name, actor)
+        for actor in (REVIEWER, COURSE_REVIEW):
+            assert answers[actor].status_code == 200, (name, actor)
+        for actor in NOBODY:
+            assert answers[actor].status_code == 404, (name, actor)
     with session_scope(ready_site.ctx.factory) as session:
         session.get(Job, job).retain_until = utcnow() - timedelta(minutes=1)
     for name, path in paths.items():
-        for actor in (OWNER, VIEWER, REVIEWER):
+        for actor in (OWNER, VIEWER, REVIEWER, COURSE_VIEW, COURSE_REVIEW):
             assert send(ready_site, actor, "GET", path).status_code == 404, (name, actor)
 
 
@@ -419,8 +493,8 @@ def test_the_post_routes_refuse_everyone_without_the_right_and_change_nothing(si
         if method != "POST":
             continue
         path = fill(site, template)
-        for actor in (VIEWER, REVIEWER, REVOKED, STRANGER):
-            role = {VIEWER: "view", REVIEWER: "review"}.get(actor)
+        for actor in (*RIGHT, *NOBODY):
+            role = RIGHT.get(actor)
             if role is not None and RANK[role] >= RANK[need]:
                 continue  # allowed to write: test_a_reviewer_decides_and_is_recorded
             response = send(site, actor, "POST", path)
@@ -590,7 +664,7 @@ def test_only_the_owner_s_use_keeps_a_document_longer(site):
 def test_a_document_past_its_time_is_refused_to_everyone(site):
     with session_scope(site.ctx.factory) as session:
         session.get(Job, site.job_id).retain_until = utcnow() - timedelta(minutes=1)
-    for actor in (VIEWER, REVIEWER):
+    for actor in (VIEWER, REVIEWER, COURSE_VIEW, COURSE_REVIEW):
         assert site.who[actor].get(f"/jobs/{site.job_id}").status_code == 404
     assert site.who[OWNER].get(f"/jobs/{site.job_id}").status_code == 404
 
@@ -613,7 +687,8 @@ def test_deleting_the_document_deletes_its_shares_and_erasing_a_person_those_tha
         assert session.scalar(select(func.count()).select_from(JobShare)) == 0
 
 
-def test_a_reread_by_a_reviewer_counts_against_the_owner(site):
+@pytest.mark.parametrize(("actor", "email"), [(REVIEWER, DAVE), (COURSE_REVIEW, GINA)])
+def test_a_reread_by_a_reviewer_counts_against_the_owner(site, actor, email):
     """The allowance used is the document owner's, whoever asks, and the reviewer is told so
     before they ask (F-093)."""
     from html import unescape
@@ -635,7 +710,7 @@ def test_a_reread_by_a_reviewer_counts_against_the_owner(site):
 
     def counts() -> tuple[int, int]:
         with session_scope(site.ctx.factory) as session:
-            reviewer_id = session.scalar(select(User.id).where(User.email == DAVE))
+            reviewer_id = session.scalar(select(User.id).where(User.email == email))
             return (
                 rereads_used(session, owner_id, utc_today()),
                 rereads_used(session, reviewer_id, utc_today()),
@@ -648,10 +723,10 @@ def test_a_reread_by_a_reviewer_counts_against_the_owner(site):
         )
         return unescape(page.text)
 
-    assert reread.SHARED_NOTE in tools(REVIEWER)
+    assert reread.SHARED_NOTE in tools(actor)
     assert reread.SHARED_NOTE not in tools(OWNER)
 
-    reviewer = site.who[REVIEWER]
+    reviewer = site.who[actor]
     path = f"/jobs/{site.job_id}/review"
     data = {"csrf_token": page_token(reviewer, path), "kind": "equation"} | box
     version = str(site.job(site.job_id).result_version or 0)
@@ -1015,3 +1090,204 @@ def test_the_class_link_does_not_exist_while_the_setting_is_off(ready_site, monk
     assert page.status_code == 200 and "Class link" not in page.text
     assert make_link(ready_site).status_code == 404
     assert link_post(ready_site, "remove").status_code == 404
+
+
+# --------------------------------------------------------------------------- course grants
+
+
+def second_document(env) -> str:
+    """Another finished document of the owner's, in no course."""
+    job_id = job_id_from(upload(env.who[OWNER], make_pdf(1)))
+    assert env.run_worker() == job_id
+    return job_id
+
+
+def opens(env, actor: str, job_id: str) -> int:
+    return env.who[actor].get(f"/jobs/{job_id}").status_code
+
+
+def test_a_course_grant_gives_nothing_while_the_setting_is_off(site, monkeypatch):
+    """The setting was on, grant rows exist, and it went off: every job route answers the
+    grantees as it answers a stranger, the People section and its routes do not exist, and the
+    owner's own page shows nothing of them."""
+    monkeypatch.setattr(site.settings, "feature_course_grants", False)
+    before = snapshot(site)
+    for (method, template), _need in NEEDS.items():
+        path = fill(site, template)
+        control = send(site, STRANGER, method, path)
+        for actor in (COURSE_VIEW, COURSE_REVIEW):
+            answer = send(site, actor, method, path)
+            assert answer.status_code == control.status_code == 404, (method, path, actor)
+            assert heading(answer) == heading(control), (method, path, actor)
+    assert snapshot(site) == before
+    owner = site.who[OWNER]
+    course = f"/courses/{site.course_id}"
+    assert 'id="people-heading"' not in owner.get(course).text
+    assert grant_to(site, "new@example.org", "view").status_code == 404
+    assert len(stored_grants(site)) == 3
+    path = f"{course}/people/{'1' * 32}/remove"
+    removal = owner.post(path, data={"csrf_token": page_token(owner, course), "confirm": "yes"})
+    assert removal.status_code == 404
+    assert "Course: " not in site.who[COURSE_REVIEW].get("/app").text
+    assert site.who[COURSE_REVIEW].get(f"/jobs/{site.job_id}/share").status_code == 404
+    assert len(stored_grants(site)) == 3  # nothing was removed or changed
+    monkeypatch.setattr(site.settings, "feature_course_grants", True)
+    assert opens(site, COURSE_REVIEW, site.job_id) == 200  # the rows still stand: on again
+
+
+def test_a_document_is_covered_by_its_course_from_the_moment_it_joins_until_it_leaves(site):
+    """Added later: covered at once. Moved to another course, taken out of any, or its course
+    deleted: not covered at once. The grantee's page changes with the next request."""
+    later = second_document(site)
+    assert opens(site, COURSE_REVIEW, later) == opens(site, COURSE_VIEW, later) == 404
+    add_to_course(site, later)
+    assert opens(site, COURSE_REVIEW, later) == opens(site, COURSE_VIEW, later) == 200
+    assert opens(site, STRANGER, later) == opens(site, COURSE_UNPROVEN, later) == 404
+    # No route takes a document out of a course: the row is changed as a migration would.
+    with session_scope(site.ctx.factory) as session:
+        other = Course(user_id=session.get(Job, later).user_id, name="Another")
+        session.add(other)
+        session.flush()
+        session.get(Job, later).course_id = other.id  # a course with nobody given access
+        session.get(Job, site.job_id).course_id = None
+    for job in (later, site.job_id):
+        assert opens(site, COURSE_REVIEW, job) == opens(site, COURSE_VIEW, job) == 404, job
+        assert opens(site, OWNER, job) == 200
+    add_to_course(site, site.job_id)  # back in the course: covered again
+    assert opens(site, COURSE_REVIEW, site.job_id) == 200
+    # Deleting the course ends the grants and leaves the document with its owner.
+    owner = site.who[OWNER]
+    course = f"/courses/{site.course_id}"
+    deleted = owner.post(
+        f"{course}/delete", data={"csrf_token": page_token(owner, course), "confirm": "yes"}
+    )
+    assert deleted.status_code == 303
+    assert stored_grants(site) == []
+    assert opens(site, COURSE_REVIEW, site.job_id) == opens(site, COURSE_VIEW, site.job_id) == 404
+    assert opens(site, OWNER, site.job_id) == 200
+
+
+def test_an_expired_document_is_refused_before_any_grant_is_read(site):
+    from sqlalchemy import event
+
+    with session_scope(site.ctx.factory) as session:
+        session.get(Job, site.job_id).retain_until = utcnow() - timedelta(minutes=1)
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, *rest):
+        statements.append(statement)
+
+    event.listen(site.ctx.engine, "before_cursor_execute", record)
+    try:
+        assert opens(site, COURSE_REVIEW, site.job_id) == 404
+    finally:
+        event.remove(site.ctx.engine, "before_cursor_execute", record)
+    assert not any("course_grants" in text or "job_shares" in text for text in statements)
+
+
+def test_a_grant_is_given_by_the_course_owner_alone(site, caplog):
+    """Everyone else gets the 404 of a course that does not exist and changes nothing; the
+    owner's answers carry no address in the log, the session cookie or a URL."""
+    caplog.set_level("DEBUG")
+    course = f"/courses/{site.course_id}"
+    grants = stored_grants(site)
+    absent = f"/courses/{'0' * 32}"
+    row = next(iter(grants))
+    with session_scope(site.ctx.factory) as session:
+        grant_id = session.scalar(select(CourseGrant.id).where(CourseGrant.email == row[0]))
+    for actor in (STRANGER, REVIEWER, COURSE_REVIEW, COURSE_VIEW, COURSE_UNPROVEN, REVOKED):
+        client = site.who[actor]
+        token = page_token(client)
+        for base, ids in ((course, grant_id), (absent, "1" * 32)):
+            add = client.post(
+                f"{base}/people",
+                data={"csrf_token": token, "email": "x@example.org", "role": "view"},
+            )
+            gone = client.post(
+                f"{base}/people/{ids}/remove", data={"csrf_token": token, "confirm": "yes"}
+            )
+            assert add.status_code == gone.status_code == 404, (base, actor)
+        assert client.get(course).status_code == 404, actor  # the course page stays the owner's
+        assert heading(client.get(course)) == heading(client.get(absent))
+    assert stored_grants(site) == grants
+    # The owner: an address that is not one, their own, a right that does not exist.
+    for email, role in (("not an address", "view"), (ALICE, "view"), (CAROL, "owner")):
+        assert grant_to(site, email, role).status_code == 422, (email, role)
+    # Changing a right, then removing: the question first, as the answer to the POST.
+    assert grant_to(site, FRANK, "review").status_code == 303
+    assert (FRANK, "review") in stored_grants(site)
+    owner = site.who[OWNER]
+    with session_scope(site.ctx.factory) as session:
+        frank_id = session.scalar(select(CourseGrant.id).where(CourseGrant.email == FRANK))
+    path = f"{course}/people/{frank_id}/remove"
+    asked = owner.post(path, data={"csrf_token": page_token(owner, course)})
+    assert asked.status_code == 200 and FRANK in asked.text and "location" not in asked.headers
+    assert (FRANK, "review") in stored_grants(site)
+    done = owner.post(path, data={"csrf_token": page_token(owner, course), "confirm": "yes"})
+    assert done.status_code == 303 and FRANK not in done.headers["location"]
+    assert opens(site, COURSE_VIEW, site.job_id) == 404  # at once, on their next request
+    assert grant_to(site, FRANK, "view", "f" * 32).status_code == 404
+    secret = "secretgrantee@example.org"
+    given = grant_to(site, secret, "view")
+    assert given.status_code == 303
+    assert secret not in given.headers.get("set-cookie", "") + given.headers["location"]
+    assert "secretgrantee" not in caplog.text
+
+
+def test_at_most_ten_people_have_a_grant_on_one_course(site):
+    for n in range(shares.MAX_GRANTS_PER_COURSE - len(stored_grants(site))):
+        assert grant_to(site, f"p{n}@example.org", "view").status_code == 303
+    assert len(stored_grants(site)) == shares.MAX_GRANTS_PER_COURSE
+    response = grant_to(site, "eleven@example.org", "view")
+    assert response.status_code == 422 and "at most 10 people" in response.text
+    assert grant_to(site, "p0@example.org", "review").status_code == 303  # not a new person
+
+
+def test_the_owner_sees_everyone_who_can_open_a_document_and_a_grantee_sees_no_addresses(site):
+    page = site.who[OWNER].get(f"/jobs/{site.job_id}/share").text
+    assert "Through the course Physics 1" in page
+    for email in (FRANK, GINA, HANK, CAROL, DAVE):
+        assert email in page, email
+    for actor in (COURSE_REVIEW, COURSE_VIEW, REVIEWER):
+        assert site.who[actor].get(f"/jobs/{site.job_id}/share").status_code == 403, actor
+        record = site.who[actor].get(f"/jobs/{site.job_id}/record").text
+        assert HANK not in record and CAROL not in record and ALICE not in record, actor
+
+
+def test_shared_with_me_lists_a_course_grant_under_its_course_and_each_document_once(site):
+    from types import SimpleNamespace
+
+    now = utcnow()
+
+    def listed(email: str, *, proved: bool = True) -> list[tuple[str, str, str]]:
+        with session_scope(site.ctx.factory) as session:
+            user_id = session.scalar(select(User.id).where(User.email == email))
+            user = SimpleNamespace(id=user_id, email=email, email_verified=proved)
+            return [(d.id, d.role, d.course) for d in shares.shared_with(session, user, now)]
+
+    job = site.job_id
+    assert listed(GINA) == [(job, "review", "Physics 1")]
+    assert listed(GINA, proved=False) == listed(ERIN) == []
+    # DAVE has a review share and gets a view grant: once, as the share, with review.
+    assert grant_to(site, DAVE, "view").status_code == 303
+    assert listed(DAVE) == [(job, "review", "")]
+    # CAROL has a view share and gets a review grant: once, under the course, with review.
+    assert grant_to(site, CAROL, "review").status_code == 303
+    assert listed(CAROL) == [(job, "review", "Physics 1")]
+    page = site.who[COURSE_REVIEW].get("/app").text
+    assert "Course: Physics 1" in page and page.count(f'href="/jobs/{job}"') == 1
+    assert "Course: " not in site.who[STRANGER].get("/app").text
+
+
+def test_a_grant_goes_with_the_person_it_names_and_with_its_course_s_owner(site):
+    with session_scope(site.ctx.factory) as session:
+        gina = session.scalar(select(User.id).where(User.email == GINA))
+        purge.erase_user(session, gina)
+        assert (GINA, "review") not in [
+            (r.email, r.role) for r in session.scalars(select(CourseGrant))
+        ]
+        assert session.scalar(select(func.count()).select_from(CourseGrant)) == 2
+        alice = session.scalar(select(User.id).where(User.email == ALICE))
+        purge.erase_user(session, alice)
+        assert session.scalar(select(func.count()).select_from(CourseGrant)) == 0
+        assert session.scalar(select(func.count()).select_from(Course)) == 0

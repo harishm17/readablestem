@@ -215,6 +215,41 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   reviewer, a person whose share was removed and a stranger; and the new routes are in
   `test_audit_authz.py::ROUTES` and the CSRF list of `test_web_auth.py`.
 
+### Course grants (WS27.1)
+
+An owner can give a person every document of one course, now and later (`web/shares.py`, the
+`course_grants` table, `FEATURE_COURSE_GRANTS`, off). It adds a second way into a document, so
+it is described here. The rule of "Sharing a document with named people" holds unchanged: a
+person's right is whatever `shares.role_of` returns, and nothing else decides it.
+
+- **The rule.** `role_of` returns the highest of: owner; the person's `job_shares` row on the
+  document; the person's `course_grants` row on `job.course_id`. The grant is read only when all
+  of these hold: the setting is on (`shares.grants_in_force`, from `session.info`, which the app
+  factory fills from the live settings, so an unconfigured session is off), the document has a
+  course, the course belongs to the document's owner (`Course.user_id == Job.user_id`), and the
+  person's sign-in *proved* the address (`CurrentUser.email_verified`, as for a share). With
+  the setting off a row gives nothing, so turning the setting off is a complete switch.
+- **Consequences, each with its path.** A document added to the course later is covered, because
+  the lookup is by `job.course_id` at each request. A document taken out of the course (the
+  column is cleared or set to another course) or a deleted course (`notation.delete_course`
+  clears the column and deletes the grants; the foreign key cascades too) is not covered. A
+  revised version keeps its course. `job_access` refuses an expired document before it calls
+  `role_of`, so no grant is read for it. Rank never goes above `review`: the table only holds
+  `view` and `review`. `is_owner`, delete, retry, title, retention, revision, combine, share,
+  the course notation and "Remember for" stay owner-only; the course pages and the People
+  section stay owner-only. Listings scoped by `Job.user_id` stay owner-scoped; "Shared with you"
+  is the one listing that adds grant-reached documents.
+- **Unproven address.** A person whose session proved nothing gets the plain 404 for a document
+  they reach only through a course (`names_unproved` looks at `job_shares` only), the same as a
+  stranger, so a course's membership is not revealed.
+- **Who sees addresses.** The owner, on the People section and on the document's share page.
+  A grantee sees no address; the review record keeps its rule.
+- **Money.** A grantee's re-read is the owner's (`reread.read_equation`, `job.user_id`).
+- **Logs.** Ids, the right and a category, never an address.
+- **Tests.** `tests/test_job_shares.py` (the course actors in the matrix of every job route; the
+  setting off; moved out; expired; unproven; the limit; erasure), and the new routes are in the
+  CSRF list of `test_web_auth.py`.
+
 ### Headers and the served document
 
 Every response carries (`web/security.py`, `test_audit_headers.py`): a Content-Security-Policy

@@ -122,6 +122,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/courses/{course_id}/starter"): USER,  # CSRF, owner of the course; adds ticked rows
     ("POST", "/courses/{course_id}/documents"): USER,  # CSRF, owner of course and of each document
     ("POST", "/courses/{course_id}/rename"): USER,
+    ("POST", "/courses/{course_id}/people"): USER,  # CSRF, owner of the course; 404 while off
+    ("POST", "/courses/{course_id}/people/{grant_id}/remove"): USER,  # CSRF, owner, asks first
     ("GET", "/jobs/{job_id}"): USER,
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): USER,
     ("GET", "/jobs/{job_id}/delete"): USER,
@@ -223,6 +225,7 @@ def site(tmp_path):
     env = WebEnv(
         tmp_path,
         feature_notation_memory=True,
+        feature_course_grants=True,
         email_login_enabled=True,
         email_sender="outbox",
         max_large_upload_mb=5,
@@ -280,6 +283,7 @@ def site(tmp_path):
             "course_id": course_id,
             "entry_id": entry_id,
             "share_id": "1" * 32,
+            "grant_id": "1" * 32,
             "report_id": "1",
             "element_id": "p1-e3",
             "slug": "equations",

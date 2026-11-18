@@ -92,6 +92,8 @@ def _page(
         # The shares go with the document, so its deletion time is the shares' too.
         retain_until = job.retain_until if job is not None else None
         retention_mode = job.retention_mode if job is not None else "day"
+        # People who reach it through its course (FEATURE_COURSE_GRANTS), read-only here.
+        through = shares.course_people(session, job) if job is not None else None
         class_link = (
             _class_link(ctx, session, job, link_address, link_errors or [], link_typed or {})
             if ctx.settings.feature_class_link and job is not None
@@ -117,6 +119,7 @@ def _page(
         "typed_role": typed_role,
         "role_words": shares.ROLE_WORDS,
         "class_link": class_link,
+        "course_people": through,
     }
     return render(request, "share.html", context, status_code=status_code)
 

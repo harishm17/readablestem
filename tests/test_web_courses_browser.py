@@ -42,6 +42,7 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
         tmp_path_factory.mktemp("courses-browser"),
         per_user_daily_page_quota=1000,
         feature_notation_memory=True,
+        feature_course_grants=True,
     )
     env.converter.output = review_output()
     port = free_port()
@@ -174,6 +175,36 @@ def test_without_javascript_a_course_symbol_and_a_remembered_letter(site, browse
     row = page.get_by_role("row", name="bold ω")
     assert "From a review" in row.inner_text()
     context.close()
+
+
+def test_the_people_section_passes_axe_empty_filled_and_with_an_error(site, browser, axe_source):
+    """The course page's People section (FEATURE_COURSE_GRANTS), plus the remove question."""
+    context, page = open_page(browser, site)
+    course_id = add_course(page, site.base, "People course")
+    page_url = f"{site.base}/courses/{course_id}"
+    found: dict[str, list[dict]] = {}
+
+    def scan(name: str) -> None:
+        found[name] = strict_axe(page, axe_source)
+
+    scan("empty")
+    page.get_by_label("Their email address").fill("not an address")
+    page.locator("#people-role-review").check()
+    page.get_by_role("button", name="Give access").click()
+    page.locator(".error-summary").wait_for()
+    scan("error")
+    page.goto(page_url)
+    page.get_by_label("Their email address").fill("colleague@example.edu")
+    page.locator("#people-role-review").check()
+    page.get_by_role("button", name="Give access").click()
+    page.get_by_text("People with access").wait_for()
+    scan("filled")
+    page.get_by_role("button", name="Remove colleague@example.edu").click()
+    page.get_by_role("heading", level=1).wait_for()
+    scan("remove question")
+    context.close()
+    failures = {name: [v["id"] for v in found_v] for name, found_v in found.items() if found_v}
+    assert not failures, failures
 
 
 # --------------------------------------------------------------------------- suggestions (T3-12)

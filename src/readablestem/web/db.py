@@ -17,7 +17,7 @@ a time), content-free by construction: no column can hold text from a document.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -25,6 +25,7 @@ from enum import StrEnum
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -666,6 +667,28 @@ class CourseNotation(Base):
     )
 
 
+class CourseGrant(Base):
+    """One person's right to read the documents of one course (`web.shares`, WS27.1, behind
+    `FEATURE_COURSE_GRANTS`): the address they must sign in with, lower-cased, and what they may
+    do ("view" or "review", never more). The course's owner is the only one who can add, change
+    or remove a row. A document is covered because its `course_id` is this course, so one added
+    later is covered at once and one moved out or whose course is deleted is not. Goes with the
+    course (ON DELETE CASCADE, and `notation.delete_course`) and with the person it names
+    (`ops.retention.erase_user`)."""
+
+    __tablename__ = "course_grants"
+    __table_args__ = (
+        UniqueConstraint("course_id", "email", name="uq_course_grant_person"),
+        CheckConstraint("role IN ('view', 'review')", name="ck_course_grants_role"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    course_id: Mapped[str] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Event(Base):
     """A content-free usage event: who (pseudonymous user id), what (`name`, a code),
     a category `code` and a number `value`, when. `job_ref` is a job id but not a
@@ -847,8 +870,19 @@ def make_engine(database_url: str) -> Engine:
     return create_engine(database_url, pool_pre_ping=True, pool_size=5, max_overflow=5)
 
 
-def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:
-    return sessionmaker(engine, expire_on_commit=False)
+# `session.info` key under which a session factory says whether course grants count right now
+# (`web.shares.role_of`). A factory that says nothing, like the worker's and the commands', has
+# no grants in force: the rule fails closed.
+COURSE_GRANTS_KEY = "course_grants_in_force"
+
+
+def make_sessionmaker(
+    engine: Engine, *, course_grants: Callable[[], bool] | None = None
+) -> sessionmaker[Session]:
+    """The session factory. `course_grants` is asked on each access check whether a person's
+    course grants count (the app passes its `FEATURE_COURSE_GRANTS` setting, read live)."""
+    info = {} if course_grants is None else {COURSE_GRANTS_KEY: course_grants}
+    return sessionmaker(engine, expire_on_commit=False, info=info)
 
 
 def create_all(engine: Engine) -> None:
