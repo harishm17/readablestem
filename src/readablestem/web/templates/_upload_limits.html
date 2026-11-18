@@ -3,9 +3,12 @@
    allowance a page states is the one the upload routes enforce. #}
 <dl class="limits-list">
   <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if office_on %}
-    A Word or PowerPoint file is turned into a PDF first.{% endif %}{% if latex_source %} A LaTeX
-    file (.tex) or a zip of a LaTeX project has its equations read from the source. The PDF is
-    still the main path. Not taken yet, so upload the compiled PDF instead: the source of a
+    A Word or PowerPoint file is turned into a PDF first.{% endif %}{% if latex_source %} If you
+    have the LaTeX file (.tex) or the zip of the LaTeX project a document was made from, upload
+    that: its headings, lists, tables and equations are then read from the file itself, where
+    from a PDF they have to be worked out from how the page looks. A project zip may be up to
+    {{ project_zip }}, and every {{ chars_per_page }} characters or figure count as one page.
+    Upload a PDF when the source is not available, or when the document is a scan. Not taken yet, so upload the compiled PDF instead: the source of a
     Beamer slide deck, a source that uses the {{ refused_classes }} class (read without its own
     rules, its solutions and correct-answer marks could reach students), and one that loads the {{ refused_packages }}
     package. Other classes without a LaTeXML binding (KOMA-Script, memoir, extarticle) are read

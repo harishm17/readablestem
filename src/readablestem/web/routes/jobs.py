@@ -654,7 +654,6 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "max_files": access.files_per_upload(user.access_tier),
         "batch_zip": ctx.settings.feature_batch_zip,
         "upload_limit_mb": ctx.settings.upload_limit_mb,
-        "source_pages": ctx.settings.source_page_limit,
         "ready_documents": sum(
             1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
         ),

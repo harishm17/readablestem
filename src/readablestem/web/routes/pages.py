@@ -241,8 +241,6 @@ def limits_context(request: Request) -> dict[str, object]:
         # A bigger file is kept so its pages can be chosen and converted in parts (T3-3).
         "in_parts": settings.upload_limit_mb > settings.max_upload_mb
         or settings.source_page_limit > settings.max_pages_per_job,
-        "upload_limit_mb": settings.upload_limit_mb,
-        "source_pages": settings.source_page_limit,
         # The daily page limit of invited people; the open tier's is in every page's context.
         "invited_page_quota": settings.per_user_daily_page_quota,
         "proof_facts": proof_facts.load(),

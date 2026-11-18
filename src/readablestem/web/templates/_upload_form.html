@@ -73,6 +73,11 @@
           <li>{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% if new_account %}
             That is the limit for a new account.{% endif %} {{ PAGES_RULE }}</li>
           {% endif %}
+          {% if latex_source and not revising %}
+          <li>Have the LaTeX file this PDF was made from? Upload that instead: its headings, lists, tables
+            and equations are then read from the file itself. From a PDF they have to be worked out
+            from how the page looks.</li>
+          {% endif %}
           <li>Your own materials only, with no student records.</li>
         </ul>
       </div>
