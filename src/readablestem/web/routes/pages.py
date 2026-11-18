@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
 from readablestem.pipeline import export_docx
-from readablestem.web import analytics, office_convert, offices, proof_facts, seo
+from readablestem.web import analytics, office_convert, offices, outcome, proof_facts, seo
 from readablestem.web.assets import cached_html, fixed_file, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -266,6 +266,8 @@ def limits_context(request: Request) -> dict[str, object]:
         # What one person may keep stored at once (`web.storage`), by tier.
         "storage_mb": settings.storage_per_user_mb,
         "open_storage_mb": settings.storage_open_tier_mb,
+        # What reading scanned and handwritten pages costs: the upload form's words.
+        "image_pages_cost": outcome.image_pages_cost(settings),
     } | _features(request)
 
 

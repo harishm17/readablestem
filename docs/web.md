@@ -578,7 +578,12 @@ to each of its parts that has such pages); the flag only offers it.
   marked "Not converted" unless asked for, and what reading them would cost
   (`outcome.image_pages_offer`: pages times `IMAGE_PAGES_USD_PER_PAGE`, at most
   `IMAGE_PAGES_MAX_USD_PER_JOB`, `Settings.image_pages_estimate`, the same figure the job's cap
-  uses). A single file's answer is a notice on its job page; a batch's is a line under the
+  uses). The cost is worded once, by `outcome.image_pages_cost`, as "up to" (both settings are
+  spend limits, not prices: a job that reaches the per-job one stops reading and keeps the rest as
+  pictures), and the same sentence is in the checkbox's hint (`aria-describedby`), the refusal of
+  a PDF of only scans, the stopped job's message, the offer above and `/limits`. With the count
+  of such pages in the file it is the estimate for the file; without it, the per-page and
+  per-document limits. A file whose count is "at least" gets the limits, not an estimate. A single file's answer is a notice on its job page; a batch's is a line under the
   document's row (`Placed.scans`, kept with the answer in `upload_result`). The finished job's
   "pages kept as pictures" note says the same from the stored page records
   (`outcome.image_pages_in`, the same count function) to its owner, with "Upload it again with the
