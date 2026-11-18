@@ -48,6 +48,14 @@ def finished_job(env) -> str:
     return job_id
 
 
+def keep_stored_page(env, job_id: str) -> None:
+    """The page as the fake converter wrote it: not made again from the result on first use."""
+    with session_scope(env.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.html_stale = False
+
+
 def ready_job(env) -> str:
     """A job with nothing left to decide, so its page is the finish line."""
     for fix in env.converter.output.result.fixes:
@@ -70,6 +78,7 @@ def folder_of(job_id: str) -> str:
 
 def test_a_finished_job_downloads_as_a_zip(web):
     job_id = ready_job(web)
+    keep_stored_page(web, job_id)
     response = fetch(web.browser, f"/jobs/{job_id}/download/canvas")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/zip"
@@ -87,6 +96,7 @@ def test_a_finished_job_downloads_as_a_zip(web):
 
 def test_with_a_course_number_the_zip_also_holds_the_page_to_paste(web):
     job_id = ready_job(web)
+    keep_stored_page(web, job_id)
     response = fetch(web.browser, f"/jobs/{job_id}/download/canvas?course=48213")
     assert response.status_code == 200
     archive = zip_of(response)
@@ -103,6 +113,7 @@ def test_the_pictures_of_a_real_document_are_files_in_the_zip(web):
         job = session.get(Job, job_id)
         assert job is not None
         job.html = source
+        job.html_stale = False
     response = fetch(web.browser, f"/jobs/{job_id}/download/canvas?course=48213")
     archive = zip_of(response)
     pictures = [n for n in archive.namelist() if n.startswith("images/")]

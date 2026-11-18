@@ -111,6 +111,7 @@ def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
 
     from readablestem.pipeline import assemble, checked_words, html_checks
 
+    site.browser.get(f"/jobs/{site.job_id}")  # the first view makes the stored page
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
         assert job is not None and not job.html_stale
@@ -149,6 +150,7 @@ def test_an_older_page_that_cannot_be_made_again_is_served_as_it_is_stored(site,
     def fails(*args, **kwargs):
         raise ValueError("the new renderer cannot read this stored result")
 
+    site.browser.get(f"/jobs/{site.job_id}")  # the first view makes the stored page
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
         assert job is not None and not job.html_stale

@@ -337,6 +337,7 @@ def test_a_failed_epub_export_is_a_plain_page(web):  # noqa: F811
         html=as_current(
             '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
         ),
+        html_stale=False,  # the page as stored, not made again from the result
     )
     response = fetch(web.browser, f"/jobs/{job_id}/download.epub")
     assert response.status_code == 409 and "cannot be made as an EPUB" in response.text
@@ -376,6 +377,7 @@ def test_a_document_that_cannot_be_made_is_left_out_and_said(web, monkeypatch): 
         html=as_current(
             '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
         ),
+        html_stale=False,  # the page as stored, not made again from the result
     )
     response = web.browser.get("/app/download?format=epub")
     assert response.status_code == 409 and "cannot be made in that file type" in response.text
@@ -577,6 +579,7 @@ def test_download_all_reads_what_is_ready_from_one_query_however_many_documents(
     from readablestem.web import bundle
 
     first = ready_job(web)
+    fetch(web.browser, f"/jobs/{first}")  # the first view makes the page the copies are of
     monkeypatch.setattr(bundle, "MAX_DOCUMENTS", 2)
 
     def copies(count: int, open_decisions: int) -> None:
