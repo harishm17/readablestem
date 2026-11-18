@@ -1035,6 +1035,8 @@ def _place_files(
             )
             continue
         too_big = len(data) > max_upload_bytes(s.max_upload_mb)
+        # Scanned and handwritten pages the box was not checked for (`scans_note` says them).
+        scans = asdict(found) if found.possible and not convert_images else None
         if pages > s.max_pages_per_job or too_big:
             placed.append(
                 _keep_for_parts(
@@ -1048,10 +1050,32 @@ def _place_files(
                     revises,
                     convert_images,
                     office=census.to_json() if census else None,
+                    scans=scans,
                 )
             )
             placed[-1].office = office
             continue
+        if scans and found.mostly(pages) and revises is None:
+            # More than half the pages are scans or handwriting: the file waits for the
+            # person's choice before anything is converted or counted (WS7.8). When it cannot
+            # wait (the room for waiting files is full), it is converted as for any file.
+            held = _keep_for_parts(
+                ctx,
+                user,
+                UploadedFile(file.filename, data),
+                pages,
+                mode,
+                course_id,
+                exam,
+                revises,
+                convert_images,
+                office=census.to_json() if census else None,
+                scans=scans,
+            )
+            if held.pending_id:
+                held.office = office
+                placed.append(held)
+                continue
         try:
             job_id = store_job(
                 ctx.factory,
@@ -1125,7 +1149,6 @@ def _place_files(
             ctx.factory, s, user_id=user.id, job_id=job_id, data=file.data, pages=pages
         )
         # Pages kept as pictures for want of the box are said at once (`scans_note`).
-        scans = asdict(found) if found.possible and not convert_images else None
         placed.append(Placed(file.filename, pages, job_id=job_id, office=office, scans=scans))
     return placed
 
@@ -1288,9 +1311,11 @@ def _keep_for_parts(
     revises: str | None,
     image_pages: bool = False,
     office: dict | None = None,
+    scans: dict[str, int] | None = None,
 ) -> Placed:
     """A file over the page or size limit is kept for the person to choose its pages
-    (T3-3, `web.pending`); nothing is converted or counted until they do."""
+    (T3-3, `web.pending`); nothing is converted or counted until they do. `scans`: the count of
+    scanned and handwritten pages, kept with it so the page it waits on says them (WS7.8)."""
     if revises is not None:
         return Placed(file.filename, pages, code="revision_too_large", status=422)
     try:
@@ -1307,6 +1332,7 @@ def _keep_for_parts(
                 exam=exam,
                 image_pages=image_pages,
                 office=office,
+                scans=scans,
             )
             pending_id = row.id
     except pending.TooManyPending:
@@ -1320,7 +1346,7 @@ def _keep_for_parts(
         log_event(logger, "upload_rejected", code="storage_full")
         return Placed(file.filename, code="storage_full", status=503, retry_after="3600")
     log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
-    return Placed(file.filename, pages, pending_id=pending_id)
+    return Placed(file.filename, pages, pending_id=pending_id, scans=scans)
 
 
 async def _answer_one(

@@ -516,6 +516,10 @@ class PendingUpload(Base):
     # The census of a Word or PowerPoint file made into this PDF (`Job.office_json`), handed to
     # every part cut from it.
     office_json: Mapped[dict | None] = mapped_column(JSON)
+    # The scanned and handwritten pages the probe counted (`page_type.ImagePageCount` as a
+    # dict) when the box was not checked: the chooser says them (`routes.jobs.scans_note`), and
+    # for a file within the limits with most pages of that kind it asks what to do with them.
+    scans_json: Mapped[dict | None] = mapped_column(JSON)
     # The 0-based pages already sent to be converted, so the rest can be chosen later.
     done_pages: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
