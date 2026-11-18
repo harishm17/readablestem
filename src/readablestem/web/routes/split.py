@@ -86,7 +86,7 @@ from readablestem.web.deps import (
 from readablestem.web.edit_check import EditCheck, check_equation_edit
 from readablestem.web.logsafe import log_event
 from readablestem.web.mathml import try_sanitize_mathml
-from readablestem.web.messages import explain_check, explain_notice, explain_reason
+from readablestem.web.messages import KIND_LABELS, explain_check, explain_notice, explain_reason
 from readablestem.web.page_edits import (
     HEADING_CODE,
     HEADING_TOO_LONG,
@@ -128,7 +128,7 @@ from readablestem.web.routes.review import (
 )
 from readablestem.web.shares import REVIEW
 from readablestem.web.speech_diff import SpokenDiff, spoken_diff
-from readablestem.web.views import KIND_LABELS, JobView, last_decision
+from readablestem.web.views import JobView, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

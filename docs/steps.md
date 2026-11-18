@@ -823,7 +823,7 @@ spelling: `\not` before a relation or arrow (`\not\in`, `\not=`, `\not\equiv`) a
 shape joins the two into the one negated sign (`mathml_shape.shape_general`): the Unicode character
 where there is one (`≠ ∉ ≰ ⊄`), the relation and U+0338 otherwise.
 `\textbf` of one letter is baked to a bold letter before the conversion (`\textbf{F}` is "bold
-capital F", not the text "F").
+cap F", not the text "F").
 
 Before checking, the equation step removes wrappers the prompt forbids but models still
 add: `$...$`, `$$...$$`, `\[...\]`, `\(...\)`, `equation` environments, `\displaystyle`,
@@ -934,13 +934,13 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 
 | Construct | Reading |
 |---|---|
-| Simple fraction (each side one or two plain tokens) | "a over b", "capital delta bold d over capital delta t"; "a over b end fraction" when a plain token follows it, and the long form after a plain token, so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}` are not said alike |
+| Simple fraction (each side one or two plain tokens) | "a over b", "cap delta bold d over cap delta t"; "a over b end fraction" when a plain token follows it, and the long form after a plain token, so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}` are not said alike |
 | Other fractions | "the fraction ... over ... end fraction" |
 | `linethickness=0` fraction | "n choose k" |
 | Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power" |
 | Primes, degrees | "y double prime", "30 degrees" |
 | Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a short subscript a plain token (or a script on one) follows is closed, "x sub i end sub y" against `x_{iy}` "x sub i y" |
-| Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "capital A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
+| Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "cap A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
 | A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides" and a pair of bars the absolute value |
 | A centered dot or a cross | between vectors (bold letters, arrows, nabla, the test of `signs.py`) "dot" and "cross"; between numbers and scalars "times" |
 | A negated relation | "is not an element of", "is neither less than nor equal to", "not equal to", "is not a subset of", ...; a relation with no word of its own "with stroke" |
@@ -951,7 +951,7 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Large operators | "the sum from i equals 1 to n of", "the integral from 0 to 1 of", "the product over k of" |
 | Limits | "the limit as x approaches 0 of" (an arrow under `lim` reads "approaches") |
 | Operators and relations | equals, minus, plus or minus, times, divided by, less than or equal to, approximately equals, proportional to, right arrow, ... |
-| Letters | "x", "capital F"; Greek "delta", "capital delta"; bold "bold d"; double-struck "double-struck capital R" |
+| Letters | "x", "cap F" (a capital is "cap", never "capital"); Greek "delta", "cap delta"; bold "bold d"; double-struck "double-struck cap R"; the letters of an upright name (`\mathrm{Var}`) add no "cap" ("V a r") |
 | Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde" |
 | Functions | "sine", "cosine", "natural log", ... |
 | Tables | "row 1: ...; row 2: ..." when there are several rows; cells of an aligned equation read as one line, matrix cells are comma-separated |
@@ -972,13 +972,19 @@ purpose: `ab_2` and `{ab}_2` (the same print), round and square matrix brackets,
 **Stored readings.** What keeps its old words and what takes the new ones, for a document converted
 before a change to these rules:
 
-- The reading stored with an equation (`EquationFix.speech`) is made once, in the equation step. The
-  review screen's "Read aloud roughly as" line, the Listen transcript (`web/listen.py`, which uses
-  the stored reading first) and the `alttext` of `MATHML_ALTTEXT` (`assemble.alttext_from_speech`)
-  all read it, so a stored document keeps the old words in all three until it is converted again
-  (a `PIPELINE_VERSION` bump does not convert a stored result again: only a new upload or a
-  revision does). An equation the author edits is read again at once (`web/edit_check.py`), with the
-  new words.
+- The reading stored with an equation (`EquationFix.speech`) is made in the equation step and
+  carries the version of the speech rules that made it (`EquationFix.speech_version`, the code's
+  `speech.SPEECH_VERSION`, 2 since "cap" and the pauses in a formula; 0 where none was stored).
+  A stored reading made by older rules and not written by a person is made again from its MathML,
+  without a model, where it is read: `speech.refresh_readings` on the result in
+  `web.review.rerender_html` (the page, the EPUB's `describedMath` and the Word fallback text),
+  `routes.review._load_versioned` (every review screen), `job_page._examples` and
+  `listen.stored_speeches` (Listen). All of them show the same string, and the stored result is
+  brought up to date the next time it is saved. A reading a person wrote has a negative version
+  and is never replaced (no path writes one today: an edited equation is read again at once,
+  `web/edit_check.py`, and stamped with the current version). Raise `SPEECH_VERSION` whenever a
+  rule changes what an existing MathML reads as; the spoken string is never part of a model
+  request, so a remade reading costs nothing.
 - Where no reading is stored (a LaTeX one is not used) the Listen transcript, `speech_diff` and the
   decision cards speak the MathML with the speech of the day: the new words, whenever a page is opened.
 - A table header's name (`table_html.named_maths`) is spoken from the stored cell MathML each time the

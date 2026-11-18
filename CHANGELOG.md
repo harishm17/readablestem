@@ -93,6 +93,36 @@
   job's page is now made again once on its first view, so it carries its id. The privacy page
   says the count and time are stored. One migration (`a9c3e5b7d1f2`: jobs from before get version
   1 and the time of their last decision or finish). No model call, no version bump.
+## Unreleased: the transcript and the speech rules (branch feat/listen-transcript-and-speech)
+
+- WS23.4 (F-120, F-121, F-122, F-348 in part, F-371, F-465): Listen starts at the lesson. The
+  skip link is an item of its own (kind `skip-link`) and, with the title, the language and the
+  bare landmark that open the page, is marked `Item.before` from the items' kinds, so Play
+  starts at the first content item and the words of an item no longer decide it; item ids are
+  unchanged. Role words come from one string table (`web/messages.py`: `KIND_LABELS`, moved
+  from `views`, and `LISTEN_LABELS`), shared with the review screen: "Main content",
+  "Navigation", "Footer", "Collapsed section" in place of "Main landmark", "Content
+  information landmark". A `<br>` is a pause and a quotation ends with "End quote". The page's
+  title is the document's name (`documents.document_title`), then "Listen". The transcript has
+  the reading width with the role as a small line above the text; a window 64rem or wider has
+  a second column that draws the selected equation, table or small picture (hidden from
+  assistive technology, never focused, not a live region), and every item links to its place on
+  the student page.
+- A capital letter in math is said "cap K" ("cap delta"), the letters of an upright name
+  (`\mathrm{Var}`, `\mathrm{Hz}`) and the element symbols of a formula add no word, and in a
+  chemical formula a comma separates a coefficient from its formula and one species from the
+  next ("2, H 2 O"; counts stay numbers). The review screen's own sentences still say
+  "capital". Speech rules now carry a version (`speech.SPEECH_VERSION`, 2;
+  `EquationFix.speech_version`): a stored reading from older rules that no person wrote is made
+  again from its MathML where it is read (the page, the EPUB's `describedMath`, the Word
+  fallback text, the review screens, Listen, the site's examples and the output audit), with
+  no model call, and a reading a person wrote (negative version) is never replaced. No spoken
+  string is part of any model request. Pinned readings changed: 33 lines in the four speech
+  test files, five in the Listen and review tests. No stored-data migration (the new field is
+  omitted when 0). `RENDER_VERSION` and `PIPELINE_VERSION` are not touched here (the
+  output-version builder owns them): the render version of this unshipped batch covers the page,
+  and a `PIPELINE_VERSION` bump is owed at merge because a new conversion stores different
+  readings.
 
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 

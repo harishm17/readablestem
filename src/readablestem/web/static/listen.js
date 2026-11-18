@@ -28,7 +28,11 @@
      screen reader user who also hears the voice gets the item once.
    - Play starts at the lesson (past the title, notices and licence) when there is no place.
      The transcript can be filtered; while it is, Previous, Next and playing move through the
-     items shown. */
+     items shown.
+   - The second column (data-listen-thing-panel) is a picture of the selected item for people
+     who see: it is aria-hidden, never takes focus and is not a live region, so the item is not
+     said twice. It is filled from the <template data-listen-thing> in the item's row, when
+     the place changes, and is hidden by the stylesheet in a narrow window. */
 (function () {
   "use strict";
 
@@ -245,6 +249,7 @@
       return;
     }
     var items = Array.prototype.slice.call(list.querySelectorAll("[data-listen-item]"));
+    var thingPanel = root.querySelector("[data-listen-thing-panel]");
     var button = {};
     ["play", "stop", "prev", "next", "heading", "equation", "beginning"].forEach(function (name) {
       button[name] = root.querySelector('[data-listen="' + name + '"]');
@@ -313,6 +318,13 @@
     function lang(i) {
       var el = items[i];
       return (el && el.closest("[lang]") && el.closest("[lang]").getAttribute("lang")) || "";
+    }
+
+    function heard(el) {
+      // What an item says in words, for the filter: its role and its text, not its links.
+      var role = el.querySelector(".listen-role");
+      var text = el.querySelector(".listen-text");
+      return ((role ? role.textContent : "") + " " + (text ? text.textContent : "")).trim();
     }
 
     function sayOf(i) {
@@ -386,15 +398,29 @@
       return at < 0 ? 0 : at;
     }
 
+    function showThing(el) {
+      // The equation, picture or table of the item, drawn beside the transcript. Only the
+      // panel's own content changes: focus stays where it is and nothing is announced.
+      if (!thingPanel) return;
+      var source = el ? el.querySelector("template[data-listen-thing]") : null;
+      thingPanel.textContent = "";
+      if (source && source.content) thingPanel.appendChild(source.content.cloneNode(true));
+      thingPanel.hidden = !source;
+    }
+
     function mark(i, scroll) {
       items.forEach(function (el) {
         el.classList.remove("is-current");
         el.removeAttribute("aria-current");
       });
-      if (i < 0) return;
+      if (i < 0) {
+        showThing(null);
+        return;
+      }
       var el = items[i];
       el.classList.add("is-current");
       el.setAttribute("aria-current", "true");
+      showThing(el);
       var folded = el.closest("details");
       if (folded) folded.open = true; // the items before the lesson are folded away
       if (!S.follow || scroll === false) return;
@@ -702,7 +728,7 @@
       var kind = kindSelect ? kindSelect.value : "";
       items.forEach(function (el) {
         var okKind = !kind || (el.getAttribute("data-kinds") || "").split(" ").indexOf(kind) !== -1;
-        var okText = !words || el.textContent.toLowerCase().indexOf(words) !== -1;
+        var okText = !words || heard(el).toLowerCase().indexOf(words) !== -1;
         el.hidden = !(okKind && okText);
       });
       // A folded group with nothing shown in it is not worth opening.

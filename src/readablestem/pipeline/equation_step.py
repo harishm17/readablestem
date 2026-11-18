@@ -104,7 +104,7 @@ from readablestem.pipeline import (
 from readablestem.pipeline.chem import expand_ce as chem_expand_ce
 from readablestem.pipeline.chem_check import compare_species
 from readablestem.pipeline.signs import compare_signs
-from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+from readablestem.pipeline.speech import SPEECH_VERSION, SpeechError, mathml_to_speech
 from readablestem.pipeline.text_layer_compare import (
     Glyph,
     compare_case,
@@ -1357,6 +1357,7 @@ def _fix(
                 latex=candidate.latex,
                 mathml=candidate.mathml,
                 speech=candidate.speech,
+                speech_version=SPEECH_VERSION,
                 display=display,
                 model_latex=candidate.model_latex if candidate.corrections else None,
             )

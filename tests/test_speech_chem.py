@@ -45,8 +45,8 @@ def say(latex: str) -> str:
         (r"\ce{CO2(g)}", "C O 2 gas"),
         (r"\ce{SO4^2-(aq)}", "S O 4 2 minus aqueous"),
         # reactions: the arrow is a verb, a plus after a state or a charge is set off
-        (r"\ce{2 H2 + O2 -> 2 H2O}", "2 H 2 plus O 2 reacts to form 2 H 2 O"),
-        (r"\ce{N2 + 3 H2 <=> 2 NH3}", "N 2 plus 3 H 2 is in equilibrium with 2 N H 3"),
+        (r"\ce{2 H2 + O2 -> 2 H2O}", "2, H 2 plus O 2 reacts to form 2, H 2 O"),
+        (r"\ce{N2 + 3 H2 <=> 2 NH3}", "N 2 plus 3, H 2 is in equilibrium with 2, N H 3"),
         (
             r"\ce{Ag+(aq) + Cl-(aq) -> AgCl(s)}",
             "A g plus aqueous, plus C l minus aqueous, reacts to form A g C l solid",
@@ -56,7 +56,7 @@ def say(latex: str) -> str:
             "C a C O 3 solid, reacts, with heat, to form C a O solid, plus C O 2 gas",
         ),
         (r"\ce{Na+ + Cl- -> NaCl}", "N a plus, plus C l minus reacts to form N a C l"),
-        (r"\ce{H2 + I2 <-> 2 HI}", "H 2 plus I 2 left right arrow 2 H I"),
+        (r"\ce{H2 + I2 <-> 2 HI}", "H 2 plus I 2 left right arrow 2, H I"),
         # concentrations
         (
             r"[\ce{H3O+}] = [\ce{OH-}]",
@@ -65,7 +65,7 @@ def say(latex: str) -> str:
         (r"[\ce{NH3}]^2", "the concentration of N H 3 squared"),
         (
             r"K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}",
-            "capital K equals the fraction the concentration of N H 3 squared over the"
+            "cap K equals the fraction the concentration of N H 3 squared over the"
             " concentration of N 2 the concentration of H 2 cubed end fraction",
         ),
         # nuclides keep their reading
@@ -97,7 +97,7 @@ MATHML = "<math xmlns='http://www.w3.org/1998/Math/MathML'>{}</math>"
             "<msup><mtext>Cu</mtext><mn>2+</mn></msup><mo>(</mo><mi>a</mi><mi>q</mi><mo>)</mo>"
             "<mo>+</mo><msup><mrow><mtext>2e</mtext></mrow><mtext>−</mtext></msup>"
             "<mo>⟶</mo><mtext>Cu</mtext><mo>(</mo><mi>s</mi><mo>)</mo>",
-            "C u 2 plus aqueous, plus 2 e minus reacts to form C u solid",
+            "C u 2 plus aqueous, plus 2, e minus reacts to form C u solid",
         ),
         # the charge of a bracketed species is on the row that holds the opening bracket
         (
@@ -115,7 +115,7 @@ MATHML = "<math xmlns='http://www.w3.org/1998/Math/MathML'>{}</math>"
         (
             '<mn>2</mn><mi mathvariant="normal">A</mi><msup><mi mathvariant="normal">g</mi>'
             "<mo>+</mo></msup><mo>(</mo><mi>a</mi><mi>q</mi><mo>)</mo>",
-            "2 A g plus aqueous",
+            "2, A g plus aqueous",
         ),
         # the cell notation bars
         ("<mtext>Pt</mtext><mo>│</mo><mtext>Cu</mtext>", "vertical bar"),
@@ -129,12 +129,12 @@ def test_openstax_shaped_mathml_is_read_the_same_way(body, speech):
 @pytest.mark.parametrize(
     ("latex", "speech"),
     [
-        (r"\mathrm{H}", "capital H"),  # one upright letter is not chemistry
-        (r"\mathrm{Hz}", "capital H z"),
+        (r"\mathrm{H}", "cap H"),  # one upright letter is not chemistry
+        (r"\mathrm{Hz}", "H z"),  # the letters of a name add no word
         (r"e^{-kt}", "e to the power minus k t end power"),
         (r"x^2 + 1", "x squared plus 1"),
         (r"[x]^2", "open bracket x close bracket squared"),
-        (r"[A]_0", "open bracket capital A close bracket sub 0"),
+        (r"[A]_0", "open bracket cap A close bracket sub 0"),
         (r"2^{3+}", "2 to the power 3 plus"),
         (r"5\ \mathrm{m/s}", "5 meters per second"),
         (r"a \to b", "a right arrow b"),

@@ -30,6 +30,13 @@ conventions, kept short:
 - units: upright letters or text after a number read as a unit, "5 m/s" as "5 meters per
   second" (`speech_units`); an italic letter is a variable and is never a unit;
 - text is read verbatim, except words that are a single maths symbol ("=" -> "equals");
+- a capital letter is said "cap K" (`CAP`; a Greek capital "cap delta"), so a voice does not read
+  "capital" before every letter of a formula; the review screen's own sentences still say
+  "capital" (`in_full_words`). An upright run of letters that is a name (`\\mathrm{Var}`: one
+  `mi` per letter) adds no "cap" and no word, and an element symbol in a chemical formula adds
+  none (`speech_chem`);
+- the rules carry a version (`SPEECH_VERSION`): a reading stored by older rules, and not written
+  by a person, is made again from its MathML when it is shown (`reading_for`, `refresh_readings`);
 - two different prints are never said alike: a short fraction or subscript that a plain
   token follows directly closes itself ("1 over 2 end fraction m v squared" for `\\frac{1}{2}mv^2`,
   "1 over 2 m v squared" for `\\frac{1}{2m}v^2`);
@@ -49,20 +56,28 @@ from __future__ import annotations
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
+from typing import Any
 
 import defusedxml
 import defusedxml.ElementTree as DET
 
 from readablestem.core.mathml_intent import ALLOWED_INTENTS
 from readablestem.core.notation import canonical_from_parts
+from readablestem.core.types import EquationFix
 from readablestem.eval.equations import normalize
 from readablestem.pipeline import speech_chem
 from readablestem.pipeline.speech_nuclides import ELEMENTS, nuclide_words
 from readablestem.pipeline.speech_units import unit_words
 
 MAX_DEPTH = 64
+
+# The version of these rules. A reading is stored with the version that wrote it
+# (`EquationFix.speech_version`); raise this number whenever a rule changes what is said, and
+# every older stored reading is made again from its MathML where it is shown (`reading_for`).
+# 2: "cap K" for a capital, no word for the letters of a name, a pause after a coefficient.
+SPEECH_VERSION = 2
 
 
 class SpeechError(ValueError):
@@ -76,9 +91,17 @@ GREEK = {
     "ρ": "rho", "ϱ": "rho", "σ": "sigma", "ς": "sigma", "τ": "tau", "υ": "upsilon",
     "φ": "phi", "ϕ": "phi", "χ": "chi", "ψ": "psi", "ω": "omega",
 }  # fmt: skip
-GREEK.update(
-    {ch.upper(): f"capital {name}" for ch, name in list(GREEK.items()) if ch.upper() != ch}
-)
+# A capital letter is "cap K": one syllable, so a formula with many capitals stays quick to hear.
+CAP = "cap"
+
+
+def in_full_words(said: str) -> str:
+    """A reading as the review screen's own sentences name a letter ("capital X", not the
+    "cap X" a voice says): for the words a person reads, not the ones a voice speaks."""
+    return f"capital {said[len(CAP) + 1 :]}" if said.startswith(f"{CAP} ") else said
+
+
+GREEK.update({ch.upper(): f"{CAP} {name}" for ch, name in list(GREEK.items()) if ch.upper() != ch})
 
 SYMBOLS = {
     # operators
@@ -277,15 +300,15 @@ def _char_words(ch: str) -> str:
     if negated is not None:
         return negated
     if ch.isascii() and ch.isalpha():
-        return f"capital {ch}" if ch.isupper() else ch
+        return f"{CAP} {ch}" if ch.isupper() else ch
     if ch.isascii():
         return ch
     name = unicodedata.name(ch, "")
     if not name:
         return ch
-    # Letterlike symbols (U+211D double-struck R): "double-struck capital R".
+    # Letterlike symbols (U+211D double-struck R): "double-struck cap R".
     base = unicodedata.normalize("NFKC", ch)
-    words = name.lower().split()
+    words = [CAP if w == "capital" else w for w in name.lower().split()]
     if len(base) == 1 and base.isascii() and base.isalpha() and words[-1] == base.lower():
         words[-1] = base
     return " ".join(words)
@@ -1174,6 +1197,27 @@ def _mark_row(kids: list[ET.Element]) -> None:
     _mark_tilde(kids)
 
 
+def _name_letter(node: ET.Element) -> bool:
+    """One upright Latin letter: a letter of a name (`\\mathrm{Var}` is three of them)."""
+    text = node.text or ""
+    return (
+        node.tag == "mi"
+        and not len(node)
+        and node.get("mathvariant") == "normal"
+        and len(text) == 1
+        and text.isascii()
+        and text.isalpha()
+    )
+
+
+def _in_name(kids: list[ET.Element], i: int) -> bool:
+    """Is kids[i] a letter in a run of two or more upright letters? Its case is part of how
+    the name is spelled ("Var"), not a capital variable, so it adds no "cap"."""
+    return _name_letter(kids[i]) and (
+        (i > 0 and _name_letter(kids[i - 1])) or (i + 1 < len(kids) and _name_letter(kids[i + 1]))
+    )
+
+
 def _speak_children(node: ET.Element) -> list[str]:
     words: list[str] = []
     kids = list(node)
@@ -1189,6 +1233,8 @@ def _speak_children(node: ET.Element) -> list[str]:
         if found is None and i > 0:
             count = _after_number(kids[i - 1])
             found = _unit_run(kids, i, count) if count is not None else None
+        if found is None and _in_name(kids, i):
+            found = [kids[i].text or ""], 1
         if found is None:
             words += _speak(kids[i])
             i += 1
@@ -1280,6 +1326,44 @@ def _join_italic_words(root: ET.Element) -> None:
                 i += 1
         if len(rebuilt) != len(kids):
             parent[:] = rebuilt
+
+
+def course_readings(applied: Iterable[Any] | None) -> dict[str, str]:
+    """The course's words for its styled letters ("vector" for a bold d), from the symbols a
+    stored result says the conversion was handed (`DocumentResult.notation_applied`): what
+    `mathml_to_speech(readings=...)` needs to say a stored equation as it was first said."""
+    from readablestem.pipeline import notation_memory
+
+    return notation_memory.readings(applied or ())
+
+
+def reading_for(equation: EquationFix, readings: Mapping[str, str] | None = None) -> str:
+    """The reading of a stored equation as the rules in force say it. A reading made by older
+    rules (`EquationFix.speech_version`) is made again from its MathML, at no model cost, so
+    the page, the EPUB and Word file, Listen and the review screen say the same words; one a
+    person wrote (a negative version) and one the rules cannot read stay as they are."""
+    version = equation.speech_version
+    if version < 0 or version >= SPEECH_VERSION or not equation.mathml.strip():
+        return equation.speech
+    try:
+        said = mathml_to_speech(equation.mathml, readings=readings)
+    except SpeechError:
+        return equation.speech
+    return said or equation.speech
+
+
+def refresh_readings(result: Any) -> None:
+    """Make every stored reading in a `DocumentResult` that older rules wrote again, in place
+    (`reading_for`, with the course's words from the result). A file is written again from a
+    stored result through this, so the page, and the EPUB and Word file made from it, say what
+    the rules in force say. A reading already current, and one a person wrote, is not touched."""
+    readings = course_readings(result.notation_applied)
+    for fix in result.fixes:
+        equation = fix.equation
+        if equation is None or not 0 <= equation.speech_version < SPEECH_VERSION:
+            continue
+        equation.speech = reading_for(equation, readings)
+        equation.speech_version = SPEECH_VERSION
 
 
 def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) -> str:

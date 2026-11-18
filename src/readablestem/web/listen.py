@@ -4,9 +4,12 @@ document, worked out from the final HTML, so an instructor can hear it before sh
 Three blind reviewers asked for this. It is built on the server from the same HTML the student
 gets, in reading order, with no model call:
 
-- landmarks (main, navigation, footer, regions), headings with their level ("Heading level 2:
-  Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link" before the
-  text, as screen readers say it) and the page title;
+- landmarks (main, navigation, footer, regions, in the plain words of `web.messages`, the
+  string table the review screen shares), headings with their level ("Heading level 2:
+  Kinematics"), paragraphs (a `<br>` is a pause), quotations (closed by "End quote"), lists
+  ("List, 3 items", then each item), links ("link" before the text, as screen readers say it)
+  and the page title. The title, the language, the skip link and the bare landmark that open the
+  page are marked `Item.before` (by kind, never by words): Play starts after them;
 - equations spoken by the speech rules the review screen uses (`pipeline.speech`): the
   stored reading of the equation when the job has one (the same string "Read aloud roughly
   as" shows, `speeches`), else the `alttext` the file carries, else a fresh reading of the
@@ -26,11 +29,14 @@ from __future__ import annotations
 import logging
 import re
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from html import escape
 from html.parser import HTMLParser
 from threading import Lock
+
+from readablestem.core.types import Kind
+from readablestem.web.messages import KIND_LABELS, LISTEN_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +79,9 @@ class Item:
     kinds: tuple[str, ...]
     lang: str = ""
     ref: str = ""
+    before: bool = False  # said before the lesson: title, skip link, the bare landmark
+    anchor: str = ""  # the id of the student page's element at or just before this item
+    thing: str = ""  # the equation, picture or table itself, as safe HTML for the side panel
 
     @property
     def kind(self) -> str:
@@ -186,29 +195,39 @@ def parse(html: str) -> _Builder:
 
 # ----------------------------------------------------------------------------- the words
 
+# The role words come from the app's string table (`web.messages`), the same one the review
+# screen takes its kind names from, so the two never name a thing two ways.
 _LANDMARKS = {
-    "main": "Main landmark",
-    "nav": "Navigation landmark",
-    "aside": "Complementary landmark",
-    "footer": "Content information landmark",
-    "header": "Banner landmark",
+    "main": LISTEN_LABELS["main"],
+    "nav": LISTEN_LABELS["navigation"],
+    "aside": LISTEN_LABELS["complementary"],
+    "footer": LISTEN_LABELS["contentinfo"],
+    "header": LISTEN_LABELS["banner"],
 }
 _ROLE_LANDMARKS = {
-    "main": "Main landmark",
-    "navigation": "Navigation landmark",
-    "complementary": "Complementary landmark",
-    "contentinfo": "Content information landmark",
-    "banner": "Banner landmark",
-    "region": "Region landmark",
-    "search": "Search landmark",
+    role: LISTEN_LABELS[role]
+    for role in ("main", "navigation", "complementary", "contentinfo", "banner", "region", "search")
 }
+_EQUATION = KIND_LABELS[Kind.EQUATION]
+_FIGURE = KIND_LABELS[Kind.FIGURE]
+_TABLE = KIND_LABELS[Kind.TABLE]
+_PARAGRAPH = KIND_LABELS[Kind.PARAGRAPH]
+_LIST_ITEM = KIND_LABELS[Kind.LIST_ITEM]
+_HEADING = KIND_LABELS[Kind.HEADING]
+# The leading items that are not the lesson, by kind and never by the words they say.
+_BEFORE_KINDS = frozenset({"title", "language", "skip-link"})
 _SPACE = re.compile(r"\s+")
 
 
 _BEFORE_PUNCT = re.compile(r" ([.,;:!?)])")
+BREAK = "\ue000"  # a <br> inside text: a pause, said as a comma unless punctuation is there
+_BREAKS = re.compile(rf"(?:\s*{BREAK})+\s*")
+_PAUSE = re.compile(rf"([.,;:!?])?{BREAK}")
 
 
 def _words(text: str) -> str:
+    text = _BREAKS.sub(BREAK, _SPACE.sub(" ", text)).strip(f" {BREAK}")
+    text = _PAUSE.sub(lambda m: f"{m.group(1) or ','} ", text)
     return _BEFORE_PUNCT.sub(r"\1", _SPACE.sub(" ", text).strip())
 
 
@@ -257,6 +276,7 @@ class _Transcript:
         self._children: dict[tuple[str, str], int] = {}  # elements of a tag met under a parent
         self._used: dict[str, int] = {}  # items made from an element so far
         self._taken: set[str] = set()  # item ids given out: each is unique in the page
+        self._anchor = ""  # the last element with an id of its own met so far
 
     # ---------------------------------------------------------------- items
 
@@ -283,21 +303,38 @@ class _Transcript:
         self._taken.add(ref)
         return ref
 
-    def add(self, role: str, text: str, kind: str, *, say: str | None = None, held=()) -> None:
+    def add(
+        self, role: str, text: str, kind: str, *, say: str | None = None, held=(), thing: str = ""
+    ) -> None:
         if self.full:
             return
         if len(self.items) >= MAX_ITEMS:
             self.full = True
             note = "The transcript stops here; the file goes on."
-            self.items.append(Item("Note", note, note, ("note",), self.lang, self._ref("note")))
+            role = LISTEN_LABELS["note"]
+            ref = self._ref("note")
+            self.items.append(
+                Item(role, note, note, ("note",), self.lang, ref, anchor=self._anchor)
+            )
             return
         text = _words(text)
         if say is None:
             say = f"{role}: {text}" if text else role
         kinds = (kind, *(k for k in dict.fromkeys(sorted(held)) if k != kind))
-        self.items.append(Item(role, text, say, kinds, self.lang, self._ref(kind)))
+        self.items.append(
+            Item(
+                role,
+                text,
+                say,
+                kinds,
+                self.lang,
+                self._ref(kind),
+                anchor=self._anchor,
+                thing=thing,
+            )
+        )
 
-    def paragraph(self, text: str, kind: str = "paragraph", role: str = "Paragraph") -> None:
+    def paragraph(self, text: str, kind: str = "paragraph", role: str = _PARAGRAPH) -> None:
         text = _words(text)
         held = self._held
         self._held = set()
@@ -343,7 +380,7 @@ class _Transcript:
             self._held.add("equation")
             return f" {self.math_speech(node) or NO_READING} "
         if tag == "br":
-            return " "
+            return BREAK
         if tag == "img":
             return f" {self.image_words(node)} " if node.get("alt").strip() else ""
         if tag == "hr":
@@ -402,7 +439,7 @@ class _Transcript:
             if run:
                 self._path.append(self._key("run"))
                 try:
-                    self.paragraph("".join(self.inline(c) for c in run))
+                    self.run(run)
                 finally:
                     self._path.pop()
                 run.clear()
@@ -415,6 +452,27 @@ class _Transcript:
             if depth <= MAX_DEPTH:
                 self.block(child, depth + 1)
         flush()
+
+    def run(self, nodes: Sequence[Node | str]) -> None:
+        """A run of inline content, said as one paragraph, except the page's own "skip to
+        content" link: that is an item of its own (kind `skip-link`), said before the lesson.
+        Both come from the run's element place, so the link's id is the one it always had."""
+        part: list[Node | str] = []
+        for node in nodes:
+            if isinstance(node, Node) and node.tag == "a" and node.has_class("skip-link"):
+                self.paragraph("".join(self.inline(c) for c in part))
+                part = []
+                self.skip_link(node)
+            else:
+                part.append(node)
+        self.paragraph("".join(self.inline(c) for c in part))
+
+    def skip_link(self, node: Node) -> None:
+        self._held = set()
+        name = _words(self.inline(node)).removeprefix("link ")
+        self._held = set()
+        if name and not self._hidden(node):
+            self.add(LISTEN_LABELS["skip-link"], name, "skip-link")
 
     @staticmethod
     def _block_like(node: Node) -> bool:
@@ -429,6 +487,8 @@ class _Transcript:
         )
 
     def block(self, node: Node, depth: int) -> None:
+        if node.get("id"):
+            self._anchor = node.get("id")
         self._path.append(self._key(node.tag, node.get("id")))
         try:
             self._block(node, depth)
@@ -453,16 +513,18 @@ class _Transcript:
         if tag == "details":
             return self.details(node, depth)
         if tag == "summary":
-            return self.paragraph(self.inline(node), "expandable", "Expandable section")
+            return self.paragraph(self.inline(node), "expandable", LISTEN_LABELS["expandable"])
         if tag == "hr":
             if role == "doc-pagebreak" and node.get("aria-label"):
-                self.add("Page break", node.get("aria-label"), "page-break")
+                self.add(LISTEN_LABELS["page-break"], node.get("aria-label"), "page-break")
             return
         if tag == "pre":
-            return self.add("Code", self._plain(node), "code")
+            return self.add(LISTEN_LABELS["code"], self._plain(node), "code")
         if tag == "blockquote":
-            self.add("Quote", "", "quote")
-            return self.walk(node, depth)
+            self.add(LISTEN_LABELS["quote"], "", "quote")
+            self.walk(node, depth)
+            self.add(LISTEN_LABELS["end-quote"], "", "quote")
+            return
         if tag == "dl":
             return self.definitions(node, depth)
         if tag == "img":
@@ -477,7 +539,7 @@ class _Transcript:
         if node.has_class("flagged"):
             return self.flagged(node, depth)
         if role == "note" and tag != "p":
-            self.add("Note", "", "note")
+            self.add(LISTEN_LABELS["note"], "", "note")
             return self.walk(node, depth)
         self.container(node, depth)
 
@@ -500,7 +562,7 @@ class _Transcript:
         changed = bool(lang) and _primary(lang) != _primary(self.lang or lang)
         if changed:
             self.add(
-                "Language change",
+                LISTEN_LABELS["language-change"],
                 _language_name(lang),
                 "language",
                 say=f"Language changes to {_language_name(lang)}",
@@ -515,7 +577,12 @@ class _Transcript:
         self._label = was_label
         if changed:
             back = _language_name(was) if was else "the page language"
-            self.add("Language change", back, "language", say=f"Language changes back to {back}")
+            self.add(
+                LISTEN_LABELS["language-change"],
+                back,
+                "language",
+                say=f"Language changes back to {back}",
+            )
         self.lang = was
 
     _sectioned = False
@@ -533,7 +600,7 @@ class _Transcript:
         text = _words(self.inline(node))
         held, self._held = self._held, set()
         if text:
-            role = f"Heading level {level}"
+            role = f"{_HEADING} level {level}"
             self.add(role, text, "heading", held=held)
 
     def p(self, node: Node) -> None:
@@ -542,14 +609,14 @@ class _Transcript:
         if role == "doc-endnote" or node.has_class("flag-note") or role == "note":
             held, self._held = self._held, set()
             if _words(text):
-                self.add("Note", text, "note", held=held)
+                self.add(LISTEN_LABELS["note"], text, "note", held=held)
             return
         if node.has_class("original-text"):
-            return self.paragraph(text, "not-converted", "Not converted")
+            return self.paragraph(text, "not-converted", LISTEN_LABELS["not-converted"])
         lang = node.get("lang")
         if lang and _primary(lang) != _primary(self.lang or lang):
             self.add(
-                "Language change", _language_name(lang), "language",
+                LISTEN_LABELS["language-change"], _language_name(lang), "language",
                 say=f"Language changes to {_language_name(lang)}",
             )  # fmt: skip
         self.paragraph(text)
@@ -557,7 +624,7 @@ class _Transcript:
     def definitions(self, node: Node, depth: int) -> None:
         for child in node.children:
             if isinstance(child, Node) and child.tag in ("dt", "dd"):
-                role = "Term" if child.tag == "dt" else "Definition"
+                role = LISTEN_LABELS["term" if child.tag == "dt" else "definition"]
                 self.add(role, self.inline(child), "paragraph", held=self._take_held())
             elif isinstance(child, Node):
                 self.block(child, depth + 1)
@@ -573,11 +640,12 @@ class _Transcript:
         n = len(entries)
         count = _plural(n, "item")
         nested = ", nested" if self._lists else ""
-        self.add("List", count + nested, "list", say=f"List, {count}{nested}")
+        word = LISTEN_LABELS["list"]
+        self.add(word, count + nested, "list", say=f"{word}, {count}{nested}")
         outer = self._label
         self._lists += 1
         for k, entry in enumerate(entries, 1):
-            self._label = f"List item {k} of {n}"
+            self._label = f"{_LIST_ITEM} {k} of {n}"
             self.walk(entry, depth)
             self._label = None
         self._lists -= 1
@@ -600,8 +668,8 @@ class _Transcript:
 
     def equation(self, math: Node, element_id: str, label: str = "") -> None:
         text = self.math_speech(math, element_id) or NO_READING
-        role = f"Equation {label}" if label else "Equation"
-        self.add(role, text, "equation", say=f"{role}: {text}")
+        role = f"{_EQUATION} {label}" if label else _EQUATION
+        self.add(role, text, "equation", say=f"{role}: {text}", thing=_thing_math(math))
 
     @staticmethod
     def _equation_label(node: Node) -> str:
@@ -620,25 +688,28 @@ class _Transcript:
 
     # ---------------------------------------------------------------- pictures
 
-    def picture(self, node: Node, role: str = "Image") -> None:
+    def picture(self, node: Node, role: str = LISTEN_LABELS["image"]) -> None:
         alt = _words(node.get("alt"))
         if self._flagged:
             return self.add(
-                "Image, not converted", alt or NO_DESCRIPTION, "not-converted",
-                say=f"Image, not converted: {alt or NO_DESCRIPTION}",
+                LISTEN_LABELS["image-not-converted"], alt or NO_DESCRIPTION, "not-converted",
+                say=f"{LISTEN_LABELS['image-not-converted']}: {alt or NO_DESCRIPTION}",
             )  # fmt: skip
         if "alt" in node.attrs and not alt:
             return  # decorative: a screen reader skips it
-        self.add(role, alt or NO_DESCRIPTION, "figure", say=f"{role}: {alt or NO_DESCRIPTION}")
+        self.add(
+            role, alt or NO_DESCRIPTION, "figure", say=f"{role}: {alt or NO_DESCRIPTION}",
+            thing=_thing_picture(node),
+        )  # fmt: skip
 
     def figure(self, node: Node, depth: int) -> None:
         for child in node.children:
             if not isinstance(child, Node):
                 continue
             if child.tag == "figcaption":
-                self.paragraph(self.inline(child), "caption", "Caption")
+                self.paragraph(self.inline(child), "caption", LISTEN_LABELS["caption"])
             elif child.tag == "img":
-                self.picture(child, "Figure")
+                self.picture(child, _FIGURE)
             elif not self._hidden(child):
                 self.block(child, depth + 1)
 
@@ -656,9 +727,11 @@ class _Transcript:
             (c for c in node.children if isinstance(c, Node) and c.tag == "summary"), None
         )
         label = _words(self.inline(summary)) if summary is not None else ""
-        self.add("Expandable section, collapsed", label, "expandable")
+        self.add(LISTEN_LABELS["section-closed"], label, "expandable")
         was = self._details
-        self._details = "Long description" if node.has_class("figure-description") else ""
+        self._details = (
+            LISTEN_LABELS["long-description"] if node.has_class("figure-description") else ""
+        )
         for child in node.children:
             if isinstance(child, Node) and child.tag == "summary":
                 continue
@@ -684,16 +757,16 @@ class _Transcript:
         said = f"{caption}, {size}" if caption else size
         if heads:
             said += ". Column headers: " + ", ".join(heads)
-        self.add("Table", said, "table", say=f"Table, {said}")
+        self.add(_TABLE, said, "table", say=f"{_TABLE}, {said}", thing=_thing_table(node))
         body = grid.body_rows()
         for number, r in enumerate(body[: self.max_rows], 1):
             self.add(
-                f"Row {number} of {len(body)}", self.row_words(grid, r), "table",
-                say=f"Row {number} of {len(body)}: {self.row_words(grid, r)}",
+                f"{LISTEN_LABELS['row']} {number} of {len(body)}", self.row_words(grid, r), "table",
+                say=f"{LISTEN_LABELS['row']} {number} of {len(body)}: {self.row_words(grid, r)}",
             )  # fmt: skip
         if len(body) > self.max_rows:
             more = f"…{_plural(len(body) - self.max_rows, 'more row')}"
-            self.add("Table", more, "table", say=more)
+            self.add(_TABLE, more, "table", say=more)
 
     def column_name(self, grid: _Grid, col: int) -> str:
         """The column's header cells, top to bottom, each said once."""
@@ -714,6 +787,62 @@ class _Transcript:
             names = self.column_name(grid, cell.col)
             parts.append(f"{names}: {value}" if names else value)
         return "; ".join(parts) if parts else "empty row"
+
+
+# ----------------------------------------------------------------- the thing itself (F-465)
+
+MAX_THING_ROWS = 40  # table rows shown beside the transcript; the student page has them all
+MAX_THING_IMAGE = 150_000  # characters of a picture's data: URI kept; a bigger one is not copied
+_THING_TAGS = frozenset(
+    {"em", "strong", "i", "b", "sub", "sup", "code", "br", "span", "caption", "thead", "tbody",
+     "tfoot", "tr", "th", "td", "table", "p"}
+)  # fmt: skip
+_THING_ATTRS = frozenset({"scope", "colspan", "rowspan"})
+
+
+def _thing_math(math: Node) -> str:
+    """The equation as MathML the browser draws, for the side panel. Built from the parsed
+    tree with every attribute but the ones MathML needs dropped (`_xml`)."""
+    return _xml(math) if math.tag == "math" else ""
+
+
+def _thing_picture(node: Node) -> str:
+    """The picture as an <img>, when it is small enough to carry twice (its bytes are in the
+    page already; a large one is left to the student page)."""
+    src = node.get("src")
+    if not src.startswith("data:image/") or len(src) > MAX_THING_IMAGE:
+        return ""
+    return f'<img src="{escape(src, quote=True)}" alt="{escape(node.get("alt"), quote=True)}">'
+
+
+def _thing_html(node: Node | str, budget: list[int]) -> str:
+    """A table's cells as safe HTML: text escaped, MathML kept, a short list of tags and
+    attributes, everything else dropped to its text. `budget` counts the rows still allowed."""
+    if isinstance(node, str):
+        return escape(node)
+    if node.tag in SKIPPED or "hidden" in node.attrs:
+        return ""
+    if node.tag == "math":
+        return _xml(node)
+    if node.tag == "tr":
+        if budget[0] <= 0:
+            return ""
+        budget[0] -= 1
+    inner = "".join(_thing_html(c, budget) for c in node.children)
+    if node.tag not in _THING_TAGS:
+        return inner
+    if node.tag == "br":
+        return "<br>"
+    attrs = "".join(
+        f' {k}="{escape(v, quote=True)}"'
+        for k, v in node.attrs.items()
+        if k in _THING_ATTRS and re.fullmatch(r"[A-Za-z0-9]{1,12}", v)
+    )
+    return f"<{node.tag}{attrs}>{inner}</{node.tag}>"
+
+
+def _thing_table(node: Node) -> str:
+    return _thing_html(node, [MAX_THING_ROWS + 1])
 
 
 def _text_all(node: Node | str) -> list[str]:
@@ -848,15 +977,28 @@ def build_transcript(
     transcript.lang = lang
     title = _words(builder.title)
     if title:
-        transcript.add("Page title", title, "title")
+        transcript.add(LISTEN_LABELS["page-title"], title, "title")
     if lang:
         transcript.add(
-            "Page language", _language_name(lang), "language",
-            say=f"Page language: {_language_name(lang)}",
+            LISTEN_LABELS["page-language"], _language_name(lang), "language",
+            say=f"{LISTEN_LABELS['page-language']}: {_language_name(lang)}",
         )  # fmt: skip
     body = next((c for c in root.children if isinstance(c, Node) and c.tag == "body"), root)
     transcript.walk(body, 0)
-    return transcript.items
+    return _before_the_lesson(transcript.items)
+
+
+def _before_the_lesson(items: list[Item]) -> list[Item]:
+    """Mark the leading items that are not the lesson: the title, the language, the skip link
+    and the bare landmark that opens the content. Chosen by kind (and a landmark with no name
+    of its own), never by what an item says; the first item after them is where Play starts."""
+    end = 0
+    for i, item in enumerate(items):
+        if item.kind in _BEFORE_KINDS or (item.kind == "landmark" and not item.text):
+            end = i + 1
+        else:
+            break
+    return [replace(item, before=True) if i < end else item for i, item in enumerate(items)]
 
 
 # ----------------------------------------------------------------------------- the cache
@@ -916,6 +1058,9 @@ def transcript_for(
 def stored_speeches(result: object) -> dict[str, str]:
     """Element id -> the equation's stored spoken reading, from a `DocumentResult`'s fixes
     (the strings the review screen shows as "Read aloud roughly as")."""
+    from readablestem.pipeline.speech import refresh_readings
+
+    refresh_readings(result)  # a reading older rules wrote is made again from its MathML
     fixes = getattr(result, "fixes", None) or []
     return {
         f.element_id: f.equation.speech
@@ -978,5 +1123,5 @@ def hear_for(
         text = _words(alt or "")
         return Hear(text, "Alt text") if text else None
     if kind == "heading" and heading_level and _words(heading_text or ""):
-        return Hear(f"Heading level {heading_level}: {_words(heading_text or '')}")
+        return Hear(f"{_HEADING} level {heading_level}: {_words(heading_text or '')}")
     return None

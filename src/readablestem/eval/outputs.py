@@ -139,7 +139,11 @@ def audit_files(html: str, facts: Facts, speeches: Mapping[str, str] | None) -> 
 
 
 def audit_document(result: DocumentResult) -> dict[str, Any]:
-    """`audit_files` of a converted document: its page, and the readings it stores."""
+    """`audit_files` of a converted document: its page, and the readings it stores (the ones
+    the page, Listen and the files show, so a reading older rules wrote is made again)."""
+    from readablestem.pipeline.speech import refresh_readings
+
+    refresh_readings(result)
     speeches = {
         fix.element_id: fix.equation.speech
         for fix in result.fixes

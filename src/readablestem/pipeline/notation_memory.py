@@ -279,7 +279,7 @@ def bold_letter_fix(element: Element, *, spoken: Mapping[str, str] | None = None
         styles = {style for char, style in element.glyphs.span_glyphs if char.strip()}
         if styles == {"bold-italic"}:
             latex = latex.replace(r"\mathbf", r"\boldsymbol")
-    from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+    from readablestem.pipeline.speech import SPEECH_VERSION, SpeechError, mathml_to_speech
     from readablestem.pipeline.validate import (
         LatexConversionError,
         check_latex,
@@ -307,7 +307,13 @@ def bold_letter_fix(element: Element, *, spoken: Mapping[str, str] | None = None
         kind=Kind.EQUATION,
         status=Status.ACCEPTED,
         confidence=BOLD_LETTER_CONFIDENCE,
-        equation=EquationFix(latex=latex, mathml=mathml, speech=speech, display=display),
+        equation=EquationFix(
+            latex=latex,
+            mathml=mathml,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display=display,
+        ),
         checks=checks,
         review="none",
     )

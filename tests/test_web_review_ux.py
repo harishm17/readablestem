@@ -433,7 +433,7 @@ def spoken(env, element_id: str, speech: str) -> None:
         ("sine theta", "sin θ"),  # a function name
         ("v equals d divided by t", "v = d / t"),
         ("the fraction a plus b over c end fraction", "a + b c"),  # structure words
-        ("double-struck capital R to the power n", "Rn"),  # a style the PDF cannot carry
+        ("double-struck cap R to the power n", "Rn"),  # a style the PDF cannot carry
         ("omega", ""),
         ("", "𝛚"),
     ],

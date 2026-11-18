@@ -10,7 +10,7 @@ omega" in the PDF's.
 Only the symbols are compared, never the words that carry structure ("to the power",
 "sub", "the fraction ... over", "end root"): the text layer has no structure (x² is
 "x2" there), so those would differ on every page. A symbol is a letter or Greek letter
-with its style ("bold", "double-struck", "capital"), a number, or a sign or relation the
+with its style ("bold", "double-struck", "cap"), a number, or a sign or relation the
 sign check compares (plus, minus, equals, less than, ...). Multiplication and division
 are left out, as the checks leave them out (a style choice, not the meaning). "Squared"
 and "cubed" count as the 2 and 3 they stand for.
@@ -69,13 +69,15 @@ class SpokenDiff:
 
 
 def _greek_names() -> frozenset[str]:
-    from readablestem.pipeline.speech import GREEK
+    from readablestem.pipeline.speech import CAP, GREEK
 
-    return frozenset(name.removeprefix("capital ") for name in GREEK.values())
+    return frozenset(name.removeprefix(f"{CAP} ") for name in GREEK.values())
 
 
 def _symbol_at(words: list[str], i: int, greek: frozenset[str]) -> int:
     """How many words from `i` voice one symbol (0: none, a word of structure)."""
+    from readablestem.pipeline.speech import CAP
+
     for sign in SIGNS:
         parts = sign.split()
         if words[i : i + len(parts)] == parts:
@@ -86,7 +88,7 @@ def _symbol_at(words: list[str], i: int, greek: frozenset[str]) -> int:
         if words[j : j + len(parts)] == parts:
             j += len(parts)
             break
-    if j < len(words) and words[j] == "capital":
+    if j < len(words) and words[j] == CAP:
         j += 1
     if j >= len(words):
         return 0

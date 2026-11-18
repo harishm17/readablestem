@@ -45,7 +45,7 @@ from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import exam, job_page
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_when, machine_date
-from readablestem.web.messages import explain_check, explain_reason, severity_label
+from readablestem.web.messages import KIND_LABELS, explain_check, explain_reason, severity_label
 from readablestem.web.review import (
     BULK_KEY,
     CHOICE_KEY,
@@ -57,7 +57,6 @@ from readablestem.web.review import (
     WRITE_KEY,
     item_labels,
 )
-from readablestem.web.views import KIND_LABELS
 
 STATEMENT = (
     "This record lists what the tool did to this document, what a person decided and when, "

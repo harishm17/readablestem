@@ -32,6 +32,7 @@ from typing import Literal
 
 from readablestem.core.types import Check, Element, EquationFix, Fix, Kind
 from readablestem.pipeline.chem_check import compare_species
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.web.messages import explain_check
 
 logger = logging.getLogger(__name__)
@@ -114,7 +115,11 @@ def check_equation_edit(element: Element | None, fix: Fix, typed: str) -> EditCh
     edited = fix.model_copy(
         update={
             "equation": EquationFix(
-                latex=latex, mathml=out.mathml, speech=out.speech, display=display
+                latex=latex,
+                mathml=out.mathml,
+                speech=out.speech,
+                speech_version=SPEECH_VERSION,
+                display=display,
             )
         }
     )
