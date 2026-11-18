@@ -157,6 +157,7 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    say_once,
     shadow,
     step_facts,
     table_math,
@@ -2091,6 +2092,17 @@ def _convert(
             )
         stops += step_facts.ink_stopped(step_facts.PAGE_TYPE, ink_late)
         stops += step_facts.ink_stopped(step_facts.INK_STROKES, strokes_late)
+        # The say-once measure, in shadow (SW60): a page whose words an element does not say
+        # is noted, with its share, in the conversion's own record and nowhere a person sees.
+        # A page kept whole as a picture, or read from one, has its own decision.
+        shadowed.over_line(
+            say_once.NOTICE_CODE,
+            lambda: say_once.over_line(
+                say_once.measure(
+                    getattr(doc, "sources", None) or {}, elements, skip={*kept, *image_built}
+                )
+            ),
+        )
         facts = step_facts.gathered(
             measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
         )

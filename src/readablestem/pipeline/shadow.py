@@ -6,7 +6,9 @@ answer, and the comparison is all that is kept. The conversion's result is the s
 the step and without it, so the step can be measured on real documents before anything
 depends on it. It leaves shadow only when an eval run meets its bar (docs/eval.md).
 
-`Shadow.beside` is the one way to run such a step:
+`Shadow.beside` runs a step that gives an answer to compare; `Shadow.over_line` runs one that
+measures each page of the document (the say-once check, `pipeline.say_once`). Both follow
+these rules:
 
 - it returns nothing, so the caller cannot use the step's answer by mistake;
 - whatever the step raises is caught here and counted as "failed" by the exception's type.
@@ -29,7 +31,7 @@ from __future__ import annotations
 
 import operator
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any, TypeVar
 
 from readablestem.core.types import ShadowFact
@@ -65,6 +67,28 @@ class Shadow:
         )
         with self._lock:
             self._facts.append(fact)
+
+    def over_line(self, step: str, tried: Callable[[], Mapping[int, tuple[float, bool]]]) -> None:
+        """Run a step that measures each page of the document (`tried` gives `{page: (share,
+        over the line)}`) and note, for each page, "differs" with its share when it is over
+        the line and "same" when it is not: the conversion kept the page as complete, and the
+        step says whether it agrees. A step that raises is one "failed" for the whole
+        document, by the exception's type."""
+        try:
+            pages = tried()
+        except Exception as exc:  # every failure: the module's note says why
+            failed = ShadowFact(step=step, outcome="failed", error=type(exc).__name__)
+            with self._lock:
+                self._facts.append(failed)
+            return
+        made = [
+            ShadowFact(
+                step=step, page=page, outcome="differs" if over else "same", share=round(share, 4)
+            )
+            for page, (share, over) in pages.items()
+        ]
+        with self._lock:
+            self._facts.extend(made)
 
     def facts(self) -> list[ShadowFact]:
         """What the steps said, ordered by step and page so that two runs of one document

@@ -1343,6 +1343,9 @@ class ShadowFact(BaseModel):
     page: int | None = None  # 0-based; None for a step over the whole document
     outcome: Literal["same", "differs", "failed"]
     error: str = ""  # the exception's class name when the outcome is "failed"
+    # A step that measures a page (`Shadow.over_line`) says its figure: a share of the page's
+    # words, 0 to 1. None for a step that only compares two answers.
+    share: float | None = None
 
 
 class StepFacts(BaseModel):

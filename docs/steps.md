@@ -1067,6 +1067,55 @@ a cent) because the worst case of one request is $0.05 to $0.09: the output limi
 thinking can fill, dominates it. Every request goes through the run's spend guard; when
 the guard refuses, the run stops and the pages left are `cap_reached`.
 
+## Say once (`pipeline/say_once.py`; runs in shadow only)
+
+Another check of the whole page, with no model and no second read of the file. Layout
+already holds what a page says (`Layout.sources`, one `PageSource` a page: the words of the
+rows it set out to read, each with the box of its glyphs, written while the rows are
+prepared, after the margin filter) and the conversion holds what each element says
+(`Element.text` and `bbox`). `say_once.measure` counts, for each page, the words that **no
+element says**, the words said **twice**, and what layout **left out by its own rule**.
+
+| Code | A word that is |
+|---|---|
+| `no_owner` | in no equation, table or figure box and said by no paragraph, heading, list item, caption or equation label |
+| `two_places` | inside the boxes of two elements that are not parent and child |
+| `place_and_text` | inside an equation, table or figure box and also said by a text element |
+| `said_twice` | said by the elements one time more than the page has it |
+| `not_on_page` | said by an element and not on the page's text layer (counted, no fault: a reading may spell a thing another way) |
+
+An equation, a table and a figure own the glyphs under their box (a child inside its parent,
+a formula in a caption or a cell, is the same owner). A paragraph, heading or list item owns
+words: the page's words that no box holds are matched one for one with the words of those
+elements, after the same folding on both sides (Unicode compatibility form, so ligatures and
+superscript digits; case folded; marks dropped; cut into runs of letters and digits; a word
+broken at a row end is looked for whole first). A paragraph that goes on over a page break
+shares its words between its pages (`Element.last_page`).
+
+Left out by layout's own rule, counted by name and never a fault: `furniture` (the running
+heads, feet, page numbers and watermarks `_MarginFilter` drops), `hidden` (text nobody can
+see, `page_type`), `contents` (the leaders and page numbers of a contents line) and
+`teacher_tag` (OpenStax's "[BL]", "[OL]" level tags). Each is recorded where layout applies
+the rule, so there is no second copy of the rule here. A page kept whole as its picture is
+not measured: it has its own decision.
+
+**It does not see wrong reading order**: the words are matched as a bag, so a block read in
+the wrong place, or a column read in the wrong order, counts as said. `eval order` is the
+measure of order. It does not see a word said in the wrong place, a formula read wrongly or
+a picture's content either.
+
+**In shadow (SW60).** At the end of a conversion `shadowed.over_line("page_missing", ...)`
+(`Shadow.over_line`) gives each measured page one content-free `ShadowFact`: its page, its
+share of words in no element, and `differs` when the page has at least `MIN_WORDS` (40)
+words and at least `LINE` (15%) of them are in no element, `same` otherwise. It is the
+shadow mechanism and not a `Notice` because a notice is listed on the job page and needs
+text for it; this is shown to nobody, changes no counter a person sees, and is counted by
+`shadow.agreement` and logged by the worker (`job_shadow`, step `page_missing`). The step's
+name is the code WS15.9's page-check writer will give the same finding; that writer is not
+built. A step that raises is one `failed` fact for the document; nothing else changes. The
+figures the line was chosen on, and the `eval say-once` command that gives them again, are
+in [eval-say-once.md](eval-say-once.md).
+
 ## Running a new step in shadow (`pipeline/shadow.py`)
 
 A new check or reader is not trusted on the day it is written. It first runs in shadow:
