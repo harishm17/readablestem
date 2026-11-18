@@ -2392,7 +2392,7 @@ text test (`text_pass.struck_glyphs`) and the blank test (`layout._mark_blanks`)
 so a rule has one meaning. A rule that crosses a vertical edge of another drawn path (the plate
 of a battery on its wire, within 2.5 pt of the edge: boxes leave out the stroke width) is part
 of a drawing and is not asked, and neither is a rule with text over or under it in any row (a
-fraction, division or radical bar, an underbrace): that rule is part of the maths.
+fraction, division or radical bar, an underbrace): that rule is part of the math.
 `layout._mark_blanks` runs in `_prepare_rows`, on the fragments of each line before
 `_merge_baselines` joins them, so a blank at the start of a line is in the line when it is
 made and cannot split a paragraph.
