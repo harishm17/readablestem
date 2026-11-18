@@ -497,19 +497,17 @@ class _Reader:
             element = self._new(
                 Kind.LIST_ITEM, text="", list_marker=marker, list_ordered=ordered, list_level=level
             )
-            lead = next((b for b in blocks if b.get("t") in ("Para", "Plain")), None)
+            lead, inlines, rest = _lead_of(blocks)
             text, spans = "", []
             if lead is not None:
-                text, spans, _ = self._inline_text(lead["c"], owner=element)
+                text, spans, _ = self._inline_text(inlines, owner=element)
             element.text = text
             self._apply_spans(element, spans)
             self.chars += len(text)
             pictures, self.loose = self.loose, []
             for picture in pictures:
                 self._picture(picture)
-            for block in blocks:
-                if block is lead:
-                    continue
+            for block in [*rest, *(b for b in blocks if b is not lead)]:
                 if block.get("t") in ("BulletList", "OrderedList"):
                     self._list(block["t"], block["c"], level + 1, depth + 1)
                 else:
@@ -771,6 +769,21 @@ class _Reader:
 
 
 META_KEYS = ("title", "subtitle", "author", "date", "abstract")
+
+
+def _lead_of(blocks: list[Any]) -> tuple[Any, list[Any], list[Any]]:
+    """The paragraph a list item starts with: its block, its inlines and the blocks that come
+    with it. With `+styles` the paragraph is wrapped in a Div carrying its style name ("List
+    Paragraph"), and that Div is the block."""
+    for block in blocks:
+        kind = block.get("t")
+        if kind in ("Para", "Plain"):
+            return block, block["c"], []
+        if kind == "Div":
+            inner = block["c"][1]
+            if inner and inner[0].get("t") in ("Para", "Plain"):
+                return block, inner[0]["c"], inner[1:]
+    return None, [], []
 
 
 def _tables_of(tree: dict[str, Any]) -> list[Any]:

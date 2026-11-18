@@ -392,9 +392,39 @@ def word(body: str) -> bytes:
         .split("<w:body>")[0]
         + f"<w:body>{body}</w:body></w:document>"
     )
-    title = '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/></w:style>'
-    styles = str(parts["word/styles.xml"]).replace("</w:styles>", title + "</w:styles>")
-    return office.rebuild(parts, replace={"word/document.xml": document, "word/styles.xml": styles})
+    named = "".join(
+        f'<w:style w:type="paragraph" w:styleId="{i}"><w:name w:val="{n}"/></w:style>'
+        for i, n in (("Title", "Title"), ("ListParagraph", "List Paragraph"))
+    )
+    styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + "</w:styles>")
+    W = office.W_NS
+    numbering = (
+        f'{office.HEAD}<w:numbering xmlns:w="{W}">'
+        '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0">'
+        '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>'
+        "</w:lvl></w:abstractNum>"
+        '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>'
+    )
+    rels = str(parts["word/_rels/document.xml.rels"]).replace(
+        "</Relationships>",
+        f'<Relationship Id="rId20" Type="{office.OD}/numbering" Target="numbering.xml"/>'
+        "</Relationships>",
+    )
+    types = str(parts["[Content_Types].xml"]).replace(
+        "</Types>",
+        '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-'
+        'officedocument.wordprocessingml.numbering+xml"/></Types>',
+    )
+    return office.rebuild(
+        parts,
+        replace={
+            "word/document.xml": document,
+            "word/styles.xml": styles,
+            "word/_rels/document.xml.rels": rels,
+            "[Content_Types].xml": types,
+        },
+        add={"word/numbering.xml": numbering},
+    )
 
 
 def read_word(data: bytes):
@@ -414,11 +444,26 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
         "<w:r><w:rPr><w:vanish/></w:rPr><w:t>SECRET-HIDDEN-WORDS</w:t></w:r></w:p>"
         "<w:p><m:oMathPara><m:oMath><m:r><m:t>v=</m:t></m:r><m:f><m:num><m:r><m:t>d</m:t></m:r>"
         "</m:num><m:den><m:r><m:t>t</m:t></m:r></m:den></m:f></m:oMath></m:oMathPara></w:p>"
+        + "".join(
+            '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/>'
+            '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/>'
+            f"</w:numPr></w:pPr><w:r><w:t>{word}</w:t></w:r></w:p>"
+            for word in ("First step", "Second step")
+        )
         + _cells("Name|Value", "g|9.8", marked=True)
         + _cells("Name|Value", "c|3.0", marked=False)
     )
     reading = read_word(word(body))
-    assert kinds(reading) == ["heading", "heading", "paragraph", "equation", "table", "table"]
+    assert kinds(reading) == [
+        "heading",
+        "heading",
+        "paragraph",
+        "equation",
+        "list_item",
+        "list_item",
+        "table",
+        "table",
+    ]
     assert reading.title == "Kinematics notes" and reading.unread_words == 0
     text = " ".join(e.text or "" for e in reading.elements)
     assert "SECRET-HIDDEN-WORDS" not in text and "page 7" in text
@@ -426,7 +471,9 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
     fix = reading.fixes[equation.id]
     assert fix.status is Status.ACCEPTED and fix.equation is not None
     assert "frac" in fix.equation.latex and "<mfrac" in (fix.equation.mathml or "")
-    first, second = reading.elements[4:]
+    items = reading.elements[4:6]  # a list item keeps its words under a styled paragraph
+    assert [(i.text, i.list_marker) for i in items] == [("First step", "1."), ("Second step", "2.")]
+    first, second = reading.elements[6:]
     # the author's header row is exact; the first-row look pandoc reads as a header is only a
     # proposal, and says so in a check
     assert first.table is not None and first.table.header_rows == 1
