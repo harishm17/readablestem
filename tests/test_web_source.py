@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import io
+import re
 import stat
 import zipfile
 
@@ -345,6 +346,9 @@ def test_a_source_that_loses_content_never_ends_as_converted(name, tmp_path, cap
         env.run_worker()
         job = env.job(job_id)
         page = client.get(f"/jobs/{job_id}").text
+        # What the page tells the person to do is something they can do: each link answers.
+        for link in re.findall(r'<a [^>]*href="(/[^"#]*)"', page.split("<main", 1)[-1]):
+            assert client.get(html.unescape(link)).status_code < 400, link
         if row.code is None:
             assert job.status == JobStatus.DONE and job.result_json is not None
             assert row.shown in (job.html or "")
