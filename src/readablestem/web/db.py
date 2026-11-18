@@ -121,7 +121,11 @@ class Job(Base):
     # and commands that stopped it, for its owner's page. Names from the document, so never
     # logged or counted, cleared when the job is tried again, deleted with the job.
     error_detail: Mapped[dict | None] = mapped_column(JSON)
+    # What the job has spent and what its calls in flight hold (`web.worker`): `cost_usd` is
+    # both, since the caps count both, and `held_usd` the part of it not yet settled. What a
+    # page may show as spent is `settled_usd`; what is held is not spent.
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    held_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     model_calls: Mapped[int] = mapped_column(Integer, default=0)
     # The two large columns (a long document's result is megabytes of JSON, its page as much
     # HTML) are deferred: reading the row does not load them, the first use of one does (one
@@ -208,6 +212,13 @@ class Job(Base):
     edits: Mapped[list[ReviewEdit]] = relationship(
         back_populates="job", cascade="all, delete-orphan", passive_deletes=True
     )
+
+    @property
+    def settled_usd(self) -> float:
+        """What the job has spent: its calls that came back, not what its calls in flight
+        hold. It never falls while a job runs, and it is the job's cost when the job ends.
+        `held_usd` is the rest of `cost_usd`."""
+        return max(0.0, float(self.cost_usd or 0.0) - float(self.held_usd or 0.0))
 
     @property
     def has_html(self) -> bool:
@@ -300,6 +311,9 @@ class JobCall(Base):
     attempt: Mapped[int] = mapped_column(Integer)
     is_fallback: Mapped[bool] = mapped_column(Boolean)
     outcome: Mapped[str] = mapped_column(String(32))
+    # The part of `cost_usd` charged at the reservation, no usage having come back: a hold,
+    # not a cost, so it is totaled apart from settled spend. 0: all of it is measured.
+    billed_unseen_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
 
 class JobStage(Base):

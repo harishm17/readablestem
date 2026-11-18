@@ -312,6 +312,45 @@ def estimate_max_cost_usd(
     return worst / 1_000_000
 
 
+# --- Reservation sizes, from measured calls ---------------------------------------------
+#
+# The worst case above is what a call could cost if it filled its output limit with
+# thinking, with the largest image. A call of the pipeline costs a fraction of it: on the
+# replay below the dearest call of each step was 0.18 to 0.6 of its worst case, and an Opus
+# equation read held about $0.099 and cost $0.0025 at the median. Holds that are many times
+# the cost starve a job that is far under its cap: eight reads in flight hold $0.79, more than
+# the $0.33 that was left of a $0.60 run cap with $0.27 spent.
+# A reservation is therefore the worst case of the request, or the measured size of its
+# step on its model when that is less.
+#
+# The size is twice the dearest call of the step on the model in the replay of the corpus's
+# recorded answers (`readablestem eval cost`; every request a conversion sent, 1,376 calls of
+# 39 uploads, under the production profile, dollars as recorded), rounded up. Its number of
+# calls is in the comment on its row. One equation call of the recordings is left out of
+# the dearest: its $0.1039 is a send charged at its reservation after no usage came back
+# plus the retry's $0.0038 (`ModelCall.billed_unseen_usd`), not a cost. A step that is not
+# in the table has no measured call (the page steps, the judge, the checks) and holds its
+# worst case. A call that costs more than its reservation is settled at what it cost and
+# logged (`model_call_over_reservation`): widen its row from a new replay.
+RESERVATIONS_MEASURED = "2026-11-18"
+RESERVATIONS: dict[tuple[str, str], float] = {
+    ("equation", "claude-haiku-5-5"): 0.0015,  # dearest of 685: $0.0007
+    ("equation", "claude-opus-5-5"): 0.046,  # 440: $0.023
+    ("figure", "claude-haiku-5-5"): 0.0015,  # 41: $0.0007
+    ("figure", "claude-opus-5-5"): 0.065,  # 156: $0.0325
+    ("image_page", "claude-opus-5-5"): 0.142,  # 14: $0.0707
+    ("table", "claude-haiku-5-5"): 0.012,  # 27: $0.0059
+    ("table", "claude-opus-5-5"): 0.12,  # 12: $0.060
+}
+
+
+def reservation_usd(step: str, model: str, worst_case_usd: float) -> float:
+    """What a call of `step` on `model` holds before it is sent: its worst case, or the
+    measured size of the step on that model (`RESERVATIONS`) when that is less."""
+    measured = RESERVATIONS.get((step, model))
+    return worst_case_usd if measured is None else min(worst_case_usd, measured)
+
+
 # --- Decisions API (POST /v1/decisions; ADR 0005) --------------------------------------
 #
 # Its own price list: the endpoint bills input tokens only (no output, cache-read or

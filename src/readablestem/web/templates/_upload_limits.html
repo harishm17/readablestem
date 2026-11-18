@@ -20,7 +20,8 @@
     review screen (marking an equation, reading a table cell) a day{% if invited_page_quota %}; an
     invited account can convert {{ invited_page_quota }} pages a day{% endif %}. New accounts
     also share a small part of the day's budget for model calls: when it is used up,
-    conversions for new accounts pause until midnight UTC while others go on. New accounts
+    conversions for new accounts pause until midnight UTC while others go on. Pages dense with
+    equations use more of that share than plain pages, so it lasts for fewer of them. New accounts
     are limited in number each day too.
     {% elif invited_page_quota %}You can convert {{ invited_page_quota }} pages a day.
     {% endif %}

@@ -713,7 +713,7 @@ def job_view(
         opt_in=job.opt_in_retention,
         error_code=job.error_code,
         error_detail=job.error_detail if job.status == JobStatus.FAILED else None,
-        cost_usd=job.cost_usd,
+        cost_usd=job.settled_usd,  # spent; what its calls in flight hold is `job.held_usd`
         model_calls=job.model_calls,
         queue_ahead=ahead,
         retries=job.retries or 0,

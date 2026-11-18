@@ -29,6 +29,12 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Protocol
 
+# How long a refused reservation waits for a call in flight to settle (a model call ends,
+# at the latest, with the provider's timeout), and the refusals that a settlement can undo:
+# the job's dollar cap and the day's. A call cap is not one.
+SETTLE_WAIT_S = 120.0
+_SETTLING_HELPS = frozenset({"job_usd", "daily"})
+
 
 class BudgetExceeded(RuntimeError):
     """A cap would be exceeded. `scope` is "daily", "job_usd" or "job_calls"."""
@@ -102,12 +108,36 @@ class JobBudget:
     spent_usd: float = 0.0
     calls: int = 0
     _held: float = 0.0
-    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    # Reservations made and not yet settled, and how many have been settled: what a refused
+    # reservation waits on (`reserve`).
+    _open: int = 0
+    _settled: int = 0
+    _lock: threading.Condition = field(default_factory=threading.Condition, repr=False)
 
     def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
         """Hold `amount_usd` against the job's and the daily dollar caps, and one of the
         job's model calls unless `count_call` is False (a second-check request, which
-        is not a model call: see the module docstring). Raises BudgetExceeded."""
+        is not a model call: see the module docstring). Raises BudgetExceeded.
+
+        A dollar cap is never smaller than what is spent plus what the calls in flight hold,
+        and a call refused for a dollar cap while others of this job are in flight is not
+        yet over it: their holds are usually far above their cost. It waits for one of them
+        to settle and asks once more; only the second refusal stops the job."""
+        with self._lock:
+            settled_before = self._settled
+        try:
+            return self._reserve(amount_usd, count_call=count_call)
+        except BudgetExceeded as exc:
+            if exc.scope not in _SETTLING_HELPS:
+                raise
+            with self._lock:
+                if not self._open:
+                    raise
+                self._lock.wait_for(lambda: self._settled > settled_before, SETTLE_WAIT_S)
+        return self._reserve(amount_usd, count_call=count_call)
+
+    def _reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
+        """One attempt at `reserve`."""
         with self._lock:
             if count_call and self.calls + 1 > self.max_calls:
                 raise BudgetExceeded("job_calls", f"job call cap {self.max_calls} reached")
@@ -117,10 +147,17 @@ class JobBudget:
             if count_call:
                 self.calls += 1
             self._held += amount_usd
+            self._open += 1
             return reservation
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
-        with self._lock:
-            self._held = max(0.0, self._held - reservation.amount_usd)
-            self.spent_usd += max(0.0, actual_usd)
-        self.guard.settle(reservation, actual_usd)
+        try:
+            self.guard.settle(reservation, actual_usd)
+        finally:
+            # Last, so a call waiting on this settlement finds the day's books settled too.
+            with self._lock:
+                self._held = max(0.0, self._held - reservation.amount_usd)
+                self.spent_usd += max(0.0, actual_usd)
+                self._open = max(0, self._open - 1)
+                self._settled += 1
+                self._lock.notify_all()

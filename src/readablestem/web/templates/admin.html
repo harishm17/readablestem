@@ -57,6 +57,7 @@
     <div><dt>Seconds a page, for 95 in 100</dt><dd>{% if steps.s_per_page_p95 is not none %}{{ "%.1f"|format(steps.s_per_page_p95) }}{% else %}Not timed{% endif %}</dd></div>
     <div><dt>Model calls a page</dt><dd>{{ "%.1f"|format(steps.calls_per_page) }}</dd></div>
     <div><dt>Dollars a page</dt><dd>{{ steps.usd_per_page|usd }}</dd></div>
+    <div><dt>Charged at their hold, no usage came back</dt><dd>{{ steps.billed_unseen_calls }} calls, {{ steps.billed_unseen_usd|usd }}</dd></div>
   </dl>
   {% else %}
   <p>No document measured yet.</p>

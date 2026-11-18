@@ -53,8 +53,10 @@ class StepRow:
     call_s_p50: float
     call_s_p95: float
     call_usd_p99: float
-    usd: float
+    usd: float  # settled: calls that came back with their usage
     usd_per_page: float
+    billed_unseen: int = 0  # calls charged at their reservation (`CallFact.billed_unseen_usd` > 0)
+    billed_unseen_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -74,8 +76,12 @@ class Report:
     pages: int
     steps: list[StepRow] = field(default_factory=list)
     stages: list[StageRow] = field(default_factory=list)
-    usd: float = 0.0
+    usd: float = 0.0  # settled: without the calls charged at their reservation
     usd_per_page: float = 0.0
+    # Calls charged at their reservation because no usage came back, and their dollars: apart
+    # from `usd`, which is what the calls cost.
+    billed_unseen_calls: int = 0
+    billed_unseen_usd: float = 0.0
     calls: int = 0  # every request
     counted_calls: int = 0  # those in a job's call count
     calls_per_page: float = 0.0
@@ -110,7 +116,8 @@ def _step_rows(calls: Iterable[CallFact], pages: int) -> list[StepRow]:
     per_page = 1 / pages if pages else 0.0
     rows = []
     for (step, model), group in sorted(by_step.items()):
-        usd = sum(c.cost_usd for c in group)
+        unseen = [c for c in group if c.billed_unseen_usd]
+        usd = sum(c.cost_usd - c.billed_unseen_usd for c in group)
         asked = sum(c.input_tokens for c in group)
         cached = sum(c.cached_input_tokens for c in group)
         seconds = [c.seconds for c in group]
@@ -127,9 +134,11 @@ def _step_rows(calls: Iterable[CallFact], pages: int) -> list[StepRow]:
                 cache_read=_ratio(cached, asked),
                 call_s_p50=percentile(seconds, 0.5),
                 call_s_p95=percentile(seconds, 0.95),
-                call_usd_p99=percentile([c.cost_usd for c in group], 0.99),
+                call_usd_p99=percentile([c.cost_usd - c.billed_unseen_usd for c in group], 0.99),
                 usd=usd,
                 usd_per_page=usd * per_page,
+                billed_unseen=len(unseen),
+                billed_unseen_usd=sum(c.billed_unseen_usd for c in unseen),
             )
         )
     return rows
@@ -167,7 +176,8 @@ def report(jobs: Sequence[Measured]) -> Report:
     are to be left out by the caller: they would count pages that nothing was measured for."""
     pages = sum(job.pages for job in jobs)
     calls = [call for job in jobs for call in job.facts.calls]
-    usd = sum(c.cost_usd for c in calls)
+    unseen = [c for c in calls if c.billed_unseen_usd]
+    usd = sum(c.cost_usd - c.billed_unseen_usd for c in calls)
     with_row = [job for job in jobs if job.settled_usd is not None]
     timed = [job for job in jobs if job.wall_s is not None and job.pages]
     rates = [job.wall_s / job.pages for job in timed if job.wall_s is not None]
@@ -178,6 +188,8 @@ def report(jobs: Sequence[Measured]) -> Report:
         stages=_stage_rows(jobs),
         usd=usd,
         usd_per_page=usd / pages if pages else 0.0,
+        billed_unseen_calls=len(unseen),
+        billed_unseen_usd=sum(c.billed_unseen_usd for c in unseen),
         calls=len(calls),
         counted_calls=sum(c.counted for c in calls),
         calls_per_page=len(calls) / pages if pages else 0.0,
@@ -270,12 +282,14 @@ def render(made: Report) -> str:
     lines += [
         "",
         f"dollars: {made.usd:.4f} ({made.usd_per_page:.4f} a page)",
+        f"charged at their reservation, no usage came back: {made.billed_unseen_calls} calls, "
+        f"${made.billed_unseen_usd:.4f} (not in the dollars above)",
         f"calls: {made.calls} ({made.calls_per_page:.2f} a page), "
         f"{made.counted_calls} in the jobs' call counts",
         f"input read from the prompt cache: {_percent(made.cache_read)}",
     ]
     if made.settled_usd is not None:
-        apart = made.settled_usd - made.usd
+        apart = made.settled_usd - made.usd - made.billed_unseen_usd
         lines.append(
             f"settled on the job rows: ${made.settled_usd:.4f} and {made.settled_calls} calls"
             + (
