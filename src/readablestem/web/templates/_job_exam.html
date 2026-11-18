@@ -4,5 +4,5 @@
    of a finished document. The student's page and files never say it. #}
 {% if not job.is_sample %}
 <p id="job-exam">{{ exam_words.on if job.exam_mode else exam_words.off }}
-  {% if job.is_owner and job.status == "done" %}<a href="/app?revises={{ job.id }}#upload-heading">{{ exam_words.change }}</a>{% endif %}</p>
+  {% if job.is_owner and job.status == "done" %}<a href="/app?revises={{ job.id }}#exam">{{ exam_words.change }}</a>{% endif %}</p>
 {% endif %}
