@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from html import escape
 from html.parser import HTMLParser
@@ -453,7 +453,7 @@ class _Transcript:
                 self.block(child, depth + 1)
         flush()
 
-    def run(self, nodes: list[Node | str]) -> None:
+    def run(self, nodes: Sequence[Node | str]) -> None:
         """A run of inline content, said as one paragraph, except the page's own "skip to
         content" link: that is an item of its own (kind `skip-link`), said before the lesson.
         Both come from the run's element place, so the link's id is the one it always had."""
