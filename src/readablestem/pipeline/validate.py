@@ -62,12 +62,11 @@ from latex2mathml.converter import convert as _latex2mathml_convert
 from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 
 from readablestem.core.latex_groups import group_delimited_scripts
-from readablestem.core.mathchars import bake_bold_variants
 from readablestem.core.mathml_intent import intent_allowed
 from readablestem.core.types import Check
 from readablestem.pipeline.chem import arrows_as_operators, group_element_symbols
 from readablestem.pipeline.chem_mathml import shape_chemistry
-from readablestem.pipeline.mathml_shape import shape_general
+from readablestem.pipeline.mathml_shape import normal_form, shape_general
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -577,7 +576,7 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
         root = wrapper
     root.set("display", display)
     _unescape_text_specials(root)
-    bake_bold_variants(root)
+    normal_form(root)
     group_element_symbols(root)
     arrows_as_operators(root)
     shape_general(root)
@@ -617,7 +616,7 @@ ALLOWED_ATTRIBUTES = _words(
     minsize maxsize linethickness numalign denomalign bevelled width height depth voffset
     linebreak notation columnalign rowalign columnspacing rowspacing columnlines rowlines
     columnwidth frame framespacing equalrows equalcolumns rowspan columnspan open close
-    encoding fontstyle fontweight
+    encoding fontstyle fontweight data-aligned-rows
     """
 )
 # Allowed on the root <math> only (OpenStax sets alttext there; it is the fallback text

@@ -18,6 +18,7 @@ from defusedxml import ElementTree as SafeET
 from markupsafe import Markup
 
 from readablestem.core.mathml_intent import intent_allowed
+from readablestem.pipeline.mathml_shape import normal_form
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -109,6 +110,7 @@ def sanitize_mathml(mathml: str, *, flag: Collection[str] = ()) -> Markup:
     if _local(root.tag) != "math":
         raise UnsafeMathML("root is not <math>")
     out: list[str] = []
+    normal_form(root)
     _write(root, out, 0, frozenset(_fold(c) for c in flag))
     return Markup("".join(out))  # every piece above was escaped or is a fixed literal
 
