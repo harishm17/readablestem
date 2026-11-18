@@ -262,6 +262,20 @@ def test_a_paragraph_is_not_cut_after_its_indented_first_line(indent):
     assert [len((e.text or "").split()) for e in paragraphs(layout)] == [3 * words, 5 * words]
 
 
+def test_centred_lines_of_different_lengths_are_not_one_paragraph():
+    short, long = "Northwestern University", "a_name2025@u.northwestern.edu"
+
+    def fill(number, page):
+        for y, text in [(100, short), (117, long), (180, short), (240, short), (300, short)]:
+            width = pymupdf.get_text_length(text, fontname="helv", fontsize=14)
+            page.insert_text((306 - width / 2, y), text, fontsize=14, fontname="helv")
+        para(page, 400, size=10)
+
+    elements = analyze(pdf_of(fill)).elements
+    found = [e.text for e in elements if "northwestern" in (e.text or "").lower()]
+    assert found[:2] == [short, long]
+
+
 # ---------------------------------------------- 4. paragraphs across a page break
 
 

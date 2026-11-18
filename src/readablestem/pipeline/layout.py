@@ -269,6 +269,9 @@ REASON_TAGGED = "tagged heading h"
 REASON_IMAGE_HEADING = "image heading h"
 REASON_NUMBERED = "numbered section"
 REASON_NUMBERED_LINE = "standalone numbered line"
+# A capital letter alone on a line in the sequence of an index or a glossary (`_letter_rows`):
+# a heading one level under the section it is in (`heading_levels`).
+REASON_LETTER = "letter heading"
 REASON_LIST_NUMBER = "list-style number"
 # A bold body-size label that repeats ("Solution" under every example): bold text, not a
 # heading (`_mark_run_in_labels`, `heading_step.heading_fixes`).
@@ -971,6 +974,12 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
         else:
             raw = below + max(0, (depth[e.id] or shallowest) - shallowest)
         levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
+    section = None  # the level of the last heading that is not a letter of an index
+    for e in sorted(headings, key=lambda e: e.order):
+        if REASON_LETTER not in e.reasons:
+            section = levels[e.id]
+        elif section is not None:
+            levels[e.id] = min(6, section + 1)  # one level under the section it heads
     return levels
 
 
@@ -1529,6 +1538,9 @@ class _Row:
     # A line of a table of contents with its leaders and page number cut off
     # (`_contents_rows`): an entry of its own, at this nesting level (1 = outermost).
     contents_level: int = 0
+    # A capital letter alone on its line, in a sequence of such lines (A, B, C ... of a
+    # glossary or an index): a heading of its own (`_letter_rows`).
+    letter: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
@@ -4723,16 +4735,59 @@ def _run_in_entries(block: _Block) -> list[_Block] | None:
     for number, first in enumerate(starts):
         end = starts[number + 1] if number + 1 < len(starts) else len(rows)
         group = rows[first:end]
-        lead = _bold_lead(group[0])
-        term = _Block(Kind.PARAGRAPH, block.bbox, [_Row(group[0].chars[:lead])])
-        rest = [_Row(group[0].chars[lead:], column=group[0].column), *group[1:]]
-        body = _Block(Kind.PARAGRAPH, block.bbox, rest)
-        definition = _paragraph_pieces(body)
-        if not _has_content(definition):
+        entry = _lead_entry(group, _bold_lead(group[0]), block.bbox)
+        if entry is None:
             return None
-        box = _union(r.bbox for r in group)
-        entries.append(_entry(_paragraph_pieces(term), definition, box, group, group[0].size))
+        entries.append(entry)
     return entries
+
+
+def _lead_entry(group: list[_Row], lead: int, box: BBox) -> _Block | None:
+    """The lines of one entry, whose first line has its term in its first `lead` characters, as
+    an entry block (`_entry`); None when the entry has no definition."""
+    term = _Block(Kind.PARAGRAPH, box, [_Row(group[0].chars[:lead])])
+    rest = [_Row(group[0].chars[lead:], column=group[0].column), *group[1:]]
+    definition = _paragraph_pieces(_Block(Kind.PARAGRAPH, box, rest))
+    if not _has_content(definition):
+        return None
+    return _entry(
+        _paragraph_pieces(term), definition, _union(r.bbox for r in group), group, group[0].size
+    )
+
+
+def _lead_entries(pages: list[_PageBlocks]) -> None:
+    """Three or more paragraphs in a row that each start with a lead term (`_lead_end`) are the
+    entries of a glossary or a list of terms: each is written as a term and its definition (in
+    place; `Element.term_end`), which the assembler makes one definition list. The letter
+    headings of an index between them do not end the row; anything else does. Fewer than three
+    are paragraphs that begin with an emphasised phrase, and stay paragraphs."""
+    row: list[tuple[_Block, int]] = []
+
+    def settle() -> None:
+        entries = [(b, _lead_entry(b.rows, lead, b.bbox)) for b, lead in row]
+        if len(row) >= LEAD_ENTRIES and all(e is not None for _, e in entries):
+            for block, entry in entries:
+                assert entry is not None
+                block.pieces, block.term_pieces = entry.pieces, entry.term_pieces
+        row.clear()
+
+    for block in (b for page in pages for b in page.blocks):
+        if block.kind == Kind.HEADING and REASON_LETTER in block.reasons:
+            continue
+        found = (
+            _lead_end(block.rows[0])
+            if block.kind == Kind.PARAGRAPH
+            and block.rows
+            and not block.code
+            and block.marker is None
+            and block.term_pieces is None
+            else None
+        )
+        if found is None:
+            settle()
+        else:
+            row.append((block, found[0]))
+    settle()
 
 
 def _entry(term: list[str | _Inline], definition: list[str | _Inline], box: BBox, rows, size):
@@ -8247,7 +8302,233 @@ class _RightEdges:
         return self._seen[key]
 
 
+HANGING_ENTRIES = 3  # entries in a row that make a hanging indent a list of entries
+HANGING_REACH = (1.0, 4.0)  # em: how far right of an entry's first line its other lines start
+LEAD_ENTRIES = 3  # paragraphs in a row that start with a lead term, to make a list of entries
+LETTER_SEQUENCE = 3  # letters in a row that make capitals alone on a line the sections of an index
+
+
+def _lead_end(row: _Row) -> tuple[int, Callable[[_Char], bool]] | None:
+    """(where the lead term ends, the test for its style) when the line starts with one.
+
+    A lead term is a stretch at the start of a line in bold, in italic or in small capitals
+    that ends in a period or a colon and is followed by regular type on the same line: a
+    few words, "Biodiversity. The variety of ...", "Bias: a tendency ...". A line that is
+    in that style throughout has no lead (a heading, an emphasised paragraph), and neither
+    has a letter or a number ("A.", "2.") or a variable (an italic x)."""
+    chars = row.chars
+    first = next((i for i, c in enumerate(chars) if not c.blank), None)
+    if first is None:
+        return None
+    tests: list[Callable[[_Char], bool]] = [
+        lambda c: c.bold,
+        lambda c: c.italic and not c.math,
+        lambda c: c.c.isupper() or not c.c.isalpha(),  # small capitals, checked below
+    ]
+    for number, test in enumerate(tests):
+        if not test(chars[first]):
+            continue
+        end = first
+        for i in range(first, len(chars)):
+            if chars[i].blank:
+                continue
+            if not test(chars[i]) or (number == 2 and chars[i].c in ".:" and i > end):
+                break
+            end = i + 1
+        else:
+            continue  # the whole line is in the style
+        if end < len(chars) and chars[end].c in ".:":
+            end += 1  # a period or a colon set in regular type after the lead
+        lead = chars[first:end]
+        text = "".join(c.c for c in lead).strip()
+        words = text.rstrip(".:").split()
+        if (
+            text[-1:] in (".", ":")
+            and 1 <= len(words) <= MAX_TERM_WORDS
+            and sum(c.isalpha() for c in text) >= 2
+            and not any(c.math for c in lead)
+            and (number < 2 or _small_capitals(lead))
+            and any(not c.blank for c in chars[end:])
+        ):
+            return end, test
+    return None
+
+
+def _small_capitals(chars: Sequence[_Char]) -> bool:
+    """Capitals of two sizes on one baseline: a large one where a word starts and smaller
+    ones after it, the way small capitals are set."""
+    letters = [c for c in chars if c.c.isalpha()]
+    if len(letters) < 3 or not all(c.c.isupper() for c in letters):
+        return False
+    sizes = {round(c.size, 1) for c in letters}
+    biggest = max(sizes)
+    return (
+        len(sizes) == 2
+        and min(sizes) <= 0.9 * biggest
+        and max(c.baseline for c in letters) - min(c.baseline for c in letters) <= 0.1 * biggest
+    )
+
+
+def _starts_entry(prev: _Row, row: _Row, run: _Run, edges: _RightEdges) -> bool:
+    """Does `row` start an entry of a glossary or a list of terms: a lead term (`_lead_end`)
+    at the left edge of the paragraph `run`, after a line that does not end in that style. (An
+    italic title that starts a line inside an entry of a bibliography is indented with it; an
+    italic "et al." after a line that runs full and stops mid-sentence is part of it.)"""
+    found = _lead_end(row)
+    if found is None or row.marker is not None or row.x0 > run.box[0] + 0.5 * row.size:
+        return False
+    if prev.clean[-1:] not in '.:;?!)”"' and prev.x1 >= edges.of(prev) - 1.5 * prev.size:
+        return False
+    last = next((c for c in reversed(prev.chars) if not c.blank), None)
+    return last is not None and not found[1](last)
+
+
+def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
+    """Mark the capital letters that head the sections of an index or a glossary (`_Row.letter`).
+
+    One capital letter alone on its line, bold or larger than the body text, in an
+    alphabetical sequence: at least `LETTER_SEQUENCE` such lines through the document, each
+    letter after the one before it (a letter with no entries is skipped), in one size,
+    typeface and column. A letter on its own line anywhere else is a label or a variable,
+    and is never marked."""
+    found: list[_Row] = []
+    for number in sorted(pages):
+        rows = sorted(pages[number], key=lambda r: (r.column == "R", r.y0))
+        found += [
+            r
+            for r in rows
+            if not r.vertical
+            and len(r.ink) == 1
+            and "A" <= r.ink[0].c <= "Z"
+            and not r.ink[0].math
+            and (r.bold or r.size >= HEADING_SIZE_RATIO * ctx.body)
+        ]
+    chain: list[_Row] = []
+    for row in [*found, None]:
+        if chain and (
+            row is None
+            or row.ink[0].c <= chain[-1].ink[0].c
+            or round(row.size * 2) != round(chain[-1].size * 2)
+            or row.family != chain[-1].family
+            or row.column != chain[-1].column
+        ):
+            if len(chain) >= LETTER_SEQUENCE:
+                for member in chain:
+                    member.letter = True
+            chain = []
+        if row is not None:
+            chain.append(row)
+
+
+def _hangs(group: Sequence[_Row]) -> list[tuple[int, int, float]]:
+    """The entries of consecutive lines of one column, as (first line, after the last line,
+    indent): a line at the left edge of the lines followed by one or more that start the
+    same distance further right (`HANGING_REACH`)."""
+    left = min(r.x0 for r in group)
+    kinds = [
+        "L"
+        if r.x0 - left <= 0.5 * r.size
+        else "I"
+        if HANGING_REACH[0] * r.size <= r.x0 - left <= HANGING_REACH[1] * r.size
+        else "?"
+        for r in group
+    ]
+    out: list[tuple[int, int, float]] = []
+    i = 0
+    while i < len(group):
+        end = i + 1
+        if kinds[i] == "L" and end < len(group) and kinds[end] == "I":
+            indent = group[end].x0 - left
+            while (
+                end < len(group)
+                and kinds[end] == "I"
+                and abs(group[end].x0 - left - indent) <= 0.5 * group[end].size
+            ):
+                end += 1
+            out.append((i, end, indent))
+        i = end
+    return out
+
+
+def _flows(entry: Sequence[_Row], edges: _RightEdges) -> bool:
+    """Do the lines of an entry set with a hanging indent run on from one to the next: every
+    line but the last reaches the right edge, the first line when it is followed by only
+    one line, and otherwise not the first, which may be a short term. The lines of a
+    contents list, nested by indent, each stop where their own title does."""
+    body = entry[1:]
+    counted = body[:-1] if len(body) > 1 else entry[:1]
+    return all(r.x1 >= edges.of(r) - 1.5 * r.size for r in counted)
+
+
+def _hanging_entries(rows: Sequence[_Row], edges: _RightEdges) -> dict[int, int]:
+    """The rows of entries set with a hanging indent, by `id(row)`, each with its entry's
+    number: the first row of an entry starts a block and the others go on from it.
+
+    Entries are `HANGING_ENTRIES` or more in a row, each a line at the left edge of its lines
+    followed by lines that all start the same distance further right, the same distance for
+    every entry of the row (a bibliography, an index, a glossary). A paragraph with an
+    indented first line has its lines the other way round; the entries of one or two lines
+    that look like it, set with the short line first, count only when their first line runs
+    to the right edge. The line after the last entry, if it is at the left edge, starts one
+    too."""
+    found: dict[int, int] = {}
+    entry = 0
+
+    def settle(group: Sequence[_Row]) -> None:
+        nonlocal entry
+        chains: list[list[tuple[int, int, float]]] = [[]]
+        for item in _hangs(group):
+            chain = chains[-1]
+            if chain and (
+                item[0] != chain[-1][1] or abs(item[2] - chain[0][2]) > 0.5 * group[item[0]].size
+            ):
+                chains.append(chain := [])
+            chain.append(item)
+        left = min(r.x0 for r in group)
+        for chain in chains:
+            if len(chain) < HANGING_ENTRIES or not all(
+                _flows(group[first:end], edges) for first, end, _ in chain
+            ):
+                continue
+            for first, end, _ in chain:
+                entry += 1
+                for row in group[first:end]:
+                    found[id(row)] = entry
+            after = chain[-1][1]
+            if after < len(group) and group[after].x0 - left <= 0.5 * group[after].size:
+                entry += 1
+                found[id(group[after])] = entry
+
+    group: list[_Row] = []
+    for row in rows:
+        if not (
+            row.kind == "text"
+            and not row.vertical
+            and not row.code
+            and row.marker is None
+            and not row.note
+            and not row.contents_level
+        ):
+            if group:
+                settle(group)
+            group = []
+            continue
+        prev = group[-1] if group else None
+        if prev is not None and not (
+            row.column == prev.column
+            and abs(row.size - prev.size) <= max(1.0, 0.12 * prev.size)
+            and 0.5 * prev.size <= row.baseline - prev.baseline <= 2.2 * prev.size
+        ):
+            settle(group)
+            group = []
+        group.append(row)
+    if group:
+        settle(group)
+    return found
+
+
 INDENT_REACH = 4  # em: how far left of an indented first line the paragraph's next line may start
+_REFERENCE_NUMBER = re.compile(r"\[\d{1,3}\]")
 
 
 def _continues(
@@ -8258,7 +8539,8 @@ def _continues(
     With `edges` (the text lines of the page), a run of one line that is indented, runs to
     the right edge and is no list item, caption or end of a sentence goes on with a line
     that starts up to `INDENT_REACH` em to its left: the second line of a paragraph whose
-    first line is indented like a typewriter's tab. Without `edges` it is rejected."""
+    first line is indented like a typewriter's tab (not two centred lines, not the next
+    numbered reference). Without `edges` it is rejected."""
     size = prev.size
     if abs(row.size - size) > max(1.0, 0.12 * size):
         return False
@@ -8277,7 +8559,10 @@ def _continues(
             and row.x0 >= left - INDENT_REACH * size
             and prev.x1 >= edges.of(prev) - 1.5 * size
             and row.x1 >= prev.x1 - 3 * size
+            # two lines centred on one another (author, affiliation) are not an indent
+            and abs(prev.x0 + prev.x1 - row.x0 - row.x1) > 0.5 * size
             and row.marker is None
+            and not _REFERENCE_NUMBER.match(row.clean)  # "[20] Smith": the next reference
             and prev.marker is None
             and not CAPTION.match(prev.clean)
             and prev.clean[-1:] not in ".:?!"
@@ -8288,6 +8573,8 @@ def _continues(
         return False
     if run.rows[0].marker is not None and row.x0 < left - 0.5 * size:
         return False  # a list item goes on at its marker or its text, never further left
+    if edges is not None and len(run.rows) == 1 and _lead_end(run.rows[0]) is not None:
+        right = max(right, edges.of(prev))  # an entry of one line: its line ends short of the edge
     if row.x0 - run.margin >= 0.8 * size and prev.x1 < right - 1.5 * size:
         return False  # first-line indent after a short line: a new paragraph
     return row.marker is None and not CAPTION.match(row.clean)
@@ -8339,7 +8626,169 @@ def _leader_split(row: _Row) -> list[_Char] | None:
     return title
 
 
-def _contents_rows(rows: list[_Row]) -> list[_Row]:
+CONTENTS_SHAPE_LINES = 3  # lines that end in a page number, at one right edge: a contents list
+CONTENTS_START_PAGES = 3  # without a "Contents" heading over it, a list counts on these pages
+CONTENTS_REACH = 1.5  # x size: how far the right edges of a list's page numbers differ
+CONTENTS_RAGGED_LINES = 6  # lines of a list whose numbers follow their titles, at no one edge
+MIN_TITLE_LETTERS = 3  # letters in the title of a contents entry that has no leaders
+_CONTENTS_HEADING = re.compile(r"(table of )?contents( \(continued\))?", re.IGNORECASE)
+_SHAPE_NUMBER = re.compile(r"\d{1,4}|[ivx]{1,6}")
+_ROMAN = {"i": 1, "v": 5, "x": 10}
+
+
+def _page_order(word: str) -> tuple[int, int]:
+    """Where a printed page number comes in a book: the roman numbers of the front matter, then
+    the others."""
+    if word.isdigit():
+        return 1, int(word)
+    total = 0
+    for here, after in pairwise(word + " "):
+        total += -_ROMAN[here] if _ROMAN.get(after, 0) > _ROMAN[here] else _ROMAN[here]
+    return 0, total
+
+
+def _numbered_line(row: _Row) -> str | None:
+    """The page number a line ends in, after a title and a space or leader dots, not part of a
+    word ("Units 12", "Units . . . 12"); None if it has no such number or the title has no
+    letters to speak of."""
+    chars = row.chars
+    end = len(chars)
+    while end and chars[end - 1].blank:
+        end -= 1
+    start = end
+    while start and chars[start - 1].c.isalnum():
+        start -= 1
+    word = "".join(c.c for c in chars[start:end])
+    if not start or not _SHAPE_NUMBER.fullmatch(word):
+        return None
+    if not (chars[start - 1].blank or chars[start - 1].c in LEADER_DOTS):
+        return None
+    return word if sum(c.c.isalpha() for c in chars[:start]) >= MIN_TITLE_LETTERS else None
+
+
+def _shape_entries(rows: Sequence[_Row], number: int) -> list[list[tuple[_Row, _Row | None]]]:
+    """The contents lists of a page found by their shape, with or without leaders.
+
+    A list is `CONTENTS_SHAPE_LINES` or more lines one after the other in one column, each
+    ending in a page number (or followed on its baseline by a line that is only that number: a
+    column of its own), the numbers at one right edge and not decreasing. It counts under a
+    "Contents" heading or on one of the first `CONTENTS_START_PAGES` pages. Each item is a line
+    and the line with its number, when that stands apart. A line without a number ends the
+    list, so a section heading right after it is not taken in."""
+    flat = [r for r in rows if not r.vertical]
+    alone = [r for r in flat if _SHAPE_NUMBER.fullmatch(r.clean)]
+    stray = {id(r) for r in alone}
+    taken: set[int] = set()
+    seen: list[tuple[_Row, _Row | None, str | None]] = []
+    for row in sorted(
+        (r for r in flat if id(r) not in stray), key=lambda r: (r.column, r.baseline)
+    ):
+        word = _numbered_line(row)
+        twin = None
+        if word is None and sum(c.c.isalpha() for c in row.chars) >= MIN_TITLE_LETTERS:
+            twin = next(
+                (
+                    n
+                    for n in alone
+                    if id(n) not in taken
+                    and abs(n.baseline - row.baseline) <= 0.35 * row.size
+                    and n.x0 > row.x1
+                ),
+                None,
+            )
+            if twin is not None:
+                taken.add(id(twin))
+                word = twin.clean
+        seen.append((row, twin, word))
+    headings = [r for r in flat if _CONTENTS_HEADING.fullmatch(r.clean.strip())]
+    found: list[list[tuple[_Row, _Row | None]]] = []
+    block: list[tuple[_Row, _Row | None, str]] = []
+
+    def close() -> None:
+        if len(block) >= CONTENTS_SHAPE_LINES and _is_contents_list(block, headings, number):
+            found.append([(row, twin) for row, twin, _ in block])
+        block.clear()
+
+    for row, twin, word in seen:
+        if word is None:
+            close()
+            continue
+        if block and (
+            row.column != block[-1][0].column or row.baseline - block[-1][0].baseline > 3 * row.size
+        ):
+            close()
+        block.append((row, twin, word))
+    close()
+    return found
+
+
+def _is_contents_list(
+    block: Sequence[tuple[_Row, _Row | None, str]], headings: Sequence[_Row], number: int
+) -> bool:
+    """Do the lines of `block` (a line, its separate number, the number) read as a contents list:
+    one right edge (a list of `CONTENTS_RAGGED_LINES` or more may have each number follow its
+    title instead), numbers that do not decrease, and a "Contents" heading above or an early
+    page."""
+    edges = [(twin or row).x1 for row, twin, _ in block]
+    middle = statistics.median(edges)
+    size = statistics.median([row.size for row, _, _ in block])
+    aligned = all(abs(e - middle) <= CONTENTS_REACH * size for e in edges)
+    if not aligned and len(block) < CONTENTS_RAGGED_LINES:
+        return False
+    orders = [_page_order(word) for _, _, word in block]
+    if any(a > b for a, b in pairwise(orders)):
+        return False
+    top = block[0][0].baseline
+    return number < CONTENTS_START_PAGES or any(h.baseline < top for h in headings)
+
+
+def _contents_lines(frags: Sequence[_Row], number: int) -> set[int]:
+    """The indices of the fragments of `frags` (a page's text before its lines are worked out)
+    that are the lines of its contents lists by shape (`_shape_entries`): fragments on one
+    baseline close together make a line, and a number set apart stays a fragment of its own."""
+    if (
+        sum(
+            1
+            for f in frags
+            if not f.vertical and (_numbered_line(f) or _SHAPE_NUMBER.fullmatch(f.clean))
+        )
+        < CONTENTS_SHAPE_LINES
+    ):
+        return set()
+    owners: dict[int, list[int]] = {}
+    rows: list[_Row] = []
+    bands: list[list[int]] = []
+    for i in sorted(
+        (i for i, f in enumerate(frags) if not f.vertical), key=lambda i: frags[i].baseline
+    ):
+        top = frags[bands[-1][0]] if bands else None
+        if top is not None and abs(frags[i].baseline - top.baseline) <= 0.3 * frags[i].size:
+            bands[-1].append(i)
+        else:
+            bands.append([i])
+    for band in bands:
+        band.sort(key=lambda i: frags[i].x0)
+        row, used = frags[band[0]], [band[0]]
+        for i in band[1:]:
+            if frags[i].x0 - row.x1 <= 4 * max(row.size, frags[i].size):
+                row, used = _join_rows(row, frags[i]), [*used, i]
+            else:
+                rows.append(row)
+                owners[id(row)] = used
+                row, used = frags[i], [i]
+        rows.append(row)
+        owners[id(row)] = used
+    return {
+        i
+        for block in _shape_entries(rows, number)
+        for pair in block
+        for r in pair
+        if r is not None
+        for i in owners[id(r)]
+    }
+
+
+def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
     """The lines of a table of contents as entries without their leaders and page numbers.
 
     A page with at least `MIN_CONTENTS_LEADER_ROWS` lines that end in dot leaders (and a
@@ -8347,10 +8796,13 @@ def _contents_rows(rows: list[_Row]) -> list[_Row]:
     leaders whose page number stands alone at the right margin on the same baseline (a
     chapter line, set in bold, with its number at the margin) keeps its text; the page
     number's own line goes; each entry gets a level from its indent. Page numbers are
-    where the printed book had the pages, which nothing in this file has."""
+    where the printed book had the pages, which nothing in this file has.
+
+    A list with no leaders is found by its shape (`_shape_entries`); its entries keep their
+    page numbers as their last words, joined to them where they stood apart."""
     split = {id(r): found for r in rows if not r.vertical and (found := _leader_split(r))}
     if len(split) < MIN_CONTENTS_LEADER_ROWS:
-        return rows
+        return _shaped_rows(rows, number)
     numbers = [r for r in rows if _PAGE_NUMBER.fullmatch(r.clean) and not r.vertical]
     pairs: list[tuple[_Row, _Row | None]] = []  # (a line, the page number beside it)
     taken: set[int] = set()
@@ -8384,6 +8836,24 @@ def _contents_rows(rows: list[_Row]) -> list[_Row]:
             continue
         if aligned and twin is not None:
             dropped.add(id(twin))
+    return _leveled(rows, entries, dropped)
+
+
+def _shaped_rows(rows: list[_Row], number: int) -> list[_Row]:
+    """`rows` with the lines of the contents lists found by shape as entries (`_contents_rows`)."""
+    entries: list[tuple[_Row, _Row]] = []
+    dropped: set[int] = set()
+    for block in _shape_entries(rows, number):
+        for row, twin in block:
+            entries.append((row, row if twin is None else _join_rows(row, twin)))
+            if twin is not None:
+                dropped.add(id(twin))
+    return _leveled(rows, entries, dropped)
+
+
+def _leveled(rows: list[_Row], entries: list[tuple[_Row, _Row]], dropped: set[int]) -> list[_Row]:
+    """`rows` with each (line, entry) pair of a contents list swapped for its entry, which gets
+    a level from its indent, and the `dropped` lines (page numbers) taken out."""
     if not entries:
         return rows
     steps: list[float] = []  # the distinct indents, outermost first
@@ -8591,6 +9061,7 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
     runs: list[_Run] = []
     code = _code_groups(rows)
     edges = _RightEdges(rows)
+    hanging = _hanging_entries(rows, edges)
     for row in rows:
         if runs:
             run = runs[-1]
@@ -8621,6 +9092,14 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
                 run.block_end = True
                 runs.append(_Run([row], row.kind, block_start=True, code=id(row) in code))
                 continue
+            entry = hanging.get(id(row))
+            if row.letter or prev.letter or (entry is not None and entry != hanging.get(id(prev))):
+                run.block_end = True  # a letter heading, or the first line of an entry
+                runs.append(_Run([row], row.kind, block_start=True))
+                continue
+            if entry is not None and run.kind == "text" == row.kind:
+                run.add(row)  # a later line of the entry (`_hanging_entries`)
+                continue
             if run.kind == "math" and row.kind == "math" and row.region is prev.region:
                 run.add(row)  # rows of one display equation (`_contiguous_regions`)
                 continue
@@ -8629,16 +9108,17 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
-            if geometric and _same_style(prev, row, ctx):
+            led = geometric and _starts_entry(prev, row, run, edges)  # a lead term: its own entry
+            if geometric and not led and _same_style(prev, row, ctx):
                 run.add(row)
                 continue
-            run.block_end = not geometric
+            run.block_end = not geometric or led
             ends_sentence = prev.clean[-1:] in ".:?!"
             short = row.x1 < run.box[2] - 3 * row.size
             # Two bold lines that differ in size or typeface are two headings (or labels),
             # not a heading and the paragraph it leads: the second one starts a block.
             restyled = geometric and prev.bold and row.bold
-            starts = not geometric or restyled or (ends_sentence and short)
+            starts = not geometric or restyled or led or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
             if row.note:
@@ -8782,6 +9262,16 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     if run.code:
         return _Block(
             Kind.PARAGRAPH, box, rows, text=_code_text(rows), font_size=size, bold=False, code=True
+        )
+    if rows[0].letter and run.kind == "text" and len(rows) == 1:
+        return _Block(
+            Kind.HEADING,
+            box,
+            rows,
+            text=rows[0].clean,
+            font_size=size,
+            bold=rows[0].bold,
+            reasons=[REASON_LETTER, *(["bold"] if rows[0].bold else [])],
         )
     # A lone ">4" or "+8" (a table cell, a stray sign) is too little to call an equation.
     trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
@@ -9389,6 +9879,10 @@ def _claim_tables(
         )
         if rest is not None:
             found = [rest, *found]
+    if found:
+        # A contents list is tried before its grid is taken for a table (`_shape_entries`).
+        covered = _contents_lines(frags[number], number)
+        found = [t for t in found if len(t.lines & covered) * 2 <= len(t.lines)]
     if not found:
         return found
     lines = set().union(*(t.lines for t in found))
@@ -9723,7 +10217,7 @@ def _page_blocks(
     _mark_notes(rows, number, page_rect.height, ctx)
     for row in rows:
         _classify_row(row)
-    rows = _contents_rows(rows)
+    rows = _contents_rows(rows, number)
     _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
@@ -11020,6 +11514,7 @@ def _analyze_document(
         row.text for rows, _, _ in prepared.values() for row in rows
     )
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx, guard)
+    _letter_rows({n: rows for n, (rows, _, _) in prepared.items()}, ctx)
     forget()
     guard.settle()
     label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins, guard)
@@ -11055,6 +11550,7 @@ def _analyze_document(
     keep_failed()
     guard.settle()
     _glossary_entries(pages)
+    _lead_entries(pages)
     _settle_bold_letters(pages)
     _promote_numbered_lines(pages, ctx)
     _mark_run_in_labels(pages, ctx)
@@ -11678,6 +12174,9 @@ def _title_key(text: str) -> str:
     return " ".join(words)
 
 
+_NUMBER_TAIL = re.compile(r" (\d{1,4}|[ivx]{1,6})$")
+
+
 def _contents_links(elements: list[Element]) -> list[Element]:
     """Each entry of a table of contents links to the heading it names, when the PDF's own
     links do not already say so (`text_pass` keeps those): a heading later in the document
@@ -11690,7 +12189,10 @@ def _contents_links(elements: list[Element]) -> list[Element]:
     out = []
     for e in elements:
         if CONTENTS_ENTRY in e.reasons and e.text and not e.links:
-            found = [h for h in headings.get(_title_key(e.text), []) if h.order > e.order]
+            key = _title_key(e.text)
+            # An entry with no leaders keeps its page number as its last word.
+            candidates = headings.get(key) or headings.get(_NUMBER_TAIL.sub("", key), [])
+            found = [h for h in candidates if h.order > e.order]
             if len(found) == 1:
                 link = Link(start=0, end=len(e.text), kind="internal", target_id=found[0].id)
                 e = e.model_copy(update={"links": [link]})
