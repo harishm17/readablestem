@@ -149,6 +149,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/review/{element_id}/check"): USER,
     ("GET", "/jobs/{job_id}/status"): USER,
     ("POST", "/jobs/{job_id}/retry"): USER,  # T3-1: CSRF, owner only, rate limited, tries capped
+    ("POST", "/jobs/{job_id}/cancel"): USER,  # WS11.3a: CSRF, owner only, rate limited
     ("POST", "/jobs/{job_id}/title"): USER,
     # H11: the Symbols screen; the POST is a review write (CSRF, owner only, version-checked)
     ("GET", "/jobs/{job_id}/symbols"): USER,

@@ -446,7 +446,7 @@ class JobView:
 
     @property
     def rerun(self) -> states.Step | None:
-        """"Convert it again" on a finished document made by an older converter (WS10.15)."""
+        """ "Convert it again" on a finished document made by an older converter (WS10.15)."""
         return self.state.rerun if self.state is not None else None
 
     @property

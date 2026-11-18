@@ -247,7 +247,9 @@ def test_another_persons_course_documents_are_not_listed_to_you(web):
     course = make_course(web)
     send(web.alice, [("secret.pdf", make_pdf(1))], course=course)
     assert web.bob.get(f"/courses/{course}").status_code == 404
-    polled = web.bob.get(f"/app/documents?course={course}", headers={"HX-Request": "true"})  # someone else's id: an empty list
+    polled = web.bob.get(
+        f"/app/documents?course={course}", headers={"HX-Request": "true"}
+    )  # someone else's id: an empty list
     assert "secret.pdf" not in polled.text
     assert web.bob.get(f"/courses/{course}/download").status_code == 404
 

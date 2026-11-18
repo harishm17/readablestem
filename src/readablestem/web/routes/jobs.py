@@ -57,6 +57,7 @@ from readablestem.web import (
     office_convert,
     output,
     pending,
+    poll,
     retention,
     sample,
     shares,
@@ -67,7 +68,6 @@ from readablestem.web import combine as combine_rules
 from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
 from readablestem.web import outcome as outcome_words
-from readablestem.web import poll
 from readablestem.web import retry as retry_rules
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import as_utc, utc_today
@@ -1557,7 +1557,9 @@ def status_context(job: JobView) -> dict[str, Any]:
     }
 
 
-def job_page_context(request: Request, job_id: str, user: CurrentUser, job: JobView) -> dict[str, Any]:
+def job_page_context(
+    request: Request, job_id: str, user: CurrentUser, job: JobView
+) -> dict[str, Any]:
     """Everything the job page prints beyond the status box: the page itself, and the body a
     finished job sends in place of the waiting one (`job_status`)."""
     context = status_context(job)
@@ -1786,7 +1788,8 @@ RETRY_REFUSED = {
 def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Try again" on a stopped or partly converted document (T3-1, `web.retry`): the same
     job goes back in the queue. "Convert it again" on a finished document made by an older
-    converter (WS10.15) is the same route, with a spend limit of its own. Nothing is counted against the daily pages (this is not an
+    converter (WS10.15) is the same route, with a spend limit of its own. Nothing is counted
+    against the daily pages (this is not an
     upload), the finished steps and the decisions made are kept, and every limit holds: the
     daily budget (a queued job waits for it), the job's own spend caps, the documents
     waiting or converting at once, the tries per job and the rate limit."""
@@ -1846,7 +1849,9 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     if refused:
         status, title, message = RETRY_REFUSED[refused]
         raise PageError(status, title, message, context={"job_id": job_id})
-    log_event(logger, "job_rerun" if started == "rerun" else "job_retried", job_id=job_id, tries=tries)
+    log_event(
+        logger, "job_rerun" if started == "rerun" else "job_retried", job_id=job_id, tries=tries
+    )
     flash(
         request,
         "Your document is queued again. What was already converted is kept, and nothing "
@@ -1894,7 +1899,9 @@ def cancel_job(request: Request, job_id: str, user: UserDep) -> Response:
             context={"job_id": job_id},
         )
     log_event(logger, "job_cancel_requested", job_id=owned_id, pages_given_back=gave_back)
-    flash(request, "Canceled. Your file is kept; you can convert it later or delete it.", undo=False)
+    flash(
+        request, "Canceled. Your file is kept; you can convert it later or delete it.", undo=False
+    )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 

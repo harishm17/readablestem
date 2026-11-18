@@ -193,7 +193,9 @@ def test_a_document_canceled_before_it_starts_gives_its_pages_back_and_counts_th
     assert site.pages_used() == counted
     assert site.run_worker() == job_id and site.job(job_id).status == "done"
     # Not an upload of someone else's: only the owner may cancel.
-    other = site.bob.post(f"{page}/cancel", data={"csrf_token": csrf_from(site.bob.get("/app").text)})
+    other = site.bob.post(
+        f"{page}/cancel", data={"csrf_token": csrf_from(site.bob.get("/app").text)}
+    )
     assert other.status_code == 404
 
 
@@ -216,7 +218,12 @@ def test_a_document_made_by_an_older_converter_is_offered_one_rerun_with_a_cap_o
         job.cost_usd = cap  # the first run used all of its cap
     pages = site.pages_used()
     assert "Convert it again" in text_of(site.browser.get(page).text)
-    assert site.bob.post(f"{page}/retry", data={"csrf_token": csrf_from(site.bob.get("/app").text)}).status_code == 404
+    assert (
+        site.bob.post(
+            f"{page}/retry", data={"csrf_token": csrf_from(site.bob.get("/app").text)}
+        ).status_code
+        == 404
+    )
 
     assert site.post_retry(site.browser, job_id).status_code == 303
     job = site.job(job_id)

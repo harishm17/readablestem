@@ -11,7 +11,8 @@ or conditions.
 
 The table (`TABLE`) has one row per key. A row says when it applies (worked out from stored
 facts only, in `state_of`), its label, its tone and its next step. Rows that need facts not
-stored yet (the daily reset of pages, the review's page cards) are not in it; they are added as rows when their facts exist, never as a surface.
+stored yet (checks that answer late, the daily reset of pages, the review's page cards) are not
+in it; they are added as rows when their facts exist, never as a surface.
 
 Rules the function owns, so no template decides them:
 
@@ -404,7 +405,7 @@ def state_of(
 
 
 def _version_key(version: str | None) -> tuple[int, ...] | None:
-    """"0.5.11" as (0, 5, 11); None for a version that is not dotted numbers."""
+    """ "0.5.11" as (0, 5, 11); None for a version that is not dotted numbers."""
     parts = (version or "").strip().split(".")
     return tuple(int(p) for p in parts) if parts and all(p.isdigit() for p in parts) else None
 
