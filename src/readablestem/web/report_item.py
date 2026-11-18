@@ -1,30 +1,23 @@
 """The "Report this item" link on a review card.
 
-It opens the feedback path the footer already offers (`FEEDBACK_URL`, else an email to
-`CONTACT_EMAIL`) with the job and the item named, so a report says where the problem is
-without the reviewer typing ids. Only the two ids go into the address: no text of the
-document, no alt text, no LaTeX. The reviewer writes what is wrong. When neither path is
-configured there is no link (and no new place where a report could go).
+It opens the app's own problem-report form (`routes/reports.py`, `web.reports`) with the item
+named in the address, so a report says where the problem is without the reviewer typing ids.
+Only the item's id is in the address: no text of the document, no alt text, no LaTeX; the
+form reads the item's kind and page from the stored document. The reviewer writes what is
+wrong. The link is always there for a person who may review: nothing depends on a mail
+program or a configured address.
 """
 
 from __future__ import annotations
 
-from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
-
-from readablestem.config import Settings
-
-SUBJECT = "ReadableSTEM report: an item on the review screen"
-BODY = "Job: {job}\nItem: {item}\n\nWhat is wrong (please do not paste text from your document):\n"
+from urllib.parse import quote
 
 
-def item_url(settings: Settings, job_id: str, item_id: str) -> str | None:
-    """Where "Report this item" goes for one item, or None when no path is set up."""
-    if settings.feedback_url:
-        parts = urlsplit(settings.feedback_url)
-        query = parse_qsl(parts.query, keep_blank_values=True)
-        query += [("job", job_id), ("item", item_id)]
-        return urlunsplit(parts._replace(query=urlencode(query)))
-    if settings.contact_email:
-        body = BODY.format(job=job_id, item=item_id)
-        return f"mailto:{settings.contact_email}?subject={quote(SUBJECT)}&body={quote(body)}"
-    return None
+def item_url(job_id: str, item_id: str) -> str:
+    """The report form for one item of one document."""
+    return f"/jobs/{job_id}/report?item={quote(item_id, safe='')}"
+
+
+def job_url(job_id: str) -> str:
+    """The report form for the document itself (a stopped conversion)."""
+    return f"/jobs/{job_id}/report"

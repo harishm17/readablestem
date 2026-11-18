@@ -46,6 +46,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
 from typing import Literal
+from urllib.parse import quote
 from xml.etree.ElementTree import Element as XmlElement
 from xml.etree.ElementTree import ParseError
 
@@ -1004,6 +1005,9 @@ class _Renderer:
     unread_parts: dict[int, str] = field(default_factory=dict)
     # Whom the authored notices speak to (`STUDENT`, or `CHECKER` for a draft's page).
     audience: str = STUDENT
+    # The instructor's contact line, when the owner gave one: each note about something not
+    # converted then links to it (`instructor_link`).
+    contact: str | None = None
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -1075,19 +1079,46 @@ class _Renderer:
             if not self.pdf_pages or page in self.pdf_pages  # a page that is not in the file
         )
 
-    def mark_for(self, page: int) -> str:
-        """The marker for `page`, which becomes the last page written."""
-        self.last_page = page
+    def page_words(self, page: int) -> tuple[str, int]:
+        """What the student's page marker says for `page` ("Page 5", "PDF page 5"), and its
+        position in the PDF."""
         position = self.pdf_pages.get(page, page) + 1
         printed = self.page_labels.get(page)
         if printed:
-            said = f"Page {printed}"
-        elif self.page_labels:  # others have printed labels: never let this one read as one
-            said = f"PDF page {position}"
-        else:
-            said = f"Page {position}"
+            return f"Page {printed}", position
+        if self.page_labels:  # others have printed labels: never let this one read as one
+            return f"PDF page {position}", position
+        return f"Page {position}", position
+
+    def mark_for(self, page: int) -> str:
+        """The marker for `page`, which becomes the last page written."""
+        self.last_page = page
+        said, position = self.page_words(page)
         self.add_style("pagebreak", navigation.PAGEBREAK_CSS)
         return navigation.pagebreak(said, self.claim_id(f"pagebreak-{position}"), AUTHORED_CLASS)
+
+    def instructor_link(self, element: Element, reason: str) -> str:
+        """A link that writes to the instructor about one thing not converted, or "" when the
+        owner gave no contact line (the note then says only "Ask your instructor"). The subject
+        names the document and the thing by kind and page ("Equation on page 3"); nothing of
+        its content is in the link, and the message body is empty (`contact_link`)."""
+        if element.kind is Kind.EQUATION:
+            noun = "equation"
+        elif element.kind is Kind.TABLE:
+            noun = "table"
+        elif reason in KEPT_PAGE_REASONS:
+            noun = "page"
+        elif reason in KEPT_IMAGE_WORDS or reason == "image_page_omitted":
+            noun = "picture"
+        else:
+            noun = "figure"
+        where = self.page_words(element.page)[0] if self.mark_pages else ""
+        if noun == "page":
+            what = where or "This page"
+        else:
+            what = f"{noun.capitalize()} on {where.lower()}" if where else noun.capitalize()
+        text = "{verb} your instructor about this " + noun
+        return contact_link(self.contact, self.titles.text, what, text) or ""
 
     def link_attrs(self, link: Link) -> str:
         """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
@@ -1554,10 +1585,11 @@ class _Renderer:
         self.flagged.add(element.id)
         fix = self.fixes.get(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(fix, reason)
+        link = self.instructor_link(element, reason)
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'
-            f'<span class="flag-label">{label}</span> {note}</p></div>'
+            f'<span class="flag-label">{label}</span> {note}{" " + link if link else ""}</p></div>'
         )
 
 
@@ -1626,6 +1658,7 @@ def _about_section(
     kept_pages: list[int] | None = None,
     contact: str | None = None,
     image_pages: list[int] | None = None,
+    title: str = "",
 ) -> str:
     """The note for students at the end of `<main>` (MF7 of the UX review): what this
     is, the statement of what was reviewed and converted (`checked_words.statement`), which
@@ -1648,7 +1681,7 @@ def _about_section(
         lines.append(f"<p>{pages_line}</p>")
     if converted := image_pages_note(image_pages or []):
         lines.append(f"<p>{converted}</p>")
-    lines.append(f"<p>{_contact_sentence(contact)}</p>")
+    lines.append(f"<p>{_contact_sentence(contact, title)}</p>")
     if source_note and source_note.strip():
         lines.append(f"<p>{_escape(source_note)}</p>")
     return (
@@ -1730,22 +1763,53 @@ def mark_draft(html: str, open_decisions: int) -> str:
     return banner + html
 
 
-def _contact_sentence(contact: str | None) -> str:
-    """The "tell your instructor" sentence, with the instructor's own contact line (T1-17)
-    when there is one: an email address (a mailto link) or a web address (a link), both
-    shown as typed. `web.titles.clean_contact` has checked it; anything else is left out
-    here too."""
+MAX_SUBJECT_TITLE = 100  # characters of the document's title in a message's subject
+
+
+def _contact_href(contact: str | None) -> tuple[str, str] | None:
+    """The instructor's contact line as ("email", address) or ("web", address), or None when
+    there is none or it is neither (`web.titles.clean_contact` has checked what is stored;
+    anything else is left out here too)."""
     line = (contact or "").strip()
     if not line or len(line) > 320 or re.search(r"[\s<>\"']", line):
-        return CONTACT
+        return None
     if re.fullmatch(r"[^@/:]+@[^@/:]+\.[^@/:.]+", line):
-        href = "mailto:" + line
-    elif re.fullmatch(r"https?://[^/\s]+\.[^/\s]+\S*", line):
-        href = line
+        return "email", line
+    if re.fullmatch(r"https?://[^/\s]+\.[^/\s]+\S*", line):
+        return "web", line
+    return None
+
+
+def contact_link(contact: str | None, title: str, what: str, text: str) -> str | None:
+    """A link to the instructor's contact line, or None when there is none. For an email
+    address it is a `mailto:` with the subject "<title>: <what>" and an empty body: `what`
+    names the thing by kind and page ("Equation on page 3"), never by its content. For a web
+    address it goes there. `text` is the link text, with `{verb}` for "Email" or "Contact"."""
+    found = _contact_href(contact)
+    if found is None:
+        return None
+    kind, address = found
+    if kind == "email":
+        name = " ".join(title.split())
+        if len(name) > MAX_SUBJECT_TITLE:
+            name = name[: MAX_SUBJECT_TITLE - 3].rstrip() + "..."
+        subject = quote(f"{name}: {what}" if name else what, safe="")
+        href = f"mailto:{address}?subject={subject}"
     else:
+        href = address
+    words = text.format(verb="Email" if kind == "email" else "Contact")
+    return f'<a href="{_escape(href)}">{_escape(words)}</a>'
+
+
+def _contact_sentence(contact: str | None, title: str = "") -> str:
+    """The "tell your instructor" sentence. With the instructor's own contact line (T1-17) it
+    carries a link that writes to them about this document (`contact_link`), and the address
+    as typed beside it, for a reader whose mail program is not set up or who prints the page."""
+    words = "{verb} your instructor about this document"
+    link = contact_link(contact, title, "a problem with this document", words)
+    if link is None:
         return CONTACT
-    link = f'<a href="{_escape(href)}">{_escape(line)}</a>'
-    return f"{CONTACT.removesuffix('.')}: {link}."
+    return f"{CONTACT.removesuffix('.')}: {link} ({_escape((contact or '').strip())})."
 
 
 # Added to a document's stylesheet only when it has a code block / a definition list
@@ -2040,6 +2104,7 @@ def render_html(
         footnote_ids=set(footnote_ids),
         origin=origin,
         audience=audience,
+        contact=contact,
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
@@ -2070,6 +2135,7 @@ def render_html(
         kept_pages,
         contact,
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
+        title=titles.text,
     )
     top = _checked_notice(summary, renderer.used_ids)
     # Exactly one H1 (SW6c): the title, added above the headings, or the heading that is it.

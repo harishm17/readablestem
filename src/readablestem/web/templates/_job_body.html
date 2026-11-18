@@ -212,7 +212,7 @@
     {% for step in state.steps if not step.form %}<li><a class="{{ 'button-secondary' if job.retry else 'button' }}" href="{{ step.href }}">{{ step.label }}</a></li>{% endfor %}
     <li><a href="/app">Back to My documents</a></li>
     <li><a href="/status">Service status</a></li>
-    {% if contact_email %}<li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20stopped%20conversion">Email us about it</a></li>{% endif %}
+    {% if job.can_review %}<li><a href="{{ report_job_url(job.id) }}" data-role="report-stopped">Tell us about it</a>{% if contact_email %} <span class="meta">or email {{ contact_email }}</span>{% endif %}</li>{% endif %}
   </ul>
   <details class="tech">
     <summary>Details for a bug report</summary>

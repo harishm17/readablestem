@@ -168,6 +168,11 @@ deleted-document page uses them to tell an owner what happened), but not for eve
   year. Changing it means changing the privacy page, which names the number.
 - **With the user.** `readablestem users delete` (`ops.retention.erase_user`) deletes all of
   a person's events at once.
+- **Problem reports** (`reports`). The same hourly purge deletes a report 30 days after it was
+  closed (`reports.CLOSED_DAYS`, `ops.retention.purge_closed_reports`) and every report 180 days
+  after it was made, closed or not (`reports.MAX_DAYS`, `purge_old_reports`); the count is
+  `reports_deleted` in `purge_done`. Erasing the sender deletes theirs. The privacy page names
+  both numbers; change them in `web/reports.py` only.
 - **Off.** `EVENTS_ENABLED=false` writes no new events (and turns the two questions after
   a download off); events already kept follow the rules above.
 

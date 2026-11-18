@@ -88,6 +88,7 @@ def seed_user(factory, email: str) -> dict[str, str]:
                 db.ReviewEdit(job_id=job.id, user_id=user.id, element_id="e1", action="accept"),
                 db.Event(user_id=user.id, name="download", job_ref=job.id, value=1.0),
                 db.Event(user_id=user.id, name="feedback", code="worked", value=1.0),
+                db.Report(from_user_id=user.id, job_ref=job.id, item_ref="p1-e1", text="wrong"),
                 db.AuthIdentity(
                     user_id=user.id, provider="google", issuer=GOOGLE_ISSUER, subject=email
                 ),
@@ -163,6 +164,7 @@ def test_every_table_that_holds_a_user_id_is_known():
         ("login_links", "user_id"),
         ("pending_uploads", "user_id"),
         ("quota_days", "user_id"),
+        ("reports", "from_user_id"),
         ("request_tokens", "user_id"),
         ("review_edits", "user_id"),
         ("upload_results", "user_id"),

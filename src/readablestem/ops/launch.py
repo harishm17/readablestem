@@ -182,11 +182,12 @@ def privacy_claim_problems(settings: Settings) -> list[str]:
     this is that register for the notice): the retention clocks (`RETENTION_HOURS`, the
     7-day choice of `web.retention`, `OPT_IN_RETENTION_DAYS`), the backups
     (`web.offices.BACKUP_DAYS`), the usage notes (`web.events`: kept `EVENT_RETENTION_DAYS`,
-    the review outcomes and the counts their totals need), the courses kept with
+    the review outcomes and the counts their totals need), the problem reports
+    (`web.reports`: `CLOSED_DAYS` and `MAX_DAYS`), the courses kept with
     FEATURE_NOTATION_MEMORY and the names kept for a LaTeX source. What is sent is
     `sent_material_problems`; who receives it is `unnamed_recipients`. Empty when every
     statement is there."""
-    from readablestem.web import events, offices, retention
+    from readablestem.web import events, offices, reports, retention
 
     notice = rendered_notice(settings)
     if notice is None:
@@ -206,6 +207,8 @@ def privacy_claim_problems(settings: Settings) -> list[str]:
             f"at least {events.MIN_ACCOUNTS} accounts and {events.MIN_DOCUMENTS} documents",
             "EVENTS_ENABLED (web.events.outcome_cells)",
         ),
+        (True, f"for {reports.CLOSED_DAYS} days after that", "web.reports.CLOSED_DAYS"),
+        (True, f"deleted {reports.MAX_DAYS} days after you send it", "web.reports.MAX_DAYS"),
         (
             settings.feature_notation_memory,
             "Your courses and their notation",

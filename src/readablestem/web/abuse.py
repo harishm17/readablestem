@@ -86,6 +86,9 @@ RULES: dict[str, Rule] = {
     # in turn, in each file type, is a dozen builds that take a minute each, so 15 in ten
     # minutes is out of reach for a person and a stop for a script. Per signed-in person.
     "zip_user": Rule(15, 600),
+    # A problem report to the operator (`web.reports`), per signed-in person: more than five in
+    # ten minutes is a script or a loop, not a person with five problems.
+    "report": Rule(5, 600),
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound
 

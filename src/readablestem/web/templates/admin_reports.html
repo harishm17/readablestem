@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% block title %}Problem reports{% endblock %}
+{% block content %}
+<h1>Problem reports</h1>
+<p>What people sent from "Report this item" on a review card and from a stopped document.
+  Ids, codes and what the sender typed: no document text and no pictures. Only admins read
+  this page. A closed report is deleted {{ closed_days }} days after it is closed, and any
+  report {{ max_days }} days after it was sent, or with the sender's account.</p>
+<p><a href="/admin">Back to admin</a></p>
+
+<section aria-labelledby="reports-heading">
+  <h2 id="reports-heading">{{ open_count }} open, {{ rows|length - open_count }} closed</h2>
+  {% if rows %}
+  <ul class="plain-list">
+    {% for r in rows %}
+    <li id="report-{{ r.id }}">
+      <h3>Report {{ r.id }}: {{ "open" if r.open else "closed" }}</h3>
+      <dl class="summary-list">
+        <div><dt>Sent</dt><dd>{{ r.created_at|utc }} by {{ r.sender }}</dd></div>
+        <div><dt>Document</dt><dd><code>{{ r.job_ref or "none" }}</code></dd></div>
+        <div><dt>Item</dt><dd>{% if r.item_ref %}<code>{{ r.item_ref }}</code>{% if r.item_kind %}, {{ r.item_kind }}{% endif %}{% if r.page %}, page {{ r.page }}{% endif %}{% else %}the document as a whole{% endif %}</dd></div>
+        <div><dt>Stop code</dt><dd>{% if r.code %}<code>{{ r.code }}</code>{% else %}none{% endif %}</dd></div>
+        <div><dt>Version</dt><dd>{{ r.version or "unknown" }}</dd></div>
+        {% if r.closed_at %}<div><dt>Closed</dt><dd>{{ r.closed_at|utc }}</dd></div>{% endif %}
+      </dl>
+      {% if r.text %}<pre class="report-text">{{ r.text }}</pre>{% else %}<p class="meta">The sender wrote nothing.</p>{% endif %}
+      {% if r.open %}
+      {% call form("admin.report_close", "/admin/reports/" ~ r.id ~ "/close", {"class": "inline-form"}) %}
+        <button type="submit" class="button-secondary">Close<span class="visually-hidden"> report {{ r.id }}</span></button>
+      {% endcall %}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No reports.</p>
+  {% endif %}
+</section>
+{% endblock %}

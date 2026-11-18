@@ -20,7 +20,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from readablestem.ops import profile, step_report
-from readablestem.web import access, events, linked_emails, shares, states, step_facts
+from readablestem.web import access, events, linked_emails, reports, shares, states, step_facts
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import ErrorAggregate, Job, QuotaDay, User, session_scope
@@ -210,6 +210,55 @@ def admin_context(request: Request) -> dict[str, Any]:
 @router.get("/admin")
 def admin_page(request: Request, user: AdminDep) -> Response:
     return render(request, "admin.html", admin_context(request))
+
+
+@router.get("/admin/reports")
+def admin_reports(request: Request, user: AdminDep) -> Response:
+    """Problem reports from "Report this item" and the stopped-document link (`web.reports`),
+    open ones first, with the sender's account. Ids, codes and what the sender typed (shown
+    escaped, never as a link); nothing from a document."""
+    with session_scope(get_ctx(request).factory) as session:
+        rows = [
+            {
+                "id": report.id,
+                "open": report.status == reports.OPEN,
+                "kind": report.kind,
+                "sender": email,
+                "job_ref": report.job_ref,
+                "item_ref": report.item_ref,
+                "item_kind": report.item_kind,
+                "page": report.page,
+                "code": report.code,
+                "version": report.pipeline_version,
+                "text": report.text,
+                "created_at": as_utc(report.created_at),
+                "closed_at": as_utc(report.closed_at),
+            }
+            for report, email in reports.listed(session)
+        ]
+    context = {
+        "rows": rows,
+        "open_count": sum(1 for row in rows if row["open"]),
+        "closed_days": reports.CLOSED_DAYS,
+        "max_days": reports.MAX_DAYS,
+        "active": "admin",
+    }
+    return render(request, "admin_reports.html", context)
+
+
+@router.post("/admin/reports/{report_id}/close", dependencies=[Depends(require_csrf)])
+@submit_once("admin.report_close")
+def close_report(request: Request, user: AdminDep, report_id: int) -> Response:
+    with session_scope(get_ctx(request).factory) as session:
+        closed = reports.close(session, report_id)
+    if closed:
+        log_event(logger, "report_closed", by=user.id)
+    flash(
+        request,
+        "Closed." if closed else NOTHING + "that report is already closed or does not exist.",
+        undo=False,
+    )
+    return RedirectResponse("/admin/reports", status_code=303)
 
 
 @router.get("/admin/health")

@@ -297,15 +297,13 @@ def footer_of(html: str) -> str:
 def test_the_contact_line_goes_in_the_student_footer(ux):
     post(ux, "/contact", contact="prof.lee@example.edu")
     footer = footer_of(stored_job(ux).html)
-    assert (
-        'tell your instructor: <a href="mailto:prof.lee@example.edu">prof.lee@example.edu</a>.'
-        in footer
-    )
+    assert 'tell your instructor: <a href="mailto:prof.lee@example.edu?subject=' in footer
+    assert "(prof.lee@example.edu)." in footer
     html = page(ux)
     assert 'id="contact"' in html and 'value="prof.lee@example.edu"' in html
     assert "added to the student file" in text_of(html)
     downloaded = fetch(ux.browser, f"/jobs/{ux.job_id}/download").text
-    assert 'href="mailto:prof.lee@example.edu"' in downloaded
+    assert 'href="mailto:prof.lee@example.edu?subject=' in downloaded
 
 
 def test_a_web_address_is_accepted_and_clearing_it_removes_the_line(ux):

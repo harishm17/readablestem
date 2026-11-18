@@ -13,6 +13,32 @@
   check. The table card's list view names "use the grid read from the PDF" once, not twice.
   No model call, no stored-data change, no migration, no version bump.
 
+## Unreleased: problem reports and the student's way to write to the instructor (branch feat/problem-reports)
+
+- SW25 (F-111, F-112, F-484 in part): "Report this item" on the review cards and the stopped
+  job's report line open one short in-app form (`/jobs/{id}/report`, no script needed, error
+  summary with focus, the same CSRF and one-submit rule) instead of a `mailto:` or the
+  `FEEDBACK_URL` address. The owner and a person with the Review right write a report; it is
+  stored in a new `reports` table (migration `e4b7a1c9d352`: kind, sender, job id, item id,
+  the item's kind and page, failure code, pipeline version, up to 1,000 typed characters,
+  status, dates; no picture, no item text, no reply address). The form says what is stored,
+  who reads it and how long, and not to type student names. Only the operator reads reports,
+  at `/admin/reports`, open ones first, with a Close button. Limit: 5 per 10 minutes per
+  account (`abuse.RULES["report"]`). Retention: with the sender's account, 30 days after
+  closing, 180 days whatever the state (`ops.retention`); the privacy page states both numbers
+  from `web/reports.py`, and `ops.launch.privacy_claim_problems` checks them. The mail address
+  stays printed beside the stopped job's link. The footer's feedback link and the other
+  `mailto:` places are unchanged.
+- Student file: when the instructor's contact line is an email address, each note about
+  something not converted (equation, picture, table, figure, page) and the footer's problem
+  line carry a link that writes to the instructor: a `mailto:` whose subject is the document's
+  title and the item by kind and page ("Equation on page 3"), with an empty body and no item
+  content. A web address links straight there; with no contact line nothing changes. The link
+  text says what it does ("Email your instructor about this equation"), and it survives the
+  Word, EPUB, Canvas and Cartridge exports and the checker's draft. `RENDER_VERSION` is not
+  bumped: only a document that has a contact line gains the links, when it is next rendered.
+  Not built: the student report form, an owner's inbox, page reports, notify mail, the
+  feedback questions (F-055).
 ## Unreleased: page pictures and exports are made once (branch perf/render-once)
 
 - PF4 (F-284): the review screen's page and region pictures are kept in a small memory cache in

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import re
 
@@ -9,6 +10,10 @@ import pytest
 
 from readablestem.core.types import Element, Fix, HeadingFix, Kind, Status
 from readablestem.pipeline import assemble, html_checks
+
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
 
 
 def _heading(eid: str, order: int, text: str, level: int) -> tuple[Element, Fix]:
@@ -156,10 +161,12 @@ def footer(html: str) -> str:
 
 
 def test_an_email_contact_line_is_a_mailto_link_in_the_footer():
-    html = render("T", contact="prof.lee@example.edu")
+    html = render("Physics notes", contact="prof.lee@example.edu")
     assert (
         "tell your instructor: "
-        '<a href="mailto:prof.lee@example.edu">prof.lee@example.edu</a>.</p>' in footer(html)
+        '<a href="mailto:prof.lee@example.edu?subject=Physics%20notes%3A%20a%20problem%20with'
+        '%20this%20document">Email your instructor about this document</a> '
+        "(prof.lee@example.edu).</p>" in footer(html)
     )
     assert all(c.passed for c in html_checks.static_checks(html))
 
@@ -186,3 +193,69 @@ def test_anything_that_is_not_an_email_or_web_address_is_left_out(contact):
     html = render("T", contact=contact)
     assert f"<p>{assemble.CONTACT}</p>" in footer(html)
     assert "<script>x" not in html and "javascript:" not in html
+
+
+# --------------------------------------------------------------------------- not-converted notes
+
+
+def unconverted(contact, audience=assemble.STUDENT) -> str:
+    """Two pages; an equation on page 2 that could not be converted, with text we must not
+    send anywhere."""
+    heading, fix = _heading("p1-e0", 0, "Motion", 1)
+    equation = Element(
+        id="p2-e1", kind=Kind.EQUATION, page=1, bbox=(72, 100, 172, 120), order=2,
+        text="SECRET = mc2", equation_label="(7)",
+    )  # fmt: skip
+    failed = Fix(element_id="p2-e1", kind=Kind.EQUATION, status=Status.FAILED, reason="refused")
+    return assemble.render_html(
+        title="Physics notes",
+        title_set=True,
+        lang="en",
+        elements=[heading, equation],
+        fixes=[fix, failed],
+        crops={"p2-e1": PNG},
+        contact=contact,
+        audience=audience,
+    )
+
+
+def instructor_links(html: str) -> list[str]:
+    return re.findall(
+        r'<a href="(mailto:[^"]+)">Email your instructor about this equation</a>', html
+    )
+
+
+def test_a_not_converted_note_links_the_instructor_without_the_items_content():
+    html = unconverted("prof.lee@example.edu")
+    (link,) = instructor_links(html)
+    assert (
+        link == "mailto:prof.lee@example.edu?subject=Physics%20notes%3A%20Equation%20on%20page%202"
+    )
+    assert "SECRET" not in link and "body=" not in link  # kind and page only; an empty body
+    assert 'Ask your instructor for a version you can read. <a href="mailto:' in html
+    assert instructor_links(unconverted("prof.lee@example.edu", assemble.CHECKER))  # the draft too
+    assert all(c.passed for c in html_checks.static_checks(html))
+
+
+def test_a_file_without_a_contact_line_has_no_link_in_its_note():
+    html = unconverted(None)
+    assert "mailto:" not in html
+    assert f"{assemble.EQUATION_NOTE}</p></div>" in html
+
+
+def test_the_instructor_link_survives_every_export():
+    import zipfile
+
+    from readablestem.pipeline import export_canvas, export_cartridge, export_docx, export_epub
+
+    html = unconverted("prof.lee@example.edu")
+    subject = "subject=Physics%20notes%3A%20Equation%20on%20page%202"
+    assert subject in export_epub.export_epub(html).content
+    canvas = export_canvas.export_canvas(html, title="Physics notes", folder="physics-notes")
+    assert subject in canvas.index_html
+    cartridge = export_cartridge.build_cartridge(canvas)
+    with zipfile.ZipFile(io.BytesIO(cartridge)) as archive:
+        assert any(subject in archive.read(n).decode("utf-8", "ignore") for n in archive.namelist())
+    if export_docx.available():
+        with zipfile.ZipFile(io.BytesIO(export_docx.export_docx(html).data)) as archive:
+            assert subject in archive.read("word/_rels/document.xml.rels").decode()

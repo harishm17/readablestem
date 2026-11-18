@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{# The problem-report form (routes/reports.py, web/reports.py). What it says before the send
+   button is an honesty claim: it must match what `reports.add` stores and what
+   `ops/retention.py` deletes. #}
+{% block title %}{% if errors %}Error: {% endif %}Tell us about a problem{% endblock %}
+{% block content %}
+<h1>Tell us about a problem</h1>
+{% include "_error_summary.html" %}
+<p>About <strong>{{ doc_title }}</strong>{% if where.item_ref %}, one item on the review screen{% else %}, which stopped converting{% endif %}.</p>
+
+<h2 id="stored-heading">What is sent and who reads it</h2>
+<ul>
+  <li>These ids and codes: the document's id{% if where.item_ref %}, the item's id{% if where.item_kind %}, what kind of item it is ({{ where.item_kind }}){% endif %}{% if where.page %}, its page number ({{ where.page }}){% endif %}{% endif %}{% if where.code %}, the code that stopped the conversion ({{ where.code }}){% endif %}, and the version of the converter{% if where.pipeline_version %} ({{ where.pipeline_version }}){% endif %}.</li>
+  <li>Whatever you type below.</li>
+  <li>Nothing from the document itself: no text, no pictures.</li>
+</ul>
+<p>The people who run ReadableSTEM read it, and no one else. It is kept until they close it
+  and for {{ closed_days }} days after that, and in any case deleted {{ max_days }} days after
+  you send it, or with your account if that comes first.</p>
+<p><strong>Do not type student names or other personal details.</strong></p>
+
+{% call form("report.send", "/jobs/" ~ job_id ~ "/report", {"novalidate": true, "class": "stack-form", "aria-labelledby": "stored-heading"}) %}
+  <input type="hidden" name="item" value="{{ where.item_ref or '' }}">
+  <div class="field{% if text_error %} field-error{% endif %}">
+    <label for="report-text">What is wrong? (optional)</label>
+    <p class="hint" id="report-text-hint">Up to {{ max_text }} characters, as plain text.</p>
+    {% if text_error %}<p class="error-message" id="report-text-error"><span class="visually-hidden">Error: </span>{{ text_error }}</p>{% endif %}
+    <textarea id="report-text" name="text" rows="6" autocomplete="off"
+              aria-describedby="report-text-hint{% if text_error %} report-text-error{% endif %}"{% if text_error %} aria-invalid="true"{% endif %}>{{ text }}</textarea>
+  </div>
+  <button type="submit" class="button">Send report</button>
+{% endcall %}
+{% if contact_email %}<p>If you would rather use email: {{ contact_email }}</p>{% endif %}
+<p><a href="{{ back }}">Back without sending</a></p>
+{% endblock %}

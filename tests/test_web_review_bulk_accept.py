@@ -29,7 +29,7 @@ from readablestem.core.types import (
     Status,
     Verification,
 )
-from readablestem.web import bulk_accept, report_item
+from readablestem.web import bulk_accept
 from readablestem.web.db import ReviewEdit, session_scope
 from readablestem.web.review import BULK_KEY, WRITE_KEY
 
@@ -312,8 +312,8 @@ def test_nothing_matching_says_so_and_bad_values_are_ignored(scaled):
 # --------------------------------------------------------------------------- report this item
 
 
-def test_the_link_names_the_job_and_the_item_and_nothing_from_the_document(tmp_path):
-    env = WebEnv(tmp_path, contact_email="help@example.org")
+def test_the_link_opens_the_report_form_with_the_item_and_nothing_from_the_document(tmp_path):
+    env = WebEnv(tmp_path)  # no contact address: the report form needs none
     env.converter.output = scaled_output()
     with env.running() as client:
         env.allow(ALICE)
@@ -322,30 +322,12 @@ def test_the_link_names_the_job_and_the_item_and_nothing_from_the_document(tmp_p
         env.job_id = job_id_from(upload(client, review_pdf()))
         env.run_worker()
         listing = client.get(f"/jobs/{env.job_id}/review/list").text
-        link = re.search(r'<a href="(mailto:[^"]+)"[^>]*data-role="report-item"', listing)
+        link = re.search(r'<a href="([^"]+)"[^>]*data-role="report-item"', listing)
         assert link, "a report link on a card"
         target = unescape(link.group(1))
-        assert target.startswith("mailto:help@example.org?subject=")
-        assert env.job_id in target and "Item%3A%20p" in target
-        for secret in ("Teacher Support", "omega", "A car on a road"):
-            assert secret not in target
+        assert re.fullmatch(rf"/jobs/{env.job_id}/report\?item=p[0-9]+-e[0-9]+", target), target
         split = client.get(f"/jobs/{env.job_id}/review?item=p1-e2").text
-        assert 'data-role="report-item"' in split
-        assert "Item%3A%20p1-e2" in unescape(split)
-
-
-def test_item_url_uses_the_feedback_url_when_there_is_one_and_nothing_without():
-    class S:
-        feedback_url = "https://forms.example.org/f?x=1"
-        contact_email = "help@example.org"
-
-    url = report_item.item_url(S, "abc123", "p2-e3")  # type: ignore[arg-type]
-    assert url == "https://forms.example.org/f?x=1&job=abc123&item=p2-e3"
-    S.feedback_url = None  # type: ignore[assignment]
-    mail = report_item.item_url(S, "abc123", "p2-e3")  # type: ignore[arg-type]
-    assert mail and mail.startswith("mailto:help@example.org?") and "abc123" in mail
-    S.contact_email = None  # type: ignore[assignment]
-    assert report_item.item_url(S, "abc123", "p2-e3") is None  # type: ignore[arg-type]
+        assert f"/jobs/{env.job_id}/report?item=p1-e2" in unescape(split)
 
 
 # --------------------------------------------------------------------------- leave a page out
