@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: nothing is cut on paper, long descriptions print open, the maths font stack, the words of a picture kept from a page (branch fix/wide-content-print-math-font)
+
+- SW45 (reduced), rules 5 and 6: on paper a table wraps inside the sheet, code wraps, and an
+  equation is scaled to fit the sheet down to 70% of its size; one still too wide prints a
+  note that it is complete on the web page (`assemble.print_width_bucket`, the `pw` classes,
+  the print block of the stylesheet). Before, the scroll box of a wide table or equation was
+  cut at the edge of the sheet with no mark (F-435). A code block with a line of 25 or more
+  characters is a named tab stop (the line was 36; a block scrolls at 30 characters at 320 px
+  and at 25 with text spacing, F-448). A long equation stays a scroll box on screen; no width
+  calibration. Word, EPUB and Canvas are unaffected (the rules are print CSS; Canvas has no
+  style block). `RENDER_VERSION` 7, so stored pages are made again when opened.
+
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 
 - WS2.8 (g), footnotes: a file that names its footnotes is read from the file. hyperref writes a

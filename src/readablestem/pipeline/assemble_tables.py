@@ -59,6 +59,7 @@ thead th { border-bottom-width: 3px; }
 @media screen and (prefers-color-scheme: dark) {
   th, td { border-color: #a6a6a6; }
 }
+@media print { .table-scroll { overflow: visible; } th, td { overflow-wrap: anywhere; } }
 """
 # A table estimated at least this wide (em of the body text) may not fit a 320 CSS px
 # screen: the column is then 288 px, 16 em of the 18 px body text. The estimate counts

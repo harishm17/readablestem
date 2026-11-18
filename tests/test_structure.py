@@ -87,11 +87,15 @@ def test_a_wide_code_block_is_a_named_tab_stop_a_narrow_one_is_not():
         y = prose(page, 100)
         y = code(page, y, [(0, "x = 1"), (0, "y = 2")])
         y = prose(page, y + 10)
-        code(page, y, [(0, "result = compute_the_total(first_value, second_value, third)")])
+        y = code(page, y, [(0, "result = compute_the_total(first_value, second_value, third)")])
+        y = prose(page, y + 10)
+        # 26 characters: scrolls at 320 px with text spacing (F-448), so it is a stop too
+        code(page, y, [(0, "total = add(first, second)")])
 
     html = html_of(page_of(fill))
     assert '<pre id="p1-e1"><code>' in html
     assert 'tabindex="0" role="group" aria-label="Program code"><code>result' in html
+    assert 'aria-label="Program code"><code>total = add(first, second)' in html
 
 
 def test_one_short_monospaced_word_is_not_a_code_block():

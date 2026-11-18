@@ -315,7 +315,7 @@ no network, no model.
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
-| Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 36 characters is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
+| Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 24 characters (it first scrolls at 30 at 320 px, at 25 with WCAG text spacing) is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |
@@ -658,6 +658,29 @@ its own scroll box (`.equation-scroll`, an inline block); short ones stay plain,
 a scroll box sits on the line differently. `tests/test_assemble_wide.py` checks in
 Chromium at 320 px that the page does not scroll sideways, that every gold equation
 that overflows is a tab stop, that arrow keys scroll it, and axe.
+
+## On paper
+
+Nothing scrolls on a sheet, so the print block of the stylesheet (`assemble.STYLE`,
+`TABLE_CSS`, `CODE_CSS`) makes sure nothing is cut without a mark (SW45 rule 6; the rest of
+the print build waits for WS21.1):
+
+- A table wraps inside the sheet (`overflow-wrap: anywhere` in its cells, no scroll box).
+- Code wraps (`pre-wrap`).
+- An equation of at least `PRINT_FIT_EM` (14 em, estimated) has the classes `pw pw-N`, N its
+  estimated width rounded up to 4 em (16 em above 48), and is scaled to the sheet down to
+  70%: `font-size: max(0.77em, min(1.1em, 100cqw / var(--pw)))`, `main` being the container.
+  An equation still too wide at 70% stays in its box, which clips on paper, and prints "This
+  equation is wider than the paper. It is complete on the web page." The note is generated
+  content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
+  The rules of each width step are added to the stylesheet only when an equation has it.
+- A picture is never wider than the sheet (`max-width: 100%`).
+- A figure's long description prints open (`details.figure-description`); where the browser
+  has no `::details-content`, its summary says "open this description before printing".
+
+The estimate is not calibrated (A23); a table cell with maths that is wider than its column
+is not scaled. Canvas has no style block, so none of this is in it; Word and the EPUB
+reader's own pagination do not use these rules.
 
 ## Flagged items
 
@@ -1156,7 +1179,7 @@ About 35 lines of inline CSS:
   item, since `text-indent` is inherited), equation numbers to the right of their
   equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
   readers still read it);
-- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together;
+- a visible `:focus-visible` outline and a print block (below, "On paper");
 - only in documents that have one: a figure's folded description (a bold summary with
   the browser's own marker, no new colors) and table rules.
 
