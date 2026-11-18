@@ -576,11 +576,11 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
         root = wrapper
     root.set("display", display)
     _unescape_text_specials(root)
-    normal_form(root)
     group_element_symbols(root)
     arrows_as_operators(root)
     shape_general(root)
     shape_chemistry(root)
+    normal_form(root)
     try:
         return serialize_mathml(root)
     except UnsafeMathMLError as exc:

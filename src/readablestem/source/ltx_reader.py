@@ -1166,7 +1166,7 @@ def equation_fix(
     mathml_ok = ""
     if not failed and mathml:
         try:
-            mathml_ok = str(sanitize_mathml(mathml))
+            mathml_ok = str(sanitize_mathml(mathml, normal=True))
         except UnsafeMathML:
             failed = True
     if not failed and not mathml_ok:
