@@ -1854,11 +1854,15 @@ the site is built, with the same component and the same script).
 - **The player** uses the browser's Web Speech API (a static file under `script-src
   'self'`). The transport is Play (which becomes Pause), Previous and Next, and stays in view;
   Play starts at the lesson. Under "More controls": Stop, Play from the beginning, next
-  heading, next equation, Follow along, speed, voice, keys. Why Play is off (no voice, or only
-  online voices) is a line right under it with "Read the transcript" (and "Choose a voice").
+  heading, next equation, Follow along, speed, voice, keys. No voice at all is a line right
+  under Play with "Read the transcript"; a voice off the device is a line there too once Play
+  has asked about it (see Privacy).
   While the filter is on, Previous, Next and playing move through the items shown. The scroll
-  offset is the transport's measured height (`--listen-sticky`), so it holds at enlarged text;
-  the transport sits on the `--z-sticky` layer (`tokens.css`).
+  offset is the transport's measured height (`--listen-sticky`, also the page's
+  `scroll-padding-top`, so a focused link is never under it), so it holds at enlarged text; the
+  transport sits on the `--z-sticky` layer (`tokens.css`). In a window under 32rem tall (a
+  laptop at 200% or 400% zoom) only a compact bar sticks: Play or Pause, Previous, Next and the
+  place, at most a third of the window; the voice line under it scrolls with the page.
   The item being spoken is marked (a bar and a tint, `aria-current`) and scrolled into
   view (instantly under `prefers-reduced-motion`). Keys (`p`, `s` or Esc, `[`, `]`, `h`, `e`)
   work only while focus is inside the page's content, never with a modifier or in a menu. State
@@ -1882,9 +1886,15 @@ the site is built, with the same component and the same script).
   class, never a live announcement, and focus never moves; the status line says only what the
   person did ("Place set to item 47 of 520"). The "Hear this" buttons share the script and keep
   no place.
-- **Privacy.** A voice with `localService === true` is the default. When the browser lists only
-  online voices, the player says some browsers send the text to their maker and speaks nothing
-  until a voice is chosen; a "Hear this" button asks once and speaks only on the second press.
+- **Privacy.** A voice with `localService === true` is the default and speaks at once. Any other
+  voice is one of two classes and Play is never switched off for either: an **online** voice
+  (not local, and named as a network voice, such as Chrome's "Google ..."), and a voice **not
+  known** (not local, no more said: all of Firefox's speech-dispatcher voices on Linux). The
+  first Play with either asks in words and the second press of Play is the answer, kept for the
+  visit; Previous, Next and the other buttons do not answer it. The words for an online voice
+  say some browsers send the text to their maker; the words for one not known say only that the
+  browser does not tell the page whether it runs on the device. A "Hear this" button does the
+  same with its own press. The sentences are in `WORDS` at the top of `static/listen.js`.
 - **Where it is offered.** The job page (beside "Preview the student version", and as the
   "Check how it sounds" step of "Before you share"), the review screen's finish line and list,
   the demo's note, the showcase examples, `/help/posting#listen`. On the review screen (split

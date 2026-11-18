@@ -33,15 +33,18 @@
   <p data-listen-unsupported hidden>This browser cannot speak text. <a href="#transcript-heading">Read the transcript</a> instead.</p>
   {# The transport stays in view while the transcript scrolls (listen.css, sticky): a direct
      child of the player, hidden like the rest of the controls until a speech engine is found.
-     Only the three buttons that are used all the time live here, so it stays short. #}
-  <div class="listen-transport" data-listen-transport hidden role="group" aria-labelledby="player-heading" aria-describedby="player-hint">
-    <div class="listen-row">
+     Only the buttons that are used all the time live in its bar, so it stays short. In a short
+     window (a laptop at 200% or 400% zoom) the block around the bar stops sticking and the bar
+     alone sticks, so the voice note under it scrolls away instead of covering the transcript. #}
+  <div class="listen-transport" data-listen-transport hidden>
+    <div class="listen-bar" role="group" aria-labelledby="player-heading" aria-describedby="player-hint">
       <button type="button" class="button button-small" data-listen="play" aria-describedby="listen-voice-note">Play</button>
       <button type="button" class="button-secondary button-small" data-listen="prev">Previous</button>
       <button type="button" class="button-secondary button-small" data-listen="next">Next</button>
       <span class="listen-position" data-listen-position></span>
     </div>
-    {# Why Play is off, right beside it: no voice, or only online voices. #}
+    {# What to know about the voice, right beside Play: no voice, or an online or not known
+       voice that Play asks about first. #}
     <p class="listen-voice-note" id="listen-voice-note" data-listen-voice-note hidden>
       <span data-listen-voice-text></span>
       <button type="button" class="link-button" data-listen-choose-voice hidden>Choose a voice</button>

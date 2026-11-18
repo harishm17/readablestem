@@ -62,6 +62,23 @@
   are 0.9 em (16.2 px; page markers were 12.8 px). No text on the page is under 14 px outside
   sub- and superscripts and maths. Colors are unchanged. RENDER_VERSION stays 8 (not shipped).
   No model call, no stored-data change, no migration, no version bump.
+## Unreleased: Listen's transport stays in view and Play is never off (branch fix/listen-transport-and-voices)
+
+- WS23.2 (F-461): at 200% and 400% zoom on a laptop the transport stopped being sticky (a
+  `max-height: 32rem` rule made it static), so after ten items it was 1,099 px (1280x450) and
+  1,400 px (320x225) above the window. In a short window only a compact bar now sticks (Play or
+  Pause, Previous, Next and the place; 42 px of 450, 66 px of 225, under a third), the voice
+  line under it scrolls with the page, `--listen-sticky` follows what really sticks, and the
+  page's `scroll-padding-top` keeps a focused link out from under it (WCAG 2.4.11). The side
+  panel's sticky offset follows the same measure.
+- WS23.3: a voice the browser does not report as local was always read as online, so Firefox on
+  Linux (all 14,805 speech-dispatcher voices "not local") showed "Only online voices" and switched
+  Play off. Voices are now local, online (not local and named as a network voice) or not known;
+  Play is never off for the class. The first Play with an online or not known voice asks once
+  and the second press answers, kept for the visit; the words for a not known voice say only
+  that the browser does not tell the page whether it runs on this device, never that text is
+  sent. "Hear this" on the review screen uses the same classes. No stored-data change, no
+  migration, no version bump, no prompt or model request touched.
 
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 
