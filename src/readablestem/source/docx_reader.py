@@ -14,7 +14,9 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
   header row"; a table with only the style's first-row flag gets one header row as a proposal
   (a warning check, `source.header_unmarked`), and a table whose rows are all headers gets one.
 - A footnote or endnote is written where its mark is, as the LaTeX path writes a note. A link is
-  a link when it is a web or mail address; a link to a bookmark is its words. Struck text is kept
+  a link when it is a web or mail address; a link to a bookmark on a heading is an internal link
+  to that heading (pandoc keeps a bookmark only on a heading, and the words of a `REF` field
+  are plain text), and a link to any other bookmark is its words. Struck text is kept
   and marked deleted; superscripts and subscripts are runs.
 - An equation typed in Word (`m:oMath`) is the LaTeX pandoc reads from it, checked by the same
   `check_latex` as any LaTeX the product accepts and written to MathML by the pipeline's one

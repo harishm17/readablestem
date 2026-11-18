@@ -23,7 +23,9 @@ keep, and adds to the elements without changing their text or anything a model s
   target is not linked.
   A Word or LaTeX document has no pages, glyphs or link annotations, so only these two kinds
   of link are made for it (`source_links`, called by `source.convert`), after the links its
-  reader made from the file, which are kept as they are.
+  reader made from the file (web and mail links, and an internal link where the file itself
+  refers to a place in it: a LaTeX reference, equation reference or citation), which are kept as
+  they are.
 - `DocumentResult.lang` and `lang_source`: the language chosen at upload ("user"), else
   detected from the body text ("detected", notice `lang_detected`; "pdf" when the PDF's own
   /Lang names the same language; `lang_mixed` when no language holds 60% of the letters),

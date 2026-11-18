@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
+
+- WS18.9 (F-557). LaTeXML already wrote `\ref`, `\eqref`, `\autoref`, `\cite` and each contents
+  entry as a link to the id of its target, and the reader threw it away; it is now an internal
+  link to the element that id became (a heading, a numbered equation, a theorem, a figure, a
+  table, a bibliography entry), and the guessed link by number only fills in where the file had no
+  reference. A Word hyperlink to a bookmark on a heading is linked the same way. On 47 LaTeX
+  sources 36 `#` links became 41 internal links (a nested contents entry is read twice, see
+  below), no document changed apart from links, and 0 pointed at a missing element. One
+  PIPELINE_VERSION bump is owed at the next PR.
+
 ## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
 
 - WS11.1e, as far as its triage line. Found by reading the upload, delete and purge code and by

@@ -14,6 +14,13 @@ What each part becomes:
   existing sanitiser (`web.mathml`, ADR 0008) and spoken by the usual reading. A formula LaTeXML
   could not read (`ltx_ERROR`, an unknown macro) is a required decision showing the TeX, with our
   own LaTeX conversion as the proposal when that works (`\\ce` is one);
+- a link to a web or mail address is a link; a link to a place in the document (LaTeXML wrote
+  `\\ref`, `\\eqref`, `\\autoref`, `\\cite`, `\\pageref` and a contents entry as `#id`) is an
+  internal link to the element that id became (`link_internal`): a heading, a numbered
+  equation, a theorem's paragraph, a figure, a table, a bibliography or list item, or the
+  paragraph that holds the id. The words stay as they are; an id that became no element
+  (`Reading` made nothing there), a link inside the element it names and one in a place that
+  holds no links (a table cell, a caption, a note, a heading) make no link;
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
   no usable picture the figure is a required decision (`source_figure_missing`). A picture
