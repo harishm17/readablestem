@@ -249,8 +249,9 @@
     person the right to view or to review one document{% if course_grants_on %}, or every document
     in one of your courses, including the ones you add later{% endif %}; they must sign in with the
     exact email address you entered, and you can remove it at any time.{% if notation_on %} A person
-    you share a document with to review{% if course_grants_on %}, or give a course to review{% endif %},
-    also sees the name of its course and the symbols it was read with.{% endif %} Everyone else on the beta, and the
+    you share a document with to review{% if course_grants_on %}, or give a course to review,{% endif %}
+    also sees the name of its course and the symbols it was read with.{% if course_grants_on %} A person
+    you give a course to, to view or to review, sees the course's name.{% endif %}{% endif %} Everyone else on the beta, and the
     people who run it, are told "not found" for an address that is yours.</li>
   <li>The converted document is shown in a sandbox that stops it running scripts.</li>
   <li>An uploaded file is first opened in a separate short-lived process with its own time
