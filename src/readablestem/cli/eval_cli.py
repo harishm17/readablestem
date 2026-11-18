@@ -16,6 +16,7 @@ import argparse
 import datetime as dt
 import json
 import math
+import subprocess
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -1127,6 +1128,39 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     return run, registry
 
 
+def _cmd_parsing_bench(args: argparse.Namespace) -> int:
+    """`eval parsing-bench`: the reader on the categories of olmOCR-Bench that need no model,
+    scored by the benchmark's own checker (`eval.olmocr_bench`). Spends nothing. The
+    benchmark is fetched outside the repository (`--fetch`) and a run keeps one file per page
+    there; `--run-dir` resumes or repeats a run from them."""
+    from readablestem.eval import olmocr_bench
+
+    folder = args.folder or olmocr_bench.default_folder()
+    if args.fetch:
+        olmocr_bench.fetch(folder, said=lambda line: print(line, file=sys.stderr, flush=True))
+    if not (folder / "bench_data").is_dir():
+        return _error(f"no benchmark at {folder}: run with --fetch")
+    run_dir = args.run_dir or olmocr_bench.new_run_dir(folder)
+
+    def said(line: str) -> None:
+        print(line, file=sys.stderr, flush=True)
+
+    try:
+        record = olmocr_bench.run(
+            folder,
+            run_dir,
+            at_once=args.at_once,
+            only=args.only,
+            limit=args.limit,
+            said=said,
+        )
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        return _error(f"parsing-bench: {exc}")
+    _write_record(args.out, record)
+    print(olmocr_bench.render(record))
+    return 0
+
+
 def _cmd_order(args: argparse.Namespace) -> int:
     """`eval order`: whether each gold page of the corpus is read in order, and what else
     is wrong on a page that is, in the page a student is given and in what the pipeline
@@ -2121,6 +2155,24 @@ def register(
         help="score a held-out set: once, for a release, never while the reader is changed",
     )
     order.set_defaults(func=_cmd_order)
+
+    parsing = group.add_parser(
+        "parsing-bench",
+        help="the reader on the olmOCR-Bench categories that need no model, scored by the "
+        "benchmark's own checker (spends nothing)",
+    )
+    parsing.add_argument("--fetch", action="store_true", help="fetch the benchmark first")
+    parsing.add_argument("--folder", type=Path, help="the fetched benchmark (outside the repo)")
+    parsing.add_argument(
+        "--run-dir", type=Path, help="a run's folder: pages already converted there are kept"
+    )
+    parsing.add_argument(
+        "--at-once", type=_positive_int, default=2, help="conversions at once (3 at most)"
+    )
+    parsing.add_argument("--only", action="append", help="one category (repeat); default: all")
+    parsing.add_argument("--limit", type=_positive_int, help="the first N PDFs of each category")
+    parsing.add_argument("--out", type=Path, help="write the run record as JSON")
+    parsing.set_defaults(func=_cmd_parsing_bench)
 
     outputs = group.add_parser(
         "outputs",
