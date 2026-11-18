@@ -196,14 +196,15 @@ OPT_IN_ROUTE = (
 )
 
 
-def failed_message(code: str, *, image_pages_offered: bool = False) -> str | None:
+def failed_message(code: str, *, image_pages_offered: bool = False, cost: str = "") -> str | None:
     """The message of a stopped job's error code, or None for a code with no message here.
     `image_pages_offered`: the deployment offers to convert scanned and handwritten pages, so
-    a PDF of only such pages was not converted because the option was not ticked."""
+    a PDF of only such pages was not converted because the option was not ticked. `cost`:
+    what reading them costs (`image_pages_cost`), said after the way to ask."""
     if image_pages_offered and code in IMAGE_PAGE_FAILS:
         what = IMAGE_PAGE_FAILS[code]
         lead = f"{what}, so it was not converted: such pages are read only when you ask."
-        return f"{lead} {OPT_IN_ROUTE}"
+        return " ".join(part for part in (lead, OPT_IN_ROUTE, cost) if part)
     return FAILED_MESSAGES.get(code)
 
 
@@ -357,6 +358,37 @@ def _count_parts(count: page_type.ImagePageCount) -> str:
     return ", ".join(parts)
 
 
+def _dollars(value: float) -> str:
+    return f"${value:.2f}" if value >= 0.01 else f"${value:.4f}"
+
+
+def image_pages_cost(settings: Settings, pages: int | None = None, many: bool = True) -> str:
+    """What reading scanned and handwritten pages costs the service (never a charge to the
+    person: the words say "of the server's budget"), in the one wording every place that
+    offers the option uses (the upload form, the offer, the refusal, /limits). Both figures are
+    limits, so they say "up to": the per-page setting is what one page may spend and the
+    per-job setting the most one document may (`Settings.image_pages_estimate`, the figure the
+    job's cap uses); a job that reaches it stops reading and keeps the rest as pictures.
+    With `pages` (the count of such pages in this file) it gives the estimate for the file.
+    `many`: those pages are more than one ("them", not "it")."""
+    per_page = settings.image_pages_usd_per_page
+    most = settings.image_pages_max_usd_per_job
+    if not pages:
+        return (
+            f"Reading a scanned or handwritten page uses up to {_dollars(per_page)} of the "
+            f"server\u2019s budget, and one document at most {_dollars(most)}. A document that "
+            "reaches that stops being read, and the pages left stay pictures."
+        )
+    each = f"{pages} {_plural(pages, 'page', 'pages')} at up to {_dollars(per_page)} each"
+    if pages * per_page > most:
+        each += f", and one document uses at most {_dollars(most)}"
+    cost = _dollars(settings.image_pages_estimate(pages))
+    return (
+        f"Reading {'them' if many else 'it'} would use up to {cost} of the server\u2019s budget "
+        f"({each})."
+    )
+
+
 def image_pages_offer(
     count: page_type.ImagePageCount, settings: Settings, *, listed: bool = False
 ) -> str:
@@ -378,15 +410,9 @@ def image_pages_offer(
             f"{what}. They are kept as pictures, marked “Not converted”, unless you ask for "
             "them to be read."
         )
-    if pages:
-        per_page = settings.image_pages_usd_per_page
-        cost = settings.image_pages_estimate(pages)
-        capped = pages * per_page > settings.image_pages_max_usd_per_job
-        how = "at most" if capped or count.at_least else "about"
-        sentences.append(
-            f"Reading {'them' if many else 'it'} would cost {how} ${cost:.2f} "
-            f"({pages} {_plural(pages, 'page', 'pages')} at ${per_page:.2f} each)."
-        )
+    # With the count unsure ("at least") the pages counted are not all there are, so an
+    # estimate for them would understate: say the per-page and per-document limits instead.
+    sentences.append(image_pages_cost(settings, None if count.at_least else pages, many))
     return " ".join(sentences)
 
 

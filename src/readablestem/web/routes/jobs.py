@@ -328,7 +328,7 @@ def upload_error_message(
         # Not "cannot convert it": the pages are read when asked for, and this upload did not.
         return (
             f"{name} {IMAGE_PAGE_WHAT[code]}, which are read only when you ask. "
-            f"{NOTHING_TAKEN} {IMAGE_PAGES_ADVICE}"
+            f"{NOTHING_TAKEN} {IMAGE_PAGES_ADVICE} {outcome_words.image_pages_cost(s)}"
         )
     return message
 
@@ -711,6 +711,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "office_kinds": kinds,
         # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
         "image_pages_offered": ctx.settings.feature_image_pages,
+        "image_pages_cost": outcome_words.image_pages_cost(ctx.settings),
         # `.tex` files and zips of a LaTeX project are taken (FEATURE_LATEX_SOURCE).
         "latex_source": ctx.latex_source_on,
         "keep_default": keep_default,

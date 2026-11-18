@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
+
+- WS7.2 (F-014): the box "Convert scanned or handwritten pages" says what reading a page costs
+  and the most one document costs ("up to $0.25 ... at most $7.50", from
+  `IMAGE_PAGES_USD_PER_PAGE` and `IMAGE_PAGES_MAX_USD_PER_JOB`), inside its hint, so a screen
+  reader reads it with the box. One function, `outcome.image_pages_cost`, words it for the
+  form, the refusal of a PDF of only scans, the stopped job's message, `/limits` and the offer
+  that WS7.8 made; with the file's count of such pages it gives the estimate for the file. The
+  offer now says "up to" where it said "about": the per-page figure is a spend limit, and the
+  measured cost is lower. Where the count is "at least", it gives the limits, not an estimate
+  that would understate. No model call, no stored-data change, no migration, no version bump.
+
 ## Unreleased: the accept-many count and the review fields (branch feat/review-identical-and-counts)
 
 - WS8.1 (identical items decided as one write) is not built: the tracked fixtures hold no

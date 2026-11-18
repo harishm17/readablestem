@@ -530,7 +530,11 @@ def _stopped(job: Facts, left: int, viewer: str, ctx: Context) -> State:
     if code in LIMIT_FAILURES:
         return _make("stopped_limit", job_error_message(code), (_upload(),) if owner else ())
     if code in FILE_FAILURES:
-        message = words.failed_message(code, image_pages_offered=ctx.image_pages_offered)
+        message = words.failed_message(
+            code,
+            image_pages_offered=ctx.image_pages_offered,
+            cost=words.image_pages_cost(ctx.settings) if ctx.settings else "",
+        )
         message = message or source_stop_message(code, job.error_detail)
         return _make("stopped_file", message, (_upload(),) if owner else ())
     # An unknown or missing code: say the step it stopped in, and that the cause is not known.
