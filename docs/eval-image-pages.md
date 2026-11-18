@@ -28,7 +28,7 @@ reasons and the open risks are at the end.
 | Part | Where |
 |---|---|
 | The pass: prompt, strict output schema, validation, review tiers, the rescue of an unreadable crop | `src/readablestem/pipeline/image_page.py`, `src/readablestem/models/prompts/image_page.md` |
-| Integration (kept pages, crops, headings, cost, notices) | `pipeline/run.py` (`_image_pages_pass`), `pipeline/layout.py` (`REASON_IMAGE_HEADING`), `pipeline/heading_step.py` unchanged |
+| Integration (kept pages, crops, headings, cost, notices) | `pipeline/run.py` (`_image_pages_pass`), `pipeline/layout/document.py` (`REASON_IMAGE_HEADING`), `pipeline/heading_step.py` unchanged |
 | Output: notice, "Show the original page", about note, rejected text as a picture | `pipeline/assemble.py` |
 | Review of the text of an image page; upload of scans; job outcome | `web/review.py`, `web/routes/review.py`, `web/routes/split.py`, templates, `web/pdf_probe.py`, `web/uploads.py`, `web/worker.py` |
 | The upload option (per document): the checkbox, the probe's count of scanned and handwritten pages, `Job.image_pages` (migration `c4e7a2b9d150`), the job's spend allowance, large files in parts | `web/templates/app.html`, `web/routes/jobs.py`, `web/routes/parts.py`, `web/pdf_probe.py`, `web/uploads.py`, `pipeline/page_type.py` (`image_page_count`), `web/intake.py`, `web/pending.py`, `web/worker.py` (`job_caps`), `web/notation.py` (`conversion_options`), `ops/limits.py` |

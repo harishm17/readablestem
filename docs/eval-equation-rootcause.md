@@ -77,7 +77,7 @@ Reading it:
 ## 3. The mechanisms, with their evidence
 
 **M1. A variable set in an italic text font is not seen as math (3.9 points; the largest).** `mathptmx`, `mathpazo`, Charter and `newtx` set the
-Latin letters of a formula in the text family's italic and only Greek letters and symbols in a math font. The layout (`pipeline/layout.py`,
+Latin letters of a formula in the text family's italic and only Greek letters and symbols in a math font. The layout (`pipeline/layout/`,
 `_inline_evidence`) kept a run only with a math-font glyph, an operator, a script or a relation, so a lone `S`, `m`, `K(t)` or `N_i` in a sentence was text.
 Example (2503.02792 p1, "Let us consider *S* species"): gold `S`; ReadableSTEM nothing; Haiku `S`; the PDF's font for the letter is
 `CharterBT-Italic`. The same on 2408.09889 p2 (Palatino: `m`, `a`), 2404.15495 p1 to 3 (Times: `K(t)`, `t`) and 2501.09629 (MathDesign). Of the

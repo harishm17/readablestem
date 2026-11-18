@@ -577,7 +577,7 @@ that decodes an image reads its width and height first (the PNG or image header 
 the PDF object's `Width` and `Height` with MuPDF) and does not decode one over
 `core.images.MAX_IMAGE_PIXELS` (40 million): the layout step treats it as "not plain" and
 keeps the picture, the figure and image-page steps leave the image as it is, and the docx
-export and the proof replay skip it. The sites are `pipeline/layout.py`,
+export and the proof replay skip it. The sites are `pipeline/layout/figures.py`,
 `pipeline/image_page.py`, `pipeline/image_page_check.py`, `pipeline/figure_images.py`,
 `pipeline/export_docx.py`, `source/figures.py`, `models/images.py`,
 `models/math_readers/local_reader.py`, `proof/replay.py` and `eval/invented/figures.py`; new

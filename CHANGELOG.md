@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: layout is a package and keeps nothing of a document in a module (branch refactor/layout-package)
+
+- WS14.8: `pipeline/layout.py` is the package `pipeline/layout/` (one module per stage, listed
+  in docs/layout.md), and what a document turns out to be (made by TeX, a slide deck, its
+  compounds, grouped displays, the ink and detector budgets) is a `_Document` passed to the
+  steps instead of five module-level names set with `global`. The output of every document is
+  unchanged. No migration and no version bump.
+
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
 - WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per

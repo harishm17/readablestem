@@ -37,7 +37,7 @@ beat Opus yet. Spend this round: $12.00 (exploratory $0.97, development $1.60, f
 
 ## 2. Over-built, or tuned to its own papers?
 
-Partly both. `pipeline/layout.py` is about 9,000 lines of rules; the model that reads an equation is the same Opus
+Partly both. `pipeline/layout/` is about 9,000 lines of rules; the model that reads an equation is the same Opus
 the chatbot uses, so the rules that decide what it is shown are the bottleneck. Rules tuned on the development papers
 shrink on fresh ones: equation round 1 was +12.9 points on development and +6.8 on fresh2; table round 1 took
 recall from 0.56 to 0.92 on development and 0.74 on fresh documents. So no further rules for single cases; the change

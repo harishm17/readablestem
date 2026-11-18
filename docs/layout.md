@@ -1,4 +1,4 @@
-# Layout analysis (`pipeline/layout.py`, `pipeline/heading_step.py`)
+# Layout analysis (`pipeline/layout/`, `pipeline/heading_step.py`)
 
 Step 1 of the conversion: a PDF becomes a list of `Element`s (headings, paragraphs, list
 items, display and inline equations, figures, data tables) in reading order, with no model
@@ -57,6 +57,49 @@ Element conventions:
   `"aligned text grid"`, `"box extended along rules"`, `"SLANet-plus grid"`,
   `"drawn cell grid"`, `"PyMuPDF grid"`, `"continued from previous page"`). How tables
   are found: [tables.md](tables.md).
+
+## Where the code is (`pipeline/layout/`)
+
+The layout step is a package of one module per stage, in the order a document is read. A module
+imports only from the ones above it in this list, so there is no import cycle and a stage can be
+read with the stages before it. `pipeline/layout/__init__.py` holds the package docstring (how a
+page is read) and re-exports every name that code or a test outside the package uses
+(`analyze`, `crop`, `release`, `Layout`, `LayoutError`, `REASON_*` and the private helpers the
+tests import), so `from readablestem.pipeline import layout` and `layout.analyze` work as before.
+
+| Module | What it holds |
+|---|---|
+| `context` | `_Document`, the document context (below), the result types `Layout`, `LayoutError`, `PageStatus`, and the page guard that keeps one failing page from stopping a document |
+| `access` | opening the PDF under the one lock, the document cache, the probe process (see "Untrusted PDFs"), the content budget, `crop`, `crop_line`, `render_page`, `page_ink`, `release` |
+| `glyphs` | `_Char`, font classes and styles, character classes, text cleaning, `glyph_style` |
+| `shared` | the types the stages hand to each other (`_Row`, `_Block`, `_Run`, `_Figure`, `_Region`, `_Path`, ...) and the few helpers more than one stage needs |
+| `rows` | lines merged into rows, form fields, ligatures, right-to-left text, stacked fractions, scripts, big operators, reaction arrows; `line_glyphs`, `page_glyphs`, `page_strikes` |
+| `drawings` | the vector paths of a page: lines, turns, boxes, radicals, rules, axes |
+| `figures` | raster images and their budgets, vector clusters, diagrams, plots, labels and their owners, page furniture bands |
+| `furniture` | margins: running heads, page numbers, margin notes |
+| `order` | columns, the gutter, full-width lines and reading order |
+| `inline_runs` | inline math, math pictures, chemistry and nuclides |
+| `display` | display equations and the number beside them |
+| `lists` | list markers and levels |
+| `blocks` | rows grouped into paragraphs, headings, list items, captions, code, contents lists, entries, with their text |
+| `tables` | table claims: the cells of a found table taken out of the page, their math and key terms |
+| `page` | one page, from its rows to its blocks (`_page_blocks`); figure labels, pen marks, drawn rules, footnote marks |
+| `joins` | passes over the whole document: run-in labels, numbered headings, paragraphs that go on over a page break |
+| `bold` | bold-letter runs and glossary entries |
+| `notices` | what was left out or could not be read |
+| `elements` | blocks turned into `Element`s, with contents and footnote links |
+| `document` | `analyze`, `_analyze_document` (the steps in order), slide decks, heading levels |
+
+A step that runs for one page is called by `_analyze_document` (in `document`), so a test that
+makes a step fail patches it in the module that calls it, not in `layout`.
+
+**The document context.** What is known about the document being read (made by TeX, a slide
+deck, how it spells its compounds, whether its displays are grouped) and the ink and detector
+budgets are one `_Document`, made by `analyze` and passed as `document=` to the steps that read
+it. Nothing about a document is kept in a module, so two documents read at once (one in the
+middle of the other, through the page-math hook) cannot change each other. `_PLAIN`, the
+document with none of these set, is what a caller outside a read gets by default. `_LOCK`
+guards PyMuPDF, its warning store and the caches, nothing else.
 
 ## How a page is read
 
@@ -1159,7 +1202,7 @@ give as a plain letter, heard as the article "a" (UX review MF2). Layout makes i
 inline equation, and the equation step fixes it without a model call
 (docs/steps.md "Course notation").
 
-Two functions in `layout.py`, nothing else in the page flow changes:
+Two functions in `layout/` (`blocks._bold_letter_runs`, `bold._settle_bold_letters`), nothing else in the page flow changes:
 
 1. `_bold_letter_runs`, per paragraph row, beside the inline math runs:
    - a math run that is one bold letter (a bold omega in CMMIB, a math bold code point)
@@ -2653,7 +2696,7 @@ time limit) belongs to the worker, which owns the job lifecycle.
 
 ## Cropping, the cache and threads
 
-PyMuPDF is not thread-safe, so every PyMuPDF call in `layout.py` runs under one module lock;
+PyMuPDF is not thread-safe, so every PyMuPDF call in `layout/` runs under one module lock (`access._LOCK`);
 concurrent callers are safe but serialised (crop on one thread; a thread pool only helps the
 model calls). `analyze` opens the document for that call only and closes it. `crop` caches
 opened documents (4 at most), keyed by the identity of the bytes object and, failing that,

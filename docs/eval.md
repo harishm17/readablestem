@@ -1049,7 +1049,7 @@ module under `src/readablestem/pipeline/` with a function that sets `Status.ACCE
 deciding functions are the rules, and so is a `config.py` setting with `accept` in its name.
 They are compared by parsed value (`ast`; a function without its docstring), so a comment, a
 docstring or `0.80` written `0.8` is no change, and a constant in a module that decides
-nothing (`layout.py`) is not a rule. A module is found by what it does, so a new step that
+nothing (`layout/`) is not a rule. A module is found by what it does, so a new step that
 sets a status is covered without a list to update.
 
 Opt-out, for a change that does not alter what a model is asked, which model answers or what

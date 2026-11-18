@@ -25,7 +25,7 @@ anchor.
 | Part | Where |
 |---|---|
 | The pass: prompt, strict output schema, verification of every quote against the text layer, the call | `src/readablestem/pipeline/page_math.py`, `src/readablestem/models/prompts/page_math.md` |
-| Reconciliation with layout (a hook in layout's page analysis; layout runs twice with the flag on) | `src/readablestem/pipeline/page_math_reconcile.py`; hook points in `pipeline/layout.py` (`analyze(page_math=...)`, `_page_blocks`, `_paragraph_pieces`, `render_page`) |
+| Reconciliation with layout (a hook in layout's page analysis; layout runs twice with the flag on) | `src/readablestem/pipeline/page_math_reconcile.py`; hook points in `pipeline/layout/` (`document.analyze(page_math=...)`, `page._page_blocks`, `blocks._paragraph_pieces`, `access.render_page`) |
 | Two readings (agreement lifts confidence, disagreement asks the main model once, a reading nobody shares is a required decision) | `pipeline/equation_step.py` (`_compare_readings`, `PAGE_READING*`), `web/messages.py` |
 | Flag and settings | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR`; `core/types.py` (`ConversionOptions.page_math`, `Element.page_latex`, `Element.page_status`, `PageMathSummary`, `Step`) |
 | Longer fenced context for one step | `models/base.py` (`VisionRequest.context_limit`), both clients |
