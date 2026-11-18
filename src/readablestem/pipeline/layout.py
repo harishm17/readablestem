@@ -10374,9 +10374,7 @@ def _prepare_rows(
     merged = _merge_baselines(kept, gutter, rules)
     if source is not None:
         for row in merged:
-            source.words.extend(
-                say_once.row_words((c.c, (c.x0, c.y0, c.x1, c.y1)) for c in row.chars)
-            )
+            source.add_row(row.chars)
         out = [f for f in frags if id(f) in gone or id(f) in placed]
         source.leave_out("furniture", sum(1 for f in out for c in f.chars if not c.blank))
     return merged, gutter, _merge_baselines(dropped, gutter)
@@ -11844,6 +11842,7 @@ def _analyze_document(
             # grid by), and the detector is the slowest step on the pen-stroke pages these are.
             # `previous` is the page before's tables, unless that page failed: a page that is
             # now a picture takes no row the break split.
+            unclaimed = frags[number]
             found[number] = (
                 []
                 if number in text_kept
@@ -11858,6 +11857,10 @@ def _analyze_document(
             )
             sources[number] = say_once.PageSource()
             sources[number].leave_out("hidden", types[number].text.left_out)
+            # the rows a table claimed are said by the table, or by the text it becomes
+            still = {id(f) for f in frags[number]}
+            for row in _merge_baselines([f for f in unclaimed if id(f) not in still], None):
+                sources[number].add_row(row.chars)
             prepared[number] = _prepare_rows(
                 doc[number], frags[number], margins, paths[number], sources[number]
             )

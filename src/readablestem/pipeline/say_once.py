@@ -52,6 +52,7 @@ import unicodedata
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from readablestem.core.types import INLINE_MARKER_RE, BBox, Element, Kind
 
@@ -90,6 +91,10 @@ class PageSource:
 
     words: list[Word] = field(default_factory=list)
     left_out: dict[str, int] = field(default_factory=dict)
+
+    def add_row(self, chars: Iterable[Any]) -> None:
+        """Set down the words of one row of layout's characters (`_Char`: `c` and its box)."""
+        self.words.extend(row_words((c.c, (c.x0, c.y0, c.x1, c.y1)) for c in chars))
 
     def leave_out(self, reason: str, glyphs: int) -> None:
         if glyphs:
