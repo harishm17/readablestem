@@ -2056,7 +2056,9 @@ def image_kind(page: PageTypeResult | PageType) -> str | None:
         return None
     if page.kind == "scan_no_text":
         return "scanned" if TEXT_NOT_COVERING in page.reasons else None
-    return "unread"
+    # A page over the drawings cap may be a typed page with one dense plot: its typed text is
+    # exact and stays as layout read it. Only a page with less than a line of type is ink.
+    return "unread" if _visible_chars(page) < TEXT_MIN else None
 
 
 def reads_image(page: PageTypeResult | PageType) -> bool:

@@ -61,6 +61,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -1209,20 +1210,22 @@ def _add_omissions(
 
 def _kept_typed(typed: Sequence[Element], blocks: Sequence[Block]) -> list[Element]:
     """The typed text of the page (`build`'s `typed`) that the read does not hold: a title
-    the model passed over stays in the page, as the PDF has it. Letters and digits only are
-    compared, so spacing and marks do not make a title look missing."""
+    the model passed over stays in the page, as the PDF has it. Words are compared, and text
+    counts as read when at least half of its words are in the read: a paragraph the model
+    read with a small difference is not written a second time."""
 
-    def plain(text: str) -> str:
-        return re.sub(r"[\W_]+", "", text.casefold())
+    def words(text: str) -> list[str]:
+        return re.findall(r"\w+", text.casefold())
 
-    read = plain(" ".join(r.value for b in blocks for r in b.runs if r.kind == "text"))
-    return [
-        e
-        for e in typed
-        if e.kind in {Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM}
-        and (own := plain(e.text or ""))
-        and own not in read
-    ]
+    read = Counter(words(" ".join(r.value for b in blocks for r in b.runs if r.kind == "text")))
+    kept: list[Element] = []
+    for element in typed:
+        own = Counter(words(element.text or ""))
+        if element.kind not in {Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM} or not own:
+            continue
+        if 2 * (own & read).total() < own.total():
+            kept.append(element)
+    return kept
 
 
 def build(
