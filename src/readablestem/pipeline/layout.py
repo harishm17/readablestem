@@ -8257,16 +8257,21 @@ def _continues(
     left, right = run.box[0], run.box[2]
     if row.x0 > right or row.x1 < left:
         return False
-    if row.x0 < left - 2 * size and not (
-        edges is not None
-        and len(run.rows) == 1
-        and row.x0 >= left - INDENT_REACH * size
-        and prev.x1 >= edges.of(prev) - 1.5 * size
-        and row.x1 >= prev.x1 - 3 * size
-        and row.marker is None
-        and prev.marker is None
-        and not CAPTION.match(prev.clean)
-        and prev.clean[-1:] not in ".:?!"
+    if (
+        row.x0 < left - 2 * size
+        and not (
+            edges is not None
+            and len(run.rows) == 1
+            and row.x0 >= left - INDENT_REACH * size
+            and prev.x1 >= edges.of(prev) - 1.5 * size
+            and row.x1 >= prev.x1 - 3 * size
+            and row.marker is None
+            and prev.marker is None
+            and not CAPTION.match(prev.clean)
+            and prev.clean[-1:] not in ".:?!"
+            # a line that starts with a raised mark starts its own entry (an affiliation, a note)
+            and not any(row.is_script(c) for c in row.chars[:1])
+        )
     ):
         return False
     if run.rows[0].marker is not None and row.x0 < left - 0.5 * size:

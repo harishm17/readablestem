@@ -492,9 +492,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
     "item, so a screen reader reads them as one block: split them into separate items with the "
     "page tools.",
-    "rtl_text": "This text is written right to left (Arabic or Hebrew) and may be in the wrong "
-    "word order, because the PDF stores it in an order a screen reader cannot be told apart "
-    "from: check it against the original.",
+    "rtl_text": "This text is written right to left (Arabic or Hebrew). The PDF may store its "
+    "words in a different order from the one they are read in, so the words may be out of "
+    "order: check it against the original.",
     "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
     "email address.",
     "link_text_unclear": "A link's text does not say where it goes (for example, click "
