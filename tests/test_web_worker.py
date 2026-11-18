@@ -130,6 +130,32 @@ def test_model_calls_made_by_a_job_are_counted_in_the_daily_spend(env):
         assert day.spent_usd > 0 and day.held_usd == pytest.approx(0.0)
 
 
+def test_a_running_jobs_spend_is_what_settled_and_never_more_than_it_ends_at(env):
+    job_id = queue_job(env)
+    seen: list[tuple[float, float, float]] = []
+
+    def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
+        def look() -> None:
+            job = env.job(job_id)
+            seen.append((job.settled_usd, job.held_usd, job.cost_usd))
+
+        held = client.budget.reserve(0.05)  # a call in flight
+        look()
+        client.budget.settle(held, 0.01)
+        look()
+        return env.converter.output.model_copy(deep=True)
+
+    worker = env.worker()
+    worker.converter = converter
+    worker.run_once()
+    (in_flight, settled) = seen
+    assert in_flight[:2] == pytest.approx((0.0, 0.05))  # the hold is counted apart from spend
+    assert settled[:2] == pytest.approx((0.01, 0.0))
+    final = env.job(job_id)
+    assert final.status == "done" and final.held_usd == 0
+    assert in_flight[0] <= settled[0] <= final.settled_usd == pytest.approx(final.cost_usd)
+
+
 def test_claims_take_the_oldest_job_first_and_never_the_same_job_twice(env):
     old = queue_job(env, age_s=60)
     new = queue_job(env)
@@ -682,17 +708,17 @@ class RecordingTracer:
 
 
 def test_a_job_whose_cap_cannot_hold_that_many_calls_runs_fewer_steps(tmp_path):
-    """One page on Claude is capped at $1.00 and a call can hold $0.14: seven at once."""
+    """One page capped at $0.30 on Claude, where a call can hold $0.065: four at once."""
     from readablestem.ops.limits import largest_reservation_usd
 
-    env = WebEnv(tmp_path, model_provider="anthropic")
+    env = WebEnv(tmp_path, model_provider="anthropic", max_usd_per_page=0.30)
     with env.running():
         env.allow(ALICE)
         queue_job(env)
         env.run_worker()
     cap, _ = job_caps(env.settings, 1)
-    assert cap == 1.0
+    assert cap == pytest.approx(0.30)
     assert env.converter.calls[0]["concurrency"] == int(
         cap // largest_reservation_usd(env.settings)
     )
-    assert env.converter.calls[0]["concurrency"] == 7
+    assert env.converter.calls[0]["concurrency"] == 4

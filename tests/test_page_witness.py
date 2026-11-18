@@ -141,11 +141,12 @@ def test_an_answer_that_ran_out_is_asked_again_as_two_halves_once():
 # ------------------------------------------------------------------------------- refusal
 
 
-def test_a_refusal_is_recorded_not_retried_and_leaves_the_page_without_formulas():
+def test_a_refusal_twice_is_recorded_and_leaves_the_page_without_formulas():
+    # Asked once more of the other model (`models.router`); no third call.
     client = FakeVisionClient(defaults={"page_witness": None})
-    page = page_witness.run_page(client, settings(), ROWS, b"png")
+    page = page_witness.run_page(client, settings(model_provider="anthropic"), ROWS, b"png")
     assert page.failed == "refused" and page.formulas == []
-    assert page.stats.refused == 1 and len(client.requests) == 1
+    assert page.stats.refused == 1 and len(client.requests) == 2
 
 
 # -------------------------------------------------------------------------------- budget

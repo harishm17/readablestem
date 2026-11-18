@@ -175,6 +175,11 @@ class ModelCall(BaseModel):
     attempt: int = 1
     is_fallback: bool = False
     outcome: Outcome = "ok"
+    # The part of `cost_usd` charged at the reservation, not at what it cost, because a send
+    # may have reached the provider and no usage came back (a connection that failed or
+    # timed out after it was sent). 0: every dollar is a measured one. Left out of the JSON
+    # when 0, so a record of a call with none is unchanged.
+    billed_unseen_usd: float = Field(default=0.0, exclude_if=lambda v: v == 0)
 
 
 class Verification(BaseModel):
@@ -1311,6 +1316,9 @@ class CallFact(BaseModel):
     attempt: int = 1
     is_fallback: bool = False
     outcome: str = "ok"
+    # The part of `cost_usd` charged at the reservation, no usage having come back
+    # (`ModelCall.billed_unseen_usd`): totaled apart from settled spend.
+    billed_unseen_usd: float = 0.0
 
 
 class StageFact(BaseModel):

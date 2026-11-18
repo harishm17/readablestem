@@ -37,6 +37,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import ModelCall
+from readablestem.models import router
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
@@ -281,8 +282,16 @@ def _ask(
 ) -> bool:
     """Ask for one window and add what verifies to `result`. True when it was answered."""
     request = build_request(settings, window, png)
-    parsed, call = client.run(request, PageWitnessOutput)  # may raise BudgetExceeded
-    result.calls.append(call)
+    # A refusal or a service error is asked once more of the other model (`models.router`).
+    try:
+        parsed, calls = router.call_with_fallback(
+            client, request, PageWitnessOutput, settings=settings, retry_on=router.PAGE_RETRYABLE
+        )  # may raise BudgetExceeded
+    except router.FallbackBudgetExceeded as exc:
+        result.calls.extend(exc.calls)  # the first call was made and paid for
+        raise
+    call = calls[-1]
+    result.calls.extend(calls)
     if parsed is not None:
         formulas, stats = verify_formulas(parsed, window)
         result.formulas.extend(formulas)

@@ -196,10 +196,13 @@ class OpenAIVisionClient:
         reservation = self._budget.reserve(estimate)  # BudgetExceeded: nothing was sent
         replies: list[_Reply] = []
         charged = 0.0
+        unseen = 0.0  # the part of `charged` that is the reservation, not a cost
         while True:
             reply, charge = self._send(sdk, request, schema, content, reservation, estimate)
             replies.append(reply)
             charged += charge
+            if reply.billed_unseen:
+                unseen += charge
             if not reply.retryable or len(replies) > self._settings.model_max_retries:
                 break
             try:
@@ -241,6 +244,7 @@ class OpenAIVisionClient:
             latency_ms=round((time.perf_counter() - started) * 1000),
             is_fallback=is_fallback,
             outcome=last.outcome,
+            billed_unseen_usd=unseen,
         )
         _log_call(call, last, sends=len(replies))
         return cast("T | None", last.parsed), call

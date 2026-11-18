@@ -79,23 +79,30 @@ def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) 
     `optional_steps` is True. The images are priced at their largest, a 2048 px crop (what
     the pipeline's crops are cut to), and the neighbouring text at its largest."""
     from readablestem.models.base import fence_untrusted
-    from readablestem.models.pricing import UnknownModelError, estimate_max_cost_usd
+    from readablestem.models.pricing import (
+        UnknownModelError,
+        estimate_max_cost_usd,
+        reservation_usd,
+    )
     from readablestem.pipeline import equation_step, figure_step, run, table_step
 
     context = fence_untrusted("x" * (run.CONTEXT_CHARS + 64))
     largest = 0.0
     for model in (settings.main_model, settings.cheap_model):
         try:
-            limits = [equation_step.output_limit(model), figure_step.MAX_OUTPUT_TOKENS]
+            limits = [
+                ("equation", equation_step.output_limit(model)),
+                ("figure", figure_step.MAX_OUTPUT_TOKENS),
+            ]
             if optional_steps and settings.feature_long_descriptions:
-                limits.append(figure_step.LONG_MAX_OUTPUT_TOKENS)
+                limits.append(("figure", figure_step.LONG_MAX_OUTPUT_TOKENS))
             if optional_steps and settings.feature_tables:
-                limits.append(table_step.MAX_OUTPUT_TOKENS)
-            for tokens in limits:
-                cost = estimate_max_cost_usd(
+                limits.append(("table", table_step.MAX_OUTPUT_TOKENS))
+            for step, tokens in limits:
+                worst = estimate_max_cost_usd(
                     model, n_images=1, text_chars=len(context), max_output_tokens=tokens
                 )
-                largest = max(largest, cost)
+                largest = max(largest, reservation_usd(step, model, worst))
         except UnknownModelError:  # refused at the first call anyway
             continue
     # The image page pass (ADR 0007), offered: one page picture and a page of output on the
@@ -107,11 +114,15 @@ def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) 
         with contextlib.suppress(UnknownModelError):  # refused at the first call anyway
             largest = max(
                 largest,
-                estimate_max_cost_usd(
+                reservation_usd(
+                    "image_page",
                     page_model,
-                    n_images=1,
-                    text_chars=0,
-                    max_output_tokens=image_page.MAX_OUTPUT_TOKENS,
+                    estimate_max_cost_usd(
+                        page_model,
+                        n_images=1,
+                        text_chars=0,
+                        max_output_tokens=image_page.MAX_OUTPUT_TOKENS,
+                    ),
                 ),
             )
     # The Claude second check (T2-20) holds its own reservation, after the step's and never
@@ -166,6 +177,19 @@ def affordable_concurrency(
     return max(1, min(wanted, int(min(room) // largest)))
 
 
+def run_cap_problem(settings: Settings, cap_usd: float, workers: int) -> str | None:
+    """Why a run cap of `cap_usd` cannot be set for `workers` steps at once, or None: it is
+    below one worst-case reservation for each of them, so the steps that fit would be
+    refused their holds while the others wait, and the run would stop before it began."""
+    largest = largest_reservation_usd(settings)
+    if cap_usd >= workers * largest:
+        return None
+    return (
+        f"${cap_usd:.4f} is below {workers} worst-case reservations (${largest:.4f} each, "
+        f"${workers * largest:.4f}); raise the cap or run fewer steps at once"
+    )
+
+
 def spend_findings(settings: Settings) -> list[Finding]:
     """Errors and warnings about the spend limits for the provider in use."""
     out: list[Finding] = []
@@ -194,8 +218,12 @@ def spend_findings(settings: Settings) -> list[Finding]:
     # A page cap below `steps` calls held at once is no finding: a job whose cap could not
     # hold that many runs fewer steps at once (`affordable_concurrency`, used by the worker
     # and the convert command), so a short document is converted either way.
-    if settings.max_usd_per_job < largest:
-        error(f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below one call's reservation")
+    if settings.max_usd_per_job < in_flight:
+        error(
+            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below {steps} calls held at "
+            f"once (${in_flight:.2f}), one worst-case reservation for each step that runs "
+            f"at once"
+        )
     elif full_job_cap < normal_job + in_flight:
         warning(
             f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below what a "

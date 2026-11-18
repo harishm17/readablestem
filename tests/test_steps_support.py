@@ -24,11 +24,16 @@ def make_settings(**kw) -> Settings:
 
 
 def fallback_router(
-    client: VisionClient, request: VisionRequest, schema: type[T], *, settings: Settings
+    client: VisionClient,
+    request: VisionRequest,
+    schema: type[T],
+    *,
+    settings: Settings,
+    retry_on: frozenset[str] | set[str] = router.RETRYABLE,
 ) -> tuple[T | None, list[ModelCall]]:
     parsed, call = client.run(request, schema)
     calls = [call]
-    if parsed is None and call.outcome in router.RETRYABLE:
+    if parsed is None and call.outcome in retry_on:
         fallback = dataclasses.replace(request, model=settings.fallback_for[request.model])
         parsed, call = client.run(fallback, schema, is_fallback=True)
         call.attempt = 2

@@ -91,6 +91,7 @@ from readablestem.core.types import (
     TableFix,
     inline_marker,
 )
+from readablestem.models import router
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
@@ -262,8 +263,15 @@ def read_page(client: VisionClient, settings: Settings, page: int, png: bytes) -
     """Ask for one page's blocks. Never raises for a bad answer (a refused, cut-off or
     invalid one is a read with no output); `BudgetExceeded`, `ConfigError` and
     `UnknownModelError` propagate."""
-    parsed, call = client.run(build_request(settings, png), ImagePageOutput)
-    return PageRead(page, parsed, [call], call.outcome, png)
+    # A refusal or a service error is asked once more of the other model (`models.router`).
+    parsed, calls = router.call_with_fallback(
+        client,
+        build_request(settings, png),
+        ImagePageOutput,
+        settings=settings,
+        retry_on=router.PAGE_RETRYABLE,
+    )
+    return PageRead(page, parsed, calls, calls[-1].outcome, png)
 
 
 def run(
@@ -308,7 +316,9 @@ def run(
             raise error
         if isinstance(error, BudgetExceeded):
             result.stopped = error
-            result.reads[number] = PageRead(number, None, [], "budget_exceeded", work[number])
+            result.reads[number] = PageRead(
+                number, None, router.calls_made(error), "budget_exceeded", work[number]
+            )
             continue
         if read is not None:
             result.reads[number] = read

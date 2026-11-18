@@ -33,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import ModelCall
+from readablestem.models import router
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
@@ -412,11 +413,15 @@ def run_page(
     `BudgetExceeded`, `ConfigError` and `UnknownModelError` propagate."""
     request, ids = build_request(settings, rows, png)
     offered = [row for row in rows if row.id in set(ids)]
-    parsed, call = client.run(request, PageMathOutput)
+    # A refusal or a service error is asked once more of the other model (`models.router`);
+    # a second failure is the page's `failed` reason and nothing more is sent for it.
+    parsed, calls = router.call_with_fallback(
+        client, request, PageMathOutput, settings=settings, retry_on=router.PAGE_RETRYABLE
+    )
     if parsed is None:
-        return PagePlan(list(rows), [], calls=[call], failed=call.outcome)
+        return PagePlan(list(rows), [], calls=calls, failed=calls[-1].outcome)
     spans, stats = verify(parsed, offered)
-    return PagePlan(list(rows), spans, stats, [call])
+    return PagePlan(list(rows), spans, stats, calls)
 
 
 @dataclass
@@ -463,15 +468,17 @@ def run(
 
     with ThreadPoolExecutor(max_workers=max(1, concurrency), thread_name_prefix="pagemath") as pool:
         outcomes = list(pool.map(one, sorted(work)))
+    made: list[ModelCall] = []
     for number, page_plan, error in outcomes:
         if isinstance(error, (ConfigError, UnknownModelError)):
             raise error
         if isinstance(error, BudgetExceeded):
             result.stopped = error
+            made.extend(router.calls_made(error))  # a refused retry leaves the first call paid
             continue
         if page_plan is not None:
             plan.pages[number] = page_plan
-    result.calls = plan.calls
+    result.calls = plan.calls + made
     return result
 
 

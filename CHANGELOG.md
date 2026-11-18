@@ -183,6 +183,32 @@
   The other misses (unruled tables whose number columns do not line up, striped tables, a
   monospace print-out, ruled key-value boxes) were measured and not built: no rule told them
   from prose (docs/eval-parsing-benchmark.md).
+## Unreleased: reservations from measurements, page-level calls fall back once (branch feat/spend-reservations-and-fallback)
+
+- WS10.4 (F-059, F-219, F-345): a call's reservation is now the smaller of its worst case and a
+  size measured per step and model (`models/pricing.py`, `RESERVATIONS`, from the corpus replay of
+  2026-11-18: 39 uploads, 1,376 calls; no call settled above its size). On `claude-opus-5-5` an
+  equation call holds $0.046 (was $0.099 to $0.103), a figure $0.065 (was $0.099 to $0.217), an
+  image page $0.142 (was $0.230 to $0.267), a table $0.12 (was $0.178 to $0.212). Steps with no
+  measurement (`page_math`, `page_witness`, OpenAI) keep the worst case. The recorded $0.60 run
+  that billed $0.27 and left 35 equations failed held eight worst-case reservations ($0.8) at
+  once; at the measured sizes it holds $0.37.
+- A reservation that does not fit while other calls of the job are in flight waits for one to
+  settle (at most 120 s) and is tried once more before the job is stopped. A job or run cap below
+  one largest reservation for each step run at once is refused when it is set (production start,
+  `launch-check`, `convert --max-usd`, `eval --max-usd`).
+- A call charged at its reservation because no usage came back is stored with
+  `job_calls.billed_unseen_usd`; `/admin` and `ops step-report` total those apart from settled
+  spend. `jobs.held_usd` is new: `Job.settled_usd` (spent) and `Job.held_usd` (held by calls in
+  flight) are available for a job's page; `jobs.cost_usd` stays spent plus held. Migration
+  `9d3e5a7c1f24` (two columns, default 0).
+- WS10.10 (F-221): `page_math`, `page_witness` and `image_page` ask once more, of the other model,
+  after a refusal or a service error (`models/router.py`, `PAGE_RETRYABLE`); a second failure ends
+  the step with its named reason. An answer that is not valid is not retried (`page_witness`
+  splits the page instead). No existing request changes.
+- WS10.11: `/limits` says that pages dense with equations use more of the new-account budget;
+  `docs/deploy.md` gives the pool's reach at the measured median ($4 is about 725 pages at
+  $0.0055 a page). The live pool value was not read.
 
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 

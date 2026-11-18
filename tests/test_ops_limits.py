@@ -54,24 +54,34 @@ def test_a_normal_full_size_claude_document_never_reaches_the_default_job_cap():
 
 
 def test_openai_page_cap_on_claude_is_refused_in_production():
-    s = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.10})
-    with pytest.raises(ConfigError, match=r"spend limits: MAX_USD_PER_PAGE \$0.10"):
+    s = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.02})
+    with pytest.raises(ConfigError, match=r"spend limits: MAX_USD_PER_PAGE \$0.02"):
         s.check_production()
     settings(**{**PROD, "model_provider": "anthropic"}).check_production()
 
 
 def test_a_daily_cap_below_the_calls_held_at_once_is_refused_in_production():
-    s = settings(**{**PROD, "model_provider": "anthropic", "daily_spend_cap_usd": 0.3})
+    s = settings(**{**PROD, "model_provider": "anthropic", "daily_spend_cap_usd": 0.2})
     with pytest.raises(ConfigError, match="DAILY_SPEND_CAP_USD"):
         s.check_production()
     # the same cap is fine on OpenAI, whose reservations are a tenth of the size
     settings(**{**PROD, "daily_spend_cap_usd": 1.0}).check_production()
 
 
+def test_a_job_cap_below_one_reservation_for_each_step_at_once_is_refused_when_it_is_set():
+    s = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_job": 0.2})
+    with pytest.raises(ConfigError, match="MAX_USD_PER_JOB"):
+        s.check_production()
+    # the run cap of a command line is refused the same way, before anything is sent
+    claude = settings(model_provider="anthropic")
+    assert limits.run_cap_problem(claude, 0.2, claude.model_concurrency)
+    assert limits.run_cap_problem(claude, 0.2, 1) is None
+
+
 def test_launch_check_lists_a_refusal_and_the_warnings(capsys):
-    refused = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.10})
+    refused = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.02})
     items = launch.launch_blockers(settings=refused)
-    assert sum("MAX_USD_PER_PAGE $0.10" in i for i in items) == 1  # named once
+    assert sum("MAX_USD_PER_PAGE $0.02" in i for i in items) == 1  # named once
     assert any(i.startswith("settings: production start refused") for i in items)
     tight = settings(**{**PROD, "model_provider": "anthropic", "per_user_daily_page_quota": 5})
     assert any(

@@ -91,7 +91,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import case, delete, select, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -383,23 +383,26 @@ class _AttemptBudget(JobBudget):
 
     hold_on_job: Callable[[float, int], None] | None = field(default=None, repr=False)
     release_on_job: Callable[[float, int], None] | None = field(default=None, repr=False)
-    settle_on_job: Callable[[float], None] | None = field(default=None, repr=False)
+    # (the call's cost, what it held)
+    settle_on_job: Callable[[float, float], None] | None = field(default=None, repr=False)
 
-    def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
+    def _reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
         calls = 1 if count_call else 0
         if self.hold_on_job is not None:
             self.hold_on_job(amount_usd, calls)
         try:
-            return super().reserve(amount_usd, count_call=count_call)
+            return super()._reserve(amount_usd, count_call=count_call)
         except BaseException:
             if self.release_on_job is not None:
                 self.release_on_job(amount_usd, calls)
             raise
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
-        super().settle(reservation, actual_usd)
+        # The job's row first: a call waiting on this settlement (`JobBudget.reserve`) is woken
+        # by `super().settle` and must find the row settled.
         if self.settle_on_job is not None:
-            self.settle_on_job(max(0.0, actual_usd) - reservation.amount_usd)
+            self.settle_on_job(max(0.0, actual_usd), reservation.amount_usd)
+        super().settle(reservation, actual_usd)
 
 
 @dataclass(frozen=True)
@@ -679,7 +682,11 @@ class Worker:
                 session.execute(
                     update(Job)
                     .where(*self._owned(attempt.claim), *under_caps)
-                    .values(cost_usd=Job.cost_usd + amount_usd, model_calls=Job.model_calls + calls)
+                    .values(
+                        cost_usd=Job.cost_usd + amount_usd,
+                        held_usd=Job.held_usd + amount_usd,
+                        model_calls=Job.model_calls + calls,
+                    )
                     .execution_options(synchronize_session=False)
                 )
             )
@@ -701,10 +708,13 @@ class Worker:
             raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")
         raise BudgetExceeded("job_usd", f"job spend cap ${attempt.max_usd:.2f} reached")
 
-    def _adjust_job(self, attempt: _Attempt, cost_delta: float, calls_delta: int) -> None:
+    def _adjust_job(
+        self, attempt: _Attempt, cost_delta: float, calls_delta: int, held_delta: float = 0.0
+    ) -> None:
         """Change the job's totals by a delta (a released hold or a settled call), whoever
-        owns the job now: the hold was added to this row. Never raises."""
-        if not cost_delta and not calls_delta:
+        owns the job now: the hold was added to this row. `held_delta` is what leaves the
+        row's held part (never below 0: a hold that was already given back). Never raises."""
+        if not cost_delta and not calls_delta and not held_delta:
             return
         try:
             with session_scope(self.factory) as session:
@@ -713,6 +723,9 @@ class Worker:
                     .where(Job.id == attempt.claim.job_id)
                     .values(
                         cost_usd=Job.cost_usd + cost_delta,
+                        held_usd=case(
+                            (Job.held_usd + held_delta < 0, 0.0), else_=Job.held_usd + held_delta
+                        ),
                         model_calls=Job.model_calls + calls_delta,
                     )
                     .execution_options(synchronize_session=False)
@@ -787,8 +800,10 @@ class Worker:
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
             hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
-            release_on_job=lambda amount, calls: self._adjust_job(attempt, -amount, -calls),
-            settle_on_job=lambda delta: self._adjust_job(attempt, delta, 0),
+            release_on_job=lambda amount, calls: self._adjust_job(
+                attempt, -amount, -calls, -amount
+            ),
+            settle_on_job=lambda actual, held: self._adjust_job(attempt, actual - held, 0, -held),
         )
         return attempt
 
@@ -1049,6 +1064,15 @@ class Worker:
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")
+        with session_scope(self.factory) as session:
+            # What a dead attempt of this job still held stays in `cost_usd` (it may have been
+            # billed) as spend: it is not in flight any more.
+            session.execute(
+                update(Job)
+                .where(Job.id == claim.job_id, Job.held_usd > 0)
+                .values(held_usd=0.0)
+                .execution_options(synchronize_session=False)
+            )
         self._current = attempt
         try:
             return self._convert_and_store(attempt, pdf, page_count, started)
@@ -1096,6 +1120,7 @@ class Worker:
             "error_detail": detail,
             "finished_at": self.clock(),
             "lease_until": None,
+            "held_usd": 0.0,  # nothing of a stopped job is in flight any more
         }
         with session_scope(self.factory) as session:
             updated = rowcount(
@@ -1250,6 +1275,7 @@ class Worker:
                 float(job.cost_usd or 0.0),
                 round(attempt.prior_usd + result.stats.cost_usd - reused_usd, 8),
             )
+            job.held_usd = 0.0
             job.model_calls = max(
                 int(job.model_calls or 0),
                 attempt.prior_calls + result.stats.model_calls - reused_calls,

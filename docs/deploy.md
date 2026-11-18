@@ -253,6 +253,28 @@ Things that differ from OpenAI, all on by default and safe to leave:
   could not make a single call and every element came back "not converted"
   (`budget_job_usd`). `tests/test_models_pricing_images.py` keeps the reservation an upper
   bound of what a call can bill.
+- **Measured sizes (WS10.4).** For the steps that were measured, the reservation is the
+  smaller of that worst case and a size fixed from the calls of the corpus replay (39
+  uploads, 1,376 calls, measured 2026-11-18; `models/pricing.py`, `RESERVATIONS`): twice
+  the dearest call of the step and model, rounded up. Equations $0.0015 (`claude-haiku-5-5`)
+  and $0.046 (`claude-opus-5-5`); figures $0.0015 and $0.065; image pages $0.142 (opus);
+  tables $0.012 and $0.12. The worst case was $0.0020 to $0.0036 on haiku and $0.10 to $0.27
+  on opus. A step with no row (`page_math`, `page_witness`, OpenAI) keeps the worst case: no
+  call of those steps is in the recordings. The table has no setting: a size changes with a
+  new measurement. In the replay no call settled above its reservation. A call that is
+  charged at its reservation because no usage came back (a timeout after the send) is stored
+  with `job_calls.billed_unseen_usd` and is totaled apart from settled spend on `/admin` and
+  in `ops step-report`.
+- **A cap never refuses what a settle would free.** A reservation that does not fit under a
+  job or day cap while other calls of the job are in flight waits for one of them to settle
+  (at most 120 s) and is tried once more; the job stops only if it still does not fit. A
+  `--max-usd`, or a `MAX_USD_PER_JOB` set in production, below one largest reservation for
+  each step the job runs at once (`ops.limits.in_flight_usd`) is refused when it is set.
+- **Spent and held.** `jobs.cost_usd` is spent plus what the calls in flight hold, because
+  the caps count both. `jobs.held_usd` is the part of it that is held, and
+  `Job.settled_usd` (`cost_usd - held_usd`) is what the job has spent. A page that shows a
+  running cost shows `settled_usd`, which never exceeds the final figure, and may say
+  "up to $X held" from `held_usd`.
 
 ### Spend limits
 
@@ -292,7 +314,7 @@ calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 | `SIGNUP_MODE` | `allowlist` (default), **`open`** for a beta anyone can try | any | See "Open sign-up" below |
 | `OPEN_TIER_DAILY_PAGE_QUOTA` / `OPEN_TIER_DAILY_REREADS` | **150** / **30** | any | A new account can convert one full-size (100-page) document and a shorter one, or several handouts, and read 30 marked regions a day. At $0.015 a page, 150 pages is $2.25: two accounts at their quota would use the pool below |
 | `MAX_NEW_ACCOUNTS_PER_DAY` | **100** | any | 100 accounts x 150 pages x $0.015 is $225 if every one used its quota, far more than the pool pays for: the pool, not the count, is the bound on money |
-| `OPEN_TIER_DAILY_SPEND_CAP_USD` | **$4** | any | Inside `DAILY_SPEND_CAP_USD`; about 260 dense pages a day for all new accounts together |
+| `OPEN_TIER_DAILY_SPEND_CAP_USD` | **$4** | any | Inside `DAILY_SPEND_CAP_USD`; about 260 dense pages a day for all new accounts together, or about 725 pages at the measured median of $0.0055 a page (`eval cost`, 2026-11); pages dense with equations use more of it, and `/limits` says so. The value is not in `ops/production.profile.toml` (it is listed there as an operations setting, never valued), and the live value was not read: $4 is the code default |
 
 If you set `MAX_USD_PER_PAGE`/`MAX_USD_PER_JOB` yourself, they apply to whichever provider
 is selected. The worst case for the day: $10 a day is $300 a month; the Anthropic

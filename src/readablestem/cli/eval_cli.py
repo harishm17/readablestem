@@ -212,6 +212,11 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
     if not args.fake and args.max_usd is None:
         return "--max-usd is required for real model calls (or pass --fake)"
     cap = args.max_usd if args.max_usd is not None else math.inf
+    if not args.fake:
+        from readablestem.ops.limits import run_cap_problem
+
+        if problem := run_cap_problem(settings, cap, settings.model_concurrency):
+            return f"--max-usd: {problem}"
     budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
     if getattr(args, "batch", False):
         from readablestem.models.anthropic_batch import BatchRunner, PendingPool

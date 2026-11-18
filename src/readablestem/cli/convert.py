@@ -371,6 +371,13 @@ def _convert(args: argparse.Namespace) -> int:
         concurrency = affordable_concurrency(
             settings, budget_usd=min(cap_usd, settings.max_usd_per_job)
         )
+    if not args.fake:
+        from readablestem.ops.limits import run_cap_problem
+
+        if problem := run_cap_problem(
+            settings, min(cap_usd, settings.max_usd_per_job), concurrency
+        ):
+            raise _CliError(f"--max-usd: {problem}")
     budget = JobBudget(
         guard=InMemorySpendGuard(cap_usd=cap_usd),
         max_usd=settings.max_usd_per_job,

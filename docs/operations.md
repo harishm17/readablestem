@@ -272,6 +272,8 @@ is never counted. It prints:
 - by step and model: calls, failed calls, calls a page, input, cached input and output
   tokens a page, the share of input read from the prompt cache, the p50 and p95 seconds
   of one call, the p99 dollars of one call and the dollars a page;
+  the dollars leave out calls charged at their reservation because no usage came back; the
+  report counts those apart ("charged at their reservation, no usage came back");
 - by stage: the p50 and p95 seconds of a job and of a page, and the stage's share of the
   wall time of the jobs that have it;
 - in all: dollars and calls beside what the job rows settled, the cache share, and the p50

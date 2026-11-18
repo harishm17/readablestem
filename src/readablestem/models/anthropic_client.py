@@ -95,6 +95,7 @@ from readablestem.models.pricing import (
     cost_usd,
     estimate_max_cost_usd,
     output_token_limit,
+    reservation_usd,
 )
 from readablestem.observability.logging import log_fields
 
@@ -186,13 +187,7 @@ class AnthropicVisionClient:
         context = self._context(request.context_text, request.context_limit)
         content = _user_content(request, context)
         sdk = self._client()
-        estimate = estimate_max_cost_usd(
-            request.model,
-            n_images=len(request.images),
-            text_chars=len(context or ""),
-            max_output_tokens=request.max_output_tokens,
-            images=request.images,
-        )
+        estimate = self.estimate_usd(request)
         started = time.perf_counter()
         gate = rate_gate("anthropic")
         gate.wait()  # after a 429 anywhere in this process, wait out its retry-after
@@ -201,10 +196,13 @@ class AnthropicVisionClient:
         )  # BudgetExceeded: nothing was sent
         replies: list[_Reply] = []
         charged = 0.0
+        unseen = 0.0  # the part of `charged` that is the reservation, not a cost
         while True:
             reply, charge = self._send(sdk, request, schema, content, reservation, estimate)
             replies.append(reply)
             charged += charge
+            if reply.billed_unseen:
+                unseen += charge
             if not reply.retryable or len(replies) > self._settings.model_max_retries:
                 break
             try:
@@ -245,6 +243,7 @@ class AnthropicVisionClient:
             latency_ms=round((time.perf_counter() - started) * 1000),
             is_fallback=is_fallback,
             outcome=last.outcome,
+            billed_unseen_usd=unseen,
         )
         _log_call(call, last, sends=len(replies))
         return cast("T | None", last.parsed), call
@@ -265,16 +264,26 @@ class AnthropicVisionClient:
         context = self._context(request.context_text, request.context_limit)
         return self._params(request, schema, _user_content(request, context))
 
-    def batch_estimate_usd(self, request: VisionRequest) -> float:
-        """The worst case of `request` at the Batches price, for the reservation."""
+    def worst_case_usd(self, request: VisionRequest) -> float:
+        """The most `request` can cost: its images and text at their largest and the whole
+        output limit (`pricing.estimate_max_cost_usd`)."""
         context = self._context(request.context_text, request.context_limit)
-        return BATCH_DISCOUNT * estimate_max_cost_usd(
+        return estimate_max_cost_usd(
             request.model,
             n_images=len(request.images),
             text_chars=len(context or ""),
             max_output_tokens=request.max_output_tokens,
             images=request.images,
         )
+
+    def estimate_usd(self, request: VisionRequest) -> float:
+        """What a send of `request` holds before it goes: the worst case, or the measured
+        size of the step on that model when that is less (`pricing.reservation_usd`)."""
+        return reservation_usd(request.step, request.model, self.worst_case_usd(request))
+
+    def batch_estimate_usd(self, request: VisionRequest) -> float:
+        """The reservation of `request` at the Batches price."""
+        return BATCH_DISCOUNT * self.estimate_usd(request)
 
     def read_batch_message(
         self, request: VisionRequest, schema: type[T], message: Any

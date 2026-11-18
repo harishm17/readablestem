@@ -107,6 +107,7 @@ def of_call(call: ModelCall, page: int | None) -> CallFact:
         attempt=call.attempt,
         is_fallback=call.is_fallback,
         outcome=call.outcome,
+        billed_unseen_usd=call.billed_unseen_usd,
     )
 
 
