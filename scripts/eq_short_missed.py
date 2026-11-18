@@ -57,6 +57,7 @@ def main() -> int:
     from readablestem.eval import pipeline_eval as pe
     from readablestem.pipeline import layout
     from readablestem.pipeline import options as run_options
+    from readablestem.pipeline.layout import blocks, tables
 
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("part")
@@ -68,12 +69,13 @@ def main() -> int:
     original = layout._inline_runs
     seen: list = []
 
-    def hook(row, info=None, kinds=None):
-        runs = original(row, info, kinds)
-        seen.append((row, runs, info or layout._CharInfo.of(row)))
+    def hook(row, info=None, kinds=None, **kw):
+        runs = original(row, info, kinds, **kw)
+        seen.append((row, runs, info or layout._CharInfo.of(row, **kw)))
         return runs
 
-    layout._inline_runs = hook
+    blocks._inline_runs = hook  # the two steps that read a row for its runs
+    tables._inline_runs = hook
     tally: Counter[str] = Counter()
     examples: dict[str, list[str]] = {}
     for paper in papers:

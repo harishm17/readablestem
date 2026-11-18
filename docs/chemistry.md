@@ -2,7 +2,7 @@
 
 How formulas, ions, state symbols, reactions and concentrations are found in a PDF, written
 as MathML, and read aloud; what it did on the development sets, and what it does not do yet.
-Code: `pipeline/chem.py` (detection and `\ce`), `pipeline/layout.py` (`_chem_words`,
+Code: `pipeline/chem.py` (detection and `\ce`), `pipeline/layout/inline_runs.py` (`_chem_words`,
 `_with_chemistry`, `_reaction_row`), `pipeline/speech_chem.py`, `core/latex_groups.py`,
 `pipeline/equation_step.py` (`expand_ce`, `read_latex`), `models/prompts/equation.md` ("Chemistry").
 Development sets only: the registered held-out sections were not run or tuned on (the recorded
@@ -73,7 +73,7 @@ Word text gained a formula that is not one.
 ### Spans: lists, half-reactions, `E°cell` and arrow labels (2026-11-03)
 
 The span errors of the development run (18 gold equations: 4 extra, 13 partial, 1 split; "Outcome
-classes" below) had four layout causes, fixed in `pipeline/layout.py` (the chemistry functions) and
+classes" below) had four layout causes, fixed in `pipeline/layout/inline_runs.py` (the chemistry functions) and
 the detection half of `pipeline/chem.py`; the rules are in docs/layout.md ("Chemistry in running
 text and on display lines").
 

@@ -733,6 +733,13 @@
   refuses the same file without counting a page when it can tell, so the count must not depend
   on whether it could. Not built: the start-up check of the upload gate against the web memory
   limit (no such limit is a setting). No migration and no version bump.
+## Unreleased: layout is a package and keeps nothing of a document in a module (branch refactor/layout-package)
+
+- WS14.8: `pipeline/layout.py` is the package `pipeline/layout/` (one module per stage, listed
+  in docs/layout.md), and what a document turns out to be (made by TeX, a slide deck, its
+  compounds, grouped displays, the ink and detector budgets) is a `_Document` passed to the
+  steps instead of five module-level names set with `global`. The output of every document is
+  unchanged. No migration and no version bump.
 
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 

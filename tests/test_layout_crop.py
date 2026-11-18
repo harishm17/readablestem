@@ -12,7 +12,7 @@ import pytest
 
 from readablestem.core.types import Element, Kind
 from readablestem.pipeline import layout
-from readablestem.pipeline.layout import LayoutError, analyze, crop, release
+from readablestem.pipeline.layout import LayoutError, access, analyze, crop, release
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -72,7 +72,7 @@ def test_crop_reports_unreadable_and_encrypted_pdfs_like_analyze():
 
 
 def test_cached_documents_expire_after_a_while_without_use(monkeypatch):
-    monkeypatch.setattr(layout, "DOCUMENT_CACHE_TTL_S", 0.2)
+    monkeypatch.setattr(access, "DOCUMENT_CACHE_TTL_S", 0.2)
     crop(block_pdf(), element((100, 100, 200, 150)))
     assert len(layout._CACHE) == 1
     deadline = time.monotonic() + 10
@@ -89,13 +89,13 @@ FIXTURES = Path(__file__).parent / "fixtures" / "layout"
 @pytest.fixture
 def unprobed(monkeypatch):
     """Forget which documents passed the probe, so every test probes afresh."""
-    monkeypatch.setattr(layout, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
 
 
 def test_a_pdf_that_kills_the_renderer_is_unreadable_not_fatal(monkeypatch, unprobed):
     # MuPDF dies of SIGABRT; SIGKILL is the same for the parent and skips the core dump.
     monkeypatch.setattr(
-        layout, "_PROBE_SCRIPT", "import os, signal; os.kill(os.getpid(), signal.SIGKILL)"
+        access, "_PROBE_SCRIPT", "import os, signal; os.kill(os.getpid(), signal.SIGKILL)"
     )
     data = block_pdf()
     with pytest.raises(LayoutError) as exc:
@@ -107,8 +107,8 @@ def test_a_pdf_that_kills_the_renderer_is_unreadable_not_fatal(monkeypatch, unpr
 
 
 def test_a_pdf_that_hangs_the_renderer_is_too_complex_not_a_hang(monkeypatch, unprobed):
-    monkeypatch.setattr(layout, "_PROBE_SCRIPT", "import time; time.sleep(60)")
-    monkeypatch.setattr(layout, "PROBE_TIMEOUT_S", 0.5)
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", "import time; time.sleep(60)")
+    monkeypatch.setattr(access, "PROBE_TIMEOUT_S", 0.5)
     started = time.monotonic()
     with pytest.raises(LayoutError) as exc:
         analyze(block_pdf())
@@ -117,7 +117,7 @@ def test_a_pdf_that_hangs_the_renderer_is_too_complex_not_a_hang(monkeypatch, un
 
 def test_a_page_that_runs_out_of_the_childs_memory_is_too_complex(monkeypatch, unprobed):
     monkeypatch.setattr(
-        layout, "_PROBE_SCRIPT", "import sys; sys.stdout.write('memory')"
+        access, "_PROBE_SCRIPT", "import sys; sys.stdout.write('memory')"
     )  # what the real script writes after a page raised MemoryError
     with pytest.raises(LayoutError) as exc:
         analyze(block_pdf())

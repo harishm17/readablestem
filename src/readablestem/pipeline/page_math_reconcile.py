@@ -134,7 +134,15 @@ class PageMathHook:
 
     # -------------------------------------------------------------- layout's two calls
 
-    def on_page(self, number: int, text_rows: list[Any], ordered: list[Any], rules: list[Any]):
+    def on_page(
+        self,
+        number: int,
+        text_rows: list[Any],
+        ordered: list[Any],
+        rules: list[Any],
+        *,
+        document: Any,
+    ):
         """Layout's first call for a page: record its rows and, with a plan, lay it over them.
         Never raises: a page this cannot handle is left as layout has it."""
         try:
@@ -152,7 +160,7 @@ class PageMathHook:
             self._checked.add(number)
             for row in text_rows:
                 row.page_checked = True
-            return self._apply(page.spans, rows, objects, text_rows, rules)
+            return self._apply(page.spans, rows, objects, text_rows, rules, document)
         except Exception as exc:  # the page is layout's, whatever went wrong
             log.warning("page math: page %d left as layout has it: %s", number, type(exc).__name__)
             self._checked.discard(number)
@@ -180,6 +188,7 @@ class PageMathHook:
         objects: dict[str, Any],
         text_rows: list[Any],
         rules: list[Any],
+        document: Any,
     ) -> list[Any]:
         by_id = {r.id: r for r in rows}
         kept: list[Span] = []
@@ -218,7 +227,9 @@ class PageMathHook:
                     inline.append((seg.row, lo, hi, span.latex))
                 else:
                     nonmath.append((seg.row, lo, hi))
-        for i in self._screen_blocks(blocks, spans, by_id, objects, text_rows, rules, cuts):
+        for i in self._screen_blocks(
+            blocks, spans, by_id, objects, text_rows, rules, cuts, document
+        ):
             for seg in spans[i].segments:
                 lo, hi = chars(seg)
                 cuts.setdefault(id(objects[seg.row]), []).append(_Cut(lo, hi, "math", i))
@@ -234,7 +245,7 @@ class PageMathHook:
                 out.append(row)
                 pieces_of[id(row)] = [(0, row, "plain", -1)]
                 continue
-            made = _cut_row(row, row_cuts)
+            made = _cut_row(row, row_cuts, document)
             pieces_of[id(row)] = made
             out.extend(piece for _, piece, _, _ in made)
 
@@ -315,6 +326,7 @@ class PageMathHook:
         text_rows: list[Any],
         rules: list[Any],
         carve: dict[int, list[_Cut]],
+        document: Any,
     ) -> list[int]:
         """The block spans that may replace layout's own cut, by the rule of ADR 0006:
 
@@ -326,7 +338,7 @@ class PageMathHook:
         development set that cost more than it gained), nor where it would leave, in a row it
         shares, a piece layout reads as maths."""
         # Layout's regions on the rows as they are: a trial, the marks are taken off again.
-        layout._equation_regions(text_rows, rules)
+        layout._equation_regions(text_rows, rules, document=document)
         region_of = {id(r): r.region for r in text_rows if r.region is not None}
         for row in text_rows:
             row.region = None
@@ -359,7 +371,7 @@ class PageMathHook:
                     if not any(not c.blank and c.c not in ",.;:" for c in piece):
                         continue
                     trial = layout._Row(piece, column=row.column)
-                    layout._classify_row(trial)
+                    layout._classify_row(trial, document=document)
                     mathy = mathy or trial.kind == "math"
             if split or mathy:
                 self.stats.refused += 1
@@ -441,7 +453,7 @@ def _gaps(length: int, taken: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return out
 
 
-def _cut_row(row: Any, cuts: list[_Cut]) -> list[tuple[int, Any, str, int]]:
+def _cut_row(row: Any, cuts: list[_Cut], document: Any) -> list[tuple[int, Any, str, int]]:
     """The pieces of `row` cut at `cuts` (sorted, not overlapping): `(start, piece, kind,
     span)` with kind "plain" for what lies between the cuts. A piece with no ink is dropped.
     Plain pieces and numbers are classified as layout classifies a row; a cut-out maths piece
@@ -461,7 +473,7 @@ def _cut_row(row: Any, cuts: list[_Cut]) -> list[tuple[int, Any, str, int]]:
             continue
         if kind == "number":
             piece.exercise_number = True
-        layout._classify_row(piece)
+        layout._classify_row(piece, document=document)
         if kind in ("math", "label"):
             piece.kind = "math"
         result.append((start, piece, kind, span))
