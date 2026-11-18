@@ -205,6 +205,30 @@ def test_inline_maths_becomes_child_equations_with_markers_in_the_paragraph():
         assert px0 <= x0 < x1 <= px1 and py0 <= y0 < y1 <= py1
 
 
+def test_a_greek_sentence_is_prose_and_a_lone_greek_letter_is_still_maths():
+    greek = analyze(
+        html_page("<p>Δυνάμεις είναι η επιστήμη της κίνησης των σωμάτων και των δυνάμεων.</p>")
+    ).elements
+    assert [e.kind for e in greek] == [Kind.PARAGRAPH]  # one paragraph, no equation
+    assert "είναι η επιστήμη" in greek[0].text
+    english = analyze(html_page("<p>The angle \u03b8 is small and the force is large today.</p>"))
+    assert [e.text for e in english.elements if e.kind == Kind.EQUATION] == ["\u03b8"]
+
+
+def test_lines_of_chinese_japanese_and_thai_join_without_a_space():
+    def fill(page):
+        page.insert_htmlbox(
+            pymupdf.Rect(72, 72, 190, 300),
+            "<p>植物は光合成によって酸素が放出されることを学びました。看起来很好。同学们都很开心。</p>",
+        )
+
+    data = one_page(fill)
+    assert len(pymupdf.open(stream=data)[0].get_text().splitlines()) > 2  # it wrapped
+    paragraph = analyze(data).elements[0]
+    assert " " not in paragraph.text
+    assert "酸素が放出" in paragraph.text and "看起来" in paragraph.text
+
+
 def test_code_option_dashes_and_markup_are_not_maths():
     def fill(page):
         page.insert_text((72, 100), "x = 5", fontsize=BODY, fontname="cour")  # code listing

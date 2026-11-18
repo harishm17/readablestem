@@ -39,6 +39,7 @@ from readablestem.pipeline.layout.glyphs import (
     _Char,
     _font_traits,
     glyph_style,
+    mark_greek_words,
 )
 from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
@@ -368,7 +369,11 @@ def _page_rows(
                     )
             if any(not c.blank for c in chars):
                 vertical = abs(dy) > 0.2 or dx < 0
-                rows.append(_Row(chars, vertical, diagonal=abs(dx) > 0.2 and abs(dy) > 0.2))
+                rows.append(
+                    _Row(
+                        mark_greek_words(chars), vertical, diagonal=abs(dx) > 0.2 and abs(dy) > 0.2
+                    )
+                )
     return rows
 
 

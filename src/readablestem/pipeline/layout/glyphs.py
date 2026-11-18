@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 
 from readablestem.core.mathchars import base_char, char_variant, styled_char
@@ -191,6 +191,9 @@ class _Char:
     # A glyph of an inline stacked fraction (numerator or denominator on a thin bar inside
     # a line of text): evidence that its run is maths (`_lift_stacked_fractions`).
     stacked: bool = False
+    # A letter of a Greek word: two or more letters of the Greek script in a text font
+    # (`mark_greek_words`). Prose, not the symbols of a formula.
+    greek_word: bool = False
 
     @property
     def blank(self) -> bool:
@@ -217,7 +220,11 @@ class _Char:
             return False
         if _font_traits(self.font)[2]:
             return True
-        return is_math_alphanumeric(c) or c in _STRONG_MATH or bool(GREEK.match(c))
+        return (
+            is_math_alphanumeric(c)
+            or c in _STRONG_MATH
+            or (bool(GREEK.match(c)) and not self.greek_word)
+        )
 
     @property
     def mono(self) -> bool:
@@ -243,6 +250,65 @@ class _Char:
         if not self.c.isalpha() or self.bold or char_variant(self.c) not in (None, "italic"):
             return False
         return bool(_REGULAR_FACE.match(self.font.split("+", 1)[-1].replace(" ", "")))
+
+
+def _greek_letter(c: str) -> bool:
+    """A letter of the Greek script, accented ones included (U+0370 to U+03FF, U+1F00 to U+1FFF)."""
+    return (0x370 <= ord(c[0]) <= 0x3FF or 0x1F00 <= ord(c[0]) <= 0x1FFF) and c.isalpha()
+
+
+def mark_greek_words(chars: list[_Char]) -> list[_Char]:
+    """`chars` with `greek_word` set on every letter of a Greek word: a run of two or more
+    letters of the Greek script in a text font is prose. A lone Greek letter, and one in a
+    maths font, stay maths (`_Char.math`), except the article "\u03b7" or "\u03bf" (and
+    capitals) with one blank between it and a Greek word: it is a word of the sentence,
+    not a variable. A combining accent belongs to its letter."""
+    out = list(chars)
+    n = len(chars)
+
+    def text_greek(k: int) -> bool:
+        return _greek_letter(chars[k].c) and not _font_traits(chars[k].font)[2]
+
+    spans: list[tuple[int, int]] = []  # [start, end) of each run of Greek letters and accents
+    i = 0
+    while i < n:
+        if not text_greek(i):
+            i += 1
+            continue
+        j = i + 1
+        while j < n and (text_greek(j) or unicodedata.category(chars[j].c[0]) == "Mn"):
+            j += 1
+        spans.append((i, j))
+        i = j
+
+    def letters(span: tuple[int, int]) -> list[int]:
+        return [k for k in range(*span) if _greek_letter(chars[k].c)]
+
+    for at, span in enumerate(spans):
+        run = letters(span)
+        if len(run) == 1 and chars[run[0]].c in _GREEK_ARTICLES:
+            next_word = (
+                at + 1 < len(spans)
+                and spans[at + 1][0] == span[1] + 1
+                and chars[span[1]].blank
+                and len(letters(spans[at + 1])) >= 2
+            )
+            last_word = (
+                at > 0
+                and spans[at - 1][1] == span[0] - 1
+                and chars[span[0] - 1].blank
+                and len(letters(spans[at - 1])) >= 2
+            )
+            if not (next_word or last_word):
+                continue
+        elif len(run) < 2:
+            continue
+        for k in run:
+            out[k] = replace(chars[k], greek_word=True)
+    return out
+
+
+_GREEK_ARTICLES = frozenset("\u03b7\u03bf\u0397\u039f")  # eta, omicron: "the"
 
 
 @lru_cache(maxsize=1024)

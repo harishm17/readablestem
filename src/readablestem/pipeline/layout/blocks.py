@@ -1307,7 +1307,9 @@ def _line_break(before: str, after: str, *, document: _Document = _PLAIN) -> tup
     or when the piece before the hyphen is a single letter, as in "x-" + "ray"). A soft
     hyphen always disappears. A break inside one token (a date, an address, a compound
     joined by a non-breaking hyphen) keeps the token whole (`hyphens.joins_inside_token`).
-    Anything else is joined with a space.
+    Two lines that end and start in a script written without spaces (Han, Kana, Thai, Lao,
+    Khmer, and their full-width punctuation) join with no separator. Anything else is
+    joined with a space.
     """
     if before.endswith("\u00ad"):
         return before[:-1], ""
@@ -1319,7 +1321,29 @@ def _line_break(before: str, after: str, *, document: _Document = _PLAIN) -> tup
         ):
             return before[:-1], ""
         return before, ""
+    if before and after and _unspaced(before[-1]) and _unspaced(after[0]):
+        return before, ""
     return before, " "
+
+
+# Scripts written without spaces between words, and the punctuation set with them.
+_UNSPACED = (
+    (0x0E00, 0x0EFF),  # Thai, Lao
+    (0x1780, 0x17FF),  # Khmer
+    (0x19E0, 0x19FF),  # Khmer symbols
+    (0x2E80, 0x2FDF),  # CJK radicals
+    (0x3000, 0x30FF),  # CJK punctuation, Hiragana, Katakana
+    (0x31F0, 0x31FF),  # Katakana extensions
+    (0x3400, 0x4DBF),  # Han, extension A
+    (0x4E00, 0x9FFF),  # Han
+    (0xF900, 0xFAFF),  # Han compatibility
+    (0xFF00, 0xFFEF),  # full-width and half-width forms
+    (0x20000, 0x2FFFF),  # Han, extensions B onward
+)
+
+
+def _unspaced(c: str) -> bool:
+    return any(lo <= ord(c) <= hi for lo, hi in _UNSPACED)
 
 
 def _merge_style_splits(blocks: list[_Block], runs: list[_Run]) -> list[_Block]:
