@@ -43,7 +43,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.web.db import ReviewEdit, session_scope
+from readablestem.web.db import Blob, ReviewEdit, session_scope
 from readablestem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
 
 
@@ -375,6 +375,22 @@ def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
     assert response.status_code == 422
     assert "failed a required check" in response.text
     assert post(web, "p1-e4", action="edit", alt="A rising line").status_code == 303
+
+
+def test_a_stored_crop_is_drawn_at_the_size_its_file_says(web):
+    """Each crop's width and height come from its PNG header, so the page keeps room for it
+    before it loads."""
+    header = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (37).to_bytes(4, "big") + (11).to_bytes(4, "big")
+    )
+    with session_scope(web.ctx.factory) as session:
+        blob = session.scalars(
+            select(Blob).where(Blob.job_id == web.job_id, Blob.element_id == "p1-e3")
+        ).one()
+        blob.content = header + blob.content[len(header) :]
+    tag = re.search(r"<img[^>]*crops/p1-e3\.png[^>]*>", review_page(web))
+    assert tag is not None
+    assert 'width="37"' in tag[0] and 'height="11"' in tag[0]
 
 
 def test_unknown_action_or_element(web):

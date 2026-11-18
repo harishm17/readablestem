@@ -145,7 +145,7 @@ def test_admin_can_allow_and_remove_people_but_not_themselves(web):
 
 
 def test_security_headers_on_app_pages(web):
-    response = web.browser.get("/")
+    response = web.browser.get("/login")
     headers = response.headers
     assert headers["content-security-policy"] == (
         "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "

@@ -129,6 +129,7 @@ def fixed_file(
     demo's PDF): the `ETag` `FileResponse` makes from its size and time, and a 304 with no
     body when the visitor already has that version."""
     response = FileResponse(path, media_type=media_type, headers={"Cache-Control": cache_control})
+    response.set_stat_headers(path.stat())  # the response makes them itself only as it is sent
     etag = response.headers["etag"]
     if _asked_for(request, etag):
         return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
