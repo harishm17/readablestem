@@ -134,11 +134,17 @@ def svg_to_png(svg: bytes) -> bytes | None:
         return None
 
 
-def figure_png(project: Path, name: str) -> bytes | None:
-    """The PNG of the project's image file `name` (a path relative to the project), or None."""
-    raw = _read_project_file(project, name)
-    if raw is None or len(raw) > MAX_FILE_BYTES:
+def png_of(raw: bytes) -> bytes | None:
+    """The PNG of the picture `raw` holds (a raster image, or the first page of a PDF, by what
+    the bytes are and not by any name), under the same size limits; None when it is neither."""
+    if len(raw) > MAX_FILE_BYTES:
         return None
     if raw.startswith(b"%PDF"):  # what the file holds, not what its name says
         return _pdf_to_png(raw)
     return _raster_to_png(raw)
+
+
+def figure_png(project: Path, name: str) -> bytes | None:
+    """The PNG of the project's image file `name` (a path relative to the project), or None."""
+    raw = _read_project_file(project, name)
+    return None if raw is None else png_of(raw)
