@@ -690,14 +690,30 @@ def _unanalysed_message(pages: int) -> str:
     )
 
 
+def _facts_stamp() -> str:
+    """The code that makes `finished_facts`: the pipeline and render versions, one of which
+    changes with every release that changes a result's summary or its words."""
+    from readablestem.pipeline.assemble import RENDER_VERSION
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    return f"{PIPELINE_VERSION}/{RENDER_VERSION}"
+
+
+def _facts_current(stored: object) -> bool:
+    """`jobs.state_facts` made by this code."""
+    return isinstance(stored, dict) and stored.get("by") == _facts_stamp()
+
+
 def finished_facts(result: object) -> dict[str, Any] | None:
     """What the state of a finished job with no outcome code reads of its stored result, kept
     in `jobs.state_facts` whenever a result is stored (the `Job.result_json` set event in
     `web.db`): what its summary says (`whole`, `remains`: `counts_of`), the version that made
     it (`rerun_step`) and `plain`, whether none of the result's gap notes or notices has a
     word to add (`gaps_of`, `_unanalysed_pages`, `_held_by_notice`). A plain result is read by
-    `load` from these alone; any other has its result read. None for a result this version
-    cannot read."""
+    `load` from these alone; any other has its result read. `by` names the code that made
+    them (`_facts_stamp`): facts made by other code are made again on first sight, so a list
+    never shows a sentence or a "Ready to share" that this code would not say. None for a
+    result this version cannot read."""
     if not isinstance(result, dict):
         return None
     try:
@@ -709,6 +725,7 @@ def finished_facts(result: object) -> dict[str, Any] | None:
         "whole": counts.whole,
         "remains": counts.remains,
         "version": version if isinstance(version, str) else None,
+        "by": _facts_stamp(),
         "plain": not (
             words.outage_message(result)
             or words.unread_message(result)
@@ -768,12 +785,14 @@ _COLUMNS = (
 
 def _stored_plain(row: Any) -> bool:
     """A finished job whose state needs no result: no outcome code, no decision open, and
-    stored facts that say its result has nothing else to word (`finished_facts`)."""
+    stored facts, made by this code, that say its result has nothing else to word
+    (`finished_facts`)."""
     return (
         row.status == JobStatus.DONE
         and not row.error_code
         and not row.open_decisions
-        and bool((row.state_facts or {}).get("plain"))
+        and _facts_current(row.state_facts)
+        and bool(row.state_facts.get("plain"))
     )
 
 
@@ -800,8 +819,13 @@ def load(
     results: dict[str, tuple[Any, int | None]] = {}
     if with_result:
         for job in session.scalars(select(Job).where(Job.id.in_(with_result))):
-            if job.open_decisions is None or job.state_facts is None:
-                job.result_json = job.result_json  # the set event stores the list's facts
+            # The set event stores the list's facts: for a row from before a column, and for
+            # facts another release made. A job with decisions open keeps none, by design, so
+            # it is not read again for them on every view.
+            if job.open_decisions is None or (
+                not job.open_decisions and not _facts_current(job.state_facts)
+            ):
+                job.result_json = job.result_json
             results[job.id] = (job.result_json, job.open_decisions)
     out: dict[str, State] = {}
     for r in rows:
