@@ -4,11 +4,12 @@ Only with `FEATURE_NOTATION_MEMORY` on; otherwise every route here is a 404, lik
 address that does not exist. With `FEATURE_COURSE_GRANTS` also on, the course page has a
 "People" section and two more owner-only POSTs (add or change a person, remove one) that give
 a person the right to view or review every document of the course (`web.shares`); with it off
-those two are 404 for everyone. The course pages themselves are the owner's alone either way. Each course belongs to one user: `_course` answers 404 for
-a course that does not exist *or* is someone else's, so ids cannot be probed. Every
-change is a normal form POST with the CSRF token, answered with a redirect (or the form
-again with its errors), so it all works without JavaScript. Deleting a course asks
-first (WCAG 3.3.4); removing one symbol does not (it is typed back in a moment).
+those two are 404 for everyone. The course pages themselves are the owner's alone either way.
+Each course belongs to one user: `_course` answers 404 for a course that does not exist *or*
+is someone else's, so ids cannot be probed. Every change is a normal form POST with the CSRF
+token, answered with a redirect (or the form again with its errors), so it all works without
+JavaScript. Deleting a course asks first (WCAG 3.3.4); removing one symbol does not (it is
+typed back in a moment).
 
 The data rules live in `web.notation`. Course names, symbols and notes are user
 content: only ids and counts are logged.
