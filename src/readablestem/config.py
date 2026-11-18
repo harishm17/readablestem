@@ -373,6 +373,15 @@ class Settings(BaseSettings):
     # Run the background worker thread inside the web process (one web service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
+    # Where conversions run. "inline": the web process starts the worker thread (`run_worker`),
+    # as always. "service": the web process starts none and the `readablestem worker` command,
+    # a process of its own, converts (`web.worker_service`); the web process then reads the
+    # worker's liveness, the AI service's health and the sandbox probe from `ops_heartbeat`
+    # (`web.worker_rows`). Rolling back is this one setting.
+    worker_mode: Literal["inline", "service"] = "inline"
+    # How many conversions the `worker` command runs at once (`worker_mode=service`); the web
+    # process's own worker thread is always one.
+    worker_slots: int = Field(default=1, ge=1, le=8)
     # Load the table detector and the structure model when the worker starts (production
     # only), while it waits for its first job, instead of inside that job: 4-5 s off the
     # first conversion after every start. Only for a conversion run in the web process: the

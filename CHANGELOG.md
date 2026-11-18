@@ -124,6 +124,23 @@
   and a `PIPELINE_VERSION` bump is owed at merge because a new conversion stores different
   readings.
 
+## Unreleased: the worker can run in its own service (branch feat/worker-service)
+
+- WS9.4 (F-274, F-277, F-282): `readablestem worker` runs the conversion worker with no web
+  server (`web/worker_service.py`), `WORKER_SLOTS` jobs at once (default 1), and `WORKER_MODE`
+  says where conversions run: `inline` (the default, exactly as before: the web process starts
+  its worker thread) or `service` (the web process starts none). Two workers on one database
+  never run the same job: a job is claimed by one conditional UPDATE after `FOR UPDATE SKIP
+  LOCKED` on Postgres, and a job whose worker died is requeued when its lease runs out, as
+  before. SIGTERM ends the running conversions' leases and exits within 20 seconds. With
+  `service`, worker liveness, the AI service's recent requests and the sandbox probe are rows of
+  `ops_heartbeat` (`worker.<slot>`, `provider`, `sandbox`; `web/worker_rows.py`) that `/readyz`,
+  `/status`, the job page and `/admin` read, so any web process gives the same answer; inline
+  nothing is written and the answers come from the process's own memory as before. The worker
+  service is described in docs/deploy-railway.md and not added to `.railway/railway.ts` (an apply
+  would start a second service whatever the setting says); rolling back is `WORKER_MODE=inline`.
+  No model call, no change to what is sent to a model or stored, no migration (the table was
+  there), no version bump.
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 
 - WS7.2 (F-014): the box "Convert scanned or handwritten pages" says what reading a page costs

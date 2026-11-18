@@ -5,7 +5,8 @@ answers with the status word alone; which task is late, the storage, the sandbox
 production profile's hash are the admin's (`ops_report`, `/admin/health`, `/admin`).
 `/healthz` says the process answers and the database does. `/readyz` says the service can
 do its job: the database answers and takes a write within a second, the worker thread is
-alive and not stuck, and the model provider is set up. Each check is one word; nothing in the
+alive and not stuck (with `WORKER_MODE=service`, the worker process's `ops_heartbeat` rows say
+so, `web.worker_rows`), and the model provider is set up. Each check is one word; nothing in the
 answer comes from a setting's value, so a key or a connection string can never end up in it.
 
 The host sends SIGTERM and later kills the process. On Railway the gap is
@@ -123,8 +124,9 @@ def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
 
 def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
     """`(fresh, details)` for the admin: the status word, the stale names, the storage
-    report, the daily canaries' latest results, the sandbox probe and the production profile's
-    hash. None of it is public (`/healthz/ops` gives the word only)."""
+    report, the daily canaries' latest results, the sandbox probe, the worker's word (as
+    `/readyz` gives it) and the production profile's hash. None of it is public
+    (`/healthz/ops` gives the word only)."""
     ok, stale = ops_freshness(ctx)
     canaries: dict[str, dict[str, str] | None] | None
     try:
@@ -139,6 +141,7 @@ def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
         "storage": stored,
         "canaries": canaries,
         "sandbox": ctx.sandbox.public(),
+        "worker": _worker_check(ctx),
         # The production profile's hash (ops/profile.py): it names no setting and no value,
         # but it says which settings run, so it is the admin's, not the public route's.
         "profile": profile.load().short_hash,
@@ -147,6 +150,8 @@ def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
 
 
 def _worker_check(ctx: AppContext) -> str:
+    if ctx.rows is not None:  # `WORKER_MODE=service`: the worker's own `ops_heartbeat` rows
+        return ctx.rows.worker()
     if not ctx.settings.run_worker:
         return "disabled"  # another process runs the jobs
     worker = ctx.worker

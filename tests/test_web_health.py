@@ -16,10 +16,12 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import update
 
 from fixtures.web.support import (
     ADMIN,
     WebEnv,
+    fake_client_factory,
     fake_output,
     job_id_from,
     login,
@@ -27,9 +29,9 @@ from fixtures.web.support import (
     upload,
 )
 from readablestem.ops import heartbeat
-from readablestem.web import health
+from readablestem.web import health, worker_rows, worker_service
 from readablestem.web.database import as_utc
-from readablestem.web.db import session_scope, utcnow
+from readablestem.web.db import OpsHeartbeat, session_scope, utcnow
 
 SECRET_KEY = "sk-never-in-the-output-0123456789"
 
@@ -150,6 +152,58 @@ def test_a_dead_worker_thread_is_not_ready(tmp_path):
         worker._stop.clear()  # the thread is gone but nobody asked for it
         assert web.get("/readyz").json()["checks"]["worker"] == "stopped"
         worker._stop.set()
+
+
+def test_with_the_worker_as_its_own_service_the_web_process_reads_its_rows(tmp_path):
+    """WS9.4. `WORKER_MODE=service`: the web process starts no worker and a queued job waits;
+    `worker_service.run` (the `readablestem worker` command) converts it; `/readyz` and `/status`
+    answer from the worker's `ops_heartbeat` rows, and `/readyz` is not ready once they are old."""
+    env = WebEnv(tmp_path, openai_api_key=SECRET_KEY, worker_mode="service")
+    with env.running() as web:
+        env.allow("alice@example.org")
+        login(web, "alice@example.org")
+        job_id = job_id_from(upload(web, make_pdf(1)))
+        assert env.ctx.worker is None
+        assert web.get("/readyz").json()["checks"]["worker"] == "not_started"
+        assert env.job(job_id).status == "queued"
+
+        stop = threading.Event()
+        service = threading.Thread(
+            target=worker_service.run,
+            args=(env.settings,),
+            kwargs={
+                "stop": stop,
+                "converter": env.converter,
+                "client_factory": fake_client_factory,
+            },
+        )
+        service.start()
+        try:
+            deadline = time.monotonic() + 30
+            while env.job(job_id).status != "done" and time.monotonic() < deadline:
+                time.sleep(0.2)
+            assert env.job(job_id).status == "done"
+            ready = web.get("/readyz")
+            assert ready.status_code == 200 and ready.json()["checks"]["worker"] == "ok"
+            worker_rows.write(
+                env.ctx.factory,
+                worker_rows.PROVIDER,
+                {"calls": [[time.time(), 0], [time.time(), 1]]},
+            )
+            assert "1 of 2 requests" in web.get("/status").text
+        finally:
+            stop.set()
+            service.join(30)
+        assert not service.is_alive()
+        assert web.get("/readyz").json()["checks"]["worker"] == "stopping"
+        with session_scope(env.ctx.factory) as session:  # nothing has beaten for a few minutes
+            session.execute(
+                update(OpsHeartbeat)
+                .where(OpsHeartbeat.name.like("worker.%"))
+                .values(last_ok_at=utcnow() - timedelta(minutes=5))
+            )
+        gone = web.get("/readyz")
+        assert gone.status_code == 503 and gone.json()["checks"]["worker"] == "stopped"
 
 
 def test_begin_shutdown_ends_a_running_jobs_lease_without_waiting(tmp_path):

@@ -1739,7 +1739,7 @@ def load_job_status(request: Request, job_id: str, user: CurrentUser) -> JobView
         )
 
 
-def status_context(job: JobView) -> dict[str, Any]:
+def status_context(request: Request, job: JobView) -> dict[str, Any]:
     """What `_job_status.html` needs. `status_version` changes whenever the fragment
     would look different, the state included (htmx polling answers 204 until then)."""
     state = job.state
@@ -1748,9 +1748,7 @@ def status_context(job: JobView) -> dict[str, Any]:
     # The AI service is not answering right now (T3-1, `web.provider_health`): said on a
     # document that is waiting or converting, and beside "Try again". The status version
     # changes with it, so a page left open hears when it starts and stops.
-    from readablestem.web.provider_health import HEALTH
-
-    down = HEALTH.is_down()
+    down = get_ctx(request).provider_health().is_down()
     if down:
         version += "-down"
     return {
@@ -1767,7 +1765,7 @@ def job_page_context(
 ) -> dict[str, Any]:
     """Everything the job page prints beyond the status box: the page itself, and the body a
     finished job sends in place of the waiting one (`job_status`)."""
-    context = status_context(job)
+    context = status_context(request, job)
     context["course"] = _job_course(request, job_id, user, job)  # notation memory
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
@@ -1814,7 +1812,7 @@ def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Res
     job = load_job_status(request, job_id, user)
     if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
         return redirect
-    context = status_context(job)
+    context = status_context(request, job)
     if v and v == context["status_version"]:
         return Response(status_code=204)
     # htmx sets document.title from a top-level <title> in the fragment.

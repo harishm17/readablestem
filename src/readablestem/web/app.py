@@ -98,7 +98,7 @@ from readablestem.web.routes import (
     sharing,
     split,
 )
-from readablestem.web.sandbox_status import run_probe
+from readablestem.web.sandbox_status import SandboxStatus, run_probe
 from readablestem.web.security import (
     CompressionMiddleware,
     RequestSizeLimitMiddleware,
@@ -115,6 +115,7 @@ from readablestem.web.worker import (
     default_client_factory,
     default_converter,
 )
+from readablestem.web.worker_rows import RowReader
 
 logger = logging.getLogger(__name__)
 
@@ -473,6 +474,12 @@ def create_app(
         tracer=_job_tracer(settings),
         uploads=UploadGate(limit=settings.max_concurrent_uploads),
     )
+    if settings.worker_mode == "service":
+        # The worker is another process (`readablestem worker`): what it says about itself, the
+        # AI service and the sandbox probe is read from `ops_heartbeat` (`web.worker_rows`).
+        ctx.rows = RowReader(factory)
+        ctx.sandbox = SandboxStatus(read=ctx.rows.sandbox)
+    inline_worker = settings.run_worker and ctx.rows is None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -483,10 +490,10 @@ def create_app(
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
         sandbox.make_undumpable()  # TeX of the same user cannot read our /proc/<pid>/environ
-        if settings.sandbox_probe_at_startup:
+        if settings.sandbox_probe_at_startup and ctx.rows is None:
             # In the background: neither start-up nor /healthz waits for it.
             run_probe(ctx.sandbox, timeout_s=settings.sandbox_probe_timeout_s)
-        if settings.run_worker:
+        if inline_worker:
             ctx.worker = Worker(
                 settings,
                 factory,
@@ -502,7 +509,7 @@ def create_app(
             logger,
             "app_started",
             env=settings.env,
-            worker=settings.run_worker,
+            worker=inline_worker,
             tracing=ctx.tracer is not None,
             fake_models=settings.fake_models,
         )

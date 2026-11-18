@@ -3,6 +3,8 @@
 
 - serve: runs the web app with uvicorn (`create_app` as a factory, so settings are read
   at start-up, and `--reload` works).
+- worker: runs the conversion worker with no web server (`web.worker_service`): `WORKER_SLOTS`
+  conversions at once, the web service's worker with `WORKER_MODE=service`.
 - users: manages the sign-in allowlist in the database named by DATABASE_URL. In dev the
   tables are created on first use; in production the schema must be migrated first.
   `link` adds another Google address for an allowed instructor and `unlink` takes it away
@@ -40,6 +42,12 @@ def register(
     )
     serve.add_argument("--reload", action="store_true", help="restart on code changes (dev)")
     serve.set_defaults(func=_cmd_serve)
+
+    worker = group.add_parser(
+        "worker",
+        help="run the conversion worker with no web server (WORKER_MODE=service, WORKER_SLOTS)",
+    )
+    worker.set_defaults(func=_cmd_worker)
 
     users = group.add_parser("users", help="manage the sign-in allowlist").add_subparsers(
         dest="users_command", required=True
@@ -110,6 +118,17 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         **uvicorn_log_options(),
     )
     return 0
+
+
+def _cmd_worker(args: argparse.Namespace) -> int:
+    from readablestem.config import ConfigError, get_settings
+    from readablestem.web.worker_service import run
+
+    try:
+        settings = get_settings()
+    except ConfigError as exc:
+        return _error(str(exc))
+    return run(settings)
 
 
 def _factory():

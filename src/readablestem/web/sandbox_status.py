@@ -35,13 +35,25 @@ _WITHHELD = frozenset({"sandbox_start_error"})
 
 
 class SandboxStatus:
-    """The last sandbox probe result of this process; safe to read from any thread."""
+    """The last sandbox probe result; safe to read from any thread.
 
-    def __init__(self) -> None:
+    By default the result of this process's own probe. With `WORKER_MODE=service` the probe
+    runs in the worker process (where LaTeXML does): there it is built with `publish`, which
+    writes each result to an `ops_heartbeat` row, and the web process's is built with `read`,
+    which returns that row (`web.worker_rows`)."""
+
+    def __init__(
+        self,
+        *,
+        publish: Callable[[str, dict[str, str], datetime | None], None] | None = None,
+        read: Callable[[], dict[str, Any] | None] | None = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._state = "not_run"
         self._checks: dict[str, str] = {}
         self._checked_at: datetime | None = None
+        self._publish = publish
+        self._read = read
 
     # ------------------------------------------------------------------ writing
 
@@ -50,19 +62,36 @@ class SandboxStatus:
             self._state = state
             self._checks = dict(checks or {})
             self._checked_at = datetime.now(UTC)
+            shown = (self._state, dict(self._checks), self._checked_at)
+        if self._publish is not None:
+            self._publish(*shown)
 
     def running(self) -> None:
         with self._lock:
             self._state = "running"
             self._checks = {}
             self._checked_at = None
+        if self._publish is not None:
+            self._publish("running", {}, None)
 
     # ------------------------------------------------------------------ reading
 
+    def _seen(self) -> tuple[str, dict[str, str], datetime | None]:
+        """(state, checks, when): this process's probe, or the worker process's row."""
+        if self._read is not None:
+            row = self._read() or {}
+            when = row.get("checked_at")
+            return (
+                str(row.get("state", "not_run")),
+                dict(row.get("checks") or {}),
+                datetime.fromisoformat(when) if when else None,
+            )
+        with self._lock:
+            return self._state, dict(self._checks), self._checked_at
+
     @property
     def state(self) -> str:
-        with self._lock:
-            return self._state
+        return self._seen()[0]
 
     def allows_source(self) -> bool:
         """Whether LaTeX source may be taken and converted: the last probe passed."""
@@ -71,17 +100,16 @@ class SandboxStatus:
     def public(self) -> dict[str, object]:
         """What `/healthz/ops` shows: the state, the checks (names and one-word answers), the
         bound in MB, whether a cgroup and seccomp are in force, and when."""
-        with self._lock:
-            checks = dict(self._checks)
-            return {
-                "state": self._state,
-                "result": {"pass": "pass", "fail": "fail", "timeout": "fail"}.get(self._state),
-                "checks": checks,
-                "bound_mb": _int(checks.get("sandbox_total_bound_mb")),
-                "cgroup": checks.get("sandbox_cgroup"),
-                "seccomp": checks.get("sandbox_seccomp"),
-                "checked_at": self._checked_at.isoformat() if self._checked_at else None,
-            }
+        state, checks, checked_at = self._seen()
+        return {
+            "state": state,
+            "result": {"pass": "pass", "fail": "fail", "timeout": "fail"}.get(state),
+            "checks": checks,
+            "bound_mb": _int(checks.get("sandbox_total_bound_mb")),
+            "cgroup": checks.get("sandbox_cgroup"),
+            "seccomp": checks.get("sandbox_seccomp"),
+            "checked_at": checked_at.isoformat() if checked_at else None,
+        }
 
 
 def _int(value: str | None) -> int | None:

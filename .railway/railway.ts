@@ -130,7 +130,9 @@ const appVariables = [
 ];
 
 // Settings only the web service holds (the image-page switch and the per-page and per-job
-// spend caps added 2026-10-22; the worker thread runs inside web). MS_* are the Microsoft
+// spend caps added 2026-10-22; the worker thread runs inside web unless WORKER_MODE=service,
+// docs/deploy-railway.md "The worker as its own service", where the `worker` service is described
+// and deliberately not defined here: applying it would start a second service). MS_* are the Microsoft
 // sign-in settings (docs/deploy-railway.md, "Microsoft sign-in on Railway"): declared before
 // they have values so a later `railway variable set` is not deleted by the next apply; the
 // app treats an unset variable as "Microsoft sign-in off", and a half-set group refuses to
@@ -161,6 +163,7 @@ const webOnlyVariables = [
   "STORAGE_GLOBAL_MAX_MB",
   "STORAGE_OPEN_TIER_MB",
   "STORAGE_PER_USER_MB",
+  "WORKER_MODE",
   "MAX_USD_PER_JOB",
   "MAX_USD_PER_PAGE",
   "MS_ALLOWED_TENANTS",

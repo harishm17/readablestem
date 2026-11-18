@@ -8,9 +8,10 @@ sends (`ModelCall.outcome`), kept for a few minutes in memory.
 The service counts as **not answering** when at least `MIN_CALLS` requests were sent in
 the last `WINDOW_S` seconds and the most recent `MIN_CALLS` all ended in `api_error` or
 `timeout`. A refusal or an unusable answer is the model's, not an outage, and a single
-failure among successes is noise. One success ends it at once. Per process (the worker
-runs inside the web process), forgotten on restart: it is a hint for a status line, never
-a gate, and it holds only times and outcome words, nothing from a document.
+failure among successes is noise. One success ends it at once. Per process,
+forgotten on restart (with `WORKER_MODE=service` the worker process writes its requests to an
+`ops_heartbeat` row and the web process reads them, `web.worker_rows`): it is a hint for a
+status line, never a gate, and it holds only times and outcome words, nothing from a document.
 
 The converter reports each request's `ModelCall` (`convert_pdf(call_observer=)`, passed by
 the worker); the public `/status` page and the job page read `HEALTH`.
@@ -79,6 +80,19 @@ class ProviderHealth:
                     break
                 started = at
         return datetime.fromtimestamp(started, UTC)
+
+    def snapshot(self) -> list[list[float | bool]]:
+        """The requests of the last `WINDOW_S` seconds as `[time, failed]` pairs: what the
+        worker process writes to its `ops_heartbeat` row (`web.worker_rows`)."""
+        with self._lock:
+            return [[at, failed] for at, failed in self._recent()]
+
+    @classmethod
+    def from_snapshot(cls, calls: list[tuple[float, bool]]) -> ProviderHealth:
+        """A view of another process's requests (`snapshot`), read by the same questions."""
+        health = cls()
+        health._calls.extend(calls[-KEEP:])
+        return health
 
     def reset(self) -> None:
         with self._lock:
