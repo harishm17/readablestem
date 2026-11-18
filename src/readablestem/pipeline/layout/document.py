@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from functools import partial
 from collections.abc import Sequence
 from typing import Any
 
@@ -532,11 +533,28 @@ def _read_deck(
                     rect.height,
                     page_labels.pdf_label(page),
                     rows,
-                    _slide_marks(page, paths.get(number, []), rect.height),
+                    slides.LazyMarks(partial(_marks_of, page, paths.get(number, []), guard, number)),
                 )
             )
     creator = doc.metadata.get("creator") if doc.metadata else None
-    return slides.detect(creator, views)
+    deck = slides.detect(creator, views)
+    if any(not guard.ok(v.number) for v in views):
+        # A page whose marks raised, when `detect` asked for them, is left out of the deck as a
+        # page whose view raised (its marks were read with the view before).
+        deck = slides.detect(creator, [v for v in views if guard.ok(v.number)])
+    return deck
+
+
+def _marks_of(
+    page: pymupdf.Page, paths: list[_Path], guard: _PageGuard, number: int
+) -> list[slides.Mark]:
+    """The page's slide marks, read when `detect` first needs them (`slides.LazyMarks`); none
+    when they cannot be read (`guard` has the page then, and `_read_deck` runs `detect` again
+    without it)."""
+    marks: list[slides.Mark] = []
+    with guard(number):
+        marks = _slide_marks(page, paths, page.rect.height)
+    return marks
 
 
 def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[slides.Mark]:
