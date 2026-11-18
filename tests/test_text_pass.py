@@ -540,6 +540,33 @@ def test_blanks_boxes_and_form_fields_are_tokens_said_in_words():
     assert result.counts()["blanks"] == 4 and result.counts()["checkboxes"] == 3
 
 
+def test_a_column_of_check_boxes_is_a_checklist_and_not_a_table():
+    # A form's check boxes beside their labels are aligned in two columns: they were read as
+    # a table of boxes and labels.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    labels = (
+        "Extended time on exams",
+        "Note-taking support",
+        "Course materials in an accessible format",
+        "Other (describe below)",
+    )
+    for i, label in enumerate(labels):
+        top = 292 + 24 * i
+        page.insert_text((84, top + 11), label)
+        widget = pymupdf.Widget()
+        widget.field_type, widget.field_name = pymupdf.PDF_WIDGET_TYPE_CHECKBOX, f"box{i}"
+        widget.rect, widget.border_color = pymupdf.Rect(60, top, 74, top + 14), (0, 0, 0)
+        page.add_widget(widget)
+    pdf = doc.tobytes()
+    doc.close()
+    elements = layout.analyze(pdf).elements
+    assert {e.kind.value for e in elements} == {"paragraph"}
+    assert " ".join(e.text for e in elements) == " ".join(f"\u2610 {label}" for label in labels)
+
+
 # --------------------------------------------------------------------------- the pass as a whole
 
 

@@ -23,7 +23,8 @@
 - SW37 (reduced): a drawing of thin filled rectangles only (Word's cell borders, painted as
   one drawing) is paper rules, and a filled shape's thin boxes are rules in the table finder:
   a 4 by 3 table drawn so is one table and no figure, and a chart of filled bars stays a
-  figure. Borders thicker than 1.6 pt are still bars.
+  figure. Borders thicker than 1.6 pt are still bars. A column of check boxes beside their
+  labels is a checklist for the table finder, not a table of boxes.
 - `PIPELINE_VERSION` is not changed here.
 
 ## Unreleased: nothing is cut on paper, long descriptions print open, the maths font stack, the words of a picture kept from a page (branch fix/wide-content-print-math-font)
