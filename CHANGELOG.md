@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: page tools by lines, the marks as text, evidence in words (branch feat/page-tools-lines-and-evidence)
+
+- WS19.4, as far as its triage line: a region to add (a picture or an equation) can be given by
+  the lines it sits between, "Starts after line" and "Ends before line", two selects filled from
+  the page's lines in reading order, with the top and the bottom of the page as ends. The box is
+  worked out from those lines' boxes and the page's text margins, in the four fields' own
+  coordinates, so the cut-out step and the add route are unchanged; the lines win over the
+  four numbers, and the form says so. Dragging a box and moving it with the arrow keys are not
+  built.
+- WS19.5, as far as its triage line: under the page image, the page's marks are listed as text
+  in reading order, each a link to its item with its number, kind and first words. Numbers of
+  neighboring lines no longer cover each other where the margin has room: on the marks test
+  page (an equation on every line, numbers shown) 11 overlapping pairs before, 0 after; with
+  two equations to a line 20 of 22 pairs are left (the margin holds two numbers).
+  `marks.PLACEMENT_VERSION` is 2, so a browser asks again for its marks stylesheets.
+- WS19.7, as far as its triage line: an equation's card gives the sentence around it with the
+  proposal read aloud in its place and, where two readings disagree, both as speech and as
+  LaTeX; a figure's card gives the sentence that refers to it; where the only evidence is the
+  page image the card says "This can only be checked against the page image." Handing the
+  check to someone else is not built.
+
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 
 - SW47 (F-080, F-407, F-481), as far as its triage line: a review write is refused as stale only

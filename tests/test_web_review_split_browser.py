@@ -288,10 +288,12 @@ def test_every_mark_is_a_link_of_at_least_24_css_px(site, browser, job, viewport
 def test_marks_are_named_and_link_to_their_decision(site, browser, job):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}/review")
-    page.get_by_role("link", name="2: Figure 1, needs your decision (2 of 3)").click()
+    page.locator(".page-frame").get_by_role(
+        "link", name="2: Figure 1, needs your decision (2 of 3)"
+    ).click()
     page.wait_for_url(re.compile(r"item=p1-e6"))
     assert "Decision 2 of 3" in page.locator("#decision-title").inner_text()
-    page.get_by_role("link", name=re.compile(r"^3: Heading 2")).first.click()
+    page.locator(".page-frame").get_by_role("link", name=re.compile(r"^3: Heading 2")).first.click()
     assert "Decision 3 of 3" in page.locator("#decision-title").inner_text()
     context.close()
 
