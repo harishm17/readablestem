@@ -501,11 +501,13 @@ class ScriptRun(_Span):
     kind: Literal["sup", "sub"]
 
 
-# What a run of an element's text is marked as (`Run`). One kind so far: "deleted", text the
-# page shows struck through (a cancelled date), written as `<del>` with the words "deleted:"
-# and "end deleted" around it (`pipeline.inline_text`). Later kinds (strong, emphasis, blank,
-# ...) are new values here, not new fields.
-RunKind = Literal["deleted"]
+# What a run of an element's text is marked as (`Run`). "deleted": text the page shows struck
+# through (a cancelled date), written as `<del>` with the words "deleted:" and "end deleted"
+# around it (`pipeline.inline_text`). "blank": a gap to fill in, written in text as underscores
+# (typed, or drawn under a gap: `layout._mark_blanks`), and "checkbox": a printed box
+# (U+2610 and its checked forms); both are written with words that say what they are.
+# Later kinds (strong, emphasis, ...) are new values here, not new fields.
+RunKind = Literal["deleted", "blank", "checkbox"]
 
 
 class Run(_Span):
@@ -868,6 +870,7 @@ NOTICE_CODES = frozenset(
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
         "struck_text",  # text the page shows struck through, kept and marked as deleted
+        "form_fields",  # a fillable PDF form: its fields are read as text, not as live inputs
         "option_labels",  # answer options (A, B, C) that run together in one paragraph or item
         "rtl_text",  # right-to-left words, in the order the PDF gives them
         # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text

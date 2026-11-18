@@ -2370,7 +2370,7 @@ annotations only), and the quads of each StrikeOut annotation. A glyph is struck
   struck with them, so a rule drawn at x-height also covers the capitals and digits beside.
 
 A rule under the text (an underline) or under a blank ("Name: ____") crosses no glyph in
-that band and strikes nothing. Struck glyphs become runs the same way as color
+that band and strikes nothing (`baseline_rules.classify`, below). Struck glyphs become runs the same way as color
 (`labelled_runs`, across inline markers), kept only with a letter, a digit or math in them,
 on paragraphs, list items and headings. Each element with runs gets the optional notice
 `struck_text` (with its page; no required decision). Glyphs are now read on any page with a
@@ -2379,6 +2379,46 @@ strike mark, not only on pages with links or color.
 With `CONTENT_RUNS` off (the default, shadow rollout) the runs are found and counted
 (`TextPassResult.deleted_runs`, trace `deleted_runs` and `deleted_runs_written: 0`) but not
 stored, and no notice is raised. The LaTeX path follows the same switch for its `\sout` runs.
+
+### Rules near a baseline, blanks, boxes and form fields (SW36, SW39)
+
+One function answers "what is this rule near a baseline": `pipeline/baseline_rules.classify`
+takes the rule's box and the ink (box, size, baseline) of the row it sits in and says
+`strike` (it crosses the glyphs between 25% and 65% of their height, see above), `underline`
+(it lies 1 pt above to 4 pt below the baseline and covers at least half of the glyph run over
+it), `blank` (it lies there with nothing over it, at least 12 pt wide, and a word of the row
+within two font sizes of it), or `rule` (a table or border rule, anything else). The struck
+text test (`text_pass.struck_glyphs`) and the blank test (`layout._mark_blanks`) both ask it,
+so a rule has one meaning. A rule that crosses a vertical edge of another drawn path (the plate
+of a battery on its wire, within 2.5 pt of the edge: boxes leave out the stroke width) is part
+of a drawing and is not asked, and neither is a rule with text over or under it in any row (a
+fraction, division or radical bar, an underbrace): that rule is part of the maths.
+`layout._mark_blanks` runs in `_prepare_rows`, on the fragments of each line before
+`_merge_baselines` joins them, so a blank at the start of a line is in the line when it is
+made and cannot split a paragraph.
+
+A blank is written into the row as five underscores at the rule's place (a space on each side
+where the text has none), so a drawn blank and a typed run of three or more underscores read
+the same. The text pass (`text_pass.token_runs`) marks every run of three or more underscores
+as a `blank` run and each of U+2610, U+2611 and U+2612 as a `checkbox` run, from the text alone
+(no flag: nothing in them depends on a model or a setting). A rule that fills no gap in a row,
+and an underline, change nothing.
+
+A fillable form (AcroForm) is read the same way. `layout.take_form_fields` reads each text,
+choice, check box, radio button and signature field of a page and takes it off the open copy
+of the page (the file is not written to), so what a field draws (its value, a tick, a frame,
+a picture of a signature) is in no later read of the page's text, drawings or images and
+cannot be a stray paragraph or a figure; push buttons stay. `layout._field_rows` puts each
+field back as a row on the baseline and in the size of the line it stands in, which merges
+with its label: an empty text field is a blank, a filled one or a choice field is its value, a
+check box or radio button is U+2610 or U+2611 for its state, a signature field is a blank
+followed by "(signature field)". The text pass reads the fields again for the value (the
+first place in the element, under the field, where its text stands, is a `blank` run) and
+raises one document notice `form_fields` ("Not handled in this file") with the number of
+fields. Fields are written as described text, not as live inputs: the converted file cannot be
+filled in. Not done: a radio group as one list of its options (each button is its own box),
+a choice field's other options, and the field's own label from its tooltip (the label is the
+text beside it).
 
 ### Source facts
 

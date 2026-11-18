@@ -7,6 +7,7 @@ tests/test_text_latex.py runs the same pass on a real LaTeX document.
 from __future__ import annotations
 
 import logging
+import re
 
 import pytest
 
@@ -464,9 +465,15 @@ def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
     pdf = struck_page()
     elements = layout.analyze(pdf).elements
     result = text_pass.apply(pdf, elements, pages=[0], runs=True)
-    struck = [(e.text or "")[r.start : r.end] for e in result.elements for r in e.runs]
+    struck = [
+        (e.text or "")[r.start : r.end]
+        for e in result.elements
+        for r in e.runs
+        if r.kind == "deleted"
+    ]
     assert struck == ["October 3", "cancelled"]
-    assert all(r.kind == "deleted" for e in result.elements for r in e.runs)
+    # The rule under the gap after "Name:" is a blank, and the underlined word is not one.
+    assert [r.kind for e in result.elements for r in e.runs if r.kind != "deleted"] == ["blank"]
     assert "October 3 October 10" in " ".join(e.text or "" for e in result.elements)  # kept
     notices = [n for n in result.notices if n.code == "struck_text"]
     assert sum(n.count for n in notices) == 2
@@ -474,8 +481,63 @@ def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
     # CONTENT_RUNS off (the shadow rollout): found and counted, not written.
     shadow = text_pass.apply(pdf, elements, pages=[0])
     assert shadow.counts()["deleted_runs"] == 2 and shadow.counts()["deleted_runs_written"] == 0
-    assert not any(e.runs for e in shadow.elements)
+    assert not any(r.kind == "deleted" for e in shadow.elements for r in e.runs)
     assert not any(n.code == "struck_text" for n in shadow.notices)
+
+
+def test_blanks_boxes_and_form_fields_are_tokens_said_in_words():
+    # SW36 and SW39: a drawn blank, typed underscores and printed boxes, and the fields of an
+    # AcroForm, are runs that the writer says ("blank", "Checkbox, checked:"); the form gets
+    # one notice, and what a field draws is no stray paragraph.
+    import pymupdf
+
+    from readablestem.pipeline.inline_text import render_inline_text
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    font = pymupdf.Font(fontfile="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    page.insert_font(fontname="dj", fontbuffer=font.buffer)
+    page.insert_text((72, 100), "Date: ____ and \u2611 yes \u2610 no", fontsize=12, fontname="dj")
+    page.insert_text((72, 160), "Course:", fontsize=12)
+    page.insert_text((72, 220), "Agree to the terms", fontsize=12)
+    page.insert_text((72, 280), "Term:", fontsize=12)
+    page.insert_text((72, 340), "Email:", fontsize=12)
+    for kind, name, rect, value in (
+        (pymupdf.PDF_WIDGET_TYPE_TEXT, "course", (140, 145, 300, 165), "ENVS 101"),
+        (pymupdf.PDF_WIDGET_TYPE_CHECKBOX, "agree", (200, 208, 212, 220), True),
+        (pymupdf.PDF_WIDGET_TYPE_COMBOBOX, "term", (140, 265, 240, 285), "Spring"),
+        (pymupdf.PDF_WIDGET_TYPE_TEXT, "email", (140, 325, 300, 345), None),
+    ):
+        widget = pymupdf.Widget()
+        widget.field_type, widget.field_name, widget.rect = kind, name, pymupdf.Rect(*rect)
+        widget.border_color = (0, 0, 0)
+        if value is not None:
+            widget.field_value = value
+        if kind == pymupdf.PDF_WIDGET_TYPE_COMBOBOX:
+            widget.choice_values = ["Fall", "Spring"]
+        page.add_widget(widget)
+    pdf = doc.tobytes()
+    doc.close()
+    elements = layout.analyze(pdf).elements
+    result = text_pass.apply(pdf, elements, pages=[0])
+    texts = [e.text for e in result.elements]
+    assert texts == [
+        "Date: ____ and \u2611 yes \u2610 no",
+        "Course: ENVS 101",
+        "Agree to the terms \u2611",
+        "Term: Spring",
+        "Email: _____",
+    ]
+    html = [render_inline_text(e.text, element=e, equation=lambda _: "") for e in result.elements]
+    said = [re.sub(r"<[^>]+>", "", h) for h in html]
+    assert said[0].count("blank") == 1 and "Checkbox, checked: " in said[0]
+    assert "Checkbox, not checked: " in said[0]
+    assert 'aria-hidden="true">____<' in html[0]  # what the page printed is kept, not read
+    assert "blank, filled in: ENVS 101" in said[1] and "blank, filled in: Spring" in said[3]
+    assert "Checkbox, checked: " in said[2] and said[4] == "Email: blank_____"
+    form = [n for n in result.notices if n.code == "form_fields"]
+    assert [(n.count, n.page, n.element_id) for n in form] == [(4, None, None)]
+    assert result.counts()["blanks"] == 4 and result.counts()["checkboxes"] == 3
 
 
 # --------------------------------------------------------------------------- the pass as a whole

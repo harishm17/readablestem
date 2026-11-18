@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: blanks and boxes are tokens, form fields are read, border boxes are rules (branch fix/blanks-fields-border-rules)
+
+- SW36 (reduced): one classifier of what a rule near a baseline is (`pipeline/baseline_rules`:
+  strike, underline, blank or rule), asked by the struck-text test and by the new blank test.
+  A rule drawn in a gap of a text row or after its last word is written as five underscores, a
+  typed run of three or more underscores is the same, and both are `blank` runs; U+2610,
+  U+2611 and U+2612 are `checkbox` runs with their state. The outputs say them in words
+  ("blank", "Checkbox, checked:") and keep the printed characters hidden from a screen reader.
+  `RunKind` gains `blank` and `checkbox`. No flag. A rule that meets the edge of another drawn
+  path (the plate of a battery) or has text over or under it (a fraction bar, an underbrace)
+  is not a blank. Blank equation lines keep the five underscores in the equation's text
+  without a run: only paragraphs, list items and headings carry runs. `RENDER_VERSION` is unchanged: the new spans
+  carry classes and no style, and a stored result has no such runs.
+- SW39 (reduced): the fields of a fillable PDF are read (`layout.take_form_fields`): a text
+  field is a blank or its value, a choice field its value, a check box or radio button a box
+  with its state, a signature field a named blank. Their appearance is taken off the page
+  copy first, so a field's value is no stray paragraph and its picture no figure with empty
+  alt. The document gets the notice `form_fields` (Not handled in this file): the converted
+  file cannot be filled in. Fields are described text, not inputs. A radio group is not one
+  list, and a field's own tooltip is not used. No flag (`FORM_FIELDS` is not built).
+- SW37 (reduced): a drawing of thin filled rectangles only (Word's cell borders, painted as
+  one drawing) is paper rules, and a filled shape's thin boxes are rules in the table finder:
+  a 4 by 3 table drawn so is one table and no figure, and a chart of filled bars stays a
+  figure. Borders thicker than 1.6 pt are still bars.
+- `PIPELINE_VERSION` is not changed here.
+
 ## Unreleased: nothing is cut on paper, long descriptions print open, the maths font stack, the words of a picture kept from a page (branch fix/wide-content-print-math-font)
 
 - SW45 (reduced), rules 5 and 6: on paper a table wraps inside the sheet, code wraps, and an

@@ -102,6 +102,7 @@ from readablestem.core.types import (
 )
 from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import (
+    baseline_rules,
     chem,
     equation_images,
     font_codes,
@@ -1802,6 +1803,99 @@ def _spread_ligatures(chars: list[dict], direction: Sequence[float]) -> None:
         i = run + 1
 
 
+@dataclass(frozen=True, slots=True)
+class FormField:
+    """One fillable field of the page (an AcroForm widget), in display coordinates."""
+
+    kind: str  # "text" | "choice" | "checkbox" | "signature"
+    box: BBox
+    value: str = ""  # a text or choice field's value, as one line
+    checked: bool = False
+
+
+_FIELD_KINDS = {
+    "Text": "text",
+    "ComboBox": "choice",
+    "ListBox": "choice",
+    "CheckBox": "checkbox",
+    "RadioButton": "checkbox",
+    "Signature": "signature",
+}
+_FIELD_UNSET = ("", "Off", "False", "None")
+FIELD_BLANK = "_____"  # an empty field, written as a drawn blank is (`_mark_blanks`)
+FIELD_BOXES = {True: "☑", False: "☐"}  # a checkbox with its state
+FIELD_SIGNATURE = f"{FIELD_BLANK} (signature field)"
+
+
+def take_form_fields(page: pymupdf.Page) -> list[FormField]:
+    """The page's text, choice, checkbox, radio and signature fields (SW39), in reading
+    order, taken off the open page: what a field draws (its value, a tick, a frame, a
+    picture of a signature) is then in no later read of the page's text, drawings or images,
+    so it can be neither a stray paragraph nor a figure; `_field_rows` puts the field back
+    as a token. Push buttons stay as they are. The document is the caller's copy, so
+    nothing is written to the file. The caller holds `_LOCK`."""
+    display = _Display.of(page)
+    taken: list[tuple[pymupdf.Widget, FormField]] = []
+    try:
+        for widget in list(page.widgets() or []):
+            kind = _FIELD_KINDS.get(widget.field_type_string)
+            if kind is None:
+                continue
+            raw = widget.field_value
+            value = " ".join(
+                " ".join(raw if isinstance(raw, (list, tuple)) else [str(raw or "")]).split()
+            )
+            if kind in ("text", "choice"):
+                value = "" if value in _FIELD_UNSET else value
+            checked = kind == "checkbox" and value not in _FIELD_UNSET
+            taken.append((widget, FormField(kind, display.box(widget.rect), value, checked)))
+        for widget, _ in taken:
+            page.delete_widget(widget)
+    except (RuntimeError, ValueError):
+        pass  # a form this library cannot read is read as the page draws it
+    return sorted((f for _, f in taken), key=lambda f: (round(f.box[1]), f.box[0]))
+
+
+def _field_rows(fields: Sequence[FormField], rows: Sequence[_Row]) -> list[_Row]:
+    """A row for each field, on the baseline and in the size of the line it stands in, so
+    it merges with its label: an empty text field is a blank, a filled one its value, a
+    checkbox its box with its state, a signature field a blank that is named. The text pass
+    marks the blank and the box as runs (`text_pass.token_runs`)."""
+    upright = [r for r in rows if not r.vertical]
+    sizes = [r.size for r in upright]
+    out: list[_Row] = []
+    for f in fields:
+        x0, y0, x1, y1 = f.box
+        mid = (y0 + y1) / 2
+        beside = [r for r in upright if r.bbox[1] <= mid <= r.bbox[3]]
+        near = min(beside, key=lambda r: abs(r.x1 - x0), default=None)
+        size = near.size if near else statistics.median(sizes) if sizes else 11.0
+        baseline = near.baseline if near else mid + 0.35 * size
+        if f.kind == "checkbox":
+            shown = FIELD_BOXES[f.checked]
+        elif f.kind == "signature":
+            shown = FIELD_SIGNATURE
+        else:
+            shown = f.value or FIELD_BLANK
+        step = min(0.5 * size, (x1 - x0) / len(shown)) if f.value else 0.5 * size
+        chars = [
+            _Char(
+                c,
+                x0 + i * step,
+                baseline - 0.8 * size,
+                x0 + (i + 1) * step,
+                baseline + 0.2 * size,
+                baseline=baseline,
+                size=size,
+                font="",
+                flags=0,
+            )
+            for i, c in enumerate(shown)
+        ]
+        out.append(_Row(chars))
+    return out
+
+
 def _page_rows(
     page: pymupdf.Page,
     raw: list[dict] | None = None,
@@ -2776,6 +2870,7 @@ def _margin_filter(
             page = doc[number]
             if number not in frags:
                 page_type.turn_page(page)  # a reference page is read upright too
+                take_form_fields(page)  # what a field draws is not a margin's text
                 frags[number] = _page_rows(page)
             if number not in paths:
                 paths[number] = _page_paths(page)
@@ -5345,10 +5440,19 @@ def _page_paths(
                 path.fill_share = _fill_share(items, display, box) if len(items) <= 200 else 1.0
         if fill and kind == "shape" and not curved and MIN_BARS <= len(items) <= MAX_BAR_ITEMS:
             path.rects = _rects_of(items, display)
+            # Thin boxes throughout (a Word table's borders, drawn as filled boxes) are rules
+            # drawn as one path, like paper rules, not bars: no figure is made of them.
+            path.rules = path.rules or (bool(path.rects) and all(map(_thin_box, path.rects)))
         paths.append(path)
         lines.append(_straight_lines(path, segments))
     _mark_axes(paths, lines)
     return paths
+
+
+def _thin_box(box: BBox) -> bool:
+    """Is the box as thin as a rule (`RULE_THICKNESS`) and long enough to be one?"""
+    width, height = box[2] - box[0], box[3] - box[1]
+    return (height <= RULE_THICKNESS and width >= 3) or (width <= RULE_THICKNESS and height >= 3)
 
 
 def _rects_of(items: Sequence[Any], display: _Display) -> tuple[BBox, ...]:
@@ -9694,7 +9798,107 @@ def _prepare_rows(
         gutter = _find_gutter(body, slide=True)
         if gutter is not None and not _words_both_sides(kept, gutter, height):
             gutter = None
+    _mark_blanks(kept, rules)  # before the lines are made: a blank is part of its gap's width
     return _merge_baselines(kept, gutter, rules), gutter, _merge_baselines(dropped, gutter)
+
+
+BLANK_LOW_LINES = 5  # a blank to fill in is written as this many underscores
+BLANK_CLEAR_EM = 0.6  # text this close (x its size) over or under a rule is across it
+BLANK_UNDER_SHARE = 0.25  # of the rule's width, covered by that text, for the rule to be across it
+EDGE_TOUCH = 2.5  # pt a rule may stop short of a line and still meet it (boxes omit stroke width)
+_AFTER_BLANK = frozenset(".,;:!?)]}\u201d\u2019")  # no space between a blank and these
+_ROW_CACHES = tuple(n for n, v in vars(_Row).items() if isinstance(v, cached_property))
+
+
+def _mark_blanks(rows: list[_Row], paths: Sequence[_Path]) -> None:
+    """A rule drawn under a gap in a row, or after its last word, is a blank to fill in
+    (SW36): the row gets `BLANK_LOW_LINES` underscores there, which the text pass marks as a
+    `blank` run like a typed "____". Which rules are blanks is `baseline_rules.classify`'s
+    call, the same one the text pass asks about struck text, so no rule is both. A rule with
+    text over or under it (a fraction bar, a brace) or that meets another drawn line is no
+    blank. Done on the lines' fragments, before they are merged, so the lines are made with
+    the blank in them; the rows are changed in place."""
+    rules = [
+        p
+        for p in paths
+        if p.kind == "hrule"
+        and p.bbox[2] - p.bbox[0] >= baseline_rules.BLANK_MIN_PT
+        and not _meets_drawing(p, paths)
+    ]
+    if not rules:
+        return
+    index = _RowIndex([r for r in rows if not r.vertical and not r.diagonal])
+    found: dict[int, tuple[_Row, list[BBox]]] = {}
+    for rule in rules:
+        _, y0, _, y1 = rule.bbox
+        if _ink_across(rule.bbox, index):
+            continue  # a fraction bar, a division bar, a brace's label: not a blank
+        for row in index.near(y0 - baseline_rules.BELOW_BASELINE_PT - 2.0, y1 + 1.0):
+            ink = [
+                baseline_rules.Ink((c.x0, c.y0, c.x1, c.y1), c.size, c.baseline)
+                for c in row.chars
+                if not c.blank
+            ]
+            if baseline_rules.classify(rule.bbox, ink).kind == "blank":
+                found.setdefault(id(row), (row, []))[1].append(rule.bbox)
+                break
+    for row, boxes in found.values():
+        for box in sorted(boxes, reverse=True):  # right to left: places before stay valid
+            at = sum(1 for c in row.chars if (c.x0 + c.x1) / 2 < (box[0] + box[2]) / 2)
+            row.chars[at:at] = _blank_chars(row.chars, at, box)
+        for cached in _ROW_CACHES:
+            row.__dict__.pop(cached, None)
+
+
+def _ink_across(rule: BBox, index: _RowIndex) -> bool:
+    """Printed text over or under the rule across much of its width, in any row: the numerator
+    and denominator of a fraction bar, the label of a brace, the dividend under a division
+    bar. A blank has nothing printed above or below it but the page."""
+    x0, y0, x1, y1 = rule
+    reach = BLANK_CLEAR_EM * index.largest
+    covered = 0.0
+    for row in index.near(y0 - reach, y1 + reach):
+        for c in row.chars:
+            if not c.blank and y0 - BLANK_CLEAR_EM * c.size <= c.y1 and c.y0 <= y1 + reach:
+                covered += max(0.0, min(c.x1, x1) - max(c.x0, x0))
+    return covered >= BLANK_UNDER_SHARE * (x1 - x0)
+
+
+def _meets_drawing(rule: _Path, paths: Sequence[_Path]) -> bool:
+    """A rule that crosses or touches a vertical edge of another drawn path (the plate of a
+    battery on its wire, a rule that closes a cell) is part of a drawing, not a blank."""
+    x0, y0, x1, _ = rule.bbox
+    return any(
+        o is not rule
+        and o.kind != "hrule"
+        and o.bbox[1] - EDGE_TOUCH <= y0 <= o.bbox[3] + EDGE_TOUCH
+        and any(x0 - EDGE_TOUCH <= x <= x1 + EDGE_TOUCH for x in (o.bbox[0], o.bbox[2]))
+        for o in paths
+    )
+
+
+def _blank_chars(chars: list[_Char], at: int, box: BBox) -> list[_Char]:
+    """The underscores of a blank over `box`, with a space on each side where the text has
+    none (and no closing punctuation after it), built to sit before `chars[at]`."""
+    before = chars[at - 1] if at > 0 else None
+    after = chars[at] if at < len(chars) else None
+    ink = next((c for c in (before, after) if c is not None and not c.blank), None)
+    if ink is None:
+        ink = next(c for c in chars if not c.blank)
+    x0, x1 = box[0], box[2]
+    step = (x1 - x0) / BLANK_LOW_LINES
+
+    def char(c: str, left: float, right: float) -> _Char:
+        return _Char(
+            c, left, ink.y0, right, ink.y1, ink.baseline, ink.size, ink.font, 0, ink.colour
+        )
+
+    made = [char("_", x0 + k * step, x0 + (k + 1) * step) for k in range(BLANK_LOW_LINES)]
+    if before is not None and not before.blank:
+        made.insert(0, char(" ", x0, x0))
+    if after is not None and not after.blank and after.c not in _AFTER_BLANK:
+        made.append(char(" ", x1, x1))
+    return made
 
 
 def _page_blocks(
@@ -10869,6 +11073,7 @@ def _read_page(
     /Rotate is turned first (`page_type.turn_page`): its rows are horizontal and every later
     step, here and in the readers that open the file again, sees the display frame."""
     page_type.turn_page(page)
+    fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
     drawings = page.get_cdrawings()
     images = page_type.image_boxes(page)
@@ -10876,13 +11081,14 @@ def _read_page(
         kind = page_type.classify(
             page, raw, drawings, budget=budget, producer=producer, images=images
         )
-        return _page_rows(page, raw, kind.text.covered), [], kind
+        rows = _page_rows(page, raw, kind.text.covered)
+        return rows + _field_rows(fields, rows), [], kind
     seen = page_type.paint_visibility(drawings, images[0])  # once: the page type reads it too
     kind = page_type.classify(
         page, raw, drawings, budget=budget, producer=producer, images=images, seen=seen
     )
     rows = _page_rows(page, raw, kind.text.covered)
-    return rows, _page_paths(page, drawings, seen), kind
+    return rows + _field_rows(fields, rows), _page_paths(page, drawings, seen), kind
 
 
 def _analyze_document(
@@ -11949,6 +12155,7 @@ class Glyph:
     bbox: BBox  # display coordinates, the frame of `Element.bbox`
     rgb: tuple[int, int, int]  # the span's fill colour, sRGB
     size: float = 0.0  # the span's font size in points (0: not known)
+    baseline: float = 0.0  # y of the glyph's origin (`baseline_rules.classify`)
 
 
 def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
@@ -11975,7 +12182,8 @@ def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
                 for ch in span["chars"]:
                     c = ch["c"].translate(_TEXT_MAP)
                     if c and not c.isspace():
-                        glyphs.append(Glyph(c[0], display.box(ch["bbox"]), rgb, size))
+                        origin = display.point(*ch["origin"])
+                        glyphs.append(Glyph(c[0], display.box(ch["bbox"]), rgb, size, origin[1]))
     return glyphs
 
 

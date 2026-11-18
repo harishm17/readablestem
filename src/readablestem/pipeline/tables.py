@@ -882,15 +882,18 @@ class _PageView:
                 pictures.append((x0, y0, x1, y1))
         view = cls(lines, hsegs, vsegs, curves, pictures, width, height)
         # A series of bars is one drawing of many rectangles: each counts, not their union.
-        # A rectangle as thin as a rule is a rule (cell borders drawn as filled boxes).
+        # A rectangle as thin as a rule is a rule wherever it is drawn, alone or one of many
+        # (cell borders drawn as filled boxes), not a bar.
         for p in paths:
             if p.kind != "shape" or not p.filled or p.curved:
                 continue
-            rects = getattr(p, "rects", ())
-            if rects:
-                view.fills += [r for r in rects if min(r[2] - r[0], r[3] - r[1]) > THIN_IMAGE]
-            else:
-                view.fills.append(p.bbox)
+            for x0, y0, x1, y1 in getattr(p, "rects", ()) or (p.bbox,):
+                if y1 - y0 <= THIN_IMAGE and x1 - x0 >= 3:
+                    view.hsegs.append((x0, x1, (y0 + y1) / 2))
+                elif x1 - x0 <= THIN_IMAGE and y1 - y0 >= 3:
+                    view.vsegs.append((y0, y1, (x0 + x1) / 2))
+                else:
+                    view.fills.append((x0, y0, x1, y1))
         sizes = [c.size for line in lines for c in line.chars if not c.blank and not line.vertical]
         if sizes:
             view.body_size = statistics.median(sizes)
