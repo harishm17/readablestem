@@ -187,7 +187,8 @@ def test_the_words_of_a_paragraph_are_changed_from_the_keyboard_alone(doc_site, 
     page.keyboard.press("Tab")  # to the button that saves it
     assert page.evaluate("document.activeElement.textContent").strip().startswith("Save the words")
     page.keyboard.press("Enter")
-    page.wait_for_load_state("networkidle")
+    # The status line is on the page empty before the notice (the save is the next page).
+    page.locator("#decision-notice", has_text="The text was changed.").wait_for()
     assert "The text was changed." in page.inner_text("#decision-notice")
     # The notice has focus's heading; the changed words are in the student file.
     page.goto(f"{doc_site.base}/jobs/{doc_job}/view")

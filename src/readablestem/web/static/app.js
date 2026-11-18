@@ -484,17 +484,18 @@
 
 /* Review screen (review_split.html). Everything there works without this; it only:
  *
- * - scrolls the page image, inside its own region, so the selected item's mark is in
- *   the region's visible box (side by side, also the window, only as far as keeps the
- *   decision's heading in view; stacked, never the window);
+ * - scrolls the page image, inside its own region, so the selected item's mark is in the
+ *   part of the region that is inside the window (the window itself is never moved on load:
+ *   side by side, the page pane is sized to the space under the header, see sizePane);
  * - asks once more for an image that could not be made (a render refused for a moment),
  *   then says so when the page image still cannot be loaded;
  * - makes "Save edit" the main button once a field of the decision is changed, so an
  *   edit is less likely to be dropped by pressing Accept out of habit (the server
  *   refuses Accept with a changed field in any case);
- * - offers keyboard shortcuts (N, P, A, E). They are off until the reviewer turns them
- *   on (WCAG 2.1.4: single-key shortcuts must be possible to turn off; speech input can
- *   type letters by accident), and never act while focus is in a field.
+ * - offers keyboard shortcuts (N, P, A, E). They are on until the reviewer turns them off
+ *   (WCAG 2.1.4: single-key shortcuts must be possible to turn off; speech input can type
+ *   letters by accident; the choice is remembered), and never act while focus is in a field.
+ *   A key with nothing to act on says so in the status line (#decision-notice).
  */
 (function () {
   "use strict";
@@ -508,29 +509,46 @@
     return start - Math.max(0, Math.min(visible / 3, visible - size));
   }
 
+  // Side by side, the page pane is sticky under the window's top edge. Its height is the
+  // window minus the space above it (the header, when the window is at the top) minus the
+  // sticky offset, so its lower edge is in the window on load; css reads --page-top, which
+  // is not set (and the pane is the window minus two offsets) without this script.
+  function sizePane() {
+    var split = document.querySelector(".split");
+    if (!split) return;
+    function measure() {
+      var top = Math.max(0, Math.round(split.getBoundingClientRect().top + window.scrollY));
+      document.documentElement.style.setProperty("--page-top", top + "px");
+    }
+    measure();
+    window.addEventListener("resize", measure);
+  }
+
   function bringMarkIntoView() {
     var region = document.querySelector(".page-scroll");
     var mark = region && region.querySelector(".box.is-current");
     if (!region || !mark) return;
-    // Inside the region only, against its own visible box: where the window happens to
-    // be does not matter (stacked, the region starts below the window on a phone, at
-    // 320 px and at 400% zoom, and any window term would overshoot).
+    // Inside the region only, against the part of its box that is in the window: where the
+    // window happens to be does not matter, and it is never moved. Stacked, the region
+    // starts below the window (a phone, 320 px, 400% zoom): its whole box counts then, and
+    // any window term would overshoot.
     var r = region.getBoundingClientRect();
     var m = mark.getBoundingClientRect();
-    var top = m.top - r.top - region.clientTop;
-    var left = m.left - r.left - region.clientLeft;
-    region.scrollTop += offset(top, m.height, region.clientHeight);
-    region.scrollLeft += offset(left, m.width, region.clientWidth);
-    // Side by side (wide screens), the page pane starts below the header, so a mark near
-    // the bottom of a page can stay below the window. Move the window just enough, and
-    // never so far that the decision's heading leaves the top of the window.
-    var heading = document.getElementById("decision-title");
+    var box = r.top + region.clientTop;
+    var from = 0;
+    var to = region.clientHeight;
     var side = window.getComputedStyle(region.closest(".page-area")).position === "sticky";
-    m = mark.getBoundingClientRect();
-    if (side && heading && m.bottom > window.innerHeight) {
-      var room = heading.getBoundingClientRect().top - 8;
-      window.scrollBy(0, Math.min(m.bottom - window.innerHeight + 24, Math.max(room, 0)));
+    if (side) {
+      from = Math.max(0, -box);
+      to = Math.min(to, window.innerHeight - box);
     }
+    if (to - from < 1) {
+      from = 0;
+      to = region.clientHeight;
+    }
+    var left = m.left - r.left - region.clientLeft;
+    region.scrollTop += offset(m.top - box - from, m.height, to - from);
+    region.scrollLeft += offset(left, m.width, region.clientWidth);
   }
 
   // A render can be refused for a moment (each person has two at a time, and the
@@ -593,8 +611,46 @@
   function typing(target) {
     if (!(target instanceof Element)) return false;
     return Boolean(
-      target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")
+      target.isContentEditable ||
+        target.closest(
+          "input, textarea, select, [contenteditable=''], [contenteditable='true'], " +
+            "[contenteditable='plaintext-only'], [role='textbox'], [role='combobox'], [role='searchbox']"
+        )
     );
+  }
+
+  // The status line is the one the saved notice uses (#decision-notice, role="status"): the
+  // page always has it, empty when nothing was saved, so what is put in it is announced.
+  // What a key says goes in a span of its own, after the saved notice's own words.
+  function say(text) {
+    var live = document.getElementById("decision-notice");
+    if (!live) return;
+    var note = live.querySelector("[data-key-note]");
+    if (!note) {
+      note = document.createElement("span");
+      note.setAttribute("data-key-note", "");
+      live.appendChild(note);
+    }
+    var gap = note.previousSibling ? " " : "";
+    note.textContent = "";
+    // Emptied first, so the same words said twice are announced twice.
+    window.setTimeout(function () { note.textContent = gap + text; }, 60);
+  }
+
+  // After n or p the new decision is a new page: focus goes to its heading, as it does
+  // after a decision is saved (the server marks that heading autofocus).
+  var FOCUS = "readablestem.focus-decision";
+
+  function focusHeadingAfterKey() {
+    var asked = false;
+    try {
+      asked = window.sessionStorage.getItem(FOCUS) === "1";
+      window.sessionStorage.removeItem(FOCUS);
+    } catch (e) {
+      asked = false;
+    }
+    var heading = document.getElementById("decision-title");
+    if (asked && heading) heading.focus();
   }
 
   function shortcuts() {
@@ -602,11 +658,12 @@
     var toggle = document.getElementById("shortcuts-on");
     if (!box || !toggle) return;
     box.hidden = false;
-    var on = false;
+    // On unless this reviewer turned them off: nothing stored is on.
+    var on = true;
     try {
-      on = window.localStorage.getItem(STORE) === "on";
+      on = window.localStorage.getItem(STORE) !== "off";
     } catch (e) {
-      on = false;
+      on = true;
     }
     toggle.checked = on;
     toggle.addEventListener("change", function () {
@@ -618,36 +675,70 @@
       }
     });
     document.addEventListener("keydown", function (event) {
-      if (!on || event.defaultPrevented || event.repeat || event.isComposing) return;
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!on || event.defaultPrevented || event.repeat) return;
+      // A key that is part of an input method's composition, or a chord, is not a shortcut.
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       if (typing(event.target)) return;
+      // Behind a dialog (the enlarged image) the screen is not what the keys would act on.
+      if (document.querySelector("dialog[open]")) return;
       var key = event.key.toLowerCase();
+      if (key !== "n" && key !== "p" && key !== "a" && key !== "e") return;
       var panel = document.getElementById("decision");
       if (!panel) return;
-      var target = null;
-      if (key === "n") target = panel.querySelector('.decision-nav a[rel="next"]');
-      else if (key === "p") target = panel.querySelector('.decision-nav a[rel="prev"]');
-      else if (key === "a") target = panel.querySelector('[data-role="accept"]');
-      else if (key === "e") {
+      event.preventDefault();
+      if (key === "n" || key === "p") {
+        var link = panel.querySelector('.decision-nav a[rel="' + (key === "n" ? "next" : "prev") + '"]');
+        if (!link) {
+          say(key === "n" ? "There is no next decision." : "There is no previous decision.");
+          return;
+        }
+        try {
+          window.sessionStorage.setItem(FOCUS, "1");
+        } catch (e) {
+          /* the page then opens without moving focus */
+        }
+        link.click();
+      } else if (key === "a") {
+        if (panel.getAttribute("data-card") === "page") {
+          say("A does nothing here: this choice keeps or replaces a whole page, so it needs Tab and a press.");
+          return;
+        }
+        var accept = panel.querySelector('[data-role="accept"]');
+        if (!accept || accept.disabled) {
+          say("There is nothing to accept here.");
+        } else if (accept.hasAttribute("data-anyway")) {
+          // Accepting goes against a check, or against what the page suggests for a group of
+          // headings: never by a single key. Focus goes to the button.
+          accept.focus();
+          say(
+            (accept.getAttribute("data-anyway") === "advice"
+              ? "A does not press this one, because the page suggests the other choice."
+              : "A does not accept this one, because accepting goes against a check.") +
+              " Focus is on the button: press it if you mean it."
+          );
+        } else {
+          accept.click();
+        }
+      } else {
         var edit = panel.querySelector(".edit-box");
-        if (edit) edit.open = true;
         // The first field, or where editing starts without being an edit itself (a
         // table's cell list: data-edit-start, which keeps no draft).
-        target = panel.querySelector("[data-edit-field], [data-edit-start]");
-        if (target) {
-          event.preventDefault();
-          target.focus();
+        var field = panel.querySelector("[data-edit-field], [data-edit-start]");
+        if (!field) {
+          say("There is nothing to edit here.");
+          return;
         }
-        return;
+        if (edit) edit.open = true;
+        field.focus();
       }
-      if (!target) return;
-      event.preventDefault();
-      target.click();
     });
   }
 
   if (!document.querySelector(".split")) return;
+  sizePane();
   bringMarkIntoView();
+  focusHeadingAfterKey();
   watchImages();
   watchEdits();
   shortcuts();

@@ -207,24 +207,6 @@
 {% set t = item.table %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
-<div class="compare table-compare" role="group" aria-labelledby="tbl-title-{{ eid }}">
-  <h3 id="tbl-title-{{ eid }}" class="part-label">{% if t.proposal %}The table in the PDF, and rebuilt{% elif t.local %}The table in the PDF, and the grid read from it{% else %}The table in the PDF{% endif %}</h3>
-  <p class="cmp-label">In the PDF</p>
-  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
-  {% if t.proposal %}
-  <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
-  {{ table_box(t.proposal, "Proposed " ~ name) }}
-  {% if not t.is_data %}<p class="hint">Not a data table, so its words are written in reading order.</p>{% endif %}
-  {% elif t.local %}
-  <p class="cmp-label">Grid read from the PDF</p>
-  {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
-  <p class="hint">Read from the PDF's own text, without a model. Compare it with the image.</p>
-  {% if t.local_flat %}{{ flat_hint() }}{% endif %}
-  {% else %}
-  <p class="cmp-none">No rebuilt table: the document shows the image, marked “not converted”.</p>
-  {% endif %}
-</div>
-{{ table_findings(item) }}
 {{ table_error(item, "actions") }}
 {% if t.proposal and (item.can_accept or t.only_headers_missing) %}
 <div class="decision-bar" role="group" aria-label="Choices for {{ name }}">
@@ -240,7 +222,7 @@
     {% if item.can_accept %}
     {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
       {{ table_fields("split") }}
-      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept" {% if t.only_headers_missing %}aria-describedby="accept-note-{{ eid }}"{% endif %}>{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
+      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept"{% if t.only_headers_missing %} data-anyway aria-describedby="accept-note-{{ eid }}"{% endif %}>{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
     {% endcall %}
     {% endif %}
   </div>
@@ -259,6 +241,24 @@
   <p class="hint decide-note" id="local-note-{{ eid }}">Students get the grid as a table, as read from the PDF; compare it with the image first.</p>
 </div>
 {% endif %}
+<div class="compare table-compare" role="group" aria-labelledby="tbl-title-{{ eid }}">
+  <h3 id="tbl-title-{{ eid }}" class="part-label">{% if t.proposal %}The table in the PDF, and rebuilt{% elif t.local %}The table in the PDF, and the grid read from it{% else %}The table in the PDF{% endif %}</h3>
+  <p class="cmp-label">In the PDF</p>
+  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
+  {% if t.proposal %}
+  <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
+  {{ table_box(t.proposal, "Proposed " ~ name) }}
+  {% if not t.is_data %}<p class="hint">Not a data table, so its words are written in reading order.</p>{% endif %}
+  {% elif t.local %}
+  <p class="cmp-label">Grid read from the PDF</p>
+  {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
+  <p class="hint">Read from the PDF's own text, without a model. Compare it with the image.</p>
+  {% if t.local_flat %}{{ flat_hint() }}{% endif %}
+  {% else %}
+  <p class="cmp-none">No rebuilt table: the document shows the image, marked “not converted”.</p>
+  {% endif %}
+</div>
+{{ table_findings(item) }}
 {{ table_correct(item, p) }}
 {{ table_fallback(item, not t.proposal and (not t.local or t.local_flat)) }}
 {{ accept_clean(p.clean_tables, "split") }}

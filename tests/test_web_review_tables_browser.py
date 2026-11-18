@@ -228,10 +228,10 @@ def test_the_keyboard_reaches_everything_in_reading_order(site, browser, job, ja
     stops = [s for s in seen if not s.startswith("a:Decision") and s != "a:"]
     assert stops[:7] == [
         "a:Show on the page",
+        "button:Accept",  # the choices come first after the heading
         "a:Enlarge",
         "div:Proposed table 1",
         "a:Change the table",  # the finding's correction
-        "button:Accept",
         "summary:Change the table",  # the grid read from the PDF is inside it
         "button:Keep as image",
     ], seen
@@ -281,9 +281,7 @@ def test_the_shortcuts_reach_the_table_card(site, browser, job):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(f"{url}?item=p1-e1")
-    page.locator("#shortcuts summary").click()
-    page.get_by_label("Use keyboard shortcuts").check()
-    page.locator("#decision-title").focus()
+    page.locator("#decision-title").focus()  # the shortcuts are on by default
     page.keyboard.press("e")
     assert page.evaluate("document.activeElement.id") == "cell-pick-p1-e1"
     assert page.locator(".table-edit").evaluate("d => d.open")

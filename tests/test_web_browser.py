@@ -196,9 +196,11 @@ def test_review_page_renders_mathml(site, browser, finished_job):
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/jobs/{finished_job}/review/list")
+    # Equation 2 is not the first of its section in the review's order, so its card is folded.
+    page.evaluate("document.querySelectorAll('details.compact-item').forEach(d => (d.open = true))")
     box = page.locator("#fix-p1-e3 .mathml-preview math").bounding_box()
     assert box is not None and box["width"] > 0
-    page.goto(f"{site.base}/jobs/{finished_job}/review")  # the review screen's decision 1
+    page.goto(f"{site.base}/jobs/{finished_job}/review?item=p1-e3")  # equation 2's card
     box = page.locator("#decision .cmp-math math").bounding_box()
     assert box is not None and box["width"] > 0
     context.close()
@@ -210,20 +212,17 @@ def test_status_updates_live_with_htmx_then_shows_results(site, browser):
     sign_in(page, site.base, ALICE)
     job_id = upload_pdf(page, site.base)
     assert "Waiting" in page.locator("#job-status").inner_text()
+    page.evaluate("window.samePage = true")
     assert site.run_worker() == job_id
-    # htmx polls every 3 s; once finished, the status (a live region) says so and links
-    # to the first decision and the results, without reloading the page under the reader.
-    link = page.locator("#job-status").get_by_role("link", name="show the results")
-    link.wait_for(timeout=15000)
-    assert "3 decisions need you" in page.locator("#job-status").inner_text()
-    assert page.locator("#job-status").get_by_role("link", name="Start the review").is_visible()
-    assert page.locator("#results-heading").count() == 0
+    # htmx polls every 3 s; once finished, the finished page is swapped in under the reader
+    # (one poll contract, web/poll.py): the results and the link to the review, with no reload.
+    page.wait_for_selector("#results-heading", timeout=15000)
+    assert page.evaluate("window.samePage") is True  # swapped in, not reloaded
+    assert page.get_by_role("link", name=re.compile(r"^Review 3 decisions$")).is_visible()
     # The tab title follows the finished state (the state table's label), then the document.
     title = page.title()
     assert title.endswith(": SECRET-HEADING Kinematics | ReadableSTEM")
     assert not title.startswith(("Waiting", "Converting", "Restarting"))
-    link.click()
-    page.wait_for_selector("#results-heading")
     context.close()
 
 
@@ -241,8 +240,9 @@ def test_everything_works_without_javascript(site, browser):
     assert page.locator("#results-heading").is_visible()
     assert page.locator('meta[http-equiv="refresh"]').count() == 0
     page.get_by_role("link", name=re.compile(r"^Review \d+ decisions?$")).click()
-    page.get_by_role("button", name="Keep as image (equation 2)").click()
-    assert "Kept as an image" in page.locator("#decision-notice").inner_text()
+    # The first card is the highest risk: equation 3, which has no reading.
+    page.get_by_role("button", name="Keep as image (equation 3)").click()
+    page.locator("#decision-notice", has_text="Kept as an image").wait_for()
     page.get_by_role("link", name="List view").click()
     page.locator("#fix-p1-e4").get_by_label(re.compile("^I understand")).check()
     page.locator("#fix-p1-e4").get_by_role("button", name="Keep without a description").click()

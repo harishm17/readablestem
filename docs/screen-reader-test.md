@@ -89,7 +89,7 @@ you have none, upload a one-page PDF once.
 | 27 | On an item, open "Edit the LaTeX" (or the alt text field), enter something invalid or empty, Save edit. | The error summary takes focus and is spoken; the field is named and keeps what you typed. | R15 |
 | 28 | Reject or "Keep as image" on one item. | A status line says what happened. | R14, R16 |
 | 29 | Tab to the page image's region and to a mark. | "Page 1 image with 5 marks", then marks named like "1: Equation 5, needs your decision (1 of 3)". A mark has text, not only color. | R14 |
-| 30 | Leave the single-key shortcuts (N, P, A, E) off. | They are off by default because single keys can collide with VoiceOver's quick keys. Do not turn them on for this test. | none |
+| 30 | Turn the single-key shortcuts (N, P, A, E) off with "Use keyboard shortcuts" under the decision, and reload. | They are on until turned off, because the keys are listed beside the switch and it is remembered. Single keys can collide with VoiceOver's quick keys: leave them off for this test. | none |
 
 ## Results (fill in)
 

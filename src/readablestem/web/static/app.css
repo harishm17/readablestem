@@ -457,7 +457,10 @@ math[intent] mi { text-transform: none; }
   .optional-area { grid-area: optional; }
   .page-area {
     grid-area: page; position: sticky; top: var(--sticky-offset);
-    max-height: calc(100vh - 2 * var(--sticky-offset)); display: flex; flex-direction: column;
+    /* The window's height less what is above the pane (the header, with the window at the top:
+       app.js measures --page-top) and the offset below it, so its lower edge is in the window
+       on load; with no script it is the window less two offsets. */
+    max-height: calc(100vh - var(--page-top, var(--sticky-offset)) - var(--sticky-offset)); display: flex; flex-direction: column;
   }
   .page-scroll { flex: 1 1 auto; min-height: 14rem; }
 }
@@ -483,6 +486,10 @@ math[intent] mi { text-transform: none; }
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4);
 }
 .decision-notice p { margin: 0; }
+/* The status line when nothing was saved: empty, and a note only when a key had nothing to do. */
+.decision-status { margin: 0; }
+.decision-status:has([data-key-note]:not(:empty)) { margin: 0 0 var(--space-4); padding: var(--space-2) var(--space-3); border: 1px solid var(--border-control); background: var(--surface); border-radius: var(--radius-control); }
+@media (forced-colors: active) { .decision-status:has([data-key-note]:not(:empty)) { border: 2px solid CanvasText; } }
 .undo-form { margin: 0; }
 .undo-form .link-button { min-height: 44px; min-width: 44px; padding: 0 var(--space-2); font-weight: 700; }
 @media (forced-colors: active) { .decision-notice { border: 2px solid CanvasText; } }
@@ -690,7 +697,7 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
 .decision-nav a[rel="next"] { margin-left: auto; }
 .done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); }
 .shortcuts { margin-top: var(--space-4); font-size: var(--step--1); }
-.shortcuts > summary { cursor: pointer; color: var(--ink-muted); display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
+.shortcuts .part-label { margin: 0 0 var(--space-1); }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: var(--space-2) 0; }
 .keys div { display: contents; }
 .keys dd { margin: 0; }
