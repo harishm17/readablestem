@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: one MathML normal form (branch feat/mathml-normal-form)
+
+- WS4.9 (F-235): the MathML that a document carries is written in one normal form, by one
+  function, `mathml_shape.normal_form`. Five rules: a function name is one identifier (`sin`,
+  `cos`, `max`, `gcd`, spelled as a run of letters or as `s` `⁢` `i` `⁢` `n`, becomes one `mi`;
+  `lim` and the other limit operators become one `mo`; an italic capital run such as `Pr` is
+  kept as letters); digits are never styled (`𝟏𝟎` and `<mn mathvariant="bold">` become plain
+  digits; the double-struck digit symbol stays); a converter attribute is dropped where the
+  engines and MathML Core do not use it (`mathvariant` on an operator or on a number);
+  the prime is an operator, `<mo>′</mo>`, in the superscript; and a table that is the aligned
+  rows of one equation carries `data-aligned-rows="true"`.
+- Where it runs: the LaTeX writer (`validate.safe_latex_to_mathml`, last step), the page writer
+  (`safe_html.sanitize_mathml`, so MathML stored by earlier versions is also written clean on the
+  page and in every export) and the LaTeXML source MathML at ingest
+  (`web.mathml.sanitize_mathml(normal=True)`). The bold clean-up that lived in
+  `core/mathchars.py` (`bake_bold_variants`) moved into this function and is deleted there.
+- Speech changes only for the function names (`c o s` is "cosine", `g c d` is "greatest common
+  divisor") and for the bold decimals, which were read as styled digits and are now read as
+  digits. MathML is stored in `Fix` records; stored speech and stored MathML are not rewritten,
+  the page writer applies the form when the page is built. No model call, no stored-data change,
+  no migration, no version bump.
+
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 
 - WS7.2 (F-014): the box "Convert scanned or handwritten pages" says what reading a page costs
