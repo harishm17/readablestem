@@ -93,6 +93,7 @@ from readablestem.web.edit_check import MEANING_CODES
 from readablestem.web.messages import explain_check
 
 if TYPE_CHECKING:
+    from readablestem.pipeline.assemble import Stamp
     from readablestem.web.db import Job
     from readablestem.web.page_edits import StructureChange
 
@@ -1851,6 +1852,7 @@ def rerender_html(
     math_alttext: bool | None = None,
     filename: str = "",
     audience: str = "student",
+    stamp: Stamp | None = None,
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
     `audience` "checker" makes a draft's page in the checker's words (`assemble.CHECKER`);
@@ -1887,6 +1889,7 @@ def rerender_html(
         title=title_override or result.title,
         filename=filename,
         audience=audience,
+        stamp=stamp,
         **chosen,
         lang=result.lang,
         elements=result.elements,
@@ -1917,7 +1920,11 @@ def rerender_job_html(
     audience: str = "student",
 ) -> str:
     """`rerender_html` with the job's own choices for the student file: the title the
-    instructor set and the contact line (T1-7, T1-17), and the app's MathML setting."""
+    instructor set and the contact line (T1-7, T1-17), the app's MathML setting, and the
+    job's version id and date (`output.stamp_of`, WS20.1): the file says which version of the
+    document it is, whoever asks for it and whenever."""
+    from readablestem.web import output
+
     return rerender_html(
         result,
         crops,
@@ -1927,4 +1934,5 @@ def rerender_job_html(
         math_alttext=math_alttext,
         filename=job.filename,
         audience=audience,
+        stamp=output.stamp_of(job),
     )

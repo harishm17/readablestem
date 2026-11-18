@@ -78,6 +78,7 @@ from readablestem.web import (
     notation,
     notice_places,
     outcomes,
+    output,
     page_edits,
     queue,
     shares,
@@ -2032,7 +2033,7 @@ def review_action(
                 witness=ctx.settings.feature_page_witness,
                 keep_open=keep_open,
             )
-            job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+            output.output_changed(job, output.DECISION)  # the file is made again when asked for
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             restart_owner_clock(job, user, get_ctx(request).settings, request)
@@ -2168,7 +2169,7 @@ def _group_action(
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
-                job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+                output.output_changed(job, output.DECISION)  # the file is made again when asked for
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
                 restart_owner_clock(job, user, get_ctx(request).settings, request)
@@ -2239,7 +2240,7 @@ def _page_group_action(
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_page_group(result, group_key)
             if outcome.changes:  # nothing left to decide: no write, no re-render
-                job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+                output.output_changed(job, output.DECISION)  # the file is made again when asked for
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
                 restart_owner_clock(job, user, get_ctx(request).settings, request)
@@ -2460,7 +2461,7 @@ def undo(
             for change in changes:
                 if isinstance(change, StructureChange) and change.removed:
                     drop_crops(session, job.id, change.removed)
-            job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+            output.output_changed(job, output.DECISION)  # the file is made again when asked for
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             restart_owner_clock(job, user, get_ctx(request).settings, request)

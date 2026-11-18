@@ -3213,6 +3213,23 @@ the last decision still works.
   the "Reject" button named for what it does, as on the review screen, each with an
   accessible name that includes the fix ("Keep without a description (figure 2)").
 
+### The output version
+
+`jobs.output_version` (an integer, 1 for the first file) and `jobs.output_changed_at` identify the
+file a job holds (WS20.1; the id the page, the About note and the head print is the first six
+characters of the job id and the count, `b9487b-12`). One function, `web.output.output_changed(job,
+cause)`, is the only code that marks the stored HTML out of date or makes it again for a reason
+a reader would see: it counts the change, sets the time and sets `html_stale`. The causes
+(`output.CAUSES`): `decision` (a review write of an item, a group or a page group, the
+symbol-list and bulk accepts, an undo), `page_edit` (a page edit), `language`, `title`,
+`contact`, `rerun` (the worker finished a job that already had a file) and `converted` (the
+first file of a job or the sample: sets the time, leaves the count at 1). A write that leaves the
+output alone (keeping the document 7 more days, adding or removing a share, a download) does not
+call it. The lazy render of a stale page (`routes.jobs.current_html`, also the one a new release
+causes) writes the stamp from the job and does not count, so the first view of a job, whose file
+the pipeline wrote with no job to name, moves nothing. The counter is separate from
+`result_version`, which stays what the review forms and the draft confirm read.
+
 A decision is one transaction: lock the job row, refuse a form from an out-of-date page
 (the stale-tab guard above), apply the decision (`web/review.py`), clean and check edits
 the way model output is (LaTeX through `web.edit_check`, the equation step's own checks

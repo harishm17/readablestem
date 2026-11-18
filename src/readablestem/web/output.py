@@ -18,6 +18,13 @@ preview) asks `export_state` before it builds anything. The answer is one of:
   The zips and "Combine parts" never take a draft: they hold it back and say how many.
 - `not available`: not finished (or nothing written yet). Nothing leaves.
 
+Every change that reaches the stored file goes through `output_changed` (WS20.1): it counts
+the change on the job (`Job.output_version`, from 1, and `Job.output_changed_at`) and marks the
+stored HTML out of date, so two copies of one document can be told apart by the version id the
+file, the head of its page and the job page say (`b9487b-12`: the first six characters of the
+job id and the counter). The lazy render of a stale page (`routes.jobs.current_html`) stamps what
+it writes and does not count.
+
 "Decisions still open" is read in one place, `open_required`: the count of the summary of
 what was checked (`pipeline.checked.open_required`, which is `core.triage.review_load`), so
 the draft gate, the job's state and the student note never disagree (SW7).
@@ -29,13 +36,15 @@ import hashlib
 import hmac
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from urllib.parse import urlencode
 
 from starlette.requests import Request
 
-from readablestem.pipeline.assemble import mark_draft
+from readablestem.pipeline.assemble import Stamp, mark_draft
 from readablestem.web import documents, shares
-from readablestem.web.db import Job, JobStatus
+from readablestem.web.database import as_utc
+from readablestem.web.db import Job, JobStatus, utcnow
 from readablestem.web.deps import SESSION_CSRF, PageError, csrf_token
 
 READY = "ready"
@@ -187,3 +196,45 @@ def file_name(filename: str, state: ExportState) -> str:
 def marked(html: str, state: ExportState) -> str:
     """The HTML as it leaves: a draft carries its banner and its state (`mark_draft`)."""
     return mark_draft(html, state.open_decisions) if state.draft else html
+
+
+# --------------------------------------------------------------------------- identity (WS20.1)
+
+# Why the stored file changed. Only a change a reader would see counts; the first conversion is
+# version 1 and sets the time without counting. A write that leaves the output alone (keeping
+# the document 7 more days, a share) does not call `output_changed` at all.
+CONVERTED = "converted"  # the first file of a job: the worker's finish, a sample
+RERUN = "rerun"  # the worker made the file again for a job that already had one
+DECISION = "decision"  # a review write: one item, a group, a page group, an undo
+PAGE_EDIT = "page_edit"  # a page edit (text, heading, picture, equation, page left out)
+LANGUAGE = "language"
+TITLE = "title"
+CONTACT = "contact"
+CAUSES = (CONVERTED, RERUN, DECISION, PAGE_EDIT, LANGUAGE, TITLE, CONTACT)
+
+
+def output_changed(job: Job, cause: str, now: datetime | None = None) -> None:
+    """The only code that marks a job's stored HTML out of date or replaces it for a reason a
+    reader would see (the caller then writes the file, or leaves it to `current_html`): count
+    the change (`Job.output_version`), set its time (`Job.output_changed_at`) and mark the file
+    out of date, so a file made before this change is made again with the new stamp. The first
+    conversion (`CONVERTED`) sets the time and leaves the count at 1. The caller holds the row
+    (the review writes lock it) and commits."""
+    if cause not in CAUSES:
+        raise ValueError(f"unknown cause of an output change: {cause}")
+    if cause != CONVERTED:
+        job.output_version = (job.output_version or 1) + 1
+    job.output_changed_at = now or utcnow()
+    job.html_stale = True
+
+
+def stamp_of(job: Job) -> Stamp:
+    """The version id and day written into the job's file. A row with no time (inserted by an
+    older release) says the day it finished, or was uploaded."""
+    when = as_utc(job.output_changed_at or job.finished_at or job.created_at) or utcnow()
+    return Stamp.of(job.id, job.output_version or 1, when)
+
+
+def version_id(job: Job) -> str:
+    """The id shown to people: the first six characters of the job id, a hyphen, the count."""
+    return stamp_of(job).version_id

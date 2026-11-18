@@ -26,7 +26,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult, Element, Kind
-from readablestem.web import events, notation, outcomes, page_edits, page_images
+from readablestem.web import events, notation, outcomes, output, page_edits, page_images
 from readablestem.web.db import Blob, Job, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -123,7 +123,7 @@ def write_structure(
                     content=png,
                 )
             )
-        job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+        output.output_changed(job, output.PAGE_EDIT)  # the file is made again when asked for
         # Text the reviewer typed: NUL (which Postgres refuses in JSON) is taken out.
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
@@ -742,7 +742,7 @@ def write_review(
         except ReviewInvalid as exc:
             exc.job_id = job.id
             raise
-        job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+        output.output_changed(job, output.DECISION)  # the file is made again when asked for
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
         restart_owner_clock(job, user, ctx.settings, request)

@@ -13,6 +13,8 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ReadableSTEM 0.1.0">
 <meta name="readablestem-render" content="6">   (assemble.RENDER_VERSION: an older page is made again)
+<meta name="readablestem-version" content="b9487b-12">   (the version id, only when the caller gives one)
+<meta name="dcterms.modified" content="2026-11-10">      (the day of the last change, UTC)
 <title>Speed and Velocity</title>
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
@@ -1306,11 +1308,28 @@ so it says no more than was done. It has no review screen's words ("needs review
   page: it starts with a note and the original page to check it against."
   (`assemble.image_pages_note`);
 - "If something is hard to read or looks wrong, tell your instructor.";
-- an optional plain-text `source_note`, such as an OpenStax attribution.
+- an optional plain-text `source_note`, such as an OpenStax attribution;
+- when the caller gives a stamp (`render_html(stamp=assemble.Stamp)`), the last line, "Version
+  b9487b-12, November 10, 2026" (`<p class="about-version">`): which version of the document
+  this file is. See "The version id" below.
 
 The note says "reviewed" for what a person did and never "checked" (the tool's checks are
 "structure checks", and they are not mentioned to students). Model cost is not in the HTML:
 the file is meant for students.
+
+### The version id
+
+Two copies of one document can be told apart (WS20.1). The id is the first six characters of the
+job id, a hyphen and a count of the changes that have reached the document's output
+(`jobs.output_version`, from 1): `b9487b-12`. The date is the day (UTC) of the last change
+(`jobs.output_changed_at`), written in full with no time. The student file says both in its About
+note and its head (`readablestem-version`, `dcterms.modified`); the Word, EPUB and Canvas files
+carry the note's line because they are made from the same page, and nothing is added to their own
+metadata. The job page shows the same line under the title, to the owner and a reviewer. The
+assembler takes the stamp as a parameter and reads no clock and no database: the web app passes
+`web.output.stamp_of(job)`; the command line has no job, so it gives none and its files say
+nothing of a version rather than invent an id. Which changes count is in docs/web.md "The output
+version".
 
 The same statement opens the page, in `<main>` before the content, when nobody has reviewed
 it or a part is a picture or left out: a `<section id="checked-notice"

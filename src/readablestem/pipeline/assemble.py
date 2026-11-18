@@ -43,7 +43,7 @@ import math
 import re
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from itertools import pairwise
 from typing import Literal
 from urllib.parse import quote
@@ -125,6 +125,37 @@ def render_version(html: str) -> int:
     head = html[: html.find("</head>")] if "</head>" in html else html[:4096]
     match = _RENDER_LINE.search(head)
     return int(match.group(1)) if match else 0
+
+
+@dataclass(frozen=True)
+class Stamp:
+    """Which version of a document a file is (WS20.1): the id the web app shows, the first six
+    characters of the job id and the count of changes that reached its output ("b9487b-12"),
+    and the day of the last one. The assembler takes it as a parameter and reads no clock; a
+    caller with no job (the CLI) passes none and the file says nothing of a version."""
+
+    version_id: str
+    day: date
+
+    @classmethod
+    def of(cls, job_id: str, version: int, changed: datetime) -> Stamp:
+        """The stamp of job `job_id` at output version `version`, last changed at `changed`
+        (the day is the UTC day)."""
+        when = changed.astimezone(UTC) if changed.tzinfo else changed
+        return cls(f"{job_id[:6]}-{version}", when.date())
+
+    @property
+    def date_text(self) -> str:
+        """The day written out in full, with no time ("November 10, 2026")."""
+        return f"{self.day:%B} {self.day.day}, {self.day.year}"
+
+    @property
+    def line(self) -> str:
+        return f"Version {self.version_id}, {self.date_text}"
+
+
+VERSION_META = "readablestem-version"
+MODIFIED_META = "dcterms.modified"
 
 
 # --------------------------------------------------------------------------- audiences
@@ -1676,6 +1707,7 @@ def _about_section(
     contact: str | None = None,
     image_pages: list[int] | None = None,
     title: str = "",
+    stamp: Stamp | None = None,
 ) -> str:
     """The note for students at the end of `<main>` (MF7 of the UX review): what this
     is, the statement of what was reviewed and converted (`checked_words.statement`), which
@@ -1701,6 +1733,8 @@ def _about_section(
     lines.append(f"<p>{_contact_sentence(contact, title)}</p>")
     if source_note and source_note.strip():
         lines.append(f"<p>{_escape(source_note)}</p>")
+    if stamp is not None:
+        lines.append(f'<p class="about-version">{_escape(stamp.line)}</p>')
     return (
         f'<section id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
@@ -2065,6 +2099,7 @@ def render_html(
     unread: tuple[int, int] = (0, 0),
     filename: str = "",
     audience: str = STUDENT,
+    stamp: Stamp | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -2102,6 +2137,9 @@ def render_html(
     pages the document has, when known, so the note can say "7 of 8" pages were left out.
     `unread`: the words and pictures a LaTeX source's reader did not read
     (`checked.unread_of`), which the student note says are not in the file.
+    `stamp`: which version of the document this file is (`Stamp`), written as the last line of
+    the student note and in the head. The caller supplies it (no clock or database is read here);
+    without one the file says nothing of a version.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -2159,6 +2197,7 @@ def render_html(
         contact,
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
         title=titles.text,
+        stamp=stamp,
     )
     top = _checked_notice(summary, renderer.used_ids, audience)
     # Exactly one H1 (SW6c): the title, added above the headings, or the heading that is it.
@@ -2197,6 +2236,14 @@ def render_html(
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
             f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
+            *(
+                [
+                    f'<meta name="{VERSION_META}" content="{_escape(stamp.version_id)}">',
+                    f'<meta name="{MODIFIED_META}" content="{stamp.day.isoformat()}">',
+                ]
+                if stamp is not None
+                else []
+            ),
             *_summary_meta(summary, audience),
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",

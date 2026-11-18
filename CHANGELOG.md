@@ -78,6 +78,21 @@
   form carries the ids of the page. Nothing asked in band 1 to 3 is offered by accept-many or
   "Accept the clean tables" (a reading made again kept its old band and could pass every check).
   No model call, no stored-data change, no migration, no version bump.
+## Unreleased: every output says which version it is (branch feat/output-version-id)
+
+- WS20.1 (F-483): a document's output has a version id and a date. The job counts the changes
+  that reach it (`jobs.output_version`, from 1, and `jobs.output_changed_at`); one function,
+  `web.output.output_changed(job, cause)`, is the only code that marks the stored page out of
+  date or makes it again for a reason a reader would see (a review decision, a page edit, the
+  language, the title, the contact line, a re-run by the worker), and a share, keeping the
+  document longer or a first view that only makes a waiting page do not count. The student file's
+  About note ends "Version b9487b-12, November 10, 2026" (the first six characters of the job id,
+  the count, and the UTC day), its head says `readablestem-version` and `dcterms.modified`, the
+  Word, EPUB and Canvas files carry the note's line, and the job page shows it to the owner and a
+  reviewer. The assembler takes a `Stamp` as a parameter; the command line gives none. A finished
+  job's page is now made again once on its first view, so it carries its id. The privacy page
+  says the count and time are stored. One migration (`a9c3e5b7d1f2`: jobs from before get version
+  1 and the time of their last decision or finish). No model call, no version bump.
 
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 

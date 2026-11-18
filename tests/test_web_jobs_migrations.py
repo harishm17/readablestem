@@ -30,6 +30,8 @@ HTML_VERSION_COLUMNS = {"html_version"}
 OUTCOMES = "c2f4a8d61e57"
 REQUEST_TOKENS = "8b3d5f0e2a71"  # SW43: one row per submitted form
 STEP_FACTS = "8b1d5f3a9e04"
+STATE_FACTS = "e4b8c2d6a193"
+OUTPUT_VERSION = "a9c3e5b7d1f2"  # WS20.1: a count and a time of the changes to an output
 
 # (revision, the one before it, columns it adds to jobs, tables it adds)
 CHAIN = [
@@ -40,6 +42,7 @@ CHAIN = [
     (HTML_VERSION, OUTCOMES, HTML_VERSION_COLUMNS, set()),
     (REQUEST_TOKENS, HTML_VERSION, set(), {"request_tokens"}),
     (STEP_FACTS, REQUEST_TOKENS, set(), {"job_calls", "job_stages", "job_not_finished"}),
+    (OUTPUT_VERSION, STATE_FACTS, {"output_version", "output_changed_at"}, set()),
 ]
 
 
@@ -134,5 +137,47 @@ def test_downgrading_the_sample_migration_deletes_sample_documents_and_keeps_the
             assert [r[0] for r in conn.execute(text("SELECT job_id FROM blobs"))] == ["real"]
             assert [r[0] for r in conn.execute(text("SELECT job_id FROM review_edits"))] == ["real"]
         assert "is_sample" not in columns(engine)
+    finally:
+        engine.dispose()
+
+
+def test_jobs_from_before_the_output_version_get_version_1_and_the_time_of_their_last_change(
+    tmp_path,
+):
+    """WS20.1: the time is the last decision, else the finish, else the upload."""
+    url = f"sqlite:///{tmp_path}/output-version.db"
+    migrate(url, STATE_FACTS)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            for job in ("decided", "finished", "uploaded"):
+                conn.execute(text(INSERT_JOB), {"id": job})
+            conn.execute(
+                text("UPDATE jobs SET finished_at = '2026-10-09 01:00:00' WHERE id <> 'uploaded'")
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO review_edits "
+                    "(id, job_id, user_id, element_id, action, created_at) "
+                    "VALUES ('r1', 'decided', 'u1', 'e1', 'accept', '2026-10-09 05:00:00'), "
+                    "('r2', 'decided', 'u1', 'e2', 'accept', '2026-10-09 03:00:00')"
+                )
+            )
+    finally:
+        engine.dispose()
+    migrate(url, OUTPUT_VERSION)
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT id, output_version, output_changed_at FROM jobs ORDER BY id")
+            ).all()
+        found = {row[0]: (row[1], str(row[2])[:19]) for row in rows}
+        assert found == {
+            "decided": (1, "2026-10-09 05:00:00"),
+            "finished": (1, "2026-10-09 01:00:00"),
+            "uploaded": (1, "2026-10-09 00:00:00"),
+        }
     finally:
         engine.dispose()

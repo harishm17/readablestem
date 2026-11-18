@@ -147,6 +147,8 @@ def test_failed_checks_of_the_html_file_are_listed(web):
               code="math_missing_display"),
     ]  # fmt: skip
     job_id = convert(web, html_checks=checks)
+    with session_scope(web.ctx.factory) as session:  # the checks as stored, not of a new render
+        session.get(Job, job_id).html_stale = False  # type: ignore[union-attr]
     results = section(web.browser.get(f"/jobs/{job_id}").text, "results-heading")
     text = page_text(results)
     assert "2 of 3 structure checks did not pass" in text

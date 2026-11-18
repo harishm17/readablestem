@@ -17,8 +17,17 @@ import docx
 import pytest
 from sqlalchemy import func, select
 
-from fixtures.web.support import BOB, as_current, fetch, job_id_from, login, make_pdf, upload
-from readablestem.core.types import Kind
+from fixtures.web.support import (
+    BOB,
+    as_current,
+    csrf_from,
+    fetch,
+    job_id_from,
+    login,
+    make_pdf,
+    upload,
+)
+from readablestem.core.types import DocumentResult, Kind
 from readablestem.ops import retention
 from readablestem.pipeline import export_canvas, export_docx, export_epub
 from readablestem.web import documents, events, export_store
@@ -328,6 +337,7 @@ def test_a_failed_epub_export_is_a_plain_page(web):  # noqa: F811
         html=as_current(
             '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
         ),
+        html_stale=False,  # the page as stored, not made again from the result
     )
     response = fetch(web.browser, f"/jobs/{job_id}/download.epub")
     assert response.status_code == 409 and "cannot be made as an EPUB" in response.text
@@ -367,6 +377,7 @@ def test_a_document_that_cannot_be_made_is_left_out_and_said(web, monkeypatch): 
         html=as_current(
             '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
         ),
+        html_stale=False,  # the page as stored, not made again from the result
     )
     response = web.browser.get("/app/download?format=epub")
     assert response.status_code == 409 and "cannot be made in that file type" in response.text
@@ -483,6 +494,59 @@ def test_a_document_has_one_title_in_every_place_and_file(web):  # noqa: F811
         assert download_filename(wanted, job_id) in zipped
 
 
+def _version_of(env, job_id: str) -> dict[str, str]:
+    """The version id and date as the job page, the student file's About block and its head say
+    them (WS20.1), each asserted to say the same."""
+    page = fetch(env.browser, f"/jobs/{job_id}").text
+    on_page = re.search(r'id="job-version">Version (\w{6}-\d+), ([A-Z]\w+ \d+, \d{4})<', page)
+    html = fetch(env.browser, f"/jobs/{job_id}/download").text
+    in_about = re.search(r'class="about-version">Version (\w{6}-\d+), ([A-Z]\w+ \d+, \d{4})<', html)
+    in_head = re.search(r'<meta name="readablestem-version" content="(\w{6}-\d+)">', html)
+    assert on_page and in_about and in_head
+    assert on_page.groups() == in_about.groups() and in_head.group(1) == on_page.group(1)
+    assert on_page.group(1).startswith(job_id[:6])
+    return {"id": on_page.group(1), "date": on_page.group(2)}
+
+
+def test_each_change_to_a_document_moves_its_version_id_and_other_writes_do_not(web):  # noqa: F811
+    """WS20.1: a saved decision and a new title each make the next version; the first render of
+    a page that was only waiting to be made, and adding a share, do not."""
+    job_id = finished_job(web)
+    now = utcnow()
+    today = f"{now:%B} {now.day}, {now.year}"
+    first = _version_of(web, job_id)  # the first view makes the stored page: it counts nothing
+    assert first == {"id": f"{job_id[:6]}-1", "date": today}
+    assert not web.job(job_id).html_stale
+
+    token = csrf_from(web.browser.get(f"/jobs/{job_id}/share").text)
+    shared = web.browser.post(
+        f"/jobs/{job_id}/share",
+        data={"csrf_token": token, "email": "erin@example.org", "role": "view"},
+    )
+    assert shared.status_code == 303
+    assert _version_of(web, job_id)["id"] == first["id"]
+
+    stored = DocumentResult.model_validate(web.job(job_id).result_json)
+    pending = next(f.element_id for f in stored.fixes if f.pending)
+    decided = web.browser.post(
+        f"/jobs/{job_id}/review/{pending}",
+        data={
+            "csrf_token": csrf_from(web.browser.get(f"/jobs/{job_id}/review").text),
+            "view": "list",
+            "action": "accept",
+        },
+    )
+    assert decided.status_code == 303
+    assert _version_of(web, job_id)["id"] == f"{job_id[:6]}-2"
+
+    titled = web.browser.post(
+        f"/jobs/{job_id}/title",
+        data={"csrf_token": csrf_from(web.browser.get(f"/jobs/{job_id}").text), "title": "Week 4"},
+    )
+    assert titled.status_code == 303
+    assert _version_of(web, job_id)["id"] == f"{job_id[:6]}-3"
+
+
 # --------------------------------------------------------------------------- download all
 
 
@@ -515,6 +579,7 @@ def test_download_all_reads_what_is_ready_from_one_query_however_many_documents(
     from readablestem.web import bundle
 
     first = ready_job(web)
+    fetch(web.browser, f"/jobs/{first}")  # the first view makes the page the copies are of
     monkeypatch.setattr(bundle, "MAX_DOCUMENTS", 2)
 
     def copies(count: int, open_decisions: int) -> None:
