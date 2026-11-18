@@ -81,6 +81,9 @@ def test_the_choice_is_said_wherever_the_document_is_handled_and_never_to_the_st
     assert on in words(f"/jobs/{exam}/record") and off in words(f"/jobs/{plain}/record")
     assert on in web.browser.get(f"/jobs/{exam}/record.csv").text
     assert web.browser.get("/app/documents").text.count("Exam or quiz</span>") == 1  # midterm only
+    student = web.browser.get(f"/jobs/{exam}/download", follow_redirects=True)
+    assert student.status_code == 200 and "<main" in student.text
+    assert "exam or quiz" not in student.text.casefold()
 
 
 # --------------------------------------------------------------------------- the note
