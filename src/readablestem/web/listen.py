@@ -57,6 +57,11 @@ def speakable(text: str | None) -> str:
 class Item:
     """One thing a screen reader would say, with its role.
 
+    `ref` is the item's stable id: it comes from the element the item was made from (the
+    element's own `id`, else its place among its parent's children), so it is the same on
+    every load of the same result and unique in the page. The player keeps a reader's place
+    by it, never by a count or a word.
+
     `say` is the words a voice speaks (a paragraph is just its text; a heading adds its
     level). `kinds` are what the item is, for "next heading" and "next equation": its own
     kind first ("heading", "equation", "paragraph", ...), then any others it holds (a paragraph
@@ -67,6 +72,7 @@ class Item:
     say: str
     kinds: tuple[str, ...]
     lang: str = ""
+    ref: str = ""
 
     @property
     def kind(self) -> str:
@@ -247,8 +253,35 @@ class _Transcript:
         self._details = ""  # the role of text inside a <details> ("Long description")
         self._flagged = False  # inside a block kept as an image
         self._held: set[str] = set()  # kinds met inside the text being collected
+        self._path: list[str] = []  # ids of the elements being read, innermost last
+        self._children: dict[tuple[str, str], int] = {}  # elements of a tag met under a parent
+        self._used: dict[str, int] = {}  # items made from an element so far
+        self._taken: set[str] = set()  # item ids given out: each is unique in the page
 
     # ---------------------------------------------------------------- items
+
+    def _key(self, tag: str, own: str = "") -> str:
+        """The id of an element: its own `id`, else its tag and place among the elements of
+        that tag under the same parent ("p1-e4/p3"). The same HTML gives the same ids."""
+        if own:
+            return own
+        parent = self._path[-1] if self._path else ""
+        seen = self._children[(parent, tag)] = self._children.get((parent, tag), 0) + 1
+        return f"{parent}/{tag}{seen}" if parent else f"{tag}{seen}"
+
+    def _ref(self, kind: str) -> str:
+        """The next item's id: the element being read, then `~2`, `~3` for its further items
+        (a table's rows, a list's entries)."""
+        base = self._path[-1] if self._path else kind
+        n = self._used.get(base, 0)
+        while True:
+            n += 1
+            ref = base if n == 1 else f"{base}~{n}"
+            if ref not in self._taken:
+                break
+        self._used[base] = n
+        self._taken.add(ref)
+        return ref
 
     def add(self, role: str, text: str, kind: str, *, say: str | None = None, held=()) -> None:
         if self.full:
@@ -256,13 +289,13 @@ class _Transcript:
         if len(self.items) >= MAX_ITEMS:
             self.full = True
             note = "The transcript stops here; the file goes on."
-            self.items.append(Item("Note", note, note, ("note",), self.lang))
+            self.items.append(Item("Note", note, note, ("note",), self.lang, self._ref("note")))
             return
         text = _words(text)
         if say is None:
             say = f"{role}: {text}" if text else role
         kinds = (kind, *(k for k in dict.fromkeys(sorted(held)) if k != kind))
-        self.items.append(Item(role, text, say, kinds, self.lang))
+        self.items.append(Item(role, text, say, kinds, self.lang, self._ref(kind)))
 
     def paragraph(self, text: str, kind: str = "paragraph", role: str = "Paragraph") -> None:
         text = _words(text)
@@ -367,7 +400,11 @@ class _Transcript:
 
         def flush() -> None:
             if run:
-                self.paragraph("".join(self.inline(c) for c in run))
+                self._path.append(self._key("run"))
+                try:
+                    self.paragraph("".join(self.inline(c) for c in run))
+                finally:
+                    self._path.pop()
                 run.clear()
 
         for child in node.children:
@@ -392,6 +429,13 @@ class _Transcript:
         )
 
     def block(self, node: Node, depth: int) -> None:
+        self._path.append(self._key(node.tag, node.get("id")))
+        try:
+            self._block(node, depth)
+        finally:
+            self._path.pop()
+
+    def _block(self, node: Node, depth: int) -> None:
         tag = node.tag
         if tag in SKIPPED or self._hidden(node) or self.full:
             return

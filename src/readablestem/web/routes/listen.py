@@ -54,6 +54,8 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
             "back_url": f"/jobs/{job_id}",
             "back_label": "Back to the results" if audience == "owner" else "Back to the document",
             "student_url": f"/jobs/{job_id}/view",
+            "listen_doc": job_id,
+            "listen_version": version,
         },
     )
 
@@ -80,6 +82,8 @@ def demo_listen(request: Request) -> Response:
             "back_url": "/demo",
             "back_label": "Back to the demo",
             "student_url": "",
+            "listen_doc": "demo",
+            "listen_version": "demo",
             "active": "demo",
         },
     )

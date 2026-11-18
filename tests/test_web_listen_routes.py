@@ -75,6 +75,8 @@ def test_the_owner_hears_the_converted_page(site):
     assert f"/jobs/{site.job_id}/view" in body
     assert re.search(r"/static/listen\.[0-9a-f]{12}\.js", body)
     assert "<script>" not in body  # script-src 'self': no inline script
+    assert f'data-listen-doc="{site.job_id}"' in body  # the player keeps its place per document
+    assert body.count("data-listen-id=") == body.count("data-listen-item")
 
 
 def test_a_person_it_was_shared_with_can_open_it_and_a_stranger_gets_the_404(site):

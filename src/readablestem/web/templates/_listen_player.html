@@ -10,18 +10,18 @@
 {% set lesson = namespace(at=0) %}
 {% for item in items %}{% if not lesson.at and item.role.startswith("Main landmark") %}{% set lesson.at = loop.index %}{% endif %}{% endfor %}
 {% set before = lesson.at - 1 if lesson.at > 1 else 0 %}
-{% macro entries(rows, start, label_id) %}
+{% macro entries(rows, start, label_id, lesson_at) %}
 <ol class="listen-transcript" role="list" start="{{ start }}" aria-labelledby="{{ label_id }}">
   {% for item in rows %}
   {% set n = start + loop.index0 %}
-  <li class="listen-item" id="item-{{ n }}" data-listen-item data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
+  <li class="listen-item" id="item-{{ n }}" data-listen-item data-listen-id="{{ item.ref }}"{% if n == lesson_at %} data-listen-lesson{% endif %} data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
     <span class="listen-role">{{ item.role }}</span>{% if item.text %}<span class="visually-hidden">: </span> <span class="listen-text">{{ item.text }}</span>{% endif %}
 
   </li>
   {% endfor %}
 </ol>
 {% endmacro %}
-<div data-listen-player>
+<div data-listen-player data-listen-doc="{{ listen_doc|default('') }}" data-listen-version="{{ listen_version|default('') }}">
   <h2 id="player-heading">Play it</h2>
   <p class="hint" id="player-hint">Optional: a screen reader can read the transcript instead.</p>
   <noscript><p>Playing needs JavaScript. The transcript still reads.</p></noscript>
@@ -52,6 +52,7 @@
         <button type="button" class="button-secondary button-small" data-listen="heading">Next heading</button>
         <button type="button" class="button-secondary button-small" data-listen="equation">Next equation</button>
         <label class="listen-follow"><input type="checkbox" data-listen-follow checked> Follow along</label>
+        <label class="listen-follow"><input type="checkbox" data-listen-keys checked> Keyboard shortcuts</label>
       </div>
       <div class="listen-row listen-settings">
         <div class="field">
@@ -79,14 +80,15 @@
     {%- if before %} Play starts at the lesson.{% endif %}</p>
   {# A compact index of plain links (it works without script) and a filter (needs script, so
      it stays hidden until the controls are shown). #}
-  {% set headings = [] %}{% set equations = [] %}
+  {% set headings = [] %}{% set equations = [] %}{% set pages = [] %}
   {% for item in items %}
     {% if item.kinds[0] == "heading" %}{% set _ = headings.append((loop.index, item)) %}{% endif %}
     {% if item.kinds[0] == "equation" %}{% set _ = equations.append((loop.index, item)) %}{% endif %}
+    {% if item.kinds[0] == "page-break" %}{% set _ = pages.append((loop.index, item)) %}{% endif %}
   {% endfor %}
-  {% if headings or equations %}
+  {% if headings or equations or pages %}
   <details class="listen-index">
-    <summary>Index: {{ headings|length }} {{ "heading" if headings|length == 1 else "headings" }}{% if equations %}, {{ equations|length }} {{ "equation" if equations|length == 1 else "equations" }}{% endif %}</summary>
+    <summary>Index: {{ headings|length }} {{ "heading" if headings|length == 1 else "headings" }}{% if equations %}, {{ equations|length }} {{ "equation" if equations|length == 1 else "equations" }}{% endif %}{% if pages %}, {{ pages|length }} {{ "page" if pages|length == 1 else "pages" }}{% endif %}</summary>
     {% if headings %}
     <h3 id="index-headings">Headings</h3>
     <ul class="listen-index-list" aria-labelledby="index-headings">
@@ -97,6 +99,12 @@
     <h3 id="index-equations">Equations</h3>
     <ul class="listen-index-list" aria-labelledby="index-equations">
       {% for n, item in equations %}<li><a href="#item-{{ n }}">{{ item.text|truncate(70, True, "…") }}</a></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if pages %}
+    <h3 id="index-pages">Pages</h3>
+    <ul class="listen-index-list" aria-labelledby="index-pages">
+      {% for n, item in pages %}<li><a href="#item-{{ n }}">{{ item.text }}</a></li>{% endfor %}
     </ul>
     {% endif %}
   </details>
@@ -122,11 +130,11 @@
     {% if before %}
     <details class="listen-before" data-listen-before>
       <summary id="before-heading">Before the lesson ({{ before }})</summary>
-      {{ entries(items[:before], 1, "before-heading") }}
+      {{ entries(items[:before], 1, "before-heading", lesson.at) }}
     </details>
-    {{ entries(items[before:], lesson.at, "transcript-heading") }}
+    {{ entries(items[before:], lesson.at, "transcript-heading", lesson.at) }}
     {% else %}
-    {{ entries(items, 1, "transcript-heading") }}
+    {{ entries(items, 1, "transcript-heading", lesson.at) }}
     {% endif %}
   </div>
 </div>

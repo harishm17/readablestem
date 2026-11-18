@@ -79,6 +79,7 @@
 .listen-before .listen-transcript { margin-top: var(--space-2); }
 
 /* The item being spoken: a tint and a full outline (never colour alone). */
+[data-listen-player].is-live .listen-item { cursor: pointer; }
 .listen-item.is-current { background: var(--accent-tint); outline: 2px solid var(--mark-current); outline-offset: -2px; }
 .listen-item.is-current .listen-role { color: var(--ink); }
 @media (forced-colors: active) {

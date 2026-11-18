@@ -1804,6 +1804,24 @@ the site is built, with the same component and the same script).
   work only while focus is inside the page's content, never with a modifier or in a menu. State
   changes go to a polite status line; the item being spoken is not announced again. It never
   moves focus, so it does not fight a screen reader.
+- **The place (SW49).** Every transcript item has a stable id from the element it was made
+  from (`Item.ref`, the page's `data-listen-id`: the element's own `id`, else its tag and place
+  under its parent), the same on every load of a result and unique in the page. The script
+  keeps its whole state in one object and reads `data-kinds` and `data-listen-*`, never the
+  words on the page. The place, speed, voice name, Follow along and Keyboard shortcuts are
+  kept in the browser's `localStorage` under the document's id and result version
+  (`readablestem.listen:<job>:<version>`, the demo `demo:demo`; static example pages use their
+  path): ids and settings only, never text of the document. At most 20 documents' places are
+  kept (the oldest dropped), and a new version of a document replaces its older entry. Every
+  read and write is wrapped, so a browser with storage blocked plays with no memory. On a return
+  the Play button says "Resume from item 47 of 520"; Stop keeps the place; "Play from the
+  beginning" is the restart. The place is set by clicking an item, an index link (Headings,
+  Equations, Pages, from the page markers) or Previous and Next, and Play starts from it. An id
+  that is gone after a new version falls back to the nearest earlier item that is still there
+  (the eight before it are kept as ids), then to the start. The place is `aria-current` and a
+  class, never a live announcement, and focus never moves; the status line says only what the
+  person did ("Place set to item 47 of 520"). The "Hear this" buttons share the script and keep
+  no place.
 - **Privacy.** A voice with `localService === true` is the default. When the browser lists only
   online voices, the player says some browsers send the text to their maker and speaks nothing
   until a voice is chosen; a "Hear this" button asks once and speaks only on the second press.
