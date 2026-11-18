@@ -58,7 +58,7 @@ CACHE = Path(os.environ.get("CORPUS_CACHE") or REPO / ".cache" / "corpus")
 KEPT_OUT = CACHE / "answers.jsonl.gz"
 
 # Sites a public entry may be fetched from, and sites an entry may cite without fetching.
-FETCH_HOSTS = frozenset({"ocw.mit.edu", "arxiv.org", "upload.wikimedia.org"})
+FETCH_HOSTS = frozenset({"ocw.mit.edu", "arxiv.org"})
 CITE_HOSTS = FETCH_HOSTS | {"openstax.org", "commons.wikimedia.org", "creativecommons.org"}
 
 OWN_LICENSE = "MIT (made for this repository)"

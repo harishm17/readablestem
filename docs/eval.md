@@ -2601,14 +2601,17 @@ As of 2026-11-11 it has 72 entries; 47 of them have reading-order labels (91 pag
 
 **Where a file may come from.** Every entry is one of three kinds.
 
-- `public` (30 entries): a file on MIT OpenCourseWare (25), arXiv or Wikimedia Commons. The
+- `public` (27 entries): a file on MIT OpenCourseWare (25) or arXiv (2). The
   manifest pins the URL, the SHA-256, the size, the license and who to credit. The file is
   fetched into `.cache/corpus/` (not committed) and the tests use a page range cut from it.
   A download whose hash differs is refused and never reaches the cache.
-- `committed` (31 entries): a file in the corpus folder. 29 were made for this repository
+- `committed` (34 entries): a file in the corpus folder. 29 were made for this repository
   and sit next to the HTML, LaTeX, Markdown or Word source they were printed from; each is
-  at most 200,000 bytes. The other 2 are ten-page cuts of OpenStax textbooks, kept because
-  the publisher's download URLs stopped serving the bytes that were measured.
+  at most 200,000 bytes. 2 are ten-page cuts of OpenStax textbooks, kept because the
+  publisher's download URLs stopped serving the bytes that were measured. 3 are files from
+  Wikimedia Commons (CC BY 4.0, CC0 and public domain), kept because Wikimedia answers a
+  CI runner's download with "too many requests". Someone else's file is committed only
+  under one of those three licenses, with its credit, and is at most 5,000,000 bytes.
 - `builder` (11 entries): a file made on demand by a builder in `tests/workflows/builders/`.
   The builders make 71 files in all; 68 give the same bytes on every run, and their hashes
   are in `builders/recorded.json`. The 3 encrypted ones cannot, and are checked by what
@@ -2650,7 +2653,7 @@ method and date for every gold file.
 
 ```bash
 uv run python -m readablestem.eval.corpus check            # committed and built files, no network
-uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 30 public files by hash
+uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 27 public files by hash
 uv run python tests/workflows/builders/record.py list      # the 71 built files and what each shows
 uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or network" for the rest
 ```
