@@ -61,6 +61,17 @@ SAME_PLACE = 0.5
 # (usage counts show "review:carried") and without a write number, so Undo never takes
 # back a whole carry at once.
 CARRIED_ACTION = "carried"
+# What an earlier change by hand was, as the list of changes not made again names it
+# (`web.carry_edits` kinds).
+NOT_REAPPLIED_WORDS = {
+    "text": "words you changed",
+    "heading": "paragraph you made a heading",
+    "picture": "picture you added",
+    "equation": "equation you marked",
+    "page_left_out": "page you left out",
+    "not_equation": "equation you gave back to the text",
+    "read_again": "equation you had read again",
+}
 
 
 @dataclass
@@ -81,6 +92,8 @@ class CarryReport:
     # earlier ones were not carried because the item they were made on changed.
     edits: list[str] = field(default_factory=list)
     edits_dropped: int = 0
+    # Which of them, by kind and 1-based page (None: the page is not known).
+    edits_not_applied: list[tuple[str, int | None]] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -91,6 +104,7 @@ class CarryReport:
             "removed": self.removed,
             "edits": self.edits,
             "edits_dropped": self.edits_dropped,
+            "edits_not_applied": [list(item) for item in self.edits_not_applied],
         }
 
     @classmethod
@@ -104,6 +118,16 @@ class CarryReport:
 
         removed = data.get("removed")
         dropped = data.get("edits_dropped")
+        held = data.get("edits_not_applied")
+        not_applied: list[tuple[str, int | None]] = []
+        for item in held if isinstance(held, list) else []:
+            if (
+                isinstance(item, list)
+                and len(item) == 2
+                and item[0] in NOT_REAPPLIED_WORDS
+                and (item[1] is None or isinstance(item[1], int))
+            ):
+                not_applied.append((item[0], item[1]))
         return cls(
             carried=ids("carried"),
             suggestion_changed=ids("suggestion_changed"),
@@ -112,6 +136,7 @@ class CarryReport:
             removed=removed if isinstance(removed, int) and removed > 0 else 0,
             edits=ids("edits"),
             edits_dropped=dropped if isinstance(dropped, int) and dropped > 0 else 0,
+            edits_not_applied=not_applied,
         )
 
 
@@ -395,6 +420,7 @@ class CarrySummary:
     waiting: int  # of the changed and new ones, how many are still waiting now
     edits: int = 0  # edits to words, headings, added items and pages left out, carried
     edits_dropped: int = 0  # earlier edits whose item changed: to be made again
+    not_applied: list[str] = field(default_factory=list)  # "Page 3: picture you added"
 
     @property
     def any(self) -> bool:
@@ -428,4 +454,11 @@ def summary(report: CarryReport, result: DocumentResult) -> CarrySummary:
         waiting=len(waiting),
         edits=len(report.edits),
         edits_dropped=report.edits_dropped,
+        not_applied=[
+            f"Page {page}: {words}" if page else words.capitalize()
+            for kind, page in sorted(
+                report.edits_not_applied, key=lambda item: (item[1] or 0, item[0])
+            )
+            for words in [NOT_REAPPLIED_WORDS[kind]]
+        ],
     )
