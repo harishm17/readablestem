@@ -38,8 +38,8 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.web import carry
-from readablestem.web.db import Job, session_scope
+from readablestem.web import carry, carry_snapshot
+from readablestem.web.db import Blob, Job, session_scope
 
 # --------------------------------------------------------------------------- the rules
 
@@ -219,21 +219,35 @@ def revise(env, client, first: str, name: str = "notes-v2.pdf") -> str:
     return job_id_from(response)
 
 
-def test_the_earlier_version_being_gone_is_said_and_nothing_is_carried(web):
+def test_decisions_still_carry_when_the_earlier_version_is_deleted_while_the_new_one_waits(web):
     env = web
     env.converter.output = first_output()
     first = job_id_from(upload(env.alice, make_pdf(1)))
     env.run_worker()
+    path = f"/jobs/{first}/review"
+    env.alice.post(f"{path}/p1-e3", data={"csrf_token": token(env.alice, path), "action": "accept"})
+    env.converter.output = revised_output()
     second = revise(env, env.alice, first, "v2.pdf")
-    # Deleted before the revised one is converted.
+    # Deleted by its owner (the purge and an account's erasure take the same path) after the
+    # upload and before the revised one is converted.
     env.alice.post(
         f"/jobs/{first}/delete", data={"csrf_token": token(env.alice, "/app"), "confirm": "yes"}
     )
     env.run_worker()
-    job = stored(env, second)
-    assert job.status == "done" and job.carried_json is None
-    text = re.sub(r"\s+", " ", env.alice.get(f"/jobs/{second}").text)
-    assert "that document was gone before this one finished" in text
+    job = env.job(second)
+    assert job.status == "done"
+    report = carry.CarryReport.from_json(job.carried_json)
+    assert report.carried == ["p1-e3"]
+    result = DocumentResult.model_validate(job.result_json)
+    assert result.fix_for("p1-e3").status is Status.ACCEPTED
+    page = re.sub(r"\s+", " ", env.alice.get(f"/jobs/{second}").text)
+    assert "new version of <strong>notes.pdf</strong>" in page.replace("\n", " ")
+    assert f"/jobs/{first}" not in page  # the earlier document's page no longer exists
+    # What was kept for the carrying goes with it: nothing of the earlier version is left.
+    with session_scope(env.ctx.factory) as session:
+        assert not session.scalar(
+            select(Blob.id).where(Blob.job_id == second, Blob.kind == carry_snapshot.KIND)
+        )
 
 
 def test_someone_elses_document_cannot_be_named_as_the_earlier_version(web):

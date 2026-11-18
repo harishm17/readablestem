@@ -35,7 +35,9 @@ changes are returned as `web.review.ReviewChange`-like records so the caller can
 
 from __future__ import annotations
 
+import hashlib
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -132,7 +134,16 @@ def _words(text: str | None) -> str:
     return uid.words(text)
 
 
-def fingerprint(element: Element, crops: dict[str, bytes]) -> str | None:
+# The picture of an item (its crop), or only its SHA-256 as hex: all a fingerprint needs of
+# it, and all the snapshot of an earlier version keeps (`web.carry_snapshot`).
+Crop = bytes | str
+
+
+def crop_digest(png: bytes) -> str:
+    return hashlib.sha256(png).hexdigest()
+
+
+def fingerprint(element: Element, crops: Mapping[str, Crop]) -> str | None:
     """The content of one item, or None when it has nothing to compare (no crop, no
     words). Two items with the same fingerprint are the same item. It is the fingerprint
     stable ids are made from (`core.uid.fingerprint`), with the crop as the content of an
@@ -143,7 +154,9 @@ def fingerprint(element: Element, crops: dict[str, bytes]) -> str | None:
         return uid.fingerprint(element)
     if element.kind in (Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
         png = crops.get(element.id)
-        return uid.fingerprint(element, png) if png else None
+        if not png:
+            return None
+        return uid.fingerprint(element, crop_sha=png if isinstance(png, str) else crop_digest(png))
     return None
 
 
@@ -236,9 +249,9 @@ def _carry_one(old: Fix, new: Fix) -> str | None:
 
 def carry_decisions(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, Crop],
     new: DocumentResult,
-    new_crops: dict[str, bytes],
+    new_crops: Mapping[str, Crop],
 ) -> tuple[CarryReport, list[CarriedChange]]:
     """Put the decisions made on `old` onto `new` (in place) where the item is the same.
 

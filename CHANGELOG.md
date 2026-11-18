@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: a revision keeps what carry-over needs of the earlier version (branch fix/revise-snapshot-at-upload)
+
+- WS20.2 (point 4) and WS20.3, merged by the triage: uploading a revised version now stores,
+  with the new job, what carry-over reads of the earlier one (`web/carry_snapshot.py`: its
+  elements and fixes, a SHA-256 in place of each crop, its structural edits, how the compared
+  regions looked, its file name; a few KB for a reviewed document). If the earlier document is
+  deleted or purged while the new one waits or converts, its decisions and edits still carry;
+  before, they were lost with only a line on the job page. The earlier row is used when it is
+  still there (it may hold later decisions), the snapshot only when it is not. The snapshot is a
+  `blobs` row of the new job (no migration): removed as soon as carry-over has run, and by every
+  deletion of the job. The card on the job page names the earlier file and links to nothing.
+  No model call, no change to stored documents, no migration, no version bump.
+
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 
 - WF52 (F-497): a tab nobody is looking at no longer asks the server for the job's status,

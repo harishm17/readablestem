@@ -288,7 +288,7 @@ class Blob(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(16))  # "upload" | "crop"
+    kind: Mapped[str] = mapped_column(String(16))  # "upload" | "crop" | "export" | "carry"
     element_id: Mapped[str | None] = mapped_column(String(64))
     media_type: Mapped[str] = mapped_column(String(64))
     content: Mapped[bytes] = mapped_column(LargeBinary)
