@@ -14,7 +14,9 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
   header row"; a table with only the style's first-row flag gets one header row as a proposal
   (a warning check, `source.header_unmarked`), and a table whose rows are all headers gets one.
 - A footnote or endnote is written where its mark is, as the LaTeX path writes a note. A link is
-  a link when it is a web or mail address; a link to a bookmark is its words. Struck text is kept
+  a link when it is a web or mail address; a link to a bookmark on a heading is an internal link
+  to that heading (pandoc keeps a bookmark only on a heading, and the words of a `REF` field
+  are plain text), and a link to any other bookmark is its words. Struck text is kept
   and marked deleted; superscripts and subscripts are runs.
 - An equation typed in Word (`m:oMath`) is the LaTeX pandoc reads from it, checked by the same
   `check_latex` as any LaTeX the product accepts and written to MathML by the pipeline's one
@@ -87,6 +89,7 @@ from readablestem.source.ltx_reader import (
     ReadError,
     Reading,
     equation_fix,
+    link_internal,
     needs_decision,
 )
 
@@ -150,6 +153,10 @@ class _Reader:
         self.title_set = False
         # table node -> its place among the tables of the tree (pandoc 3.1 gives no style id back)
         self.table_place: dict[int, int] = {}
+        # A bookmark's name (a heading's id, or a span's) -> the element it is in, and the
+        # links to such a name: element, start, end, name (`ltx_reader.link_internal`).
+        self.ids: dict[str, str] = {}
+        self.refs: list[tuple[Element, int, int, str]] = []
 
     # ------------------------------------------------------------------ elements
 
@@ -187,7 +194,7 @@ class _Reader:
         if kind in ("Para", "Plain"):
             self._paragraph(content)
         elif kind == "Header":
-            self._heading(int(content[0]), content[2])
+            self._heading(int(content[0]), content[2], str(content[1][0]))
         elif kind == "Div":
             self._div(content[0], content[1], depth)
         elif kind == "BlockQuote":
@@ -257,13 +264,15 @@ class _Reader:
             checks=[Check(name="source.exact", passed=True)],
         )
 
-    def _heading(self, level: int, inlines: list[Any]) -> None:
+    def _heading(self, level: int, inlines: list[Any], name: str = "") -> None:
         element = self._new(Kind.HEADING, text="", bold=True)
         text, _, formulas = self._inline_text(inlines, owner=None)
         if not text:
             self._drop(element)
             return
         element.text = text
+        if name:  # pandoc names a heading's bookmark by the heading's id
+            self.ids.setdefault(name, element.id)
         self._heading_fix(element, level, text)
         if formulas:  # a formula in a heading is written as its TeX: a decision
             self.report.math_in_headings += formulas
@@ -378,12 +387,16 @@ class _Reader:
                 elif kind in ("Link", "Span", "Emph", "Strong", "Underline", "SmallCaps",
                               "Strikeout", "Superscript", "Subscript", "Cite"):  # fmt: skip
                     start = length
+                    if kind == "Span" and content[0][0] and owner is not None:
+                        self.ids.setdefault(str(content[0][0]), owner.id)  # a bookmark
                     inner = content[1] if kind in ("Link", "Span") else content
                     inner = content[1] if kind == "Cite" else inner
                     visit(inner, level + 1)
                     if length > start:
                         if kind == "Link" and is_safe_href(content[2][0]):
                             spans.append(("uri", start, length, content[2][0]))
+                        elif kind == "Link" and content[2][0].startswith("#"):
+                            spans.append(("ref", start, length, content[2][0][1:]))
                         elif kind == "Superscript":
                             spans.append(("sup", start, length, None))
                         elif kind == "Subscript":
@@ -406,8 +419,7 @@ class _Reader:
                 shifted.append((kind, a2, b2, extra))
         return text, shifted, formulas
 
-    @staticmethod
-    def _apply_spans(element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
         text = element.text or ""
         markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
         for kind, start, end, extra in spans:
@@ -418,6 +430,8 @@ class _Reader:
             try:
                 if kind == "uri":
                     inline.add(element, Link(kind="uri", start=start, end=end, href=str(extra)))
+                elif kind == "ref":
+                    self.refs.append((element, start, end, str(extra)))
                 elif kind in ("sup", "sub"):
                     inline.add(element, ScriptRun(start=start, end=end, kind=kind))
                 elif kind == "deleted":
@@ -1041,6 +1055,7 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
     reader.meta(tree.get("meta", {}))
     reader.blocks(tree.get("blocks", []))
     reader.attach_captions()
+    link_internal(reader.out.elements, reader.ids, reader.refs)
     out, report = reader.out, reader.report
     out.lang = _language(facts)
     report.math_held = facts.equations

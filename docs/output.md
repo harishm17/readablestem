@@ -964,8 +964,20 @@ items and headings; offsets are into the stored text, markers included.
   LaTeX prints a heading's or caption's number in a tag the reader leaves out of the text
   ("1.2 ", "Figure 3: "), so the reader hands it over as `Reading.printed` and the targets
   are found as if it were there. Word captions and "Theorem 1." paragraphs hold their words
-  already. LaTeX's own `\ref`, `\eqref` and `\cite` links (a `#` link in the XHTML) are not
-  kept: the text of a reference stays and the guessed link above is the only one.
+  already. LaTeX's own references are exact, so they win: LaTeXML has written `\ref`,
+  `\eqref`, `\autoref`, `\cite`, `\pageref` and each `\tableofcontents` entry as a `#id` link,
+  the reader records which element each LaTeXML id became (a heading, a numbered equation, a
+  theorem's paragraph, a figure, a table, a bibliography entry, or the paragraph that holds
+  the id) and each such link is an "internal" link to that element (`ltx_reader.link_internal`;
+  the words are LaTeXML's, usually just the number, and `source_links` widens them to the
+  word before them, as it does a PDF's: "Section 2", "equation (1)"). The guessed link is made
+  only where the file had no reference, and never overlaps one. An id that became no element,
+  a link inside the element it names (a theorem citing itself), and a reference in a place
+  that holds no links (a table cell, a caption, a footnote, a heading) make no link; the words
+  stay text. `\pageref` prints the number of its target (LaTeXML has no pages), so its words
+  say "page 2.1" and the link goes to that target. A Word hyperlink to a bookmark on a heading
+  is the same kind of link (`docx_reader`; pandoc keeps no other bookmark, and the words of a
+  `REF` field are plain text).
 - A link never wraps an inline equation: a wide one is a tab stop of its own, and a tab
   stop cannot sit inside a link (axe `nested-interactive`). A link across an equation is
   written in two pieces around it.

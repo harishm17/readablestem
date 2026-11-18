@@ -293,6 +293,50 @@ def test_links_keep_safe_schemes_only_and_scripts_become_runs(tmp_path):
     assert colour.rgb == (255, 0, 0)
 
 
+def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path):
+    def ref(target: str, words: str) -> str:
+        return f'<a href="#{target}" class="ltx_ref"><span class="ltx_text">{words}</span></a>'
+
+    body = (
+        f'<ul class="ltx_toclist"><li class="ltx_tocentry">{ref("S2", "2 Next")}</li></ul>'
+        '<div id="S1" class="ltx_section"><h2 class="ltx_title ltx_title_section">'
+        '<span class="ltx_tag ltx_tag_section">1 </span>First</h2>'
+        f'<div class="ltx_para"><p class="ltx_p">See Section {ref("S2", "2")}, equation '
+        f"({ref('S1.E2', '2')}), {ref('bib.bib1', '1')} and {ref('nowhere', '?')}.</p></div>"
+        '<div id="Thm1" class="ltx_theorem"><h6 class="ltx_title ltx_runin">'
+        '<span class="ltx_tag">Theorem 1</span>.</h6><div class="ltx_para">'
+        f'<p class="ltx_p">It holds, as {ref("Thm1", "Theorem 1")} says.</p></div></div>'
+        '<table id="S1.EGx1" class="ltx_equationgroup"><tbody id="S1.E1"><tr class="ltx_equation">'
+        f"<td>{math('a', '<mi>a</mi>')}</td></tr></tbody>"
+        '<tbody id="S1.E2"><tr class="ltx_equation">'
+        f"<td>{math('b', '<mi>b</mi>')}</td></tr></tbody></table></div>"
+        '<div id="S2" class="ltx_section"><h2 class="ltx_title ltx_title_section">Next</h2></div>'
+        '<ul class="ltx_biblist"><li id="bib.bib1" class="ltx_bibitem">'
+        '<span class="ltx_tag ltx_tag_bibitem">[1]</span>'
+        '<span class="ltx_bibblock">A. One, 1990.</span></li></ul>'
+    )
+    result = read(body, tmp_path)
+    by_id = {e.id: e for e in result.elements}
+
+    def found(element: Element) -> list[tuple[str, str, str]]:
+        return [
+            ((element.text or "")[k.start : k.end], k.kind, by_id[k.target_id].text or "")
+            for k in element.links
+        ]
+
+    toc, _, paragraph, theorem, _, row_b, _, entry = result.elements
+    assert found(toc) == [("2 Next", "internal", "Next")]
+    # the number is the link's words; a link to nothing makes none, nor does a theorem citing
+    # itself; the second row of a group is the equation the second number names
+    assert found(paragraph) == [
+        ("2", "internal", "Next"),
+        ("2", "internal", ""),
+        ("1", "internal", "A. One, 1990."),
+    ]
+    assert paragraph.links[1].target_id == row_b.id
+    assert entry.kind is Kind.LIST_ITEM and not theorem.links
+
+
 def test_a_footnote_is_kept_in_the_text(tmp_path):
     body = (
         '<p class="ltx_p">Text<span class="ltx_note ltx_role_footnote">'
@@ -585,17 +629,20 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
 
     link = f'<Relationship Id="rId30" Type="{office.OD}/hyperlink" Target="https://example.org/x" '
     body = (
-        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Motion</w:t></w:r></w:p>'
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:bookmarkStart w:id="1" w:name="_Ref1"/>'
+        '<w:r><w:t>Motion</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>'
         "<w:p><w:r><w:t xml:space='preserve'>Write to a@b.org or see www.example.org, </w:t></w:r>"
         '<w:hyperlink r:id="rId30"><w:r><w:t>the page</w:t></w:r></w:hyperlink>'
         "<w:r><w:t xml:space='preserve'> and www.example.org/typed. See Table 1.</w:t></w:r></w:p>"
         "<w:p><w:r><w:t>Theorem 1. A statement.</w:t></w:r></w:p>"
         "<w:p><w:r><w:t>Then Theorem 1 gives the table's answer.</w:t></w:r></w:p>"
+        '<w:p><w:r><w:t xml:space="preserve">Back to </w:t></w:r><w:hyperlink w:anchor="_Ref1">'
+        "<w:r><w:t>Motion</w:t></w:r></w:hyperlink><w:r><w:t>.</w:t></w:r></w:p>"
     )
     data = word(body, rels=link + 'TargetMode="External"/>')
     blob = envelope.wrap("docx", "notes.docx", None, data)
     result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
-    _, first, theorem, last = result.elements
+    heading, first, theorem, last, back = result.elements
 
     def found(element: Element) -> list[tuple[str, str]]:
         return [(k.kind, (element.text or "")[k.start : k.end]) for k in element.links]
@@ -608,3 +655,4 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
     ]
     assert found(last) == [("crossref", "Theorem 1")]
     assert last.links[0].target_id == theorem.id and not theorem.links
+    assert found(back) == [("internal", "Motion")] and back.links[0].target_id == heading.id
