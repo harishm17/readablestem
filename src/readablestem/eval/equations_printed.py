@@ -314,7 +314,9 @@ def _alignment_marks_off(s: str) -> str:
     row_start = rf"(^|{_BREAK}|\\begin\{{[a-z]+\}})\s*&"
     while (shorter := re.sub(row_start, r"\1", s)) != s:
         s = shorter
-    s = re.sub(rf"&\s*(?={_BREAK}|\\end\{{|$)", "", s)
+    row_end = rf"&\s*(?={_BREAK}|\\end\{{|$)"  # `a & & \\`: each empty cell at the end, in turn
+    while (shorter := re.sub(row_end, "", s)) != s:
+        s = shorter
     s = re.sub(rf"&\s*(?={_RELATION})", "", s)
     return re.sub(rf"({_RELATION})\s*&", r"\1", s)
 

@@ -24,6 +24,7 @@ PRINTS_ALIKE = [
     (r"{a \over b}c", r"\frac{a}{b}c"),  # the old infix fraction
     (r"\begin{array}{rcl}a&=&b\\c&=&d\end{array}", r"\begin{aligned}a&=b\\c&=d\end{aligned}"),
     (r"\begin{pmatrix}a&b\\c&d\end{pmatrix}", r"\left(\begin{array}{cc}a&b\\c&d\end{array}\right)"),
+    (r"\begin{array}{rcl}a&&\\&\rightarrow&b\end{array}", r"\begin{aligned}a\\ \to b\end{aligned}"),
 ]
 
 PRINTS_DIFFERENTLY = [
