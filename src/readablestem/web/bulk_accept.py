@@ -29,6 +29,7 @@ from readablestem.web.review import (
     ReviewChange,
     ReviewInvalid,
     apply_review,
+    asked_in_a_high_band,
     can_accept,
     is_image_page_item,
     is_kept_image,
@@ -81,7 +82,8 @@ def is_bulk_candidate(fix: Fix, slug: str, element: Element | None = None) -> bo
     """Whether the bulk action for `slug` accepts this fix: undecided, a usable proposal,
     nothing failed, nothing flagged, and on its own (not in a group). Never an item read from
     an image of a page (`element`): handwritten and scanned maths is always its own decision,
-    whatever its checks say."""
+    whatever its checks say. Never one asked in band 1 to 3 either: a reading made again that
+    passes every check keeps the band of the failure it replaced."""
     spec = BULK_KINDS[slug]
     if fix.kind is not spec.kind or fix.status is not Status.NEEDS_REVIEW:
         return False
@@ -89,7 +91,7 @@ def is_bulk_candidate(fix: Fix, slug: str, element: Element | None = None) -> bo
         c.name == "image_page.maths_always_checked" for c in fix.checks
     ):
         return False
-    if fix.group_key or fix.reason or is_kept_image(fix):
+    if fix.group_key or fix.reason or is_kept_image(fix) or asked_in_a_high_band(fix):
         return False
     if fix.failed_checks or _flagged(fix) or not can_accept(fix):
         return False

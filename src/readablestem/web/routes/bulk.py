@@ -157,7 +157,8 @@ def accept(
     message = f"Accepted {n} {what} {spec.tail}. Undo takes them all back in one step."
     left = len(bulk_accept.candidates(result, slug)) if ids is not None else 0
     if left:  # a page of a longer list: the next page is where the person goes on
-        rest = f"{left} more {spec.one if left == 1 else spec.many} {'is' if left == 1 else 'are'} listed below."
+        what_left = f"{left} more {spec.one if left == 1 else spec.many}"
+        rest = f"{what_left} {'is' if left == 1 else 'are'} listed below."
         flash(request, f"{message} Undo is on the review screen. {rest}", undo=False)
         return RedirectResponse(f"/jobs/{job_id}/accept/{slug}?view={view}", status_code=303)
     flash(request, message, element_id=GROUP_FLASH + slug)

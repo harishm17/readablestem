@@ -166,6 +166,10 @@ def test_only_undecided_items_with_nothing_failed_are_candidates():
     # A single item is decided on its card: "Accept many figures (1)" is not offered.
     result.fix_for("p2-e12").status = Status.ACCEPTED
     assert {o.slug: o.count for o in bulk_accept.offers(result)} == {"equations": 2}
+    # A reading made again that passes every check keeps the band of the failure it replaced:
+    # a decision asked in band 1 to 3 is never accepted in bulk.
+    result.fix_for("p2-e7").band = 2
+    assert [f.element_id for f in bulk_accept.candidates(result, "equations")] == ["p1-e2"]
 
 
 def test_a_heading_group_or_kept_page_is_never_a_candidate():
@@ -203,6 +207,28 @@ def test_accepting_changes_only_the_listed_items_in_one_write_marked_bulk(scaled
     assert all(e.action == "accept" and e.before["status"] == "needs_review" for e in recorded)
     fixes = {f.element_id: f for f in stored(scaled).fixes}
     assert all(fixes[e].reviewed for e in EQUATION_CANDIDATES)
+
+
+def test_a_long_list_is_paged_and_the_button_accepts_the_page_it_shows(scaled, monkeypatch):
+    monkeypatch.setattr(bulk_accept, "PAGE_SIZE", 1)
+    shown = re.findall(r'name="ids" value="([^"]+)"', confirm_page(scaled, "equations").text)
+    assert shown == ["p1-e2"]  # the first page; the other candidate is on page 2
+    assert "page=2" in confirm_page(scaled, "equations").text
+    # Whatever the form says, only what is a candidate and was listed is accepted.
+    response = accept(scaled, "equations", ids=["p1-e2", "p2-e8"])
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/jobs/{scaled.job_id}/accept/equations")
+    after = statuses(scaled)
+    assert (after["p1-e2"], after["p2-e7"], after["p2-e8"]) == (
+        "accepted",
+        "needs_review",
+        "needs_review",
+    )
+    # What is left comes up as the first page; a form with no list accepts every candidate.
+    shown = re.findall(r'name="ids" value="([^"]+)"', confirm_page(scaled, "equations").text)
+    assert shown == ["p2-e7"]
+    assert accept(scaled, "equations").status_code == 303
+    assert statuses(scaled)["p2-e7"] == "accepted"
 
 
 def test_undo_takes_the_whole_action_back_as_one_step(scaled):
