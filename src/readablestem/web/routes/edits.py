@@ -552,7 +552,7 @@ def _read_new_equation(
     page_edits.insert_element(probe, element.model_copy())
     placed = sorted(probe.elements, key=lambda e: e.order)
     context = pipeline_run.context_texts(placed).get(element_id)
-    return read_equation(request, job, user.id, element, png, context)
+    return read_equation(request, job, user.id, element, png, context)[0]
 
 
 # --------------------------------------------------------------------------- an equation's card
@@ -640,7 +640,9 @@ def read_again(
     placed = sorted(result.elements, key=lambda e: e.order)
     context = pipeline_run.context_texts(placed).get(element_id)
     try:
-        read = read_equation(request, job, user.id, reading, bytes(png), context, escalate=True)
+        read, asked = read_equation(
+            request, job, user.id, reading, bytes(png), context, escalate=True
+        )
     except ReadRefused as exc:
         return _item_refusal(request, job_id, user, view, element_id, exc.message)
     if is_empty(read):
@@ -651,7 +653,7 @@ def read_again(
             job_id,
             user,
             version,
-            lambda stored, job, session: page_edits.read_again(stored, reading, read),
+            lambda stored, job, session: page_edits.read_again(stored, reading, read, fresh=asked),
             decision=False,
         )
     except ReviewStale:
@@ -875,7 +877,7 @@ def read_cell(
     try:
         with page_images.render_slot(user.id):
             png = render_region_crop(_upload(request, job_id, user), element.page, box)
-        read = read_equation(request, job, user.id, reading, png, element.caption)
+        read, _ = read_equation(request, job, user.id, reading, png, element.caption)
     except page_images.RenderFailed:
         return refuse("The page could not be read just now. Try again in a moment.")
     except ReadRefused as exc:

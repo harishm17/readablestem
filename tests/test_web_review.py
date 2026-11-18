@@ -794,12 +794,23 @@ def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(w
     description and Not an equation. Each stores its own decision, the rendered output says
     the same, and Undo puts the stored result back as it was."""
     from readablestem.models.fake import FakeVisionClient
+    from readablestem.web import page_edits
 
     _give_text(web, "p1-e5", "x = 1")
-    web.ctx.client_factory = lambda settings, budget: FakeVisionClient(
-        budget=budget,
-        defaults={"equation": {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}},
-    )
+    clients: list[FakeVisionClient] = []
+
+    def model(settings, budget) -> FakeVisionClient:
+        clients.append(
+            FakeVisionClient(
+                budget=budget,
+                defaults={
+                    "equation": {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
+                },
+            )
+        )
+        return clients[-1]
+
+    web.ctx.client_factory = model
 
     def held() -> dict:
         """What the review decides: the elements and their fixes, as stored."""
@@ -818,6 +829,14 @@ def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(w
     assert read is not None and read.pending and read.equation is not None
     assert read.equation.latex == "x^2 + 1"
     assert held()["elements"] == before["elements"]
+    assert _undo(web).status_code == 303
+    assert held() == before
+    # Asked for again, the record answers: no second call, and the page does not say the
+    # picture was read anew.
+    assert post(web, "p1-e5", action="reread").status_code == 303
+    assert sum(len(c.requests) for c in clients) == 1
+    said = unescape(review_page(web))
+    assert page_edits.READ_BEFORE in said and page_edits.READ_AGAIN not in said
     assert _undo(web).status_code == 303
     assert held() == before
 

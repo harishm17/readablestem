@@ -767,14 +767,27 @@ NOT_AN_EQUATION_IN_TABLE = (
 NOT_AN_EQUATION_WHERE = "The text this belongs to is not there any more."
 
 
-def read_again(result: DocumentResult, element: Element, read: Fix) -> StructureChange:
+READ_AGAIN = "The tool read it again. Check what it read."
+# The same picture, the same question: the record answered and the model was not asked.
+READ_BEFORE = (
+    "The tool has already read this picture a second time, and this is the reading it gave. "
+    "It was not asked again and nothing was counted. If the reading is wrong, edit the LaTeX "
+    "or keep the equation as an image."
+)
+
+
+def read_again(
+    result: DocumentResult, element: Element, read: Fix, *, fresh: bool = True
+) -> StructureChange:
     """Replace the proposal of an equation that waits with `read`, a new reading of the same
     picture (`web.reread`, made with no lock held), on the same item. The item keeps its id,
     its place and its crop; whatever the step made, the reviewer decides it (as for an
     equation added by hand: the tool read it a second time because a person asked, so
     its answer is checked), and Undo puts the earlier reading back, as a whole.
     `element` is the element as the read left it (a number printed beside the formula, read
-    out of its LaTeX, is kept). Raises LookupError for an item that is not a waiting equation."""
+    out of its LaTeX, is kept). `fresh` False: the reading is the one the model gave the last
+    time this picture was asked about (`web.reread`), and the notice says so instead of saying
+    the picture was read again. Raises LookupError for an item that is not a waiting equation."""
     fix = result.fix_for(element.id)
     if fix is None or fix.kind is not Kind.EQUATION or not fix.pending:
         raise LookupError(element.id)
@@ -797,7 +810,7 @@ def read_again(result: DocumentResult, element: Element, read: Fix) -> Structure
         action="read_again",
         before={STRUCTURE_KEY: before},
         after={STRUCTURE_KEY: capture(result, elements=[element.id], fixes=[element.id])},
-        message="The tool read it again. Check what it read.",
+        message=READ_AGAIN if fresh else READ_BEFORE,
         shows=element.id,
         page=element.page,
     )

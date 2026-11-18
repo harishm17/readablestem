@@ -299,11 +299,13 @@ def read_equation(
     context_text: str | None = None,
     *,
     escalate: bool = False,
-) -> Fix:
+) -> tuple[Fix, bool]:
     """Read the crop `png` of `element` (an equation) with the equation step. Returns its
-    fix (possibly FAILED or ABSTAINED: the reviewer decides). The read counts against the job's
-    owner (the day's allowance, spend pool and caps), whoever asked; `user_id` is who is
-    waiting for it, so one person has one read going at a time. A read that returns no
+    fix (possibly FAILED or ABSTAINED: the reviewer decides) and whether the model was asked
+    (False: the record answered, so the page must not say it was read anew). The read counts
+    against the job's owner (the day's allowance, spend pool and caps), whoever asked;
+    `user_id` is who is waiting for it, so one person has one read going at a time. A read
+    that returns no
     equation, or is stopped by a cap or the model's availability, is given back against the
     day's allowance. Raises ReadRefused when a cap or the model's availability stopped it.
     The caller holds no database lock.
@@ -369,7 +371,7 @@ def read_equation(
         cost=round(fix.cost_usd, 4) if asked else 0.0,
         asked=asked,
     )
-    return fix
+    return fix, asked
 
 
 def _asked_cheaper(fix: Fix, main_model: str) -> bool:
