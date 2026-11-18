@@ -151,6 +151,18 @@
   names what restarts the delete clock and the steps that write a temporary copy.
 - No stored documents, recordings, hashes or costs change. No `PIPELINE_VERSION` or
   `RENDER_VERSION` bump and no migration.
+## Unreleased: ReadableSTEM on olmOCR-Bench at $0 (branch feat/public-parsing-benchmark)
+
+- A27 (F-403): `readablestem eval parsing-bench` fetches olmOCR-Bench (pinned revision, ODC-BY)
+  outside the repository, converts its one-page PDFs through the product's own path with a
+  client that refuses every model request, turns the student page into markdown
+  (`eval/olmocr_bench.py`) and scores five categories with the benchmark's own checker
+  (`proof/parsers/runners/olmocr_check.py`, in a separate environment). Scans, equations and
+  pictured text are dropped or reported as not run, with counts. First run, pipeline 0.5.11:
+  order 68.8, headers and footers 32.5, long tiny text 37.3 (n 83), tables 51.8, baseline 99.0.
+  The record is `data/eval/parsing-bench-olmocr.json`; the failures by cause are in
+  `docs/eval-parsing-benchmark.md`.
+- Eval only: no change to what a document is converted to, so no `PIPELINE_VERSION` bump.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

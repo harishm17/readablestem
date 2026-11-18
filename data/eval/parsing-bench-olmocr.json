@@ -1,0 +1,230 @@
+{
+ "set": "olmocr-bench",
+ "split": {
+  "name": "development",
+  "seed": "olmocr-bench",
+  "set_sha256": "73e00cd7d7412225ed6199c427ef279a121ef22de1c807c223a2183b50579926",
+  "documents": 747
+ },
+ "client": "none",
+ "profile": {
+  "name": "production",
+  "sha256": "213535ac0803b65f153e0c81abfef42b3c9e26cdf742fe7299335b6eb7c7998c",
+  "confirmed": false,
+  "differs": [],
+  "counted_off": [
+   "FEATURE_LATEX_SOURCE",
+   "OFFICE_INPUT_ENABLED"
+  ]
+ },
+ "pipeline_version": "0.5.11",
+ "commit": "f559fb0ab629e8397adcec1a43561e2c3b433871",
+ "machine": {
+  "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+  "cores": 16
+ },
+ "not_finished": [],
+ "benchmark": {
+  "dataset": "allenai/olmOCR-bench",
+  "revision": "54a96a6fb6a2bd3b297e59869491db4d3625b711",
+  "license": "ODC-BY",
+  "checker": "olmocr==0.4.27",
+  "page": "olmOCR-Bench, Allen Institute for AI; fetched outside the repository"
+ },
+ "model_calls": 0,
+ "usd": 0.0,
+ "run": {
+  "pages": 747,
+  "scans": 161,
+  "refused": {},
+  "page_types": {
+   "scan_ocr": 72,
+   "scan_no_text": 60,
+   "born_digital": 601,
+   "vector_no_text": 4,
+   "mixed_ink": 5,
+   "mixed_hidden_text": 3,
+   "blank": 2
+  },
+  "kinds": {
+   "scan": 157,
+   "table": 145,
+   "figure": 204,
+   "typical": 183,
+   "dense_math": 54,
+   "slide": 4
+  },
+  "pages_that_asked_a_model": 603,
+  "requests_refused_by_step": {
+   "equation": 3038,
+   "figure": 1266,
+   "image_page": 132,
+   "table": 434
+  },
+  "stopped_early": 0,
+  "seconds_median": 3.59
+ },
+ "metrics": {
+  "multi_column": {
+   "checks": 884,
+   "run": 705,
+   "passed": 485,
+   "score": 68.8,
+   "score_if_dropped_failed": 54.9,
+   "dropped": {
+    "scan read from its picture (an OCR layer, if any, is not used)": 136,
+    "scan with no text layer": 43
+   },
+   "run_no_request": 204,
+   "score_no_request": 77.0,
+   "pdfs": 231,
+   "pdfs_run": 185,
+   "column": "MultCol"
+  },
+  "headers_footers": {
+   "checks": 753,
+   "run": 636,
+   "passed": 207,
+   "score": 32.5,
+   "score_if_dropped_failed": 27.5,
+   "dropped": {
+    "scan read from its picture (an OCR layer, if any, is not used)": 82,
+    "scan with no text layer": 35
+   },
+   "run_no_request": 206,
+   "score_no_request": 21.8,
+   "pdfs": 266,
+   "pdfs_run": 228,
+   "column": "Hdr/Ftr"
+  },
+  "long_tiny_text": {
+   "checks": 442,
+   "run": 83,
+   "passed": 31,
+   "score": 37.3,
+   "score_if_dropped_failed": 7.0,
+   "dropped": {
+    "scan read from its picture (an OCR layer, if any, is not used)": 179,
+    "scan with no text layer": 180
+   },
+   "run_no_request": 20,
+   "score_no_request": 100.0,
+   "pdfs": 62,
+   "pdfs_run": 13,
+   "column": "TinyTxt"
+  },
+  "table_tests": {
+   "checks": 1020,
+   "run": 857,
+   "passed": 444,
+   "score": 51.8,
+   "score_if_dropped_failed": 43.5,
+   "dropped": {
+    "scan read from its picture (an OCR layer, if any, is not used)": 89,
+    "scan with no text layer": 74
+   },
+   "run_no_request": 39,
+   "score_no_request": 0.0,
+   "pdfs": 188,
+   "pdfs_run": 160,
+   "column": "Tables"
+  },
+  "baseline": {
+   "checks": 747,
+   "run": 586,
+   "passed": 580,
+   "score": 99.0,
+   "score_if_dropped_failed": 77.6,
+   "dropped": {
+    "scan read from its picture (an OCR layer, if any, is not used)": 101,
+    "scan with no text layer": 60
+   },
+   "run_no_request": 142,
+   "score_no_request": 97.9,
+   "pdfs": 747,
+   "pdfs_run": 586,
+   "column": "Base"
+  }
+ },
+ "not_run": {
+  "arxiv_math": {
+   "pdfs": 522,
+   "checks": 2927,
+   "reason": "equations are read by a model in the product",
+   "column": "ArXiv"
+  },
+  "old_scans_math": {
+   "pdfs": 36,
+   "checks": 458,
+   "reason": "equations are read by a model in the product",
+   "column": "OldMath"
+  },
+  "old_scans": {
+   "pdfs": 98,
+   "checks": 526,
+   "reason": "scans have no text layer; a model reads their picture",
+   "column": "OldScan"
+  }
+ },
+ "published": {
+  "source": "README of the fetched revision, percent; a tool's row is its own full run",
+  "rows": {
+   "GOT OCR": {
+    "MultCol": 42.0,
+    "Hdr/Ftr": 93.6,
+    "TinyTxt": 29.9,
+    "Tables": 0.2,
+    "Base": 94.0
+   },
+   "Marker v1.6.2": {
+    "MultCol": 71.0,
+    "Hdr/Ftr": 87.1,
+    "TinyTxt": 76.9,
+    "Tables": 69.8,
+    "Base": 99.5
+   },
+   "MinerU v1.3.10": {
+    "MultCol": 59.0,
+    "Hdr/Ftr": 96.6,
+    "TinyTxt": 39.1,
+    "Tables": 60.9,
+    "Base": 96.6
+   },
+   "Mistral OCR API": {
+    "MultCol": 71.3,
+    "Hdr/Ftr": 93.6,
+    "TinyTxt": 77.1,
+    "Tables": 60.6,
+    "Base": 99.4
+   },
+   "GPT-4o (Anchored)": {
+    "MultCol": 69.3,
+    "Hdr/Ftr": 93.8,
+    "TinyTxt": 60.6,
+    "Tables": 70.0,
+    "Base": 96.8
+   },
+   "Gemini Flash 2 (Anchored)": {
+    "MultCol": 61.5,
+    "Hdr/Ftr": 64.7,
+    "TinyTxt": 71.5,
+    "Tables": 72.1,
+    "Base": 95.6
+   },
+   "Qwen 2.5 VL (No Anchor)": {
+    "MultCol": 68.3,
+    "Hdr/Ftr": 73.6,
+    "TinyTxt": 49.1,
+    "Tables": 67.3,
+    "Base": 98.3
+   },
+   "olmOCR (Anchored)": {
+    "MultCol": 79.4,
+    "Hdr/Ftr": 93.4,
+    "TinyTxt": 81.7,
+    "Tables": 70.2,
+    "Base": 99.0
+   }
+  }
+ }
+}
