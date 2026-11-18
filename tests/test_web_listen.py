@@ -241,6 +241,25 @@ def test_page_breaks_definitions_code_and_ordered_lists():
     assert next(i for i in items if i.text == "b" or i.say == "b").role == "List item 2 of 2"
 
 
+def test_every_item_has_an_id_from_its_element_that_is_stable_and_unique():
+    html = doc(
+        '<main><h1 id="h1">Kinematics</h1><p>First</p><p>Second</p><p id="p9">Third</p>'
+        "<table><tr><th>a</th></tr><tr><td>1</td></tr><tr><td>2</td></tr></table>"
+        '<ul><li>one</li><li>two</li></ul><hr role="doc-pagebreak" aria-label="Page 2" id="pg2">'
+        "</main>"
+    )
+    first = listen.build_transcript(html)
+    refs = [i.ref for i in first]
+    assert all(refs) and len(set(refs)) == len(refs)
+    assert refs == [i.ref for i in listen.build_transcript(html)]
+    by_text = {i.text: i.ref for i in first}
+    assert by_text["Kinematics"] == "h1" and by_text["Third"] == "p9"
+    assert by_text["Page 2"] == "pg2"
+    # An element with no id is named by its place, so a new heading elsewhere leaves it be.
+    later = listen.build_transcript(html.replace("<h1", "<h2 id='new'>New</h2><h1"))
+    assert {i.text: i.ref for i in later}["Second"] == by_text["Second"]
+
+
 def test_very_long_transcripts_stop_with_a_note():
     body = "".join(f"<p>p{n}</p>" for n in range(listen.MAX_ITEMS + 50))
     items = listen.build_transcript(doc(f"<main>{body}</main>"))

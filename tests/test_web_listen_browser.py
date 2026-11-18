@@ -34,7 +34,8 @@ HTML = as_current(
     '<math id="p1-e2"><mi>v</mi><mo>=</mo><mi>d</mi><mo>/</mo><mi>t</mi></math>.</p>'
     "<h2>Average speed</h2><p>It is distance over time.</p>"
     '<div class="equation" id="p1-e3"><math display="block"><mi>x</mi><mo>+</mo><mn>1</mn>'
-    "</math></div><ul><li>one</li><li>two</li></ul></main></body></html>"
+    "</math></div><ul><li>one</li><li>two</li></ul>"
+    '<hr role="doc-pagebreak" aria-label="Page 2" id="pg2"></main></body></html>'
 )
 
 # A speech engine that records what it is asked to say. `voices` is set per test; an
@@ -186,10 +187,16 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     page.get_by_role("button", name="Next equation").click()
     assert spoken(page)[-1] == "Equation: x plus 1"
 
-    stop.click()
+    where = current(page)
+    stop.click()  # Stop keeps the place; Play says where it will start and starts there
     assert status(page) == "Stopped."
-    assert page.locator(".listen-item.is-current").count() == 0
-    assert stop.is_disabled() and play.is_enabled() and play.inner_text() == "Play"
+    assert current(page) == where and stop.is_disabled() and play.is_enabled()
+    assert play.inner_text() == "Resume from item 8 of 12"
+    play.click()
+    assert spoken(page)[-1] == "Equation: x plus 1"
+    stop.click()
+    page.get_by_role("button", name="Play from the beginning").click()  # the restart
+    assert spoken(page)[-1] == "Page title: Kinematics notes"
     context.close()
 
 
@@ -211,8 +218,13 @@ def test_keyboard_shortcuts_work_inside_the_page_and_ignore_modifiers(site, brow
     page.keyboard.press("s")
     assert status(page) == "Stopped."
     page.get_by_label("Speed").focus()
+    place = current(page)
     page.keyboard.press("h")  # in a menu the letter selects, it is not a command
-    assert page.locator(".listen-item.is-current").count() == 0
+    assert current(page) == place
+    page.get_by_label("Keyboard shortcuts").uncheck()
+    page.locator("[data-listen=play]").focus()
+    page.keyboard.press("h")  # switched off: the letter does nothing
+    assert current(page) == place
     context.close()
 
 
@@ -229,6 +241,77 @@ def test_a_screen_reader_user_is_not_interrupted(site, browser, job):
     page.evaluate("window.__end()")
     assert page.evaluate("document.activeElement.textContent.trim()") == "Pause"  # focus stayed
     assert status(page) == "Playing."  # not "Item 2 of ...": the voice says the item
+    context.close()
+
+
+def test_the_place_and_settings_come_back_and_hold_no_text(site, browser, job):
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
+    page.get_by_label("Speed").select_option("1.5")
+    page.get_by_label("Voice").select_option("cloud")
+    # A click on an item and a Pages link in the index each set the place; nothing is spoken.
+    page.locator("#item-9").click()
+    assert "Item 9 of 12" in page.locator("[data-listen-position]").inner_text()
+    page.locator(".listen-index").evaluate("d => d.open = true")
+    page.get_by_role("link", name="Page 2").click()
+    assert current(page).startswith("Page break")
+    assert spoken(page) == []
+    page.reload()  # a return visit offers the place and plays from it, with speed and voice kept
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    play = page.locator("[data-listen=play]")
+    assert play.inner_text() == "Resume from item 12 of 12"
+    assert page.get_by_label("Speed").input_value() == "1.5"
+    play.click()
+    assert page.evaluate("window.__spoken[0].voice") == "Cloud Voice"
+    assert page.evaluate("window.__spoken[0].rate") == 1.5
+    assert spoken(page)[0].startswith("Page break")
+    stored = page.evaluate("JSON.stringify(Object.assign({}, localStorage))")
+    for word in ("Kinematics", "speed", "distance", "Average", "equals"):
+        assert word not in stored  # ids and settings only, never the document's words
+
+    # A place whose id is gone (the document changed) falls back to the nearest earlier item
+    # that still exists, and a document with no place at all starts at the lesson.
+    key = page.evaluate(
+        "Object.keys(localStorage).find(k => k.includes(':') && !k.endsWith('places'))"
+    )
+    page.evaluate(
+        "([k, v]) => localStorage.setItem(k, v)",
+        [key, '{"at": "gone", "back": ["gone2", "p1-e3"]}'],
+    )
+    page.reload()
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    assert page.locator("[data-listen=play]").inner_text() == "Resume from item 8 of 12"
+    # Places of other documents do not pile up: twenty are kept, the oldest dropped.
+    page.evaluate(
+        """() => {
+          const keys = [];
+          for (let n = 0; n < 25; n += 1) {
+            keys.push('readablestem.listen:doc' + n + ':1');
+            localStorage.setItem(keys[n], '{"at": "x"}');
+          }
+          localStorage.setItem('readablestem.listen:places', JSON.stringify({keys}));
+        }"""
+    )
+    page.locator("#item-9").click()
+    kept = page.evaluate("Object.keys(localStorage).filter(k => k.includes('doc'))")
+    assert len(kept) == 19 and "readablestem.listen:doc0:1" not in kept
+    page.evaluate("localStorage.clear()")
+    page.reload()
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    assert page.locator("[data-listen=play]").inner_text() == "Play"
+    context.close()
+
+
+def test_a_browser_that_blocks_storage_still_plays(site, browser, job):
+    blocked = (
+        "Object.defineProperty(window, 'localStorage', "
+        "{get() { throw new Error('blocked'); }, configurable: true});\n"
+    )
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=blocked + STUB)
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.locator("[data-listen=play]").click()
+    assert spoken(page) == ["Main landmark"]
     context.close()
 
 

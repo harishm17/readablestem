@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: Listen keeps its place (branch feat/listen-keeps-its-place)
+
+- SW49 (F-459, F-460, F-119): Listen remembers where the reader was. Every transcript item has
+  a stable id from its element; the player keeps one state object and saves the place, speed,
+  voice name, Follow along and Keyboard shortcuts in the browser (ids and settings only, 20
+  documents at most, nothing saved when storage is blocked). Play says "Resume from item 47 of
+  520"; Stop keeps the place; "Play from the beginning" restarts. A click on an item or an index
+  link sets the place, and the index has a Pages group. The lesson's first item is marked by the
+  page, not found by its label words. No model call, no stored-data change, no migration, no
+  version bump.
+
 ## Unreleased: the accept-many count and the review fields (branch feat/review-identical-and-counts)
 
 - WS8.1 (identical items decided as one write) is not built: the tracked fixtures hold no
