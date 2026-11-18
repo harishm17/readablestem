@@ -76,7 +76,8 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import contrast, language, layout, page_type
 from readablestem.pipeline import notices as notice_rules
-from readablestem.pipeline.layout import Glyph, Strike
+from readablestem.pipeline.baseline_rules import STRIKE_X_SLACK, Ink, classify
+from readablestem.pipeline.layout import FormField, Glyph, Strike
 
 log = logging.getLogger(__name__)
 
@@ -90,16 +91,6 @@ BOX_SLACK = 1.5  # pt: a glyph belongs to an element when its centre is this clo
 TARGET_SLACK = 2.0  # pt: a destination point this close to an element's box is on it
 TARGET_X_SLACK = 6.0  # pt: ... and this close in x is in its column
 MAX_ALIGN_CHARS = 20_000  # longer texts are not aligned (cost; no real paragraph is this long)
-
-# Struck text (`struck_glyphs`): a line crosses a glyph where a strikeout does, between these
-# shares of the glyph's height measured up from its foot (an underline is under the foot,
-# an overline over the top), and it is no thicker than this share of the text's size (a
-# filled bar behind text, a highlight, is not a line through it). Most glyphs the line spans
-# in its row must be crossed so: a line that only touches one tall glyph is not a strike.
-STRIKE_LOW, STRIKE_HIGH = 0.25, 0.65
-STRIKE_MAX_SIZE_SHARE = 0.12
-STRIKE_MIN_CROSSED = 0.5
-STRIKE_X_SLACK = 0.5  # pt: a glyph whose middle is this close to a line's end is under it
 
 # Link text that says nothing on its own (WCAG 2.4.4), compared case-folded with the
 # punctuation around it removed; and a bare URL longer than `LONG_URL_CHARS` as the whole
@@ -184,6 +175,9 @@ class PdfText:
     annotations: int = 0  # link annotations of any kind on the analysed pages
     # Per page, the marks that may strike text through (`layout.page_strikes`).
     strikes: dict[int, list[Strike]] = field(default_factory=dict)
+    # Per page, its fillable fields (`layout.take_form_fields`): the notice, and the value of a
+    # filled field as the run that says it is one.
+    fields: dict[int, list[FormField]] = field(default_factory=dict)
 
 
 def _catalog_lang(doc: pymupdf.Document) -> str | None:
@@ -254,6 +248,9 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
                 in_doc = {p for p in wanted if 0 <= p < doc.page_count}
                 for number in sorted(in_doc):
                     page_type.turn_page(doc[number])  # layout's display frame
+                    fields = layout.take_form_fields(doc[number])  # before the glyphs are read
+                    if fields:
+                        found.fields[number] = fields
                     annotations = doc[number].get_links()
                     found.annotations += len(annotations)
                     links = _pdf_links(doc, number, annotations, in_doc)
@@ -777,51 +774,60 @@ def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> li
 # ============================================================================ struck text
 
 
-def _middle_y(glyph: Glyph) -> float:
-    return (glyph.bbox[1] + glyph.bbox[3]) / 2
-
-
-def _size(glyph: Glyph) -> float:
-    """The glyph's text size: its span's font size, else the height of its box."""
-    return glyph.size or (glyph.bbox[3] - glyph.bbox[1])
-
-
 def struck_glyphs(glyphs: Sequence[Glyph], strikes: Iterable[Strike]) -> set[int]:
     """Indexes into `glyphs` of the glyphs struck through.
 
     A StrikeOut annotation strikes every glyph whose middle is inside it. A drawn line
-    strikes the glyphs of one row when it crosses most of the glyphs it spans there
-    (`STRIKE_MIN_CROSSED`) between `STRIKE_LOW` and `STRIKE_HIGH` of their height, and is no
-    thicker than `STRIKE_MAX_SIZE_SHARE` of their size; then every glyph of that row under
-    it is struck, a comma or a full stop as much as a letter. An underline, a rule under
-    blanks, an overline, a table rule between rows and a highlight behind text cross no
-    glyph so, and strike nothing."""
+    strikes what `baseline_rules.classify` says it strikes: the glyphs of one row it
+    crosses through the middle. An underline, a rule under blanks, an overline, a table rule
+    between rows and a highlight behind text cross no glyph so, and strike nothing."""
     struck: set[int] = set()
+    ink: list[Ink] | None = None
     for strike in strikes:
-        x0, y0, x1, y1 = strike.bbox
-        under = [
-            i
-            for i, g in enumerate(glyphs)
-            if x0 - STRIKE_X_SLACK <= (g.bbox[0] + g.bbox[2]) / 2 <= x1 + STRIKE_X_SLACK
-        ]
         if strike.annotation:
-            struck.update(i for i in under if _centre_in(glyphs[i].bbox, strike.bbox, 0.0))
+            x0, x1 = strike.bbox[0], strike.bbox[2]
+            struck.update(
+                i
+                for i, g in enumerate(glyphs)
+                if x0 - STRIKE_X_SLACK <= (g.bbox[0] + g.bbox[2]) / 2 <= x1 + STRIKE_X_SLACK
+                and _centre_in(g.bbox, strike.bbox, 0.0)
+            )
             continue
-        y, thickness = (y0 + y1) / 2, y1 - y0
-        touched = [i for i in under if glyphs[i].bbox[1] <= y <= glyphs[i].bbox[3]]
-        crossed = []
-        for i in touched:
-            top, foot = glyphs[i].bbox[1], glyphs[i].bbox[3]
-            if foot - top <= 0 or thickness > STRIKE_MAX_SIZE_SHARE * _size(glyphs[i]):
-                continue
-            if STRIKE_LOW <= (foot - y) / (foot - top) <= STRIKE_HIGH:
-                crossed.append(i)
-        if not crossed or len(crossed) < STRIKE_MIN_CROSSED * len(touched):
-            continue
-        top = min(glyphs[i].bbox[1] for i in crossed)
-        foot = max(glyphs[i].bbox[3] for i in crossed)
-        struck.update(i for i in under if top <= _middle_y(glyphs[i]) <= foot)
+        if ink is None:
+            ink = [Ink(g.bbox, g.size, g.baseline) for g in glyphs]
+        verdict = classify(strike.bbox, ink)
+        if verdict.kind == "strike":
+            struck.update(verdict.ink)
     return struck
+
+
+# A blank typed as underscores (three or more, the way a drawn blank is written into the text
+# by `layout._mark_blanks`) and a printed checkbox: ballot box, with check, with X.
+TOKEN_RE = re.compile(r"_{3,}|[\u2610\u2611\u2612]")
+
+
+def token_runs(element: Element, fields: Sequence[FormField] = ()) -> list[Run]:
+    """The element's blanks and printed checkboxes as runs (SW36), found in its text. The
+    drawn blanks and the empty fields are in the text already, as underscores, and a field's
+    box as a ballot box. No flag and no glyphs: what the text says is what the runs mark, so
+    a reviewer's retyped text gets the same. The value of a filled field (`fields`, SW39) is
+    a blank too: the first place in the element, under the field, where its text stands."""
+    text = element.text or ""
+    if not text or any(r.kind in ("blank", "checkbox") for r in element.runs):
+        return []
+    found = [
+        Run(start=m.start(), end=m.end(), kind="checkbox" if m.group()[0] != "_" else "blank")
+        for m in TOKEN_RE.finditer(text)
+    ]
+    for f in fields:
+        if not f.value or not _overlaps(f.box, element.bbox, BOX_SLACK):
+            continue
+        at = text.find(f.value)
+        while at >= 0 and any(r.start < at + len(f.value) and at < r.end for r in found):
+            at = text.find(f.value, at + 1)
+        if at >= 0:
+            found.append(Run(start=at, end=at + len(f.value), kind="blank"))
+    return sorted(found, key=lambda r: (r.start, r.end))
 
 
 def deleted_runs(element: Element, aligner: _Aligner, strikes: Sequence[Strike]) -> list[Run]:
@@ -908,7 +914,9 @@ class TextPassResult:
             "crossrefs": sum(1 for k in links if k.kind == "crossref"),
             "colour_runs": sum(len(e.colour_runs) for e in self.elements),
             "deleted_runs": self.deleted_runs,
-            "deleted_runs_written": sum(len(e.runs) for e in self.elements),
+            "deleted_runs_written": sum(r.kind == "deleted" for e in self.elements for r in e.runs),
+            "blanks": sum(r.kind == "blank" for e in self.elements for r in e.runs),
+            "checkboxes": sum(r.kind == "checkbox" for e in self.elements for r in e.runs),
             "passages": sum(1 for e in self.elements if e.lang),
             "notices": len(self.notices),
         }
@@ -969,8 +977,11 @@ def annotate(
             update["links"] = links[element.id]
         if element.id in coloured:
             update["colour_runs"] = coloured[element.id]
-        if runs and element.id in struck:
-            update["runs"] = [*element.runs, *struck[element.id]]
+        marked = [*(struck[element.id] if runs and element.id in struck else [])]
+        if element.kind in LINK_KINDS:
+            marked += token_runs(element, pdf.fields.get(element.page, ()))
+        if marked:
+            update["runs"] = sorted([*element.runs, *marked], key=lambda r: (r.start, r.end))
         if langs.get(element.id):
             update["lang"] = langs[element.id]
         updated.append(element.model_copy(update=update) if update else element)
@@ -981,6 +992,8 @@ def annotate(
     if colour:
         notices.extend(_colour_reference_notices(updated, set(coloured)))
     notices.extend(notice_rules.from_runs(updated))
+    if form := sum(len(v) for v in pdf.fields.values()):
+        notices.append(Notice(code="form_fields", count=form, review="none"))
     notices.extend(lang_notices)
     found = sum(len(r) for r in struck.values())
     return TextPassResult(

@@ -497,6 +497,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "could not be kept and is written on the line, so check it reads right.",
     "struck_text": "Text struck through on the page is kept, shown struck through and read "
     "out as deleted: if students no longer need it, take it out with the page tools.",
+    "form_fields": "This PDF is a fillable form. Its fields are written out as text (a blank, a "
+    "box with its state, or the value filled in), and the converted file cannot be filled in: "
+    "keep the PDF for students who need to fill it in.",
     "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
     "item, so a screen reader reads them as one block: check that each option can be told from "
     "the next, and change the words if not.",

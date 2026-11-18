@@ -95,6 +95,16 @@ DELETED_CSS = (
     "del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;"
     " text-decoration-skip-ink: none; }\n"
 )
+# Blanks and printed checkboxes (`Element.runs`, kinds "blank" and "checkbox"; found by
+# `text_pass.token_runs`). The characters the page printed are kept, hidden from a screen
+# reader (`aria-hidden`), and the tool's own words stand in for them, visually hidden, so a
+# blank is heard as "blank" and a box as "Checkbox, not checked:" (SW36). A format that keeps
+# text but not the tags (Word) shows both, which still says what the line is.
+TOKEN_KINDS = ("blank", "checkbox")
+BLANK_WORDS = "blank"
+FILLED_WORDS = "blank, filled in: "  # a form field that has a value (SW39)
+CHECKBOX_WORDS = {"not checked": "Checkbox, not checked: ", "checked": "Checkbox, checked: "}
+CHECKED_BOXES = frozenset("\u2611\u2612")  # ballot box with check, ballot box with X
 # An element id a link may point at ("p3-e12"), as the assembler writes ids.
 LINK_TARGET = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
 
@@ -153,6 +163,7 @@ class _Segment:
     colour: tuple[int, int, int] | None
     script: str | None = None  # "sup" or "sub" when this piece is a raised or lowered run
     deleted: bool = False  # inside struck text
+    token: int | None = None  # index of the blank or checkbox run this piece is
 
 
 def render_inline_text(
@@ -183,6 +194,7 @@ def render_inline_text(
     runs: list[ColourRun] = []
     scripts: list[ScriptRun] = []
     struck: list[Run] = []
+    tokens: list[Run] = []
     if element is not None:
         found = inline.spans(element)
         scripts = _usable(found.scripts, text, markers)
@@ -193,9 +205,10 @@ def render_inline_text(
         if add_style is not None:
             runs = _usable(found.colours, text, markers)
         struck = _usable([r for r in found.runs if r.kind == "deleted"], text, markers)
-    if not links and not runs and not scripts and not struck:
+        tokens = _usable([r for r in found.runs if r.kind in TOKEN_KINDS], text, markers)
+    if not links and not runs and not scripts and not struck and not tokens:
         return _plain(text, placed)
-    segments = _segments(text, placed, [k for k, _ in links], runs, scripts, struck)
+    segments = _segments(text, placed, [k for k, _ in links], runs, scripts, struck, tokens)
     for rgb in sorted({s.colour for s in segments if s.colour is not None}):
         if add_style is not None:
             add_style(f"colour-{colour_class(rgb)}", colour_css(rgb))
@@ -203,7 +216,9 @@ def render_inline_text(
         add_style(STACK_CLASS, STACK_CSS)
     if add_style is not None and struck:
         add_style(DELETED_CLASS, DELETED_CSS)
-    return _write(text, segments, [href for _, href in links], [k for k, _ in links], link_attrs)
+    return _write(
+        text, segments, [href for _, href in links], [k for k, _ in links], link_attrs, tokens
+    )
 
 
 def _plain(text: str, placed: dict[int, tuple[int, str]]) -> str:
@@ -225,12 +240,13 @@ def _segments(
     runs: list[ColourRun],
     scripts: Sequence[ScriptRun] = (),
     struck: Sequence[Run] = (),
+    tokens: Sequence[Run] = (),
 ) -> list[_Segment]:
     """The text cut at every marker, link and run edge, each piece with what covers it."""
     cuts = {0, len(text)}
     for start, (end, _) in placed.items():
         cuts |= {start, end}
-    for span in (*links, *runs, *scripts, *struck):
+    for span in (*links, *runs, *scripts, *struck, *tokens):
         cuts |= {span.start, span.end}
     edges = sorted(cuts)
     segments = []
@@ -245,7 +261,15 @@ def _segments(
             (r.kind for r in scripts if r.start <= start and end <= r.end and maths is None), None
         )
         deleted = any(r.start <= start and end <= r.end for r in struck)
-        segments.append(_Segment(start, end, maths, link, colour, script, deleted))
+        token = next(
+            (
+                i
+                for i, r in enumerate(tokens)
+                if r.start <= start and end <= r.end and maths is None
+            ),
+            None,
+        )
+        segments.append(_Segment(start, end, maths, link, colour, script, deleted, token))
     return segments
 
 
@@ -254,14 +278,38 @@ def _stacked(segments: Sequence[_Segment]) -> bool:
     return any(a.script and b.script and a.script != b.script for a, b in pairwise(segments))
 
 
-def _inner(text: str, segments: Sequence[_Segment]) -> str:
+def _token(kind: str, shown: str) -> str:
+    """A blank or a checkbox as the page printed it, with the words that say it."""
+    if kind == "blank" and shown.strip("_"):  # a filled field: its value is what is said
+        return f'<span class="blank">{_hidden(FILLED_WORDS)}{escape_text(shown)}</span>'
+    if kind == "blank":
+        return (
+            f'<span class="blank">{_hidden(BLANK_WORDS)}'
+            f'<span aria-hidden="true">{escape_text(shown)}</span></span>'
+        )
+    state = "checked" if shown in CHECKED_BOXES else "not checked"
+    return (
+        f'<span class="checkbox">{_hidden(CHECKBOX_WORDS[state])}'
+        f'<span aria-hidden="true">{escape_text(shown)}</span></span>'
+    )
+
+
+def _inner(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) -> str:
     """The pieces as HTML: maths as written, raised and lowered runs in `<sup>` and `<sub>`
-    (a pair side by side in one stacked span), the rest escaped."""
+    (a pair side by side in one stacked span), blanks and checkboxes with their words, the
+    rest escaped."""
     out: list[str] = []
     i = 0
     while i < len(segments):
         seg = segments[i]
-        if seg.maths:
+        if seg.token is not None:
+            j = i
+            while j + 1 < len(segments) and segments[j + 1].token == seg.token:
+                j += 1  # one run cut by a link or colour edge is written once
+            run = tokens[seg.token]
+            out.append(_token(run.kind, text[segments[i].start : segments[j].end]))
+            i = j
+        elif seg.maths:
             out.append(seg.maths)
         elif seg.script:
             tag = seg.script
@@ -286,7 +334,7 @@ def _hidden(words: str) -> str:
     return f'<span class="visually-hidden {AUTHORED_CLASS}">{words}</span>'
 
 
-def _struck(text: str, segments: Sequence[_Segment]) -> str:
+def _struck(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) -> str:
     """The pieces with each stretch of struck text as `<del>`, said as struck (`DELETED_*`)."""
     out: list[str] = []
     i = 0
@@ -294,7 +342,7 @@ def _struck(text: str, segments: Sequence[_Segment]) -> str:
         j = i
         while j < len(segments) and segments[j].deleted == segments[i].deleted:
             j += 1
-        inner = _coloured(text, segments[i:j])
+        inner = _coloured(text, segments[i:j], tokens)
         if segments[i].deleted:
             inner = f"{_hidden(DELETED_BEFORE)}<del>{inner}</del>{_hidden(DELETED_AFTER)}"
         out.append(inner)
@@ -302,14 +350,14 @@ def _struck(text: str, segments: Sequence[_Segment]) -> str:
     return "".join(out)
 
 
-def _coloured(text: str, segments: Sequence[_Segment]) -> str:
+def _coloured(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) -> str:
     out: list[str] = []
     i = 0
     while i < len(segments):
         j = i
         while j < len(segments) and segments[j].colour == segments[i].colour:
             j += 1
-        inner = _inner(text, segments[i:j])
+        inner = _inner(text, segments[i:j], tokens)
         rgb = segments[i].colour
         out.append(f'<span class="{colour_class(rgb)}">{inner}</span>' if rgb else inner)
         i = j
@@ -322,6 +370,7 @@ def _write(
     hrefs: list[str],
     links: Sequence[Link] = (),
     link_attrs: LinkAttrs | None = None,
+    tokens: Sequence[Run] = (),
 ) -> str:
     out: list[str] = []
     i = 0
@@ -329,7 +378,7 @@ def _write(
         j = i
         while j < len(segments) and segments[j].link == segments[i].link:
             j += 1
-        inner = _struck(text, segments[i:j])
+        inner = _struck(text, segments[i:j], tokens)
         link = segments[i].link
         shown = "".join(text[s.start : s.end] for s in segments[i:j])
         if link is not None and shown.strip():

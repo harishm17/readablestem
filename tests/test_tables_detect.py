@@ -134,6 +134,38 @@ def test_a_ruled_numeric_table_is_kept():
     assert judgement.columns == 3 and judgement.column_rules == 4
 
 
+def test_a_table_drawn_with_filled_border_boxes_is_a_table_and_a_chart_stays_a_figure():
+    # Word draws cell borders as thin filled rectangles, and a Word page paints them as one
+    # drawing: it was read as the bars of a chart (SW37).
+    def bordered(page):
+        shape = page.new_shape()
+        for r in range(5):
+            shape.draw_rect(pymupdf.Rect(100, 150 + 22 * r - 0.5, 340, 150 + 22 * r + 0.5))
+        for c in range(4):
+            shape.draw_rect(pymupdf.Rect(100 + 80 * c - 0.5, 150, 100 + 80 * c + 0.5, 238))
+        shape.finish(fill=(0, 0, 0), color=None)
+        shape.commit()
+        for r in range(4):
+            for c in range(3):
+                write(page, 106 + 80 * c, 165 + 22 * r, f"R{r}C{c} {r * 3 + c}")
+
+    def chart(page):
+        write(page, 72, 100, "Rainfall by month, in millimetres.")
+        for k, height in enumerate((40, 90, 65, 120)):
+            page.draw_rect(
+                pymupdf.Rect(120 + 50 * k, 400 - height, 150 + 50 * k, 400), fill=(0.2, 0.3, 0.8)
+            )
+        page.draw_line((110, 400), (330, 400), width=0.8)
+        page.draw_line((110, 270), (110, 400), width=0.8)
+
+    def kinds(fill):
+        return [e.kind for e in analyze(pdf(fill)).elements]
+
+    assert kinds(bordered).count(Kind.TABLE) == 1
+    assert Kind.FIGURE not in kinds(bordered)
+    assert Kind.FIGURE in kinds(chart) and Kind.TABLE not in kinds(chart)
+
+
 def test_an_unruled_aligned_grid_is_kept_on_text_alone():
     def fill(page):
         for r, row in enumerate(PENDULUM):

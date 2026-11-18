@@ -345,10 +345,13 @@ def _finish(
         element.page = 0
     # Struck text (`\\sout`) is written only with CONTENT_RUNS; off, it is counted, as the
     # PDF text pass counts it (`text_pass.apply`).
-    struck = sum(len(e.runs) for e in elements)
+    struck = sum(r.kind == "deleted" for e in elements for r in e.runs)
     with pipeline._span(tracer, "runs", deleted_runs=struck, written=options.content_runs):
-        if not options.content_runs:
-            elements = [e.model_copy(update={"runs": []}) if e.runs else e for e in elements]
+        if not options.content_runs and struck:
+            elements = [
+                e.model_copy(update={"runs": [r for r in e.runs if r.kind != "deleted"]})
+                for e in elements
+            ]
     page_list = [0]
     counts = Counter(e.kind.value for e in elements)
     pipeline._send(stage_progress, "layout", 1, 1, dict(counts))

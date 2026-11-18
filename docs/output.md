@@ -981,8 +981,9 @@ written in the body color, as in pipeline 0.3.0.
 
 Text whose look changes its meaning is kept as a run of the element's text
 (`Element.runs`, `core/types.Run`), offsets into the stored text like links and color
-runs. One kind exists so far: `deleted`, text struck through on the page ("The midterm is
-on ~~October 3~~ October 10"). Bold, italic and highlighted text are not runs yet; they are
+runs. Three kinds exist: `deleted`, text struck through on the page ("The midterm is
+on ~~October 3~~ October 10"), and `blank` and `checkbox`, a blank to fill in and a printed
+or form check box (below). Bold, italic and highlighted text are not runs yet; they are
 written as plain text.
 
 A struck run is kept, never removed, and written as `<del>` with the words said around it:
@@ -1031,6 +1032,29 @@ counted in the trace (`deleted_runs`, `deleted_runs_written: 0`) but not stored 
 and no notice is raised: the output is as before. A result without runs is stored and
 written byte for byte as before (the field is left out of the JSON when empty), and a
 result with runs loads in a release that does not know them, which writes the words plain.
+
+### Blanks, check boxes and form fields
+
+A blank (a drawn rule in a gap of a row, or three or more typed underscores), a printed check
+box (U+2610, U+2611, U+2612) and the fields of a fillable PDF are runs of kind `blank` and
+`checkbox` (docs/layout.md "Rules near a baseline, blanks, boxes and form fields"). The
+characters the page printed stay, hidden from a screen reader, and the tool's own words are
+said in their place, in the same visually hidden span as the struck text's:
+
+```html
+<p>Date: <span class="blank"><span class="visually-hidden readablestem">blank</span><span aria-hidden="true">_____</span></span></p>
+<p>I agree <span class="checkbox"><span class="visually-hidden readablestem">Checkbox, checked: </span><span aria-hidden="true">&#9745;</span></span></p>
+<p>Course: <span class="blank"><span class="visually-hidden readablestem">blank, filled in: </span>ENVS 101</span></p>
+```
+
+A reader hears "Date: blank", "I agree checkbox, checked:" and "Course: blank, filled in: ENVS
+101". The spans carry a class and no style, so the page's stylesheet is the same. Word has
+no hidden text a screen reader reads, so it holds both the words and the printed characters;
+Listen skips the `aria-hidden` characters and says the words; EPUB and Canvas are written from
+the same HTML. A document with a fillable form gets one notice, `form_fields` ("Not handled
+in this file", no page, the number of fields): the converted file cannot be filled in, so the
+instructor keeps the PDF for students who fill it in. There is no switch: what these runs
+mark is in the text, and a result without them is written as before.
 
 ## MathML is rebuilt, never pasted
 

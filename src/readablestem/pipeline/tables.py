@@ -251,10 +251,11 @@ _LEADERS = re.compile(r"(?:\.\s?){5,}|\u2026{2,}|(?:[\u00b7\u2219\u22c5]\s?){5,}
 # Spacing accents TeX and Word draw above a letter (as layout's _ACCENTS).
 _ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
 # Bullets that start a list item (as layout's _BULLET_GLYPHS; the private-use bullets of Symbol
-# and Wingdings arrive here already mapped, `font_codes`).
+# and Wingdings arrive here already mapped, `font_codes`), and the check boxes of a checklist
+# (U+2610 to U+2612, tokens of their own in the output, so they are not layout bullets).
 _BULLETS = frozenset(
     "\u2022\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u27a2\u25ba\u25b8\u25b6"
-    "\u25b9\u27a4\u25c6\u25c7"
+    "\u25b9\u27a4\u25c6\u25c7\u2610\u2611\u2612"
 )
 # Dots that are bullets when a space follows them (base-14 Helvetica prints U+2022 as
 # a middle dot); maths (a dot product) otherwise.
@@ -882,15 +883,18 @@ class _PageView:
                 pictures.append((x0, y0, x1, y1))
         view = cls(lines, hsegs, vsegs, curves, pictures, width, height)
         # A series of bars is one drawing of many rectangles: each counts, not their union.
-        # A rectangle as thin as a rule is a rule (cell borders drawn as filled boxes).
+        # A rectangle as thin as a rule is a rule wherever it is drawn, alone or one of many
+        # (cell borders drawn as filled boxes), not a bar.
         for p in paths:
             if p.kind != "shape" or not p.filled or p.curved:
                 continue
-            rects = getattr(p, "rects", ())
-            if rects:
-                view.fills += [r for r in rects if min(r[2] - r[0], r[3] - r[1]) > THIN_IMAGE]
-            else:
-                view.fills.append(p.bbox)
+            for x0, y0, x1, y1 in getattr(p, "rects", ()) or (p.bbox,):
+                if y1 - y0 <= THIN_IMAGE and x1 - x0 >= 3:
+                    view.hsegs.append((x0, x1, (y0 + y1) / 2))
+                elif x1 - x0 <= THIN_IMAGE and y1 - y0 >= 3:
+                    view.vsegs.append((y0, y1, (x0 + x1) / 2))
+                else:
+                    view.fills.append((x0, y0, x1, y1))
         sizes = [c.size for line in lines for c in line.chars if not c.blank and not line.vertical]
         if sizes:
             view.body_size = statistics.median(sizes)
