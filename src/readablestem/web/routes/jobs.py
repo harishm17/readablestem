@@ -67,6 +67,7 @@ from readablestem.web import combine as combine_rules
 from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
 from readablestem.web import outcome as outcome_words
+from readablestem.web import poll
 from readablestem.web import retry as retry_rules
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import as_utc, utc_today
@@ -695,11 +696,15 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
     converting. 204 (no swap) while nothing changed, so an open tab costs one small
     query every few seconds; when something did, the whole list, with a `<title>` that
     htmx moves into the tab title ("My documents (4 of 6 finished)")."""
+    course_id = course if JOB_ID.match(course) else None
+    if redirect := poll.fragment_or_redirect(
+        request, f"/courses/{course_id}" if course_id else "/app"
+    ):
+        return redirect
     ctx = get_ctx(request)
     spend_closed = conversions_closed(ctx, user) is not None
     now = utcnow()
     # The list of one course's documents (the course page, T3-4) polls with its own id.
-    course_id = course if JOB_ID.match(course) else None
     with session_scope(ctx.factory) as session:
         if v and v == documents.list_version(
             session, user.id, now=now, budget_closed=spend_closed, course_id=course_id
@@ -712,8 +717,7 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
         "documents": listing,
         "list_url": f"/app/documents?course={course_id}" if course_id else "/app/documents",
     }
-    if request.headers.get("HX-Request") == "true":
-        context["page_title"] = listing.page_title
+    context["page_title"] = listing.page_title  # htmx moves it into the tab title
     return render(request, "_documents.html", context)
 
 
@@ -1527,16 +1531,10 @@ def status_context(job: JobView) -> dict[str, Any]:
     }
 
 
-@router.get("/jobs/{job_id}")
-def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Response:
-    """Status page. Without JavaScript it reloads itself only if the user opted in
-    (`?auto=1`, offered in a <noscript> link); htmx polls otherwise.
-
-    `state` (`web.states`) is in the context: the status box, the tab title and the next
-    steps all print it.
-    """
-    job = load_job_status(request, job_id, user)
-    context = status_context(job) | {"auto_reload": auto == "1"}
+def job_page_context(request: Request, job_id: str, user: CurrentUser, job: JobView) -> dict[str, Any]:
+    """Everything the job page prints beyond the status box: the page itself, and the body a
+    finished job sends in place of the waiting one (`job_status`)."""
+    context = status_context(job)
     context["course"] = _job_course(request, job_id, user)  # notation memory
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
@@ -1547,6 +1545,19 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     context["keep_until"] = (
         retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
     )
+    return context
+
+
+@router.get("/jobs/{job_id}")
+def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Response:
+    """Status page. Without JavaScript it reloads itself only if the user opted in
+    (`?auto=1`, offered in a <noscript> link); htmx polls otherwise.
+
+    `state` (`web.states`) is in the context: the status box, the tab title and the next
+    steps all print it.
+    """
+    job = load_job_status(request, job_id, user)
+    context = job_page_context(request, job_id, user, job) | {"auto_reload": auto == "1"}
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
@@ -1554,21 +1565,27 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
 
 @router.get("/jobs/{job_id}/status")
 def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Response:
-    """Status fragment polled by htmx. 204 (no swap) while nothing changed.
+    """Status fragment polled by htmx (SW8). 204 (no swap) while nothing changed.
 
-    Once the job finishes, the fragment says so and links to the results instead of
-    reloading the page (HX-Refresh did that before): a reload nobody asked for sends a
-    screen reader back to the top of the page and loses the reader's place, while the
-    status region already announces the change and the link is one step away.
+    When the job has finished, the answer is the status box and, out of band, the heading
+    and `#job-body` of the finished page, so the waiting page becomes the finished one where
+    the person is reading: no reload, the focus stays where it was, and the live region
+    says the new state once. Without scripts the page's "Refresh the status" link reloads it.
     """
     job = load_job_status(request, job_id, user)
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
+        return redirect
     context = status_context(job)
     if v and v == context["status_version"]:
         return Response(status_code=204)
-    context["results_link"] = job.finished
-    if request.headers.get("HX-Request") == "true":
-        # htmx sets document.title from a top-level <title> in the fragment.
-        context["page_title"] = f"{context['state'].label}: {job.title}"
+    # htmx sets document.title from a top-level <title> in the fragment.
+    context["page_title"] = f"{context['state'].label}: {job.title}"
+    if job.finished:
+        context = job_page_context(request, job_id, user, job) | {
+            "page_title": context["page_title"],
+            "oob": True,
+            "finished_swap": True,
+        }
     return render(request, "_job_status.html", context)
 
 
@@ -1583,6 +1600,8 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     with session_scope(ctx.factory) as session:
         row = job_access(session, job_id, user, VIEW)
         job = job_view(session, row, role=shares.role_of(session, row, user) or VIEW)
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
+        return redirect
     if v and v == job.progress_version:
         return Response(status_code=204)
     return render(request, "_job_progress.html", {"job": job})

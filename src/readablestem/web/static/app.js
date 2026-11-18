@@ -428,6 +428,38 @@
   });
 })();
 
+/* "Last checked" (job.html, web/poll.py). A page that polls says when it last asked, whether
+ * or not the answer changed anything (a 204 changes nothing, on purpose: a screen reader is not
+ * interrupted). The line sits outside the live region, so it is never read out. It goes when the
+ * job has finished: the page is the finished one then.
+ */
+(function () {
+  "use strict";
+
+  var line = document.getElementById("last-checked");
+  if (!line) return;
+  var time = line.querySelector("[data-last-checked]");
+
+  function stamp() {
+    if (document.querySelector("#job-status[data-finished]")) {
+      line.hidden = true;
+      return;
+    }
+    time.textContent = new Date().toLocaleTimeString([], { timeStyle: "medium" });
+    line.hidden = false;
+  }
+
+  stamp();
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var elt = event.detail && event.detail.elt;
+    var trigger = elt && elt.getAttribute ? elt.getAttribute("hx-trigger") : "";
+    if (trigger && trigger.indexOf("every") === 0 && event.detail.successful) stamp();
+  });
+  document.addEventListener("htmx:afterSettle", function () {
+    if (document.querySelector("#job-status[data-finished]")) line.hidden = true;
+  });
+})();
+
 /* After a download (_after_download.html, web/feedback.py): the two optional questions
  * are in the page but hidden until the download link is used. Without JavaScript they
  * show on the next visit, and a link leads to them.

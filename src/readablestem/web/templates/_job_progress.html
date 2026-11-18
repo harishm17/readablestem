@@ -2,11 +2,12 @@
    against your PDF's text"), outside the live region so a screen reader is not told
    every element; anyone can read it when they want. Polled by htmx on its own (204 while
    unchanged); without JavaScript it is current whenever the page is loaded. #}
-<div id="job-progress"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/progress?v={{ job.progress_version }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+<div id="job-progress"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/progress?v={{ job.progress_version }}" hx-trigger="{{ poll_trigger }}" hx-swap="outerHTML"{% endif %}>
   {% if job.stage_lines %}
   <ol class="check-list" aria-label="Steps so far">
     {% for line in job.stage_lines %}
-    <li>{{ line.text }} <span class="meta">({{ "in progress" if line.state == "now" else "done" }})</span></li>
+    <li>{{ line.text }} <span class="meta">({{ "in progress" if line.state == "now" else "done" }})</span>
+      {% if line.state == "now" and line.total %}<br><progress max="{{ line.total }}" value="{{ line.done }}" aria-label="{{ line.text }}">{{ line.done }} of {{ line.total }}</progress>{% endif %}</li>
     {% endfor %}
   </ol>
   {% endif %}

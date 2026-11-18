@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 
-from readablestem.web import access, events, pending, ranges
+from readablestem.web import access, events, pending, poll, ranges
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import utc_today
 from readablestem.web.db import PendingUpload, session_scope, utcnow
@@ -194,6 +194,8 @@ def preview(request: Request, upload_id: str, user: UserDep, parts: str = "") ->
     """The parts as typed, with their page counts: what the chooser's preview swaps in while
     the person types (htmx). Only page numbers are sent; nothing is stored or logged."""
     context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000])
+    if redirect := poll.fragment_or_redirect(request, f"/uploads/{upload_id}"):  # after the owner check
+        return redirect
     return render(request, "_parts_preview.html", context | {"oob": True})
 
 

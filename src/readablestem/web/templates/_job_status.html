@@ -5,7 +5,7 @@
    the tab title follows the status ("Converting: notes.pdf") as the box does. #}
 {% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
-<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ state.key }}" data-title="{{ state.label }}: {{ job.title }}" data-summary="{{ state.label }}. {{ state.message }}"{% endif %}>
+<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="{{ poll_trigger }}" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ state.key }}" data-title="{{ state.label }}: {{ job.title }}" data-summary="{{ state.label }}. {{ state.message }}"{% endif %}>
   <p><span class="status-badge status-{{ state.badge }}">{{ state.label }}</span>
     {{ state.message }}</p>
   {# A stopped source: every file or command that stopped it, from LaTeX's own report
@@ -32,15 +32,17 @@
     may stop early with parts not converted. If it does, “Try again” converts them once the
     service is back; nothing is lost.</p>
   {% endif %}
-  {% if results_link|default(false) %}
-  {# Only in the polled fragment: the full page shows the results itself. From here the
-     first decision is one click away (MF17). #}
-  {% set review = state.primary if state.primary and state.primary.kind == "review" else none %}
-  <p>{% if review %}<a href="{{ review.href }}">Start the review</a> or {% endif %}<a href="/jobs/{{ job.id }}">{{ "show the results" if review else ("Show why it stopped" if state.stopped else "Show the results") }}</a></p>
-  {% endif %}
   {# Product analytics (web/analytics.py): the person has just seen the job finish. The
      loader sends it once per job in this browser. Counts and a status, nothing else. #}
   {% if analytics_on|default(false) and conversion_event|default(none) %}
   <span hidden data-ph-event="conversion_completed" data-ph-once="conv-{{ job.id }}" data-ph-props='{{ conversion_event|tojson }}'></span>
   {% endif %}
 </div>
+{% if finished_swap|default(false) %}
+{# The job has finished: the heading and the body of the finished page replace the waiting
+   ones (web/poll.py). Out of band, so the status box above is the only thing in the live region. #}
+{% include "_job_heading.html" %}
+<div id="job-body" hx-swap-oob="true">
+{% include "_job_body.html" %}
+</div>
+{% endif %}

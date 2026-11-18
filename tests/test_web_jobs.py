@@ -326,7 +326,7 @@ def test_a_poll_of_a_job_still_converting_does_not_read_its_stored_result(web, p
     engine = web.ctx.factory.kw["bind"]
     event.listen(engine, "before_cursor_execute", spy)
     try:
-        response = web.browser.get(f"/jobs/{job_id}/{poll}")
+        response = web.browser.get(f"/jobs/{job_id}/{poll}", headers={"HX-Request": "true"})
     finally:
         event.remove(engine, "before_cursor_execute", spy)
     assert response.status_code == 200

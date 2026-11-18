@@ -98,6 +98,9 @@ FOUND_KINDS = (
 class StageLine:
     text: str
     state: StageState
+    # The step's own counts, for the progress element (0 when the step has none to show).
+    done: int = 0
+    total: int = 0
 
 
 def _events(progress: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -171,7 +174,7 @@ def stage_lines(progress: dict[str, Any] | None) -> list[StageLine]:
         if event is not None and _count(event, "total"):
             done, total = _count(event, "done"), _count(event, "total")
             text = f"{stage.capitalize()}: {done} of {total} {verb}"
-            lines.append(StageLine(text, "done" if _finished(event) else "now"))
+            lines.append(StageLine(text, "done" if _finished(event) else "now", done, total))
     for stage, text in (
         ("assemble", "Building the HTML file"),
         ("checks", "Running the structure checks"),

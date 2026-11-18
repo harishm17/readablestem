@@ -42,7 +42,7 @@ from readablestem.observability.logging import configure_logging, request_loggin
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
 from readablestem.pipeline import checked_words
-from readablestem.web import analytics, dev_only, forms, output, seo
+from readablestem.web import analytics, dev_only, forms, output, poll, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -191,6 +191,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     env.filters["usd"] = _usd
     env.filters["speakable"] = _speakable
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)
+    env.globals["poll_trigger"] = poll.TRIGGER  # ty: ignore[invalid-assignment]
     env.globals["static_url"] = static_url  # ty: ignore[invalid-assignment]
     # Absolute address for link previews (og:image and og:url must be absolute); empty in
     # tests, where the tags fall back to relative addresses.

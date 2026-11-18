@@ -427,7 +427,7 @@ def test_every_state_reads_the_same_on_every_surface_from_the_one_table(web):
             return
         page = web.alice.get(f"/jobs/{job_id}").text
         assert re.search(r"<title>\s*" + re.escape(label) + ":", page), (key, label)
-        listing = web.alice.get("/app/documents").text
+        listing = web.alice.get("/app/documents", headers={"HX-Request": "true"}).text
         assert _badge(listing, f'id="doc-{job_id}"').startswith(label), key
         assert _badge(batch, f'id="batch-doc-{job_id}"').startswith(label), key
         parts = web.alice.get(f"/jobs/{by_key['host']}").text
