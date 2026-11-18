@@ -470,10 +470,10 @@ class Settings(BaseSettings):
     # Keep coloured text (colours adjusted to 4.5:1 contrast) and note colour references.
     feature_colour: bool = False
     # Write marked runs of the text (`Element.runs`: struck text as `<del>`, said as
-    # "deleted"). Off is the shadow rollout: the runs are found and counted in the trace,
-    # not written. Once it has been on in production for a release it becomes the default
-    # and the off branch goes (content model, WS16.1).
-    content_runs: bool = False
+    # "deleted"). On since F-509 was measured (docs/layout.md "Struck text"); off is the
+    # old shadow rollout: the runs are found and counted in the trace, not written. Once it
+    # has been on in production for a release the off branch goes (content model, WS16.1).
+    content_runs: bool = True
     # Per-course notation memory: hints for the equation step, spoken readings, bold
     # letters in running text as maths, "remember for this course" on the review screen.
     feature_notation_memory: bool = False

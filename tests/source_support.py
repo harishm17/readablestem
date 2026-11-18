@@ -155,7 +155,7 @@ LOSSES: dict[str, Loss] = {
         None,
         "ZQintertext",
     ),
-    # Struck text (`\sout`, a deleted run with CONTENT_RUNS, plain text without) is read, not
+    # Struck text (`\sout`, a deleted run unless CONTENT_RUNS is off, then plain text) is read, not
     # counted as unread (SW51a meets SW42.4).
     "struck_text": Loss(
         _article("The quiz is on \\sout{ZQstruck Monday} Friday.", "\\usepackage[normalem]{ulem}"),

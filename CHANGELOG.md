@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: struck text is on by default (branch feat/content-runs-on)
+
+- WS16.1 and SW51a. `CONTENT_RUNS` is on in the code and in the production profile: text the page
+  strikes through (a drawn line, a StrikeOut annotation, a font's strike effect; or `\sout` in a
+  LaTeX source) is stored as a `deleted` run, written as `<del>` with "deleted:" and "end deleted"
+  for a screen reader, `w:strike` in Word and spoken the same way in Listen, and the optional
+  notice `struck_text` is raised. The switch stays for a release (the off branch goes after one
+  release in production).
+- Measured before turning it on: on 70-plus generated PDFs (strikes of every kind against
+  underlines, grids, fractions, ruled blanks, boxes and rules) no live text was marked deleted;
+  on the 73 distinct real-world development files none was; the corpus replay made the same
+  requests and had the same misses (1,314) with the switch off and on.
+- Two false positives and one miss fixed: a filled bar in a vector figure that the page clips
+  away was read as a strike through the caption beside it (the text pass now renders the marks
+  that would strike text and drops the ones that do not show), and an inline equation the page
+  strikes through was left live (it is now a run on its marker). Not found: struck table cells and
+  struck display equations (their elements carry no runs).
+- `deleted_runs` and `deleted_runs_written` are in the trace allowlist, so the counts can be read.
+- Not bumped: `PIPELINE_VERSION` and `RENDER_VERSION` (one bump is already owed).
+
 ## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
 
 - WS11.1e, as far as its triage line. Found by reading the upload, delete and purge code and by

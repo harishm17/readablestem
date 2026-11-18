@@ -36,7 +36,7 @@ keep, and adds to the elements without changing their text or anything a model s
   4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`).
 - the notice `link_text_unclear` for a link whose text says nothing on its own ("click
   here", a long bare URL with next to no text around it).
-- `Element.runs`, "deleted" (written only with CONTENT_RUNS; without it they are found and
+- `Element.runs`, "deleted" (written with CONTENT_RUNS, on by default; off, they are found and
   counted in the trace, not written): text the page strikes through, a cancelled date on a
   syllabus, with the notice `struck_text`. A thin horizontal line or bar crosses glyphs
   of one row where a strikeout does (`struck_glyphs`), or a StrikeOut annotation covers
@@ -270,10 +270,12 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
                     if links:
                         found.links[number] = links
                     strikes = layout.page_strikes(doc[number])
-                    if strikes:
-                        found.strikes[number] = strikes
                     if colour or links or strikes:
                         found.glyphs[number] = layout.page_glyphs(doc[number])
+                    if strikes:
+                        strikes = drawn_strikes(doc[number], strikes, found.glyphs[number])
+                    if strikes:
+                        found.strikes[number] = strikes
             finally:
                 doc.close()
         finally:
@@ -957,6 +959,64 @@ def struck_glyphs(glyphs: Sequence[Glyph], strikes: Iterable[Strike]) -> set[int
         if verdict.kind == "strike":
             struck.update(verdict.ink)
     return struck
+
+
+# A drawn mark that strikes text must also show on the page: the share of its length, at this
+# many pixels to the point, that a render finds inked. Clipped away, covered or in a layer
+# that is off, a mark is in the page's drawings but not on the page (a vector figure's legend
+# sample drawn outside its clip), and a reader who sees no line sees no deleted text.
+STRIKE_SCALE = 8
+STRIKE_DRAWN_SHARE = 0.9
+STRIKE_INK_BELOW = 210  # of 255, grey: a hairline's antialiased row still counts
+
+
+def drawn_strikes(
+    page: pymupdf.Page, strikes: list[Strike], glyphs: Sequence[Glyph]
+) -> list[Strike]:
+    """`strikes` without the drawn marks that would strike text but that the page does not
+    show. Only those marks are rendered (a thin strip along each): the others strike nothing,
+    so whether they show does not matter. A render that fails keeps the mark. The caller holds
+    `_LOCK`."""
+    ink: list[Ink] | None = None
+    kept = []
+    for strike in strikes:
+        if strike.annotation:
+            kept.append(strike)
+            continue
+        x0, y0, x1, y1 = strike.bbox
+        if not any(
+            g.bbox[0] < x1 and g.bbox[2] > x0 and g.bbox[1] < y1 and g.bbox[3] > y0 for g in glyphs
+        ):
+            kept.append(strike)  # crosses no glyph: strikes nothing, never rendered
+            continue
+        if ink is None:
+            ink = [Ink(g.bbox, g.size, g.baseline) for g in glyphs]
+        if classify(strike.bbox, ink).kind != "strike" or _shows(page, strike.bbox):
+            kept.append(strike)
+    return kept
+
+
+def _shows(page: pymupdf.Page, box: BBox) -> bool:
+    """A strip of the page along the drawn mark `box` is inked along its length (every
+    column of the strip, bar the odd gap, holds a pixel darker than paper)."""
+    x0, y0, x1, y1 = box
+    try:
+        strip = pymupdf.Rect(x0, y0 - 0.1, x1, y1 + 0.1) & page.rect
+        if strip.is_empty:
+            return True
+        pix = page.get_pixmap(
+            matrix=pymupdf.Matrix(STRIKE_SCALE, STRIKE_SCALE),
+            clip=strip,
+            colorspace=pymupdf.csGRAY,
+            alpha=False,
+        )
+    except Exception:  # an unreadable render is not evidence the mark is hidden
+        return True
+    rows, width, data = pix.height, pix.width, pix.samples
+    inked = sum(
+        any(data[r * width + c] < STRIKE_INK_BELOW for r in range(rows)) for c in range(width)
+    )
+    return inked >= STRIKE_DRAWN_SHARE * width
 
 
 # A blank typed as underscores (three or more, the way a drawn blank is written into the text

@@ -492,7 +492,8 @@ def test_a_language_name_or_tag_is_accepted_and_anything_else_refused():
 
 def struck_page() -> bytes:
     """A syllabus page: a date struck through by a drawn line, a word struck by a StrikeOut
-    annotation, an underlined word, a rule under a blank to fill in and the corner of a plot."""
+    annotation, an underlined word, a rule under a blank to fill in, the corner of a plot and
+    a line the page paints over."""
     import pymupdf
 
     doc = pymupdf.open()
@@ -503,6 +504,7 @@ def struck_page() -> bytes:
         220: "You must not bring a phone to the exam.",
         280: "Name:",
         340: "The answer is x = 12 and not 13 today.",
+        430: "The room is hidden behind a rule that never shows.",
     }
     for y, words in lines.items():
         page.insert_text((72, y), words, fontsize=12)
@@ -524,6 +526,11 @@ def struck_page() -> bytes:
     page.draw_line((tick.x1 + 9, 400 + 1.5), (tick.x1 + 27, 400 + 1.5), width=0.6)
     equation = under(340, "x = 12")
     page.draw_line((equation.x0, 340 - 3.6), (equation.x1, 340 - 3.6), width=0.6)  # an equation
+    # A line through "hidden" that the page paints over: in the drawings, not on the page.
+    hidden = under(430, "hidden")
+    bar = pymupdf.Rect(hidden.x0, 430 - 4.2, hidden.x1, 430 - 3.0)
+    page.draw_line((hidden.x0, 430 - 3.6), (hidden.x1, 430 - 3.6), width=0.6)
+    page.draw_rect(bar, color=None, fill=(1, 1, 1))
     data = doc.tobytes()
     doc.close()
     return data
