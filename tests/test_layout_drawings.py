@@ -535,3 +535,26 @@ def test_a_full_page_plot_with_axes_drawn_as_dashes_keeps_its_axes():
     (figure,) = _figures(out)
     assert _holds(figure, (30, 22, 587, 770))
     assert "Projectile height" in _text_of(out)
+
+
+def test_a_structure_of_atom_labels_and_short_bonds_is_one_figure_to_decide_on():
+    # Labels of one to three characters with a short stroke between them (a drawn
+    # molecule), too small and plain for a drawing cluster, were written as a dozen loose
+    # paragraphs, each a decision. They are one figure with the labels kept, and the
+    # running text above and below is still text.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    top = y + 30
+    atoms = ["HO", "C", "H", "O", "C", "NH2", "H", "C", "OH", "H", "C", "O", "H", "CH3"]
+    for i, atom in enumerate(atoms):
+        x, row = 120 + 34 * (i % 7), top + (22 if i % 2 else 0) + 60 * (i // 7)
+        _label(page, (x, row), atom, 10)
+        _lines(page, [[(x + 18, row - 4), (x + 30, row + (10 if i % 2 else -10))]], width=0.8)
+    area = (120, top - 10, 120 + 34 * 6 + 30, top + 60 + 24)
+    _running_text(page, area[3] + 40, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out)
+    assert _holds(figure, area)
+    assert layout.REASON_DRAWING_FRAGMENTS in figure.reasons
+    assert "NH2" not in _text_of(out) and "Acceleration is" in _text_of(out)

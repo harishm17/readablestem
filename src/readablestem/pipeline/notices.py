@@ -20,7 +20,10 @@ written by the steps (the figure and table work only set their fix fields):
 - `long_description_missing` (optional): a chart or diagram without a long
   description, when long descriptions are on.
 
-and one follows from the text itself (`from_runs`): `struck_text` (optional), a paragraph,
+and two follow from layout's reasons on the text (`from_reasons`): `option_labels` and
+`rtl_text` (required), a paragraph or list item that holds several answer options, or
+right-to-left words in the order the PDF gives them. And one follows from the text itself
+(`from_runs`): `struck_text` (optional), a paragraph,
 list item or heading with words the page strikes through, kept and marked as deleted
 (`Element.runs`). A reviewer's text edit that changes the struck words takes the mark off,
 and the notice goes with it.
@@ -56,6 +59,12 @@ HANDWRITING_ON_PAGE = "handwriting_on_page"
 COLOUR_ONLY = "colour_only"
 LONG_DESCRIPTION_MISSING = "long_description_missing"
 STRUCK_TEXT = "struck_text"
+# Text decisions layout raises on a paragraph or list item (`Element.reasons`), WS2.4a and
+# SW54a: options run together in one block, and right-to-left words whose order the PDF's
+# text layer does not give reliably. Both are "required": not handled in this file.
+OPTION_LABELS = "option_labels"
+RTL_TEXT = "rtl_text"
+TEXT_CODES = (OPTION_LABELS, RTL_TEXT)
 # The reasons of figures kept as images before any model work; each is its own notice
 # code (`pipeline.page_type`).
 KEPT_IMAGE_CODES = frozenset(
@@ -64,7 +73,7 @@ KEPT_IMAGE_CODES = frozenset(
 # Codes this module derives from the fixes; any stored notice with one of them is
 # replaced by `current`.
 DERIVED_CODES = frozenset(
-    {TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING, STRUCK_TEXT}
+    {TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING, STRUCK_TEXT, *TEXT_CODES}
 ) | (KEPT_IMAGE_CODES)
 # Figures that need more than short alt text (W3C "complex images").
 # Where a notice is listed on the job page.
@@ -168,6 +177,7 @@ def current(result: DocumentResult) -> list[Notice]:
     derived = [
         *from_fixes(result.elements, result.fixes, long_descriptions=True),
         *from_runs(result.elements),
+        *from_reasons(result.elements),
     ]
     kept = [n for n in result.notices if n.code not in DERIVED_CODES]
     return ordered(merge(derived, kept), result.elements)
@@ -181,4 +191,16 @@ def from_runs(elements: Iterable[Element]) -> list[Notice]:
         Notice(code=STRUCK_TEXT, page=e.page, element_id=e.id, count=n)
         for e in elements
         if (n := sum(1 for r in e.runs if r.kind == "deleted"))
+    ]
+
+
+def from_reasons(elements: Iterable[Element]) -> list[Notice]:
+    """`option_labels` and `rtl_text` (required) for each element layout flagged with that
+    reason. Never a decision: there is no text decision to make until one exists, and the
+    job page lists the item under "Not handled in this file" so it is not silent."""
+    return [
+        Notice(code=code, page=e.page, element_id=e.id, review="required")
+        for e in elements
+        for code in TEXT_CODES
+        if code in e.reasons
     ]

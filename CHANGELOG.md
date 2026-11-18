@@ -66,6 +66,37 @@
   it is found upright (`TableGrid.turned` is 0; `tables._page_turn` still turns a table set
   sideways alone on an upright page). The real-document table scoring maps the labelled boxes
   into that frame (`eval.tables.labelled_as_read`).
+## Unreleased: paragraphs across indents and columns, drawings of fragments, options and right-to-left text (branch fix/paragraphs-joins-fragments)
+
+- SW34a: a paragraph is not cut after its indented first line. While a run holds only that
+  line, the next line may start up to 4 em to its left when the first runs to the right edge
+  of its column (`layout._RightEdges`), is no list item or caption and does not end a
+  sentence. A two-line paragraph whose second line falls short stays cut. No flag and no
+  shadow run. On the fetched development corpus (28 files), with SW50a: 60 fewer paragraphs
+  (3 of them the page joins below) and 2 fewer words, both a hyphen at a line end that a cut
+  had kept and the join repaired, or a label that is now a list marker.
+- SW50a: a paragraph that ends a page in one column goes on in the other column of the next
+  page (`layout._goes_on`, `edges`): the head may sit at the left edge of another body block
+  of its page, and across columns only when the tail has two or more rows. Joined across
+  pages on the corpus: 10 before, 13 after; on the tracked PDFs 6 joins, each read by hand
+  and right.
+- WS2.9a: text fragments among short strokes (a drawn structure whose strokes no drawing
+  cluster took) are one figure with the reason `drawing_fragments`, their rows kept as its
+  labels (`layout._fragment_figures`). Contents pages (leader dots), derivations (a fraction
+  bar or two) and any region with prose are not taken. The corpus and the tracked PDFs have
+  none; the test page is a generated structure.
+- WS2.4a: answer options that reading order put in one line are one item each; a block of
+  several rows that still holds later labels keeps them and is flagged `option_labels`,
+  listed as a required notice (`notices.from_reasons`). Two tracked blocks of
+  `e1_mc_columns.pdf` are flagged; one corpus list item is split.
+- SW54a: a paragraph or list item with two or more right-to-left words is flagged
+  `rtl_text` (a required notice) until the reorder (SW54b, on hold) exists, and the two
+  letters of a lam-alef ligature, which MuPDF returns reversed, are put back in order
+  (`layout._swap_lam_alef`: "دوال" is "دولا", "األكسجين" is "الأكسجين" in `d1_scripts.pdf` and
+  `d3_arabic_doc.pdf`). Six right-to-left blocks on the tracked PDFs, all flagged.
+- No text decision exists yet (WS16.6), so options and right-to-left text raise a required
+  notice and no fix: a paragraph fix would offer "keep as image" where only scanned-page text
+  has an image to keep. The decision waits for WS16.6. `PIPELINE_VERSION` is not changed here.
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 

@@ -2154,9 +2154,10 @@ def _convert(
         *image_page.notices(image_built),
         *reading_notices,
     ]
-    derived = notice_rules.from_fixes(
-        elements, ordered, long_descriptions=options.long_descriptions
-    )
+    derived = [
+        *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),
+        *notice_rules.from_reasons(elements),
+    ]
     notices = notice_rules.ordered(notice_rules.merge(derived, notices), elements)
     result = DocumentResult(
         pipeline_version=PIPELINE_VERSION,

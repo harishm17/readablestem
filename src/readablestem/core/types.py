@@ -868,6 +868,8 @@ NOTICE_CODES = frozenset(
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
         "struck_text",  # text the page shows struck through, kept and marked as deleted
+        "option_labels",  # answer options (A, B, C) that run together in one paragraph or item
+        "rtl_text",  # right-to-left words, in the order the PDF gives them
         # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text
         # and page types"). The first four have a decision: the page's (or region's)
         # FAILED figure fix with the same reason, grouped by reason.

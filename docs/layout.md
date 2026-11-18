@@ -162,7 +162,12 @@ Element conventions:
    font size matches (within 1 pt or 12 %), the baseline step is at most 1.3 x the typical
    body line pitch, it starts within the paragraph's horizontal span, it is not a first-line
    indent after a short line (LaTeX paragraphs), and it does not start a list item or a
-   `Figure N` caption. A row continuing a list item never starts left of the item's
+   `Figure N` caption. While a run holds only its first line, and that line is indented,
+   runs to the right edge of its column (`_RightEdges`: the end that a quarter of the
+   column's lines of that size reach), is no list item or caption and does not end a
+   sentence, the next line may start up to 4 em to its left (`INDENT_REACH`): the second
+   line of a paragraph that opens with a typewriter's tab is not a new paragraph. A
+   two-line paragraph whose second line falls short of the first stays cut. A row continuing a list item never starts left of the item's
    marker (so the paragraph after a list is not swallowed by its last item). A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
@@ -209,13 +214,16 @@ Element conventions:
    a page (footnotes in smaller type below it, and the running header and footer the margin
    filter dropped, are not in the way) does not end a sentence, the top block of the next
    page starts with a lower-case letter, and the two share size, typeface, weight and left
-   edge with no first-line indent, both at the text area's edges. The element keeps the
+   edge (or the left edge of another body block of its page: a two-column page that ends in
+   the right column and goes on in the left column of the next, which needs a tail of two
+   rows or more, since a one-line tail across columns is too often a license line) with
+   no first-line indent, both at the text area's edges. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
    part keeps its own page for its crop. A hyphen at the page break is repaired like one at
-   a line break. A paragraph that starts with math, a break between a column on one page
-   and a column on the next, and a list item (a lowercase paragraph after a list item at a
-   page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
+   a line break. A paragraph that starts with math, a break onto a column that is not at the
+   left edge of a body block of the next page, and a list item (a lowercase paragraph after
+   a list item at a page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
    the last part (None when it ends on its own page). The assembler writes the page markers
    of the pages after `page` up to `last_page` right after the joined paragraph (`marks_after`),
    never inside it, so the markers stay in order and continuous (Page 1, Page 2, Page 3) and the
@@ -1075,6 +1083,28 @@ Not done: equations that Word exports as vector drawings (EMF/WMF, drawn as path
 considered when the layout already made them a figure by `_vector_figures`; they are
 classified like a raster picture, but they have not been measured; handwritten equations.
 
+### Answer options and right-to-left text (WS2.4a, SW54a)
+
+Two things layout does not get right are never left silent: both set a reason on the
+paragraph or list item (`Element.reasons`), and `notices.from_reasons` turns it into a
+"required" notice, listed under "Not handled in this file" (no decision: the text decision
+of WS16.6 does not exist yet, and a paragraph fix would offer "keep as image" where only
+scanned-page text has an image to keep).
+
+- **Option labels** (`option_labels`, `_later_labels`, `_split_options`): a block that
+  starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
+  its text, set off by a gap wider than half an em, is a grid of options that reading order
+  merged. A line of text that stands alone is cut at each later label, one run per option;
+  any other block is kept whole and flagged. Where a table is detected over the grid, the
+  table keeps it (WS2.4b).
+- **Right-to-left text** (`rtl_text`, `_rtl_words`): a block with two or more words that
+  have a strong right-to-left letter (bidi class R or AL) is flagged, because the order of
+  the words in the row is the PDF's, which is not always the reading order (the reorder,
+  SW54b, is on hold). A lam-alef ligature glyph (`_swap_lam_alef`) comes out of MuPDF with
+  its two letters reversed ("إىل" for "إلى"); where an alef-family letter and a lam share
+  one glyph box they are put back in order, in `_text_blocks`, so every reader of
+  characters sees it.
+
 ### Bold letters in prose
 
 Only with `FEATURE_NOTATION_MEMORY` on (the run's `ConversionOptions.notation_memory`);
@@ -1366,6 +1396,17 @@ math by the document's evidence; the equation step's own tiers then decide it.
   figure's box 206 of 282 (122 before), printed labels 255 of 420 (149), body markers
   lost 0 of 480, captions kept 48 of 48, figures found 54 of 60 (both). Still outside:
   values printed above bars, timelines (0 of 48 label kinds) and circuits (0 of 18).
+- **A drawing made of text fragments** (`_fragment_figures`, WS2.9a): the labels of a drawn
+  structure, circuit or diagram whose strokes are too short and plain for a drawing cluster
+  were written as dozens of loose paragraphs and one-symbol equations, each its own
+  decision. A group of 12 or more text rows of 3 characters or fewer, within 3 body sizes
+  of each other and outside the figures and tables already found, with at least half a
+  short stroke per fragment among them (a stroke between 0.5 and 6 body sizes long: a
+  contents page's leader dots are not strokes, and a derivation has a fraction bar or two)
+  is one figure, reason `drawing_fragments`, its rows kept as its labels and written as
+  text no more. A region whose rows have a median length of 4 characters or more, or one
+  with a row of three words, is text and stays text. Found after the drawing clusters,
+  before the page's text is read, so the rows are out of the reading order.
 - **Glyphs drawn as outlines in a line of text** (`_glyph_outlines`, 2026-11-11, WS6.10,
   F-364): a page-type pen stroke inside a typed line (within its height, a tenth of it
   over at most, with typed glyphs on both sides) whose drawing is a fill with no stroke
