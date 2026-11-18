@@ -118,17 +118,17 @@ Element conventions:
    labels in the footer band dropped as page numbers, an axis title repeated under each
    chart of a deck dropped as a running footer, and a repeated rotated y-axis title
    dropped as a watermark). A dropped row is a label when it is at most 40 characters,
-   not diagonal, and within 8 x its font size of a figure or of the short rows just
-   beside it (its tick labels), level with it for a rotated row. Bare numbers count only
+   not diagonal, and the one label rule below takes it (`_label_owners`: within one font
+   size of the figure's nearest stroke, or of a label the figure holds already; a rotated
+   row 2.5 times as far, up to 40 characters). Bare numbers count only
    two or more on one baseline (tick labels), or alone when level with a figure (the
    axis title `v` at the top of a full-page plot's y-axis, which the page-number rule
    reads as a roman numeral) and the same band of the other pages holds no changing
    number there (a page number beside a figure that reaches into the band stays a page
    number; since 2026-10-12); other text only when it is beside a figure on every analyzed page it was
    dropped from (`_label_keys`), so a running footer that also runs under pages of text
-   stays dropped. The rows taken back are the figure's labels, in its text and its crop,
-   however far from it within that reach (`_take_labels`; before, tick labels 6 pt under
-   the x-axis were read as paragraphs of one digit each). A short footer repeated under a
+   stays dropped. The rows taken back are the figure's labels, in its text and its crop
+   (before, tick labels 6 pt under the x-axis were read as paragraphs of one digit each). A short footer repeated under a
    chart on every page of a document is read as text (noise, not a loss).
 3. **Columns.** Narrow lines (at most 55 % of the text width) are projected onto the x-axis.
    A gap of at least 8 pt in the middle half that no narrow line touches (or at most two,
@@ -1424,23 +1424,64 @@ math by the document's evidence; the equation step's own tiers then decide it.
   photo and a report's screenshots under their captions were dropped as backgrounds,
   with no decision). Only a plain picture (a colored panel or a wash drawn as an image,
   `_plain_image`) under running text is a background and is dropped.
-- **A drawing's outer labels** (`_absorb_outer_labels`, 2026-11-11, WS6.12, F-399): once
-  every figure has the labels at its edges, a vector drawing takes the ones beyond them,
-  looked for from its growing box up to 3 times: a row of spread-out short words (the
-  tick or category labels along an axis: the typical gap between its words at least 0.8
-  x its font size, none under 0.4) within 0.6 x font size of the box; a short row (25
-  characters or fewer) within one font size that is vertical (a rotated axis title) or
-  centered on the drawing (its middle within 15 % of the drawing's side of the drawing's
-  middle) and is no line of the page's running text; and a short quantity (12 glyphs of
-  math at most) set partly over the drawing ("N = 49 N" beside a force arrow). A
-  caption, a line of code, a row larger than body text and display math clear of the
-  drawing never join. The figure's box, and so the picture cut for the figure step,
-  grows to them. Before, a chart's category names stayed in the body as a stray
-  paragraph and its crop had no axis values, so the model estimated them. On the 12
-  sealed generated figure documents of accuracy round 2 (no model): label kinds inside a
-  figure's box 206 of 282 (122 before), printed labels 255 of 420 (149), body markers
-  lost 0 of 480, captions kept 48 of 48, figures found 54 of 60 (both). Still outside:
-  values printed above bars, timelines (0 of 48 label kinds) and circuits (0 of 18).
+- **One label rule by distance** (`_label_owners`, `_claim_labels`, SW40, WS6.12's reaches
+  made one): a row is a label of a figure when it lies within `LABEL_REACH` (1.0) x its
+  font size of the figure's nearest drawn stroke (`_stroke_gap`: the distance to the
+  strokes, not to the drawing's box, which reaches over blank ground beside a diagonal or
+  an L; a path drawn by a few straight lines counts by those lines, `_Path.edges`, any
+  other by its box) or of a label the figure holds already, or when most of it lies
+  inside the drawing's box (any length: the text in a flowchart's boxes); the rule runs
+  again from the figure and what it holds until nothing more is found, since an axis
+  title stands a line beyond the tick labels. A row two figures could claim goes to the
+  nearer. Outside the drawing a label is short (`LABEL_SHORT`, 25 characters, or the
+  tick or category labels of an axis set in one row, or several short ones far apart on
+  one line: a timeline's events). A turned row (an axis title) is never a line of a
+  paragraph, so it may stand up to `LABEL_TURNED` = 2.5 times as far and hold
+  `LABEL_SHORT_TURNED` = 40 characters. Any kind of row counts, math and rotated ones
+  too: a circuit's "R1 = 4 ohm", a triangle's sides and angle, a force arrow's "N". Never
+  a label: a line of running text (a paragraph that passes by a figure, a title; for a
+  row inside the drawing, found among the rows inside it), a caption, a line of code.
+  Measured (SW40, 2026-11-18, 116 tracked PDFs and the 28-file corpus, short rows outside
+  a vector figure's box, by distance to the nearest stroke in font sizes): the rows that
+  were labels all lie within 1.0; beyond 1.0 the rows are prose fragments, headings and
+  list items; turned rows that are labels reach about 2.0 and no turned row that is not
+  one lies nearer than 2.5. So one reach, 1.0, with the turned rows' 2.5 times that.
+  Not a label either: a short numbered title (a problem's "5. Blocks and springs"), a row
+  that starts like a list item, a marker of one or two characters ("5.", "(a)", "B)") and
+  a word of three letters or more (`_starts_like_item`). The list markers are not known yet
+  where the labels are found, so the row's own start is read. A title taken as a figure's
+  label is lost as a heading, and a label kept out stays a paragraph as before, so the
+  rule leans toward the title. Measured (2026-11-18, the labels the rule claimed outside their figure and not
+  turned, on the tracked files and in the corpus; the corpus has one title among them, the
+  tracked files none): a row a candidate would keep out of the labels, tracked / corpus.
+  A marker and a word of three letters: 0 / 1, the title, so no label released. A font
+  larger than the figure's other labels: 5 / 62, nearly all true labels (chart titles,
+  braces) and the title too. Bold unlike the others: 0 / 2, not the title. At the left
+  margin with the figure to its right: 1 / 8. Running text below it: 20 / 175, and the
+  title has none. Only the first keeps the title and releases no true label.
+  A slide's footer bar set in from the page's edge (`_edge_band`, a rule or box at least 85
+  % of the page wide inside the top or bottom 15 %) is furniture like one that touches
+  the edge: before, a line of code or a total just above it was read as the bar's label
+  (the 6.0001 deck, 35 pages, each with an empty figure for the bar). The tail line of a
+  caption counts as the caption's own, not a label (`_running_text`).
+  A picture has no strokes: only the rows on it are its labels. The figure's box, and so
+  the picture cut for the figure step, grows to its labels. Replaces `_absorb_labels`,
+  `_absorb_outer_labels` and the dropped rows' own reach (`_take_labels`), five reaches
+  that disagreed: the figure with no tick labels took nothing, a circuit's part names
+  were equations (the label take refused math of more than three glyphs), a triangle's
+  four labels stayed equations. Before, a chart's category names stayed in the body as
+  a stray paragraph and its crop had no axis values, so the model estimated them
+  (2026-11-11, WS6.12, F-399).
+- **Shapes that vanished** (WS6.15, 2026-11-18). A timeline's ruler (a long thin line
+  with ticks, 5 pt tall) fell under the 24 pt a figure needs on both sides, so it was a
+  small drawing; no label was held for it and the paragraph's block took its labels, so
+  its drawing was dropped and the labels were a paragraph in scrambled order: a ruler at
+  least 96 pt long with ticks standing out of the line (more than 1 pt) is a figure
+  (`thin_ruler`, `_vector_figures`; a table's header rule alone stays a rule). A free-body diagram's
+  force arrows, each thin and 20 pt off its box, were separate small drawings that
+  joined the box only within 12 pt: a small drawing joins a figure within
+  `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves. A circuit's
+  parts were not found as labels, see the label rule above.
 - **A drawing made of text fragments** (`_fragment_figures`, WS2.9a): the labels of a drawn
   structure, circuit or diagram whose strokes are too short and plain for a drawing cluster
   were written as dozens of loose paragraphs and one-symbol equations, each its own
@@ -1508,7 +1549,7 @@ and its inline math is not looked for. The assembler writes `<pre><code>` with t
 escaped and the CSS added only when a document has code; a block with a line over 36
 characters is a tab stop named "Program code" (axe `scrollable-region-focusable`, as
 equations are). A box drawn round one line of code is its frame, not a figure
-(`_absorb_labels`). The notice `code_block` (review "none") is still given, now saying the
+(`_backdrop`). The notice `code_block` (review "none") is still given, now saying the
 code keeps its line breaks and indentation but not its highlighting.
 
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
