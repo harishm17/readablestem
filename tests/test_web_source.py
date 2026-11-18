@@ -426,6 +426,10 @@ class TestRealConversion:
         assert link.status_code == 400 and "cannot be replaced with a new version" in link.text
         sent = send(env.browser, ARTICLE.encode(), "v2.tex", revises=job_id)
         assert sent.status_code == 400 and "cannot be replaced with a new version" in sent.text
+        assert (
+            "Upload a revised version" not in sent.text
+            and "Upload a revised version" not in link.text
+        )
         assert len(jobs(env)) == before
 
 

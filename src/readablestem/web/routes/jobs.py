@@ -1016,7 +1016,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 status,
                 filename,
                 course=chosen,
-                revises=revises or "",
+                revises="" if code == "revise_source" else revises or "",  # no revise form
                 fields=form.fields,
             )
         )
