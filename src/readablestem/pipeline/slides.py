@@ -99,7 +99,8 @@ class PageView:
     height: float
     label: str | None  # the page label the PDF gives it, if any
     rows: Sequence[RowView]
-    marks: Iterable[Mark] = ()  # every image, and the drawings in the body of the slide (`LazyMarks`)
+    # every image, and the drawings in the body of the slide (`LazyMarks` reads them late)
+    marks: Iterable[Mark] = ()
 
 
 @dataclass(frozen=True)

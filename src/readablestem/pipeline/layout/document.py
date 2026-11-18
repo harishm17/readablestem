@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from functools import partial
 from collections.abc import Sequence
+from functools import partial
 from typing import Any
 
 import pymupdf
@@ -533,7 +533,9 @@ def _read_deck(
                     rect.height,
                     page_labels.pdf_label(page),
                     rows,
-                    slides.LazyMarks(partial(_marks_of, page, paths.get(number, []), guard, number)),
+                    slides.LazyMarks(
+                        partial(_marks_of, page, paths.get(number, []), guard, number)
+                    ),
                 )
             )
     creator = doc.metadata.get("creator") if doc.metadata else None
