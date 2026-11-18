@@ -176,7 +176,7 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     assert page.evaluate("window.__spoken[0].voice") == "Local Voice"
 
     page.evaluate("window.__end()")  # the voice finishes an item: the next is spoken
-    assert spoken(page)[1] == "The speed is v equals d divided by t."
+    assert spoken(page)[1] == "The speed is v equals d over t."
 
     page.get_by_role("button", name="Next", exact=True).click()
     assert spoken(page)[-1] == "Heading level 2: Average speed"
@@ -191,7 +191,7 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     assert status(page) == "Playing."
 
     page.get_by_role("button", name="Previous", exact=True).click()
-    assert "The speed is v equals d divided by t." in spoken(page)[-1]
+    assert "The speed is v equals d over t." in spoken(page)[-1]
     page.get_by_role("button", name="Next heading").click()
     assert spoken(page)[-1] == "Heading level 2: Average speed"
     page.get_by_role("button", name="Next equation").click()
@@ -396,7 +396,7 @@ def test_without_javascript_the_transcript_is_text_and_the_controls_stay_hidden(
     assert page.locator("[data-listen-controls]").is_hidden()
     assert "Playing needs JavaScript" in page.locator("noscript").inner_text()
     assert (
-        "The speed is v equals d divided by t."
+        "The speed is v equals d over t."
         in page.locator("[data-listen-transcript]").inner_text()
     )
     context.close()

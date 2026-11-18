@@ -173,6 +173,21 @@ def test_every_builder_gives_its_recorded_bytes_in_two_runs() -> None:
     _assert_recorded(QUICK, _in_a_new_process())
 
 
+def test_the_measuring_commands_can_build_a_file_outside_pytest() -> None:
+    """`readablestem eval burden` and the other measures build these files in a process
+    pytest did not start, where the `tests` folder is not on the path by itself."""
+    entry = next(e for e in ENTRIES.values() if e.builder and not FIXTURES[e.builder].slow)
+    code = (
+        "import sys; from readablestem.eval import corpus; "
+        "print(len(corpus.document(corpus.load_manifest()[sys.argv[1]])))"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code, entry.id], capture_output=True, text=True, check=False
+    )
+    assert out.returncode == 0, out.stderr[-400:]
+    assert int(out.stdout) > 0
+
+
 @pytest.mark.slow
 def test_the_slow_builders_give_their_recorded_bytes_in_two_runs() -> None:
     _assert_recorded([n for n in STABLE if FIXTURES[n].slow], _in_a_new_process("--slow"))
