@@ -12500,7 +12500,8 @@ def _layout_notices(
             if block.kind not in _TEXT_BLOCKS or element_id is None:
                 continue
             ink = [c for row in block.rows for c in row.chars if not c.blank]
-            if named is not None and block.rows[0].note:
+            # a list item made from a line or grid of terms has text and no rows
+            if named is not None and block.rows and block.rows[0].note:
                 notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
                                       review="none"))  # fmt: skip
                 started.update(dict.fromkeys(block.rows[0].note, element_id))

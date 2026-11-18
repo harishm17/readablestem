@@ -343,6 +343,12 @@ def named_footnote_pdf() -> bytes:
     )
     page.insert_text((72 + width, 95), "2", fontsize=7, fontname="helv")
     page.insert_text((72 + width + 4.5, 100), "Next we measure it.", fontsize=BODY, fontname="helv")
+    # a line of terms becomes list items made from its text, with no rows of their own
+    page.insert_text((72, 160), "Section Key Terms", fontsize=16, fontname="hebo")
+    x = 72.0
+    for term in ("absolute pressure", "gauge pressure", "pascal"):
+        page.insert_text((x, 190), term, fontsize=BODY)
+        x += pymupdf.get_text_length(term, fontname="helv", fontsize=BODY) + 13.0
     page.draw_line((72, 700), (200, 700))
     page.insert_text((72, 715), "1 A line number in small type.", fontsize=8)
     page.insert_text((72, 735), "2 Pressure is measured in pascals.", fontsize=8)
@@ -373,6 +379,9 @@ def test_a_file_that_names_its_footnotes_decides_which_blocks_are_footnotes():
     assert (link.kind, link.target_id) == ("internal", notes[0].id)
     # the raised mark is set off from the word it touches, not read as part of it
     assert "here.2 Next we" in (body.text or "")
+    # a list made from a line of terms is read too (it stopped the whole document once)
+    terms = [e.text for e in layout.elements if e.kind == Kind.LIST_ITEM]
+    assert terms == ["absolute pressure", "gauge pressure", "pascal"]
 
 
 # ------------------------------------------------------------------------- contents
