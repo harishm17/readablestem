@@ -133,6 +133,10 @@ _REAL_WORLD_COMMANDS = {
     "intercal": r"a \intercal b",
     "rightsquigarrow": r"u \rightsquigarrow v",
     "leadsto": r"u \leadsto v",
+    "not": r"a \not\in B",
+    "nleq": r"a \nleq b",
+    "nsubseteq": r"A \nsubseteq B",
+    "nparallel": r"l \nparallel m",
 }
 
 
@@ -339,6 +343,9 @@ def test_safe_latex_to_mathml_output_is_always_allowlisted(latex):
         (f'<math {NS}><mi data-x="1">x</mi></math>', "unknown_attribute"),
         (f"<math {NS}><mfrac><mi>a</mi></mfrac></math>", "bad_arity"),
         (f"<math {NS}><msubsup><mi>a</mi><mi>b</mi></msubsup></math>", "bad_arity"),
+        (f"<math {NS}><mfrac><mrow/><mi>b</mi></mfrac></math>", "empty_argument"),
+        (f"<math {NS}><msqrt><mrow/></msqrt></math>", "empty_argument"),
+        (f"<math {NS}><msup><mi>x</mi><mrow/></msup></math>", "empty_argument"),
         (f"<math {NS}><mi>\\foo</mi></math>", "unconverted_command"),
         (f"<math {NS}><mtext>\\textbf{{x</mtext></math>", "unconverted_command"),
         (f"<math {NS}><merror><mtext>x</mtext></merror></math>", "unconverted_command"),
