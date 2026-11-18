@@ -1605,11 +1605,14 @@ def split_page(
     page_view = builder.page_view(number, selected, current_key, place.key if place else None)
     # Stylesheets of mark positions: the page shown, and the page of the decision's equation
     # (its proposal is sized under its crop by a rule in that page's stylesheet).
-    mark_pages = [number]
+    shown = [number]
     if panel.item is not None and panel.item.kind == "equation":
         home = builder.elements.get(panel.item.element_id)
         if home is not None and home.page + 1 != number:
-            mark_pages.append(home.page + 1)
+            shown.append(home.page + 1)
+    # Each link carries the stylesheet's own tag (`marks_css`), so the browser keeps the file
+    # for as long as the page's marks are the same: a decision on the same page asks for nothing.
+    mark_pages = [(n, page_marks(builder.result, builder.sizes, n - 1).tag()) for n in shown]
     open_count = sum(d.open for d in builder.queue)
     optional = builder.optional_lines(number if page_mode else None)
     flashes = pop_flash(request)
@@ -1901,7 +1904,7 @@ class PageMarks:
     notes: dict[str, marks.BBox]
     equations: list[Element]  # one for each fix of an equation on the page
 
-    def etag(self) -> str:
+    def tag(self) -> str:
         """Same inputs, same stylesheet, same tag (`marks.PLACEMENT_VERSION` changes it when
         the code that makes the stylesheet does)."""
         parts = [
@@ -1913,7 +1916,10 @@ class PageMarks:
             list(self.notes.items()),
             [(e.id, e.bbox, e.font_size, e.display) for e in self.equations],
         ]
-        return '"' + hashlib.sha256(json.dumps(parts).encode("utf-8")).hexdigest()[:32] + '"'
+        return hashlib.sha256(json.dumps(parts).encode("utf-8")).hexdigest()[:32]
+
+    def etag(self) -> str:
+        return f'"{self.tag()}"'
 
     def css(self) -> str:
         rules: list[str] = []
@@ -1984,7 +1990,9 @@ def page_marks(
 
 
 @router.get("/jobs/{job_id}/review/marks.css")
-def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> Response:
+def marks_css(
+    request: Request, job_id: str, user: UserDep, page: str = "", v: str = ""
+) -> Response:
     """Where each mark goes on one page image (`web.marks`: a frame round the element and a
     clickable area of at least 24 CSS px that overlaps no other), and the size the proposal of
     each equation on that page is drawn at under its crop. Element ids and numbers only.
@@ -1992,7 +2000,10 @@ def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> R
     The screen links the stylesheet of the page it shows. Its `ETag` is a hash of
     what it is made from (`PageMarks.etag`), so the browser asks again each time
     (`no-cache`) and gets a 304 when that has not changed, without a mark being placed. It is
-    asked only after the same checks as the screen itself."""
+    asked only after the same checks as the screen itself. `v`, the tag the screen's link
+    carries, is the same as this page's tag only while the page's marks are unchanged: then the
+    file is kept without asking again, since a new page's marks are a new address. Without it,
+    or from a screen drawn before the marks moved, it is asked again each time."""
     # Not `_load_versioned`: the job's summary and crops are the screen's and cost far more.
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
@@ -2004,7 +2015,8 @@ def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> R
     sizes = resolve_page_sizes(request, job_id, user, result)
     plan = page_marks(result, sizes, int(page) - 1)
     etag = plan.etag()
-    headers = {"Cache-Control": "private, no-cache", "ETag": etag}
+    keep = "private, max-age=31536000, immutable" if v == plan.tag() else "private, no-cache"
+    headers = {"Cache-Control": keep, "ETag": etag}
     if asked_for(request, etag):
         return Response(status_code=304, headers=headers)
     return Response(plan.css(), media_type="text/css; charset=utf-8", headers=headers)

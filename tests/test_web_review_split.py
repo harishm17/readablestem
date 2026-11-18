@@ -343,7 +343,13 @@ def test_marks_are_served_per_page_and_asked_again_only_to_be_told_nothing_chang
     assert split.browser.get(f"/jobs/{split.job_id}/review/marks.css").status_code == 404
 
     # The screen links the stylesheet of the page it shows.
-    assert 'marks.css?page=2"' in screen(split, "?item=p2-e2&page=2")
+    linked = re.search(r"marks.css\?page=2&amp;v=(\w+)", screen(split, "?item=p2-e2&page=2"))
+    assert linked is not None
+    # Its tag is the page's own: the browser keeps the file, and asks again only for another.
+    kept = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=2&v={linked[1]}")
+    assert tags[2] == f'"{linked[1]}"' and "immutable" in kept.headers["cache-control"]
+    stale = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=2&v=0")
+    assert stale.headers["cache-control"] == "private, no-cache"
 
     def placed(*args, **kwargs):
         raise AssertionError("a mark was placed")
