@@ -82,6 +82,12 @@
 {% else %}
 {% include "_job_ready.html" %}
 {% endif %}
+{# WS19.6: the way to a page's tools from a document with no decision (WS11.3b's order puts it
+   second; here it follows the first block). The review screen opens in page mode. #}
+{% if job.can_review and pg.has_pages and not job.is_sample %}
+<p id="fix-a-page"><a href="/jobs/{{ job.id }}/review?mode=page&amp;page=1">Fix something on a page</a>
+  <span class="hint">Change the words, add what the tool missed, or leave a page out.</span></p>
+{% endif %}
 </div>
 
 {% if job.carry and job.is_owner %}

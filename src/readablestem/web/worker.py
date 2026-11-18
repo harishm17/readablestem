@@ -134,6 +134,8 @@ STRUCTURE_ACTIONS = frozenset(
         "omit_page",
         "restore_page",
         "not_equation",
+        "read_again",  # listed as not made again (`carry_edits.READ_AGAIN`)
+        "undo",  # takes back the edit before it
     }
 )
 # A region or a page compared between two files is drawn at this size (pixels per point).
@@ -1440,6 +1442,7 @@ class Worker:
             )
             report.edits = edits.ids
             report.edits_dropped = edits.dropped
+            report.edits_not_applied = edits.not_applied
             if changes or edits.items:
                 from readablestem.web import notation
 

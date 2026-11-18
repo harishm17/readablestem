@@ -15,6 +15,25 @@
   fixture: five decisions on five items sent from one page drawn at version 0 stored 1 before and
   5 after. No form field, column or migration is added, and a page open before this release
   works. Held: presence, per-person undo and a refusal that names the other person.
+## Unreleased: page tools, words and the way in (branch feat/page-tools-words-and-route)
+
+- SW46 / WS19.1: a re-run or revision lists, by name and page, every page change of the person
+  that it did not make again ("Page 2: words you changed"), under the existing "not made
+  again" line on the job page; an equation read again is listed too, unless it was undone. The
+  list is `edits_not_applied` in `carried_json` (an optional key: older rows read as empty).
+  Deleting and editing words are carried as before.
+- WS19.8 (F-478, F-374, F-419): an edit is called an edit. The notice after a text edit names
+  the edit and no longer says all decisions are made; the undo button after a page edit reads
+  "Undo this change" (after a decision it keeps its wording); the record's count line reads "N
+  decisions made by a person. M changes to pages." (the record page and the CSV count the same
+  things); the refusal of a removed mark reads "Keep the mark [equation 3] in the text, or
+  remove the equation as well." with the real item named.
+- WS19.6 (F-474, F-479): "Fix something on a page" on the job page opens the review screen in
+  page mode (`?mode=page&page=N`): the page's tools are the first panel under "Page N", with no
+  decision of another page above them, and that page's optional checks follow. Two clicks from
+  the job page of a document with no decision. Not built: the same link in the instructor's
+  preview (the preview is the bare student file with no app frame around it).
+- No stored-field change, no migration, no prompt or model request changed, no version bump.
 
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 

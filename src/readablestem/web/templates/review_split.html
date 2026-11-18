@@ -589,7 +589,7 @@
       {% if undo %}
       {% call form("review.undo", "/jobs/" ~ job.id ~ "/undo", {"class": "undo-form"}) %}
         {{ hidden_fields() }}
-        <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> this decision</span></button>
+        <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> {{ "this change" if undo_of_edit else "this decision" }}</span></button>
       {% endcall %}
       {% endif %}
     </div>
@@ -619,6 +619,9 @@
     {% else %}
     <p><a href="/jobs/{{ job.id }}">Back to the results</a></p>
     {% endif %}
+    {% elif panel.mode == "page" %}
+    {# "Fix something on a page" (WS19.6): the page's tools are the panel. #}
+    {% include "_page_tools.html" %}
     {% else %}
     {% if panel.why %}<p class="why">{{ panel.why }}</p>{% endif %}
     {% if panel.mode == "item" and panel.status_class == "pill-optional" %}<p class="hint">It was accepted: nothing to do unless you disagree.</p>{% endif %}
@@ -703,7 +706,7 @@
     {% endif %}
     {# T3-5, T3-16: change the text, make a line a heading, add what the tool missed, leave
        the page out. #}
-    {% include "_page_tools.html" %}
+    {% if panel.mode != "page" %}{% include "_page_tools.html" %}{% endif %}
   </section>
 
   <section class="page-area" id="page-view" aria-labelledby="page-title" tabindex="-1">

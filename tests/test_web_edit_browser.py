@@ -155,6 +155,8 @@ def test_the_page_tools_pass_axe_in_every_state(doc_site, browser, doc_job, axe_
     url = f"{doc_site.base}/jobs/{doc_job}/review"
     page.goto(f"{url}?page=1&tools=1")
     check("the tools open: text list, add, leave out")
+    page.goto(f"{url}?page=1&mode=page")
+    check("page mode: the tools first, no decision")
     page.goto(f"{url}?page=1&tools=1&change=p1-e1")
     check("a paragraph open to change")
     page.goto(f"{url}?page=1&tools=1&change={PARAGRAPH}")
@@ -193,6 +195,34 @@ def test_the_words_of_a_paragraph_are_changed_from_the_keyboard_alone(doc_site, 
     # The notice has focus's heading; the changed words are in the student file.
     page.goto(f"{doc_site.base}/jobs/{doc_job}/view")
     assert "tensors" in page.content()
+    context.close()
+
+
+def test_the_tools_of_page_2_are_two_clicks_from_the_job_page_of_a_document_with_no_decision(
+    doc_site, browser, doc_job
+):
+    """WS19.6: "Fix something on a page", then page 2: the tools are the first panel under
+    "Page 2", nothing of a decision is above them, and the window has not scrolled."""
+    from sqlalchemy import select
+
+    from readablestem.web.db import Job, session_scope
+
+    with session_scope(doc_site.ctx.factory) as session:
+        job = session.scalar(select(Job).where(Job.id == doc_job))
+        assert job is not None
+        result = dict(job.result_json or {})
+        result["fixes"] = [{**f, "status": "accepted"} for f in result.get("fixes") or []]
+        job.result_json = result
+    context, page = open_page(browser, doc_site)
+    page.goto(f"{doc_site.base}/jobs/{doc_job}")
+    page.get_by_role("link", name=re.compile("^Fix something on a page")).click()
+    page.get_by_role("link", name=re.compile("^Page 2")).first.click()
+    page.wait_for_load_state("networkidle")
+    assert page.inner_text("#decision-title").strip() == "Page 2"
+    assert page.locator("#decision #page-tools").count() == 1
+    assert "Decision" not in page.inner_text("#decision").split("Change page")[0]
+    top = page.evaluate("document.getElementById('decision-title').getBoundingClientRect().top")
+    assert 0 <= top < DESKTOP["height"]  # the tools' heading is on the first screen
     context.close()
 
 

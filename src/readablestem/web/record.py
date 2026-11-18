@@ -82,6 +82,8 @@ ACTION_WORDS = {
     "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
     "omit_page": "Left the page out of the student file and of the review",
     "restore_page": "Put the page back into the student file and the review",
+    "read_again": "Had the tool read the equation again",
+    "not_equation": "Gave the equation back to the text",
     "carried": "Carried over from the earlier version of the document",
     "relabel": "Changed a symbol in several equations at once",
     UNDO_ACTION: "Undid the decision before",
@@ -110,6 +112,20 @@ CARRIED_EDIT_WORDS = {
     "equation": "equation marked by hand",
     "page_left_out": "page left out",
 }
+# The actions that change a page and settle no decision: counted as changes to pages, apart
+# from the decisions a person made (`Record.count_line`).
+PAGE_CHANGES = frozenset(
+    {
+        "edit_text",
+        "make_heading",
+        "add_figure",
+        "add_equation",
+        "omit_page",
+        "restore_page",
+        "read_again",
+        "not_equation",
+    }
+)
 # What the tool had, for an edit on something that is not a proposal of the tool.
 STRUCTURE_TOOL_HAD = {
     "edit_text": "Text as read from the PDF",
@@ -219,6 +235,17 @@ class Record:
     # was not converted): (title, text).
     state: str = ""
     gaps: list[tuple[str, str]] = field(default_factory=list)
+    changes: int = 0  # changes a person made to pages (`PAGE_CHANGES`)
+
+    @property
+    def count_line(self) -> str:
+        """ "N decisions made by a person. M changes to pages." The page and the CSV say it
+        with these two numbers."""
+        decided = self.counts.decided
+        return (
+            f"{decided} {'decision' if decided == 1 else 'decisions'} made by a person. "
+            f"{self.changes} {'change' if self.changes == 1 else 'changes'} to pages."
+        )
 
 
 long_when = format_when  # "October 9, 2026, 14:03 UTC" (`web.dates`)
@@ -530,6 +557,7 @@ def build(
         ),
         state=state.label if state is not None else "",
         gaps=[(g.title, g.text) for g in state.gaps] if state is not None else [],
+        changes=sum(1 for e in ordered if e.action in PAGE_CHANGES),
     )
 
 
@@ -599,7 +627,8 @@ def to_csv(record: Record) -> str:
     for kind, n in record.by_kind.items():
         row("summary", f"Found: {kind}", detail=n)
     row("summary", "Accepted by the tool, no decision from a person", detail=c.accepted)
-    row("summary", "Decided by a person", detail=c.decided)
+    row("summary", "Decisions made by a person", detail=c.decided)
+    row("summary", "Changes to pages made by a person", detail=record.changes)
     s = record.checked
     # What people did, per decision (`core.triage.review_load`), the open ones first.
     for action, label in checked_words.ACTION_ROWS.items():

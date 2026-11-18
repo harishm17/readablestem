@@ -152,6 +152,25 @@ def test_a_decision_sent_twice_is_saved_once(split):
     assert split.job(split.job_id).result_version == 1
 
 
+def test_fix_something_on_a_page_opens_that_pages_tools_first_with_no_decision(split):
+    """WS19.6: the job page offers the way in; page mode puts the page's tools first under
+    "Page N", shows no decision, lists that page's optional checks, and keeps the mode when
+    the reviewer moves to another page."""
+    job_page = split.browser.get(f"/jobs/{split.job_id}").text
+    assert "/review?mode=page&amp;page=1" in job_page and "Fix something on a page" in job_page
+    html = screen(split, "?mode=page&page=2")
+    shown = panel(html)
+    before_tools = shown.split('id="page-tools"')[0]
+    heading = re.search(r'id="decision-title"[^>]*>([^<]*)<', shown)
+    assert heading and heading.group(1) == "Page 2"
+    assert "Decision" not in text_of(before_tools)  # nothing of a decision above the tools
+    assert "Decision 1 of" not in text_of(html) and 'class="steps"' not in html
+    assert "No optional checks." in html  # the one note is on page 1
+    assert "?page=1&amp;mode=page#decision-title" in html  # the page chips keep the mode
+    # An address that names an item is the ordinary screen.
+    assert "Decision 1 of" in text_of(screen(split, "?mode=page&page=2&item=p1-e2"))
+
+
 def test_the_live_check_answers_a_signed_out_session_quietly(split):
     """F-088: signed out in another tab, the session's CSRF token is gone with it; the
     check answers 204 and an empty body, not a 403 dropped into the page."""

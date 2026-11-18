@@ -371,11 +371,18 @@ def limited(rule_name: str) -> Any:
 
 
 def flash(
-    request: Request, message: str, *, element_id: str | None = None, undo: bool = True
+    request: Request,
+    message: str,
+    *,
+    element_id: str | None = None,
+    undo: bool = True,
+    edit: bool = False,
 ) -> None:
     """One-time notice for the next page. Content-free: it lives in the session cookie.
     `undo` False: the notice is not about a review write, so the review screen offers no
-    Undo under it (Undo would take back the write before, which the notice is not about)."""
+    Undo under it (Undo would take back the write before, which the notice is not about).
+    `edit`: the write was a change to a page, not a decision, so the notice does not speak of
+    decisions and its Undo is "Undo this change"."""
     items = list(request.session.get(SESSION_FLASH, []))
     # An action that restarted the deletion clock says the new time in its first notice
     # (`say_new_time`, web/retention.py).
@@ -386,6 +393,8 @@ def flash(
     entry: dict[str, Any] = {"message": message, "element_id": element_id}
     if not undo:
         entry["undo"] = False
+    if edit:
+        entry["edit"] = True
     items.append(entry)
     request.session[SESSION_FLASH] = items[-5:]
 

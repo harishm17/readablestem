@@ -113,7 +113,10 @@ def test_changing_the_words_keeps_the_equation_where_it_is(edits):
 
 def test_an_equation_may_not_be_left_out_or_repeated_or_invented(edits):
     for typed, problem in [
-        ("A rigid body turning with angular velocity omega moves a point.", "not at all"),
+        (
+            "A rigid body turning with angular velocity omega moves a point.",
+            "Keep the mark [equation 1] in the text, or remove the equation as well.",
+        ),
         ("It is [equation 1] and [equation 1] again.", "twice"),
         ("Angular velocity [equation 1] and ⟦p1-e5⟧ here.", "tool's own"),
     ]:
@@ -225,6 +228,14 @@ def test_unknown_element_or_action_is_not_found(edits):
     assert edit_post(edits, "p9-e9", action="text", text="x").status_code == 404
     assert edit_post(edits, PLAIN, action="delete", text="x").status_code == 404
     assert edit_post(edits, "p1-e2", action="text", text="x").status_code == 422  # an equation
+
+
+def test_the_notice_after_a_text_edit_names_the_edit_and_its_undo_says_change(edits):
+    done = edit_post(edits, PLAIN, action="text", text="Something else entirely.")
+    page = edits.browser.get(done.headers["location"]).text
+    notice = text_of(page.split('id="decision-notice"')[1].split("</div>")[0])
+    assert "The text was changed." in notice and "All decisions made" not in notice
+    assert "Undo this change" in notice and "this decision" not in notice
 
 
 def test_undo_gives_the_words_back(edits):

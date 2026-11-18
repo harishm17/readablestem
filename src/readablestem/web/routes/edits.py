@@ -223,7 +223,7 @@ def _page_action(
             flash(request, STALE_FLASH, undo=False)
         return back(exc.job_id, page + 1)
     log_event(logger, f"page_{action}", job_id=job_id)
-    flash(request, change.message)
+    flash(request, change.message, edit=True)
     return back(owned_id, page + 1, result)
 
 
@@ -347,7 +347,7 @@ def edit_element(
         log_event(logger, "review_invalid", job_id=job_id, action=f"edit_{action}")
         return _invalid_screen(request, job_id, user, page, element_id, exc, change=element_id)
     log_event(logger, f"edit_{action}", job_id=job_id)
-    flash(request, change.message, element_id=element_id)
+    flash(request, change.message, element_id=element_id, edit=True)
     return back_to_page(owned_id, page)
 
 
@@ -518,7 +518,7 @@ def add_region(
     except page_images.RenderFailed:
         return refuse("The page could not be read just now. Try again in a moment.", "add")
     log_event(logger, f"add_{kind}", job_id=job_id)
-    flash(request, change.message, element_id=change.shows)
+    flash(request, change.message, element_id=change.shows, edit=True)
     from readablestem.web.routes.split import review_url
 
     return RedirectResponse(

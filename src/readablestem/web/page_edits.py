@@ -290,6 +290,11 @@ TEXT_KINDS = (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING)
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 _TOKEN = re.compile(r"\[equation (\d+)\]")
 NOTHING_CHANGED = "Nothing changed: this is the text it already has."
+MARK_LEFT_OUT = "Keep the mark {token} in the text, or remove the equation as well."
+MARK_REPEATED = (
+    "“{token}” is there twice. Keep it once, where the equation belongs: "
+    "the equation itself is changed in its own decision."
+)
 NOT_TEXT = "That is not a paragraph, a list item or a heading."
 CODE_NOTE = "program code"
 
@@ -435,11 +440,8 @@ def edit_text(result: DocumentResult, element_id: str, typed: str) -> StructureC
     for marker_id in from_token.values():
         if left.get(marker_id, 0) != 1:
             token = equation_tokens(result, element)[0][marker_id]
-            many = "twice" if left.get(marker_id, 0) > 1 else "not at all"
-            message = (
-                f"“{token}” is there {many}. Keep it once, where the equation belongs: "
-                "the equation itself is changed in its own decision."
-            )
+            template = MARK_REPEATED if left.get(marker_id, 0) > 1 else MARK_LEFT_OUT
+            message = template.format(token=token)
             raise ReviewInvalid([FieldError(fid, message)], values)
     old = element.text or ""
     before = capture(

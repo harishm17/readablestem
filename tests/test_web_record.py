@@ -69,12 +69,32 @@ def test_a_decision_is_listed_with_who_when_and_what_the_tool_had(web):
     decide(web, "p1-e2", action="accept")
     decide(web, "p2-e2", action="reject")
     words = text_of(web.browser.get(f"/jobs/{web.job_id}/record").text)
-    assert "Decisions made by a person" in words
+    assert "Decisions and changes made by a person" in words
     assert "Accepted" in words and "Rejected, original kept" in words
     assert "Asked for a decision" in words  # what the tool had for the first
     assert ALICE in words  # by whom
     assert re.search(r"\w+ \d{1,2}, 20\d\d, \d\d:\d\d UTC", words)  # when
     assert "Equation 1" in words
+
+
+def test_a_change_to_a_page_is_counted_apart_from_decisions_on_the_page_and_in_the_csv(web):
+    path = f"/jobs/{web.job_id}/review"
+    web.browser.post(
+        f"/jobs/{web.job_id}/edit/p1-e4",
+        data={
+            "csrf_token": token(web.browser, path),
+            "version": str(web.job(web.job_id).result_version or 0),
+            "action": "text",
+            "text": "Something else entirely.",
+        },
+    )
+    words = text_of(web.browser.get(f"/jobs/{web.job_id}/record").text)
+    assert "0 decisions made by a person. 1 change to pages." in words
+    rows = table(web.browser.get(f"/jobs/{web.job_id}/record.csv").text)
+    summary = {r["item"]: r["detail"] for r in rows if r["section"] == "summary"}
+    assert summary["Decisions made by a person"] == "0"
+    assert summary["Changes to pages made by a person"] == "1"
+    assert sum(1 for r in rows if r["section"] == "decision") == 1
 
 
 # --------------------------------------------------------------------------- the CSV
