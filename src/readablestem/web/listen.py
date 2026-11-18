@@ -4,9 +4,12 @@ document, worked out from the final HTML, so an instructor can hear it before sh
 Three blind reviewers asked for this. It is built on the server from the same HTML the student
 gets, in reading order, with no model call:
 
-- landmarks (main, navigation, footer, regions), headings with their level ("Heading level 2:
-  Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link" before the
-  text, as screen readers say it) and the page title;
+- landmarks (main, navigation, footer, regions, in the plain words of `web.messages`, the
+  string table the review screen shares), headings with their level ("Heading level 2:
+  Kinematics"), paragraphs (a `<br>` is a pause), quotations (closed by "End quote"), lists
+  ("List, 3 items", then each item), links ("link" before the text, as screen readers say it)
+  and the page title. The title, the language, the skip link and the bare landmark that open the
+  page are marked `Item.before` (by kind, never by words): Play starts after them;
 - equations spoken by the speech rules the review screen uses (`pipeline.speech`): the
   stored reading of the equation when the job has one (the same string "Read aloud roughly
   as" shows, `speeches`), else the `alttext` the file carries, else a fresh reading of the
@@ -436,16 +439,12 @@ class _Transcript:
             if run:
                 self._path.append(self._key("run"))
                 try:
-                    self.paragraph("".join(self.inline(c) for c in run))
+                    self.run(run)
                 finally:
                     self._path.pop()
                 run.clear()
 
         for child in node.children:
-            if isinstance(child, Node) and child.tag == "a" and child.has_class("skip-link"):
-                flush()
-                self.skip_link(child)
-                continue
             if isinstance(child, str) or (child.tag in INLINE and not self._block_like(child)):
                 run.append(child)
                 continue
@@ -454,16 +453,26 @@ class _Transcript:
                 self.block(child, depth + 1)
         flush()
 
+    def run(self, nodes: list[Node | str]) -> None:
+        """A run of inline content, said as one paragraph, except the page's own "skip to
+        content" link: that is an item of its own (kind `skip-link`), said before the lesson.
+        Both come from the run's element place, so the link's id is the one it always had."""
+        part: list[Node | str] = []
+        for node in nodes:
+            if isinstance(node, Node) and node.tag == "a" and node.has_class("skip-link"):
+                self.paragraph("".join(self.inline(c) for c in part))
+                part = []
+                self.skip_link(node)
+            else:
+                part.append(node)
+        self.paragraph("".join(self.inline(c) for c in part))
+
     def skip_link(self, node: Node) -> None:
-        """The page's own "skip to content" link, said before the lesson as the link it is.
-        It takes the element place a text run there would have had, so its id is unchanged."""
-        self._path.append(self._key("run"))
-        try:
-            name = _words(self.inline(node)).removeprefix("link ")
-            if name and not self._hidden(node):
-                self.add(LISTEN_LABELS["skip-link"], name, "skip-link")
-        finally:
-            self._path.pop()
+        self._held = set()
+        name = _words(self.inline(node)).removeprefix("link ")
+        self._held = set()
+        if name and not self._hidden(node):
+            self.add(LISTEN_LABELS["skip-link"], name, "skip-link")
 
     @staticmethod
     def _block_like(node: Node) -> bool:

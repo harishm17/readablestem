@@ -30,6 +30,13 @@ conventions, kept short:
 - units: upright letters or text after a number read as a unit, "5 m/s" as "5 meters per
   second" (`speech_units`); an italic letter is a variable and is never a unit;
 - text is read verbatim, except words that are a single maths symbol ("=" -> "equals");
+- a capital letter is said "cap K" (`CAP`; a Greek capital "cap delta"), so a voice does not read
+  "capital" before every letter of a formula; the review screen's own sentences still say
+  "capital" (`in_full_words`). An upright run of letters that is a name (`\\mathrm{Var}`: one
+  `mi` per letter) adds no "cap" and no word, and an element symbol in a chemical formula adds
+  none (`speech_chem`);
+- the rules carry a version (`SPEECH_VERSION`): a reading stored by older rules, and not written
+  by a person, is made again from its MathML when it is shown (`reading_for`, `refresh_readings`);
 - two different prints are never said alike: a short fraction or subscript that a plain
   token follows directly closes itself ("1 over 2 end fraction m v squared" for `\\frac{1}{2}mv^2`,
   "1 over 2 m v squared" for `\\frac{1}{2m}v^2`);

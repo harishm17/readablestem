@@ -23,6 +23,13 @@ OpenStax's (one `mtext` for "HSO" or "2e", `mn` for a count or a charge).
 | an arrow in a table cell of its own | read with the cells around it (`row_parts`) |
 | `[`, a species, `]` | "the concentration of H 3 O plus" |
 | the electron `e` (with a raised minus) | "e minus" |
+| a coefficient (`2` before `H`, `2e`, an `mtext` "2H") | "2," then the formula: "2, H 2 O" |
+| a charge before a `+` or the next species | a comma after it: "C u 2 plus, plus 2, e minus" |
+
+A coefficient and a charge are numbers, never words, and a comma (a short pause in a voice)
+separates a coefficient from its formula and one species from the next, so "2, H 2 O" is not
+heard as "2 H 2 O" (twenty-two H, O). An element symbol is never said as a capital letter
+("cap"): the symbols of a formula add no word.
 
 Element symbols are spelled letter by letter ("N a", "C l"): a screen reader says "Na" as a
 word. Names are not substituted ("sulfate"): a reading must not say more than the page.
@@ -385,8 +392,9 @@ def _species_words(node: ET.Element) -> list[str]:
     if _is_electron(node):
         count = text[:-1]
         return [*([count + ","] if count else []), "e"]
-    if node.tag == "mtext" and _formula_text(node) is not None:
-        coefficient = _MTEXT_FORMULA.match(text).group(1)  # type: ignore[union-attr]
+    formula = _MTEXT_FORMULA.match(text) if node.tag == "mtext" else None
+    if formula is not None and _formula_text(node) is not None:
+        coefficient = formula.group(1)
         pieces = [
             _letters(piece) if piece[0].isalpha() else piece
             for piece in re.findall(r"[A-Z][a-z]?|\d+", text[len(coefficient) :])

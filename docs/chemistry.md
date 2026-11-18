@@ -175,17 +175,17 @@ one `mtext (aq)`, a nuclide as `mmultiscripts` or as an empty base with its numb
 | Fe³⁺ | F e 3 plus |
 | Na⁺ + Cl⁻ → NaCl | N a plus, plus C l minus reacts to form N a C l |
 | Ag⁺(aq) + Cl⁻(aq) → AgCl(s) | A g plus aqueous, plus C l minus aqueous, reacts to form A g C l solid |
-| 2 H₂ + O₂ ⇌ 2 H₂O | 2 H 2 plus O 2 is in equilibrium with 2 H 2 O |
+| 2 H₂ + O₂ ⇌ 2 H₂O | 2, H 2 plus O 2 is in equilibrium with 2, H 2 O |
 | CaCO₃(s) →(Δ) CaO(s) + CO₂(g) | C a C O 3 solid, reacts, with heat, to form C a O solid, plus C O 2 gas |
 | [H₃O⁺] = [OH⁻] | the concentration of H 3 O plus equals the concentration of O H minus |
 | Zn²⁺(aq, 0.10 M) | Z n 2 plus aqueous, 0.10 molar |
-| E°(Cu²⁺/Cu) | capital E degrees open parenthesis C u 2 plus slash C u close parenthesis |
+| E°(Cu²⁺/Cu) | cap E degrees open parenthesis C u 2 plus slash C u close parenthesis |
 | ⁶⁰₂₈Ni* → ⁶⁰₂₈Ni + γ | nickel 60, atomic number 28, excited state reacts to form nickel 60, atomic number 28 plus gamma |
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | ¹⁴₆C | carbon 14, atomic number 6 |
 
 Element symbols are spelled ("N a", not "Na"), counts are numbers with no "sub" (a coefficient and
-a count are told apart by the symbol between them, as a teacher says "two H two O"), a charge is
+a count are told apart by a pause: a comma follows the coefficient, "2, H 2 O", as a teacher says "two, H two O"), a charge is
 its number and its sign, a `+` after a charge or a state symbol follows a comma so it is not read
 as a second charge. Names are not substituted ("sulfate"): a reading must not say more than the
 page. A concentration is read only for a bracket around a formula; `[A]` stays "open bracket A
@@ -330,7 +330,7 @@ Twenty of the 24, as read (the rest are in the tests):
 | [H₃O⁺] = [OH⁻] = 1.0 × 10⁻⁷ M | the concentration of H 3 O plus equals the concentration of O H minus equals … |
 | rate = k[OCl⁻]²[I⁻] | rate equals k the concentration of O C l minus squared the concentration of I minus |
 | HSO₃⁻(aq) + OH⁻(aq) ⇌ SO₃²⁻(aq) + H₂O(l) | H S O 3 minus aqueous, plus O H minus aqueous, is in equilibrium with S O 3 2 minus aqueous, plus H 2 O liquid |
-| Pt(s) \| H₂(g, 1 atm) \| H⁺(aq, 1 M) ‖ Ag⁺(aq, 1 M) \| Ag(s) | P t solid, vertical bar H 2 open parenthesis g comma 1 atm close parenthesis vertical bar H plus open parenthesis a q comma 1 capital M close parenthesis double vertical bar … |
+| Pt(s) \| H₂(g, 1 atm) \| H⁺(aq, 1 M) ‖ Ag⁺(aq, 1 M) \| Ag(s) | P t solid, vertical bar H 2 open parenthesis g comma 1 atm close parenthesis vertical bar H plus open parenthesis a q comma 1 cap M close parenthesis double vertical bar … |
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | Na⁺ + Cl⁻ → NaCl | N a plus, plus C l minus reacts to form N a C l |
 

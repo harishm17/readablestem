@@ -30,11 +30,12 @@ import jinja2
 import pymupdf
 
 from readablestem.core.types import DocumentResult, Element, Fix, Kind
+from readablestem.pipeline.speech import refresh_readings
 from readablestem.web import listen, messages, speech_diff
 from readablestem.web.compare import band_clip, compare_equation, context_clip
+from readablestem.web.messages import KIND_LABELS
 from readablestem.web.review import group_fixes, item_labels
 from readablestem.web.routes.review import reject_words
-from readablestem.web.views import KIND_LABELS
 
 SITE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SITE_DIR.parent
@@ -613,6 +614,7 @@ def load_example(folder: Path) -> Example:
     pdf_path = base / meta.get("pdf", "source.pdf")
     report = json.loads(report_path.read_text(encoding="utf-8"))
     result = DocumentResult.model_validate(report["result"])
+    refresh_readings(result)  # a reading older speech rules wrote is made again, as the app does
     models = sorted({c.model for f in result.fixes for c in f.calls})
     return Example(
         id=str(meta["id"]),

@@ -1776,8 +1776,8 @@ showcase site has one per example (`site/build.py` writes `examples/<id>/listen.
 the site is built, with the same component and the same script).
 
 - **The transcript** is built on the server from the final HTML in reading order, with no
-  model call: the page title and language, landmarks, headings with their level ("Heading
-  level 2: Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link"
+  model call: the page title and language, the skip link, landmarks, headings with their level
+  ("Heading level 2: Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link"
   before the text), figures (alt text, caption, the long description inside its collapsed
   section), tables (caption, size, column headers, then up to 8 rows read with their headers
   and "…N more rows"), pictures kept as images ("Image, not converted"), page breaks and
@@ -1785,6 +1785,19 @@ the site is built, with the same component and the same script).
   as" on the review screen: the stored reading of that equation when the job has one, else the
   file's `alttext`, else `pipeline.speech` on the MathML. A reading that looks like LaTeX is
   never used (`listen.speakable`, the rule the review screen's `speakable` filter applies).
+  **Role words** are plain words from the app's string table, `web/messages.py`, the one the
+  review screen takes its item names from (`KIND_LABELS`: Equation, Figure, Table, Heading,
+  Paragraph, List item; `LISTEN_LABELS`: "Main content", "Navigation", "Side notes", "Footer",
+  "Header", "Section", "Collapsed section", "End quote", ...), never the ARIA names ("Main
+  landmark", "Content information landmark"). A `<br>` is a pause (a comma in the words), and a
+  `<blockquote>` closes with an "End quote" item.
+  **Before the lesson (F-120).** The page title, the page language, the skip link (`a.skip-link`,
+  kind `skip-link`, said "Skip link: Skip to main content") and a landmark with no name that
+  opens the content are marked `Item.before` by `listen._before_the_lesson`, from the items'
+  kinds and never from their words; the player folds them under "Before the lesson (N)" and
+  Play starts at the first item after them (`data-listen-lesson`). A page with nothing before
+  its content has no fold, and a page with no such marker starts at its first heading. The
+  items keep their ids.
 - **Kept per job result version** in memory (`listen.CACHE`, the last 32; the key also holds a
   digest of the HTML). Nothing is stored in the database, logged, or put in a downloaded or
   exported file.
@@ -1793,7 +1806,21 @@ the site is built, with the same component and the same script).
   the lesson (title, language, notices, license) are folded under "Before the lesson", an index
   of headings and equations is a list of links, and a filter (text and kind) narrows the list
   (script). The transcript is plain text, so it works without JavaScript and in a browser that
-  cannot speak; the controls are hidden until `listen.js` finds `speechSynthesis`.
+  cannot speak; the controls are hidden until `listen.js` finds `speechSynthesis`. The page's
+  title is the document's name (`documents.document_title`, the function every page uses),
+  then "Listen" ("Kinematics notes: Listen | ReadableSTEM"), for the owner and a reader alike.
+  **Layout (F-465).** The transcript has the reading width (`--prose-max`) with the role as a
+  small line above the text. In a window 64rem or wider a second column (`.listen-thing`)
+  draws the selected item itself: the equation as MathML (`Item.thing`, from the same parsed
+  MathML the reading is made from), a table's first 40 rows, or a picture when its data is under
+  150,000 characters (a larger picture is left to the student page, so a page never carries its
+  images twice). It is filled by `listen.js` from the `<template data-listen-thing>` in the
+  item's row when the place changes, and it is `aria-hidden`, never takes focus and is not a
+  live region, so a screen reader hears the item once, from the transcript; a narrow window has
+  no second column. Every item also has a link, "Student page", to its place on `/jobs/{id}/view`
+  (`Item.anchor`: the id of the element the item came from, else the nearest element before it
+  that has one, else the top of the page); the demo and the showcase pages have no student page
+  and show no link.
 - **The player** uses the browser's Web Speech API (a static file under `script-src
   'self'`). The transport is Play (which becomes Pause), Previous and Next, and stays in view;
   Play starts at the lesson. Under "More controls": Stop, Play from the beginning, next
