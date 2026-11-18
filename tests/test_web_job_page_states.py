@@ -221,6 +221,36 @@ def test_a_stopped_job_offers_no_decisions_and_nothing_to_keep(web):
     assert f'action="/jobs/{job_id}/retry"' in html
 
 
+def test_a_converter_that_went_silent_shows_restarting_and_a_running_one_shows_its_count(web):
+    """F-318, F-037: a running job whose worker stopped renewing its lease says it is
+    restarting; while it runs, the step with counts has a progress element."""
+    from datetime import timedelta
+
+    from readablestem.web.db import utcnow
+
+    job_id = convert(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.status, job.error_code, job.attempts = JobStatus.RUNNING, None, 1
+        job.lease_until = utcnow() + timedelta(minutes=5)
+        job.progress_json = {
+            "stages": {
+                "layout": {"stage": "layout", "done": 1, "total": 1, "counts": {}},
+                "equations": {"stage": "equations", "done": 9, "total": 21, "counts": {}},
+            }
+        }
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert states.TABLE["converting"].label in page_text(section_of_status(html))
+    assert '<progress max="21" value="9"' in html
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.lease_until = utcnow() - timedelta(minutes=5)
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert states.TABLE["restarting"].label in page_text(section_of_status(html))
+
+
 def test_a_job_with_no_tries_left_is_never_told_to_try_again(web):
     """F-315: with the three tries used, nothing on the page offers "Try again"."""
     job_id = convert(web)
