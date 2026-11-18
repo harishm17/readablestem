@@ -1106,7 +1106,7 @@ def demo_note_html(
         "follows are the tool's proposals; the ones marked for review have not been checked "
         "by a person.</p>\n"
         f'<p><a href="/">Back to ReadableSTEM</a>.{source}</p>\n'
-        "<details>\n<summary>Source, licence and notes</summary>\n"
+        "<details>\n<summary>Source, license and notes</summary>\n"
         f'<p>Read <a href="{esc(page.page_url, quote=True)}">the original page on '
         "openstax.org</a>. Licensed under "
         f'<a href="{esc(page.license_url, quote=True)}">{esc(page.license_name)}</a> '
