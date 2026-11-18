@@ -5,7 +5,8 @@ answers with the status word alone; which task is late, the storage, the sandbox
 production profile's hash are the admin's (`ops_report`, `/admin/health`, `/admin`).
 `/healthz` says the process answers and the database does. `/readyz` says the service can
 do its job: the database answers and takes a write within a second, the worker thread is
-alive and not stuck, and the model provider is set up. Each check is one word; nothing in the
+alive and not stuck (with `WORKER_MODE=service`, the worker process's `ops_heartbeat` rows say
+so, `web.worker_rows`), and the model provider is set up. Each check is one word; nothing in the
 answer comes from a setting's value, so a key or a connection string can never end up in it.
 
 The host sends SIGTERM and later kills the process. On Railway the gap is
