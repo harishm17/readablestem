@@ -601,6 +601,25 @@ counted are the PDF's. A page count from LibreOffice can differ from Word's. Mea
 the development box: a one-page Word file converts in under a second; with the model, a
 one-page file with a Word equation took 5.5 s and $0.014 on Claude.
 
+**The census (WS18.13).** The child's preflight returns what it counted in the file, as
+`office_convert.Census` (counts only, no text), in the header line it sends back; the upload route
+stores it on the job (`jobs.office_json`; `pending_uploads.office_json` for a large file kept for
+its parts, which hands it to each part) and the CLI uses it too. It counts with an expat target
+that builds no tree, on the parts the preflight already read, under the same size limits and
+defusedxml parser; a part that is not well formed gives partial counts. What it holds, and what
+each count is for: `tracked_insertions` and `tracked_deletions` (Word: `w:ins` and `w:del`, outside
+`mc:Fallback`) make the *required* notice `office_tracked_changes` (count = both), so a Word file
+with open changes is "Ready", never "Ready to share", with the sentence "Tracked changes ... Accept
+or reject them in Word, then upload the file again"; `speaker_notes` (slides whose notes hold text),
+`hidden_slides` and `comments` make *optional* notices (`office_speaker_notes`,
+`office_hidden_slides`, `office_comments`, "Worth checking"), because the PDF export leaves each
+of them out; `typed_equations` (OMML equations, Word and PowerPoint) is the job page's "How this
+file was read" sentence (they are read as pictures of the PDF page, like any equation in a PDF);
+`units` (slides, or the pages Word states) is built for a later charge and nothing reads it yet.
+Counted and left out because no sentence needs them (rule 12): hidden runs, fields, text boxes,
+headers and footers, footnotes, tables, pictures. The notices are added to the result when the
+worker stores it (`web/office_census.py`), so "Try again" does not list them twice.
+
 Not done: Word fields are not evaluated (an `INCLUDETEXT` field did not read the local file
 it names, tested); no PowerPoint conversion could be run on the development box (Impress is
 not installed there), so that path is covered by the file checks and a stand-in only.
@@ -714,7 +733,13 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   "Running uploaded TeX"), and `source/ltx_reader.py` turns its XHTML into elements: headings,
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
-  LaTeXML could not read, and a figure with no picture, are required decisions.
+  LaTeXML could not read, and a figure with no picture, are required decisions. **Which picture
+  a name means** (WS18.2) is decided as LaTeX does it, not by the suffix as written: the reader
+  takes the first entry of LaTeXML's `candidates` for the graphic that is inside the project and
+  of a kind it reads (`.pdf .png .jpg .jpeg .gif`); with none, the written name with those
+  suffixes in that order, as written and in capitals (pdfTeX's order); `\includegraphics{fig1}`
+  finds `fig1.png`. `.eps` and `.svg` stay unread (a figure with no picture, as before), and what
+  the picture is is decided from its bytes (`figures.figure_png`), not its name.
 - **Nothing left out unsaid** (SW42.4). A picture outside a float (centered, in a sentence, in a
   list item, in a table cell) is a figure of its own straight after the block that holds it; a
   picture in a cell makes its table a required decision (`source.read` / `source_table_picture`),

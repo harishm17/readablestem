@@ -197,6 +197,9 @@ class Job(Base):
     # one began (a job interrupted `MAX_ATTEMPTS` times since then is failed, as before).
     retries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     attempts_at_retry: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # A Word or PowerPoint upload (T3-30): the census its preflight counted (what the PDF route
+    # did with the file; `web.office_convert.Census.to_json`, counts only). NULL for a PDF.
+    office_json: Mapped[dict | None] = mapped_column(JSON)
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -499,6 +502,9 @@ class PendingUpload(Base):
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     image_pages: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     retention_mode: Mapped[str] = mapped_column(String(8), default="day", server_default="day")
+    # The census of a Word or PowerPoint file made into this PDF (`Job.office_json`), handed to
+    # every part cut from it.
+    office_json: Mapped[dict | None] = mapped_column(JSON)
     # The 0-based pages already sent to be converted, so the rest can be chosen later.
     done_pages: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

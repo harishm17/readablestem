@@ -95,6 +95,47 @@ def test_a_presentation_is_converted_the_same_way(web):
     assert send(web.browser, office.pptx(), "Slides.pptx", PPTX).status_code == 303
 
 
+def stored_notices(env) -> list[dict]:
+    """The notices of the (first) job's stored result."""
+    with session_scope(env.ctx.factory) as session:
+        job = session.scalars(select(Job).order_by(Job.created_at)).first()
+        return list((job.result_json or {}).get("notices") or [])
+
+
+def job_page(web, data: bytes, filename: str, media_type: str = DOCX) -> str:
+    """The job page of a converted upload."""
+    job_id = job_id_from(send(web.browser, data, filename, media_type))
+    assert web.run_worker() == job_id
+    return web.browser.get(f"/jobs/{job_id}").text
+
+
+def test_the_job_page_says_how_a_word_file_was_read_and_holds_back_open_changes(web):
+    page = job_page(web, office.docx_with_changes(), "Marked.docx")
+    assert "How this file was read" in page and "tagged PDF" in page
+    assert "accepted or rejected in this Word file: 2" in page  # insertions and deletions
+    assert "Comments in the original file: 1" in page
+    assert {(n["code"], n["review"], n["count"]) for n in stored_notices(web)} >= {
+        ("office_tracked_changes", "required", 2),
+        ("office_comments", "optional", 1),
+    }
+    assert "everything was converted" not in page.lower()
+
+
+def test_a_clean_word_file_has_no_office_notices_and_a_presentation_lists_what_it_dropped(web):
+    page = job_page(web, office.docx(), "Clean.docx")
+    assert "How this file was read" in page and "tracked changes" not in page.lower()
+    assert not [n for n in stored_notices(web) if n["code"].startswith("office_")]
+    deck = job_page(web, office.pptx_with_extras(), "Deck.pptx", PPTX)
+    assert "Slides with speaker notes: 1" in deck and "Hidden slides: 1" in deck
+    assert "2 equations typed in the equation editor were read as pictures" in deck
+
+
+def test_a_pdf_has_no_census(web):
+    job_id = job_id_from(send(web.browser, make_pdf(1), "plain.pdf", "application/pdf"))
+    assert jobs(web)[0].office_json is None
+    assert "How this file was read" not in web.browser.get(f"/jobs/{job_id}").text
+
+
 def test_the_name_and_media_type_decide_nothing(web):
     assert send(web.browser, office.docx(), "notes.pdf", "application/pdf").status_code == 303
     plain = make_pdf(1)

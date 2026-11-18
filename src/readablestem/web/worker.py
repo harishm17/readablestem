@@ -106,7 +106,7 @@ from readablestem.core.types import (
 )
 from readablestem.ops import limits
 from readablestem.pipeline import step_facts as pipeline_step_facts
-from readablestem.web import access, carry_edits, events, step_facts
+from readablestem.web import access, carry_edits, events, office_census, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
@@ -1181,6 +1181,10 @@ class Worker:
             # A part of a longer file: its pages are numbered as in that file, and the file
             # is made again from the result (lazily, `current_html`) to say so.
             numbered = combine_rules.number_part_pages(job, result)
+            # A Word or PowerPoint upload: what its PDF route left out or kept open (T3-30).
+            result.notices = office_census.with_notices(
+                result.notices, office_census.parse(job.office_json)
+            )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
             job.html_stale = numbered  # False: the file is made from this result

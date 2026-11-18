@@ -102,6 +102,13 @@
 {% include "_job_notices.html" %}
 {% endif %}
 
+{% if job.office_lines %}
+<section aria-labelledby="office-read-heading" id="office-read">
+  <h2 id="office-read-heading">How this file was read</h2>
+  {% for line in job.office_lines %}<p>{{ line }}</p>{% endfor %}
+</section>
+{% endif %}
+
 {% if pg.card %}
 {% include "_job_card.html" %}
 {% endif %}

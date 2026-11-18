@@ -963,7 +963,7 @@ def _place_files(
             continue
         # A Word or PowerPoint file is made into a tagged PDF first (T3-30); from here on the
         # PDF is what is probed, stored, split into parts and converted, as for any upload.
-        data, office = file.data, False
+        data, office, census = file.data, False, None
         try:
             if is_office_upload(file.data) and office_convert.input_kinds(s):
                 office = True
@@ -971,7 +971,7 @@ def _place_files(
                     raise UploadRejected("office_budget")
                 started = time.monotonic()
                 try:
-                    data = _office_to_pdf(
+                    data, census = _office_to_pdf(
                         ctx, file.data, timeout_s=min(s.office_timeout_s, office_left)
                     )
                 finally:
@@ -1020,6 +1020,7 @@ def _place_files(
                     exam,
                     revises,
                     convert_images,
+                    office=census.to_json() if census else None,
                 )
             )
             placed[-1].office = office
@@ -1038,6 +1039,7 @@ def _place_files(
                 image_pages=convert_images,
                 revises=revises,
                 now=utcnow(),
+                office=census.to_json() if census else None,
             )
         except TooManyJobs as exc:
             placed.append(
@@ -1256,6 +1258,7 @@ def _keep_for_parts(
     exam: bool,
     revises: str | None,
     image_pages: bool = False,
+    office: dict | None = None,
 ) -> Placed:
     """A file over the page or size limit is kept for the person to choose its pages
     (T3-3, `web.pending`); nothing is converted or counted until they do."""
@@ -1274,6 +1277,7 @@ def _keep_for_parts(
                 course_id=course_id,
                 exam=exam,
                 image_pages=image_pages,
+                office=office,
             )
             pending_id = row.id
     except pending.TooManyPending:
@@ -1354,9 +1358,11 @@ UPLOAD_RESULT_GONE = (
 )
 
 
-def _office_to_pdf(ctx: AppContext, data: bytes, *, timeout_s: float | None = None) -> bytes:
-    """A Word or PowerPoint upload as PDF bytes (`web.office_convert`); `UploadRejected`
-    when this server cannot take it."""
+def _office_to_pdf(
+    ctx: AppContext, data: bytes, *, timeout_s: float | None = None
+) -> tuple[bytes, office_convert.Census]:
+    """A Word or PowerPoint upload as PDF bytes with its census (`web.office_convert`);
+    `UploadRejected` when this server cannot take it."""
     s = ctx.settings
     soffice = office_convert.soffice_command(s.soffice_path)
     if not office_convert.input_kinds(s):

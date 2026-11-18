@@ -526,6 +526,17 @@ def _unanalysed_pages(result: Mapping[str, Any] | None) -> int:
     return len({n.get("page") for n in notices if n.get("code") == "drawings_not_analysed"})
 
 
+_OPEN_CHANGES_MESSAGE = (
+    "The Word file still has tracked changes, so check the notices before you share it."
+)
+
+
+def _open_changes(result: Mapping[str, Any] | None) -> bool:
+    """A stored result with the required notice for open tracked changes (`web.office_census`)."""
+    notices = (result or {}).get("notices") or []
+    return any(n.get("code") == "office_tracked_changes" for n in notices)
+
+
 def _unanalysed_message(pages: int) -> str:
     return (
         f"The drawings on {checked_words.plural(pages, 'page')} were not analyzed, so check the "
@@ -550,6 +561,10 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
     steps = (download, share) if viewer == "owner" else (download,)
     summary = counts.summary
     if summary is not None and summary.ready_to_share:
+        if _open_changes(job.result_json):
+            # A Word file whose tracked changes nobody accepted or rejected (`web.office_census`):
+            # the PDF may show deleted words, so it is not known to be the final text.
+            return _make("ready_remains", _OPEN_CHANGES_MESSAGE, steps)
         if pages := _unanalysed_pages(job.result_json):
             # The ink analysis ran out of work on these pages (`drawings_not_analysed`): the
             # page cannot say everything was converted.

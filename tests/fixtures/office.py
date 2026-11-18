@@ -268,3 +268,100 @@ def docx_with_equation() -> bytes:
         .replace("<w:sectPr>", math + "<w:sectPr>", 1)
     )
     return rebuild(parts, replace={"word/document.xml": document})
+
+
+_M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+_REVISION = 'w:id="{n}" w:author="A. Author" w:date="2026-01-01T00:00:00Z"'
+
+
+def docx_with_changes(*, insertions: int = 1, deletions: int = 1, comments: int = 1) -> bytes:
+    """`docx()` with open tracked changes (each one in a paragraph of its own) and comments. The
+    counts are by construction: a test never takes them from the reader."""
+    parts = docx_parts()
+    body = ""
+    for n in range(insertions):
+        body += f"<w:p><w:ins {_REVISION.format(n=100 + n)}><w:r><w:t>added words</w:t></w:r></w:ins></w:p>"
+    for n in range(deletions):
+        body += (
+            f"<w:p><w:del {_REVISION.format(n=200 + n)}><w:r><w:delText>deleted words</w:delText>"
+            "</w:r></w:del></w:p>"
+        )
+    for n in range(comments):
+        body += (
+            f'<w:p><w:commentRangeStart w:id="{n}"/><w:r><w:t>commented</w:t></w:r>'
+            f'<w:commentRangeEnd w:id="{n}"/><w:r><w:commentReference w:id="{n}"/></w:r></w:p>'
+        )
+    document = str(parts["word/document.xml"]).replace("<w:sectPr>", body + "<w:sectPr>", 1)
+    replace = {"word/document.xml": document}
+    add: dict[str, bytes | str] = {}
+    if comments:
+        add["word/comments.xml"] = (
+            HEAD
+            + f'<w:comments xmlns:w="{W_NS}">'
+            + "".join(
+                f'<w:comment w:id="{n}" w:author="A. Author"><w:p><w:r><w:t>a remark</w:t></w:r></w:p>'
+                "</w:comment>"
+                for n in range(comments)
+            )
+            + "</w:comments>"
+        )
+        replace["[Content_Types].xml"] = str(parts["[Content_Types].xml"]).replace(
+            "</Types>",
+            '<Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-'
+            'officedocument.wordprocessingml.comments+xml"/></Types>',
+        )
+        replace["word/_rels/document.xml.rels"] = str(
+            parts["word/_rels/document.xml.rels"]
+        ).replace(
+            "</Relationships>",
+            f'<Relationship Id="rId7" Type="{OD}/comments" Target="comments.xml"/></Relationships>',
+        )
+    return rebuild(parts, replace=replace, add=add)
+
+
+def pptx_with_extras(*, equations: int = 2) -> bytes:
+    """`pptx()` where slide 1 has speaker notes and `equations` typed equations and slide 2 is
+    hidden; one comment on slide 2 and a notes slide with no text on it for slide 2."""
+    parts = pptx_parts()
+    math = (
+        f'<p:sp><p:nvSpPr><p:cNvPr id="9" name="Eq"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/>'
+        f'<p:txBody><a:bodyPr/><a:p><a14:m xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main">'
+        f'<m:oMathPara xmlns:m="{_M_NS}"><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></m:oMathPara></a14:m>'
+        "</a:p></p:txBody></p:sp>"
+    ) * equations
+    slide1 = str(parts["ppt/slides/slide1.xml"]).replace("</p:spTree>", math + "</p:spTree>", 1)
+    slide2 = str(parts["ppt/slides/slide2.xml"]).replace("<p:sld ", '<p:sld show="0" ', 1)
+
+    def notes(text: str) -> str:
+        return (
+            HEAD + f"<p:notes {_P_NS}><p:cSld><p:spTree>{_TREE}"
+            '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image"/><p:cNvSpPr/><p:nvPr>'
+            '<p:ph type="sldImg"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>'
+            '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr/><p:nvPr><p:ph type="body" '
+            'idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:p><a:r>'
+            f"<a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>"
+        )
+
+    return rebuild(
+        parts,
+        replace={
+            "ppt/slides/slide1.xml": slide1,
+            "ppt/slides/slide2.xml": slide2,
+            "ppt/slides/_rels/slide1.xml.rels": _rels(
+                ("rId1", "slideLayout", "../slideLayouts/slideLayout1.xml"),
+                ("rId2", "image", "../media/image1.png"),
+                ("rId3", "notesSlide", "../notesSlides/notesSlide1.xml"),
+            ),
+            "ppt/slides/_rels/slide2.xml.rels": _rels(
+                ("rId1", "slideLayout", "../slideLayouts/slideLayout1.xml"),
+                ("rId3", "notesSlide", "../notesSlides/notesSlide2.xml"),
+            ),
+        },
+        add={
+            "ppt/notesSlides/notesSlide1.xml": notes("Say this aloud"),
+            "ppt/notesSlides/notesSlide2.xml": notes("  "),
+            "ppt/comments/comment1.xml": HEAD
+            + f'<p:cmLst {_P_NS}><p:cm authorId="0" dt="2026-01-01T00:00:00.000" idx="1">'
+            '<p:pos x="10" y="10"/><p:text>a remark</p:text></p:cm></p:cmLst>',
+        },
+    )

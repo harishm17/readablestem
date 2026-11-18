@@ -893,6 +893,13 @@ NOTICE_CODES = frozenset(
         # LaTeX source: words or pictures no rule of the reader took (`source.report`
         # `SourceReport.unread_words`, `unread_pictures`): `count` of them.
         "source_unread",
+        # Word or PowerPoint upload (`web.office_census`): what the PDF route left out or kept
+        # open, counted from the file. Tracked changes still open are required; the rest are
+        # optional. `count` is the number of changes, notes, slides or comments.
+        "office_tracked_changes",
+        "office_speaker_notes",
+        "office_hidden_slides",
+        "office_comments",
     }
 )
 

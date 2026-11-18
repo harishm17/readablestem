@@ -512,6 +512,15 @@ NOTICE_MESSAGES: dict[str, str] = {
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
     "source_unread": "This tool could not read part of the LaTeX source, so it is not in the file.",
+    # Word and PowerPoint uploads (`web.office_census`); "{count}" is the number counted.
+    "office_tracked_changes": "Tracked changes (insertions and deletions) that nobody "
+    "accepted or rejected in this Word file: {count}. The PDF this was read from may show "
+    "words that were deleted and not yet the final text. Accept or reject them in Word, then "
+    "upload the file again, before you give this to students.",
+    "office_speaker_notes": "Slides with speaker notes: {count}. The notes are not in this "
+    "file: only the slides were read.",
+    "office_hidden_slides": "Hidden slides: {count}. They are not in this file.",
+    "office_comments": "Comments in the original file: {count}. They are not in this file.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
