@@ -512,6 +512,8 @@ class _Reader:
                     self._list(block["t"], block["c"], level + 1, depth + 1)
                 else:
                     self.block(block, depth + 1)
+            if not text.strip() and self.out.elements[-1] is element:
+                self._drop(element)  # an empty item holds no word and no child: a blank line
 
     # ------------------------------------------------------------------ tables
 
