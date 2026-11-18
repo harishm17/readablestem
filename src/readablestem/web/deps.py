@@ -332,6 +332,11 @@ REFUSAL_WORDS: dict[str, tuple[str, str, dict[str, Any]]] = {
         "can still sign in.",
         _SIGN_IN_BACK,
     ),
+    "zip_user": (
+        "Too many zip downloads",
+        "Several zip files of your documents were made in the last few minutes.",
+        {},
+    ),
 }
 
 

@@ -180,6 +180,26 @@ def test_refused_requests_in_a_loop_are_still_stopped_per_address(web):
     assert statuses[address.limit :] == [429, 429]
 
 
+def test_the_zip_routes_share_one_per_person_allowance(web):
+    """A zip builds every ready document's files, so the four zip routes count against one
+    rule per person: the wait comes back in `Retry-After`, and another person is not held."""
+    login(web.browser, ALICE)
+    rule = web.ctx.limiter.rules["zip_user"]
+    first = [web.browser.get("/app/download").status_code for _ in range(rule.limit - 1)]
+    assert first == [409] * (rule.limit - 1)  # nothing is ready: the build was still asked for
+    assert web.browser.head("/app/download").status_code == 200  # a HEAD builds nothing: free
+    assert web.browser.get("/account/export").status_code == 200  # the last one allowed
+    refused = web.browser.get("/app/download?format=docx")
+    assert refused.status_code == 429
+    assert int(refused.headers["retry-after"]) > 0
+    assert "Too many zip downloads" in refused.text
+    assert web.browser.get("/account/export").status_code == 429
+    bob = web.client()
+    login(bob, BOB)
+    assert bob.get("/app/download").status_code == 409
+    bob.close()
+
+
 def test_a_normal_afternoon_is_never_limited(web):
     """Several uploads and page loads by one person stay inside every allowance."""
     login(web.browser, ALICE)
