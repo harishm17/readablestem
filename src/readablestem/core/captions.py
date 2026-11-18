@@ -13,8 +13,8 @@ from __future__ import annotations
 import re
 
 _NUMBER = (
-    r"\s*(?:\d+[A-Za-z]?(?:[.\-–]\d+[A-Za-z]?)*|[IVXLC]{1,6}\b)"
-    r"(?:\s*[.:|–—-]\s*|\s+(?=[A-Z(\"'“])|\s*$)"
+    r"\s*(?:\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*|[IVXLC]{1,6}\b)"
+    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
 )
 
 # "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", "TABLE IV. ...".
