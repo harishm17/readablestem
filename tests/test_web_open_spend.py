@@ -264,14 +264,14 @@ def test_a_review_read_for_a_new_account_draws_on_the_pool(tmp_path):
         assert env.ctx.guard.snapshot().open_spent_usd > before
 
         spend_pool(env, spent=1.0)
-        refused = mark_region(env)
+        refused = mark_region(env, {"left": "10", "top": "20", "right": "50", "bottom": "35"})
         assert refused.status_code == 422
         text = " ".join(refused.text.split())
         assert reread.OPEN_POOL_REFUSAL in text.replace("&#39;", "'")
 
 
-def mark_region(env):
-    box = {"left": "10", "top": "55", "right": "50", "bottom": "70"}
+def mark_region(env, box=None):
+    box = box or {"left": "10", "top": "55", "right": "50", "bottom": "70"}
     path = f"/jobs/{env.job_id}/review"
     version = str(env.job(env.job_id).result_version or 0)
     data = {"csrf_token": token(env.browser, path), "version": version, "kind": "equation"}
