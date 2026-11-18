@@ -8,7 +8,7 @@ from before it is filled the first time a list reads it, as `open_decisions` was
 downgrade drops the column.
 
 Revision ID: e4b8c2d6a193
-Revises: 9d3e5a7c1f24
+Revises: e4b7a1c9d352
 Create Date: 2026-11-18 15:00:00.000000+00:00
 """
 
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e4b8c2d6a193"
-down_revision: str | Sequence[str] | None = "9d3e5a7c1f24"
+down_revision: str | Sequence[str] | None = "e4b7a1c9d352"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -384,9 +384,12 @@ def _set_state(job: Job, key: str) -> None:
     elif key in {"partly_converted", "ready", "ready_remains", "sample"}:
         job.result_json = _decide_all(job.result_json or {})
         if key == "ready":  # and every part converted: nothing a picture, no check failing
-            result = job.result_json
+            result = dict(job.result_json)
             result["elements"] = [e for e in result["elements"] if e["kind"] == "heading"]
             result["fixes"], result["html_checks"] = [], []
+            job.result_json = (
+                result  # stored as the app stores one: assigned, never changed in place
+            )
         job.error_code = "pages_not_converted" if key == "partly_converted" else None
         job.is_sample = key == "sample"
     elif key == "deleted":
