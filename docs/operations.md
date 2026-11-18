@@ -11,8 +11,8 @@ cover.
 | What | When | Where |
 |---|---|---|
 | Aggregate, then purge | Hourly at minute 7, the Railway `cron` service | `readablestem ops cron`: needs only the database, prints `aggregated_jobs=... jobs_deleted=...`, exits 1 if aggregation failed (after the purge ran). The HTTP route `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, logs `cron_done`) does the same work, but nothing in production calls it |
-| Decisions canary | Not run in production | Only the HTTP cron route runs it (`ops.canary.maybe_run_daily`), and it is OpenAI's Decisions API, which is off under `MODEL_PROVIDER=anthropic`. By hand only. See "Decisions canary" below |
-| Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
+| Decisions canary | Once per UTC day, in `ops cron` and the HTTP cron route (`ops.canary.run_daily`) | It is OpenAI's Decisions API, so under `MODEL_PROVIDER=anthropic` (production) it answers `provider_not_openai` and does nothing. See "Decisions canary" below |
+| Claude canary | Once per UTC day, in `ops cron` and the HTTP cron route (`ops.canary.run_daily`) | Does nothing while `CLAUDE_SECOND_CHECK` is `off` (its value in code and in production). By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
 | Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to a `.part` file, checked (gzip, completion line, restore into a scratch database, every table and the schema version present), then moved into the `/backups` volume; dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`, or `backup_failed reason=...` and exit 1. Records the `backup` heartbeat. See "Backups and restore" |
 | Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes (which one is late is on the admin page, `/admin`), and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
@@ -447,9 +447,8 @@ of the model or the service, seen the day it happens.
   away) logs one ERROR line `decisions_canary_drift` with the counts, the largest move
   and the case ids, and the command exits 1. A case that got no answer is
   `decisions_canary_incomplete` (WARNING), not drift.
-- **In the HTTP cron route** (`POST /internal/cron/aggregate-and-purge`), after the purge:
-  at most once per UTC day. The Railway cron service runs `ops cron` instead, which does
-  not run it, so no canary runs in production unless something calls the route. The first cron run of the day claims it by inserting the
+- **In `ops cron` and the HTTP cron route** (`POST /internal/cron/aggregate-and-purge`),
+  after the purge: at most once per UTC day. The first cron run of the day claims it by inserting the
   aggregate row (day, `canary`, `decisions:run`) if it is missing, so two instances or
   two runs cannot both send it; a claimed day is not retried, even if the run failed.
   Fail-open: nothing about the canary changes the cron's response or its status code.
@@ -457,7 +456,7 @@ of the model or the service, seen the day it happens.
   key. It reserves through a `JobBudget` of $0.02 on the daily spend cap (dollars only:
   Decisions requests are not model calls, and the budget allows none); a run costs
   about $0.00075 and takes about 3 s; cases still unsent after 60 s count as failed
-  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` does not run it; use the command below.
+  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` runs it too (`ops.canary.run_daily`), through the same day claim; its status is in the cron heartbeat's note and on `/admin`.
 - **By hand:** `uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02`
   (exit 0 no drift, 1 drift, 2 could not compare). After a deliberate change (new
   question wording, new canary cases) or a drift you have looked at and accept:
@@ -476,10 +475,12 @@ failures, for example the weekly GitHub workflow.
 | `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Railway's deploy health check (`.railway/railway.ts`); the Dockerfile's HEALTHCHECK for local Docker |
 | `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | GitHub `uptime.yml` every 5 minutes; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
 | `GET /healthz/ops` | 200 `{"status":"ok"}`, or 503 `{"status":"stale"}`: the status word and nothing else, so it says no task, setting or number to someone who is not signed in | GitHub `uptime.yml` every 3 hours, which reads the status code; you, with `curl` |
-| `GET /admin/health` | Admin only. The same status code with the detail: `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}`; `stale` names only the tasks that are late (`database` if the table could not be read, `storage` while full). The admin page shows the same under "Scheduled tasks, storage and sandbox" | you, signed in as an admin |
+| `GET /admin/health` | Admin only. The same status code with the detail: `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}`; `stale` names only the tasks that are late (`database` if the table could not be read, `storage` while full). The admin page shows the same under "Scheduled tasks, storage and sandbox", with the latest result and day of each daily canary (`canaries`; "Daily checks"), read from the day's counts | you, signed in as an admin |
 
-`/readyz` has three checks, each one word and never a setting's value (so no key, URL or
-model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
+`/readyz` has four checks, each one word and never a setting's value (so no key, URL or
+model name can leak): `database` (`ok`, `unreachable`), `database_write` (`ok`, or `failed`
+when a write that touches no data is not accepted within 1 second, as when another connection
+holds the write lock: pages that only read still work then), `worker` (`ok`; `disabled` when
 `RUN_WORKER=false`; `stopping` after SIGTERM; `stopped` if the thread died; `stalled` if
 neither the loop nor a running conversion has shown life for six minutes; `not_started`),
 `model_provider` (`ok`; `no_key` if the selected provider's key is empty; `unpriced_model`;

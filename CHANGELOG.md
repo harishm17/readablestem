@@ -2,6 +2,17 @@
 
 ## Unreleased: platform guards, second batch (branch fix/platform-guards-2)
 
+- WS12.5 (F-215, F-342, F-343), parts (a), (b) and (f). (a) was already built (WS26.2): `/admin`
+  shows the late backup, cron and the full storage from `ops_freshness`, the function
+  `/healthz/ops` uses; it now also shows the latest result of each daily canary ("Daily checks",
+  and `canaries` in `/admin/health`). (b) `readablestem ops cron` runs both canaries once per UTC
+  day through `canary.run_daily`, which the HTTP route calls too, and notes their status in the
+  cron heartbeat. Both stay off in production while `CLAUDE_SECOND_CHECK` is `off` and the
+  provider is not OpenAI, so no spend starts. (f) `/readyz` gains `database_write`: a write that
+  changes nothing, with a 1 second limit, and not ready when it fails (with a second connection
+  holding the write lock, `/readyz` answered ready while every POST waited 5 to 7 seconds). The
+  public `/healthz/ops` is unchanged: the status word only.
+
 - WS26.3 (ZS-3, F-159, F-366): the per-person upload rule (`upload_user`) counts accepted files
   only. A refused upload, or a part that is not started, gives its count back
   (`RateLimiter.give_back`, from `create_job` and `convert_parts`). The per-address `upload` rule

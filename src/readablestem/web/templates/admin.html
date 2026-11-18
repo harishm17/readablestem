@@ -93,6 +93,9 @@
     {% if ops.storage %}
     <div><dt>Stored uploads</dt><dd>{{ ops.storage.stored_mb }} MB of {{ ops.storage.limit_mb }} MB{% if ops.storage.full %} (full: new uploads are refused){% endif %}</dd></div>
     {% endif %}
+    {% if ops.canaries %}
+    <div><dt>Daily checks</dt><dd>{% for name, label in (("decisions", "Decisions"), ("claude", "Claude second check")) %}{{ label }}: {% if ops.canaries[name] %}{{ ops.canaries[name].status }} on {{ ops.canaries[name].day }}{% else %}no result in the last 7 days{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</dd></div>
+    {% endif %}
     <div><dt>Sandbox probe</dt><dd>{{ ops.sandbox.state }}</dd></div>
   </dl>
   <p>The same as JSON: <a href="/admin/health">/admin/health</a>.</p>

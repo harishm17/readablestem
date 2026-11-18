@@ -4,9 +4,9 @@
 answers with the status word alone; which task is late, the storage, the sandbox probe and the
 production profile's hash are the admin's (`ops_report`, `/admin/health`, `/admin`).
 `/healthz` says the process answers and the database does. `/readyz` says the service can
-do its job: the database answers, the worker thread is alive and not stuck, and the model
-provider is set up. Each check is one word; nothing in the answer comes from a setting's
-value, so a key or a connection string can never end up in it.
+do its job: the database answers and takes a write within a second, the worker thread is
+alive and not stuck, and the model provider is set up. Each check is one word; nothing in the
+answer comes from a setting's value, so a key or a connection string can never end up in it.
 
 The host sends SIGTERM and later kills the process. On Railway the gap is
 `RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, 10 seconds for `web` (.railway/railway.ts). uvicorn
@@ -22,13 +22,16 @@ import logging
 import signal
 import threading
 from collections.abc import Callable
+from datetime import timedelta
 from types import FrameType
+
+from sqlalchemy import select, text
 
 from readablestem.config import Settings
 from readablestem.ops import heartbeat, profile
 from readablestem.web import storage
 from readablestem.web.database import ping
-from readablestem.web.db import session_scope
+from readablestem.web.db import ErrorAggregate, OpsHeartbeat, session_scope, utcnow
 from readablestem.web.deps import AppContext
 from readablestem.web.logsafe import log_event
 
@@ -42,10 +45,65 @@ def readiness(ctx: AppContext) -> tuple[bool, dict[str, str]]:
     """(ready, one word per check). `ctx` is the web `AppContext`."""
     checks = {
         "database": "ok" if ping(ctx.engine) else "unreachable",
+        "database_write": _write_check(ctx.engine),
         "worker": _worker_check(ctx),
         "model_provider": _provider_check(ctx.settings),
     }
     return all(v in {"ok", "disabled", "fake"} for v in checks.values()), checks
+
+
+# A write that waits longer than this says the database cannot take writes right now: another
+# connection holds the write lock (SQLite), or the database is read-only or stuck (Postgres).
+WRITE_CHECK_MS = 1000
+_WRITE_PROBE = "readyz"  # a name no task writes: the check updates it, finds no row, rolls back
+
+
+def _write_check(engine) -> str:
+    """ "ok" when a write is accepted within `WRITE_CHECK_MS`, else "failed". The write is an
+    UPDATE of a row that does not exist, rolled back: it takes the write lock like any write and
+    changes nothing. A GET page works while every write waits (a second connection holding the
+    lock), so `/readyz` has to try one."""
+    try:
+        with engine.connect() as conn:
+            dialect = conn.dialect.name
+            previous = None
+            if dialect == "sqlite":
+                previous = conn.exec_driver_sql("PRAGMA busy_timeout").scalar()
+                conn.exec_driver_sql(f"PRAGMA busy_timeout={WRITE_CHECK_MS}")
+            elif dialect == "postgresql":
+                conn.execute(text(f"SET LOCAL statement_timeout = {WRITE_CHECK_MS}"))
+            try:
+                conn.execute(
+                    OpsHeartbeat.__table__.update()
+                    .where(OpsHeartbeat.name == _WRITE_PROBE)
+                    .values(detail=None)
+                )
+            finally:
+                conn.rollback()
+                if previous is not None:
+                    conn.exec_driver_sql(f"PRAGMA busy_timeout={int(previous)}")
+    except Exception:
+        return "failed"
+    return "ok"
+
+
+def canary_days(session, days: int = 7) -> dict[str, dict[str, str] | None]:
+    """The latest result of each daily canary (`ops.canary.run_daily`) in the last `days` days:
+    {"decisions": {"day": ..., "status": ...}, "claude": ...}, None for one with no result (it
+    is off here, or has not run). Read from the day's counts, so it is the same whichever of the
+    HTTP cron route and `ops cron` ran it."""
+    since = (utcnow() - timedelta(days=days)).date()
+    rows = session.execute(
+        select(ErrorAggregate.day, ErrorAggregate.category)
+        .where(ErrorAggregate.step == "canary", ErrorAggregate.day >= since)
+        .order_by(ErrorAggregate.day.desc())
+    ).all()
+    found: dict[str, dict[str, str] | None] = {"decisions": None, "claude": None}
+    for day, category in rows:
+        kind, _, status = category.partition(":")
+        if kind in found and found[kind] is None and status and status != "run":
+            found[kind] = {"day": day.isoformat(), "status": status}
+    return found
 
 
 def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
@@ -65,18 +123,21 @@ def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
 
 def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
     """`(fresh, details)` for the admin: the status word, the stale names, the storage
-    report, the sandbox probe and the production profile's hash. None of it is public
-    (`/healthz/ops` gives the word only)."""
+    report, the daily canaries' latest results, the sandbox probe and the production profile's
+    hash. None of it is public (`/healthz/ops` gives the word only)."""
     ok, stale = ops_freshness(ctx)
+    canaries: dict[str, dict[str, str] | None] | None
     try:
         with session_scope(ctx.factory) as session:
             stored: dict[str, int | bool] | None = storage.report(session, ctx.settings)
+            canaries = canary_days(session)
     except Exception:
-        stored = None
+        stored, canaries = None, None
     details: dict[str, object] = {
         "status": "ok" if ok else "stale",
         "stale": stale,
         "storage": stored,
+        "canaries": canaries,
         "sandbox": ctx.sandbox.public(),
         # The production profile's hash (ops/profile.py): it names no setting and no value,
         # but it says which settings run, so it is the admin's, not the public route's.
