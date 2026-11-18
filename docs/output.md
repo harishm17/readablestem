@@ -716,8 +716,8 @@ that overflows is a tab stop, that arrow keys scroll it, and axe.
 
 ## On paper
 
-Nothing scrolls on a sheet, so the print block of the stylesheet (`student_sheet.CORE`,
-`TABLE_CSS`, `CODE_CSS`) makes sure nothing is cut without a mark (SW45 rule 6; the rest of
+Nothing scrolls on a sheet, so the print block of the stylesheet (`student_sheet.PRINT`,
+`TABLE` and `CODE` there) makes sure nothing is cut without a mark (SW45 rule 6; the rest of
 the print build waits for WS21.1):
 
 - A table wraps inside the sheet (`overflow-wrap: anywhere` in its cells, no scroll box).
@@ -1347,8 +1347,28 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 
 ## Styling
 
-About 35 lines of inline CSS:
+About 100 lines of inline CSS, all of it in one module, `pipeline/student_sheet.py`. The sheet
+is a set of named parts: the core every page has (base, headings, equation, lists, hidden
+text, figure, kept picture and notice, about, skip link, then the narrow-screen, print and
+dark blocks), and the parts a page gets only when it uses them (code, definition list,
+table, contents list, page marker, footnote, figure description, stacked scripts, struck
+text, colored text, the print fit of a wide equation, the image-page note). Three builds
+are made from the parts: the screen build is what the page carries; the EPUB build
+(`student_sheet.epub`, below) is the same text cut by the EPUB writer; and what the Canvas
+export may carry into `style` attributes (`student_sheet.CANVAS_PROPERTIES`) is defined
+beside them.
 
+- the type scale, in em of the 1.125rem (18 px) text: h1 2 (36 px), h2 1.5 (27), h3 1.3
+  (23.4), h4 1.15 (20.7); h5 and h6 stay at the text's size, never under it, and are told
+  apart from it and from each other by weight and style (h5 bold, h6 bold italic). Captions,
+  the notes beside a kept picture, footnotes and page markers are one step smaller, 0.9 em
+  (16.2 px), with more room above a caption. No text on the page is under 14 px; the
+  exceptions are sub- and superscripts, the stacked scripts of a nuclide or an ion
+  (`0.75em`) and the scripts inside math, which the browser sizes. The scale is the same
+  in the EPUB (sizes are relative there, so it follows the reader's own text size) and in
+  the standalone Canvas page; the Canvas page for pasting leaves heading sizes to Canvas's
+  own theme (rules on bare `h1` to `h6` are not carried into it). The Word file is made by
+  pandoc and takes none of it;
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
   (about 17:1 contrast; for a dark scheme see "Dark colors");
 - images at their printed size (PDF points x 96/72) and never wider than the column; an

@@ -3,8 +3,8 @@
 The sheet is a set of named parts and the builds made from them:
 
 - **Screen** (`screen`): what the page carries in its `<style>`. The core is the parts that
-  every page has (`CORE_PARTS`, in this order: base, equation, lists, hidden text, figure, flag
-  and notice, about, skip link, then the narrow-screen, print and dark blocks). The
+  every page has (`CORE_PARTS`, in this order: base, headings, equation, lists, hidden text,
+  figure, flag and notice, about, skip link, then the narrow-screen, print and dark blocks). The
   feature parts (`CODE`, `DEFINITIONS`, `IMAGE_PAGE`, `TABLE`, `CONTENTS`, `PAGE_MARKER`,
   `FOOTNOTE`, `FIGURE_DESCRIPTION`, `SCRIPT_STACK`, `DELETED`, `colour`, `print_fit`) are
   added only to a document that uses them (`assemble._Renderer.add_style`, once per name) and
@@ -38,9 +38,20 @@ BASE = """\
 body { margin: 0; background: #ffffff; color: #1b1b1b;
   font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
-h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
+"""
+# The heading scale (F-445), in em of the 18 px text: a step at every level down to h4, and
+# h4 larger than the text. h5 and h6 stay at the text's size, never under it, and are told apart
+# from it and from each other by weight and style: h5 is bold, h6 is bold and italic.
+HEADINGS = """\
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
+h1 { font-size: 2em; }
+h2 { font-size: 1.5em; }
+h3 { font-size: 1.3em; }
+h4 { font-size: 1.15em; }
+h5 { font-size: 1em; }
+h6 { font-size: 1em; font-style: italic; }
 """
 EQUATION = """\
 .equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
@@ -69,7 +80,7 @@ HIDDEN = """\
 FIGURE = """\
 figure { margin: 1.5em 0; }
 figure img { display: block; }
-figcaption { margin-top: 0.5em; }
+figcaption { margin-top: 0.75em; font-size: 0.9em; }
 """
 # A picture kept for what could not be read as text, a notice, and the tool's note beside them.
 FLAG = """\
@@ -80,7 +91,7 @@ FLAG = """\
 .flagged-inline { display: inline-block; max-width: 100%; vertical-align: middle;
   line-height: 1.25; border: 2px dashed #8a3c00; padding: 0.1em 0.2em; }
 .flagged-inline img { vertical-align: middle; }
-.flag-note { margin: 0.75em 0 0; }
+.flag-note { margin: 0.75em 0 0; font-size: 0.9em; }
 .flag-label { font-weight: 700; }
 .original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
 """
@@ -130,6 +141,7 @@ DARK = """\
 """
 CORE_PARTS = (
     BASE,
+    HEADINGS,
     EQUATION,
     LISTS,
     HIDDEN,
@@ -223,14 +235,15 @@ CONTENTS = f"""\
 """
 PAGE_MARKER = """\
 .pagebreak { margin: 1.5em 0 0.5em; padding: 0.25em 0 0; border-top: 1px solid #767676;
-  font-size: 0.8rem; color: #595959; text-align: right; }
+  font-size: 0.9em; color: #595959; text-align: right; }
 .pagebreak hr { margin: 0; padding: 0; border: 0; height: 0; }
 @media screen and (prefers-color-scheme: dark) {
   .pagebreak { border-top-color: #8c8c8c; color: #c4c4c4; }
 }
 """
 FOOTNOTE = """\
-.backlink { font-size: 0.85em; margin-left: 0.5em; }
+[role="doc-footnote"] { font-size: 0.9em; }
+.backlink { margin-left: 0.5em; }
 """
 # A figure description. No new colours: the summary is the body text, bold, with the browser's
 # own marker. A closed description prints open (F-436): where the browser can draw a closed

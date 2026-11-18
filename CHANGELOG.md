@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: one source for the student sheet, and a type scale (branch refactor/student-sheet-one-source)
+
+- WS21.1: the student page's stylesheet is one module, `pipeline/student_sheet.py`, as named
+  parts (the core, then a part for each feature a page gets only when it uses it) and the
+  builds made from them: the screen sheet, the EPUB cut (`student_sheet.epub`, moved from
+  `export_epub`) and what the Canvas inliner may carry (`CANVAS_PROPERTIES` and its rewrites,
+  moved from `export_canvas`). The constants of `assemble`, `assemble_tables`, `navigation`,
+  `figure_details` and `inline_text` are gone; `colour_css` is `student_sheet.colour`. A pure
+  move: 22 pages, their Canvas files and their EPUBs came out byte for byte the same (577
+  files). `RENDER_VERSION` stays in `assemble` (many modules import it).
+- WS21.5 (F-445): a type scale. h1 to h4 step down from 36 px to 20.7 px (h4 was the size of
+  the text), h5 and h6 are the size of the text and told apart by weight and style (they were
+  14.9 and 12.1 px). Captions, the notes beside a kept picture, footnotes and page markers
+  are 0.9 em (16.2 px; page markers were 12.8 px). No text on the page is under 14 px outside
+  sub- and superscripts and maths. Colors are unchanged. RENDER_VERSION stays 8 (not shipped).
+  No model call, no stored-data change, no migration, no version bump.
+
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 
 - WF52 (F-497): a tab nobody is looking at no longer asks the server for the job's status,
