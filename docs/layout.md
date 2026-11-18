@@ -2568,7 +2568,18 @@ on paragraphs, list items and headings. Each element with runs gets the optional
 `struck_text` (with its page; no required decision). Glyphs are now read on any page with a
 strike mark, not only on pages with links or color.
 
-With `CONTENT_RUNS` off (the default, shadow rollout) the runs are found and counted
+Two checks beyond the band rule, both in `text_pass`. A drawn mark that would strike text must
+also show on the page (`drawn_strikes`): a strip of the page along it is rendered (8 pixels to
+the point) and 90% of its columns must be inked, since a vector figure can keep a legend
+sample in its drawings that its clip hides, and a reader who sees no line sees no deleted
+text. Only marks that cross glyphs are rendered. And an inline equation the page strikes
+through (a majority of its glyphs struck) is a run that is its marker alone (`deleted_runs`).
+What is not found, named: a struck table cell (cells carry no runs) and a struck display
+equation (equation elements carry no runs). `layout.page_strikes` still lists marks that the
+page clips away or covers (`layout.py`, `page_strikes`: it reads `get_cdrawings()` without the
+clip entries), which is why the text pass renders the ones that matter.
+
+With `CONTENT_RUNS` off (the shadow rollout, the default until 2026-11-18) the runs are found and counted
 (`TextPassResult.deleted_runs`, trace `deleted_runs` and `deleted_runs_written: 0`) but not
 stored, and no notice is raised. The LaTeX path follows the same switch for its `\sout` runs.
 

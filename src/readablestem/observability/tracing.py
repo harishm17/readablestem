@@ -80,7 +80,18 @@ ALLOWED_ATTRIBUTES = frozenset(
     }
 )
 # Counts: numbers only, never strings.
-COUNT_ATTRIBUTES = frozenset({"calls", "model_calls", "elements", "tasks", "fixes", "count"})
+COUNT_ATTRIBUTES = frozenset(
+    {
+        "calls",
+        "model_calls",
+        "elements",
+        "tasks",
+        "fixes",
+        "count",
+        "deleted_runs",
+        "deleted_runs_written",
+    }
+)
 # Steps that call a model. A span opened with one of these as `step` (or with `model=`)
 # becomes a Langfuse generation, so the model, tokens and cost set on it later land in
 # Langfuse's cost views. The type is fixed when the span starts, so it is decided then.

@@ -12,6 +12,7 @@ import re
 import pytest
 
 from readablestem.core.types import (
+    INLINE_MARKER_RE,
     DocumentResult,
     DocumentStats,
     Element,
@@ -491,7 +492,8 @@ def test_a_language_name_or_tag_is_accepted_and_anything_else_refused():
 
 def struck_page() -> bytes:
     """A syllabus page: a date struck through by a drawn line, a word struck by a StrikeOut
-    annotation, an underlined word, a rule under a blank to fill in and the corner of a plot."""
+    annotation, an underlined word, a rule under a blank to fill in, the corner of a plot and
+    a line the page paints over."""
     import pymupdf
 
     doc = pymupdf.open()
@@ -501,6 +503,8 @@ def struck_page() -> bytes:
         160: "Lab 3 is cancelled and moved to Friday.",
         220: "You must not bring a phone to the exam.",
         280: "Name:",
+        340: "The answer is x = 12 and not 13 today.",
+        430: "The room is hidden behind a rule that never shows.",
     }
     for y, words in lines.items():
         page.insert_text((72, y), words, fontsize=12)
@@ -520,6 +524,13 @@ def struck_page() -> bytes:
     tick = under(400, "1.0")
     page.draw_line((tick.x1 + 3, 380), (tick.x1 + 3, 520), width=0.6)
     page.draw_line((tick.x1 + 9, 400 + 1.5), (tick.x1 + 27, 400 + 1.5), width=0.6)
+    equation = under(340, "x = 12")
+    page.draw_line((equation.x0, 340 - 3.6), (equation.x1, 340 - 3.6), width=0.6)  # an equation
+    # A line through "hidden" that the page paints over: in the drawings, not on the page.
+    hidden = under(430, "hidden")
+    bar = pymupdf.Rect(hidden.x0, 430 - 4.2, hidden.x1, 430 - 3.0)
+    page.draw_line((hidden.x0, 430 - 3.6), (hidden.x1, 430 - 3.6), width=0.6)
+    page.draw_rect(bar, color=None, fill=(1, 1, 1))
     data = doc.tobytes()
     doc.close()
     return data
@@ -536,17 +547,19 @@ def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
         for r in e.runs
         if r.kind == "deleted"
     ]
-    assert struck == ["October 3", "cancelled"]
+    # The third is the struck equation "x = 12" in a sentence: a run that is its marker alone.
+    assert struck[:2] == ["October 3", "cancelled"] and len(struck) == 3
+    assert INLINE_MARKER_RE.fullmatch(struck[2])
     # The rule under the gap after "Name:" is a blank, and the underlined word is not one;
     # nor is the legend's line sample, which the axis parts from the tick label beside it.
     assert [r.kind for e in result.elements for r in e.runs if r.kind != "deleted"] == ["blank"]
     assert "October 3 October 10" in " ".join(e.text or "" for e in result.elements)  # kept
     notices = [n for n in result.notices if n.code == "struck_text"]
-    assert sum(n.count for n in notices) == 2
+    assert sum(n.count for n in notices) == 3
     assert all(n.review == "optional" and n.page == 0 for n in notices)
     # CONTENT_RUNS off (the shadow rollout): found and counted, not written.
     shadow = text_pass.apply(pdf, elements, pages=[0])
-    assert shadow.counts()["deleted_runs"] == 2 and shadow.counts()["deleted_runs_written"] == 0
+    assert shadow.counts()["deleted_runs"] == 3 and shadow.counts()["deleted_runs_written"] == 0
     assert not any(r.kind == "deleted" for e in shadow.elements for r in e.runs)
     assert not any(n.code == "struck_text" for n in shadow.notices)
 

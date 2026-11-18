@@ -1475,8 +1475,8 @@ class ConversionOptions(BaseModel):
     tables: bool = False
     long_descriptions: bool = False
     colour: bool = False
-    # Write struck runs (CONTENT_RUNS); off, they are counted, not written.
-    content_runs: bool = False
+    # Write struck runs (CONTENT_RUNS, on by default); off, they are counted, not written.
+    content_runs: bool = True
     notation_memory: bool = False
     # A page math pass places each page's equations (ADR 0006).
     page_math: bool = False

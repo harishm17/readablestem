@@ -1199,9 +1199,10 @@ A text edit that changes struck words takes the run off, and the edit's message 
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
 last run.
 
-`CONTENT_RUNS` (off by default) is the rollout switch. Off, struck runs are found and
-counted in the trace (`deleted_runs`, `deleted_runs_written: 0`) but not stored or written,
-and no notice is raised: the output is as before. A result without runs is stored and
+`CONTENT_RUNS` (on by default since 2026-11-18, and in the production profile) is the
+rollout switch. Off, struck runs are found and counted in the trace (`deleted_runs`,
+`deleted_runs_written: 0`) but not stored or written, and no notice is raised: the output
+is as the release before it wrote them. A result without runs is stored and
 written byte for byte as before (the field is left out of the JSON when empty), and a
 result with runs loads in a release that does not know them, which writes the words plain.
 

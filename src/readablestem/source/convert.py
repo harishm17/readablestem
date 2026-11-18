@@ -393,8 +393,8 @@ def _finish(
     )
     for element in elements:  # a source has no pages to number (the reading's are estimates)
         element.page = 0
-    # Struck text (`\\sout`) is written only with CONTENT_RUNS; off, it is counted, as the
-    # PDF text pass counts it (`text_pass.apply`).
+    # Struck text (`\\sout`) is written with CONTENT_RUNS (on by default); off, it is counted,
+    # as the PDF text pass counts it (`text_pass.apply`).
     struck = sum(r.kind == "deleted" for e in elements for r in e.runs)
     with pipeline._span(tracer, "runs", deleted_runs=struck, written=options.content_runs):
         if not options.content_runs and struck:
