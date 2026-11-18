@@ -117,6 +117,12 @@ ADD_DATA_TABLE = "add_data_table"
 # "Describe it in words" on an item kept as an image (T3-16): the text becomes the image's
 # alt text after the same checks as any alt text (`describe_in_words`).
 DESCRIBE = "describe"
+# "Read again" and "Not an equation" on an equation card (WS8.5, WS4.5): structural writes of
+# the decision route (`routes.edits.read_again`, `not_an_equation`), undone as one entry.
+REREAD = "reread"
+NOT_EQUATION = "not_equation"
+# The `ReviewEdit.action` of those two writes: Undo of one lands on the item, not on the page tools.
+ITEM_WRITES = frozenset({"read_again", NOT_EQUATION})
 MAX_LATEX_CHARS = 5000
 TEXT_EDIT_ELSEWHERE = (
     "Change the words of this text with “Change the words” on the page, then Accept it; "

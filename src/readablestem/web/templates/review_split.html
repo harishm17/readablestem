@@ -17,7 +17,7 @@
    and the links (UX review BW11). #}
 {% block skip_links %}<a class="skip-link" href="#decision-title">Skip to the decision</a>{% endblock %}
 
-{% from "_review_shared.html" import error_line, speech_lines, latex_field, alt_fields, keep_original, figure_choices, figure_fallback with context %}
+{% from "_review_shared.html" import error_line, speech_lines, latex_field, alt_fields, keep_original, own_choices, own_notes, figure_choices, figure_fallback with context %}
 {% from "_review_shared.html" import hidden_fields as shared_hidden with context %}
 {% macro hidden_fields() %}{{ shared_hidden("split") }}{% endmacro %}
 
@@ -67,7 +67,7 @@
 {% endmacro %}
 
 {% macro save_button(item, main=False) %}
-<button type="submit" name="action" value="edit" class="{{ 'button' if main else 'button-secondary' }}" data-role="save">Save edit<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
+<button type="submit" name="action" value="edit" class="{{ 'button' if main else 'button-secondary' }}" data-role="save"{% if item.no_proposal and not item.values.get("latex") %} data-needs-edit{% endif %}>Save edit<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
 {%- endmacro %}
 
 {# One line of a folded list: the item's number and page as a link, what it is (a
@@ -96,7 +96,7 @@
 {% macro equation_choices(p, item, anyway) %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
-{% if p.suggestion or item.can_accept %}
+{% if p.suggestion or item.can_accept or item.can_read_again or item.can_not_equation %}
 <div class="decision-bar" role="group" aria-label="Choices for {{ name }}" data-decide-form="decide-{{ eid }}">
   {{ error_line(item, "actions") }}
   {% if anyway and not p.suggestion %}<p class="bar-lead">The proposal changes the meaning.</p>{% endif %}
@@ -107,9 +107,11 @@
     {% if item.can_accept %}
     <button type="submit" form="decide-{{ eid }}" name="action" value="accept" class="{{ 'button-secondary' if (anyway or p.suggestion) else 'button' }}" data-role="accept"{% if anyway %} data-tone="caution"{% endif %} {% if anyway %}aria-describedby="accept-note-{{ eid }}"{% endif %}>Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
+    {{ own_choices(item, "decide-" ~ eid) }}
   </div>
   {% if p.suggestion %}<p class="hint decide-note" id="suggest-hint-{{ eid }}">Saves and rechecks.</p>{% endif %}
   {% if item.can_accept and anyway %}<p class="hint decide-note" id="accept-note-{{ eid }}">Accept anyway keeps the differing meaning.</p>{% endif %}
+  {{ own_notes(item) }}
 </div>
 {% else %}
 {{ error_line(item, "actions") }}
@@ -133,7 +135,7 @@
     {# Scrolls sideways when wide: a named tab stop, so it can be scrolled from the keyboard. #}
     <div class="cmp-row" tabindex="0" role="group" aria-label="Proposed {{ item.label|lower }}"><div class="cmp-math">{{ item.mathml }}</div></div>
     {% else %}
-    <p class="cmp-none">No proposal yet: type the LaTeX below, or keep it as an image.</p>
+    <p class="cmp-none">No proposal yet.{% if item.can_read_again %} Read it again, type the LaTeX, keep it as a picture with your description{% if item.can_not_equation %}, or say it is not an equation{% endif %}.{% else %} Type the LaTeX below, or keep it as an image.{% endif %}</p>
     {% endif %}
   </div>
   {{ speech_lines(item, p.spoken) }}
@@ -213,7 +215,7 @@
   {{ hidden_fields() }}
   {# Closed by default: open only when typing is the way forward (an error, no proposal, a
      kept stale edit, or a meaning change with no one-click fix above). #}
-  <details class="edit-box"{% if item.errors.get("latex") or (anyway and not p.suggestion) or not item.values.get("latex") or (stale and stale.kept) %} open{% endif %}>
+  <details class="edit-box"{% if item.errors.get("latex") or (anyway and not p.suggestion) or (item.values.get("latex") if item.no_proposal else not item.values.get("latex")) or (stale and stale.kept) %} open{% endif %}>
     <summary>Edit the LaTeX</summary>
     {{ latex_field(item, live=True) }}
     {{ save_button(item, main=(anyway or not item.can_accept) and not p.suggestion) }}

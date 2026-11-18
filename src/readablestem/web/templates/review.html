@@ -16,7 +16,7 @@
 
 {% macro counted(n, one, many) %}{{ n }} {{ one if n == 1 else many }}{% endmacro %}
 
-{% from "_review_shared.html" import error_line, speech_lines, latex_field, alt_fields, figure_choices, figure_fallback, keep_original with context %}
+{% from "_review_shared.html" import error_line, speech_lines, latex_field, alt_fields, figure_choices, figure_fallback, keep_original, own_choices, own_notes with context %}
 {% from "_review_shared.html" import hidden_fields as shared_hidden with context %}
 {# Every decision form: the CSRF token, the view to come back to (and the list's filter), and
    the review version the page was drawn at (a form from an out-of-date tab is refused, not
@@ -179,9 +179,11 @@
     {% if item.can_accept %}
     <button type="submit" name="action" value="accept" class="button-secondary">{{ item.accept_label }}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
+    {% if item.kind == "equation" %}{{ own_choices(item) }}{% endif %}
     {% if item.kind != "equation" and item.can_reject %}<button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
   </div>
   {% if item.kind == "equation" %}
+  {{ own_notes(item) }}
   {{ keep_original(item, "If it cannot be converted") }}
   {% elif item.can_reject %}
   <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>

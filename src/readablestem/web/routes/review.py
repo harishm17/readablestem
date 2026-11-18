@@ -64,6 +64,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
+from readablestem.pipeline import table_math
 from readablestem.pipeline.layout import REASON_LARGER_FONT
 from readablestem.pipeline.notices import TEXT_NOTICE_OF
 from readablestem.pipeline.validate import ALT_WARN_CHARS
@@ -110,8 +111,11 @@ from readablestem.web.review import (
     ADD_DATA_TABLE,
     DESCRIBE,
     GROUP_SLUGS,
+    ITEM_WRITES,
     KEPT_IMAGES_SLUG,
     NOT_CONVERTED,
+    NOT_EQUATION,
+    REREAD,
     SAVE_ONLY,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
@@ -136,6 +140,7 @@ from readablestem.web.review import (
     group_anchor,
     group_fixes,
     group_members,
+    has_proposal,
     heading_level_written,
     heading_places,
     is_group_key,
@@ -517,6 +522,13 @@ class ReviewItem:
     describe_hint: str = ""
     # A figure: what its alt text should say for the kind of figure it is (`ALT_GUIDANCE`).
     alt_guidance: str = ""
+    # An equation that waits (WS8.5, WS4.5): read its picture again, and give its glyphs back
+    # to the text. Not offered where there is no picture, no text from the PDF, or it is a
+    # table's cell (`_item(tied=...)`).
+    can_read_again: bool = False
+    can_not_equation: bool = False
+    # ... and the tool read no equation from it: the card says what it can do instead.
+    no_proposal: bool = False
 
     @property
     def open(self) -> bool:
@@ -866,9 +878,12 @@ def _item(
     label: str | None = None,
     source_note: str = "",
     origin: str = "pdf",
+    tied: frozenset[str] | None = None,
 ) -> ReviewItem:
     """`label`: the item's name (`web.review.item_labels`), else kind and `number`;
-    `source_note`: `messages.source_item_notes` for this item; `origin`: the result's."""
+    `source_note`: `messages.source_item_notes` for this item; `origin`: the result's;
+    `tied`: the equations that are a table's cells (None: not known, so an equation's own
+    actions are not offered)."""
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
@@ -956,6 +971,25 @@ def _item(
         alt_guidance=ALT_GUIDANCE.get(fix.figure.figure_type, ALT_GUIDANCE["other"])
         if fix.figure is not None
         else "",
+        can_read_again=_own_equation(fix, element, origin, tied) and fix.element_id in crop_ids,
+        can_not_equation=_own_equation(fix, element, origin, tied)
+        and bool((element.text or "").strip() if element is not None else ""),
+        no_proposal=fix.kind is Kind.EQUATION and not has_proposal(fix),
+    )
+
+
+def _own_equation(
+    fix: Fix, element: Element | None, origin: str, tied: frozenset[str] | None
+) -> bool:
+    """A waiting equation of a PDF that is not a table's cell: the card can read it again
+    and give it back to the text."""
+    return (
+        fix.kind is Kind.EQUATION
+        and fix.pending
+        and element is not None
+        and origin == "pdf"
+        and tied is not None
+        and fix.element_id not in tied
     )
 
 
@@ -1323,6 +1357,7 @@ def _page(
     fix_groups = kept_images_apart(group_fixes(result))
     places = heading_places(result)
     notes = source_item_notes(result)
+    tied = table_math.tied_ids(result.elements)
     items = {
         f.element_id: _item(
             f,
@@ -1334,6 +1369,7 @@ def _page(
             labels.get(f.element_id),
             source_note=notes.get(f.element_id, ""),
             origin=result.origin,
+            tied=tied,
         )
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)
@@ -1626,6 +1662,14 @@ def review_action(
         return keep_filter(
             _page_group_action(request, job_id, element_id, user, action, view, version), flt
         )
+    if action in {REREAD, NOT_EQUATION}:
+        # "Read again" and "Not an equation" on an equation card: writes of the item, not
+        # decisions on its fix (`routes.edits`).
+        from readablestem.web.routes import edits as item_edits
+
+        if action == REREAD:
+            return item_edits.read_again(request, job_id, element_id, user, version, view, flt)
+        return item_edits.not_an_equation(request, job_id, element_id, user, version, view, flt)
     sent = {
         "latex": latex,
         "alt": alt,
@@ -2053,6 +2097,7 @@ def undo_offer(request: Request, job_id: str, user: CurrentUser, version: int) -
 
 UNDO_PENDING = "Undone. {it} waiting for your decision again."
 UNDO_BACK = "Undone. {it} back as {was}."
+UNDO_ITEM = "Undone. It is back as it was."
 
 
 @router.post("/jobs/{job_id}/undo", dependencies=[Depends(require_csrf)])
@@ -2115,6 +2160,15 @@ def undo(
     from readablestem.web.routes.split import review_url
 
     structural = [c for c in changes if isinstance(c, StructureChange)]
+    if len(edits) == 1 and edits[0].action in ITEM_WRITES:
+        # Read again or "Not an equation": back on the item, where the choice was.
+        target = edits[0].element_id
+        flash(request, UNDO_ITEM, element_id=target, undo=False)
+        if view == LIST_VIEW:
+            where = list_url(owned_id, review_anchor(result, target))
+            return keep_filter(RedirectResponse(where, status_code=303), flt)
+        where = review_url(owned_id, item=target, anchor="decision-title")
+        return RedirectResponse(where, status_code=303)
     if structural:
         # An edit to the text, a page or something added: back on the page it was on.
         flash(request, "Undone. The document is as it was before.", element_id=None)

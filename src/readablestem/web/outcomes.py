@@ -12,7 +12,8 @@ most one `events.Outcome`: its kind, the reason code that put it in front of the
 - replaced: the other reading was taken (a second reader's or the page witness's choice on
   the card, or "Use the grid read from the PDF" on a table).
 - rejected: "Keep as image", "Keep the original", a heading kept as bold text.
-- removed: "This is not a table", a page left out (a page put back takes it back: -1).
+- removed: "This is not a table", "Not an equation", a page left
+  out (a page put back takes it back: -1).
 - added: a picture or an equation marked by hand.
 
 One thing, one outcome: a write on something whose content the reviewer already changed
@@ -64,6 +65,7 @@ _STRUCTURE_OUTCOMES = {
     "restore_page": "removed",
     "add_figure": "added",
     "add_equation": "added",
+    "not_equation": "removed",
 }
 
 Change = ReviewChange | StructureChange
@@ -208,6 +210,15 @@ def _structure_outcome(
         return _made("equation", events.NO_REASON, outcome, origin)
     element = (held.get("elements") or {}).get(change.element_id) or {}
     kind = str(element.get("kind", "paragraph"))
+    if change.action == "not_equation":
+        # The equation that was asked about, and the code that asked.
+        asked = (held.get("fixes") or {}).get(change.element_id)
+        reason = events.NO_REASON
+        if isinstance(asked, dict):
+            fix = Fix.model_validate(asked)
+            if not fix.decided_by_reviewer:
+                reason = _flag_reason(fix, {})
+        return _made(kind, reason, outcome, origin)
     if change.action == "edit_text":
         was = ((first or {}).get(STRUCTURE_KEY) or {}).get("elements", {}).get(change.element_id)
         if isinstance(was, dict) and was.get("text") != element.get("text"):

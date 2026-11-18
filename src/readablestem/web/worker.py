@@ -122,7 +122,15 @@ from readablestem.web.step_cache import forget as forget_steps
 # `ReviewEdit.action` of the edits that change the structure and not a fix (web.page_edits):
 # their rows are read when a new conversion inherits from an earlier one.
 STRUCTURE_ACTIONS = frozenset(
-    {"edit_text", "make_heading", "add_figure", "add_equation", "omit_page", "restore_page"}
+    {
+        "edit_text",
+        "make_heading",
+        "add_figure",
+        "add_equation",
+        "omit_page",
+        "restore_page",
+        "not_equation",
+    }
 )
 # A region or a page compared between two files is drawn at this size (pixels per point).
 COMPARE_ZOOM = 1.5

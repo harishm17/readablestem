@@ -1378,10 +1378,15 @@ def transcribe(
     settings: Settings,
     context_text: str | None = None,
     line_png: bytes | None = None,
+    first_model: str | None = None,
 ) -> Fix:
     """Transcribe one equation crop (with `line_png`, an inline equation's line with the
     span boxed, read under `LINE_PROMPT_NAME`). Never raises for model or validation problems (they
     become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is refused.
+
+    `first_model`: the model of the first reading, in place of `_first_model` (a re-read that
+    came back empty asks the main model, `web.reread`). The request is the one the main model
+    gets from the pipeline itself.
 
     A bold letter layout found in running text gets its fix without a model call
     (`notation_memory.bold_letter_fix`); with course notation in force, the model gets
@@ -1432,7 +1437,7 @@ def transcribe(
             reconcile=settings.equation_glyph_reconcile,
         )
 
-    first_model = _first_model(element, settings)
+    first_model = first_model or _first_model(element, settings)
     # The text around the equation goes to the main model only when it re-reads a cheap
     # answer (`Settings.equation_context_on_escalation`); course notation always goes.
     first_context = context_text

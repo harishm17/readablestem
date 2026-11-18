@@ -8,11 +8,12 @@ Pages are not refunded when a job fails or is deleted: the quota limits what a u
 submit, and refunds would let a failing upload be retried without bound.
 
 The same row counts the model reads an open-tier account starts from the review screen
-(`try_consume_reread`: a region marked as an equation, a table cell read as maths), and one
-`signup_days` row per UTC day counts the accounts open sign-up made (`try_take_signup`). All
-three are one conditional UPDATE, so the database decides who is over the limit, and none is
-given back: what is counted is what was asked for, not what came of it. Which limit a person
-has depends on their tier (`web.access`).
+(`try_consume_reread`: a region marked as an equation, a table cell read as maths, "Read
+again" on an equation), and one `signup_days` row per UTC day counts the accounts open
+sign-up made (`try_take_signup`). All three are one conditional UPDATE, so the database
+decides who is over the limit. A page and a sign-up are not given back: what is counted is
+what was asked for. A read that comes back with nothing is given back
+(`give_back_reread`). Which limit a person has depends on their tier (`web.access`).
 """
 
 from __future__ import annotations
@@ -90,6 +91,17 @@ def try_consume_reread(session: Session, user_id: str, *, allowance: int, day: d
         .execution_options(synchronize_session=False)
     )
     return rowcount(session.execute(stmt)) == 1
+
+
+def give_back_reread(session: Session, user_id: str, *, day: date) -> None:
+    """Take one model read off the user's count for `day`: the read came back with nothing, so
+    it did not use the allowance. Never goes below zero."""
+    session.execute(
+        update(QuotaDay)
+        .where(QuotaDay.user_id == user_id, QuotaDay.day == day, QuotaDay.rereads >= 1)
+        .values(rereads=QuotaDay.rereads - 1)
+        .execution_options(synchronize_session=False)
+    )
 
 
 def rereads_used(session: Session, user_id: str, day: date) -> int:
