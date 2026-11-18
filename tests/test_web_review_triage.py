@@ -261,6 +261,13 @@ def test_one_function_decides_the_tier_and_the_review_walks_the_risk_bands():
     old = result.fixes[0].model_copy(update={"review": "none"})
     assert triage.tier_for(old) == "required"
     assert triage.required_decisions([old]) == 1
+    # "Next" follows the review's order, not the page's: the equation of band 2 comes before the
+    # one of band 4 although it sits on a later page.
+    assert [review.next_to_review(result, key) for key in ("p2-e0", "p1-e0", "p3-e0")] == [
+        "p1-e0",
+        "p3-e0",
+        "p1-e1",
+    ]
     # Deciding the first two (the failed check is replaced by the edit) moves nobody.
     for fix in result.fixes:
         if fix.element_id in {"p3-e0", "p2-e0"}:

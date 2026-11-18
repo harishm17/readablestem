@@ -100,7 +100,7 @@ def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     actions = html[
         html.index('id="next-actions"') : html.index("</ul>", html.index("next-actions"))
     ]
-    assert f'<a class="button" href="/jobs/{job_id}/review?item=p1-e3">Review 3 decisions</a>' in (
+    assert f'<a class="button" href="/jobs/{job_id}/review?item=p1-e5">Review 3 decisions</a>' in (
         actions
     )
     assert f'href="/jobs/{job_id}/draft">Download a draft (3 decisions open)</a>' in actions
@@ -507,7 +507,7 @@ def test_a_draft_download_asks_first_and_says_what_students_get(web):
     )  # the abstained equation is the image
     assert "1 equation is an image marked “Not converted”." in text
     assert (
-        f'<a class="button" href="/jobs/{job_id}/review?item=p1-e3">Review 3 decisions first'
+        f'<a class="button" href="/jobs/{job_id}/review?item=p1-e5">Review 3 decisions first'
         in (page.text)
     )
 

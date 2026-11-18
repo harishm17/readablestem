@@ -152,7 +152,7 @@ def edits(env) -> list[ReviewEdit]:
 
 def test_accept_moves_on_and_the_document_has_the_table(tables):
     page = follow(tables, post(tables, "p1-e1", action="accept"))
-    assert "Decision 2 of 3" in panel(page)
+    assert "Decision 1 of 3" in panel(page)
     assert "Table 1: Accepted. 2 decisions left." in page
     fix = fix_of(tables, "p1-e1")
     assert (fix.status, fix.reviewed) == (Status.ACCEPTED, True)
