@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: course notation, who receives it and what a document was read with (branch feat/course-words-and-applied)
+
+- WS11.14 (F-329): the course pages and the upload form's course hint said "the model
+  provider" in three typed copies, and "Only you see it" although a person who reviews a
+  shared document sees the course's name and the symbols that apply to an equation. They now
+  print one sentence from `web.recipients.notation_words`, which names the provider
+  (`model_vendor`), says at most 24 symbols go with each equation, that the notes do not, and
+  who else sees the list.
+- WS11.14 (F-102, first half): the symbols a conversion was handed are kept with the result
+  (`DocumentResult.notation_applied`: key and meaning) and the job page lists them ("Read
+  with 6 symbols from Physics 201") for the owner and a reviewer. A job with no record says
+  the course's notation was applied and lists nothing. No migration (the result is a JSON
+  column; results without the field read as before), no request change, no version bump.
+  Not built: "Convert again to apply", the course page's marks, starter sets, the table of
+  suggestions, the lede, the double-click handling.
+
 ## Unreleased: page pictures and exports are made once (branch perf/render-once)
 
 - PF4 (F-284): the review screen's page and region pictures are kept in a small memory cache in
