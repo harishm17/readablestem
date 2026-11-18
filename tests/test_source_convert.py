@@ -96,7 +96,8 @@ def test_a_broken_macro_is_a_required_decision_showing_the_tex():
     assert r"\mysterycommand{x}+y" in result.html  # shown as written, flagged
 
 
-def test_figures_from_the_project_go_through_the_figure_step():
+@pytest.mark.parametrize("name", ["rich_figure", "rich_figure_bare"])  # fig1.png, then fig1
+def test_figures_from_the_project_go_through_the_figure_step(name):
     def figure(request):
         return {
             "figure_type": "chart",
@@ -106,7 +107,7 @@ def test_figures_from_the_project_go_through_the_figure_step():
         }
 
     client = FakeVisionClient(responders={"figure": figure})
-    result = convert("rich_figure", extra={"fig1.png": png_bytes()}, client=client)
+    result = convert(name, extra={"fig1.png": png_bytes()}, client=client)
     figures = [f for f in result.fixes if f.kind is Kind.FIGURE]
     assert len(figures) == 1
     assert [r.step for r in client.requests] == ["figure"]  # one picture, one request

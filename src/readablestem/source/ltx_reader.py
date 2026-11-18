@@ -1341,9 +1341,10 @@ def _text_without_math(cell: Node) -> str:
 # ---------------------------------------------------------------------------- entry
 
 
-def graphics_of(xml: bytes) -> dict[str, str]:
-    """The image file each `graphics` element of LaTeXML's XML names, by its id (the same id the
-    XHTML's `img` has). Anything that is not well formed gives an empty map."""
+def graphics_of(xml: bytes, project: Path) -> dict[str, str]:
+    """The image file each `graphics` element of LaTeXML's XML shows, by its id (the same id the
+    XHTML's `img` has), found the way LaTeX finds it (`figures.find`) in `project`. Anything that
+    is not well formed gives an empty map."""
     try:
         root = SafeET.fromstring(xml, forbid_dtd=True, forbid_entities=True)
     except Exception:
@@ -1354,7 +1355,7 @@ def graphics_of(xml: bytes) -> dict[str, str]:
             ident = node.get("{http://www.w3.org/XML/1998/namespace}id") or ""
             name = node.get("graphic") or ""
             if ident and name:
-                found[ident] = name
+                found[ident] = figures.find(project, name, node.get("candidates") or "")
     return found
 
 
