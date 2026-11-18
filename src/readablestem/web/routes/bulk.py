@@ -141,10 +141,14 @@ def accept(
             version,
             lambda result: bulk_accept.accept_all(result, slug, ids),
             kind="group",
-            # The page listed what was waiting at its version, and it does not send the list:
-            # any item of the kind decided or edited since then (the first named in the
-            # refusal) may be one of them, so the action is refused rather than guessed at.
-            acts_on=lambda result: [f.element_id for f in result.fixes if f.kind is spec.kind],
+            # The items the page listed, when it sent them: a write since then to one of them
+            # (named in the refusal) refuses the action. A form without the list may mean any
+            # item of the kind, so any of them decided or edited since refuses it.
+            acts_on=lambda result: (
+                ids
+                if ids is not None
+                else [f.element_id for f in result.fixes if f.kind is spec.kind]
+            ),
         )
     except ReviewStale as exc:
         return _stale_page(request, job_id, user, view, slug, changed=exc.changed)

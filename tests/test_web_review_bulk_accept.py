@@ -291,9 +291,12 @@ def test_a_page_drawn_before_the_last_change_is_refused_and_nothing_is_accepted(
     assert "Equation 1 changed in another tab or window" in refused.text  # it says which
     assert statuses(scaled) == before
     assert [e.element_id for e in edits(scaled)] == ["p1-e2"]
-    # Nothing of another kind changed, so the figures drawn at the same version are accepted.
+    # Nothing of another kind changed, so the figures drawn at the same version are accepted,
+    # and so is a page of equations that did not list the one decided.
     assert accept(scaled, "figures", version=stale).status_code == 303
     assert statuses(scaled)["p1-e6"] == "accepted"
+    assert accept(scaled, "equations", version=stale, ids=["p2-e7"]).status_code == 303
+    assert statuses(scaled)["p2-e7"] == "accepted"
 
 
 def test_an_unknown_kind_is_not_found(scaled):
