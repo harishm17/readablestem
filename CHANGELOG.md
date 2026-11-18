@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: help pages and device checks (branch feat/help-pages-and-device-checks)
+
+- WS25.4 (F-384): a help section of four pages. `/help` lists them with a line each saying what it
+  answers; `/help/review` says how to review (the kinds of item, what each button does in the
+  screen's own words, the keyboard shortcuts and their switch, accepting many at once, the page
+  tools, what happens to a decision left open, how to tell a document is ready to post);
+  `/help/latex` says what a LaTeX file or zip may hold, what each upload and stop message means and
+  what to change, from the same limits and refused lists the upload checks use; `/help/posting`
+  joins the set with the same row of links at its end; `/limits` is the fourth page of the index,
+  linked and not repeated. Every sentence was written from the code. A "Help" link is in the footers (not the sign-in pages'
+  one-task footer), and `/help/review` is linked from the review screen and the list view,
+  `/help/latex` from the upload form's LaTeX line, from a refused LaTeX upload and from a stopped
+  LaTeX job. The pages are public, in the sitemap and `llms.txt` (`seo.PUBLIC_PAGES`,
+  `page_dates.json`), in `ops.launch.PUBLIC_TEMPLATES`, and in the public-page, axe, reflow,
+  contents-link and authz lists of the tests. No page, link or model call changes what a
+  document stores or costs; no migration, no version bump (`PIPELINE_VERSION` and `RENDER_VERSION`
+  are not owed: no stored output changes).
+- WS25.8: `docs/device-checks.md` lists ten checks that need a real device, account or reader
+  (Safari on a Mac and an iPhone, VoiceOver on both, VoiceOver on the review screen, NVDA, JAWS,
+  TalkBack, EPUB in Apple Books, Word with its accessibility checker, a Canvas import, Listen in
+  Spanish, Windows high contrast and 400% zoom). Each has its steps, what it gates and who can run
+  it, and every result is `not done`. It replaces `docs/screen-reader-test.md` (removed; its steps
+  are in D3 and D4 and its results rows are the table of criterion rows there). The links in
+  `docs/README.md`, `docs/acr/` and `tests/fixtures/web/keyboard.py` point to it. No public claim
+  changed.
+
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 
 - WF52 (F-497): a tab nobody is looking at no longer asks the server for the job's status,
