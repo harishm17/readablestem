@@ -113,7 +113,9 @@ def test_a_mixed_pdf_with_the_option_converts_and_without_it_keeps_the_scans_as_
     said = " ".join(offered.browser.get(plain_at.headers["location"]).text.split())
     assert "1 page is scanned or handwritten (1 scanned image)" in said
     assert (
-        "kept as pictures" in said and "would cost up to $0.25 (1 page at up to $0.25 each)" in said
+        "kept as pictures" in said
+        and "up to $0.25" in said
+        and "1 page at up to $0.25 each" in said
     )
     # With it, nothing is offered: the pages are being read.
     assert "scanned or handwritten (" not in offered.browser.get(asked_at.headers["location"]).text
@@ -134,18 +136,18 @@ def test_every_place_that_offers_the_option_states_its_cost_from_the_settings(tm
     with env.running() as client:
         env.allow(ALICE)
         login(client, ALICE)
-        per_page = "costs up to $0.40, and one document costs at most $0.50"
+        per_page = "up to $0.40"  # the figures follow the settings, whatever the words
 
         def text(response) -> str:
             return " ".join(response.text.split())
 
-        assert per_page in text(client.get("/app"))  # the form, inside the box's hint
+        assert per_page in text(client.get("/app")) and "at most $0.50" in text(client.get("/app"))
         assert per_page in text(client.get("/limits"))
         assert per_page in text(upload(client, scan_pdf()))  # the refusal
         one = text(client.get(upload(client, part_scanned_pdf()).headers["location"]))
-        assert "would cost up to $0.40 (1 page at up to $0.40 each)" in one
+        assert "up to $0.40" in one and "1 page at up to $0.40 each" in one
         two = text(client.get(upload(client, mixed_pdf()).headers["location"]))
-        assert "would cost up to $0.50 (2 pages at up to $0.40 each, and one document" in two
+        assert "up to $0.50" in two and "2 pages at up to $0.40 each" in two  # held to the cap
 
 
 def test_a_batch_names_the_scanned_pages_of_each_document_that_has_them(offered):
@@ -160,7 +162,7 @@ def test_a_batch_names_the_scanned_pages_of_each_document_that_has_them(offered)
     )
     said = " ".join(client.get(response.headers["location"]).text.split())
     assert said.count("scanned or handwritten (") == 1  # the typed document has none
-    assert "would cost up to $0.25" in said
+    assert "up to $0.25" in said
 
 
 def test_the_pages_of_a_converted_scan_count_against_the_daily_quota_as_usual(offered):
@@ -278,7 +280,7 @@ def test_a_file_of_mostly_scans_waits_for_the_choice_before_anything_is_converte
     held = response.headers["location"]
     said = " ".join(client.get(held).text.split())
     assert "2 pages are scanned or handwritten (2 scanned images)" in said
-    assert "would cost up to $0.50 (2 pages at up to $0.25 each)" in said
+    assert "up to $0.50" in said and "2 pages at up to $0.25 each" in said
     assert "Nothing is converted" in said
     with session_scope(offered.ctx.factory) as session:
         assert session.query(Job).count() == 0

@@ -363,7 +363,8 @@ def _dollars(value: float) -> str:
 
 
 def image_pages_cost(settings: Settings, pages: int | None = None, many: bool = True) -> str:
-    """What reading scanned and handwritten pages costs, in the one wording every place that
+    """What reading scanned and handwritten pages costs the service (never a charge to the
+    person: the words say "of the server's budget"), in the one wording every place that
     offers the option uses (the upload form, the offer, the refusal, /limits). Both figures are
     limits, so they say "up to": the per-page setting is what one page may spend and the
     per-job setting the most one document may (`Settings.image_pages_estimate`, the figure the
@@ -374,15 +375,18 @@ def image_pages_cost(settings: Settings, pages: int | None = None, many: bool = 
     most = settings.image_pages_max_usd_per_job
     if not pages:
         return (
-            f"Reading a scanned or handwritten page costs up to {_dollars(per_page)}, and one "
-            f"document costs at most {_dollars(most)}. A document that reaches that stops being "
-            "read, and the pages left stay pictures."
+            f"Reading a scanned or handwritten page uses up to {_dollars(per_page)} of the "
+            f"server\u2019s budget, and one document at most {_dollars(most)}. A document that "
+            "reaches that stops being read, and the pages left stay pictures."
         )
     each = f"{pages} {_plural(pages, 'page', 'pages')} at up to {_dollars(per_page)} each"
     if pages * per_page > most:
-        each += f", and one document costs at most {_dollars(most)}"
+        each += f", and one document uses at most {_dollars(most)}"
     cost = _dollars(settings.image_pages_estimate(pages))
-    return f"Reading {'them' if many else 'it'} would cost up to {cost} ({each})."
+    return (
+        f"Reading {'them' if many else 'it'} would use up to {cost} of the server\u2019s budget "
+        f"({each})."
+    )
 
 
 def image_pages_offer(

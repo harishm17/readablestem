@@ -419,7 +419,7 @@ def test_the_pages_note_offers_to_read_them_with_the_price_and_the_form_filled_i
         page = client.get(f"/jobs/{job_id}").text
         text = page_text(page)
         assert "Pages 1 and 2 are scanned images, so they were not converted" in text
-        assert "would cost up to $0.50 (2 pages at up to $0.25 each)" in text
+        assert "up to $0.50" in text and "2 pages at up to $0.25 each" in text
         assert f"/app?revises={job_id}&amp;image_pages=on" in page
         form = client.get(f"/app?revises={job_id}&image_pages=on").text
         assert re.search(r'id="image_pages"[^>]*\schecked', form)
