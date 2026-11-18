@@ -181,6 +181,7 @@ FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-
 # "Download all" for one file (audit findings F-029, F-100).
 FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04" }
 FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04" }
+FEATURE_WORD_SOURCE = { value = false, source = "not stated; code default" }
 IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default" }
 IMAGE_PAGES_DPI = { value = 200, source = "not stated; code default" }
 IMAGE_PAGES_OMISSION_CHECK = { value = true, source = "not stated; code default" }

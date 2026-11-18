@@ -63,7 +63,7 @@ from dataclasses import asdict, dataclass
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 from readablestem.core.childenv import child_env
 
@@ -281,6 +281,8 @@ class Census:
     typed_equations: int = 0
     units: int | None = None
     units_exact: bool = False
+    # a Word file the reader took itself (`FEATURE_WORD_SOURCE`): no PDF was made of it
+    read_from_file: bool = False
 
     def to_json(self) -> dict[str, object]:
         return asdict(self)
@@ -304,7 +306,7 @@ class Census:
             raise ValueError("not a census")
         return Census(
             kind=str(data["kind"]), units=units, units_exact=data.get("units_exact") is True,
-            **counts,
+            read_from_file=data.get("read_from_file") is True, **counts,
         )  # fmt: skip
 
 
@@ -659,6 +661,8 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     limit_memory(WRAPPER_MEMORY_BYTES)
     out = sys.stdout.buffer
+    if args[:1] == ["--check"]:
+        return _check_main(out)
     try:
         soffice = args[0]
         timeout_s = float(args[1]) if len(args) > 1 else DEFAULT_TIMEOUT_S
@@ -676,6 +680,28 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     header = json.dumps({"ok": True, "kind": kind, "census": census.to_json()})
     out.write(header.encode() + b"\n" + pdf)
+    return 0
+
+
+def _check_main(out: BinaryIO) -> int:
+    """`--check`: the gate of the Word reader (`source.docx_package.check`) on the file on stdin,
+    in a child like the conversion's, so a damaged zip is parsed here and not in the web
+    process. One JSON line: the census and the pages the file will count as, or the refusal."""
+    from readablestem.source import docx_package
+
+    # Run as `-m`, this module is `__main__`: the gate raises the class of the imported module.
+    rejected_type = docx_package.OfficeRejected
+    try:
+        data = sys.stdin.buffer.read()
+        census = docx_package.check(data)
+        pages = docx_package.prepare(data, census).facts.pages()
+    except rejected_type as rejected:
+        out.write(json.dumps({"ok": False, "code": rejected.code}).encode() + b"\n")
+        return 0
+    except Exception:  # fails closed, with no message that could carry file content
+        out.write(json.dumps({"ok": False, "code": "unreadable"}).encode() + b"\n")
+        return 0
+    out.write(json.dumps({"ok": True, "census": census.to_json(), "pages": pages}).encode() + b"\n")
     return 0
 
 

@@ -407,7 +407,9 @@ def _convert(args: argparse.Namespace) -> int:
     if census is not None:  # what the PDF route left out or kept open, as on the job page
         from readablestem.web import office_census
 
-        output.result.notices = office_census.with_notices(output.result.notices, census)
+        output.result.notices = office_census.with_notices(
+            output.result.notices, census, output.result.origin
+        )
     html = output.result.html
     checks = output.checks if isinstance(output, PipelineOutput) else static_checks(html)
     axe = axe_checks(html) if args.axe else None

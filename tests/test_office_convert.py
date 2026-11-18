@@ -439,3 +439,32 @@ def test_libreoffice_fetches_nothing_even_if_a_check_missed_a_linked_picture():
         assert pdf.startswith(b"%PDF-")
         with pytest.raises(socket.timeout):
             listener.accept()
+
+
+# ------------------------------------------------- the gate of the Word reader (WS18.14)
+
+
+def test_the_word_gate_runs_in_a_child_and_names_what_it_refuses_that_the_preflight_passes():
+    from readablestem.web.uploads import UploadRejected, check_word_isolated
+
+    census, pages = check_word_isolated(office.docx())
+    assert census.kind == "docx" and pages == 1
+    parts = office.docx_parts()
+    parts["word/../../evil.xml"] = "<x/>"
+    leaving = office.rebuild(parts)
+    assert preflight(leaving).kind == "docx"  # the Office preflight lets the name through
+    with pytest.raises(UploadRejected) as raised:
+        check_word_isolated(leaving)
+    assert raised.value.code == "office_unsafe"
+    with pytest.raises(UploadRejected) as raised:
+        check_word_isolated(office.pptx())  # not a Word file: the PDF route's to take
+    assert raised.value.code == "office_unsupported"
+    strict = str(office.docx_parts()["word/document.xml"]).replace(
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    )
+    with pytest.raises(UploadRejected) as raised:  # pandoc cannot read Strict Open XML
+        check_word_isolated(
+            office.rebuild(office.docx_parts(), replace={"word/document.xml": strict})
+        )
+    assert raised.value.code == "office_unsupported"

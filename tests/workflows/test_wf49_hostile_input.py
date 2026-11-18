@@ -38,7 +38,7 @@ import source_support
 from fixtures.web.support import job_id_from, upload
 from readablestem.config import Settings
 from readablestem.core import sandbox
-from readablestem.source import latexml
+from readablestem.source import latexml, pandoc
 from readablestem.web.db import Job, JobStatus, session_scope
 
 pytestmark = pytest.mark.workflow
@@ -105,10 +105,10 @@ class Run:
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory: pytest.TempPathFactory) -> Iterator[harness.ReplaySite]:
-    site = harness.ReplaySite(tmp_path_factory.mktemp("site"), **LIMITS)
-    if latexml.installed() and sandbox.available():
+    site = harness.ReplaySite(tmp_path_factory.mktemp("site"), feature_word_source=True, **LIMITS)
+    if (latexml.installed() or pandoc.installed()) and sandbox.available():
         # Tests do not run the sandbox probe at startup; this is the state it leaves where
-        # LaTeX can be read.
+        # LaTeX or a Word file can be read.
         site.ctx.sandbox.set("pass", {})
     yield site
     site.close()
@@ -131,6 +131,12 @@ def can_start(backend: str) -> bool:
 def able(case: Case, backend: str) -> None:
     """Skips a source where this machine cannot read LaTeX. CI's jobs that have LaTeXML
     say so (`source_support.REQUIRED`), and there bubblewrap must start."""
+    if case.file.endswith(".docx"):
+        if not pandoc.installed():
+            pytest.skip("pandoc is not installed")
+        if not (can_start(backend) if backend else sandbox.available()):
+            pytest.skip(f"this machine cannot start the {backend or 'a'} sandbox")
+        return
     if not case.file.endswith((".tex", ".zip")):
         return
     needed = backend or "bwrap"

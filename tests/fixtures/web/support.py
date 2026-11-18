@@ -288,7 +288,11 @@ class WebEnv:
             self.settings, converter=self.converter, client_factory=fake_client_factory
         )
         self.ctx = self.app.state.ctx
-        if self.settings.feature_latex_source or self.settings.feature_batch_zip:
+        if (
+            self.settings.feature_latex_source
+            or self.settings.feature_batch_zip
+            or self.settings.feature_word_source
+        ):
             self.ctx.sandbox.set("pass")  # as if the probe had passed on this machine
 
     @contextmanager

@@ -321,7 +321,7 @@ image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; 
 refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
 LaTeX upload must stay off. In production (2026-11-04) the probe passes on the Landlock backend, so `FEATURE_LATEX_SOURCE`
 is on; `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off until real decks and course sources
-have been tried. The residual risks below, and under "Residual risks, accepted for the beta", still hold.
+have been tried. `FEATURE_WORD_SOURCE` (off) puts pandoc on an uploaded Word file: it is given a rebuilt working copy and never the upload (`source/docx_package.py`), runs under the same sandbox and lock, with `--sandbox` and limits of its own, and each of a zip bomb, a member name that leaves the package, an outside reference in a relationship, a macro part, an embedded object and an XML entity is refused or made inert before pandoc sees the file (`tests/workflows/test_wf49_hostile_input.py`). The residual risks below, and under "Residual risks, accepted for the beta", still hold.
 
 **Landlock backend** (`core/landlock_exec.py`, `core/sandbox.py`; `tests/test_sandbox_landlock.py`).
 Chosen automatically when bubblewrap cannot start (`sandbox.backend()`; `READABLESTEM_SANDBOX_BACKEND`

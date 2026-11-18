@@ -202,12 +202,12 @@ use = "headless Chromium for the axe scans, the browser tests and equation rende
 # Dockerfile.
 
 [system.pandoc]
-use = "writes the Word download from the finished HTML (pipeline/export_docx.py)"
+use = "writes the Word download from the finished HTML (pipeline/export_docx.py); reads an uploaded Word file into a tree (source/pandoc.py, source/docx_reader.py) when FEATURE_WORD_SOURCE is on"
 license = "GPL-2.0-or-later"
 run_only = true
-reads = "HTML this app wrote"
-runs_in = "a child process with a time limit"
-hostile = ["tests/test_export_docx.py"]
+reads = "HTML this app wrote; and, for a Word upload, a working copy of the file that source/docx_package.py rebuilt (its parts are limited, its relationships filtered, its pictures replaced, hidden text taken out)"
+runs_in = "a child process with a time limit; for an upload, the sandbox (core/sandbox.py: no network, a read-only system, pandoc --sandbox) under the lock the LaTeXML conversion takes"
+hostile = ["tests/test_export_docx.py", "tests/test_sandbox_steps.py", "tests/test_office_convert.py", "tests/workflows/test_wf49_hostile_input.py"]
 
 [system.latexml]
 use = "converts uploaded LaTeX and Beamer source to XML and HTML (source/latexml.py); pulls in TeX Live's base, ImageMagick and Perl"

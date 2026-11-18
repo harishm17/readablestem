@@ -1182,7 +1182,7 @@ class Worker:
             numbered = combine_rules.number_part_pages(job, result)
             # A Word or PowerPoint upload: what its PDF route left out or kept open (T3-30).
             result.notices = office_census.with_notices(
-                result.notices, office_census.parse(job.office_json)
+                result.notices, office_census.parse(job.office_json), result.origin
             )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)

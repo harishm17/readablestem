@@ -351,3 +351,166 @@ def test_the_graphics_map_reads_the_xml_ids(tmp_path):
 
 def test_the_language_comes_from_the_page(tmp_path):
     assert reader.read(page('<p class="ltx_p">x</p>', lang="fr"), tmp_path).lang == "fr"
+
+
+# ------------------------------------------------------------- Word, read from the file itself
+# (`source.docx_package`, `source.pandoc`, `source.docx_reader`): needs pandoc and a sandbox.
+
+from fixtures import office  # noqa: E402  (grouped with the tests that use it)
+from readablestem.core import sandbox  # noqa: E402
+from readablestem.source import docx_package, docx_reader  # noqa: E402
+from readablestem.source import pandoc as pandoc_step  # noqa: E402
+from readablestem.web.office_convert import OfficeRejected  # noqa: E402
+
+needs_pandoc = pytest.mark.skipif(
+    not (pandoc_step.installed() and sandbox.available()),
+    reason="needs pandoc and a working sandbox (bubblewrap or Landlock)",
+)
+M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+
+
+def _cells(*rows: str, marked: bool) -> str:
+    out = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblLook w:firstRow="1"/></w:tblPr>'
+    out += '<w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/></w:tblGrid>'
+    for number, row in enumerate(rows):
+        head = "<w:trPr><w:tblHeader/></w:trPr>" if marked and number == 0 else ""
+        out += f"<w:tr>{head}"
+        for cell in row.split("|"):
+            out += (
+                "<w:tc><w:tcPr><w:tcW w:w='2000' w:type='dxa'/></w:tcPr>"
+                f"<w:p><w:r><w:t>{cell}</w:t></w:r></w:p></w:tc>"
+            )
+        out += "</w:tr>"
+    return out + "</w:tbl>"
+
+
+def word(body: str) -> bytes:
+    parts = office.docx_parts()
+    document = (
+        str(parts["word/document.xml"])
+        .replace("<w:document ", f'<w:document xmlns:m="{M_NS}" ', 1)
+        .split("<w:body>")[0]
+        + f"<w:body>{body}</w:body></w:document>"
+    )
+    named = "".join(
+        f'<w:style w:type="paragraph" w:styleId="{i}"><w:name w:val="{n}"/></w:style>'
+        for i, n in (("Title", "Title"), ("ListParagraph", "List Paragraph"))
+    )
+    styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + "</w:styles>")
+    W = office.W_NS
+    numbering = (
+        f'{office.HEAD}<w:numbering xmlns:w="{W}">'
+        '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0">'
+        '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>'
+        "</w:lvl></w:abstractNum>"
+        '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>'
+    )
+    rels = str(parts["word/_rels/document.xml.rels"]).replace(
+        "</Relationships>",
+        f'<Relationship Id="rId20" Type="{office.OD}/numbering" Target="numbering.xml"/>'
+        "</Relationships>",
+    )
+    types = str(parts["[Content_Types].xml"]).replace(
+        "</Types>",
+        '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-'
+        'officedocument.wordprocessingml.numbering+xml"/></Types>',
+    )
+    return office.rebuild(
+        parts,
+        replace={
+            "word/document.xml": document,
+            "word/styles.xml": styles,
+            "word/_rels/document.xml.rels": rels,
+            "[Content_Types].xml": types,
+        },
+        add={"word/numbering.xml": numbering},
+    )
+
+
+def read_word(data: bytes):
+    prepared = docx_package.prepare(data)
+    result = pandoc_step.read("docx", prepared.working)
+    assert result.tree is not None, result.failure
+    return docx_reader.read(prepared, result.tree)[0]
+
+
+@needs_pandoc
+def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_out():
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Kinematics notes</w:t></w:r></w:p>'
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Motion</w:t></w:r></w:p>'
+        "<w:p><w:r><w:t>Speed is distance over time, page </w:t></w:r>"
+        '<w:fldSimple w:instr=" PAGE "><w:r><w:t>7</w:t></w:r></w:fldSimple>'
+        "<w:r><w:rPr><w:vanish/></w:rPr><w:t>SECRET-HIDDEN-WORDS</w:t></w:r></w:p>"
+        "<w:p><m:oMathPara><m:oMath><m:r><m:t>v=</m:t></m:r><m:f><m:num><m:r><m:t>d</m:t></m:r>"
+        "</m:num><m:den><m:r><m:t>t</m:t></m:r></m:den></m:f></m:oMath></m:oMathPara></w:p>"
+        + "".join(
+            '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/>'
+            '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/>'
+            f"</w:numPr></w:pPr><w:r><w:t>{word}</w:t></w:r></w:p>"
+            for word in ("First step", "Second step")
+        )
+        + _cells("Name|Value", "g|9.8", marked=True)
+        + _cells("Name|Value", "c|3.0", marked=False)
+    )
+    reading = read_word(word(body))
+    assert kinds(reading) == [
+        "heading",
+        "heading",
+        "paragraph",
+        "equation",
+        "list_item",
+        "list_item",
+        "table",
+        "table",
+    ]
+    assert reading.title == "Kinematics notes" and reading.unread_words == 0
+    text = " ".join(e.text or "" for e in reading.elements)
+    assert "SECRET-HIDDEN-WORDS" not in text and "page 7" in text
+    equation = reading.elements[3]
+    fix = reading.fixes[equation.id]
+    assert fix.status is Status.ACCEPTED and fix.equation is not None
+    assert "frac" in fix.equation.latex and "<mfrac" in (fix.equation.mathml or "")
+    items = reading.elements[4:6]  # a list item keeps its words under a styled paragraph
+    assert [(i.text, i.list_marker) for i in items] == [("First step", "1."), ("Second step", "2.")]
+    first, second = reading.elements[6:]
+    # the author's header row is exact; the first-row look pandoc reads as a header is only a
+    # proposal, and says so in a check
+    assert first.table is not None and first.table.header_rows == 1
+    flagged = {e.id: {c.name for c in reading.fixes[e.id].checks} for e in (first, second)}
+    assert docx_reader.HEADER_CHECK not in flagged[first.id]
+    assert docx_reader.HEADER_CHECK in flagged[second.id]
+    assert {n.code for n in reading.notices} >= {"word_hidden_text"}
+
+
+@needs_pandoc
+def test_pandoc_is_given_no_file_it_could_read_and_no_address_it_could_fetch():
+    parts = office.docx_parts()
+    rels = str(parts["word/_rels/document.xml.rels"]).replace(
+        'Target="media/image1.png"', 'Target="/etc/passwd"'
+    )
+    raw = office.rebuild(parts, replace={"word/_rels/document.xml.rels": rels})
+    # even handed the raw file, pandoc's own sandbox flag reads nothing of the host's
+    result = pandoc_step.read("docx", raw)
+    assert "root:x:0:0" not in str(result.tree)
+    # and the working copy has no relationship that leaves the package at all
+    prepared = docx_package.prepare(office.docx())
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(prepared.working)) as archive:
+        names = archive.namelist()
+        assert not [n for n in names if n.startswith("word/embeddings")]
+        assert b"External" not in archive.read("word/_rels/document.xml.rels")
+
+
+@pytest.mark.parametrize(
+    "member",
+    ["word/../../evil.xml", "/etc/evil.xml", "word\\evil.xml"],
+)
+def test_a_member_name_that_leaves_the_package_is_refused_before_pandoc(member):
+    parts = office.docx_parts()
+    parts[member] = "<x/>"
+    with pytest.raises(OfficeRejected) as refused:
+        docx_package.check(office._zip(parts))
+    assert refused.value.code == "office_unsafe"

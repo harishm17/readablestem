@@ -82,7 +82,7 @@ def record_write(
     """Record what this write did (`events.add_outcomes`) and mark each change's `after`
     with it, for Undo. Call before the write's ReviewEdits are made."""
     firsts = _first_befores(session, job.id, [c.element_id for c in changes])
-    origin = "source" if result.origin in {"latex", "beamer"} else "page"
+    origin = "source" if result.origin in {"latex", "beamer", "docx"} else "page"
     recorded: list[events.Outcome] = []
     for change in changes:
         structural = isinstance(change, StructureChange)

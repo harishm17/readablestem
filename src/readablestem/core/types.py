@@ -905,6 +905,14 @@ NOTICE_CODES = frozenset(
         "office_speaker_notes",
         "office_hidden_slides",
         "office_comments",
+        # Word file read from the file itself (`source.docx_reader`): what the reader took
+        # out of the reading or could not carry. `count`: words, boxes, parts or changes.
+        "word_hidden_text",  # hidden text, left out as Word hides it
+        "word_text_boxes",  # text in boxes the reader did not read (words lost, counted)
+        "word_headers_footers",  # running headers and footers, not part of the text
+        "word_objects",  # SmartArt, charts or embedded objects: not read
+        "word_tracked_changes",  # tracked changes: the reader took the accepted text
+        "word_rtl_text",  # right-to-left paragraphs: words in reading order, no direction kept
     }
 )
 
@@ -1262,9 +1270,10 @@ class DocumentResult(BaseModel):
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.
     image_pages: ImagePagesSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # Where the document came from: "pdf" (every result before this field), "latex" (a LaTeX
-    # source converted by `readablestem.source`, which has no pages to show) or "beamer". Left
+    # source converted by `readablestem.source`, which has no pages to show), "beamer" or "docx"
+    # (a Word file read from the file itself, `source.docx_reader`). Left
     # out of the JSON for a PDF, so a stored result reads the same.
-    origin: Literal["pdf", "latex", "beamer"] = Field(
+    origin: Literal["pdf", "latex", "beamer", "docx"] = Field(
         default="pdf", exclude_if=lambda v: v == "pdf"
     )
     # A source only: what LaTeXML reported and where its error nodes are (`SourceReport`).

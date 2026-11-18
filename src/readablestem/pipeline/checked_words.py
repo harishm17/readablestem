@@ -145,7 +145,7 @@ def pictures_sentence(s: CheckedSummary) -> str:
         shown += " of the original"
     else:
         shown = "is shown as it was written" if k == 1 else "are shown as they were written"
-        shown += " in LaTeX"
+        shown += " in the Word file" if s.origin == "docx" else " in LaTeX"
     return (
         f"{parts} and {shown}, marked “Not converted” or “Needs a description”: ask your "
         "instructor for a version you can read."

@@ -730,63 +730,9 @@ class _Reader:
         self, element: Element, latex: str, mathml: str, failed: bool, display: Display
     ) -> None:
         """Set the fix for an equation element from LaTeXML's reading of it."""
-        from readablestem.pipeline.speech import SpeechError, mathml_to_speech
-        from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
-
-        latex = re.sub(r"^\\displaystyle\s*", "", latex).strip()
-        mathml_ok = ""
-        if not failed and mathml:
-            try:
-                mathml_ok = str(sanitize_mathml(mathml))
-            except UnsafeMathML:
-                failed = True
-        if not failed and not mathml_ok:
-            failed = True
-        if failed:
-            self.errors += 1
-            element.text = latex or None  # shown as written where nothing better exists
-            proposal = _own_conversion(latex, display)
-            fix = Fix(
-                element_id=element.id,
-                kind=Kind.EQUATION,
-                status=Status.NEEDS_REVIEW if proposal is not None else Status.FAILED,
-                reason=None if proposal is not None else "invalid_latex",
-                confidence=None,
-                equation=proposal,
-                checks=[Check(name="source.macro", passed=False, code="unknown_command")],
-                review="required",
-            )
-            self.out.fixes[element.id] = fix
-            return
-        speech, speech_check = "", None
-        try:
-            speech = mathml_to_speech(mathml_ok)
-        except SpeechError:
-            speech_check = Check(
-                name="speech.generated", passed=False, severity="warning", code="speech_failed"
-            )
-        checks = [Check(name="source.exact", passed=True)]
-        if speech_check is not None or not speech:
-            checks.append(
-                speech_check
-                or Check(
-                    name="speech.generated", passed=False, severity="warning", code="speech_empty"
-                )
-            )
-        self.out.fixes[element.id] = Fix(
-            element_id=element.id,
-            kind=Kind.EQUATION,
-            status=Status.ACCEPTED,
-            confidence=1.0,
-            equation=EquationFix(
-                latex=latex,
-                mathml=mathml_ok,
-                speech=speech,
-                display=display,
-            ),
-            checks=checks,
-            review="optional" if len(checks) > 1 else "none",
-        )
+        fix, failed = equation_fix(element, latex, mathml, failed, display)
+        self.errors += failed
+        self.out.fixes[element.id] = fix
 
     def _inline_math(self, math: Node, owner: Element) -> Element:
         latex, mathml, failed = self._math_parts(math, "inline")
@@ -1201,6 +1147,67 @@ def _serialise_svg(svg: Node) -> bytes:
     from xml.etree.ElementTree import tostring
 
     return tostring(svg, encoding="utf-8")
+
+
+def equation_fix(
+    element: Element, latex: str, mathml: str, failed: bool, display: Display
+) -> tuple[Fix, bool]:
+    """The fix of an equation a source states exactly, and whether it failed the product's checks
+    (the second value). `latex` is the source's own, `mathml` the converter's, accepted through the
+    sanitiser (`web.mathml`, ADR 0008) and spoken by the usual reading. A formula that failed (or
+    whose MathML the sanitiser refuses) is shown as written (`element.text` is set) and is a
+    required decision, with our own LaTeX conversion as the proposal when that works. Shared by
+    the LaTeX reader and the Word reader (`source.docx_reader`), so a source equation is judged
+    by one set of checks."""
+    from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+    from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
+
+    latex = re.sub(r"^\\displaystyle\s*", "", latex).strip()
+    mathml_ok = ""
+    if not failed and mathml:
+        try:
+            mathml_ok = str(sanitize_mathml(mathml))
+        except UnsafeMathML:
+            failed = True
+    if not failed and not mathml_ok:
+        failed = True
+    if failed:
+        element.text = latex or None  # shown as written where nothing better exists
+        proposal = _own_conversion(latex, display)
+        fix = Fix(
+            element_id=element.id,
+            kind=Kind.EQUATION,
+            status=Status.NEEDS_REVIEW if proposal is not None else Status.FAILED,
+            reason=None if proposal is not None else "invalid_latex",
+            confidence=None,
+            equation=proposal,
+            checks=[Check(name="source.macro", passed=False, code="unknown_command")],
+            review="required",
+        )
+        return fix, True
+    speech, speech_check = "", None
+    try:
+        speech = mathml_to_speech(mathml_ok)
+    except SpeechError:
+        speech_check = Check(
+            name="speech.generated", passed=False, severity="warning", code="speech_failed"
+        )
+    checks = [Check(name="source.exact", passed=True)]
+    if speech_check is not None or not speech:
+        checks.append(
+            speech_check
+            or Check(name="speech.generated", passed=False, severity="warning", code="speech_empty")
+        )
+    fix = Fix(
+        element_id=element.id,
+        kind=Kind.EQUATION,
+        status=Status.ACCEPTED,
+        confidence=1.0,
+        equation=EquationFix(latex=latex, mathml=mathml_ok, speech=speech, display=display),
+        checks=checks,
+        review="optional" if len(checks) > 1 else "none",
+    )
+    return fix, False
 
 
 def _own_conversion(latex: str, display: Display) -> EquationFix | None:
