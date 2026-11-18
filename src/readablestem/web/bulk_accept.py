@@ -19,6 +19,7 @@ page kept as an image: those stay for a person.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from readablestem.core.types import DocumentResult, Element, Fix, Kind, Status
@@ -131,12 +132,28 @@ def offers(result: DocumentResult) -> list[Offer]:
     return out
 
 
-def accept_all(result: DocumentResult, slug: str) -> list[ReviewChange]:
-    """Accept every candidate, in place: one ordinary Accept per fix, each marked as one of
-    a bulk action in its record (`BULK_KEY` holds the kind's slug). Raises ReviewInvalid when
-    there is none."""
+PAGE_SIZE = 20  # the confirming page lists this many at a time (`page_of`)
+
+
+def page_of(found: list[Fix], page: int) -> tuple[list[Fix], int, int]:
+    """One page of the list the confirming page shows: (its fixes, its number, the pages in
+    all). A page number out of range is the nearest page that exists."""
+    pages = max(1, -(-len(found) // PAGE_SIZE))
+    page = min(max(page, 1), pages)
+    return found[(page - 1) * PAGE_SIZE : page * PAGE_SIZE], page, pages
+
+
+def accept_all(
+    result: DocumentResult, slug: str, only: Collection[str] | None = None
+) -> list[ReviewChange]:
+    """Accept the candidates, in place: one ordinary Accept per fix, each marked as one of
+    a bulk action in its record (`BULK_KEY` holds the kind's slug). `only`: the element ids
+    the person was shown (one page of the list); without it, every candidate. Raises
+    ReviewInvalid when there is none."""
     spec = BULK_KINDS[slug]
     waiting = candidates(result, slug)
+    if only is not None:
+        waiting = [f for f in waiting if f.element_id in only]
     if not waiting:
         raise ReviewInvalid([FieldError(f"bulk-{slug}", spec.nothing)])
     changes = [apply_review(result, fix.element_id, "accept", {}) for fix in waiting]
