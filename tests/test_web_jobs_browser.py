@@ -394,7 +394,9 @@ def test_add_part_and_the_preview_say_what_is_wrong_before_anything_is_sent(site
     expect(page.locator("#parts-summary")).to_contain_text("before converting", timeout=5000)
     expect(page.locator(".parts-row-error")).to_contain_text("Page 1 is in part 1 and part 4")
     page.get_by_role("button", name="Remove part 4").click()
-    expect(page.locator("#parts-summary")).to_have_text("All 3 parts (12 pages) start now.", timeout=5000)
+    expect(page.locator("#parts-summary")).to_have_text(
+        "All 3 parts (12 pages) start now.", timeout=5000
+    )
     # What the preview shows is what is in the box (the form still sends the box).
     page.get_by_text("Type the pages instead").click()
     expect(page.get_by_label("Pages for each part")).to_have_value("1-4\n5-8\n9-12")
