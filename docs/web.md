@@ -58,6 +58,7 @@ value and where that value came from. This page does not repeat those values.
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
 | `FEATURE_WORD_SOURCE` | Off by default. Reads a `.docx` from the file itself with pandoc in the sandbox, in place of a LibreOffice PDF; the PDF route stays the fallback for what the reader does not take. See "Word files read from the file" |
+| `FEATURE_COURSE_GRANTS` | Off by default; needs `FEATURE_NOTATION_MEMORY`. Course grants (WS27.1, `web/shares.py`, `routes/courses.py`): the owner of a course gives a person, by the address they sign in with, the right to `view` or `review` every document in it, now and later. Off, the People section is not there, `/courses/{id}/people...` answer 404, and a `course_grants` row that exists gives no right. See "Course grants" below and docs/deploy-railway.md, "Before `FEATURE_COURSE_GRANTS` is turned on" |
 | `FEATURE_CLASS_LINK` | Off by default. The class link (WS27.2, `web/links.py`, `routes/class_link.py`): the owner of a ready document makes one link that opens the published student version at `/s/{token}` without a sign-in, until a last day at most 180 days away. Off, there is no section on the share page and `/s/...` answers 404. See "The class link" below and docs/deploy-railway.md, "Before `FEATURE_CLASS_LINK` is turned on" |
 | `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default in code; which are on in production is in the production profile |
@@ -201,6 +202,8 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; anyone who may open the document (a person's address is shown to the owner only, and the CSV names who decided in the owner's file only), finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the checked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
+| POST `/courses/{id}/people` | owner of the course; setting on | Give a person (`email`, in full) the right `role` (`view` or `review`) on every document of the course, or change theirs (the share page's validation and words; at most 10 people per course); 422 with the reason beside the field. CSRF-checked, one-submit form `people.add`. 404 with `FEATURE_COURSE_GRANTS` off |
+| POST `/courses/{id}/people/{grant_id}/remove` | owner of the course; setting on | Without `confirm=yes` the answer is the question "Remove <address> from <course>?" (so no address is in a URL); with it, remove the grant, effective on the person's next request. CSRF-checked, one-submit form `people.remove` |
 | GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, the queue (how many stored documents are in each state, in the table's labels, F-213), aggregate counts, usage counts per day and per pseudonymous person |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (the Remove button's POST answers with a question that names the address and says what is lost, and removes only with `confirm=yes`, so no address is in a URL; adding makes them `invited`; removing blocks them). Every admin POST says what happened: "Nothing changed: ..." with the reason for an empty or unknown address or a repeat, never a success when no row changed (`routes/admin.py`, the words of `routes/sharing.SHARE_OUTCOME`'s shape) |
 | POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (the Block button and the "Block by email" form post, the answer is a question naming the address, and only `confirm=yes` blocks; signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
@@ -1269,6 +1272,48 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
 - Tests: `tests/test_job_shares.py` (the matrix of every job route against the owner, a viewer, a
   reviewer, a removed person and a stranger; the address rules; removal at once; who is
   recorded; the clock; deletion), `tests/test_audit_authz.py`, `tests/test_web_auth.py`.
+
+### Course grants (`web/shares.py`, `routes/courses.py`, `FEATURE_COURSE_GRANTS`, WS27.1)
+
+An owner gives a person, by the address they sign in with, the right to `view` or `review` every
+document of one course, now and later. Behind `FEATURE_COURSE_GRANTS` (off in code and in the
+production profile; it also needs `FEATURE_NOTATION_MEMORY`, because courses do). Off, there is no
+People section, the two routes answer the same 404 as a wrong address, and a `course_grants` row
+that exists gives **no** right. Before turning it on read docs/deploy-railway.md, "Before
+`FEATURE_COURSE_GRANTS` is turned on". docs/security.md, "Course grants", has the access rule.
+
+- **Table.** `course_grants` (`id`, `course_id` FK to `courses` ON DELETE CASCADE and indexed,
+  `email` the sign-in address in lower case (320, indexed), `role` `view` or `review` (a CHECK),
+  `created_at`; unique on `course_id` and `email`). Migration `d3a8f1c5e692`, after
+  `c5d9e1a3b7f4`; the downgrade drops the table (the grants are lost, the documents are not).
+- **The rule is `shares.role_of` alone.** The highest of: owner; the document's `job_shares` row
+  for the person; a `course_grants` row on `job.course_id` for the person, when the course is the
+  owner's own and grants are in force. The `job_access` signatures did not change: the setting
+  reaches `role_of` through the session (`db.make_sessionmaker(..., course_grants=...)` puts a
+  callable in `session.info`, read per request by `shares.grants_in_force`; a session made
+  without it counts as off). Rank never exceeds `review`; `is_owner` and every owner-only route
+  stay owner-only.
+- **The People section** (`_course_people.html`, on `GET /courses/{id}`, owner only): the people
+  and their right, the add form (the share page's words and validation, `shares._checked_person`),
+  change and remove next to each person, "N of 10 people". Plain forms, no script. Nothing is
+  emailed: the page says to tell the person. Remove is a POST whose answer is the question
+  (`course_person_remove_confirm.html`), as for the Admin page's Block.
+- **The document's share page** lists, read-only, "Through the course <name>" with the people and
+  their right and a link to the course's People section. The review record is unchanged: only
+  the owner sees addresses.
+- **"Shared with you"** also lists the documents reached through a course, grouped under the
+  course's name, each document once; one shared directly as well shows the higher right.
+- **Deletion.** `notation.delete_course` deletes the course's grants; `ops.retention.erase_user`
+  deletes the grants that name the erased address and those on the erased person's courses.
+  Removing a document from a course (or the document expiring) ends the grant's reach to it.
+- **Money.** A grantee's re-read goes through the same `reread.read_equation` as a reviewer's:
+  the owner's allowance, pool, per-job cap and rate limit (`job.user_id`).
+- **Logs.** `course_grant_set`, `course_grant_removed` and `course_grant_refused`: course id,
+  right and a category; never an address. Flash notices carry no address.
+- Tests: `tests/test_job_shares.py` (the course actors in the route matrix, the setting off,
+  covered from the moment a document joins until it leaves, expired before any grant is read, who
+  may give a grant, the limit, what the owner and a grantee see, "Shared with you", erasure),
+  `tests/test_web_courses.py`, `tests/test_web_migrations.py`, `tests/test_web_auth.py` (CSRF).
 
 ### The class link (`web/links.py`, `routes/class_link.py`, `FEATURE_CLASS_LINK`, WS27.2)
 
@@ -3990,6 +4035,7 @@ test fails when a table with a user id is added without it.
   (nullable; links made before it prove nothing). Additive; the downgrade drops the column.
 - `5d8e1f2a7c39` (the head as of 2026-11-04): `users.keep_week_default`, the Account page's "Keep new
   documents for 7 days by default" (server default false). Additive; the downgrade drops the column.
+- `d3a8f1c5e692` (course grants, after `c5d9e1a3b7f4`): the table `course_grants` (`course_id` FK cascade, the sign-in address in lower case, `role` `view` or `review`; unique per course and address). Additive; the downgrade drops the table.
 - `b7112167eb0d` (job shares): the table `job_shares` (`job_id`, the sign-in address in
   lower case, `role` `view` or `review`; unique per document and address). Additive: nothing else
   changes, and the downgrade drops the table (the shares are lost, the documents are not).

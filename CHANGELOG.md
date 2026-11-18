@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: course grants, off until the list is done (branch feat/course-grants)
+
+- WS27.1, reduced to course grants only. An owner can give a person, by the address they sign in
+  with, the right to view or review every document of one course, now and later, from a People
+  section on the course page (add, change, remove; at most 10 people; nothing is emailed; Remove
+  asks first as the answer to the POST). The rule is `shares.role_of` alone, so every route that
+  asks `job_access` follows it: a document added to the course is covered, one taken out or a
+  deleted course is not, an expired document is refused before any grant is read, the address must
+  be proven as for a share, rank stops at review, and the course pages and every owner-only action
+  stay owner-only. The document's share page lists the people reached through its course, and
+  "Shared with you" groups those documents under the course. A grantee's re-read is charged to the
+  owner as a reviewer's is. Behind `FEATURE_COURSE_GRANTS` (off in code and in the production
+  profile; needs `FEATURE_NOTATION_MEMORY`): off, the routes are 404 and a grant row gives no
+  right. Deleting a course or erasing an account deletes the grants. One migration,
+  `d3a8f1c5e692` (table `course_grants`). Not built: teams, departments, offices, "send to my
+  accessibility office", hand-over of a course, usage totals. The public pages that become
+  incomplete are listed in docs/deploy-railway.md, "Before `FEATURE_COURSE_GRANTS` is turned on".
+  No model request changed; no pipeline or render version bump.
+
 ## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
 
 - WS11.1e, as far as its triage line. Found by reading the upload, delete and purge code and by

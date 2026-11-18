@@ -167,6 +167,7 @@ production if a required one is missing, and logs the reason):
 | `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
 | `FEATURE_WORD_SOURCE` | Reads a `.docx` from the file itself (pandoc in the sandbox, `source/docx_reader.py`) instead of from a LibreOffice PDF; needs pandoc, a passing sandbox probe, and takes only files the reader's gate accepts, the rest go the PDF route (docs/web.md, "Word files read from the file"). Not declared on `web` in `railway.ts` yet. | Production's value is in the production profile; off until real Word files have been read both ways. |
 | `FEATURE_CLASS_LINK` | The class link: an owner's link that opens the published student version without a sign-in (docs/web.md, "The class link"). Declared on `web` in `railway.ts`. | Off, and stays off until the list in "Before `FEATURE_CLASS_LINK` is turned on" below is done. |
+| `FEATURE_COURSE_GRANTS` | Course grants: an owner gives a person every document of a course (docs/web.md, "Course grants"). Needs `FEATURE_NOTATION_MEMORY`. Declared on `web` in `railway.ts`. | Off, and stays off until the list in "Before `FEATURE_COURSE_GRANTS` is turned on" below is done. |
 | `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until a few real decks have been converted and read. |
 | `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is: the probe passes on Railway with it. |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off by default (production's values: the production profile). With it, allow 2 GB of memory. | Unset. |
@@ -234,6 +235,35 @@ open tier 150 pages a day; invited 300 pages a day (`PER_USER_DAILY_PAGE_QUOTA`)
 of 250 MB per open-tier person, 300 MB per invited person and 2000 MB for everybody
 (`STORAGE_*_MB`; these cap what is stored at a time, not what is uploaded per day); a spend cap of
 $6 per job and $10 a day for the site, of which open-tier accounts may use $4.
+
+## Before `FEATURE_COURSE_GRANTS` is turned on
+
+Course grants (WS27.1, docs/web.md "Course grants") let an owner give a person every document of a
+course. They are off in code and in the production profile, and with the switch off the public
+pages are accurate. Do not set it to `true` on `web` (it needs `FEATURE_NOTATION_MEMORY` too)
+until the sentences below are changed or made conditional; the code does not do that for them,
+except the one in `privacy.html`, which already follows the switch (`course_grants_on`).
+
+1. **These sentences are false or incomplete once it is on** (`src/readablestem/web/templates/`):
+   - `security.html:122-125`: "A document belongs to the person who uploaded it ... The owner can
+     share a document with named people": a course can be shared too, and the people reach
+     documents added later.
+   - `offices.html:80-82`: "A document can be shared with named colleagues, who must sign in with
+     the exact email address entered": same.
+   - `account.html:24` ("People you share a document with see this beside your address") and
+     `account.html:51` ("A read started by someone a document is shared with counts here"): both
+     should also name a course's people.
+   - `help_review.html:262`: "A person you shared the document with to view only is never given
+     the draft": true for a course grant too; add "or a course".
+   - `privacy.html`: the access sentence is already conditional on `course_grants_on`.
+   - Unchanged and still true: `_retention_table.html:9` and `privacy.html:58`, `67-68` (a document
+     is deleted on its schedule whoever can open it).
+2. **Tell the owners what a grant is.** A grant covers documents added later; taking a document out
+   of the course ends it; nothing is emailed; the grantee must sign in with Google, Microsoft or an
+   emailed link to that exact address. The People section says this; the help pages do not yet.
+3. **Know what it does not do.** No teams, departments or offices, no hand-over of a course, no
+   usage totals. A grant is a person's address, not a role in an organization. The grantee's reads
+   count against the owner's allowance.
 
 ## Before `FEATURE_CLASS_LINK` is turned on
 
