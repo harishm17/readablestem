@@ -91,11 +91,18 @@ DERIVED_CODES = frozenset(
 ) | (KEPT_IMAGE_CODES)
 # Figures that need more than short alt text (W3C "complex images").
 # Where a notice is listed on the job page.
-Section = Literal["not_handled", "worth_checking"]
+Section = Literal["handled", "not_handled", "worth_checking"]
+# Notices that record something found and converted, with no decision and nothing to check:
+# a footnote kept where it falls, a block of program code kept as code. They are counted
+# under "Handled in this file", never listed as left out (F-043).
+HANDLED_CODES = frozenset({"footnote", "code_block"})
 
 
 def section(notice: Notice) -> Section:
-    """ "Not handled in this file" for required and none, "Worth checking" for optional."""
+    """ "Handled in this file" for what was found and converted (`HANDLED_CODES`), "Not
+    handled in this file" for the other required and none, "Worth checking" for optional."""
+    if notice.code in HANDLED_CODES:
+        return "handled"
     return "worth_checking" if notice.review == "optional" else "not_handled"
 
 

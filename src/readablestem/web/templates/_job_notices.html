@@ -22,6 +22,15 @@
   </ul>
 </section>
 {% endif %}
+{% if pg.notices.handled %}
+<section aria-labelledby="handled-heading">
+  <h2 id="handled-heading">Handled in this file</h2>
+  <ul class="check-list">
+    {% for line in pg.notices.handled %}<li>{{ line.text }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% if pg.notices.worth_checking %}
 <section aria-labelledby="worth-checking-heading">
   <h2 id="worth-checking-heading">Worth checking</h2>

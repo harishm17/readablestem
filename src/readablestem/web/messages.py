@@ -542,6 +542,22 @@ NOTICE_MESSAGES: dict[str, str] = {
     "office_comments": "Comments in the original file: {count}. They are not in this file.",
 }
 
+# What the job page says of what it found and converted (`pipeline.notices.HANDLED_CODES`):
+# the thing named singular and plural, then what was done with it, for any count.
+HANDLED_MESSAGES: dict[str, tuple[str, str, str]] = {
+    "footnote": (
+        "footnote",
+        "footnotes",
+        "kept where they fall in the text; a mark in the text links to its footnote where the "
+        "mark could be found.",
+    ),
+    "code_block": (
+        "block of program code",
+        "blocks of program code",
+        "kept as code, with line breaks and indentation, without highlighting.",
+    ),
+}
+
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
 # A table check with no sentence of its own is still named by the part of the table it is about,
 # so the reviewer is told where to look (rows, headers, words, maths), not only that one failed.
