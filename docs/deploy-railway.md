@@ -186,6 +186,15 @@ entries, which means a proxy is missing from the setting (or a client forged the
 carries counts, no addresses. `readablestem ops launch-check` cannot see the live header; it
 only flags `TRUSTED_PROXY_HOPS=0`.
 
+Every request line in the log also carries `forwarded_parts`, the number of entries the
+`X-Forwarded-For` header held when it reached the app (a count, never an address; 0 with no
+header). To settle how Railway treats the header, send one public GET to a page that is not a
+health route (those log at debug level) with a made-up two-entry header and read the count on its
+line: 3 means Railway appends the address it saw, so the limiter keys on the real address
+(`TRUSTED_PROXY_HOPS=1` is right); 1 means it replaces the header; 2 means it passes the header
+through, and `TRUSTED_PROXY_HOPS` must change before anything else. **Not yet read in production**:
+write the date and the count here when it is.
+
 `CRON_TOKEN` must be at least 32 characters (production refuses to start otherwise). To rotate
 `SESSION_SECRET` without signing people out, use `SESSION_SECRET_PREVIOUS`
 ([security.md](security.md), "Rotating the session secret").

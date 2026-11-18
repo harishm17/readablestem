@@ -78,6 +78,8 @@ def test_the_address_is_the_one_the_trusted_proxy_wrote_not_one_the_client_wrote
     behind_balancer = request_with({"x-forwarded-for": "6.6.6.6, 203.0.113.7, 130.211.0.1"})
     assert client_ip(behind_balancer, trusted_hops=2) == "203.0.113.7"
     assert client_ip(spoofed, trusted_hops=0) == "10.0.0.9"  # no proxy: the header is ignored
+    replaced = request_with({"x-forwarded-for": "203.0.113.7"})  # a host that replaces the header
+    assert client_ip(replaced, trusted_hops=1) == "203.0.113.7"
 
 
 def test_a_header_that_is_not_an_address_falls_back_to_the_peer():

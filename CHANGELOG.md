@@ -8,6 +8,13 @@
   stays on requests. Before, 3 refused files followed by good files from one account stopped at
   the 13th good file (12 taken); now all 15 are taken. No request, prompt or stored document
   changes, so no version bump.
+- WS26.6, the log part: the content-free request log line carries `forwarded_parts`, the number of
+  `X-Forwarded-For` entries (a count, never an address), so one public GET with a two-entry header
+  can show how Railway treats the header (3 appends, 1 replaces, 2 passes it through;
+  `docs/deploy-railway.md`). The GET and the Landlock checks in the production image and in
+  production are not part of this change. The probe's bound for thread tasks is not built: no
+  caller needs it yet (the Word reader on `feat/word-reader` bounds pandoc by the group's resident
+  memory, not by the probe's total).
 
 ## Unreleased: exam mode is in view at upload and said wherever the document is handled (branch feat/exam-mode-visible-and-used)
 
