@@ -21,6 +21,9 @@ PRINTS_ALIKE = [
     (r"u'_\theta", r"u_\theta'"),  # a prime before or after a subscript
     (r"\begin{align}a&=b\end{align}", r"\begin{aligned}a&=b\end{aligned}"),
     (r"\mathbf{k=p+q}", r"\mathbf{k}=\mathbf{p}+\mathbf{q}"),  # a style sets letters only
+    (r"{a \over b}c", r"\frac{a}{b}c"),  # the old infix fraction
+    (r"\begin{array}{rcl}a&=&b\\c&=&d\end{array}", r"\begin{aligned}a&=b\\c&=d\end{aligned}"),
+    (r"\begin{pmatrix}a&b\\c&d\end{pmatrix}", r"\left(\begin{array}{cc}a&b\\c&d\end{array}\right)"),
 ]
 
 PRINTS_DIFFERENTLY = [
@@ -36,6 +39,10 @@ PRINTS_DIFFERENTLY = [
     (r"x^{a}b", r"x^{ab}"),
     (r"\mathbf{x}+y", r"x+y"),  # bold against plain
     (r"\mathbf{x}+y", r"\mathbf{x}+\mathbf{y}"),  # a bold letter against a plain one
+    (r"\begin{pmatrix}1&2\end{pmatrix}", r"\begin{pmatrix}12\end{pmatrix}"),  # two cells, one cell
+    (r"\begin{cases}x&y>0\end{cases}", r"\begin{cases}xy>0\end{cases}"),
+    (r"{a \over b}c", r"{a \over bc}"),  # where an infix fraction ends
+    (r"a\\b", r"a;b"),  # a line break against a semicolon
 ]
 
 
