@@ -1135,28 +1135,23 @@ class SplitBuilder:
                     tier = "repeat"
                 else:
                     name = f"{what}, needs your decision ({of})"
-                boxes.append(
-                    Box(
-                        fix.element_id, href, str(decision.number), name, tier, is_current,
-                        element.order, self.first_words(element, fix),
-                    )
-                )  # fmt: skip
+                tag = str(decision.number)
             elif tier == "optional":
-                name = f"{label}, optional check"
-                boxes.append(
-                    Box(
-                        fix.element_id, href, "Note", name, "optional", is_current,
-                        element.order, self.first_words(element, fix),
-                    )
-                )  # fmt: skip
+                tag, name = "Note", f"{label}, optional check"
             else:
-                status = self.item(fix).status_label.lower()
-                boxes.append(
-                    Box(
-                        fix.element_id, href, "✓", f"{label}, {status}", "accepted", is_current,
-                        element.order, self.first_words(element, fix),
-                    )
-                )  # fmt: skip
+                tag, name, tier = "✓", f"{label}, {self.item(fix).status_label.lower()}", "accepted"
+            boxes.append(
+                Box(
+                    fix.element_id,
+                    href,
+                    tag,
+                    name,
+                    tier,
+                    is_current,
+                    order=element.order,
+                    preview=self.first_words(element, fix),
+                )
+            )
         placed = {b.element_id for b in boxes}
         notes: list[Box] = []
         for place in self.notes:

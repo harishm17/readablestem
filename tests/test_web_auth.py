@@ -286,6 +286,11 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/jobs/{job_id}/share",  # give a named person access, or change their right (G1)
         "/jobs/{job_id}/share/{share_id}/revoke",  # take it away (G1)
+        "/jobs/{job_id}/share/link",  # the class link (WS27.2), and its changes
+        "/jobs/{job_id}/share/link/pause",
+        "/jobs/{job_id}/share/link/remove",
+        "/jobs/{job_id}/share/link/resume",
+        "/jobs/{job_id}/share/link/update",
         "/jobs/{job_id}/symbols",
         "/jobs/{job_id}/tables/accept-clean",  # the clean tables, in one write (T3-11)
         "/jobs/{job_id}/tables/{element_id}/read-cell",  # a maths cell read by the model (T3-11)

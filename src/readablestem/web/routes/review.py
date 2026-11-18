@@ -1025,6 +1025,7 @@ def _item(
             if element is not None and fix.kind is Kind.EQUATION
             else "",
             mathml=fix.equation.mathml if fix.equation else None,
+            source=checked_words.source_noun(origin),
         ),
         kept_image=is_kept_image(fix),
         source_note=source_note,

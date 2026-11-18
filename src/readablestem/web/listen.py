@@ -1098,11 +1098,13 @@ def hear_for(
     heading_text: str | None = None,
     text_layer: str = "",
     mathml: str | None = None,
+    source: str = "PDF",
 ) -> Hear | None:
     """The spoken forms of a decision's proposal, or None when it has none worth playing
     (a table, a paragraph, an equation with no reading). The equation's reading is the
     one "Read aloud roughly as" shows (`speakable`); the PDF's is `speech_diff
-    .read_text_layer`, the same speech rules applied to the text layer."""
+    .read_text_layer`, the same speech rules applied to the text layer. `source` is what
+    the document was made from, in the words about it (`checked_words.source_noun`)."""
     if kind == "equation":
         said = speakable(speech)
         if not said and mathml:
@@ -1120,7 +1122,7 @@ def hear_for(
         pdf = speakable(read_text_layer(text_layer)) if text_layer else ""
         if text_layer and not pdf:
             return Hear(said, "Converted page")  # too long or unreadable to say the PDF's
-        return Hear(said, "Converted page", pdf or "nothing", "PDF text")
+        return Hear(said, "Converted page", pdf or "nothing", f"{source} text")
     if kind == "figure":
         if decorative:
             return Hear("Marked decorative, so a screen reader skips it.")
