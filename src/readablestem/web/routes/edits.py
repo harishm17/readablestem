@@ -18,7 +18,7 @@ these back (`web.review.undo_last`). Nothing typed is logged.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -69,6 +69,8 @@ from readablestem.web.routes.review import (
     _split_redirect,
     _stale_page,
     done_message,
+    refuse_stale,
+    written_with,
 )
 from readablestem.web.shares import REVIEW
 from readablestem.web.worker import db_safe
@@ -94,19 +96,21 @@ def write_structure(
     make: Callable[[DocumentResult, Job, Session], StructureChange],
     *,
     decision: bool = True,
+    acts_on: Callable[[DocumentResult], Collection[str]] | None = None,
 ) -> tuple[StructureChange, DocumentResult, str]:
     """One structural edit as one transaction: `make` applies it to the stored result and
     returns what to record, with the id of the owned job row (what a redirect is built
     from, never the request's). `decision`: it counts as a decision made (usage events);
-    reading an item again is not one. Raises ReviewStale, ReviewInvalid (nothing saved; both
-    carry that id as `job_id`) or a PageError (404)."""
+    reading an item again is not one. `acts_on`: the elements the edit changes, for an edit
+    that moves no other element (`routes.review.refuse_stale`); without it any write since
+    the page was drawn refuses the edit. Raises ReviewStale, ReviewInvalid (nothing saved;
+    both carry that id as `job_id`) or a PageError (404)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, REVIEW, lock=True)
         require_done(job)
-        if is_stale(job.result_version, version):
-            raise ReviewStale(job.id)
         result = DocumentResult.model_validate(job.result_json or {})
+        refuse_stale(session, job, version, acts_on(result) if acts_on else None)
         open_before = _open_decisions(result)
         try:
             change = make(result, job, session)
@@ -330,7 +334,9 @@ def edit_element(
         return page_edits.make_heading(result, element_id, level)
 
     try:
-        change, _, owned_id = write_structure(request, job_id, user, version, make)
+        change, _, owned_id = write_structure(
+            request, job_id, user, version, make, acts_on=lambda _: [element_id]
+        )
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale as exc:
@@ -618,9 +624,9 @@ def read_again(
         # One budget per document's owner, so sharing never raises how fast it can spend.
         enforce(request, "reread", job.user_id)
         require_done(job)
-        stale = is_stale(job.result_version, version)
         result = DocumentResult.model_validate(job.result_json or {})
         element_id = element_ref(result, element_id)
+        stale = _stale_now(session, job, version, written_with(result, element_id))
         png = session.scalar(
             select(Blob.content).where(
                 Blob.job_id == job.id, Blob.kind == "crop", Blob.element_id == element_id
@@ -631,7 +637,7 @@ def read_again(
     if fix is None or element is None or fix.kind is not Kind.EQUATION:
         raise PageError(404, *NOT_FOUND)
     if stale:
-        return _stale_page(request, job_id, user, view, element_id)
+        return _stale_page(request, job_id, user, view, element_id, changed=stale.changed)
     if not fix.pending:
         return _item_refusal(request, job_id, user, view, element_id, NOT_WAITING)
     if png is None:
@@ -655,9 +661,10 @@ def read_again(
             version,
             lambda stored, job, session: page_edits.read_again(stored, reading, read, fresh=asked),
             decision=False,
+            acts_on=lambda stored: written_with(stored, element_id),
         )
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, element_id)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, element_id, changed=exc.changed)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     log_event(logger, "read_again", job_id=job_id, element_id=element_id)
@@ -721,12 +728,16 @@ def write_review(
     make: Callable[[DocumentResult], list[ReviewChange]],
     *,
     kind: str,
+    acts_on: Callable[[DocumentResult], Collection[str]] | None = None,
 ) -> tuple[list[ReviewChange], DocumentResult, str]:
     """Review decisions as one write, as the decision route makes them: lock the job, apply
     `make` to the stored result, store a `ReviewEdit` for each fix it changed, count the
     write. Returns the id of the owned job row too (what a redirect is built from, never
-    the request's). Raises ReviewStale, ReviewInvalid (nothing saved; both carry that id
-    as `job_id`) or a PageError."""
+    the request's). `acts_on`: the elements the write may change (a table and its equations,
+    every item of the kind a many-item action writes); a write since the page was drawn that
+    touched none of them does not refuse it (`routes.review.refuse_stale`). Raises
+    ReviewStale, ReviewInvalid (nothing saved; both carry that id as `job_id`) or a
+    PageError."""
     ctx = get_ctx(request)
     with (
         session_scope(ctx.factory) as session,
@@ -734,9 +745,8 @@ def write_review(
     ):
         job = job_access(session, job_id, user, REVIEW, lock=True)
         require_done(job)
-        if is_stale(job.result_version, version):
-            raise ReviewStale(job.id)
         result = DocumentResult.model_validate(job.result_json or {})
+        refuse_stale(session, job, version, acts_on(result) if acts_on else None)
         try:
             changes = make(result)
         except ReviewInvalid as exc:
@@ -769,6 +779,22 @@ def write_review(
     return changes, result, owned_id
 
 
+def _stale_now(
+    session: Session, job: Job, version: str, acts_on: Collection[str]
+) -> ReviewStale | None:
+    """`refuse_stale` as an answer, for a route that checks before it spends a read."""
+    try:
+        refuse_stale(session, job, version, acts_on)
+    except ReviewStale as exc:
+        return exc
+    return None
+
+
+def _all_tables(result: DocumentResult) -> list[str]:
+    """Every table: the items the "accept the clean tables" action may write."""
+    return [f.element_id for f in result.fixes if f.kind is Kind.TABLE]
+
+
 def _marked_bulk(result: DocumentResult) -> list[ReviewChange]:
     """The clean tables accepted, each marked in the record as one of an action (T3-6)."""
     changes = accept_clean_tables_rule(result)
@@ -794,10 +820,10 @@ def accept_clean_tables(
     view = LIST_VIEW if view == LIST_VIEW else "split"
     try:
         changes, result, owned_id = write_review(
-            request, job_id, user, version, _marked_bulk, kind="group"
+            request, job_id, user, version, _marked_bulk, kind="group", acts_on=_all_tables
         )
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, "tables")
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, "tables", changed=exc.changed)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="accept_clean")
         flash(request, " ".join(e.message for e in exc.errors), undo=False)
@@ -845,15 +871,15 @@ def read_cell(
         # One budget per document's owner, so sharing never raises how fast it can spend.
         enforce(request, "reread", job.user_id)
         require_done(job)
-        stale = is_stale(job.result_version, version)
         result = DocumentResult.model_validate(job.result_json or {})
-    element_id = element_ref(result, element_id)
+        element_id = element_ref(result, element_id)
+        stale = _stale_now(session, job, version, written_with(result, element_id))
     fix = result.fix_for(element_id)
     element = next((e for e in result.elements if e.id == element_id), None)
     if fix is None or element is None or fix.kind is not Kind.TABLE:
         raise PageError(404, *NOT_FOUND)
     if stale:
-        return _stale_page(request, job_id, user, "split", element_id)
+        return _stale_page(request, job_id, user, "split", element_id, changed=stale.changed)
     values = {"row": row, "col": col}
 
     def refuse(message: str) -> Response:
@@ -893,9 +919,10 @@ def read_cell(
             version,
             lambda stored: _marked_model_read(apply_review(stored, element_id, "edit", form)).every,
             kind="single",
+            acts_on=lambda stored: written_with(stored, element_id),
         )
-    except ReviewStale:
-        return _stale_page(request, job_id, user, "split", element_id)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, "split", element_id, changed=exc.changed)
     except ReviewInvalid as exc:
         # What it read does not pass as it stands: shown in the cell's box, with what
         # differs from the PDF, for the reviewer to correct or to use anyway.

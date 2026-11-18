@@ -276,7 +276,7 @@ def test_another_person_cannot_see_or_accept_them(scaled):
 def test_a_page_drawn_before_the_last_change_is_refused_and_nothing_is_accepted(scaled):
     stale = version(scaled)
     first = scaled.browser.post(
-        f"/jobs/{scaled.job_id}/review/p1-e6",
+        f"/jobs/{scaled.job_id}/review/p1-e2",
         data={
             "csrf_token": token(scaled.browser, f"/jobs/{scaled.job_id}/review"),
             "view": "list",
@@ -288,8 +288,12 @@ def test_a_page_drawn_before_the_last_change_is_refused_and_nothing_is_accepted(
     before = statuses(scaled)
     refused = accept(scaled, "equations", version=stale)
     assert refused.status_code == 409
+    assert "Equation 1 changed in another tab or window" in refused.text  # it says which
     assert statuses(scaled) == before
-    assert [e.element_id for e in edits(scaled)] == ["p1-e6"]
+    assert [e.element_id for e in edits(scaled)] == ["p1-e2"]
+    # Nothing of another kind changed, so the figures drawn at the same version are accepted.
+    assert accept(scaled, "figures", version=stale).status_code == 303
+    assert statuses(scaled)["p1-e6"] == "accepted"
 
 
 def test_an_unknown_kind_is_not_found(scaled):

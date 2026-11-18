@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
+
+- SW47 (F-080, F-407, F-481), as far as its triage line: a review write is refused as stale only
+  when the thing it acts on changed since its page was drawn, not when anything in the document
+  did. A decision or an edit of one item, a heading group, a page group, "Read again", a table's
+  cell read, accept many, accept the clean tables and relettering a symbol read the writes since
+  the page's version from the `ReviewEdit` rows (each records the number its write made) and are
+  refused only when one of them changed an item the write acts on (a table and the equations
+  behind its cells count as one; a many-item action counts every item of its kind). The refusal
+  says "This item was changed in another tab or window", or names the items for a group or a
+  many-item action. Undo, a page left out or put back, a region added, "Not an equation" and a
+  write the tool made itself are still refused when anything changed. Measured on the review
+  fixture: five decisions on five items sent from one page drawn at version 0 stored 1 before and
+  5 after. No form field, column or migration is added, and a page open before this release
+  works. Held: presence, per-person undo and a refusal that names the other person.
+
 ## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
 
 - WF52 (F-497): a tab nobody is looking at no longer asks the server for the job's status,

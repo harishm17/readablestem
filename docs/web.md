@@ -2768,11 +2768,20 @@ Save edit runs the same function, so the two never disagree.
 **Stale tabs** (MF12). Every review write (a decision, a group decision, Undo)
 counts itself on the job, inside its transaction after the row is locked
 (`web.review.bump_result_version`, `jobs.result_version`), and every review form, in both
-views, carries the number its page was drawn at (`version`). A form drawn before the last
-write (a tab left open while the document was changed in another one) is refused with a
-409, nothing applied: the decision is shown as it is now, with "Your choice was not
-saved. This document was changed in another tab or window after this page was opened. …
-Equation 1 is now: accepted by you." and a **Reload this page** link (by GET; reloading
+views, carries the number its page was drawn at (`version`). What refuses a form depends on
+what it acts on (`routes.review.refuse_stale`). A write on one item (a decision, an edit, an
+item's words, "Read again"), on a group's members or on the items of a many-item action (accept
+many, accept the clean tables, relettering a symbol) is refused only when a write since the
+page was drawn changed one of those items; the writes since are read from the `ReviewEdit`
+rows, which record the number each write made, so no form field or column is added, and the
+write is applied to the newest stored result under the row lock. Two tabs, or two cards decided
+one after the other from one page, therefore both save. A write that depends on the whole
+document is refused when anything changed: Undo, a page left out or put back, a region added
+and "Not an equation". So is any write since that left no row (the tool's own, a setting
+change). A form that sends no version is never refused. A refused form gets a 409, nothing
+applied: the decision is shown as it is now, with "Your choice was not saved. This item was
+changed in another tab or window after this page was opened. … Equation 1 is now: accepted by
+you." (a group or many-item action names the items that changed) and a **Reload this page** link (by GET; reloading
 the POST would only send it again). What was typed stays in the field. The notice takes
 focus, like the error summary. A form without the field (a page from before this release,
 a script) is not refused: the guard is for tabs, not a lock.

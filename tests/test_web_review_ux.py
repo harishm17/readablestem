@@ -117,15 +117,41 @@ def test_a_write_from_an_out_of_date_tab_is_refused_and_says_so(ux):
     assert 'name="version" value="1"' in page
 
 
+def test_a_page_from_before_other_decisions_still_saves_the_items_they_did_not_touch(ux):
+    # Five decisions on five different items, every one sent from the page drawn at version 0
+    # (a second tab, or cards decided in quick succession): all five are stored.
+    members = [f.element_id for f in stored(ux).fixes if f.group_key == GROUP]
+    for target in ["p1-e2", "p1-e6", *members]:
+        assert post(ux, target, action="accept", version="0").status_code == 303, target
+    pending = [f.element_id for f in stored(ux).fixes if f.pending]
+    assert pending == [] and version_of(ux) == 5 and len(edits(ux)) == 5
+    # The item itself having changed since is what refuses a write, and only that one.
+    assert post(ux, "p1-e2", action="reject", version="0").status_code == 409
+    assert stored(ux).fix_for("p1-e2").status.value == "accepted"
+    # A page left out moves other elements: it refuses every item's form drawn before it.
+    omit = ux.browser.post(
+        f"/jobs/{ux.job_id}/pages/2/omit",
+        data={"csrf_token": token(ux.browser, f"/jobs/{ux.job_id}/review"), "version": "5"},
+    )
+    assert omit.status_code == 303 and version_of(ux) == 6
+    assert post(ux, "p1-e6", action="reject", version="5").status_code == 409
+    # A write that left no record of what it touched (the tool's own) cannot be told apart.
+    with session_scope(ux.ctx.factory) as session:
+        job = session.get(Job, ux.job_id)
+        assert job is not None
+        job.result_version += 1
+    assert post(ux, "p1-e6", action="reject", version="6").status_code == 409
+
+
 def test_a_refused_stale_edit_keeps_what_was_typed(ux):
-    assert post(ux, "p1-e6", action="accept", version="0").status_code == 303
+    assert post(ux, "p1-e2", action="accept", version="0").status_code == 303
     response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
     assert response.status_code == 409
     assert r"\boldsymbol{\omega}</textarea>" in panel(response.text)
     # ... in an open edit box, and the notice says it is there.
     assert '<details class="edit-box" open>' in panel(response.text)
     assert "What you typed is kept below." in response.text
-    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
+    assert stored(ux).fix_for("p1-e2").status.value == "accepted"  # the first tab's decision stands
     # Choosing again from the refreshed page works.
     assert (
         post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="1").status_code
@@ -134,19 +160,24 @@ def test_a_refused_stale_edit_keeps_what_was_typed(ux):
 
 
 def test_stale_group_and_list_view_writes_are_refused_too(ux):
-    assert post(ux, "p1-e2", action="accept", version="0").status_code == 303
+    # One member of the group decided in another tab: the group action, drawn before, is refused.
+    assert post(ux, "p1-e7", action="accept", version="0").status_code == 303
     group = post(ux, GROUP, action="reject", version="0")
     assert group.status_code == 409
     assert "Your choice was not saved" in group.text
-    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"needs_review"}
-    listed = post(ux, "p1-e6", action="accept", version="0", view="list")
+    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {
+        "accepted",
+        "needs_review",
+    }
+    assert post(ux, "p1-e6", action="accept", version="1").status_code == 303
+    listed = post(ux, "p1-e6", action="reject", version="1", view="list")
     assert listed.status_code == 409
     assert "<h1>All items as a list</h1>" in listed.text
     assert (
         f'href="/jobs/{ux.job_id}/review/list?at=item-p1-e6#item-p1-e6">Reload this page</a>'
         in listed.text
     )
-    assert stored(ux).fix_for("p1-e6").status.value == "needs_review"
+    assert stored(ux).fix_for("p1-e6").status.value == "accepted"
 
 
 # --------------------------------------------------------------------------- MF3 edits

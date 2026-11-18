@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 from urllib.parse import quote, urlencode
@@ -1324,6 +1324,7 @@ def split_page(
     show_accepted: bool = False,
     invalid: tuple[str, ReviewInvalid] | None = None,
     stale: bool = False,
+    stale_changed: Sequence[str] = (),
     status_code: int = 200,
     cell: str = "",
     tools: bool = False,
@@ -1397,6 +1398,7 @@ def split_page(
             item,
             review_url(builder.job_id, item=item),
             invalid[1].values if invalid is not None else None,
+            stale_changed,
         )
         if stale
         else None,

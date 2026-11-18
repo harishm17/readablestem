@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import logging
 import struct
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
 from urllib.parse import parse_qsl, urlencode
@@ -158,6 +158,7 @@ from readablestem.web.review import (
     kind_for_slug,
     needs_attention,
     next_to_review,
+    page_group_members,
     reject_keeps,
     restorable,
     review_anchor,
@@ -394,6 +395,15 @@ STALE_MESSAGE = (
     "This document was changed in another tab or window after this page was opened. It is "
     "shown below as it is now: check it, then choose again."
 )
+STALE_ITEM_MESSAGE = (
+    "This item was changed in another tab or window after this page was opened. It is shown "
+    "below as it is now: check it, then choose again."
+)
+STALE_MEMBERS_MESSAGE = (
+    "{names} changed in another tab or window after this page was opened, so nothing was "
+    "saved. They are shown below as they are now: check them, then choose again."
+)
+NAMED_AT_MOST = 3
 
 
 @dataclass
@@ -416,6 +426,7 @@ def stale_notice(
     target: str,
     href: str,
     typed: Mapping[str, str] | None = None,
+    changed: Sequence[str] = (),
 ) -> StaleNotice:
     fix = (
         result.fix_for(target) if not (is_group_key(target) or is_page_group_key(target)) else None
@@ -428,7 +439,16 @@ def stale_notice(
         element = next((e for e in result.elements if e.id == target), None)
         now = f"{label} is now: {status_words(fix, element, result.origin).lower()}."
     kept = any((value or "").strip() for value in (typed or {}).values())
-    message = f"{STALE_MESSAGE} {STALE_KEPT}" if kept else STALE_MESSAGE
+    message = STALE_MESSAGE
+    if changed and fix is not None:
+        message = STALE_ITEM_MESSAGE
+    elif changed:
+        labels = item_labels(result)
+        names = [labels.get(c, "An item") for c in changed]
+        more = len(names) - NAMED_AT_MOST
+        listed = ", ".join(names[:NAMED_AT_MOST]) + (f" and {more} more" if more > 0 else "")
+        message = STALE_MEMBERS_MESSAGE.format(names=listed)
+    message = f"{message} {STALE_KEPT}" if kept else message
     return StaleNotice(STALE_TITLE, message, now, href, kept)
 
 
@@ -1619,6 +1639,7 @@ def _page(
     *,
     invalid: tuple[str, ReviewInvalid] | None = None,
     stale: str | None = None,
+    stale_changed: Sequence[str] = (),
     status_code: int = 200,
     kind: str = "",
     page: str = "",
@@ -1746,7 +1767,13 @@ def _page(
         "undo": bool(top) and undo_offer(request, view.id, user, version),
         "stale": None
         if stale is None
-        else stale_notice(result, numbers, stale, list_url(view.id, _stale_anchor(result, stale))),
+        else stale_notice(
+            result,
+            numbers,
+            stale,
+            list_url(view.id, _stale_anchor(result, stale)),
+            changed=stale_changed,
+        ),
         # No `active` nav item: this page is not "My documents" itself, so the link
         # must not be announced as the current page (aria-current="page").
     }
@@ -1845,18 +1872,35 @@ def _stale_page(
     view: str,
     target: str,
     values: dict[str, str] | None = None,
+    changed: Sequence[str] = (),
 ) -> Response:
     """A write from an out-of-date page: nothing applied; the view the form was on, as it
     is now, says so (409). What the reviewer typed stays in the field, so choosing again
-    is one click."""
+    is one click. `changed`: the items that changed since the page was drawn, when that is
+    why it was refused (`refuse_stale`); the notice names them."""
     log_event(logger, "review_stale", job_id=job_id)
     kept = ReviewInvalid([], values)
     if view == LIST_VIEW:
-        return _page(request, job_id, user, invalid=(target, kept), stale=target, status_code=409)
+        return _page(
+            request,
+            job_id,
+            user,
+            invalid=(target, kept),
+            stale=target,
+            stale_changed=changed,
+            status_code=409,
+        )
     from readablestem.web.routes.split import split_page
 
     return split_page(
-        request, job_id, user, item=target, invalid=(target, kept), stale=True, status_code=409
+        request,
+        job_id,
+        user,
+        item=target,
+        invalid=(target, kept),
+        stale=True,
+        stale_changed=changed,
+        status_code=409,
     )
 
 
@@ -1912,10 +1956,68 @@ def _already_saved(
         return None
 
 
-def _refuse_stale(job: Job, version: str) -> None:
-    """Raise ReviewStale when the form was drawn before the job's last review write."""
-    if is_stale(job.result_version, version):
+# What a write of one of these actions changed is the element it names (and what it was written
+# through to, which has its own row): a decision, an edit of an item, and the three writes of
+# one item's words, level or reading. Every other action (a page left out or put back, a
+# region added, "Not an equation", an Undo) moves or renumbers other elements.
+ITEM_ACTIONS = frozenset(
+    {*STATUS_FOR_ACTION, ADD_DATA_TABLE, DESCRIBE, "read_again", "edit_text", "make_heading"}
+)
+
+
+def written_with(result: DocumentResult, element_id: str) -> list[str]:
+    """The element and what an edit of it is written through to: a table's cells' equations,
+    or the table an equation is a cell of (`web.review._written_through`)."""
+    from readablestem.pipeline import table_math
+
+    ids = [element_id]
+    element = next((e for e in result.elements if e.id == element_id), None)
+    if element is not None and element.kind is Kind.TABLE and element.table is not None:
+        ids += [c.equation_id for c in element.table.cells if c.equation_id]
+    elif (tie := table_math.tie_of(result.elements, element_id)) is not None:
+        ids.append(tie[0].id)
+    return ids
+
+
+def refuse_stale(
+    session: Session, job: Job, sent: str, acts_on: Collection[str] | None = None
+) -> None:
+    """Raise ReviewStale when the form was drawn before a write that matters to it. Called with
+    the job row locked, so what it reads is the newest stored result.
+
+    `acts_on` None: the write depends on the whole document (Undo, a page edit that moves other
+    elements): any write since the page was drawn refuses it (`is_stale`). Otherwise `acts_on`
+    holds the elements the write changes (an item and what it is written through to, a
+    group's members, the items of a many-item action): the writes since the page was drawn are
+    read from the `ReviewEdit` rows that record each write's number (`WRITE_KEY`), and the
+    form is refused only when one of them changed an element in `acts_on`, which `ReviewStale`
+    then names. It is refused too when a write since left no such row (the tool's own, a setting
+    change) or was one of the other actions (`ITEM_ACTIONS`): those cannot be told apart."""
+    if not is_stale(job.result_version, sent):
+        return
+    current = job.result_version or 0
+    seen = int(sent) if sent.strip().isdecimal() else -1
+    if acts_on is None or not 0 <= seen < current:
         raise ReviewStale(job.id)
+    rows = session.execute(
+        select(ReviewEdit.element_id, ReviewEdit.action, ReviewEdit.after).where(
+            ReviewEdit.job_id == job.id
+        )
+    ).all()
+    since = [
+        (element_id, action, after[WRITE_KEY])
+        for element_id, action, after in rows
+        if isinstance(after, dict)
+        and isinstance(after.get(WRITE_KEY), int)
+        and after[WRITE_KEY] > seen
+    ]
+    if not set(range(seen + 1, current + 1)) <= {written for _, _, written in since}:
+        raise ReviewStale(job.id)
+    if any(action not in ITEM_ACTIONS for _, action, _ in since):
+        raise ReviewStale(job.id)
+    changed = [e for e in dict.fromkeys(element_id for element_id, _, _ in since) if e in acts_on]
+    if changed:
+        raise ReviewStale(job.id, changed)
 
 
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
@@ -2023,9 +2125,9 @@ def review_action(
             job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
-            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
             element_id = element_ref(result, element_id)
+            refuse_stale(session, job, version, written_with(result, element_id))
             change_made = apply_review(
                 result,
                 element_id,
@@ -2043,10 +2145,10 @@ def review_action(
             session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
+    except ReviewStale as stale:
         same = _already_saved(request, job_id, user, element_id, action, form, anyway, keep_open)
         if same is None:
-            return _stale_page(request, job_id, user, view, element_id, _typed(form))
+            return _stale_page(request, job_id, user, view, element_id, _typed(form), stale.changed)
         # The item already has this decision, by this reviewer (often a second click
         # whose page was drawn before the first one saved): nothing to save twice, and
         # the answer the first click got (SW43, "identical repeat").
@@ -2167,8 +2269,9 @@ def _group_action(
             job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
-            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
+            members = [m.element_id for m in group_members(result, group_key)]
+            refuse_stale(session, job, version, members)
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
                 output.output_changed(job, output.DECISION)  # the file is made again when asked for
@@ -2179,8 +2282,8 @@ def _group_action(
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, group_key)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, group_key, changed=exc.changed)
     except ReviewInvalid as exc:
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
         log_event(logger, "review_invalid", job_id=job_id, action=f"group_{logged_action}")
@@ -2238,8 +2341,9 @@ def _page_group_action(
             job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
-            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
+            members = [m.element_id for m in page_group_members(result, group_key)]
+            refuse_stale(session, job, version, members)
             outcome = apply_page_group(result, group_key)
             if outcome.changes:  # nothing left to decide: no write, no re-render
                 output.output_changed(job, output.DECISION)  # the file is made again when asked for
@@ -2250,8 +2354,8 @@ def _page_group_action(
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, group_key)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, group_key, changed=exc.changed)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="page_group_unknown")
         return _invalid_page(request, job_id, user, view, group_key, exc)
@@ -2451,7 +2555,7 @@ def undo(
             require_done(job)
             if not version.strip():
                 raise ReviewStale(owned_id)
-            _refuse_stale(job, version)
+            refuse_stale(session, job, version)
             edits = last_write(session, job.id, job.result_version or 0)
             if not can_undo(edits, user.id):
                 raise _NothingToUndo(owned_id)
