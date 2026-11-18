@@ -328,8 +328,9 @@ def page_marks(doc: pymupdf.Document, page: pymupdf.Page) -> tuple[list[PdfMark]
     finally:
         page.set_rotation(turned)
     turn = page.rotation_matrix
+    number = page.number or 0
     marks = [
-        PdfMark(page.number, xref, kind, _display_box(rect, turn), words, parent, replaces)
+        PdfMark(number, xref, kind, _display_box(rect, turn), words, parent, replaces)
         for xref, kind, rect, words, parent, replaces in found
     ]
     return marks, names, attached
