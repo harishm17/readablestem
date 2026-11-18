@@ -21,7 +21,7 @@
 {% set rows = proof_facts.chart|selectattr("headline")|list if compact else proof_facts.chart %}
 <figure class="proof-chart{% if compact %} proof-chart-compact{% endif %}"
   {%- if compact %} aria-label="ReadableSTEM against a general chatbot, on equations"{% else %} aria-labelledby="proof-chart-title"{% endif %}>
-  {% if not compact %}<p class="proof-chart-title" id="proof-chart-title"><strong>ReadableSTEM against a general chatbot, on equations</strong></p>{% endif %}
+  {% if not compact %}<h3 class="proof-chart-title card-title" id="proof-chart-title">ReadableSTEM against a general chatbot, on equations</h3>{% endif %}
   <svg class="chart-defs" width="0" height="0" aria-hidden="true" focusable="false">
     <defs>
       <pattern id="chart-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

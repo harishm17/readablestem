@@ -73,9 +73,9 @@
 {% for family in inv.families %}
 <section class="symbol-family" aria-labelledby="family-{{ loop.index }}">
   {% if family.members %}
-  <h2 id="family-{{ loop.index }}">Looks alike: <span aria-hidden="true" class="family-glyphs">{% for m in family.members %}{{ m.glyph }}{% if not loop.last %} {% endif %}{% endfor %}</span><span class="visually-hidden">{% for m in family.members %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span></h2>
+  <h2 id="family-{{ loop.index }}" class="card-title">Looks alike: <span aria-hidden="true" class="family-glyphs">{% for m in family.members %}{{ m.glyph }}{% if not loop.last %} {% endif %}{% endfor %}</span><span class="visually-hidden">{% for m in family.members %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span></h2>
   {% else %}
-  <h2 id="family-{{ loop.index }}">{{ family.name }}</h2>
+  <h2 id="family-{{ loop.index }}" class="card-title">{{ family.name }}</h2>
   {% endif %}
   {% for row in family.rows %}
   {% set rid = row.element_id %}
