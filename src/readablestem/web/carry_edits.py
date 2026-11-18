@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -195,7 +195,7 @@ def _markers(text: str) -> list[str]:
 
 def _typed_text(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     old_element: Element,
     origin: Origin,
     new: DocumentResult,
@@ -228,7 +228,7 @@ def _typed_text(
 
 def _carry_words(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     new_crops: dict[str, bytes],
     rows: list[EditRow],
@@ -295,7 +295,7 @@ def _carry_words(
 
 def _apply_words(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     old_element: Element,
     origin: Origin,
     old_fix: Fix | None,
@@ -357,9 +357,30 @@ def _found_there_now(old: DocumentResult, added: Element, new: DocumentResult) -
     return False
 
 
+def _added_by_hand(old: DocumentResult) -> list[Element]:
+    """The pictures and equations added by hand to the earlier version, in reading order."""
+    added = [
+        e
+        for e in old.elements
+        if ADDED_ID.fullmatch(e.id) and e.kind in (Kind.FIGURE, Kind.EQUATION)
+    ]
+    return sorted(added, key=lambda e: e.order)
+
+
+def regions_compared(old: DocumentResult) -> list[tuple[int, Box | None]]:
+    """The places `carry_structure` and `carry_omitted` ask `Unchanged` about, for the earlier
+    version with its omitted pages back: the region of each added picture or equation, and
+    each page left out. A snapshot of the earlier version keeps how these looked
+    (`web.carry_snapshot`), so the question can be answered once that file is gone."""
+    asked: list[tuple[int, Box | None]] = [
+        (e.page, _clip(e.bbox)) for e in _added_by_hand(old)[:MAX_CHECKS]
+    ]
+    return asked + [(page, None) for page in old.omitted_pages]
+
+
 def _carry_added(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     unchanged: Unchanged,
     job_pages: int,
@@ -367,18 +388,13 @@ def _carry_added(
     out = EditsCarried()
     pages = page_edits.page_count(new, job_pages)
     fixes = {f.element_id: f for f in old.fixes}
-    added = [
-        e
-        for e in old.elements
-        if ADDED_ID.fullmatch(e.id) and e.kind in (Kind.FIGURE, Kind.EQUATION)
-    ]
-    for index, element in enumerate(sorted(added, key=lambda e: e.order)):
+    for index, element in enumerate(_added_by_hand(old)):
         fix = fixes.get(element.id)
         png = old_crops.get(element.id)
         kind = PICTURE if element.kind is Kind.FIGURE else EQUATION
         if (
             fix is None
-            or png is None
+            or not isinstance(png, bytes)  # the picture itself, not only its digest
             or index >= MAX_CHECKS
             or element.page >= pages
             or element.page in new.omitted_pages
@@ -415,7 +431,7 @@ def _held_element(row: EditRow) -> Element | None:
 
 
 def _carry_not_equation(
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     new_crops: dict[str, bytes],
     rows: list[EditRow],
@@ -477,7 +493,7 @@ def _carry_read_again(old: DocumentResult, rows: list[EditRow]) -> EditsCarried:
 
 def carry_structure(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     new_crops: dict[str, bytes],
     rows: list[EditRow],

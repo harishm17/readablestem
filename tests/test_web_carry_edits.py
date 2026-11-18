@@ -93,13 +93,18 @@ def pdf_with(change) -> bytes:
     return data
 
 
-def revise(env, first: str, data: bytes) -> str:
+def revise(env, first: str, data: bytes, delete_first: bool = False) -> str:
     response = env.browser.post(
         "/jobs",
         data={"csrf_token": token(env.browser), "revises": first},
         files={"pdf": ("notes-v2.pdf", data, "application/pdf")},
     )
     second = job_id_from(response)
+    if delete_first:  # while the revised one waits to be converted
+        env.browser.post(
+            f"/jobs/{first}/delete",
+            data={"csrf_token": token(env.browser, "/app"), "confirm": "yes"},
+        )
     env.converter.output = review_output()
     env.run_worker()
     return second
@@ -122,9 +127,12 @@ def carried_rows(env, job_id: str) -> dict[str, dict]:
 # --------------------------------------------------------------------------- a revised PDF
 
 
-def test_edits_by_hand_come_back_on_a_revised_pdf_where_nothing_changed(web):
+@pytest.mark.parametrize("delete_first", [False, True])
+def test_edits_by_hand_come_back_on_a_revised_pdf_where_nothing_changed(web, delete_first):
+    """Also when the earlier document is deleted after the upload and before the revised one
+    is converted: the picture added by hand is put back by what was kept at the upload."""
     make_edits(web, web.first)
-    second = revise(web, web.first, pdf_with(lambda doc: None))  # other bytes, same pages
+    second = revise(web, web.first, pdf_with(lambda doc: None), delete_first)  # other bytes
     result = stored(web, second)
     assert element(result, PLAIN).text == "Discuss vectors and scalars with your class."
     heading = element(result, LATER)

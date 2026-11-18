@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import access, retention, storage
+from readablestem.web import access, carry_snapshot, retention, storage
 from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from readablestem.web.quota import pages_left, try_consume_pages
@@ -107,6 +107,9 @@ def store_job(
     is changed then. `part_group` and `part_label` say that the file is one part of a larger
     one converted in parts (`web.routes.parts`)."""
     now = now or utcnow()  # the caller's clock (the upload route's; tests move it)
+    # What carry-over will need of the earlier version if it is deleted before this one is
+    # converted (`web.carry_snapshot`), read before the transaction below holds any lock.
+    snapshot = carry_snapshot.take(factory, user_id, revises, data) if revises else None
     with session_scope(factory) as session:
         # Checked before the pages are counted: a refusal costs nothing.
         tier = access.tier_of(session, user_id)
@@ -141,4 +144,6 @@ def store_job(
         session.add(job)
         session.flush()
         session.add(Blob(job_id=job.id, kind="upload", media_type=media_type, content=data))
+        if snapshot is not None:
+            carry_snapshot.store(session, job.id, snapshot)
         return job.id

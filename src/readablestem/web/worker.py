@@ -107,9 +107,10 @@ from readablestem.core.types import (
 )
 from readablestem.ops import limits
 from readablestem.pipeline import step_facts as pipeline_step_facts
-from readablestem.web import access, carry_edits, events, office_census, step_facts
+from readablestem.web import access, carry_edits, carry_snapshot, events, office_census, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
+from readablestem.web.carry_snapshot import Earlier
 from readablestem.web.database import as_utc, rowcount, utc_today
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
 from readablestem.web.fair_queue import claim_order_by
@@ -122,25 +123,6 @@ from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
 from readablestem.web.states import CANCELED
 from readablestem.web.step_cache import DbStepCache
 from readablestem.web.step_cache import forget as forget_steps
-
-# `ReviewEdit.action` of the edits that change the structure and not a fix (web.page_edits):
-# their rows are read when a new conversion inherits from an earlier one.
-STRUCTURE_ACTIONS = frozenset(
-    {
-        "edit_text",
-        "make_heading",
-        "add_figure",
-        "add_equation",
-        "omit_page",
-        "restore_page",
-        "not_equation",
-        "read_again",  # listed as not made again (`carry_edits.READ_AGAIN`)
-        "undo",  # takes back the edit before it
-    }
-)
-# A region or a page compared between two files is drawn at this size (pixels per point).
-COMPARE_ZOOM = 1.5
-COMPARE_MAX_SIDE_PX = 2400
 
 if TYPE_CHECKING:
     from readablestem.core.types import ConversionOptions
@@ -443,20 +425,6 @@ class _Attempt:
     # The course symbols this attempt's conversion was handed (`_converter_kwargs`), kept with
     # the result (`web.notation.applied_record`). User content: never logged.
     notation: list[NotationEntry] = field(default_factory=list)
-
-
-@dataclass
-class _Earlier:
-    """The result a new one inherits decisions from (`Worker._earlier_version`): it, its
-    crops, its file name, and whether it is the job's own earlier result (a try-again)."""
-
-    result: DocumentResult
-    crops: dict[str, bytes]
-    name: str
-    own: bool
-    # The job it came from, and its structural edits (`web.carry_edits`), oldest first.
-    source_id: str = ""
-    edits: list[carry_edits.EditRow] = field(default_factory=list)
 
 
 @dataclass
@@ -1331,19 +1299,22 @@ class Worker:
 
     # ------------------------------------------------------------------ earlier decisions
 
-    def _earlier_version(self, session: Session, job: Job) -> _Earlier | None:
+    def _earlier_version(self, session: Session, job: Job) -> Earlier | None:
         """The result whose decisions this one inherits, with its crops, or None.
 
         A job being tried again inherits from its own earlier result (T3-1: the decisions
         made on a partly converted document survive "Convert the missing parts"). Else the
         earlier version the upload said it revises (T3-2, `web.carry`), if it is still the
-        owner's, finished and not past its deletion time."""
+        owner's, finished and not past its deletion time. When it is not (deleted, or past
+        its time, while this one waited or converted) the snapshot taken at the upload is
+        used (`web.carry_snapshot`); it is removed here either way, its use being over."""
         if (job.retries or job.rerun_version) and job.result_json:
             source, own = job, True
         elif job.revises_job_id:
             source, own = session.get(Job, job.revises_job_id), False
         else:
             return None
+        snapshot = None if own else carry_snapshot.pop(session, job.id)
         if (
             source is None
             or source.user_id != job.user_id
@@ -1352,20 +1323,8 @@ class Worker:
             or (retain := as_utc(source.retain_until)) is None
             or retain <= self.clock()
         ):
-            return None
-        try:
-            earlier = DocumentResult.model_validate(source.result_json)
-        except ValueError:
-            return None
-        blobs = session.scalars(select(Blob).where(Blob.job_id == source.id, Blob.kind == "crop"))
-        crops = {b.element_id: b.content for b in blobs if b.element_id}
-        rows = session.scalars(
-            select(ReviewEdit)
-            .where(ReviewEdit.job_id == source.id, ReviewEdit.action.in_(STRUCTURE_ACTIONS))
-            .order_by(ReviewEdit.created_at, ReviewEdit.id)
-        )
-        edits = [carry_edits.EditRow(r.element_id, r.action, r.before, r.after) for r in rows]
-        return _Earlier(earlier, crops, source.filename, own, source.id, edits)
+            return snapshot
+        return carry_snapshot.read(session, source, own=own) or snapshot
 
     def _upload_of(self, session: Session, job_id: str) -> bytes | None:
         found = session.scalar(
@@ -1373,13 +1332,15 @@ class Worker:
         )
         return bytes(found) if found is not None else None
 
-    def _unchanged(self, session: Session, job: Job, earlier: _Earlier) -> carry_edits.Unchanged:
+    def _unchanged(self, session: Session, job: Job, earlier: Earlier) -> carry_edits.Unchanged:
         """Does a page, or a region of it, look the same in the earlier file and in the new
         one? A try-again is the same file, so yes. Else both are drawn the same way and the
         pictures compared; a file that cannot be read, or a drawing that fails, is "no"."""
         if earlier.own:
             return lambda page, box: True
         new_pdf = self._upload_of(session, job.id)
+        if earlier.looks is not None:  # a snapshot: the earlier PDF is not kept with it
+            return carry_snapshot.unchanged_after(earlier, new_pdf)
         old_pdf = self._upload_of(session, earlier.source_id)
         if new_pdf is None or old_pdf is None:
             return lambda page, box: False
@@ -1391,7 +1352,11 @@ class Worker:
             try:
                 drawn = [
                     page_images.render_region(
-                        pdf, page, zoom=COMPARE_ZOOM, max_side=COMPARE_MAX_SIDE_PX, clip=box
+                        pdf,
+                        page,
+                        zoom=carry_snapshot.COMPARE_ZOOM,
+                        max_side=carry_snapshot.COMPARE_MAX_SIDE_PX,
+                        clip=box,
                     )
                     for pdf in (old_pdf, new_pdf)
                 ]
@@ -1407,7 +1372,7 @@ class Worker:
         job: Job,
         result: DocumentResult,
         crops: dict[str, bytes],
-        earlier: _Earlier,
+        earlier: Earlier,
     ) -> None:
         """Put the earlier result's decisions and edits on the new result
         (`carry.carry_decisions`, `carry_edits`) and make the HTML file again from it. For a

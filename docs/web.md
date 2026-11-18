@@ -1625,7 +1625,9 @@ upload changes: its pages count against the daily quota like any other conversio
 When the new job has been converted, the worker (`Worker._carry_decisions`, in the same
 transaction that stores the result) reads the earlier version's result and crops, if it is
 still the owner's, finished and not past its deletion time, and carries the decisions over
-(`carry.carry_decisions`):
+(`carry.carry_decisions`). If it is not (the owner deleted it, or the purge did, while the new
+one waited or converted), the worker uses the snapshot the upload took (below). The live row is
+used whenever it is there: it may hold decisions made after the upload.
 
 - An item is **the same item** only if its kind and content fingerprint are equal: for an
   equation, figure or table the SHA-256 of its crop, plus an equation's display mode and a
@@ -1652,8 +1654,26 @@ carry, and usage counts show `review:carried`). The report is `jobs.carried_json
 ids and counts, and the earlier file's name for the owner's page; no text of the document.
 The job page's "Compared with the earlier version" card says how many decisions were carried
 over, how many items changed or are new, and links to the first that needs a decision; the
-review screen marks a decision it carried. If the earlier document was deleted before the new
-one finished, the card says so and every decision is new.
+review screen marks a decision it carried. The card names the earlier file and does not link
+to it, so it stays true when that document is gone. The card says that nothing was copied only
+when no snapshot could be taken (an upload made before snapshots, or an earlier version that
+could not be read) and the earlier document was gone.
+
+**The snapshot at upload (`web/carry_snapshot.py`).** When `POST /jobs` stores a revised
+version, `intake.store_job` writes out what carry-over reads of the earlier version, under the
+check the upload already makes (the person's own, finished, kept, not the sample), and stores
+it with the new job as a `blobs` row of kind `carry` (zlib JSON). It holds the earlier result's
+elements and fixes (pages left out included; no HTML, notices or stats), the SHA-256 of each
+crop in place of the crop (a fingerprint is all carry-over uses of one; only the pictures and
+equations added by hand keep their bytes, because they are copied onto the new file), the
+structural review edits, a digest of how each region carry-over compares looked in the earlier
+PDF (so "this page looks the same" can be answered without that PDF), and the earlier file's
+name. Nothing about the earlier document's deletion time is changed by taking it. If it cannot
+be taken the upload goes through as before. The worker removes it in the same transaction as
+the carry (`carry_snapshot.pop`), whether or not anything carried; every deletion of a job
+(`ops.retention.delete_jobs`: owner delete, purge, account erasure) deletes all its blobs, so
+it goes with the job too. A job that fails keeps it until the job is deleted. It counts in the
+person's stored bytes like any blob.
 
 **Edits that are not decisions (`web/carry_edits.py`).** The review screen also changes what no
 fix covers: the words of a paragraph, a paragraph made a heading, a picture or an equation
