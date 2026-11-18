@@ -74,6 +74,11 @@ def stored(env, job_id: str) -> Blob:
         return blob
 
 
+def blob_count(env) -> int:
+    with session_scope(env.ctx.factory) as session:
+        return len(list(session.scalars(select(Blob))))
+
+
 def refused(env, data: bytes, filename: str, **fields) -> str:
     """Upload and expect a refusal that cost nothing; the page's text."""
     response = send(env.browser, data, filename, **fields)
@@ -281,6 +286,34 @@ def test_the_quota_is_enforced_for_a_source_like_for_a_pdf(tmp_path, available):
         assert "page" in text and "today" in text
 
 
+@pytest.mark.parametrize("kind", ["tex", "zip"])
+def test_a_source_that_does_not_fit_the_storage_limit_is_refused_like_a_pdf(web, monkeypatch, kind):
+    """The room is checked again when the job is stored (another upload may have filled it in
+    between): that is a refusal with the numbers, not a server error, for every kind of file."""
+    from types import SimpleNamespace
+
+    from readablestem.web import intake, storage
+
+    def full(*_args, **_kwargs):
+        raise storage.StorageRefused(299, 300)
+
+    monkeypatch.setattr(intake, "storage", SimpleNamespace(check_room=full))
+    data = ARTICLE.encode() if kind == "tex" else make_zip({"main.tex": ARTICLE})
+    text = refused(web, data, f"paper.{kind}")
+    assert "299 MB of the 300 MB" in html.unescape(text)
+
+
+@pytest.mark.parametrize("kind", ["tex", "zip"])
+def test_deleting_a_source_job_leaves_no_row_and_no_stored_file(web, kind):
+    data = ARTICLE.encode() if kind == "tex" else make_zip({"main.tex": ARTICLE})
+    job_id = queue_source(web, f"paper.{kind}", data)
+    assert stored(web, job_id).content  # the file as uploaded is the job's one stored copy
+    token = csrf_from(web.browser.get("/app").text)
+    gone = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token, "confirm": "yes"})
+    assert gone.status_code == 303
+    assert jobs(web) == [] and blob_count(web) == 0
+
+
 # ------------------------------------------------------------------ the job
 
 
@@ -467,3 +500,8 @@ def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_
         page = client.get(f"/jobs/{job_id}").text
         assert "was read from the file itself" in page and "turned into a tagged PDF" not in page
         assert client.get(f"/jobs/{job_id}/review/list").status_code == 200
+        # the notice says the Word file is kept as uploaded, and deleting removes every copy
+        assert "the Word .docx file" in " ".join(client.get("/privacy").text.split())
+        token = csrf_from(client.get("/app").text)
+        gone = client.post(f"/jobs/{job_id}/delete", data={"csrf_token": token, "confirm": "yes"})
+        assert gone.status_code == 303 and jobs(env) == [] and blob_count(env) == 0

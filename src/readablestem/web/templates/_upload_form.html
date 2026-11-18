@@ -88,7 +88,11 @@
           {% if not revising %}
           <li>A file bigger than one document ({{ one_document }}) is kept so you choose the pages; each part becomes a document.</li>
           {% endif %}
-          {% if office_kinds %}
+          {% if word_source %}
+          <li>A Word (.docx) file is read from the file itself and kept as uploaded; every
+            {{ chars_per_page }} characters or picture count as one page.{% if office_kinds %} PowerPoint, and a
+            Word file that cannot be read that way, become a PDF first; its page count applies.{% endif %}</li>
+          {% elif office_kinds %}
           <li>Word and PowerPoint become a PDF first; its page count applies.</li>
           {% endif %}
           {% if batch_zip and not revising %}

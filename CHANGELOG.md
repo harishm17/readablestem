@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
+
+- WS11.1e, as far as its triage line. Found by reading the upload, delete and purge code and by
+  uploading each kind and deleting it: a PDF is stored as uploaded; a `.tex` file, a LaTeX zip and
+  (with `FEATURE_WORD_SOURCE`) a Word file are stored as uploaded, in the job's `upload` row of
+  `blobs`; a PowerPoint file, and a Word file the reader does not take, are stored only as the PDF
+  made from them. Every copy is one `blobs` row, counted in the person's storage and removed by
+  every deletion path (0 rows after each). What was wrong was the words: the privacy notice, the
+  upload form, /limits, /pricing and two guides said a Word file is always turned into a PDF and
+  never kept, and the delete pages said the PDF is deleted. They now say what is true for the
+  kinds this server takes (`word_source` joins `latex_source` in the pages' context). A
+  `.tex` file, a zip or a Word file refused by the storage limit at the moment it was stored ended
+  in a server error (500); it now gets the same "You are storing ..." answer as a PDF. Not built:
+  keeping the original of a PowerPoint or a PDF-route Word file (the reader cannot use it and
+  it would hold the author's name and tracked changes longer than the notice says), a table of
+  kinds, a new reader. No migration; no model request changed.
+
 ## Unreleased: the buttons that lose work or access ask first (branch fix/destructive-actions-confirm)
 
 - WS24.6 (F-106, F-197, F-210, F-432), as far as its triage line: the secondary buttons that acted

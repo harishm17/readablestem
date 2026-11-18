@@ -2,8 +2,11 @@
    `limits_context`, web/deps.py). /limits and /pricing both include this list, so the
    allowance a page states is the one the upload routes enforce. #}
 <dl class="limits-list">
-  <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if office_on %}
-    A Word or PowerPoint file is turned into a PDF first.{% endif %}{% if latex_source %} If you
+  <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if word_source %}
+    A Word (.docx) file is read from the file itself and kept as uploaded; it counts as one page for every
+    {{ chars_per_page }} characters or picture in it.{% if office_on %} A PowerPoint file, and a Word file that
+    cannot be read that way, is turned into a PDF first, and its page count applies.{% endif %}{% elif office_on %}
+    A Word or PowerPoint file is turned into a PDF first, and its page count applies.{% endif %}{% if latex_source %} If you
     have the LaTeX file (.tex) or the zip of the LaTeX project a document was made from, upload
     that: its headings, lists, tables and equations are then read from the file itself, where
     from a PDF they have to be worked out from how the page looks. A project zip may be up to
