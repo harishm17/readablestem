@@ -87,6 +87,34 @@ def test_a_cell_that_would_run_as_a_formula_is_quoted():
     assert rec.safe_cell("Equation 3") == "Equation 3" and rec.safe_cell(7) == "7"
 
 
+def test_the_owner_is_named_once_and_a_reader_gets_no_address_no_actor_and_no_links(web):
+    decide(web, "p1-e2", action="accept")
+    decide(web, "p2-e2", action="reject")
+    owner = web.browser
+    owner.post(
+        f"/jobs/{web.job_id}/share",
+        data={
+            "csrf_token": token(owner, f"/jobs/{web.job_id}/share"),
+            "email": BOB,
+            "role": "view",
+        },
+    )
+    bob = web.client()
+    login(bob, BOB)
+    mine = owner.get(f"/jobs/{web.job_id}/record").text
+    # The page's own header names the signed-in person; the record names them once more.
+    assert mine.split("<h1>Review record</h1>")[1].count(ALICE) == 1
+    assert "/review?item=p1-e2" in mine  # an item is a link to its card, for who may open it
+    csv_owner = owner.get(f"/jobs/{web.job_id}/record.csv").text
+    assert "by" in table(csv_owner)[0] and csv_owner.count(ALICE) == 1
+
+    theirs = bob.get(f"/jobs/{web.job_id}/record")
+    assert ALICE not in theirs.text and "Equation 1" in text_of(theirs.text)
+    assert "/review?item=" not in theirs.text  # a reader would be refused the review screen
+    csv_reader = bob.get(f"/jobs/{web.job_id}/record.csv").text
+    assert "by" not in table(csv_reader)[0] and ALICE not in csv_reader
+
+
 # --------------------------------------------------------------------------- who may ask
 
 

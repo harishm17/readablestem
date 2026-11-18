@@ -25,9 +25,11 @@ import csv
 import io
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from readablestem import __version__
 from readablestem.core import triage
@@ -47,6 +49,7 @@ from readablestem.web.messages import explain_check, explain_reason, severity_la
 from readablestem.web.review import (
     BULK_KEY,
     CHOICE_KEY,
+    GROUP_KINDS,
     INVENTORY_KEY,
     MODEL_READ_KEY,
     UNDO_ACTION,
@@ -146,13 +149,26 @@ ALWAYS_NOT_CHECKED = (
 
 
 @dataclass(frozen=True)
+class ItemRef:
+    """An item as the record names it: its words, the review screen's address for it when the
+    reader may open that screen and it is still there, and a note when it is not."""
+
+    text: str  # "Equation 3"
+    href: str = ""
+    note: str = ""  # "no longer in the document"
+
+
+@dataclass(frozen=True)
 class DecisionRow:
     when: datetime
-    item: str  # "Equation 3"
+    item: str  # "Equation 3": the words, for the CSV
     page: int | None  # 1-based
     tool_had: str
     decision: str
-    by: str
+    by: str  # as the page names the person to its reader ("you")
+    by_file: str = ""  # as the CSV names them: it leaves the app, so there is no "you"
+    refs: tuple[ItemRef, ...] = ()  # the items `item` names, each with its link
+    more: int = 0  # items past the ones named
 
 
 @dataclass(frozen=True)
@@ -160,6 +176,7 @@ class ImageRow:
     item: str
     page: int | None
     why: str
+    ref: ItemRef | None = None
 
 
 @dataclass(frozen=True)
@@ -179,6 +196,7 @@ class Record:
     made_at: datetime
     tool: str
     owner: str
+    csv_actors: bool  # the CSV names who decided only for the owner
     language: str
     title_chosen: bool
     contact_set: bool
@@ -190,7 +208,7 @@ class Record:
     kept_as_images: list[ImageRow] = field(default_factory=list)
     checks_run: int = 0
     failed_checks: list[CheckRow] = field(default_factory=list)
-    open_items: list[str] = field(default_factory=list)
+    open_items: list[ItemRef] = field(default_factory=list)
     not_checked: list[str] = field(default_factory=list)
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
@@ -239,7 +257,12 @@ def _relabel_mark(edit: Any) -> dict[str, Any] | None:
 
 
 def _relabel_rows(
-    edits: list[Any], labels: dict[str, str], who: dict[str, str], owner: str
+    edits: list[Any],
+    labels: dict[str, str],
+    who: dict[str, str],
+    file_who: dict[str, str],
+    owner: str,
+    ref: Callable[[str, str], ItemRef],
 ) -> list[DecisionRow]:
     """One row for each write that changed a symbol in many equations: the writes' edits
     (one per equation, what Undo needs) are one decision of the person."""
@@ -255,8 +278,10 @@ def _relabel_rows(
         mark = _relabel_mark(first) or {}
         named = [labels.get(e.element_id, "Equation") for e in group]
         shown = ", ".join(named[:MAX_NAMED_EQUATIONS])
-        if len(named) > MAX_NAMED_EQUATIONS:
-            shown += f" and {len(named) - MAX_NAMED_EQUATIONS} more"
+        shown_edits = list(zip(named, group, strict=True))[:MAX_NAMED_EQUATIONS]
+        more = max(0, len(named) - MAX_NAMED_EQUATIONS)
+        if more:
+            shown += f" and {more} more"
         rows.append(
             DecisionRow(
                 when=as_utc(first.created_at) or first.created_at,
@@ -269,9 +294,38 @@ def _relabel_rows(
                     n=len(group),
                 ),
                 by=who.get(first.user_id, owner),
+                by_file=file_who.get(first.user_id, owner),
+                refs=tuple(ref(label, e.element_id) for label, e in shown_edits),
+                more=more,
             )
         )
     return rows
+
+
+def _item_ref(result: DocumentResult, review_url: str | None) -> Callable[[str, str], ItemRef]:
+    """Name an item (its words and its id) with the review screen's address for it, when the
+    reader may open that screen and the item is in the document: a decision opens at its
+    card, a page's own edit at that page's tools, a text at the tool that changes it. An item
+    that is not in the document any more (a page tool or a re-read took it out) is named with
+    a note and no link."""
+    pages = {e.id: e.page + 1 for e in result.elements}
+    decided = {f.element_id for f in result.fixes if f.kind in GROUP_KINDS}
+    held = {e.id for o in result.omitted for e in o.elements}
+
+    def ref(text: str, element_id: str) -> ItemRef:
+        base = review_url or ""
+        if (number := _page_number(element_id)) is not None:
+            return ItemRef(text, f"{base}?page={number}&tools=1" if base else "")
+        if element_id in decided:
+            return ItemRef(text, f"{base}?item={quote(element_id)}" if base else "")
+        if element_id in pages:
+            where = f"?page={pages[element_id]}&tools=1&change={quote(element_id)}"
+            return ItemRef(text, base + where if base else "")
+        if element_id in held:
+            return ItemRef(text, note="on a page left out of the document")
+        return ItemRef(text, note="no longer in the document")
+
+    return ref
 
 
 def _page_number(element_id: str) -> int | None:
@@ -357,7 +411,10 @@ def build(
     result: DocumentResult,
     edits: list[Any],
     who: dict[str, str],
+    file_who: dict[str, str],
     owner: str,
+    csv_actors: bool,
+    review_url: str | None,
     filename: str,
     title: str,
     job_ref: str,
@@ -371,7 +428,10 @@ def build(
 ) -> Record:
     """The record from a finished job's parts. `edits` are its `ReviewEdit` rows (any
     order); `who` maps a user id to the name shown for them; `state` is the job's
-    `states.State`, whose label and gap notes the record prints."""
+    `states.State`, whose label and gap notes the record prints. `who` and `file_who` map a
+    user id to the words that name the person on the page and in the CSV (`shares.names_of`).
+    `review_url` is the review screen's address for a reader who may open it, else None: the
+    items the record names are links to it."""
     elements = {e.id: e for e in result.elements}
     fixes: dict[str, Fix] = {}
     for fix in result.fixes:
@@ -384,6 +444,7 @@ def build(
         for f in held.fixes:
             fixes.setdefault(f.element_id, f)
     labels = item_labels(result)
+    ref = _item_ref(result, review_url)
     counts = job_page.breakdown(result.fixes, result.notices)
     summary = checked.of_result(result)
     decisions = []
@@ -406,9 +467,11 @@ def build(
                 tool_had=TOOL_STATUS_WORDS.get(str(before), str(before)),
                 decision=_decision_words(edit),
                 by=who.get(edit.user_id, owner),
+                by_file=file_who.get(edit.user_id, owner),
+                refs=(ref(item, edit.element_id),),
             )
         )
-    decisions.extend(_relabel_rows(relabeled, labels, who, owner))
+    decisions.extend(_relabel_rows(relabeled, labels, who, file_who, owner, ref))
     decisions.sort(key=lambda d: d.when)
     # The parts shown as pictures, as the summary counts them (an element with no fix too).
     images = [
@@ -419,6 +482,11 @@ def build(
             why=explain_reason(fix.reason).text
             if (fix := fixes.get(p.element_id)) is not None and fix.reason
             else "",
+            ref=ref(
+                labels.get(p.element_id)
+                or KIND_LABELS.get(elements[p.element_id].kind, p.kind.title()),
+                p.element_id,
+            ),
         )
         for p in summary.converted.pictures
     ]
@@ -428,7 +496,7 @@ def build(
         if not c.passed
     ]
     open_items = [
-        labels.get(unit[0].element_id, unit[0].kind.value.title())
+        ref(labels.get(unit[0].element_id, unit[0].kind.value.title()), unit[0].element_id)
         for unit in triage.units(f for f in result.fixes if f.pending)
     ]
     return Record(
@@ -440,6 +508,7 @@ def build(
         made_at=made_at,
         tool=f"ReadableSTEM {__version__}, pipeline {result.pipeline_version}",
         owner=owner,
+        csv_actors=csv_actors,
         language=job_page.language_line(result),
         title_chosen=title_chosen,
         contact_set=contact_set,
@@ -493,18 +562,30 @@ def to_csv(record: Record) -> str:
     not_converted, check, not_checked."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\r\n")
-    writer.writerow(CSV_HEADER)
+    # Who decided is a column only in the owner's file: a person the document was shared with
+    # gets the same record without it.
+    columns = [c for c in CSV_HEADER if c != "by" or record.csv_actors]
+    writer.writerow(columns)
 
     def row(section: str, item="", page="", tool_had="", decision="", by="", when="", detail=""):
-        writer.writerow(
-            [safe_cell(v) for v in (section, item, page, tool_had, decision, by, when, detail)]
+        cells = dict(
+            section=section,
+            item=item,
+            page=page,
+            tool_had=tool_had,
+            decision=decision,
+            by=by,
+            when_utc=when,
+            detail=detail,
         )
+        writer.writerow([safe_cell(cells[c]) for c in columns])
 
     row("document", "Title", detail=record.title)
     row("document", "File name", detail=record.filename)
     row("document", "Pages", detail=record.pages)
     row("document", "Converted on", when=iso_when(record.converted_at))
-    row("document", "Converted by", by=record.owner)
+    if record.csv_actors:
+        row("document", "Converted by", by=record.owner)
     row("document", "Tool", detail=record.tool)
     row("document", "Language", detail=record.language)
     row("document", "Exam or quiz", detail=exam.words(record.exam_mode))
@@ -534,9 +615,9 @@ def to_csv(record: Record) -> str:
     for title, text in record.gaps:
         row("summary", title, detail=text)
     for d in record.decisions:
-        row("decision", d.item, d.page or "", d.tool_had, d.decision, d.by, iso_when(d.when))
+        row("decision", d.item, d.page or "", d.tool_had, d.decision, d.by_file, iso_when(d.when))
     for item in record.open_items:
-        row("open", item, decision="Waiting for a decision")
+        row("open", item.text, decision="Waiting for a decision")
     for i in record.kept_as_images:
         row("not_converted", i.item, i.page or "", detail=i.why)
     row("check", "Structure checks of the HTML file that ran", detail=record.checks_run)

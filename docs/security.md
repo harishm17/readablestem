@@ -187,9 +187,11 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   deletes their `ReviewEdit` rows on other people's documents (as for any erased account), so
   the owner's record loses those rows and the reviewer's decisions stay in the stored result.
 - **Who did what.** `ReviewEdit.user_id` is the person who made the edit, and the review
-  record's "Decided by" column names them. Only the owner sees email addresses: the owner gets
-  "Name (address)", everyone else gets names only ("the owner" or "a reviewer" when a person
-  has no name). The banner on a shared document and the "Shared with you" list name the owner
+  record's "Decided by" column and the review list's "Accepted by ..." text name them, with
+  one function (`shares.names_of`): "you" for the person reading, and for anyone else a name
+  ("the owner" or "a reviewer" when a person has no name). Only the owner sees email
+  addresses: once at the top of the record ("Converted by"), a person with no name by their
+  address, and the CSV has a "by" column in the owner's file only. The banner on a shared document and the "Shared with you" list name the owner
   the same way. The sharing page, which lists addresses, is owner-only.
 - **Undo.** Undo takes back the last write only if the person asking made it; nobody undoes
   another person's write (the owner does not undo a reviewer's, nor the reverse).

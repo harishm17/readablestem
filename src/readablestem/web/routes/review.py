@@ -1549,6 +1549,31 @@ def split_list(
     )
 
 
+def _name_deciders(
+    request: Request, job_id: str, user: CurrentUser, items: dict[str, ReviewItem]
+) -> None:
+    """An item someone else decided says so ("Accepted by Sam"), not "by you": the words
+    that name them are those of the record (`shares.names_of`)."""
+    decided = {i.element_id for i in items.values() if i.by_you}
+    if not decided:
+        return
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        last: dict[str, str] = {}
+        for edit in session.scalars(
+            select(ReviewEdit)
+            .where(ReviewEdit.job_id == job.id, ReviewEdit.action != UNDO_ACTION)
+            .order_by(ReviewEdit.created_at, ReviewEdit.id)
+        ):
+            last[edit.element_id] = edit.user_id
+        others = {u for e, u in last.items() if e in decided and u != user.id}
+        names = shares.names_of(session, job, user, others) if others else {}
+    for element_id, person in last.items():
+        if element_id in decided and person in names:
+            item = items[element_id]
+            item.status_label = item.status_label.replace(" by you", f" by {names[person]}")
+
+
 def _page(
     request: Request,
     job_id: str,
@@ -1586,6 +1611,7 @@ def _page(
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)
     }
+    _name_deciders(request, job_id, user, items)
     groups = {g.slug: _group(result, g, items, elements, places) for g in fix_groups}
     cards: dict[str, HeadingGroupView | PageGroupView] = {
         unit.group.key: unit.group

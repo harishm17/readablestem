@@ -197,6 +197,7 @@ def privacy_claim_problems(settings: Settings) -> list[str]:
         (True, f"{retention.WEEK_DAYS} days after you last worked on it", "web.retention"),
         (True, f"{settings.opt_in_retention_days} days after upload", "OPT_IN_RETENTION_DAYS"),
         (True, f"kept for about {offices.BACKUP_DAYS} days", "web.offices.BACKUP_DAYS"),
+        (True, "who made each review decision and when", "web.db.ReviewEdit (web.record)"),
         (
             settings.events_enabled,
             f"deleted after {events.EVENT_RETENTION_DAYS} days",

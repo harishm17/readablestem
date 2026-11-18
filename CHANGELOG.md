@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: the record is written for its reader (branch feat/record-for-its-reader)
+
+- WS8.11 (F-145, F-419): the record page says "you" for the person reading and a name for
+  anyone else (the owner's address is printed once, in "Converted by", and only to the owner);
+  the review list's "Accepted by you" says "by Sam" when someone else decided, from the same
+  function (`shares.names_of`). The CSV has the "by" column in the owner's file only, and its
+  rows say "the owner" for the owner. Each item the record names links to its card on the
+  review screen for a reader who may open it; an item no longer in the document says so. The
+  privacy page says what the record holds. No model call, no stored-data change, no
+  migration, no version bump.
+
 ## Unreleased: the accept-many count and the review fields (branch feat/review-identical-and-counts)
 
 - WS8.1 (identical items decided as one write) is not built: the tracked fixtures hold no
