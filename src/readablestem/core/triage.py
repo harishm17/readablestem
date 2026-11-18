@@ -156,8 +156,8 @@ class ReviewLoad:
     required_fixes: int = 0
     optional: int = 0
     none: int = 0
-    # Per kind (a fix's `Kind`: "equation", "figure", "heading", "table", and "paragraph"
-    # for a page read from its picture) and per reason code.
+    # Per kind (a fix's `Kind`: "equation", "figure", "heading", "table", and "paragraph" or
+    # "list_item" for a page read from its picture or a text decision) and per reason code.
     required_by_kind: Counter[str] = field(default_factory=Counter)  # decisions
     optional_by_kind: Counter[str] = field(default_factory=Counter)
     required_by_reason: Counter[str] = field(default_factory=Counter)  # fixes

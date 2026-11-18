@@ -66,7 +66,7 @@ def _per_page(n: int, pages: int) -> str:
 def _review_load(counts: dict[tuple[str, str], int], pages: int) -> list[tuple[str, str]]:
     """Required decisions (a heading group counts once) and optional notes, per page, of
     every kind of fix the counts hold: the four steps first, then any other (a page read
-    from its picture is a `paragraph` fix)."""
+    from its picture, or a text decision, is a `paragraph` or `list_item` fix)."""
     found = {s for (s, c) in counts if c in ("decisions:required", "tier:optional")}
     kinds = [*STEPS, *sorted(found - set(STEPS) - {"job"})]
     decisions = {s: counts.get((s, "decisions:required"), 0) for s in kinds}

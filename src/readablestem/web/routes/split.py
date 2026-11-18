@@ -96,6 +96,7 @@ from readablestem.web.review import (
     GROUP_KINDS,
     MAX_LATEX_CHARS,
     NOT_CONVERTED,
+    TEXT_FIX_KINDS,
     FieldError,
     ReviewInvalid,
     clean_tables,
@@ -812,7 +813,7 @@ class SplitBuilder:
         elif fix.kind is Kind.HEADING and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_alt = f"{item.label} in the PDF, with the lines around it."
-        elif fix.kind is Kind.PARAGRAPH and element is not None:
+        elif fix.kind in TEXT_FIX_KINDS and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_alt = f"{item.label} in the PDF, as it is on the page."
             if page:

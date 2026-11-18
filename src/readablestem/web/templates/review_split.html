@@ -32,12 +32,12 @@
   {{ error_line(item, "actions") }}
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
     {% if item.can_accept %}
-    <button type="submit" name="action" value="accept" class="button" data-role="accept" aria-describedby="accept-note-{{ eid }}">Accept<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" name="action" value="accept" class="button" data-role="accept" aria-describedby="accept-note-{{ eid }}">{{ item.accept_label }}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
-    <button type="submit" name="action" value="reject" class="button-secondary" data-role="reject" data-tone="quiet" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+    {% if item.can_reject %}<button type="submit" name="action" value="reject" class="button-secondary" data-role="reject" data-tone="quiet" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
   </div>
-  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">Accept keeps it as proposed.</p>{% endif %}
-  <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>
+  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">{{ item.accept_label }} keeps it as proposed.</p>{% endif %}
+  {% if item.can_reject %}<p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>{% endif %}
 </div>
 {% endmacro %}
 
@@ -296,7 +296,7 @@
 {% set eid = item.element_id %}
 {{ region(p) }}
 <dl class="facts">
-  <div><dt>Text as read from the image</dt><dd class="read-text">{{ item.read_text or "(no text)" }}</dd></div>
+  <div><dt>{{ item.read_label }}</dt><dd class="read-text" dir="auto"{% if item.read_lang %} lang="{{ item.read_lang }}"{% endif %}>{{ item.read_text or "(no text)" }}</dd></div>
 </dl>
 {% if p.change_href %}<p class="notice-actions"><a class="button-secondary" href="{{ p.change_href }}" data-role="change-words">Change the words<span class="visually-hidden"> of {{ item.label|lower }}</span></a></p>{% endif %}
 {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
@@ -599,7 +599,7 @@
     {% elif panel.item.kind == "equation" %}{{ equation_body(panel) }}
     {% elif panel.item.kind == "figure" %}{{ figure_body(panel) }}
     {% elif panel.item.kind == "table" %}{{ table_split_body(panel) }}
-    {% elif panel.item.kind == "paragraph" %}{{ text_body(panel) }}
+    {% elif panel.item.kind in ("paragraph", "list_item") %}{{ text_body(panel) }}
     {% else %}{{ heading_body(panel) }}{% endif %}
 
     {% if panel.item or panel.group or panel.pages %}

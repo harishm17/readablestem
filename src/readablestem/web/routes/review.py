@@ -65,6 +65,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline.layout import REASON_LARGER_FONT
+from readablestem.pipeline.notices import TEXT_NOTICE_OF
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
     bulk_accept,
@@ -114,6 +115,7 @@ from readablestem.web.review import (
     SAVE_ONLY,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
+    TEXT_FIX_KINDS,
     UNDO_ACTION,
     USE_LOCAL_NOTE,
     WRITE_KEY,
@@ -197,6 +199,9 @@ USE_LOCAL_DONE = (
     "check it against the image."
 )
 EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
+# What the words of a text decision are called on its card: the text layer's, not a picture's.
+TEXT_LAYER_LABEL = "Text as the PDF gives it"
+LOOKS_RIGHT = "Looks right"
 ANYWAY_DONE = "Your edit was saved as you wrote it, although it differs from the PDF."
 
 
@@ -343,6 +348,7 @@ NOUNS = {
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
     Kind.PARAGRAPH: ("piece of text", "pieces of text"),
+    Kind.LIST_ITEM: ("list item", "list items"),
 }
 # The list view's own section for pages and handwriting kept as images
 # (`web.review.kept_images_apart`): figures in the data, not in words.
@@ -481,9 +487,16 @@ class ReviewItem:
     # What the item is, in a few words, for lists that name it (UX review MF15): the
     # heading's text or the start of the alt text. Equations show `mathml` instead.
     preview: str = ""
-    # Text read from an image of a scanned or handwritten page (a PARAGRAPH fix): the words
-    # as read, an inline equation shown as "[equation]". Document content, owner only.
+    # The words of a paragraph or list item fix, as read from an image of a scanned or
+    # handwritten page or as the text layer gave them (`pipeline.notices.text_decisions`): an
+    # inline equation shown as "[equation]". Document content, owner only. `read_label` names
+    # them, `read_lang` is the passage's language (written as `lang`, with `dir="auto"`, so
+    # right-to-left words are drawn as they are read).
     read_text: str = ""
+    read_label: str = "Text as read from the image"
+    read_lang: str = ""
+    reason_lead: str = "Not converted"  # "Check this" for a text decision: the words are there
+    accept_label: str = "Accept"  # "Looks right" for a text decision: the words are right
     # What a screen reader gets from the PDF for an equation: its text layer ("" when
     # the PDF has none). Shown only to the job's owner, on the review screens.
     text_layer: str = ""
@@ -915,6 +928,10 @@ def _item(
         by_you=fix.decided_by_reviewer,
         preview=_preview(fix, element),
         read_text=_read_text(fix, element),
+        read_label=TEXT_LAYER_LABEL if fix.reason in TEXT_NOTICE_OF else ReviewItem.read_label,
+        read_lang=(element.lang or "") if element is not None else "",
+        accept_label=LOOKS_RIGHT if fix.reason in TEXT_NOTICE_OF else ReviewItem.accept_label,
+        reason_lead="Check this" if fix.reason in TEXT_NOTICE_OF else ReviewItem.reason_lead,
         text_layer=(element.text or "").strip()
         if element is not None and fix.kind is Kind.EQUATION
         else "",
@@ -1007,7 +1024,7 @@ PREVIEW_CHARS = 60  # of an alt text, in a list line
 def _read_text(fix: Fix, element: Element | None) -> str:
     """The words of a text fix (ADR 0007) as the card shows them: an inline equation as
     "[equation]", blanks collapsed."""
-    if fix.kind is not Kind.PARAGRAPH or element is None:
+    if fix.kind not in TEXT_FIX_KINDS or element is None:
         return ""
     return " ".join(INLINE_MARKER_RE.sub("[equation]", element.text or "").split())
 
@@ -1018,7 +1035,7 @@ def _preview(fix: Fix, element: Element | None) -> str:
     if fix.kind is Kind.HEADING:
         text = fix.heading.text if fix.heading is not None else (element.text if element else "")
         return " ".join((text or "").split())
-    if fix.kind is Kind.PARAGRAPH:
+    if fix.kind in TEXT_FIX_KINDS:
         words = _read_text(fix, element)
         if len(words) <= PREVIEW_CHARS:
             return words

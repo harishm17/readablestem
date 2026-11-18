@@ -8486,7 +8486,7 @@ def _code_text(rows: Sequence[_Row]) -> str:
 
 
 # The text decisions layout raises on a paragraph or list item (`Element.reasons`; the
-# pipeline turns them into a decision, `run._text_decisions`). WS2.4a, SW54a.
+# pipeline turns them into a decision, `notices.text_decisions`). WS2.4a, SW54a.
 REASON_OPTION_LABELS = notice_rules.OPTION_LABELS
 REASON_RTL_ORDER = notice_rules.RTL_TEXT
 TEXT_DECISIONS = (REASON_OPTION_LABELS, REASON_RTL_ORDER)

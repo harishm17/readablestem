@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import checked, checked_words
+from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import job_page
 from readablestem.web import outcome as words
@@ -534,7 +535,8 @@ _HOLDS = {
     "office_tracked_changes": (
         "The Word file still has tracked changes, so check the notices before you share it."
     ),
-    # `pipeline.notices.TEXT_CODES`: facts of the text that have no decision to carry them yet
+    # `pipeline.notices.TEXT_CODES`: a result stored before the text decision existed has the
+    # notice and no decision behind it. A result with the decision is counted by the summary.
     "rtl_text": (
         "The words of right-to-left text may be out of order, so check the notices before you "
         "share it."
@@ -546,8 +548,20 @@ _HOLDS = {
 
 
 def _held_by_notice(result: Mapping[str, Any] | None) -> str:
-    """The sentence of a stored result's notice that holds it back (`_HOLDS`), "" when none."""
-    codes = {n.get("code") for n in (result or {}).get("notices") or []}
+    """The sentence of a stored result's notice that holds it back (`_HOLDS`), "" when none.
+    A text notice whose element has the decision (`pipeline.notices.text_decisions`) does not:
+    that decision is in the summary's count, open or made."""
+    data = result or {}
+    decided = {
+        (f.get("element_id"), notice_rules.TEXT_NOTICE_OF[f["reason"]])
+        for f in data.get("fixes") or []
+        if f.get("reason") in notice_rules.TEXT_NOTICE_OF
+    }
+    codes = {
+        n.get("code")
+        for n in data.get("notices") or []
+        if (n.get("element_id"), n.get("code")) not in decided
+    }
     return next((message for code, message in _HOLDS.items() if code in codes), "")
 
 

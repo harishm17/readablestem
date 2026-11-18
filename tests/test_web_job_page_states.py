@@ -108,6 +108,36 @@ def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     assert 'id="ready-heading"' not in html
 
 
+def test_a_text_decision_is_one_decision_and_deciding_it_makes_the_job_shareable(web):
+    decide_everything(web)
+    result = web.converter.output.result
+    result.fixes = [f for f in result.fixes if f.element_id != "p1-e5"]
+    result.elements = [e for e in result.elements if e.id != "p1-e5"]
+    for fix in result.fixes:
+        fix.reviewed = False
+    paragraph = next(e for e in result.elements if e.kind is Kind.PARAGRAPH)
+    paragraph.text, paragraph.lang, paragraph.reasons = "שלום עולם", "he", ["rtl_text"]
+    result.fixes.append(
+        Fix(
+            element_id=paragraph.id,
+            kind=Kind.PARAGRAPH,
+            status=Status.NEEDS_REVIEW,
+            review="required",
+            reason="text.rtl_order",
+        )
+    )
+    job_id = convert(web)
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert title(html).startswith(f"{states.TABLE['needs_decisions'].label}:")
+    review = web.browser.get(f"/jobs/{job_id}/review/list").text
+    assert "שלום עולם" in review and 'lang="he"' in review and 'dir="auto"' in review
+    form = {"csrf_token": token(web.browser, f"/jobs/{job_id}/review"), "action": "accept"}
+    response = web.browser.post(f"/jobs/{job_id}/review/{paragraph.id}", data=form)
+    assert response.status_code == 303
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert title(html).startswith("Ready to share:")
+
+
 def section_of_status(html: str) -> str:
     start = html.index('id="job-status"')
     return html[start : html.index("</div>", start)]

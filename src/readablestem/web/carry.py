@@ -8,8 +8,10 @@ when, and only when, the item is the same item:
 - **Same item** means the same kind and the same content fingerprint. For an equation, a
   figure or a table that is the SHA-256 of its crop (the picture cut from the page), plus
   the display mode of an equation and the caption of a figure, which the figure's alt text
-  is written for. For a heading it is its words, size and weight. A crop that differs by a
-  single pixel is a different fingerprint: a changed item never inherits a decision.
+  is written for. For a heading it is its words, size and weight. For a paragraph or list item
+  with a decision (`pipeline.notices.text_decisions`) it is its words, and the decision is
+  carried only onto the same words. A crop that differs by a single pixel is a different
+  fingerprint: a changed item never inherits a decision.
 - **Position** chooses between items that share a fingerprint (the same small figure on
   twenty pages): the nearest one on the page and in the reading order is matched first, one
   earlier item to one new item. It also finds the items that *changed*: an earlier decided
@@ -46,6 +48,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
+from readablestem.pipeline.notices import TEXT_DECISION_KINDS, TEXT_NOTICE_OF
 
 # A decision is carried only onto the kinds a person decides on the review screen.
 CARRIED_KINDS = (Kind.EQUATION, Kind.FIGURE, Kind.TABLE, Kind.HEADING)
@@ -134,7 +137,7 @@ def fingerprint(element: Element, crops: dict[str, bytes]) -> str | None:
     words). Two items with the same fingerprint are the same item. It is the fingerprint
     stable ids are made from (`core.uid.fingerprint`), with the crop as the content of an
     equation, a figure or a table."""
-    if element.kind is Kind.HEADING:
+    if element.kind in (Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM):
         if not _words(element.text):
             return None
         return uid.fingerprint(element)
@@ -203,7 +206,18 @@ def _proposal(fix: Fix) -> dict[str, Any]:
 
 
 def _same_proposal(old: Fix, new: Fix) -> bool:
+    if new.kind in TEXT_DECISION_KINDS:
+        return True  # the proposal is the element's own words: the same fingerprint, the same
     return _proposal(old) == _proposal(new) and bool(_proposal(new))
+
+
+def _carried(fix: Fix) -> bool:
+    """A fix of a kind a person decides on the review screen: the four kinds, and a paragraph
+    or list item only for a text decision (`pipeline.notices.text_decisions`), not for the
+    fix of a paragraph on a scanned page."""
+    if fix.kind in CARRIED_KINDS:
+        return True
+    return fix.kind in TEXT_DECISION_KINDS and fix.reason in TEXT_NOTICE_OF
 
 
 def _wants_decision(fix: Fix) -> bool:
@@ -240,11 +254,11 @@ def carry_decisions(
 
     old_fixes: dict[str, Fix] = {}
     for fix in old.fixes:
-        if fix.kind in CARRIED_KINDS and fix.element_id in old_elements:
+        if _carried(fix) and fix.element_id in old_elements:
             old_fixes.setdefault(fix.element_id, fix)
     new_fixes: dict[str, Fix] = {}
     for fix in new.fixes:
-        if fix.kind in CARRIED_KINDS and fix.element_id in new_elements:
+        if _carried(fix) and fix.element_id in new_elements:
             new_fixes.setdefault(fix.element_id, fix)
 
     # Fingerprints of both sides, by kind.

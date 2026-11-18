@@ -43,7 +43,7 @@
 <p class="fix-meta"><span class="status-badge fix-{{ item.status }}">{{ item.status_label }}</span></p>
 {% if item.reason %}
 <div class="explained">
-  <p><strong>Not converted:</strong> {{ item.reason.text }}</p>
+  <p><strong>{{ item.reason_lead }}:</strong> {{ item.reason.text }}</p>
 </div>
 {% endif %}
 {% if item.source_note %}
@@ -62,7 +62,7 @@
 {% endif %}
 
 <div class="fix-body">
-  {% if item.kind in ("equation", "figure", "table", "paragraph") %}
+  {% if item.kind in ("equation", "figure", "table", "paragraph", "list_item") %}
   <figure class="crop">
     {% if item.crop_url %}
     <img src="{{ item.crop_url }}" loading="lazy"
@@ -126,9 +126,9 @@
     {% endif %}
     {% elif item.kind == "table" %}
     {{ table_list_proposal(item) }}
-    {% elif item.kind == "paragraph" %}
-    <p class="part-label">Text as read from the image</p>
-    <p class="read-text">{{ item.read_text or "(no text)" }}</p>
+    {% elif item.kind in ("paragraph", "list_item") %}
+    <p class="part-label">{{ item.read_label }}</p>
+    <p class="read-text" dir="auto"{% if item.read_lang %} lang="{{ item.read_lang }}"{% endif %}>{{ item.read_text or "(no text)" }}</p>
     <p class="hint"><a href="/jobs/{{ job.id }}/review?item={{ eid }}">Change the words on the review screen</a>.</p>
     {% endif %}
   </div>
@@ -174,10 +174,10 @@
   {% else %}
   {{ error_line(item, "actions") }}
   <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
-    {% if item.kind != "paragraph" %}<button type="submit" name="action" value="edit" class="button">Save edit<span class="visually-hidden"> to {{ name }}</span></button>{% endif %}
+    {% if item.kind not in ("paragraph", "list_item") %}<button type="submit" name="action" value="edit" class="button">Save edit<span class="visually-hidden"> to {{ name }}</span></button>{% endif %}
     {% if item.override %}<button type="submit" name="action" value="edit_anyway" class="button-secondary" aria-describedby="latex-error-{{ eid }}">Use my edit anyway<span class="visually-hidden"> for {{ name }}</span></button>{% endif %}
     {% if item.can_accept %}
-    <button type="submit" name="action" value="accept" class="button-secondary">Accept<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" name="action" value="accept" class="button-secondary">{{ item.accept_label }}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
     {% if item.kind != "equation" and item.can_reject %}<button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>{% endif %}
   </div>

@@ -34,7 +34,9 @@ NAME_CHARS = 60
 MAX_NAMES = 5
 # Notices that are a decision of their own (the table or page kept as an image is a fix the
 # reviewer decides): they are in the queue, not in the optional checks.
-DECISION_CODES = frozenset({"table_not_rebuilt"}) | notice_rules.KEPT_IMAGE_CODES
+DECISION_CODES = (
+    frozenset({"table_not_rebuilt", *notice_rules.TEXT_CODES}) | notice_rules.KEPT_IMAGE_CODES
+)
 # What the names are, in a sentence ("Links: “click here”"). Anything else: "Here:".
 NAMES_LEAD = {
     "link_text_unclear": "The link text",
@@ -125,6 +127,15 @@ def place_of(
         name = labels.get(element.id, "")
         query = urlencode({"item": element.id} | ({"page": shown} if shown is not None else {}))
         return Place(notice, names=(name,) if name else (), query=query)
+    if (
+        fix is not None
+        and fix.kind in notice_rules.TEXT_DECISION_KINDS
+        and fix.reason in notice_rules.TEXT_NOTICE_OF
+    ):  # the paragraph or list item with the decision: its card, with its first words
+        query = urlencode({"item": element.id} | ({"page": shown} if shown is not None else {}))
+        return Place(
+            notice, snippet=_shorten(readable(element.text or ""), SNIPPET_CHARS), query=query
+        )
     key = note_key(notice)
     names: list[str] = []
     if notice.code == "link_text_unclear":

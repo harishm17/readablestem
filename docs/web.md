@@ -2017,6 +2017,14 @@ From top to bottom:
    and the pages kept as images for one reason once, as their group. A kept page is one
    line: its hidden text that was not used is said on it, and only the first page of a
    group has "Decide it"; the others say "It is decided together with page 2."
+   A paragraph or list item flagged `rtl_text` or `option_labels` has a decision of its own
+   (`notices.text_decisions`, reason `text.rtl_order` or `text.option_labels`): its notice is
+   derived from that decision while it waits and is gone once it is made, so the job is
+   "Needs your decisions" and then "Ready to share" like any other. Its review card shows the
+   words as the PDF gives them (`dir="auto"`, the element's `lang`) and "Looks right"; a
+   result stored before has the bare notice and keeps the job at "Ready"
+   (`states._HOLDS`). A decision on the same words carries over to a revised upload
+   (`carry.CARRIED_KINDS`, the words as the fingerprint).
    (`job_page.notice_lists`). The Results list counts "Pages kept as images" and
    "Handwriting kept as images" apart from the figures, the decisions name them ("the
    handwritten pages and the scanned page", never "groups of repeated figures"), and the

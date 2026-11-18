@@ -2057,6 +2057,9 @@ def _convert(
         elements, run.fixes = table_math.settle(elements, run.fixes)
         # No empty alt text on content (WS6.4): decoration only with evidence, after every step.
         decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)
+        # A paragraph or list item layout doubts (`option_labels`, `rtl_text`) gets its decision.
+        for fix in notice_rules.text_decisions(elements, run.fixes):
+            run.fixes[fix.element_id] = fix
         ordered = _ordered_fixes(elements, run.fixes)
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
@@ -2156,7 +2159,7 @@ def _convert(
     ]
     derived = [
         *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),
-        *notice_rules.from_reasons(elements),
+        *notice_rules.from_reasons(elements, ordered),
     ]
     notices = notice_rules.ordered(notice_rules.merge(derived, notices), elements)
     result = DocumentResult(

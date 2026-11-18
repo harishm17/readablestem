@@ -20,9 +20,13 @@ written by the steps (the figure and table work only set their fix fields):
 - `long_description_missing` (optional): a chart or diagram without a long
   description, when long descriptions are on.
 
-and two follow from layout's reasons on the text (`from_reasons`): `option_labels` and
-`rtl_text` (required), a paragraph or list item that holds several answer options, or
-right-to-left words in the order the PDF gives them. And one follows from the text itself
+and two follow from layout's reasons on the text: `option_labels` and `rtl_text`
+(required), a paragraph or list item that holds several answer options, or right-to-left
+words in the order the PDF gives them. Each has a decision, the paragraph or list item's own
+fix (`text_decisions`, reason `text.option_labels` or `text.rtl_order`), and its notice is
+derived from that fix while the decision waits (`from_fixes`); a stored result from before
+the decision existed has only the element's reason, and `from_reasons` still lists it, with
+no decision behind it. And one follows from the text itself
 (`from_runs`): `struck_text` (optional), a paragraph,
 list item or heading with words the page strikes through, kept and marked as deleted
 (`Element.runs`). A reviewer's text edit that changes the struck words takes the mark off,
@@ -38,7 +42,7 @@ Content-free: codes, pages, element ids and counts only (rule 1).
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Literal
 
 from readablestem.core.types import (
@@ -48,6 +52,7 @@ from readablestem.core.types import (
     Fix,
     Kind,
     Notice,
+    Status,
 )
 
 TABLE_NOT_REBUILT = "table_not_rebuilt"
@@ -65,6 +70,15 @@ STRUCK_TEXT = "struck_text"
 OPTION_LABELS = "option_labels"
 RTL_TEXT = "rtl_text"
 TEXT_CODES = (OPTION_LABELS, RTL_TEXT)
+# The reason of the decision each of those raises (`Fix.reason`), in the order one is chosen
+# when a block has both: words in the wrong order change what is read more than run-together
+# options do. The decision is the fix of the element itself, the shape a scanned page's
+# paragraph has, so the review card, the counts and carry-over need no second one.
+RTL_ORDER_REASON = "text.rtl_order"
+OPTION_LABELS_REASON = "text.option_labels"
+TEXT_REASONS = {RTL_TEXT: RTL_ORDER_REASON, OPTION_LABELS: OPTION_LABELS_REASON}
+TEXT_NOTICE_OF = {reason: code for code, reason in TEXT_REASONS.items()}
+TEXT_DECISION_KINDS = (Kind.PARAGRAPH, Kind.LIST_ITEM)
 # The reasons of figures kept as images before any model work; each is its own notice
 # code (`pipeline.page_type`).
 KEPT_IMAGE_CODES = frozenset(
@@ -128,6 +142,8 @@ def from_fixes(
             add(COLOUR_ONLY, fix, "optional")
         if long_descriptions and _missing_long_description(fix):
             add(LONG_DESCRIPTION_MISSING, fix, "optional")
+        if fix.pending and fix.kind in TEXT_DECISION_KINDS and fix.reason in TEXT_NOTICE_OF:
+            add(TEXT_NOTICE_OF[fix.reason], fix, "required")
     return found
 
 
@@ -177,7 +193,7 @@ def current(result: DocumentResult) -> list[Notice]:
     derived = [
         *from_fixes(result.elements, result.fixes, long_descriptions=True),
         *from_runs(result.elements),
-        *from_reasons(result.elements),
+        *from_reasons(result.elements, result.fixes),
     ]
     kept = [n for n in result.notices if n.code not in DERIVED_CODES]
     return ordered(merge(derived, kept), result.elements)
@@ -194,13 +210,43 @@ def from_runs(elements: Iterable[Element]) -> list[Notice]:
     ]
 
 
-def from_reasons(elements: Iterable[Element]) -> list[Notice]:
+def from_reasons(elements: Iterable[Element], fixes: Iterable[Fix] = ()) -> list[Notice]:
     """`option_labels` and `rtl_text` (required) for each element layout flagged with that
-    reason. Never a decision: there is no text decision to make until one exists, and the
-    job page lists the item under "Not handled in this file" so it is not silent."""
+    reason and that has no decision of its own: a result stored before the decision existed.
+    Nothing stands behind that notice, so the job page lists it under "Not handled in this
+    file" and holds the job at "Ready" (`web.states`). An element with the decision gets its
+    notice from the fix (`from_fixes`), and loses it when the decision is made."""
+    decided = {
+        (f.element_id, TEXT_NOTICE_OF[f.reason]) for f in fixes if f.reason in TEXT_NOTICE_OF
+    }
     return [
         Notice(code=code, page=e.page, element_id=e.id, review="required")
         for e in elements
         for code in TEXT_CODES
-        if code in e.reasons
+        if code in e.reasons and (e.id, code) not in decided
     ]
+
+
+def text_decisions(elements: Iterable[Element], fixes: Mapping[str, Fix]) -> list[Fix]:
+    """The decision on each paragraph or list item layout flagged (`option_labels`,
+    `rtl_text`) that has no fix yet: `Fix(status=NEEDS_REVIEW, review="required")` with the
+    reason `text.rtl_order` or `text.option_labels`. Its proposal is the element's own text
+    (it has no field of its own), so the person says the words are right, or changes them
+    with the page tools. One decision a block: when it has both flags the first of
+    `TEXT_REASONS` is its reason, and the other still has its notice."""
+    out: list[Fix] = []
+    for element in elements:
+        if element.kind not in TEXT_DECISION_KINDS or element.id in fixes:
+            continue
+        code = next((c for c in TEXT_REASONS if c in element.reasons), None)
+        if code is not None:
+            out.append(
+                Fix(
+                    element_id=element.id,
+                    kind=element.kind,
+                    status=Status.NEEDS_REVIEW,
+                    review="required",
+                    reason=TEXT_REASONS[code],
+                )
+            )
+    return out

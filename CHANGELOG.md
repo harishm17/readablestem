@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: right-to-left text and run-together answer options are a decision (branch feat/text-decisions)
+
+- WS16.6 part 1: `rtl_text` and `option_labels` raise a decision on the paragraph or list
+  item, not only a required notice: its own `Fix` (`NEEDS_REVIEW`, `review="required"`, reason
+  `text.rtl_order` or `text.option_labels`), the shape a scanned page's paragraph has
+  (`notices.text_decisions`, made in `run.py` after layout). The review screen has a card for
+  it and a list-item kind table (`list-items`): the words as the PDF gives them (`dir="auto"`
+  and the element's `lang`), "Looks right", a change of the words, and the page tools.
+  Its notice is derived from the pending decision and goes when it is made. A decision counts
+  everywhere one does (triage, the checked summary, the job state, the documents list, the
+  review record and the CSV exports), and a decision on the same words carries over to a
+  revised upload (`carry.py`). The job is "Needs your decisions", then "Ready to share".
+- A result stored before has the element's reason and the bare required notice, and no decision:
+  it loads as it did, listed under "Not handled in this file" and held at "Ready"
+  (`states._HOLDS`); no migration. A block with both flags gets one decision (`text.rtl_order`)
+  and the other flag keeps its bare notice and its hold.
+- Not built: `text.join_doubt`, `text.tag_disagrees`, the page record, the document card and
+  the per-source switch (WS8.22); no WS16.5 field that nothing fills. Changes the output of a
+  PDF with such text, so `PIPELINE_VERSION` needs a bump at merge.
+
 ## Unreleased: nothing is cut on paper, long descriptions print open, the maths font stack, the words of a picture kept from a page (branch fix/wide-content-print-math-font)
 
 - SW45 (reduced), rules 5 and 6: on paper a table wraps inside the sheet, code wraps, and an

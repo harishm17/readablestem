@@ -87,6 +87,7 @@ from readablestem.core.types import (
     TableGrid,
     grid_problems,
 )
+from readablestem.pipeline.notices import TEXT_DECISION_KINDS, TEXT_NOTICE_OF
 from readablestem.web import reading_chips
 from readablestem.web.edit_check import MEANING_CODES
 from readablestem.web.messages import explain_check
@@ -131,12 +132,16 @@ GROUP_SLUGS = {
     Kind.FIGURE: "figures",
     Kind.TABLE: "tables",
     Kind.HEADING: "headings",
-    # Text read from an image of a scanned or handwritten page (ADR 0007): paragraphs and
-    # list items, the only prose that has a fix. Accept it, or keep it as the picture;
-    # its words are changed in the split view (`web.page_edits.edit_text`).
+    # Text with a decision of its own: read from an image of a scanned or handwritten page
+    # (ADR 0007), or a paragraph or list item layout doubts (`pipeline.notices.text_decisions`).
+    # Accept it; a scanned page's text can also be kept as the picture. Its words are
+    # changed in the split view (`web.page_edits.edit_text`).
     Kind.PARAGRAPH: "text",
+    Kind.LIST_ITEM: "list-items",
 }
 GROUP_KINDS = tuple(GROUP_SLUGS)
+# The kinds whose proposal is the element's own text.
+TEXT_FIX_KINDS = TEXT_DECISION_KINDS
 # Waiting for a decision: a proposal to check, or nothing usable (the reviewer can write
 # one, or reject to confirm the original stays).
 PENDING = PENDING_STATUSES
@@ -298,8 +303,8 @@ def kept_images_apart(groups: list[FixGroup]) -> list[FixGroup]:
 
 
 def group_fixes(result: DocumentResult) -> list[FixGroup]:
-    """Non-empty groups in priority order (equations, figures, headings). Paragraph and
-    list fixes, if a future step makes any, are not reviewable here."""
+    """Non-empty groups in priority order (equations, figures, tables, headings, text, list
+    items)."""
     position = _positions(result)
     groups = []
     for kind in GROUP_KINDS:
@@ -430,8 +435,8 @@ def group_anchor(group_key: str) -> str:
 
 
 def has_proposal(fix: Fix) -> bool:
-    # A paragraph's proposal is its text, which lives on its element (ADR 0007).
-    return fix.kind is Kind.PARAGRAPH or any(
+    # A paragraph's or list item's proposal is its text, which lives on its element (ADR 0007).
+    return fix.kind in TEXT_FIX_KINDS or any(
         p is not None for p in (fix.equation, fix.figure, fix.heading, fix.table)
     )
 
@@ -762,7 +767,7 @@ def _edit(
         return _edit_figure(fix, element, form)
     if fix.kind is Kind.HEADING:
         return _edit_heading(result, fix, element, form)
-    if fix.kind is Kind.PARAGRAPH:
+    if fix.kind in TEXT_FIX_KINDS:
         raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), TEXT_EDIT_ELSEWHERE)])
     raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), "This cannot be edited.")])
 
@@ -1296,6 +1301,8 @@ def reject_keeps(origin: str, fix: Fix, element: Element | None) -> str:
     kind. A source has no page pictures until its witness gives them (plan WS18.4)."""
     if fix.kind not in KEPT_AS_PICTURE:
         return ""
+    if fix.reason in TEXT_NOTICE_OF:
+        return "nothing"  # a doubt about the words of a text layer: no picture is made of it
     if origin == "pdf":
         return "picture"
     return "written" if element is not None and (element.text or "").strip() else "nothing"

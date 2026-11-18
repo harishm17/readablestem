@@ -104,6 +104,30 @@ def test_a_notice_no_decision_stands_behind_holds_back_ready_to_share():
     assert state("rtl_text", "required").key == state("option_labels", "required").key == held.key
 
 
+def test_a_text_decision_is_what_holds_the_job_not_its_notice():
+    from readablestem.pipeline import checked
+    from readablestem.pipeline import notices as notice_rules
+
+    element = Element(
+        id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 10, 10), order=0,
+        text="שלום", reasons=["rtl_text"],
+    )  # fmt: skip
+    (decision,) = notice_rules.text_decisions([element], {})
+
+    def state(fix: Fix) -> states.State:
+        summary = checked.summarize(elements=[element], fixes=[fix], html_checks=[])
+        result = {
+            "notices": [{"code": "rtl_text", "element_id": "p1-e0", "review": "required"}],
+            "fixes": [fix.model_dump(mode="json")],
+        }
+        facts = states.Facts(id="j", status="done", result_json=result)
+        return states.state_of(facts, states.counts_of(summary))
+
+    assert state(decision).key == "needs_decisions"
+    decision.status, decision.reviewed = Status.ACCEPTED, True
+    assert state(decision).shareable
+
+
 # --------------------------------------------------------------------------- reading
 
 
