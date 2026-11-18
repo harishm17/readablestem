@@ -51,7 +51,7 @@ from readablestem.web.intake import (
     store_job,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import next_day_start, pages_left, retry_after
 from readablestem.web.uploads import (
     ExtractFailed,
     UploadRejected,
@@ -301,15 +301,17 @@ def _start_parts(
             out.status, out.retry_after = 413, ""
             break
         except stored_bytes.StorageFull:
+            wait = retry_after(stored_bytes.FULL_WAIT_S)
             out.error = (
                 "The service holds as much uploaded material as it can for now, so "
-                f"{named} was not started. Room frees up through the day: choose it again in "
-                "an hour. This file is kept."
+                f"{named} was not started. Room frees up through the day: choose it again "
+                f"{wait.words}. This file is kept."
             )
-            out.status, out.retry_after = 503, "3600"
+            out.status, out.retry_after = 503, wait.header
             break
         except QuotaRefused as exc:
             left = exc.left
+            wait = retry_after()
             limit = access.page_quota(s, user.access_tier)
             of_today = (
                 f"the {limit} pages a new account can convert today"
@@ -319,10 +321,10 @@ def _start_parts(
             out.error = (
                 f"{named} has {exc.pages} {'page' if exc.pages == 1 else 'pages'}, but you have "
                 f"{left} of {of_today} left. It was not started. "
-                "The count starts again at midnight UTC; this file is kept so you can choose it "
+                f"The count starts again {wait.words}; this file is kept so you can choose it "
                 "then."
             )
-            out.status, out.retry_after = 429, "3600"
+            out.status, out.retry_after = 429, wait.header
             break
         ctx.wake_worker()
         out.started.append({"id": job_id, "label": part.label})
@@ -358,12 +360,12 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
         from readablestem.web.routes.jobs import conversions_paused
 
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
-        raise PageError(*conversions_paused(closed, kept=True), headers={"Retry-After": "3600"})
+        raise conversions_paused(closed, kept=True)
     if (refused := ctx.uploads.enter(user.id)) is not None:
-        from readablestem.web.routes.jobs import UPLOAD_BUSY
+        from readablestem.web.routes.jobs import upload_busy
 
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
-        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+        raise upload_busy(refused)
     try:
 
         def enforce_each(count: int) -> None:

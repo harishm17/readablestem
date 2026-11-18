@@ -34,6 +34,7 @@ from readablestem.web import (
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
+from readablestem.web.quota import retry_after
 from readablestem.web.sandbox_status import SandboxStatus
 from readablestem.web.spend import DbSpendGuard
 from readablestem.web.uploads import UploadGate
@@ -286,17 +287,16 @@ def enforce(request: Request, rule_name: str, key: str | None = None) -> None:
     if wait is None:
         return
     log_event(logger, "rate_limited", logging.WARNING, rule=rule_name)
-    minutes = max(1, round(wait / 60))
+    again = retry_after(wait)  # the wait the limiter knows, said and sent as one number
     title, what, context = REFUSAL_WORDS.get(
         rule_name, ("Too many attempts", "There have been too many attempts.", {})
     )
     raise PageError(
         429,
         title,
-        f"{what} Try again in about {minutes} minute{'' if minutes == 1 else 's'}. "
-        "Nothing was changed.",
+        f"{what} Try again {again.words}. Nothing was changed.",
         context=context,
-        headers={"Retry-After": str(wait)},
+        headers={"Retry-After": again.header},
     )
 
 

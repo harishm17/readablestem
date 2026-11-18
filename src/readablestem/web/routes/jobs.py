@@ -99,7 +99,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
 )
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.pending import MAX_PENDING_PER_USER
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import next_day_start, pages_left, retry_after
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
@@ -171,8 +171,12 @@ STORAGE_FULL_TITLE = "Uploads are paused while storage catches up"
 STORAGE_FULL_MESSAGE = (
     "The service holds as much uploaded material as it can for now. Documents are deleted "
     "{hours} hours after their owners last work on them, so room frees up through the day. "
-    "Try again in an hour. Nothing was uploaded."
+    "Try again {wait}. Nothing was uploaded."
 )
+# What a busy conversion and a busy gate ask a person to wait: said and sent as one number
+# (`quota.retry_after`; a full store's is `storage.FULL_WAIT_S`).
+OFFICE_BUSY_WAIT_S = 60
+UPLOAD_BUSY_WAIT_S = 10
 # A refused upload costs nothing: the probe runs before the daily page count.
 PDF_ADVICE = " Save a copy as a PDF first."
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
@@ -238,7 +242,8 @@ def upload_error_message(
         "office_failed": f"{name} could not be turned into a PDF. It may be damaged or too "
         "complicated. Open it in Word or PowerPoint, save it as a PDF, and upload that.",
         "office_busy": "Another Word or PowerPoint file is being converted at the moment. "
-        f"Wait a minute, then upload {name} again. Nothing was uploaded.",
+        f"Try again {retry_after(OFFICE_BUSY_WAIT_S).words}: upload {name} again. Nothing was "
+        "uploaded.",
         "office_budget": f"{name} was not converted: Word and PowerPoint files take a while, "
         "and this upload had used up its time. Upload it again on its own. Nothing was "
         "uploaded.",
@@ -298,7 +303,9 @@ def upload_error_message(
         "storage_user": f"You are storing {pages or 0} MB of the {left or 0} MB you can keep, "
         f"and {name} would go over it. Delete documents you no longer need (My documents, "
         f"then Delete), then upload {name} again. Nothing was uploaded.",
-        "storage_full": STORAGE_FULL_MESSAGE.format(hours=s.retention_hours),
+        "storage_full": STORAGE_FULL_MESSAGE.format(
+            hours=s.retention_hours, wait=retry_after(stored_bytes.FULL_WAIT_S).words
+        ),
     }.get(code, f"{name} cannot be converted.")
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
         # Not "cannot convert it": the pages are read when asked for, and this upload did not.
@@ -390,16 +397,17 @@ def _quota_message(
     for new accounts, not a fault."""
     has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
     whose = "a new account can convert" if new_account else "you can convert"
+    again = retry_after().words  # the same time the refusal's `Retry-After` counts down to
     if not left:
         return (
             f"{has}, and you have used all {quota} pages {whose} today. Upload it "
-            "again after the count starts again at midnight UTC. Nothing was uploaded."
+            f"again after the count starts again {again}. Nothing was uploaded."
         )
     limit = f"the {quota} pages {whose} today" if new_account else f"today's {quota} pages"
     return (
         f"{has}, but you have {left} of {limit} left. Upload a part of up "
         f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
-        "count starts again at midnight UTC. Nothing was uploaded."
+        f"count starts again {again}. Nothing was uploaded."
     )
 
 
@@ -787,18 +795,19 @@ async def create_job(request: Request, user: UserDep) -> Response:
     enforce(request, "upload_user", user.id)  # before anything is read or any process starts
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
-        raise PageError(*conversions_paused(closed, kept=False), headers={"Retry-After": "3600"})
+        raise conversions_paused(closed, kept=False)
     if await run_in_threadpool(_storage_full, ctx):  # before the body is read
         log_event(logger, "upload_rejected", code="storage_full")
+        wait = retry_after(stored_bytes.FULL_WAIT_S)
         raise PageError(
             503,
             STORAGE_FULL_TITLE,
-            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours),
-            headers={"Retry-After": "3600"},
+            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours, wait=wait.words),
+            headers={"Retry-After": wait.header},
         )
     if (refused := ctx.uploads.enter(user.id)) is not None:
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
-        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+        raise upload_busy(refused)
     try:
         return await _take_upload(request, ctx, user)
     finally:
@@ -810,43 +819,54 @@ def _storage_full(ctx: AppContext) -> bool:
         return stored_bytes.global_full(session, ctx.settings)
 
 
-def conversions_paused(closed: str, *, kept: bool) -> tuple[int, str, str]:
-    """Status, title and message of the page for an upload turned away because no model
-    spend is left today (`deps.conversions_closed`): the day's cap, or the pool for new
-    accounts. `kept`: the file is still waiting for its pages to be chosen."""
+def conversions_paused(closed: str, *, kept: bool) -> PageError:
+    """The page for an upload turned away because no model spend is left today
+    (`deps.conversions_closed`): the day's cap, or the pool for new accounts. `kept`: the
+    file is still waiting for its pages to be chosen. Both reset at the day's start, so the
+    words and `Retry-After` are the time left to it."""
     nothing = "Nothing was started; this file is kept." if kept else "Nothing was uploaded."
+    wait = retry_after()
+    headers = {"Retry-After": wait.header}
     if closed == "open":
-        return (
+        return PageError(
             503,
             "Conversions for new accounts are paused for today",
             "The share of today's budget set aside for new accounts has been used up. "
-            f"Uploads from new accounts open again after midnight UTC. {nothing} "
+            f"Uploads from new accounts open again {wait.words}. {nothing} "
             "Accounts that were invited are not affected.",
+            headers=headers,
         )
-    return (
+    return PageError(
         503,
         "Conversions are paused for today",
-        "Today's budget for conversions has been used up. New uploads open again "
-        f"after midnight UTC. {nothing}",
+        f"Today's budget for conversions has been used up. New uploads open again {wait.words}. "
+        f"{nothing}",
+        headers=headers,
     )
 
 
-# Status, title and message when the upload gate (web/uploads.py) turns someone away.
-UPLOAD_BUSY = {
-    "busy": (
+def upload_busy(refused: str) -> PageError:
+    """The page when the upload gate (web/uploads.py) turns someone away: `"busy"` (the
+    server is taking as many as it will) or `"own_upload"` (one of theirs is still being
+    checked)."""
+    wait = retry_after(UPLOAD_BUSY_WAIT_S)
+    headers = {"Retry-After": wait.header}
+    if refused == "own_upload":
+        return PageError(
+            429,
+            "Another upload of yours is still being checked",
+            "A document you uploaded a moment ago, perhaps in another tab, is still being "
+            f"checked. Try again {wait.words}: go back and upload this one again. Nothing was "
+            "uploaded this time.",
+            headers=headers,
+        )
+    return PageError(
         503,
         "Too many uploads right now",
-        "Several documents are being uploaded at this moment. Wait a few seconds, then "
-        "go back and upload again. Nothing was uploaded.",
-    ),
-    "own_upload": (
-        429,
-        "Another upload of yours is still being checked",
-        "A document you uploaded a moment ago, perhaps in another tab, is still being "
-        "checked. Wait a few seconds, then go back and upload this one again. Nothing was "
-        "uploaded this time.",
-    ),
-}
+        "Several documents are being uploaded at this moment. Try again "
+        f"{wait.words}: go back and upload again. Nothing was uploaded.",
+        headers=headers,
+    )
 
 
 @dataclass
@@ -1024,7 +1044,9 @@ def _place_files(
                     exc.pages or 0,
                     code=exc.code,
                     status=exc.status_code,
-                    retry_after="10" if exc.code == "office_busy" else "",
+                    retry_after=retry_after(OFFICE_BUSY_WAIT_S).header
+                    if exc.code == "office_busy"
+                    else "",
                     office=office,
                 )
             )
@@ -1088,7 +1110,7 @@ def _place_files(
                     file.filename,
                     code="storage_full",
                     status=503,
-                    retry_after="3600",
+                    retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
                     office=office,
                 )
             )
@@ -1101,7 +1123,7 @@ def _place_files(
                     code="page_quota",
                     status=429,
                     left=exc.left,
-                    retry_after="3600",
+                    retry_after=retry_after().header,
                     office=office,
                 )
             )
@@ -1256,7 +1278,7 @@ def _place_source(
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
-            retry_after="3600",
+            retry_after=retry_after().header,
         )  # fmt: skip
     ctx.wake_worker()
     log_event(
@@ -1313,7 +1335,12 @@ def _keep_for_parts(
         )
     except stored_bytes.StorageFull:
         log_event(logger, "upload_rejected", code="storage_full")
-        return Placed(file.filename, code="storage_full", status=503, retry_after="3600")
+        return Placed(
+            file.filename,
+            code="storage_full",
+            status=503,
+            retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
+        )
     log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
     return Placed(file.filename, pages, pending_id=pending_id)
 

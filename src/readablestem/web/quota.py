@@ -18,6 +18,8 @@ has depends on their tier (`web.access`).
 from __future__ import annotations
 
 import logging
+import math
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
 from markupsafe import Markup
@@ -96,6 +98,46 @@ def next_day_start(now: datetime) -> datetime:
     (pages show it in the reader's own time: the `utc` template filter and app.js)."""
     tomorrow = now.astimezone(UTC).date() + timedelta(days=1)
     return datetime.combine(tomorrow, time(), tzinfo=UTC)
+
+
+@dataclass(frozen=True)
+class Wait:
+    """A refusal's "come back later" in both its forms, made from one number so the header
+    and the sentence cannot disagree: `header` is the `Retry-After` value (whole seconds),
+    `words` completes "Try again ...": "at midnight UTC" for the daily reset, else "in about
+    5 minutes"."""
+
+    seconds: int
+    daily: bool = False
+
+    @property
+    def header(self) -> str:
+        return str(self.seconds)
+
+    @property
+    def words(self) -> str:
+        if self.daily:
+            return "at midnight UTC"
+        if self.seconds < 60:
+            return f"in {self.seconds} second{'' if self.seconds == 1 else 's'}"
+        minutes = round(self.seconds / 60)
+        if minutes < 60:
+            about = "" if self.seconds % 60 == 0 else "about "
+            return f"in {about}{'a minute' if minutes == 1 else f'{minutes} minutes'}"
+        hours = round(self.seconds / 3600)
+        about = "" if self.seconds % 3600 == 0 else "about "
+        return f"in {about}{'an hour' if hours == 1 else f'{hours} hours'}"
+
+
+def retry_after(seconds: float | None = None, *, now: datetime | None = None) -> Wait:
+    """The wait a refusal states and sends as `Retry-After`. With `seconds` (what a rate
+    limiter or a fixed pause knows): that many, at least one. With none: until the daily
+    allowance and the day's spend cap start again (`next_day_start`), the time the page
+    quota really resets at. Every refusal that tells a person to come back makes it here."""
+    if seconds is not None:
+        return Wait(max(1, math.ceil(seconds)))
+    moment = now or datetime.now(UTC)
+    return Wait(max(1, math.ceil((next_day_start(moment) - moment).total_seconds())), daily=True)
 
 
 def try_consume_reread(session: Session, user_id: str, *, allowance: int, day: date) -> bool:
