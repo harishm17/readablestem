@@ -109,5 +109,7 @@ def test_the_manifest_and_the_root_icon_answer_and_name_icons_that_exist(client)
     touch = client.get("/apple-touch-icon.png")
     assert touch.status_code == 200 and touch.headers["content-type"] == "image/png"
     assert touch.content == (STATIC / "apple-touch-icon.png").read_bytes()
+    svg = client.get("/static/icon.svg")
+    assert svg.status_code == 200 and svg.headers["content-type"].startswith("image/svg+xml")
     page = client.get("/privacy").text
     assert 'rel="manifest" href="/site.webmanifest"' in page

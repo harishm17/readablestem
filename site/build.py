@@ -1131,6 +1131,9 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
     out.put("assets/controls.css", (APP_STATIC / "controls.css").read_text(encoding="utf-8"))
     for name in fonts:
         out.put(f"assets/fonts/{name}", (APP_FONTS / name).read_bytes())
+    # The icons are the app's own, drawn by scripts/brand_icons.py.
+    for name in ("icon.svg", "favicon.ico"):
+        out.put(f"assets/{name}", (APP_STATIC / name).read_bytes())
     out.put("assets/converted.css", converted_css(examples))
     # The player's script and styles are the app's own files (src/.../web/static/listen.*).
     out.put("assets/listen.js", (APP_STATIC / "listen.js").read_text(encoding="utf-8"))

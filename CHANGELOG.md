@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: the icons are drawn from one SVG (branch fix/brand-icons-one-source)
+
+- WS24.9 (F-424), as far as its triage line. The favicon, the 192 and 512 px icons and the touch
+  icon were a serif "RS" on rgb(26,79,160), which is not the accent, and the social card was set
+  in another typeface; none came from a source file. `static/icon.svg` is now the one source: the
+  header's mark in the accent `#1c46ad` (`#8ab4ff` in dark mode). `scripts/brand_icons.py` draws
+  `favicon.ico` (16, 32, 48 px, each frame from the SVG), the 192 and 512 px icons, the 180 px
+  touch icon (opaque) and `social-card.png` (Source Sans 3 and Latin Modern Math, both vendored),
+  with no network. `base.html` links the SVG icon with the `.ico` as the fallback; the 500 and 503
+  pages and the showcase link the same. A test rebuilds every file and compares decoded pixels
+  (bytes depend on the zlib). The Content-Security-Policy is unchanged: the manifest falls under
+  `default-src 'self'`. Not built: a new mark; the showcase has no manifest or touch icon (it is a
+  sub-site under `/showcase/`). No migration; no model request changed.
+
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 
 - WS18.9 (F-557). LaTeXML already wrote `\ref`, `\eqref`, `\autoref`, `\cite` and each contents
