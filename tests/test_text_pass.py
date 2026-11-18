@@ -431,7 +431,7 @@ def test_a_language_name_or_tag_is_accepted_and_anything_else_refused():
 
 def struck_page() -> bytes:
     """A syllabus page: a date struck through by a drawn line, a word struck by a StrikeOut
-    annotation, an underlined word and a rule under a blank to fill in."""
+    annotation, an underlined word, a rule under a blank to fill in and the corner of a plot."""
     import pymupdf
 
     doc = pymupdf.open()
@@ -455,6 +455,11 @@ def struck_page() -> bytes:
     page.draw_line((word.x0, 220 + 1.5), (word.x1, 220 + 1.5), width=0.6)  # under it
     name = under(280, "Name:")
     page.draw_line((name.x1 + 6, 280 + 1), (name.x1 + 150, 280 + 1), width=0.6)  # a blank
+    # A plot's corner: a tick label, the axis, and inside it the line sample of the legend.
+    page.insert_text((72, 400), "1.0", fontsize=12)
+    tick = under(400, "1.0")
+    page.draw_line((tick.x1 + 3, 380), (tick.x1 + 3, 520), width=0.6)
+    page.draw_line((tick.x1 + 9, 400 + 1.5), (tick.x1 + 27, 400 + 1.5), width=0.6)
     data = doc.tobytes()
     doc.close()
     return data
@@ -472,7 +477,8 @@ def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
         if r.kind == "deleted"
     ]
     assert struck == ["October 3", "cancelled"]
-    # The rule under the gap after "Name:" is a blank, and the underlined word is not one.
+    # The rule under the gap after "Name:" is a blank, and the underlined word is not one;
+    # nor is the legend's line sample, which the axis parts from the tick label beside it.
     assert [r.kind for e in result.elements for r in e.runs if r.kind != "deleted"] == ["blank"]
     assert "October 3 October 10" in " ".join(e.text or "" for e in result.elements)  # kept
     notices = [n for n in result.notices if n.code == "struck_text"]

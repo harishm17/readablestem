@@ -2477,6 +2477,22 @@ fraction, division or radical bar, an underbrace): that rule is part of the math
 `_merge_baselines` joins them, so a blank at the start of a line is in the line when it is
 made and cannot split a paragraph.
 
+Three things stand beside a rule on its baseline and are not text of its row, so the rule is
+no blank after them (measured over 277 development files: 82 of 203 drawn blanks were one of
+these, in 17 papers, and none of the 117 blanks of the 12 forms and worksheets changed):
+
+- a row that holds only the pieces of a big math sign (`_sign_pieces`: a radical sign, the
+  corners and middle of a brace, any glyph of a math symbol or extension font): the rule after
+  it is the sign's own bar;
+- a word across the gutter of a two-column page: a rule in one column is no blank of a line in
+  the other;
+- a word across an upright line or the side of a frame that spans the rule's height
+  (`_parted`): a tick label, a plot's axis, then a legend's sample line.
+
+`_parted` looks only at the nearest word on each side within two font sizes, and the rule
+stays a blank when a word on either side has no wall between. Still read as blanks (4 in
+those files): a fraction bar or an overline whose numerator and denominator sit in other rows.
+
 A blank is written into the row as five underscores at the rule's place (a space on each side
 where the text has none), so a drawn blank and a typed run of three or more underscores read
 the same. The text pass (`text_pass.token_runs`) marks every run of three or more underscores
