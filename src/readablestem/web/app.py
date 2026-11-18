@@ -43,7 +43,6 @@ from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
 from readablestem.pipeline import checked_words
 from readablestem.web import analytics, dev_only, forms, output, seo
-from readablestem.web.exam import EXAM_WORDS
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -57,6 +56,7 @@ from readablestem.web.deps import (
     current_user,
     render,
 )
+from readablestem.web.exam import EXAM_WORDS
 from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception

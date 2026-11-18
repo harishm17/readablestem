@@ -73,7 +73,9 @@ def test_the_choice_is_said_wherever_the_document_is_handled_and_never_to_the_st
     assert off in words(f"/jobs/{plain}") and on not in words(f"/jobs/{plain}")
     # The owner can change it: the revised upload asks for the file again, box ready.
     assert f"/app?revises={exam}" in web.browser.get(f"/jobs/{exam}").text
-    assert 'id="exam" name="exam" value="on" checked' in web.browser.get(f"/app?revises={exam}").text
+    assert (
+        'id="exam" name="exam" value="on" checked' in web.browser.get(f"/app?revises={exam}").text
+    )
     assert on in words(f"/jobs/{exam}/review")
     assert on not in words(f"/jobs/{plain}/review")
     assert on in words(f"/jobs/{exam}/record") and off in words(f"/jobs/{plain}/record")
