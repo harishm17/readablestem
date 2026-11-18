@@ -234,9 +234,9 @@ def test_documents_already_converted_can_be_added_to_a_course_and_the_page_says_
     assert response.status_code == 303
     assert web.job(kept).course_id == course_id
     assert web.job(job_id_from(inside)).course_id == other  # already in a course: left alone
-    assert "Added 1 document to Physics 1. They were not converted again." in text_of(
-        web.browser.get(path).text
-    )
+    said = text_of(web.browser.get(path).text)
+    assert "Added 1 document to Physics 1. They were not converted again." in said
+    assert "2 you chose could not be added: a document joins a course only when" in said
     assert "Add converted documents" not in web.browser.get(path).text
 
 
@@ -256,6 +256,9 @@ def test_only_ones_own_finished_documents_can_be_added(web):
         data={"csrf_token": token(web.browser, path), "job": [theirs, job_id_from(queued)]},
     )
     assert web.job(theirs).course_id is None
+    assert "Nothing was added: a document joins a course only when" in text_of(
+        web.browser.get(path).text
+    )
     assert web.job(job_id_from(queued)).course_id is None
     assert web.job(job_id_from(queued)).status == JobStatus.QUEUED
     # Someone else's course is a 404.

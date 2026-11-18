@@ -219,7 +219,10 @@ def test_another_users_course_is_not_found(web):
         assert post(bob, path, **fields).status_code == 404, path
     assert [c.name for c in rows(web, Course)] == ["Physics 1"]
     assert [e.canonical for e in rows(web, CourseNotation)] == [BOLD_D]
-    assert web.browser.get("/courses/not-an-id").status_code == 404
+    missing = web.browser.get("/courses/not-an-id")
+    assert missing.status_code == 404
+    assert "There is no course at this address" in missing.text  # not "no document"
+    assert "no document" not in bob.get(base).text
 
 
 # --------------------------------------------------------------------------- entries
@@ -299,6 +302,7 @@ def test_remember_checks_the_job_and_the_course(reviewing):
     assert wrong.status_code == 404
     bad = post(reviewing.browser, path, **(fields | {"symbol": "bold omega"}))
     assert bad.status_code == 400
+    assert "Nothing was saved:" in bad.text and "standard form" in bad.text  # says which check
     assert not any(e.canonical == BOLD_OMEGA for e in rows(reviewing, CourseNotation))
 
 

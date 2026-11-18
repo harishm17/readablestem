@@ -23,7 +23,7 @@ from typing import Any
 
 import itsdangerous
 import jinja2
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
@@ -63,7 +63,12 @@ from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.quota import PAGES_RULE, allowance_phrase
-from readablestem.web.return_to import decision_link, remember_return, signed_out_page
+from readablestem.web.return_to import (
+    build_pages,
+    decision_link,
+    remember_return,
+    signed_out_page,
+)
 from readablestem.web.routes import (
     account,
     admin,
@@ -283,9 +288,9 @@ def _on_draft_confirm(request: Request, exc: Exception) -> Response:
 
 def _on_csrf_failed(request: Request, exc: Exception) -> Response:
     log_event(logger, "csrf_rejected", logging.WARNING)
-    back = decision_link(request)  # a review decision or Undo (web.return_to)
-    if back and current_user(request) is None:  # its session's cookie expired, token too
+    if current_user(request) is None:  # the session ended and took the form's token with it
         return signed_out_page(request, status_code=403)
+    back = decision_link(request)  # a review decision or Undo (web.return_to)
     message = "For your security, forms stop working when you sign in again or after a while. "
     message += (
         "Go back to the decision and choose again."
@@ -547,6 +552,7 @@ def create_app(
         app.add_exception_handler(unavailable, _on_database_unavailable)
 
     app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
+    routers: list[APIRouter] = []
     for module in (
         pages,
         account,
@@ -572,10 +578,13 @@ def create_app(
         email_login,
         discovery,
     ):
-        app.include_router(module.router)
-    app.include_router(auth_router)
+        routers.append(module.router)
+    routers.append(auth_router)
     if dev_only.available(settings):  # builder pages (web.dev_only): 404 in production
-        app.include_router(dev.router)
+        routers.append(dev.router)
     if settings.analytics_enabled:  # the /m/ proxy to PostHog (web.analytics); absent when off
-        app.include_router(analytics.router)
+        routers.append(analytics.router)
+    for router in routers:
+        app.include_router(router)
+    app.state.return_pages = build_pages(routers)  # the pages sign-in comes back to
     return app

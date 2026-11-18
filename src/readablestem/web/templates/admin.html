@@ -141,14 +141,13 @@
   <table>
     <caption id="allowlist-caption" class="visually-hidden">People on the allowlist</caption>
     <thead>
-      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Access</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove or block</th></tr>
+      <tr><th scope="col">Email</th><th scope="col">Access</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove or block</th></tr>
     </thead>
     <tbody>
       {% for person in users %}
       <tr>
         <th scope="row">{{ person.email }}</th>
-        <td>{{ "Admin" if person.is_admin else "Instructor" }}</td>
-        <td>{{ "Open" if person.tier == "open" else "Invited" }}</td>
+        <td>{{ "Open" if person.tier == "open" else "Invited" }}{% if person.is_admin %}, admin{% endif %}</td>
         <td>
           {% if person.linked %}
           <ul class="plain-list">

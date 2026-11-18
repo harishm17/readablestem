@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
+
+- WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per
+  100 pages and decisions per page, by release, from the review outcome events
+  (`events.outcome_cells`, with `events.outcome_releases`), with the small-count rule (5 accounts,
+  10 documents, no account over half; admin accounts and samples left out). A flag counts in the
+  ratio only when its source has a class in `events.SOURCE_CLASSES` (none has yet, so every
+  flag prints as "not classified" and no ratio is claimed); rule-required decisions are on their
+  own line. `/admin`'s per-person table now says "Review writes" for what it counted and adds
+  "Decisions" and "Documents reviewed". Not built: the held-out and reports columns, per-profile
+  sub-tables, page_read_again, a block on the page itself.
+- WS11.17: every admin POST answers with what happened ("Nothing changed: ..." for an empty or
+  unknown address, a repeat, an account already blocked), and none reports success when no row
+  changed. The Role column is gone, so nobody is called an instructor by default.
+- SW11: the course 404 says "course"; the notation refusal names the check that failed; adding
+  documents to a course says why some were left out. Sign-in comes back to every GET page that
+  takes the signed-in or admin user, built from the routes. A form posted with nobody signed in
+  gets the signed-out page, not only a decision.
+- WS27.6: `readablestem ops lookup ADDRESS` shows one account for support and no content.
+  No migration and no version bump.
+
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 
 - SW57 (F-574): a reading the file's characters could not be held against (no characters in

@@ -151,7 +151,47 @@ deleted-document page uses them to tell an owner what happened), but not for eve
 
 The upload fingerprint in `uploaded` events is keyed with `SESSION_SECRET`: rotating the
 secret makes the next upload of a file look new (a missed `reuploaded`, nothing else).
-`/admin` shows the counts per day and per pseudonymous person.
+`/admin` shows the counts per day and per pseudonymous person: review writes, decisions that
+stand (the outcome counts net of undo) and documents reviewed, and nothing finer.
+
+### Accuracy in use
+
+`readablestem ops accuracy` prints what reviewers did with each release's output, newest
+release first, from the `decision_outcome` events (`web.events.outcome_cells`, grouped in SQL;
+nothing is copied anywhere, so an erased account and events past 400 days drop out at once).
+A release stored with a profile hash (`0.5.11+0123456789ab`) is its own table. Per lane
+(`web.events.LANES`) and for all lanes:
+
+- **False flags per true flag**, over doubt flags only: a doubt flag is false when it was
+  kept and true when it was edited, replaced, rejected, removed or added. "Of which kept in
+  bulk" are the false ones kept by a group write.
+- **Required by a rule**, on its own line and never in that ratio: decisions a rule asks for
+  whatever the readers say, and how many of them changed something.
+- **Not classified**: a flag whose source has no class in `web.events.SOURCE_CLASSES` yet.
+  Until a source is there, every flag is unclassified and no ratio is printed; the table of
+  sources of WS8.22 fills it in.
+- **Found by a reviewer with no flag**, per 100 pages: edits, replacements, removals and
+  additions of something nothing flagged, with "added by hand" beside it. It is a floor, not
+  the error rate: it counts only what a reviewer found.
+- **Decisions per page**, the median over the documents that were reviewed.
+
+A cell is printed only when it draws on at least 5 accounts and 10 documents and no one
+account supplies more than half of its decisions or pages; otherwise it says "too few to show"
+and how many more accounts it needs, and its counts still go into "All lanes". When exactly one
+lane is withheld the next smallest is withheld with it. Admin accounts and sample documents
+are left out of every count. The command applies this rule for whoever runs it. With
+`EVENTS_ENABLED=false` it says there are no numbers from use. The pages counted are those the
+`uploaded` event recorded for the documents with outcomes.
+
+### Looking up one account for support
+
+`readablestem ops lookup ADDRESS` (`ops/support.py`) prints one account: its tier and state,
+today's pages and re-reads, what it has cost today and in all, its documents (the newest 50)
+as rows of an id, a state, pages, an error category, a cost and two dates, and the three review
+figures `/admin` shows for it (review writes, decisions, documents reviewed). It prints no file
+name, title or document text, and no review outcome by kind, reason or document, so it is not
+a way around the small-count rule above. Each lookup is logged as `support_lookup` with the
+account's pseudonym, never the address. Exit code 1 when nobody has that address.
 
 ### Step facts and the step report
 

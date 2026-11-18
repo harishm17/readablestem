@@ -1,6 +1,6 @@
 """CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
 report|export-opted-in|decisions-canary|claude-canary|replay-erasures|sandbox-probe|
-profile-check|image-facts.
+profile-check|image-facts|accuracy|lookup.
 
 The same tasks the web app runs on its hourly cron call, for running by hand or as the
 Railway `cron` service (`readablestem ops cron`). Output is counts only, as `key=value` pairs on
@@ -16,11 +16,15 @@ production calls either, because production runs `ops cron`: run them by hand.
 `profile-check` compares the settings of this environment with the production profile
 (ops/profile.py) and prints the names that differ, never a value; `image-facts --write` is run
 by the image build to record what the image carries in the profile's `[image_facts]` table.
+`accuracy` prints what reviewers did with each release's output (`web.events.outcome_cells`,
+small counts withheld); `lookup` shows one account for support (`ops.support`). Neither prints
+content.
 """
 
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +33,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.ops.retention import PurgeStats
+from readablestem.web import events
 
 
 def register(
@@ -118,6 +123,18 @@ def register(
     steps.add_argument("--last", type=int, help="at most this many jobs, the newest first")
     steps.add_argument("--json", action="store_true", help="the report as JSON")
     steps.set_defaults(func=_cmd_step_report)
+    sub.add_parser(
+        "accuracy",
+        help="false flags per true flag, silent misses found and decisions a page, by release, "
+        "from review outcomes (counts only; a cell with too few accounts is withheld)",
+    ).set_defaults(func=_cmd_accuracy)
+    lookup = sub.add_parser(
+        "lookup",
+        help="one account for support: tier, state, today's use, spend, its documents' "
+        "content-free facts and three review counts (no titles, no content)",
+    )
+    lookup.add_argument("email", help="the account's address")
+    lookup.set_defaults(func=_cmd_lookup)
     export = sub.add_parser(
         "export-opted-in",
         help="copy opted-in jobs (crops, results, review labels) for error analysis",
@@ -423,6 +440,104 @@ def _cmd_step_report(args: argparse.Namespace) -> int:
         return _db_error(exc)
     made = step_report.report(jobs)
     print(json.dumps(made.as_dict(), indent=2) if args.json else step_report.render(made))
+    return 0
+
+
+def _cmd_lookup(args: argparse.Namespace) -> int:
+    """One account for support (`ops.support`): exit 1 when nobody has that address."""
+    from datetime import UTC, datetime
+
+    from readablestem.ops import support
+    from readablestem.web.db import session_scope
+    from readablestem.web.logsafe import log_event
+
+    try:
+        with session_scope(_factory()) as session:
+            found = support.lookup(session, args.email, today=datetime.now(UTC).date())
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    if found is None:
+        print("Nobody has an account under that address.")
+        return 1
+    log_event(logging.getLogger(__name__), "support_lookup", account=found.pseudonym)
+    for line in support.render(found):
+        print(line)
+    return 0
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
+def _cell_lines(cell: events.OutcomeCell) -> list[str]:
+    """One lane of one release in words. A withheld cell says so and gives no number."""
+    name = "All lanes" if cell.lane == events.ALL_LANES else cell.lane
+    if not cell.shown:
+        more = (
+            f"needs {_plural(cell.needs_accounts, 'more account')}"
+            if cell.needs_accounts
+            else f"needs {events.MIN_DOCUMENTS} documents, and no one account over "
+            f"{events.MAX_SHARE:.0%} of it"
+        )
+        return [f"  {name}: too few to show ({more})"]
+    lines = [
+        f"  {name}: {_plural(cell.accounts, 'account')}, {_plural(cell.documents, 'document')}, "
+        f"{cell.pages} pages, {cell.decisions} decisions"
+    ]
+    if cell.false_per_true is not None:
+        flags = cell.false_flags + cell.true_flags
+        lines.append(
+            f"    {cell.false_per_true:.1f} false flags per true flag ({flags} flags; "
+            f"of which kept in bulk: {cell.kept_in_bulk})"
+        )
+    else:
+        lines.append("    false flags per true flag: no ratio (no doubt flag was true yet)")
+    lines.append(
+        f"    required by a rule: {cell.required}, of which {cell.required_changed} changed"
+    )
+    if cell.not_classified:
+        lines.append(f"    not classified: {cell.not_classified} (in no ratio)")
+    if cell.unflagged_per_100_pages is not None:
+        lines.append(
+            f"    found by a reviewer with no flag: {cell.unflagged_per_100_pages:.1f} per "
+            f"100 pages, of which added by hand: {cell.added} (a floor, not the rate)"
+        )
+    if cell.decisions_per_page_median is not None:
+        lines.append(
+            f"    decisions per page, median over {_plural(cell.documents, 'document')}: "
+            f"{cell.decisions_per_page_median:.2f}"
+        )
+    return lines
+
+
+def _cmd_accuracy(args: argparse.Namespace) -> int:
+    """Review outcomes by release (`web.events.outcome_cells`): the same small-count rule as
+    every other reader, whoever runs it. Counts only; no account and no document."""
+    from readablestem.config import get_settings
+    from readablestem.web import events
+    from readablestem.web.db import session_scope
+
+    if not get_settings().events_enabled:
+        print("Usage events are off, so there are no numbers from use.")
+        return 0
+    try:
+        with session_scope(_factory()) as session:
+            releases = events.outcome_releases(session)
+            cells = {release: events.outcome_cells(session, release) for release in releases}
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    print(
+        f"A cell needs {events.MIN_ACCOUNTS} accounts and {events.MIN_DOCUMENTS} documents, "
+        f"and no one account over {events.MAX_SHARE:.0%} of it; admin accounts and sample "
+        "documents are left out. Withheld cells still count in All lanes."
+    )
+    if not releases:
+        print("No review outcomes have been recorded.")
+    for release in releases:
+        print(f"release {release}")
+        for cell in cells[release]:
+            for line in _cell_lines(cell):
+                print(line)
     return 0
 
 

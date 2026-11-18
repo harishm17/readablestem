@@ -194,7 +194,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the checked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, the queue (how many stored documents are in each state, in the table's labels, F-213), aggregate counts, usage counts per day and per pseudonymous person |
-| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (adding makes them `invited`; removing blocks them) |
+| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (adding makes them `invited`; removing blocks them). Every admin POST says what happened: "Nothing changed: ..." with the reason for an empty or unknown address or a repeat, never a success when no row changed (`routes/admin.py`, the words of `routes/sharing.SHARE_OUTCOME`'s shape) |
 | POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
@@ -1349,6 +1349,10 @@ id and no page number is stored. `events.outcome_cells(release)` is the one read
 per lane (`events.LANES`) and for all lanes, without admin accounts, and a cell drawing on
 fewer than 5 accounts or 10 documents, or with one account giving more than half its
 decisions or pages, is withheld (with the next smallest lane when it is the only one).
+Flags count in false flags per true flag only when `events.SOURCE_CLASSES` names their source
+a doubt source; a rule source counts on its own line; any other is "not classified".
+`readablestem ops accuracy` prints it by release (`events.outcome_releases`), and
+`readablestem ops lookup` shows one account's three figures (docs/operations.md).
 
 `/admin` counts them per UTC day (last 28 days) and per pseudonymous person (`u-` and
 the start of the random user id, never an email). Events are deleted after 400 days by
@@ -2555,13 +2559,17 @@ A decision posted then used to give "This form has expired" or a bare 401, and s
 always went to My documents. Now:
 
 - a page asked for while signed out is remembered, and signing in goes back to it
-  (`auth.finish_login`), so a deep link to a decision survives sign-in;
+  (`auth.finish_login`), so a deep link to a decision survives sign-in. The pages are the GET
+  routes whose function takes the signed-in or the admin user, collected from the routers
+  when the app is made (`return_to.build_pages`), so a new page is covered with no list to
+  update;
 - a decision (or Undo) posted while signed out answers "Please sign in again. Your session
   ended, so this was not saved. … Sign in again to come back to the same decision.", with
   the sign-in buttons on the page; signing in lands on that decision. When the cookie
   itself expired (its CSRF token with it) the page is the same, not "This form has
-  expired". A form whose token is from before the reviewer signed in again (in another
-  tab) says the form has expired and links **Back to the decision**;
+  expired". The same holds for any form, not only a decision: posted with nobody signed in
+  it gets the signed-out page. A form whose token is from before the reviewer signed in again
+  (in another tab) says the form has expired and links **Back to the decision**;
 - with JavaScript, what is typed into a decision's fields is kept as a draft in this
   tab's `sessionStorage`, under the form's address (ids only; plus the form's
   `data-draft-key` where two forms post to one address, as a table's cell form, keyed by
@@ -2577,10 +2585,10 @@ always went to My documents. Now:
   one is not put back and nothing claims protection that is not there.
   Choosing a table cell from the list is navigation, so it keeps no draft.
 
-Only pages of this app are remembered (`/app`, `/admin`, a job's page, review screen,
-list view or HTML, with a query of ids and numbers; one pattern), so it is not an open
-redirect: `//elsewhere.example`, images, stylesheets and anything else are neither
-remembered nor followed. It lives in the signed session cookie, which signing in clears.
+Only pages of this app are remembered (the GET routes that take the signed-in or the admin
+user, with a plain path and a query of ids and numbers), so it is not an open redirect:
+`//elsewhere.example`, `..`, the static files and anything else are neither remembered nor
+followed. It lives in the signed session cookie, which signing in clears.
 The server never sends typed text back on these pages.
 
 **Keyboard** (BW11). "Skip to the decision" is the second Tab stop (after "Skip to main

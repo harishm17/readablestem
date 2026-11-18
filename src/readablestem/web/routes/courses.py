@@ -52,27 +52,45 @@ Field = Annotated[str, Form()]
 # A second Add for something already there (SW43): the page it would have led to, and this.
 COURSE_EXISTS = "You already have a course with this name, so nothing new was added. Here it is."
 ENTRY_EXISTS = "This course already has {what} with that meaning, so nothing new was added."
+# The same words for a course that never existed, one that was deleted and another person's
+# (like `routes.jobs.NOT_FOUND` for a document): the page must not say which.
+COURSE_NOT_FOUND = (
+    "Page not found",
+    "There is no course at this address that this account can open. Check the address and "
+    "your account.",
+)
+# Why a chosen document is not added (`notation.attach_documents`).
+NOT_ADDED = "a document joins a course only when it is finished, yours and in no other course"
 
 
 def _require_feature(request: Request) -> None:
     if not notation.enabled(get_ctx(request).settings):
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
 
 
 def _course(session: Session, course_id: str, user: CurrentUser) -> Course:
     if not JOB_ID.match(course_id):
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
     course = notation.owned_course(session, course_id, user.id)
     if course is None:
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
     return course
 
 
 def _entry(course: Course, entry_id: str) -> CourseNotation:
     row = next((r for r in course.notation if r.id == entry_id), None)
     if row is None or not JOB_ID.match(entry_id):
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
     return row
+
+
+def _not_saved(reason: str) -> PageError:
+    """A form the review screen never builds (a hand-made post): which check it failed."""
+    return PageError(
+        400,
+        "That could not be saved",
+        f"Nothing was saved: {reason}. Go back to the review screen and choose again.",
+    )
 
 
 def _errors(exc: notation.NotationInvalid) -> dict[str, Any]:
@@ -459,7 +477,7 @@ def add_documents(
     """Add documents already converted, with no course yet, to this course. They are listed
     under it and their review screen uses its notation; they are not converted again."""
     _require_feature(request)
-    ids = [j for j in job if JOB_ID.match(j)]
+    ids = list(dict.fromkeys(j for j in job if JOB_ID.match(j)))
     with session_scope(get_ctx(request).factory) as session:
         course = _course(session, course_id, user)
         back = f"/courses/{course.id}#course-documents"  # from the owned row, not the request
@@ -469,14 +487,16 @@ def add_documents(
         flash(request, "Check the documents to add first. Nothing was added.", undo=False)
     elif count:
         log_event(logger, "course_documents_added", course_id=course_id, n=count)
+        left = len(ids) - count
         flash(
             request,
             f"Added {count} {'document' if count == 1 else 'documents'} to {name}. "
-            "They were not converted again.",
+            "They were not converted again."
+            + (f" {left} you chose could not be added: {NOT_ADDED}." if left else ""),
             undo=False,
         )
     else:
-        flash(request, "Nothing was added: those documents are not available to add.", undo=False)
+        flash(request, f"Nothing was added: {NOT_ADDED}. Check the ones you chose.", undo=False)
     return RedirectResponse(back, status_code=303)
 
 
@@ -509,8 +529,13 @@ def remember(
     if not JOB_ID.match(job):
         raise PageError(404, *NOT_FOUND)
     canonical = canonical_symbol(symbol)
-    if canonical is None or canonical != symbol or meaning not in notation.MEANINGS:
-        raise PageError(400, "That could not be saved", "Go back and try again.")
+    shown = symbol[:20]
+    if canonical is None:
+        raise _not_saved(f"{shown!r} is not a letter or symbol a course can remember")
+    if canonical != symbol:
+        raise _not_saved(f"{shown!r} is not written in the standard form of that symbol")
+    if meaning not in notation.MEANINGS:
+        raise _not_saved(f"{meaning[:30]!r} is not one of the meanings a course can record")
     with session_scope(get_ctx(request).factory) as session:
         owned = job_access(session, job, user, OWNER)
         course = _course(session, course_id, user)
