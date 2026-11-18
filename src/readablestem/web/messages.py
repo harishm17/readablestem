@@ -415,8 +415,8 @@ REASON_MESSAGES: dict[str, str] = {
     "its words in a different order from the one they are read in, so check them against the "
     "original: if they read right, choose Looks right; if not, change the words.",
     "text.option_labels": "Answer options (A, B, C and so on) run together in one paragraph or "
-    "list item, so a screen reader reads them as one block. If that is not what the original "
-    "shows, split them into separate items with the page tools; if it is, choose Looks right.",
+    "list item, so a screen reader reads them as one block. If each option can still be told "
+    "from the next, choose Looks right; if not, change the words so that each one is set apart.",
     # Table step (pipeline.table_step)
     "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
     "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
@@ -498,8 +498,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "struck_text": "Text struck through on the page is kept, shown struck through and read "
     "out as deleted: if students no longer need it, take it out with the page tools.",
     "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
-    "item, so a screen reader reads them as one block: split them into separate items with the "
-    "page tools.",
+    "item, so a screen reader reads them as one block: check that each option can be told from "
+    "the next, and change the words if not.",
     "rtl_text": "This text is written right to left (Arabic or Hebrew). The PDF may store its "
     "words in a different order from the one they are read in, so the words may be out of "
     "order: check it against the original.",
