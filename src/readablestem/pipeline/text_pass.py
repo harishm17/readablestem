@@ -93,6 +93,7 @@ from readablestem.pipeline import contrast, language, layout, page_type
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.baseline_rules import STRIKE_X_SLACK, Ink, classify
 from readablestem.pipeline.layout import FormField, Glyph, Strike
+from readablestem.pipeline.layout.glyphs import clean_text
 
 log = logging.getLogger(__name__)
 
@@ -179,6 +180,21 @@ class PdfLink:
     dest_point: tuple[float, float] | None = None
 
 
+@dataclass(frozen=True)
+class PdfMark:
+    """One reviewer's annotation of a page with a comment to carry (`NOTE_ANNOTS`), in display
+    coordinates. `parent` is the xref of the annotation it replies to (/IRT), `replaces` says
+    the file calls a caret a replacement of the text struck out beside it."""
+
+    page: int
+    xref: int
+    kind: str  # the annotation's type, as PyMuPDF names it ("Text", "Highlight", "Caret")
+    box: BBox
+    contents: str
+    parent: int | None = None
+    replaces: bool = False
+
+
 @dataclass
 class PdfText:
     """What the text pass reads from the PDF itself: /Lang (when present and well formed),
@@ -193,6 +209,11 @@ class PdfText:
     # Per page, its fillable fields (`layout.take_form_fields`): the notice, and the value of a
     # filled field as the run that says it is one.
     fields: dict[int, list[FormField]] = field(default_factory=dict)
+    # Per page, the annotations that carry a comment, and the names of the files attached to
+    # the PDF (embedded files, and files attached to a page), which are not converted.
+    marks: dict[int, list[PdfMark]] = field(default_factory=dict)
+    attachments: list[str] = field(default_factory=list)
+    attachment_count: int = 0
 
 
 def _catalog_lang(doc: pymupdf.Document) -> str | None:
@@ -241,6 +262,104 @@ def _pdf_links(
     return out
 
 
+# Annotations whose /Contents is a comment to carry: the marks on text, the shapes and lines
+# round it, the sticky note and the caret. A text box (FreeText) is not one, it is page text
+# and is read as such; a popup is the window of its parent's comment, so each comment is read
+# once; an attached file's /Contents is a label for the file, which the notice names.
+NOTE_ANNOTS = page_type.ANNOTATION_ART - {
+    pymupdf.mupdf.PDF_ANNOT_FREE_TEXT,
+    pymupdf.mupdf.PDF_ANNOT_POPUP,
+    pymupdf.mupdf.PDF_ANNOT_SOUND,
+    pymupdf.mupdf.PDF_ANNOT_FILE_ATTACHMENT,
+}
+_NOT_SHOWN = pymupdf.mupdf.PDF_ANNOT_IS_HIDDEN | pymupdf.mupdf.PDF_ANNOT_IS_NO_VIEW
+MAX_MARKS_PER_PAGE = 500  # a page is not read for more comments than any reviewer writes
+MAX_NOTE_CHARS = 10_000
+MAX_ATTACHMENT_NAMES = 20  # names kept for the notice; the count says how many there are
+ATTACHMENT_NAME_CHARS = 120
+REASON_NOTE = "annotation note"  # `Element.reasons` of a paragraph made from a comment
+NOTE_LEAD = "Note on the page: "
+# A caret this near a struck-out passage (pt) is the replacement of that passage.
+CARET_REACH = 14.0
+
+
+def _xref_value(doc: pymupdf.Document, xref: int, key: str) -> tuple[str, str]:
+    try:
+        return doc.xref_get_key(xref, key)
+    except Exception:  # a broken object has no such key
+        return ("null", "null")
+
+
+def page_marks(doc: pymupdf.Document, page: pymupdf.Page) -> tuple[list[PdfMark], list[str], int]:
+    """The comments of the page's annotations (`NOTE_ANNOTS`, not hidden), in the file's
+    order and the display frame, and the names of the files attached to it (a file
+    attachment annotation) with their count. A hidden annotation is not shown to a sighted
+    reader, so it is not read. The caller holds `_LOCK`; the page has been turned
+    (`page_type.turn_page`)."""
+    if page.first_annot is None:
+        return [], [], 0
+    found: list[tuple[int, str, tuple[float, ...], str, int | None, bool]] = []
+    names: list[str] = []
+    attached = 0
+    turned = page.rotation  # an annotation's box is read in unrotated space
+    page.set_rotation(0)
+    try:
+        annots = [a for a in page.annots() or () if not a.flags & _NOT_SHOWN]
+        kinds = {a.xref: a.type[1] for a in annots}
+        for annot in annots:
+            if annot.type[0] == pymupdf.mupdf.PDF_ANNOT_FILE_ATTACHMENT:
+                attached += 1
+                with contextlib.suppress(Exception):  # a broken attachment is counted, unnamed
+                    names.append(_file_name(annot.file_info.get("filename") or ""))
+            if annot.type[0] not in NOTE_ANNOTS or len(found) >= MAX_MARKS_PER_PAGE:
+                continue
+            words = clean_text(str(annot.info.get("content") or ""))[:MAX_NOTE_CHARS]
+            if not words:
+                continue
+            kind, value = _xref_value(doc, annot.xref, "IRT")
+            parent = (
+                int(value.split()[0]) if kind == "xref" and value.split()[0].isdigit() else None
+            )
+            replaces = annot.type[1] == "Caret" and (
+                _xref_value(doc, annot.xref, "IT")[1] == "/Replace"
+                or (parent is not None and kinds.get(parent) == "StrikeOut")
+            )
+            found.append((annot.xref, annot.type[1], tuple(annot.rect), words, parent, replaces))
+    finally:
+        page.set_rotation(turned)
+    turn = page.rotation_matrix
+    marks = [
+        PdfMark(page.number, xref, kind, _display_box(rect, turn), words, parent, replaces)
+        for xref, kind, rect, words, parent, replaces in found
+    ]
+    return marks, names, attached
+
+
+def _display_box(rect: Sequence[float], turn: pymupdf.Matrix) -> BBox:
+    box = pymupdf.Rect(rect) * turn
+    return (float(box.x0), float(box.y0), float(box.x1), float(box.y1))
+
+
+def _file_name(raw: str) -> str:
+    return clean_text(raw)[:ATTACHMENT_NAME_CHARS] or "(no name)"
+
+
+def embedded_files(doc: pymupdf.Document) -> tuple[list[str], int]:
+    """The names of the files embedded in the PDF (at most `MAX_ATTACHMENT_NAMES`) and how
+    many there are. A file in a PDF is never opened here."""
+    try:
+        count = doc.embfile_count()
+        names = []
+        for name in doc.embfile_names()[:MAX_ATTACHMENT_NAMES]:
+            try:
+                names.append(_file_name(doc.embfile_info(name).get("filename") or name))
+            except Exception:  # an entry that cannot be read is counted, unnamed
+                names.append("(no name)")
+        return names, count
+    except Exception:  # a broken name tree: nothing to say
+        return [], 0
+
+
 def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText:
     """/Lang, links and glyphs of the analysed pages (0-based).
 
@@ -260,12 +379,20 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
             doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
             try:
                 found.lang = _catalog_lang(doc)
+                found.attachments, found.attachment_count = embedded_files(doc)
                 in_doc = {p for p in wanted if 0 <= p < doc.page_count}
                 for number in sorted(in_doc):
                     page_type.turn_page(doc[number])  # layout's display frame
                     fields = layout.take_form_fields(doc[number])  # before the glyphs are read
                     if fields:
                         found.fields[number] = fields
+                    marks, names, attached = page_marks(doc, doc[number])
+                    if marks:
+                        found.marks[number] = marks
+                    found.attachment_count += attached
+                    found.attachments += names[
+                        : max(0, MAX_ATTACHMENT_NAMES - len(found.attachments))
+                    ]
                     annotations = doc[number].get_links()
                     found.annotations += len(annotations)
                     links = _pdf_links(doc, number, annotations, in_doc)
@@ -933,6 +1060,137 @@ def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> li
     return notices
 
 
+# ============================================================================ comments
+
+
+def _gap(a: BBox, b: BBox) -> float:
+    """The distance between two boxes (0 when they touch or overlap)."""
+    dx = max(a[0] - b[2], b[0] - a[2], 0.0)
+    dy = max(a[1] - b[3], b[1] - a[3], 0.0)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def _overlap_area(a: BBox, b: BBox) -> float:
+    return max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+
+
+def _anchor(body: Sequence[Element], mark: PdfMark, strikes: Sequence[Strike]) -> Element | None:
+    """The element of the page the comment goes after: the one with the most of the
+    annotation's box on it, else the one nearest to it. A caret that stands at the end of a
+    struck-out passage goes after the element that holds the passage."""
+    box = mark.box
+    if mark.kind == "Caret":
+        near = [(_gap(box, k.bbox), k.bbox) for k in strikes if k.annotation]
+        reach = [(gap, bbox) for gap, bbox in near if gap <= CARET_REACH]
+        if reach:
+            box = min(reach)[1]
+    if not body:
+        return None
+
+    def distance(e: Element) -> tuple[bool, float, float, float, int]:
+        # On an element: the one with most of the box on it. Beside the text, in a margin:
+        # the one at the same height, nearest across, as the page reads.
+        away = max(box[1] - e.bbox[3], e.bbox[1] - box[3], 0.0)
+        across = max(box[0] - e.bbox[2], e.bbox[0] - box[2], 0.0)
+        return (_gap(box, e.bbox) > 0, -_overlap_area(box, e.bbox), away, across, e.order)
+
+    return min(body, key=distance)
+
+
+def _in_reading_order(marks: Sequence[PdfMark]) -> list[PdfMark]:
+    """The page's comments from top to bottom, each followed by its replies (/IRT) in the
+    file's order; a reply whose parent has no comment of its own stands at its own place."""
+    known = {m.xref for m in marks}
+    replies: dict[int, list[PdfMark]] = defaultdict(list)
+    for m in marks:
+        if m.parent in known and m.parent != m.xref:
+            replies[m.parent].append(m)
+    out: list[PdfMark] = []
+    seen: set[int] = set()
+
+    def visit(m: PdfMark) -> None:
+        if m.xref in seen:
+            return
+        seen.add(m.xref)
+        out.append(m)
+        for reply in replies.get(m.xref, ()):
+            visit(reply)
+
+    for m in sorted(marks, key=lambda m: (m.box[1], m.box[0])):
+        if m.parent not in known or m.parent == m.xref:
+            visit(m)
+    for m in marks:  # replies in a loop of replies: nobody is their parent, so keep them
+        visit(m)
+    return out
+
+
+def comment_notes(
+    elements: list[Element],
+    marks: Mapping[int, Sequence[PdfMark]],
+    strikes: Mapping[int, Sequence[Strike]],
+) -> tuple[list[Element], int]:
+    """`elements` with one paragraph for each comment of the PDF's annotations, after the
+    element whose text the annotation covers (or is nearest to), and how many were made.
+
+    The paragraph starts "Note on the page: "; a caret the file calls a replacement says
+    "replace with" and then the text. A page with no element of its own has its notes after
+    the last element before it. Nothing before them is renamed: an id is one past the highest
+    on its page, and only `order` is renumbered. Layout keeps no notes field yet, so the
+    comment is a paragraph and can be taken out like any other line."""
+    if not marks:
+        return elements, 0
+    after: dict[str | None, list[Element]] = defaultdict(list)
+    index: dict[int, int] = {}
+    for e in elements:
+        tail = e.id.rsplit("-e", 1)[-1]
+        index[e.page] = max(index.get(e.page, -1), int(tail) if tail.isdecimal() else -1)
+    count = 0
+    for page, found in sorted(marks.items()):
+        body = [e for e in elements if e.page == page and e.display != "inline"]
+        for mark in _in_reading_order(found):
+            owner = _anchor(body, mark, strikes.get(page, ()))
+            if owner is None:  # nothing of the page: after the last element before it
+                before = [e for e in elements if e.page < page and e.display != "inline"]
+                owner = before[-1] if before else None
+            index[page] = index.get(page, -1) + 1
+            words = f"replace with {mark.contents}" if mark.replaces else mark.contents
+            after[owner.id if owner else None].append(
+                Element(
+                    id=f"p{page + 1}-e{index[page]}",
+                    kind=Kind.PARAGRAPH,
+                    page=page,
+                    bbox=mark.box,
+                    order=0,
+                    text=NOTE_LEAD + words,
+                    reasons=[REASON_NOTE],
+                )
+            )
+            count += 1
+    if not count:
+        return elements, 0
+    # A note goes after the inline equations that follow its paragraph, not between them.
+    tails: dict[str, str] = {}
+    for e in elements:
+        if e.id in after and e.display != "inline":
+            tails[e.id] = e.id
+    last: str | None = None
+    for e in elements:
+        if e.display == "inline" and e.parent_id in tails and tails[e.parent_id] == last:
+            tails[e.parent_id] = e.id
+        last = e.id
+    moved: dict[str, list[Element]] = defaultdict(list)
+    for owner_id, notes in after.items():
+        if owner_id is not None:
+            moved[tails[owner_id]].extend(notes)
+    out: list[Element] = list(after.get(None, ()))
+    for e in elements:
+        out.append(e)
+        out.extend(moved.get(e.id, ()))
+    return [
+        e if e.order == i else e.model_copy(update={"order": i}) for i, e in enumerate(out)
+    ], count
+
+
 # ============================================================================ struck text
 
 
@@ -1293,6 +1551,17 @@ def annotate(
         if langs.get(element.id):
             update["lang"] = langs[element.id]
         updated.append(element.model_copy(update=update) if update else element)
+    updated, comments = comment_notes(updated, pdf.marks, pdf.strikes)  # after the language
+    if comments:
+        notices.append(Notice(code="annotations_read", count=comments))
+    if pdf.attachment_count:
+        notices.append(
+            Notice(
+                code="attachments_not_converted",
+                count=pdf.attachment_count,
+                names=pdf.attachments[:MAX_ATTACHMENT_NAMES],
+            )
+        )
     for (page, owner), count in sorted(found.dropped.items(), key=lambda kv: str(kv[0])):
         notices.append(Notice(code="link_scheme_dropped", page=page, element_id=owner, count=count))
     for (page, owner), count in sorted(unclear.items()):

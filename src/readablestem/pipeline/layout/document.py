@@ -233,7 +233,9 @@ def _read_page(
     page_type.turn_page(page)
     fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
-    drawings = [*page.get_cdrawings(), *glyph_strokes.strokes(page, raw)]
+    # What a reviewer's annotations paint (an icon, a caret, a highlight) is not the page's art.
+    drawings = page_type.without_annotation_art(page, page.get_cdrawings())
+    drawings = [*drawings, *glyph_strokes.strokes(page, raw)]
     images = page_type.image_boxes(page)
     if page_type.too_complex(drawings):  # PAGE_MAX_PATHS: no path is read (`kept_reason`)
         kind = page_type.classify(
@@ -557,7 +559,7 @@ def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[
             else f"{info.get('width')}x{info.get('height')}"
         )
         marks.append(slides.Mark("image", key, display.box(info["bbox"])))
-    drawings = page.get_cdrawings() if paths else []
+    drawings = page_type.without_annotation_art(page, page.get_cdrawings()) if paths else []
     width = page.rect.width
     for path in paths:
         centre = (path.bbox[1] + path.bbox[3]) / 2

@@ -44,6 +44,7 @@ NAMES_LEAD = {
     "long_description_missing": "The figure",
     "table_not_rebuilt": "The table",
     "struck_text": "The struck text",
+    "attachments_not_converted": "The files",
 }
 
 
@@ -121,7 +122,7 @@ def place_of(
     page = f"page={shown}" if shown is not None else ""
     element = elements.get(notice.element_id or "")
     if element is None:
-        return Place(notice, query=page)
+        return Place(notice, names=tuple(notice.names), query=page)
     fix = fixes.get(element.id)
     if fix is not None and fix.kind in {Kind.FIGURE, Kind.TABLE, Kind.EQUATION, Kind.HEADING}:
         name = labels.get(element.id, "")

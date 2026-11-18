@@ -1122,6 +1122,66 @@ ICON_ANNOTS = frozenset(
 )
 
 
+# What a reviewer draws over a page, whose appearance is not the page's own art: the icons
+# above, the marks on text (highlight, underline, squiggle, strike-out), the shapes and lines
+# around it, and the box of a text box. Its drawings are not figures and not handwriting
+# (`without_annotation_art`). A pen stroke (Ink) is not here: it is read as handwriting.
+ANNOTATION_ART = ICON_ANNOTS | {
+    pymupdf.mupdf.PDF_ANNOT_HIGHLIGHT,
+    pymupdf.mupdf.PDF_ANNOT_UNDERLINE,
+    pymupdf.mupdf.PDF_ANNOT_SQUIGGLY,
+    pymupdf.mupdf.PDF_ANNOT_STRIKE_OUT,
+    pymupdf.mupdf.PDF_ANNOT_SQUARE,
+    pymupdf.mupdf.PDF_ANNOT_CIRCLE,
+    pymupdf.mupdf.PDF_ANNOT_LINE,
+    pymupdf.mupdf.PDF_ANNOT_POLYGON,
+    pymupdf.mupdf.PDF_ANNOT_POLY_LINE,
+    pymupdf.mupdf.PDF_ANNOT_FREE_TEXT,
+}
+_ART_SLACK = 1.0  # pt: an appearance is inside its annotation's box, bar rounding
+_NOT_SHOWN = pymupdf.mupdf.PDF_ANNOT_IS_HIDDEN | pymupdf.mupdf.PDF_ANNOT_IS_NO_VIEW
+
+
+def without_annotation_art(
+    page: pymupdf.Page, drawings: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """`page.get_cdrawings()` without the drawings that annotations paint (`ANNOTATION_ART`).
+
+    Annotations are painted after the page's own content, so their drawings are the last of
+    the list: from the end, every drawing that lies inside the box of a shown annotation is
+    one of theirs, and the first that does not is the page's. Of those, the ones inside the
+    box of an annotation of `ANNOTATION_ART` are left out; a pen stroke's stay. The page's own
+    drawings keep their places in the list. Nothing is changed on the page: the hidden-text
+    checks still see an annotation that covers words."""
+    if page.first_annot is None:
+        return drawings
+    turned = page.rotation  # the drawings are in unrotated space, a sticky note's box is not
+    page.set_rotation(0)
+    try:
+        shown = [a for a in page.annots() or () if not a.flags & _NOT_SHOWN]
+        boxes = [tuple(a.rect) for a in shown]
+        art = [tuple(a.rect) for a in shown if a.type[0] in ANNOTATION_ART]
+    finally:
+        page.set_rotation(turned)
+    if not art:
+        return drawings
+
+    def inside(rect: Sequence[float], within: Sequence[Sequence[float]]) -> bool:
+        s = _ART_SLACK
+        return any(
+            b[0] - s <= rect[0]
+            and b[1] - s <= rect[1]
+            and rect[2] <= b[2] + s
+            and rect[3] <= b[3] + s
+            for b in within
+        )
+
+    start = len(drawings)
+    while start > 0 and inside(drawings[start - 1]["rect"], boxes):
+        start -= 1
+    return [d for i, d in enumerate(drawings) if i < start or not inside(d["rect"], art)]
+
+
 def _drop_icons(page: pymupdf.Page) -> None:
     """Delete the page's icon annotations (`ICON_ANNOTS`): a comment's icon over a word
     does not make the word covered."""
