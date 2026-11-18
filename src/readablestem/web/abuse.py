@@ -108,7 +108,9 @@ class RateLimiter:
         allowance (the per-person upload rule counts accepted files only)."""
         with self._lock:
             hits = self._hits.get((rule_name, key))
-            for _ in range(min(count, len(hits)) if hits else 0):
+            if hits is None:
+                return
+            for _ in range(min(count, len(hits))):
                 hits.pop()
 
     def _forget(self, now: float) -> None:

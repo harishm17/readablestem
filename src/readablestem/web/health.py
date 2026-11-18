@@ -25,7 +25,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from types import FrameType
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 
 from readablestem.config import Settings
 from readablestem.ops import heartbeat, profile
@@ -74,7 +74,7 @@ def _write_check(engine) -> str:
                 conn.execute(text(f"SET LOCAL statement_timeout = {WRITE_CHECK_MS}"))
             try:
                 conn.execute(
-                    OpsHeartbeat.__table__.update()
+                    update(OpsHeartbeat)
                     .where(OpsHeartbeat.name == _WRITE_PROBE)
                     .values(detail=None)
                 )
