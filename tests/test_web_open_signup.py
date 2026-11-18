@@ -413,13 +413,41 @@ def test_an_admin_cannot_block_themselves_or_a_stranger_and_others_cannot_block(
     assert row is not None and row.is_allowed
     assert "You cannot block yourself" in admin_web.browser.get("/admin").text
     post_admin(admin_web, "/admin/users/block", email="ghost@example.org")
-    assert "Nobody has an account under that address" in admin_web.browser.get("/admin").text
+    assert "nobody has an account under that address" in admin_web.browser.get("/admin").text
     post_admin(admin_web, "/admin/users/block", email="not an address")
 
     carol = client_for(admin_web, CAROL)
     forbidden = carol.post("/admin/users/block", data={"csrf_token": token(carol), "email": BOB})
     assert forbidden.status_code == 403
     assert carol.post("/admin/users/block", data={"email": BOB}).status_code == 403
+
+
+def test_every_admin_post_says_what_happened_and_nothing_succeeds_without_a_change(admin_web):
+    """An empty or unknown address, a repeat and a real change each get their own words on the
+    page (`Nothing changed` and the reason); nobody is labelled an instructor."""
+
+    def says(path: str, text: str, **fields) -> None:
+        response = post_admin(admin_web, path, **fields)
+        page = (
+            response.text if response.status_code == 422 else admin_web.browser.get("/admin").text
+        )
+        assert text in page, (path, fields)
+
+    says("/admin/allowlist", "Nothing changed: enter an email address", email="")
+    says("/admin/allowlist", "Added to the allowlist", email=DAVE)
+    says("/admin/allowlist", "Nothing changed: that address was already allowed", email=DAVE)
+    says("/admin/allowlist", "Changed: they are now an admin", email=DAVE, admin="on")
+    says("/admin/allowlist/remove", "Nothing changed: enter an email address", email="")
+    says("/admin/allowlist/remove", "Nothing changed: nobody has an account", email=BOB)
+    says("/admin/allowlist/remove", "Removed from the allowlist", email=DAVE)
+    says("/admin/allowlist/remove", "Nothing changed: that address was already off", email=DAVE)
+    says("/admin/users/block", "Nothing changed: that account was already blocked", email=DAVE)
+    says("/admin/users/unblock", "The account was unblocked", email=DAVE)
+    says("/admin/users/unblock", "Nothing changed: that account was not blocked", email=DAVE)
+    says("/admin/users/block", "Nothing changed: enter an email address", email="")
+    says("/admin/linked-emails", "Nothing changed: enter both email addresses", email=DAVE)
+    says("/admin/linked-emails/remove", "Nothing changed: that address was not linked", other=BOB)
+    assert "<td>Instructor</td>" not in admin_web.browser.get("/admin").text  # no default label
 
 
 # --------------------------------------------------------------------------- deleting an account

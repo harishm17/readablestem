@@ -17,9 +17,10 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import case, func, select
+from sqlalchemy.orm import Session
 
 from readablestem.ops import profile, step_report
-from readablestem.web import access, events, linked_emails, states, step_facts
+from readablestem.web import access, events, linked_emails, shares, states, step_facts
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import ErrorAggregate, Job, QuotaDay, User, session_scope
@@ -47,6 +48,17 @@ USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 PEOPLE_ROWS = 300
 # A second Link for a link already made (SW43).
 LINK_EXISTS = "That address was already linked to this instructor. Nothing was changed."
+# What the admin is told, by what happened (the shape of `routes/sharing.SHARE_OUTCOME`): no
+# address is in a notice, and nothing reports success when no row changed. A change names
+# what changed, in `{what}`.
+ALLOW_OUTCOME = {
+    shares.ADDED: "Added to the allowlist. Nothing was sent: tell them to sign in.",
+    shares.CHANGED: "Changed: {what}.",
+    shares.UNCHANGED: "Nothing changed: that address was already allowed.",
+}
+NOTHING = "Nothing changed: "
+NO_ADDRESS = NOTHING + "enter an email address, like name@example.org."
+NO_ACCOUNT = NOTHING + "nobody has an account under that address."
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
 # "Model work of recent documents": the newest documents finished in this many days.
 STEP_DAYS = 7
@@ -221,7 +233,7 @@ def allow(
 ) -> Response:
     normalised = normalise_email(email)
     if normalised is None:
-        message = "Enter an email address, like name@example.org."
+        message = NO_ADDRESS
         context = admin_context(request) | {
             "errors": [{"field_id": "allow-email", "message": message}],
             "email_error": message,
@@ -230,18 +242,38 @@ def allow(
         return render(request, "admin.html", context, status_code=422)
     try:
         with session_scope(get_ctx(request).factory) as session:
-            # Unticked keeps the person's current role: re-adding an admin must not demote them.
-            set_allowed(session, normalised, allowed=True, admin=True if admin == "on" else None)
+            outcome, what = _allow(session, normalised, admin=True if admin == "on" else None)
     except linked_emails.LinkRefused as refused:
+        message = NOTHING + refused.message[:1].lower() + refused.message[1:]
         context = admin_context(request) | {
-            "errors": [{"field_id": "allow-email", "message": refused.message}],
-            "email_error": refused.message,
+            "errors": [{"field_id": "allow-email", "message": message}],
+            "email_error": message,
             "email_value": email,
         }
         return render(request, "admin.html", context, status_code=422)
-    log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
-    flash(request, "The allowlist was updated.")
+    if outcome != shares.UNCHANGED:
+        log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
+    flash(request, ALLOW_OUTCOME[outcome].format(what=what), undo=False)
     return RedirectResponse("/admin", status_code=303)
+
+
+def _allow(session: Session, email: str, *, admin: bool | None) -> tuple[str, str]:
+    """Allow `email` (unticked `admin` keeps the person's current role: re-adding an admin
+    must not demote them) and say what happened: `ADDED` (a new account), `CHANGED` (and what
+    changed) or `UNCHANGED`."""
+    before = session.scalar(select(User).where(User.email == email))
+    was = None if before is None else (before.is_allowed, before.access_tier, before.is_admin)
+    after = set_allowed(session, email, allowed=True, admin=admin)
+    if was is None or after is None:
+        return shares.ADDED, ""
+    changes = []
+    if not was[0]:
+        changes.append("they can sign in again")
+    if was[1] != after.access_tier:
+        changes.append("they are now invited, with the instructors' limits")
+    if was[2] != after.is_admin:
+        changes.append("they are now an admin" if after.is_admin else "they are no longer an admin")
+    return (shares.CHANGED, "; ".join(changes)) if changes else (shares.UNCHANGED, "")
 
 
 @router.post("/admin/allowlist/remove", dependencies=[Depends(require_csrf)])
@@ -249,30 +281,55 @@ def allow(
 def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     normalised = normalise_email(email)
     if normalised == user.email:
-        flash(request, "You cannot remove yourself. Ask another admin.")
+        flash(request, "You cannot remove yourself. Ask another admin.", undo=False)
         return RedirectResponse("/admin", status_code=303)
-    if normalised is not None:
+    if normalised is None:
+        message = NO_ADDRESS
+    else:
         with session_scope(get_ctx(request).factory) as session:
-            set_allowed(session, normalised, allowed=False)
-        log_event(logger, "allowlist_remove", by=user.id)
-    flash(request, "The allowlist was updated.")
+            was = _was_allowed(session, normalised)
+            if was:
+                set_allowed(session, normalised, allowed=False)
+        if was:
+            log_event(logger, "allowlist_remove", by=user.id)
+            message = "Removed from the allowlist. They were signed out and their work stopped."
+        else:
+            message = (
+                NO_ACCOUNT
+                if was is None
+                else NOTHING + "that address was already off the allowlist."
+            )
+    flash(request, message, undo=False)
     return RedirectResponse("/admin", status_code=303)
+
+
+def _was_allowed(session: Session, email: str) -> bool | None:
+    """Whether the account may sign in now; None when nobody has that address."""
+    return session.scalar(select(User.is_allowed).where(User.email == email))
 
 
 def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Response:
     normalised = normalise_email(email)
     if blocked and normalised == user.email:
-        flash(request, "You cannot block yourself. Ask another admin.")
+        flash(request, "You cannot block yourself. Ask another admin.", undo=False)
         return RedirectResponse("/admin", status_code=303)
-    found = None
-    if normalised is not None:
-        with session_scope(get_ctx(request).factory) as session:
-            found = set_blocked(session, normalised, blocked=blocked)
-    if found is None:
-        flash(request, "Nobody has an account under that address.")
+    if normalised is None:
+        message = NO_ADDRESS
     else:
-        log_event(logger, "user_blocked" if blocked else "user_unblocked", by=user.id)
-        flash(request, "The account was blocked." if blocked else "The account was unblocked.")
+        with session_scope(get_ctx(request).factory) as session:
+            was = _was_allowed(session, normalised)
+            if was is not None and was == blocked:  # allowed to be blocked, blocked to be let in
+                set_blocked(session, normalised, blocked=blocked)
+        if was is None:
+            message = NO_ACCOUNT
+        elif was != blocked:
+            message = NOTHING + (
+                "that account was already blocked." if blocked else "that account was not blocked."
+            )
+        else:
+            log_event(logger, "user_blocked" if blocked else "user_unblocked", by=user.id)
+            message = "The account was blocked." if blocked else "The account was unblocked."
+    flash(request, message, undo=False)
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -303,13 +360,13 @@ def link_email(
     owner, linked = normalise_email(email), normalise_email(other)
     message = ""
     if owner is None or linked is None:
-        message = "Enter both email addresses, like name@example.org."
+        message = NOTHING + "enter both email addresses, like name@example.org."
     else:
         try:
             with session_scope(get_ctx(request).factory) as session:
                 linked_emails.link(session, owner, linked)
         except linked_emails.LinkRefused as refused:
-            message = refused.message
+            message = NOTHING + refused.message[:1].lower() + refused.message[1:]
             if refused.code == "already_linked" and _linked_to(request, linked, owner):
                 # This very link is there already (often a second click): nothing to fix
                 # (SW43, "identical repeat").
@@ -324,7 +381,7 @@ def link_email(
         }
         return render(request, "admin.html", context, status_code=422)
     log_event(logger, "linked_email_add", by=user.id)
-    flash(request, "The other Google account was linked.")
+    flash(request, "The other Google account was linked.", undo=False)
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -339,9 +396,15 @@ def _linked_to(request: Request, linked: str, owner: str) -> bool:
 @submit_once("admin.unlink")
 def unlink_email(request: Request, user: AdminDep, other: Annotated[str, Form()] = "") -> Response:
     linked = normalise_email(other)
-    if linked is not None:
+    if linked is None:
+        message = NO_ADDRESS
+    else:
         with session_scope(get_ctx(request).factory) as session:
-            linked_emails.unlink(session, linked)
-        log_event(logger, "linked_email_remove", by=user.id)
-    flash(request, "The other Google account was removed. That instructor was signed out.")
+            removed = linked_emails.unlink(session, linked)
+        if removed:
+            log_event(logger, "linked_email_remove", by=user.id)
+            message = "The other Google account was removed. That instructor was signed out."
+        else:
+            message = NOTHING + "that address was not linked to anyone."
+    flash(request, message, undo=False)
     return RedirectResponse("/admin", status_code=303)
