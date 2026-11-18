@@ -87,6 +87,37 @@ def test_wf19_hidden_text_is_left_out_and_counted_and_a_sideways_page_is_read_up
     assert text.index("Week 1") < text.index("Week 8")
 
 
+def test_wf19_a_file_cut_off_is_not_ready_until_the_owner_answers_and_the_student_is_told_always(
+    site: harness.ReplaySite, made: Callable[[str, bytes], str]
+) -> None:
+    """F-505. A six-page PDF cut in the middle opens only after repair, with pages 4 to 6 empty:
+    the page asks before it says "Ready to share", and the student file says the pages are not
+    there before and after the owner continues. A file with a damaged cross-reference table
+    that repairs with content on every page asks nothing."""
+    files = load()
+    cut = made("truncated.pdf", files["truncated.pdf"].make())
+    assert state(site, cut) != READY and "cut off" in state(site, cut)
+    page = harness.words(site.page(f"/jobs/{cut}").xpath("//main")[0])
+    assert "pages 4 to 6 are empty" in page and "continue with pages 1 to 3" in page
+    assert "Every part the tool found was converted" not in page
+    told = "pages 4 to 6 of the original pdf are empty"
+    assert told in student_text(site, cut).lower()
+
+    sent = site.browser.post(
+        f"/jobs/{cut}/cut-off", data={"csrf_token": harness.token(site.browser, f"/jobs/{cut}")}
+    )
+    assert sent.status_code == 303
+    assert state(site, cut) == "Ready"  # may be shared, but never "Ready to share"
+    page = harness.words(site.page(f"/jobs/{cut}").xpath("//main")[0])
+    assert "Pages 4 to 6 of the PDF are empty" in page and "Every part the tool found" not in page
+    assert told in student_text(site, cut).lower()
+
+    repaired = made("xref-damaged.pdf", files["xref-damaged.pdf"].make())
+    assert state(site, repaired) == READY
+    assert not [n for n in site.result(repaired).notices if n.review == "required"]
+    assert "cut off" not in student_text(site, repaired)
+
+
 # ------------------------------------------------------------------------------------- WF22
 
 SENTENCES = (

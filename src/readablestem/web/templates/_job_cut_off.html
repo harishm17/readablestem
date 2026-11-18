@@ -1,0 +1,21 @@
+{# Audiences: owner #}
+{# A PDF that looks cut off (`file_cut_off`, pipeline/source_facts.py): its last pages are empty.
+   Until the owner answers, the document is not "Ready to share" (web/states.py). Two ways on:
+   a fresh copy of the file, or "continue" (POST /jobs/{id}/cut-off), which keeps the notice and
+   the statement that those pages are not in the file. #}
+{% if job.is_owner and pg.cut_off_open %}
+<section aria-labelledby="cut-off-heading" id="cut-off">
+  <h2 id="cut-off-heading">The file looks cut off</h2>
+  <p>{{ checked_words.cut_off_owner_pages(pg.cut_off_open) }}</p>
+  <ul class="actions">
+    <li><a class="button" href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a fresh copy</a></li>
+    <li>
+      <form method="post" action="/jobs/{{ job.id }}/cut-off" class="inline-form">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button type="submit" class="button-secondary">Continue with {{ "page 1" if pg.cut_off_open[0] == 2 else "pages 1 to " ~ (pg.cut_off_open[0] - 1) }}</button>
+      </form>
+    </li>
+  </ul>
+  <p class="hint">Students are told that the later pages are not in the file, whichever you choose.</p>
+</section>
+{% endif %}

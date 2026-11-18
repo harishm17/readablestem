@@ -38,7 +38,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from readablestem.core.types import DocumentResult
+from readablestem.core.types import DocumentResult, Notice
 from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
@@ -113,6 +113,9 @@ TABLE: dict[str, Row] = {
     # changes it first, with the control on the job page. Said to the owner only; a document
     # already shared stays shared.
     "confirm_language": Row("Converted: confirm the language", GAPS, True),
+    # Finished with no decision open, but the PDF looks cut off (`file_cut_off`): the owner
+    # uploads a fresh copy or continues with the pages before the empty ones first.
+    "file_cut_off": Row("Converted: the file looks cut off", GAPS, True),
     # Finished with no decision open, but a part is a picture, a page is left out or a
     # structure check failed (or none is stored): "Ready" and what remains (SW7).
     "ready_remains": Row("Ready", GAPS, True),
@@ -121,7 +124,14 @@ TABLE: dict[str, Row] = {
 }
 # The states that have something to keep, so "Keep for 7 days" is offered (F-316).
 KEEPS = frozenset(
-    {"needs_decisions", "partly_converted", "ready", "ready_remains", "confirm_language"}
+    {
+        "needs_decisions",
+        "partly_converted",
+        "ready",
+        "ready_remains",
+        "confirm_language",
+        "file_cut_off",
+    }
 )
 # The finished states with no decision open and no gap note: their message is the
 # summary's (`pipeline.checked`), never a template's.
@@ -698,6 +708,16 @@ def _language_check(result: Mapping[str, Any] | None) -> str:
     return next((text for code, text in _LANGUAGE_CHECKS.items() if code in codes), "")
 
 
+def _cut_off_check(result: Mapping[str, Any] | None) -> str:
+    """The question of a PDF that looks cut off while its owner has not answered it ("" when
+    there is none, or it is answered: the pages stay missing, which the summary says)."""
+    notices = [
+        Notice.model_validate(n) for n in (result or {}).get("notices") or [] if isinstance(n, dict)
+    ]
+    pages = notice_rules.cut_off_pages(notices, open_only=True)
+    return checked_words.cut_off_question(tuple(p + 1 for p in pages)) if pages else ""
+
+
 def _held_by_notice(result: Mapping[str, Any] | None) -> str:
     """The sentence of a stored result's notice that holds it back (`_HOLDS`), "" when none.
     A text notice whose element has the decision (`pipeline.notices.text_decisions`) does not:
@@ -763,6 +783,7 @@ def finished_facts(result: object) -> dict[str, Any] | None:
         "language": bool(_language_check(result)),
         "plain": not (
             _language_check(result)
+            or _cut_off_check(result)
             or words.outage_message(result)
             or words.unread_message(result)
             or _unanalysed_pages(result)
@@ -787,6 +808,9 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | Non
         steps = (*actions, download) if actions else (download,)
         return _make("partly_converted", " ".join(g.text for g in gaps), steps, gaps)
     steps = (download, share) if viewer == "owner" else (download,)
+    if viewer == "owner" and (cut := _cut_off_check(job.result_json)):
+        see = Step("cut_off", "See the empty pages", f"/jobs/{job.id}#cut-off-heading")
+        return _make("file_cut_off", cut, (see, *steps))
     if viewer == "owner" and (check := _language_check(job.result_json)):
         confirm = Step("language", "Confirm the language", f"/jobs/{job.id}#language-heading")
         return _make(

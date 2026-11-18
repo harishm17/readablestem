@@ -12,6 +12,20 @@
   guessed links by number fell from 18 to 5, no document changed apart from links, and none
   pointed at a missing element. One
   PIPELINE_VERSION bump is owed at the next PR.
+## Unreleased: a PDF cut off in the middle is no longer called whole (branch fix/cut-off-file)
+
+- WS14.5, F-505, as far as its triage line. A six-page PDF cut at half its bytes opens only after
+  MuPDF repairs it, with pages 4 to 6 empty; the page said "Ready to share. Every part the tool
+  found was converted." and the student file stopped at "Page 3". A repaired file whose last
+  pages are empty now gets a required notice, `file_cut_off`: the state is "Converted: the file
+  looks cut off" with "Upload a fresh copy, or continue with pages 1 to 3", and after "Continue"
+  (`POST /jobs/{id}/cut-off`) the state is "Ready" with the pages named. The notice stays, and the
+  one summary of what was checked (`CheckedSummary.cut_off`) tells the student file, the EPUB and
+  Word files, the Canvas README, the record and Listen that those pages are not in the file. A
+  repaired file with content on every page gets an optional line (`file_repaired`); a file MuPDF
+  did not repair is never touched. The probe at the upload door is unchanged. No migration; no
+  model request changed; `PIPELINE_VERSION` and `RENDER_VERSION` not bumped (the next bump covers
+  it).
 
 ## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
 

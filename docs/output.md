@@ -1022,6 +1022,13 @@ A passage is found the same way, block by block. When no language holds 60 % of 
 letters the document is mixed: its language is the largest one, and the notice
 `lang_mixed` says so.
 
+A PDF that looks cut off (repaired when opened, its last pages empty) is a required check of
+the same kind, `file_cut_off`, with one difference: the owner's answer ("continue with the
+pages before the empty ones") keeps the notice, so `CheckedSummary.converted.cut_off_pages`
+still names the pages and every statement of what was converted (the student note, the EPUB
+accessibility summary, the Canvas README, the record) says they are not in the file.
+`file_repaired` (optional) is the line for a repaired file with content on every page.
+
 `lang_assumed` and `lang_mixed` are required checks: until the owner confirms the language
 or changes it, the job is not "Ready to share" (the state "Converted: confirm the
 language", `web.states`) and the open item is counted. Where the document language

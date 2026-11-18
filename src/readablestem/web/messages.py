@@ -501,6 +501,11 @@ NOTICE_MESSAGES: dict[str, str] = {
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",
+    "file_cut_off": "This file looks cut off: its last pages are empty, so the rest is not in "
+    "the converted file. Upload a fresh copy, or continue with the pages before them.",
+    "file_repaired": "This PDF was damaged, and the tool had to repair it to open it. Check "
+    "the converted file against the original: a page that is empty in the PDF may have "
+    "lost its content.",
     "code_block": "Program code is kept as a code block with its line breaks and "
     "indentation, without highlighting.",
     "footnote": "A footnote is kept where it falls in the text; its mark in the text links "

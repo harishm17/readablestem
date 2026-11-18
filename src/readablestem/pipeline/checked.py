@@ -68,7 +68,7 @@ from readablestem.core.types import (
     Kind,
 )
 from readablestem.pipeline import assemble_tables, decoration
-from readablestem.pipeline.notices import KEPT_IMAGE_CODES
+from readablestem.pipeline.notices import KEPT_IMAGE_CODES, cut_off_pages
 
 # Kinds of a part shown as a picture, as `checked_words.KIND_WORDS` names them: a page (or
 # handwriting) kept as an image is a figure in the data model but not in words.
@@ -109,6 +109,9 @@ class Converted:
     text_blocks: int = 0
     pictures: tuple[Picture, ...] = ()
     left_out_pages: tuple[int, ...] = ()  # 1-based
+    # The empty pages at the end of a PDF that was repaired when it was opened: it looks cut
+    # off (`source_facts.repair_notices`). Not in the file, whatever the owner decided.
+    cut_off_pages: tuple[int, ...] = ()  # 1-based
     pages: int | None = None  # pages in the document, when known
     # What a LaTeX source's reader did not read (`SourceReport.unread_words`,
     # `unread_pictures`): not in the file, so not everything found was converted.
@@ -175,8 +178,12 @@ class CheckedSummary:
         return self.converted.unread_words + self.converted.unread_pictures
 
     @property
+    def cut_off(self) -> int:
+        return len(self.converted.cut_off_pages)
+
+    @property
     def all_found_converted(self) -> bool:
-        return not self.pictures and not self.left_out and not self.unread
+        return not self.pictures and not self.left_out and not self.unread and not self.cut_off
 
     # ----- the rules
 
@@ -192,7 +199,13 @@ class CheckedSummary:
     def needs_notice(self) -> bool:
         """The student page opens with the statement: nobody reviewed it, or a part is a
         picture, left out or not read."""
-        return not self.reviewed or bool(self.pictures) or bool(self.left_out) or bool(self.unread)
+        return (
+            not self.reviewed
+            or bool(self.pictures)
+            or bool(self.left_out)
+            or bool(self.unread)
+            or bool(self.cut_off)
+        )
 
 
 def _first_fixes(fixes: Iterable[Fix]) -> dict[str, Fix]:
@@ -211,6 +224,7 @@ def converted(
     fixes: Iterable[Fix],
     left_out_pages: Iterable[int] = (),
     pages: int | None = None,
+    cut_off_pages: Iterable[int] = (),
 ) -> Converted:
     """What was converted, part by part, as the renderer writes it (`assemble._Renderer`):
     an equation without MathML, a figure without a description or a table not rebuilt is
@@ -271,6 +285,7 @@ def converted(
         **counts,
         pictures=tuple(pictures),
         left_out_pages=tuple(sorted({p + 1 for p in left_out_pages})),
+        cut_off_pages=tuple(sorted({p + 1 for p in cut_off_pages})),
         pages=pages,
     )
 
@@ -286,18 +301,20 @@ def summarize(
     version: str = "",
     origin: str = "pdf",
     unread: tuple[int, int] = (0, 0),
+    cut_off_pages: Iterable[int] = (),
 ) -> CheckedSummary:
     """The summary from the parts of a result. `html_checks` None: the page has not been
     checked yet (the renderer, before the checks run), which is not the same as none run.
     `reviewed_on` is the day of the last review decision, said only once a person made one.
-    `unread`: the words and pictures a LaTeX source's reader did not read (`unread_of`)."""
+    `unread`: the words and pictures a LaTeX source's reader did not read (`unread_of`).
+    `cut_off_pages`: 0-based, the empty last pages of a repaired PDF (`cut_off_of`)."""
     from readablestem.pipeline.checked_words import NEVER_CHECKED
 
     load = triage.review_load(fixes)
     checks = list(html_checks) if html_checks is not None else None
     return CheckedSummary(
         converted=replace(
-            converted(elements, fixes, left_out_pages, pages),
+            converted(elements, fixes, left_out_pages, pages, cut_off_pages),
             unread_words=unread[0],
             unread_pictures=unread[1],
         ),
@@ -330,7 +347,14 @@ def of_result(
         version=version or result.pipeline_version,
         origin=result.origin,
         unread=unread_of(result),
+        cut_off_pages=cut_off_of(result),
     )
+
+
+def cut_off_of(result: DocumentResult) -> list[int]:
+    """The 0-based pages a PDF that looks cut off has empty at its end (`file_cut_off`, which
+    stays on the result after the owner continues: only its `review` changes)."""
+    return cut_off_pages(result.notices)
 
 
 def unread_of(result: DocumentResult) -> tuple[int, int]:

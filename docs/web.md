@@ -2514,6 +2514,22 @@ From top to bottom:
    passage languages worked out again against the new language. Then it makes the HTML
    again (`review.rerender_html`, with the day of the last decision for the student
    note) and bumps `jobs.result_version`. The language tag is not logged.
+   **A file that looks cut off** (F-505, `source_facts.repair_notices`): a PDF that MuPDF had to
+   repair when it opened it (a download that did not finish) and whose last pages are empty
+   (page type "blank": no text, picture or drawing) gets one required notice, `file_cut_off`
+   (`page` the first empty page, `count` how many, to the end of the file). The job's state is
+   "Converted: the file looks cut off" and says "This file looks cut off: pages 4 to 6 are empty.
+   Upload a fresh copy, or continue with pages 1 to 3." The owner has two ways on, in the section
+   "The file looks cut off" (`_job_cut_off.html`): "Upload a fresh copy" (the revise path) and
+   "Continue with pages 1 to 3" (`POST /jobs/{id}/cut-off`, CSRF-checked, owner only, finished jobs
+   only: `notices.continue_cut_off` sets the notice's review to "none"; the student file is not
+   made again). The notice is kept after the answer: `checked.cut_off_of` reads the pages from
+   it, so the summary never says "Every part the tool found was converted" (state "Ready", with
+   "Pages 4 to 6 of the PDF are empty ... so the rest is not in this file"), the student note
+   says the pages are not in the file, and the EPUB, Word file, Canvas README, the record and
+   Listen say it from the same summary. A repaired file with content on every page, or with
+   empty pages only in the middle, gets the optional line `file_repaired` ("Worth checking");
+   a file MuPDF did not repair raises nothing, whatever blank pages it has.
 8. **For students** (`web/routes/job_settings.py`, `web/titles.py`): the title students
    hear (T1-7) and a contact line (T1-17). The title field starts with the stored
    `jobs.title_override`, else what the file's `<title>` already is

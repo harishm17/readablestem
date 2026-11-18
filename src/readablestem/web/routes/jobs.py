@@ -2030,6 +2030,36 @@ def set_language(
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
+@router.post("/jobs/{job_id}/cut-off", dependencies=[Depends(require_csrf)])
+def continue_cut_off(request: Request, job_id: str, user: UserDep) -> Response:
+    """The owner of a PDF that looks cut off (`file_cut_off`) continues with the pages before the
+    empty ones: the notice stops holding the document back and stays, so the job page and the
+    student file still say those pages are not in the file. The student file does not change."""
+    from readablestem.pipeline import notices as notice_rules
+
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        owned_id = job.id
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        if not notice_rules.cut_off_pages(result.notices, open_only=True):
+            raise PageError(
+                409,
+                "Nothing to continue",
+                "This document is not waiting for an answer about empty pages.",
+                context={"job_id": job_id},
+            )
+        result = notice_rules.continue_cut_off(result)
+        job.result_json = result.model_dump(mode="json", exclude={"html"})
+        from readablestem.web.review import bump_result_version
+
+        bump_result_version(job)  # review forms open in other tabs are now stale
+        say_new_time(request, retention.restart_clock_and_say(job, get_ctx(request).settings))
+    log_event(logger, "cut_off_continued", job_id=job_id)
+    flash(request, "You chose to continue with the pages before the empty ones.")
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
+
+
 # --------------------------------------------------------------------------- try again
 
 RETRY_ALREADY = "This document is already waiting or being converted. Nothing was changed."
