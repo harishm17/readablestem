@@ -136,6 +136,8 @@ def _converted(folder: Path, monkeypatch: pytest.MonkeyPatch, clock_s: float) ->
     return Converted(ENTRY, facts=output.facts, parts=measure.parts(output.result))
 
 
+# A replay of a corpus file: the workflow job has the table model its answers were made with.
+@pytest.mark.workflow
 def test_a_page_a_slow_machine_leaves_out_is_named_unless_the_step_says_it_stopped(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

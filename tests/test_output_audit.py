@@ -166,11 +166,14 @@ def test_one_defect_of_each_kind_is_one_count_of_each(output, defects, kinds):
 
 def test_the_built_files_of_a_page_that_is_right_have_no_count():
     # Without its note: a note's mark is an empty footnote in the Word file today (F-566),
-    # and the audit counts that.
+    # and the audit counts that. Without its link to the figure: pandoc before 3.2 (the
+    # version the image pins, and CI's) writes no bookmark for a figure, so the link leads
+    # nowhere in the Word file today (F-581), and the audit counts that too.
     page = _changed(
         PAGE,
         ('<a id="noteref-p2-e5" role="doc-noteref" href="#p2-e5">1</a>', ""),
         ('<div role="doc-footnote" id="p2-e5"><p>The slope is three metres long.</p></div>\n', ""),
+        ('<a href="#p1-e6">Figure 1</a>', "Figure 1"),
     )
     facts = replace(FACTS, order=FACTS.order[:-1])
 

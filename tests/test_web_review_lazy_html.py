@@ -134,3 +134,31 @@ def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
         assert job is not None
         job.html = (stored.html or "").replace("</main>", "<p>Stored as it was.</p></main>")
     assert "Stored as it was." in site.browser.get(f"/jobs/{site.job_id}/view").text
+
+
+def test_an_older_page_that_cannot_be_made_again_is_served_as_it_is_stored(site, monkeypatch):
+    """A release must not turn a document that could be opened into an error: when the new
+    renderer fails on a stored result, the page the older renderer made is still served."""
+    import re
+
+    from readablestem.web import review
+
+    def fails(*args, **kwargs):
+        raise ValueError("the new renderer cannot read this stored result")
+
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None and not job.html_stale
+        job.html = re.sub(r'<meta name="readablestem-render"[^>]*>\n', "", job.html or "")
+        job.html = job.html.replace("</main>", "<p>Stored as it was.</p></main>")
+    monkeypatch.setattr(review, "rerender_job_html", fails)
+
+    answer = site.browser.get(f"/jobs/{site.job_id}/view")
+
+    assert answer.status_code == 200 and "Stored as it was." in answer.text
+    # A page a review write made out of date has no stored page to fall back to: it fails.
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None
+        job.html_stale = True
+    assert site.browser.get(f"/jobs/{site.job_id}/view").status_code == 500

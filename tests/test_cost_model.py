@@ -18,6 +18,8 @@ from readablestem.eval.measure import Converted
 ENTRY = "s15_charts_figures"
 
 
+# A replay of a corpus file: the workflow job has the table model its answers were made with.
+@pytest.mark.workflow
 def test_the_kinds_add_up_to_what_the_replayed_file_cost(tmp_path, capsys):
     if reason := measure.cannot_replay(ENTRY):
         if os.environ.get("CI"):

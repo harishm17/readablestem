@@ -299,8 +299,16 @@ jobs:
         with:
           path: .cache/corpus
           key: corpus-${{ hashFiles('tests/workflows/corpus/corpus.json') }}
+      # A site may answer "too many requests" to a runner's address for longer than one
+      # fetch waits. A file already fetched stays in the folder, so each further attempt asks
+      # only for what is missing.
       - name: Fetch the corpus's public files (each checked against its hash)
-        run: uv run python -m readablestem.eval.corpus check --fetch
+        run: |
+          for attempt in 1 2 3 4; do
+            uv run python -m readablestem.eval.corpus check --fetch && exit 0
+            echo "fetch attempt $attempt left files missing; retrying"; sleep $((attempt * 90))
+          done
+          exit 1
       # The hostile-input workflow runs LaTeX sources in the real sandbox (as the `latex
       # source` job does): with the variable below a missing LaTeXML or bubblewrap fails it.
       - name: Install LaTeXML and bubblewrap, allow user namespaces

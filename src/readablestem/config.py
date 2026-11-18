@@ -135,8 +135,8 @@ class Settings(BaseSettings):
     # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
     # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to
     # before. Production's value is in the profile. Turning it on changes equation crops and
-    # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped (0.5.10 or
-    # later) in the change that enables it.
+    # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped in the
+    # change that enables it.
     layout_display_grouping: bool = False
     # A calibrated rule on top of the checks (`pipeline/flag_policy.py`): an accepted equation
     # that looks like the readings that turned out wrong (a small logistic model over content-free

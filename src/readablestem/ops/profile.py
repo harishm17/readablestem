@@ -15,8 +15,8 @@ Who reads it:
   values were taken from the repository's own prose, not read from the dashboard) a difference
   is a warning and the service starts: a wrong guess here must not take production down on the
   next deploy. Once confirmed, a difference refuses the start;
-- `/healthz/ops` returns the profile's hash beside the status word, and /admin its name, hash and
-  the names of the settings that differ;
+- `/admin/health` returns the profile's hash in its report, and /admin its name, hash and the
+  names of the settings that differ (the public `/healthz/ops` says the status word only);
 - `readablestem ops profile-check` prints the same comparison;
 - the eval reports stamp it (`stamp`): a run whose settings are not the profile's says
   "development settings" (`readablestem eval ... --profile production` runs under it).

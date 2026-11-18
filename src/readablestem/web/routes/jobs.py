@@ -91,7 +91,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     live_job_count,
     store_job,
 )
-from readablestem.web.logsafe import log_event
+from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.outcome import JobOutcome, job_outcome
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left
@@ -522,22 +522,32 @@ def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
     in the page's head): it is made again once from the stored result, so a fix to the
     sheet, the markup or the student words reaches documents converted before it. The
     stored elements and decisions are not touched; the stored checks become those of the
-    new page."""
+    new page. If that fails, the stored page is served as it is and the failure is logged
+    (`older_page_not_remade`): a release must not turn a document that opened into an error."""
     if job.status != JobStatus.DONE or not _out_of_date(job):
         return job
     from readablestem.web.review import rerender_job_html
 
     session.refresh(job, with_for_update=True)
     if _out_of_date(job):
-        result = DocumentResult.model_validate(job.result_json or {})
-        with notation.in_force(ctx.factory, ctx.settings, job.id):
-            job.html = rerender_job_html(
-                job,
-                result,
-                _crops(session, job.id),
-                checked_on=last_decision(session, job),
-                math_alttext=ctx.settings.mathml_alttext,
-            )
+        try:
+            result = DocumentResult.model_validate(job.result_json or {})
+            with notation.in_force(ctx.factory, ctx.settings, job.id):
+                html = rerender_job_html(
+                    job,
+                    result,
+                    _crops(session, job.id),
+                    checked_on=last_decision(session, job),
+                    math_alttext=ctx.settings.mathml_alttext,
+                )
+        except Exception as exc:
+            if job.html_stale or job.html is None:
+                raise  # a review write changed the result: no stored page says what it says
+            # Only the renderer is newer. The stored page is still this result's page, so it
+            # is served as it was before pages were made again; the failure is ours to read.
+            log_exception(logger, "older_page_not_remade", exc, job_id=job.id)
+            return job
+        job.html = html
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = False
     return job
@@ -1596,7 +1606,8 @@ def confirm_draft(
             if not output.may_take_draft(role_of(session, job, user)):
                 raise PageError(403, *output.DRAFT_NOT_FOR_VIEWERS, context={"job_id": job_id})
             token = output.mint_token(request, job)
-    target = output.download_url(job_id, file_type, token, course=number)
+        owned_id = job.id  # the redirect is built from the owned row, not the request
+    target = output.download_url(owned_id, file_type, token, course=number)
     return RedirectResponse(target, status_code=303)
 
 
