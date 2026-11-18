@@ -459,3 +459,12 @@ def test_the_word_gate_runs_in_a_child_and_names_what_it_refuses_that_the_prefli
     with pytest.raises(UploadRejected) as raised:
         check_word_isolated(office.pptx())  # not a Word file: the PDF route's to take
     assert raised.value.code == "office_unsupported"
+    strict = str(office.docx_parts()["word/document.xml"]).replace(
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    )
+    with pytest.raises(UploadRejected) as raised:  # pandoc cannot read Strict Open XML
+        check_word_isolated(
+            office.rebuild(office.docx_parts(), replace={"word/document.xml": strict})
+        )
+    assert raised.value.code == "office_unsupported"

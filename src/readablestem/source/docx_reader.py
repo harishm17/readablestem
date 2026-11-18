@@ -214,19 +214,35 @@ class _Reader:
         if _TOC.match(name):
             self.report.toc_paragraphs += 1
             return
-        if name == "title" and not self.title_set:
-            text = _plain(_first_inlines(blocks))
-            if text:
-                element = self._new(Kind.HEADING, text=text, bold=True)
-                self._heading_fix(element, 1, text)
-                self.chars += len(text)
-                self.out.title = text
-                self.title_set = True
-                return
+        if name == "title" and self._title(_plain(_first_inlines(blocks))):
+            return
         if name == _CAPTION:
             self._caption(blocks)
             return
         self.blocks(blocks, depth + 1)
+
+    def _title(self, text: str) -> bool:
+        """The document's title: a level 1 heading, once. False when there is none to make."""
+        if not text or self.title_set:
+            return False
+        element = self._new(Kind.HEADING, text=text, bold=True)
+        self._heading_fix(element, 1, text)
+        self.chars += len(text)
+        self.out.title = text
+        self.title_set = True
+        return True
+
+    def meta(self, meta: dict[str, Any]) -> None:
+        """What pandoc moves out of the body into its metadata: the Title, Subtitle, Author, Date
+        and Abstract paragraphs. The title is the title, the rest are paragraphs before the
+        body, in the file's own order of those five."""
+        for key in META_KEYS:
+            value = meta.get(key)
+            if value is None:
+                continue
+            if key == "title" and self._title(_plain(_meta_inlines(value))):
+                continue
+            self.blocks(_meta_blocks(value), 1)
 
     def _heading_fix(self, element: Element, level: int, text: str) -> None:
         self.out.fixes[element.id] = Fix(
@@ -729,6 +745,27 @@ class _Reader:
 # ---------------------------------------------------------------------------- helpers
 
 
+META_KEYS = ("title", "subtitle", "author", "date", "abstract")
+
+
+def _meta_blocks(value: dict[str, Any]) -> list[Any]:
+    kind, content = value.get("t"), value.get("c")
+    if kind == "MetaInlines":
+        return [{"t": "Para", "c": content}]
+    if kind == "MetaString":
+        return [{"t": "Para", "c": [{"t": "Str", "c": str(content)}]}]
+    if kind == "MetaBlocks":
+        return list(content)
+    if kind == "MetaList":
+        return [block for item in content for block in _meta_blocks(item)]
+    return []
+
+
+def _meta_inlines(value: dict[str, Any]) -> list[Any]:
+    blocks = _meta_blocks(value)
+    return _first_inlines(blocks) if blocks else []
+
+
 def _is_display(item: dict[str, Any]) -> bool:
     return item.get("t") == "Math" and item["c"][0].get("t") == "DisplayMath"
 
@@ -892,18 +929,24 @@ def _tree_words(tree: dict[str, Any]) -> Counter[str]:
     text and breaks, no formulas, no alt text; a block's end is a space."""
     out: list[str] = []
     stack: list[Any] = [tree.get("blocks", [])]
+    meta = tree.get("meta", {})
+    for key in reversed(META_KEYS):
+        if key in meta:
+            stack.extend([" ", meta[key]])
     while stack:
         node = stack.pop()
         if isinstance(node, list):
             stack.extend(reversed(node))
         elif isinstance(node, dict):
             kind = node.get("t")
-            if kind == "Str":
-                out.append(node["c"])
+            if kind in ("Str", "MetaString"):
+                out.append(str(node["c"]))
             elif kind in ("Space", "SoftBreak", "LineBreak"):
                 out.append(" ")
             elif kind == "Code":
                 out.append(node["c"][1])
+            elif kind == "CodeBlock":
+                out.extend((node["c"][1], " "))
             elif kind in ("Math", "Image", "RawInline", "RawBlock"):
                 continue
             else:
@@ -933,6 +976,7 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
     file. `ReadError` for a tree that is too large or too deep."""
     reader = _Reader(prepared)
     facts = prepared.facts
+    reader.meta(tree.get("meta", {}))
     reader.blocks(tree.get("blocks", []))
     reader.attach_captions()
     out, report = reader.out, reader.report

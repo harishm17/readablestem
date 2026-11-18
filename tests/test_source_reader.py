@@ -392,7 +392,9 @@ def word(body: str) -> bytes:
         .split("<w:body>")[0]
         + f"<w:body>{body}</w:body></w:document>"
     )
-    return office.rebuild(parts, replace={"word/document.xml": document})
+    title = '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/></w:style>'
+    styles = str(parts["word/styles.xml"]).replace("</w:styles>", title + "</w:styles>")
+    return office.rebuild(parts, replace={"word/document.xml": document, "word/styles.xml": styles})
 
 
 def read_word(data: bytes):
@@ -405,8 +407,10 @@ def read_word(data: bytes):
 @needs_pandoc
 def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_out():
     body = (
+        '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Kinematics notes</w:t></w:r></w:p>'
         '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Motion</w:t></w:r></w:p>'
-        "<w:p><w:r><w:t>Speed is distance over time.</w:t></w:r>"
+        "<w:p><w:r><w:t>Speed is distance over time, page </w:t></w:r>"
+        '<w:fldSimple w:instr=" PAGE "><w:r><w:t>7</w:t></w:r></w:fldSimple>'
         "<w:r><w:rPr><w:vanish/></w:rPr><w:t>SECRET-HIDDEN-WORDS</w:t></w:r></w:p>"
         "<w:p><m:oMathPara><m:oMath><m:r><m:t>v=</m:t></m:r><m:f><m:num><m:r><m:t>d</m:t></m:r>"
         "</m:num><m:den><m:r><m:t>t</m:t></m:r></m:den></m:f></m:oMath></m:oMathPara></w:p>"
@@ -414,13 +418,15 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
         + _cells("Name|Value", "c|3.0", marked=False)
     )
     reading = read_word(word(body))
-    assert kinds(reading) == ["heading", "paragraph", "equation", "table", "table"]
-    assert "SECRET-HIDDEN-WORDS" not in " ".join(e.text or "" for e in reading.elements)
-    equation = reading.elements[2]
+    assert kinds(reading) == ["heading", "heading", "paragraph", "equation", "table", "table"]
+    assert reading.title == "Kinematics notes" and reading.unread_words == 0
+    text = " ".join(e.text or "" for e in reading.elements)
+    assert "SECRET-HIDDEN-WORDS" not in text and "page 7" in text
+    equation = reading.elements[3]
     fix = reading.fixes[equation.id]
     assert fix.status is Status.ACCEPTED and fix.equation is not None
     assert "frac" in fix.equation.latex and "<mfrac" in (fix.equation.mathml or "")
-    first, second = reading.elements[3:]
+    first, second = reading.elements[4:]
     # the author's header row is exact; the first-row look pandoc reads as a header is only a
     # proposal, and says so in a check
     assert first.table is not None and first.table.header_rows == 1

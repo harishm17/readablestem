@@ -62,6 +62,7 @@ HEADER_STYLE = "rs-header-"  # + the number of leading rows marked as header row
 _DRIVE = re.compile(r"^[A-Za-z]:")
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_STRICT_NS = "http://purl.oclc.org/ooxml/wordprocessingml"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -109,7 +110,10 @@ _FALLBACK = f"{{{MC}}}Fallback"
 _FLDSIMPLE, _INSTR = f"{{{W}}}fldSimple", f"{{{W}}}instr"
 _OMATH = f"{{{M}}}oMath"
 _DELETED = (f"{{{W}}}del", f"{{{W}}}moveFrom")
-_BREAKS = (f"{{{W}}}tab", f"{{{W}}}br", f"{{{W}}}cr")
+_NOBREAK_HYPHEN = f"{{{W}}}noBreakHyphen"
+_BR, _CR = f"{{{W}}}br", f"{{{W}}}cr"
+# a tab, a break and the mark of a note each stand between two words in the reading
+_BREAKS = (f"{{{W}}}tab", _BR, _CR, f"{{{W}}}footnoteReference", f"{{{W}}}endnoteReference")
 _FALSE = {"0", "false", "off"}
 
 
@@ -162,9 +166,11 @@ def _check_depth(archive: zipfile.ZipFile, name: str) -> None:
     """Refuse a part nested deeper than `MAX_DEPTH`, counted by a parser that builds nothing."""
     depth = 0
 
-    def start(_tag: str, _attrs: object) -> None:
+    def start(_tag: str, attrs: dict[str, str]) -> None:
         nonlocal depth
         depth += 1
+        if depth == 1 and any(v.startswith(_STRICT_NS) for v in attrs.values()):
+            raise OfficeRejected("office_unsupported")  # pandoc cannot read Strict Open XML
         if depth > MAX_DEPTH:
             raise OfficeRejected("office_unsafe")
 
@@ -287,7 +293,12 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
         for name in ("word/styles.xml", "word/numbering.xml"):
             if name in names:
                 out[name] = _read_bytes(archive, name, MAX_SMALL_PART_BYTES)
-        rels = _read_bytes(archive, "word/_rels/document.xml.rels", office.MAX_RELS_BYTES)
+        rels_name = "word/_rels/document.xml.rels"  # a file made by a chat export has none
+        rels = (
+            _read_bytes(archive, rels_name, office.MAX_RELS_BYTES)
+            if rels_name in names
+            else b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+        )
         for target in _image_targets(rels, names):
             out[target] = PLACEHOLDER
         out["word/_rels/document.xml.rels"] = _filter_rels(
@@ -420,6 +431,8 @@ def _hide(root: ET.Element, hidden_styles: set[str], facts: Facts) -> None:
                     parent.insert(at + offset, inner)
                     stack.append(inner)
             else:
+                if child.tag == _CR:  # pandoc reads a carriage return as nothing; a break is read
+                    child.tag = _BR
                 stack.append(child)
 
 
@@ -489,6 +502,8 @@ def _paragraph(paragraph: ET.Element, facts: Facts) -> None:
             parts.append(node.text or "")
         elif node.tag in _BREAKS:
             parts.append(" ")
+        elif node.tag == _NOBREAK_HYPHEN:
+            parts.append("\u2011")  # pandoc writes it as the non-breaking hyphen sign
         elif node.tag == _R:
             props = node.find(_RPR)
             lang = props.find(_LANG) if props is not None else None
