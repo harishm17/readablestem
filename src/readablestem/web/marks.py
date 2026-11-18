@@ -25,6 +25,12 @@ is a 44 px target, one between neighbours stays 24 px with space around it, whic
 The layout covers every fix on the page, shown or not (accepted ones are only shown on
 request), so whatever subset a view shows, no two of its links overlap.
 
+Only links that can ever touch are compared. A link moves only along the axes where it still
+covers the middle of its element (`_slack`), so each has a region it never leaves (`_reach`);
+two marks whose regions are apart are never compared, and the rest are compared in the order
+all pairs would have been, so the result is the same as comparing every pair, at a cost that
+grows with the marks that are near each other, not with the square of all of them.
+
 A mark's number sits just left of its frame, except for an equation in a line of text,
 where it would cover the word before: its number goes in the page margin on the same
 line (`Mark.tag_x`), when the margin has room.
@@ -45,6 +51,12 @@ TARGET_MARGIN = 1.05  # a little over 24 px, so rounding never leaves 23.9
 GAP_PT = 0.4  # space left between two links pushed apart
 ROUNDS = 60
 PHASES = 4
+TRIES_PER_MARK = 150  # pairs tried for each mark before laying out gives up (`_separate_all`)
+# Bump when `place` or the rules made from its marks (`routes.split._box_rules`) change what
+# they write for the same boxes: the stylesheet's `ETag` carries it, so a browser holding
+# the old stylesheet asks again.
+PLACEMENT_VERSION = 1
+NEAR_PT = 1e-6  # two boxes this close count as touching (rounding never hides a neighbour)
 MARGIN_TAG_PT = 28.0  # room a number needs in the page margin
 
 
@@ -111,8 +123,13 @@ def _shift(mark: Mark, axis: int, by: float) -> None:
 def _separate(a: Mark, b: Mark, side: float, *, other_axis: bool = False) -> bool:
     """Push two overlapping links apart, along the axis where they overlap less (or the
     other one, `other_axis`), else along the other; True if either moved."""
-    ox, oy = _overlap(a.link, b.link)
-    if ox <= 0 or oy <= 0:
+    # `_overlap`, written out: this runs for every pair near each other, most of them apart.
+    al, bl = a.link, b.link
+    ox = min(al[2], bl[2]) - max(al[0], bl[0])
+    if ox <= 0:
+        return False
+    oy = min(al[3], bl[3]) - max(al[1], bl[1])
+    if oy <= 0:
         return False
     axes = (0, 1) if (ox <= oy) != other_axis else (1, 0)
     for axis in axes:
@@ -172,23 +189,74 @@ def place(
         link = _centred(element, frame, side, page_size)
         tag_x = _margin_x(element, page_size[0], text) if element_id in inline else None
         marks.append(Mark(element_id, element, frame, link, tag_x))
-    for attempt in range(PHASES):
-        # Each pair along its cheaper axis until nothing moves; then the pairs still
-        # overlapping (one squeezed between two others along that axis) along the other.
-        for _ in range(ROUNDS):
-            moved = False
-            for i, a in enumerate(marks):
-                for b in marks[i + 1 :]:
-                    moved = _separate(a, b, side) or moved
-            if not moved:
-                break
-        stuck = [(a, b) for i, a in enumerate(marks) for b in marks[i + 1 :] if _overlaps(a, b)]
-        if not stuck or attempt == PHASES - 1:
-            break
-        for a, b in stuck:
-            _separate(a, b, side, other_axis=True)
+    _separate_all(marks, side)
     _grow(marks, page_size, comfortable_pt(page_size[0]))
     return {m.element_id: m for m in marks}
+
+
+def _separate_all(marks: list[Mark], side: float) -> None:
+    """Push the overlapping links apart. Each pair along its cheaper axis until nothing
+    moves; then the pairs still overlapping (one squeezed between two others along that
+    axis) along the other. Where marks cannot all be separated (elements that overlap each
+    other) the pushing can go round for a long time, so the work is bounded: `TRIES_PER_MARK`
+    pairs tried for each mark, and the loop ends there with the links as they are."""
+    pairs = _near_pairs([_reach(m, side) for m in marks])
+    # What a pair does depends only on where its two links are: a pair that did nothing is
+    # not tried again until one of its links has moved (`moves` counts each link's moves).
+    moves = [0] * len(marks)
+    idle: dict[tuple[int, int], tuple[int, int]] = {}
+    tries = TRIES_PER_MARK * len(marks)
+    for attempt in range(PHASES):
+        for _ in range(ROUNDS):
+            moved = False
+            for pair in pairs:
+                i, j = pair
+                if idle.get(pair) == (moves[i], moves[j]):
+                    continue
+                if tries <= 0:
+                    return
+                tries -= 1
+                if _separate(marks[i], marks[j], side):
+                    moves[i] += 1
+                    moves[j] += 1
+                    moved = True
+                else:
+                    idle[pair] = (moves[i], moves[j])
+            if not moved:
+                break
+        stuck = [(i, j) for i, j in pairs if _overlaps(marks[i], marks[j])]
+        if not stuck or attempt == PHASES - 1:
+            return
+        for i, j in stuck:
+            if _separate(marks[i], marks[j], side, other_axis=True):
+                moves[i] += 1
+                moves[j] += 1
+
+
+def _reach(mark: Mark, side: float) -> BBox:
+    """Every place the link can be in while it is laid out: where it starts, and as far
+    either way along each axis as `_slack` lets it go (a link moves only inside that)."""
+    box = []
+    for axis in (0, 1):
+        back, ahead = _slack(mark, axis, side)
+        box.append((mark.link[axis] - max(back, 0.0), mark.link[axis + 2] + max(ahead, 0.0)))
+    return (box[0][0], box[1][0], box[0][1], box[1][1])
+
+
+def _near_pairs(boxes: list[BBox]) -> list[tuple[int, int]]:
+    """The index pairs (i < j, in order) of the boxes that touch or overlap: a sweep along x,
+    so each box is looked at against the few that start inside its width."""
+    order = sorted(range(len(boxes)), key=lambda i: boxes[i][0])
+    pairs = []
+    for at, i in enumerate(order):
+        _, y0, x1, y1 = boxes[i]
+        for j in order[at + 1 :]:
+            b = boxes[j]
+            if b[0] > x1 + NEAR_PT:
+                break
+            if b[1] <= y1 + NEAR_PT and b[3] >= y0 - NEAR_PT:
+                pairs.append((min(i, j), max(i, j)))
+    return sorted(pairs)
 
 
 def comfortable_pt(page_width: float) -> float:
@@ -202,12 +270,23 @@ def _grow(marks: list[Mark], page_size: tuple[float, float], goal: float) -> Non
     overlapping another link. The 24 px layout above is the floor: a link with no room keeps
     its size (so 2.5.8 holds everywhere), one with room becomes a 44 px target. Frames do
     not change. Earlier marks claim their room first."""
+    # The most a link can ever cover is its own grown box (it only gets bigger), so a link
+    # is compared only with the ones whose largest box touches its largest box.
+    largest = []
     for mark in marks:
+        x0, y0, x1, y1 = mark.link
+        gx, gy = max(0.0, goal - (x1 - x0)) / 2, max(0.0, goal - (y1 - y0)) / 2
+        largest.append(_clamp((x0 - gx, y0 - gy, x1 + gx, y1 + gy), page_size))
+    near: list[list[int]] = [[] for _ in marks]
+    for i, j in _near_pairs(largest):
+        near[i].append(j)
+        near[j].append(i)
+    for at, mark in enumerate(marks):
         x0, y0, x1, y1 = mark.link
         grow_x, grow_y = max(0.0, goal - (x1 - x0)) / 2, max(0.0, goal - (y1 - y0)) / 2
         if grow_x <= 0 and grow_y <= 0:
             continue
-        others = [o.link for o in marks if o is not mark]
+        others = [marks[j].link for j in near[at]]
 
         def grown(t: float, x0=x0, y0=y0, x1=x1, y1=y1, gx=grow_x, gy=grow_y) -> BBox:
             return _clamp((x0 - gx * t, y0 - gy * t, x1 + gx * t, y1 + gy * t), page_size)

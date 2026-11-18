@@ -58,7 +58,7 @@ def urls(env) -> list[str]:
         f"{base}/regions/p1-e2.png",
         f"{base}/regions/p1-e3.png",
         f"{base}/regions/p1-e6.png",
-        f"{base}/review/marks.css",
+        f"{base}/review/marks.css?page=1",
     ]
 
 
@@ -69,7 +69,9 @@ def test_page_and_region_images_are_rendered_for_the_owner_and_never_cached(web)
     for url in urls(web):
         response = web.browser.get(url)
         assert response.status_code == 200, url
-        assert response.headers["cache-control"] == "private, no-store", url
+        # The marks are asked again each time and answered 304 when nothing changed.
+        control = "private, no-cache" if "marks.css" in url else "private, no-store"
+        assert response.headers["cache-control"] == control, url
         if url.endswith(".png"):
             assert response.headers["content-type"] == "image/png"
     page = web.browser.get(f"/jobs/{web.job_id}/pages/1.png").content
@@ -84,8 +86,10 @@ def test_page_and_region_images_are_rendered_for_the_owner_and_never_cached(web)
 def test_nobody_else_gets_the_images(web):
     bob = web.client()
     login(bob, BOB)
+    tag = web.browser.get(urls(web)[-1]).headers["etag"]  # the owner's stylesheet tag
     for url in urls(web):
         assert bob.get(url).status_code == 404, url
+        assert bob.get(url, headers={"If-None-Match": tag}).status_code == 404, url
     assert bob.get(f"/jobs/{web.job_id}/review").status_code == 404
 
 
