@@ -189,6 +189,7 @@ def _parse(mathml: str) -> ET.Element:
             raise SpeechError("MathML nested too deeply")
         stack.extend((child, depth + 1) for child in elem)
     _restore_upright_symbols(root)
+    _retag_operator_glyphs(root)
     _join_italic_words(root)
     return normalize(root)
 
@@ -368,8 +369,16 @@ def _text_of(node: ET.Element) -> str:
     return "".join(node.itertext()).strip()
 
 
+_NAME_SYMBOLS = frozenset("∞∂∇∅ℏℓ")
+
+
 def _is_plain_token(node: ET.Element) -> bool:
-    return node.tag in {"mi", "mn", "mtext"} and _text_of(node) not in FUNCTIONS
+    r"""A letter, a number or a word. The converter leaves some relations and operators as `mi`
+    (`\geqslant`, `\pm`): a sign is not a token a short form can run into."""
+    text = _text_of(node)
+    if node.tag == "mi" and not (text[:1].isalnum() or text[:1] in _NAME_SYMBOLS):
+        return False
+    return node.tag in {"mi", "mn", "mtext"} and text not in FUNCTIONS
 
 
 def _starts_plain(node: ET.Element) -> bool:
@@ -419,7 +428,7 @@ def _mark_preceded(root: ET.Element) -> frozenset[int]:
     """The ids of the nodes a plain token directly precedes (a first node in a row follows
     what the row follows)."""
     found: set[int] = set()
-    stack = [(root, None)]
+    stack: list[tuple[ET.Element, ET.Element | None]] = [(root, None)]
     while stack:
         node, before = stack.pop()
         transparent = node.tag in {"math", "mrow"}
@@ -489,6 +498,8 @@ def _transposable(base: ET.Element) -> bool:
         text = _text_of(base)
         bold = base.get("mathvariant") in _BOLD_VARIANTS
         return len(text) == 1 and text.isascii() and text.isalpha() and (text.isupper() or bold)
+    if base.tag == "mrow" and len(base) > 1 and base[0].tag != "mo":
+        return _transposable(base[-1])  # `\\boldsymbol{BB}^T` is printed as `BB^T`
     if base.tag == "mrow" and len(base) > 2:
         bracketed = _mo_text(base[0]) in {"(", "["} and _mo_text(base[-1]) in {")", "]"}
         return bracketed and any(n.tag == "mtable" or _transposable(n) for n in base.iter())
@@ -586,20 +597,6 @@ def _pre_script(word: str, script: ET.Element) -> list[str]:
     return [word, *_speak(script), f"end {word}"]
 
 
-def _base_words(base: ET.Element) -> list[str]:
-    r"""A base of several tokens that is not bracketed ("{ab}_2") is said as a quantity, or it
-    would be said as `ab_2`, whose script belongs to the last token only."""
-    words = _speak(base)
-    first = base[0] if len(base) else None
-    if base.tag != "mrow" or first is None or len(base) < 2:
-        return words
-    if first.tag == "mo" and _text_of(first) in _OPENERS:
-        return words
-    if all(k.tag == "mi" and k.get("mathvariant") == "normal" for k in base):
-        return words  # upright letters are a unit or a word: \mathrm{km}^2
-    return ["the quantity", *words, "end quantity"]
-
-
 def _speak_msub(node: ET.Element) -> list[str]:
     if len(node) != 2:
         return _speak_children(node)
@@ -612,7 +609,7 @@ def _speak_msub(node: ET.Element) -> list[str]:
     limits = _with_limits(base, sub, None)
     if limits is not None:
         return limits
-    return [*_base_words(base), *_sub_words(sub, followed=id(node) in _FOLLOWED.get())]
+    return [*_speak(base), *_sub_words(sub, followed=id(node) in _FOLLOWED.get())]
 
 
 def _speak_msup(node: ET.Element) -> list[str]:
@@ -629,7 +626,7 @@ def _speak_msup(node: ET.Element) -> list[str]:
         return limits
     if _inverts(base, sup):
         return ["inverse", FUNCTIONS[_text_of(base)]]
-    return [*_base_words(base), *_power_words(sup, base, followed=id(node) in _FOLLOWED.get())]
+    return [*_speak(base), *_power_words(sup, base, followed=id(node) in _FOLLOWED.get())]
 
 
 def _speak_msubsup(node: ET.Element) -> list[str]:
@@ -645,7 +642,7 @@ def _speak_msubsup(node: ET.Element) -> list[str]:
     if limits is not None:
         return limits
     return [
-        *_base_words(base),
+        *_speak(base),
         *_sub_words(sub),
         *_power_words(sup, base, followed=id(node) in _FOLLOWED.get()),
     ]
@@ -1240,6 +1237,19 @@ def _restore_upright_symbols(root: ET.Element) -> None:
         text = node.text or ""
         if len(node) == 0 and node.get("mathvariant") is None and (text in ELEMENTS or text == "e"):
             node.set("mathvariant", "normal")
+
+
+_OPERATOR_GLYPHS = frozenset("|‖∣∥⟨⟩±∓:…")
+
+
+def _retag_operator_glyphs(root: ET.Element) -> None:
+    r"""The converter writes `\vert`, `\Vert`, `\pm` and `\langle` as `mi` and `|`, `\|` as `mo`
+    (gold LaTeX is converted without `mathml_shape`). One print is one reading: they are
+    operators in the speech whichever way they arrive."""
+    for node in root.iter():
+        local = node.tag.rsplit("}", 1)[-1]
+        if local == "mi" and len(node) == 0 and (node.text or "") in _OPERATOR_GLYPHS:
+            node.tag = node.tag[: -len("mi")] + "mo"
 
 
 def _join_italic_words(root: ET.Element) -> None:

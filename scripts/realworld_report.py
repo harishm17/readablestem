@@ -388,6 +388,17 @@ def main() -> int:
             rows_in = [spoken.refold(r, gold) for r in rows_in]
         items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
     result: dict = {"part": args.part, "arms": {}}
+    if args.spoken:
+        for label, its in items.items():
+            moved = [p for r in its for p in r["pairs"] if p.get("spoken_moved")]
+            strict = sum(1 for p in moved if p["spoken_strict"])
+            result["arms"].setdefault(label, {})["spoken_moved"] = {
+                "moved": len(moved), "strict": strict, "alike_but_different": len(moved) - strict,
+            }  # fmt: skip
+            print(
+                f"spoken, {label}: {len(moved)} pairs moved wrong to right, {strict} of them one "
+                f"print (strict), {len(moved) - strict} said alike but printed differently"
+            )
     print(f"## {args.part}: " + ", ".join(f"{k}: {len(v)} papers" for k, v in items.items()))
     # pooled metrics with cluster intervals
     rows = []
