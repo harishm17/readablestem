@@ -881,6 +881,7 @@ class CombineView:
     ready: int
     left_out: int
     needed: str
+    language: str = ""  # the one check on the file's language (`web.combine.language_check`)
 
 
 def combine_view(session: Session, job: Job) -> CombineView:
@@ -891,7 +892,8 @@ def combine_view(session: Session, job: Job) -> CombineView:
     from readablestem.web import queue
 
     links = part_links(session, job)
-    ready_ids = {k.job.id for k in combine_rules.kept_parts(session, job)}
+    kept = combine_rules.kept_parts(session, job)
+    ready_ids = {k.job.id for k in kept}
     waiting = [p.id for p in links if p.state is not None and p.state.key == "needs_decisions"]
     first: dict[str, str] = {}
     counts: dict[str, int] = {}
@@ -920,7 +922,9 @@ def combine_view(session: Session, job: Job) -> CombineView:
         for p in links
     ]
     ready = sum(1 for r in rows if r.ready)
-    return CombineView(rows, ready, len(rows) - ready, _still_needed(rows))
+    return CombineView(
+        rows, ready, len(rows) - ready, _still_needed(rows), combine_rules.language_check(kept)
+    )
 
 
 def _still_needed(rows: list[CombineRow]) -> str:

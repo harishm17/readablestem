@@ -21,6 +21,9 @@ keep, and adds to the elements without changing their text or anything a model s
   "Theorem 2.1", "Lemma", "Proposition", "Corollary", "Definition" and "Example" (a
   paragraph or heading that starts with that label and number). A reference inside its own
   target is not linked.
+  A Word or LaTeX document has no pages, glyphs or link annotations, so only these two kinds
+  of link are made for it (`source_links`, called by `source.convert`), after the links its
+  reader made from the file, which are kept as they are.
 - `DocumentResult.lang` and `lang_source`: the language chosen at upload ("user"), else
   detected from the body text ("detected", notice `lang_detected`; "pdf" when the PDF's own
   /Lang names the same language; `lang_mixed` when no language holds 60% of the letters),
@@ -63,7 +66,7 @@ import contextlib
 import logging
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Literal, get_args
@@ -718,12 +721,20 @@ class _Targets:
         return next(iter(found)) if len(found) == 1 else None
 
 
-def crossref_targets(elements: Iterable[Element]) -> _Targets:
+def crossref_targets(
+    elements: Iterable[Element], printed: Mapping[str, str] | None = None
+) -> _Targets:
+    """The figures, tables, equations, sections, ... that references can name, by number.
+    `printed` is what a source file printed in front of an element's own text, which its
+    reader left out ("1.2 " before a heading, "Figure 3: " before a caption): the PDF's text
+    holds it, so this is read as if it were there."""
     targets = _Targets()
     for element in elements:
-        if element.kind in (Kind.FIGURE, Kind.TABLE) and element.caption:
+        lead = (printed or {}).get(element.id, "")
+        caption = element.caption or (element.table.caption if element.table else None)
+        if element.kind in (Kind.FIGURE, Kind.TABLE) and caption:
             for kind, pattern in _CAPTION_NUMBER.items():
-                if match := pattern.match(element.caption):
+                if match := pattern.match(lead + caption):
                     targets.ids[kind][_key(match.group(1))].add(element.id)
         elif element.kind is Kind.EQUATION and element.display != "inline":
             for match in _LABEL_NUMBER.finditer(element.equation_label or ""):
@@ -732,14 +743,14 @@ def crossref_targets(elements: Iterable[Element]) -> _Targets:
                 if match.group(1) and match.group(3):
                     targets.bracketed.add(key)
         elif element.kind in LINK_KINDS and element.text:
-            _label_targets(element, targets)
+            _label_targets(element, targets, lead)
     return targets
 
 
-def _label_targets(element: Element, targets: _Targets) -> None:
+def _label_targets(element: Element, targets: _Targets, lead: str = "") -> None:
     """The section, chapter, theorem, ... that this heading or paragraph is, by the number
     it starts with."""
-    text = element.text or ""
+    text = lead + (element.text or "")
     if element.kind is Kind.HEADING:
         if match := _SECTION_HEADING.match(text):
             targets.ids["section"][_key(match.group("num"))].add(element.id)
@@ -1098,6 +1109,40 @@ class TextPassResult:
         }
 
 
+def _guessed_links(element: Element, own: list[Link], targets: _Targets) -> list[Link]:
+    """`own`, the links the file (or layout) gave `element`, with the addresses typed in its
+    text with no link, then the references by number, added. The file's links keep their
+    words, and nothing is linked inside maths."""
+    text = element.text or ""
+    links = sorted([*own, *typed_addresses(text, own)], key=lambda k: k.start)
+    if element.kind in RUNNING_KINDS:
+        links = sorted(
+            [*links, *crossrefs(text, targets, links, element.id)], key=lambda k: k.start
+        )
+    return links
+
+
+def source_links(
+    elements: list[Element], printed: Mapping[str, str] | None = None
+) -> list[Element]:
+    """The elements of a source document (Word, LaTeX: `source.convert`) with the same two
+    kinds of link the PDF pass adds: typed addresses and references by number. Links the
+    reader made from the file (web and email links) are kept, never overlapped; a source has
+    no pages, glyphs or link annotations, so nothing else of the pass runs. `printed` is
+    what the file printed before an element's text and the reader left out (`crossref_targets`)."""
+    targets = crossref_targets(elements, printed)
+    out: list[Element] = []
+    for element in elements:
+        if element.kind not in LINK_KINDS or not element.text:
+            out.append(element)
+            continue
+        links = _guessed_links(element, list(element.links), targets)
+        out.append(
+            element.model_copy(update={"links": links}) if links != element.links else element
+        )
+    return out
+
+
 def annotate(
     elements: list[Element],
     pdf: PdfText,
@@ -1126,13 +1171,8 @@ def annotate(
             shown = visible_text(element.text, link.start, link.end)
             if unclear_link_text(shown, context_words(element.text, link.start, link.end)):
                 unclear[(element.page, element.id)] += 1
-        # Addresses typed with no link in the file, then references by number. Neither is a
-        # link of the file, so neither is judged for its text above.
-        own = sorted([*own, *typed_addresses(element.text, own)], key=lambda k: k.start)
-        if element.kind in RUNNING_KINDS:
-            own = sorted(
-                [*own, *crossrefs(element.text, targets, own, element.id)], key=lambda k: k.start
-            )
+        # Neither is a link of the file, so neither is judged for its text above.
+        own = _guessed_links(element, own, targets)
         if own:
             links[element.id] = own
     coloured: dict[str, list[ColourRun]] = {}

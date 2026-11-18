@@ -521,6 +521,19 @@ and each part's equations, figures and tables as in the part.
   color runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
 - **Title.** The title the instructor chose for the first part, else the source file's name
   without the part tag and extension; the contact line is the first part's that has one.
+- **Language.** The file's `<html lang>` is the language most parts have (by language
+  subtag: "en" and "en-US" are one; an earlier part first on a tie). A part in another
+  language keeps it: its paragraphs, list items and headings are written with their own
+  `lang` unless they have one already (`combine._element`), so a screen reader changes voice
+  at the part. A part whose language was assumed or mixed (`lang_assumed`, `lang_mixed`, not
+  yet confirmed) votes for nothing and is marked with nothing, since its tag is a guess: it
+  is read in the file's language until its owner confirms it on the part's page
+  (`text_pass.set_document_language`), and the next file made follows. The combined file is
+  made on request and stored nowhere, so it has no language control of its own. The combine
+  page asks once for the whole (`web.combine.language_check`, `#combine-language`), however
+  many parts are unconfirmed, and also when the parts disagree and no language is held by
+  more than half of them. Tables, figures and equations carry no `lang` of their own, in a
+  part or in a document.
 - **Not done.** It is not offered as
   a Canvas zip or cartridge (download the parts one by one for those).
 
@@ -942,6 +955,17 @@ items and headings; offsets are into the stored text, markers included.
   sentence is not part of the address, and an address cut at a line end is whole only
   where the converted text joins it. They are not counted as links of the PDF on the
   job page and get no `link_text_unclear` notice, because nobody made them links.
+- **Word and LaTeX documents** get the same typed addresses and references by number, from
+  the same two functions (`text_pass.source_links`, called where `source.convert` finishes
+  the elements; the PDF-only parts of the pass need glyphs and link annotations, and a source
+  has neither). The reader's own links ("uri": a Word hyperlink, LaTeX's `\href` and `\url`)
+  come first and are never overlapped or replaced; nothing is linked inside math (an inline
+  formula is a marker); the job page's count of links kept counts only the file's own.
+  LaTeX prints a heading's or caption's number in a tag the reader leaves out of the text
+  ("1.2 ", "Figure 3: "), so the reader hands it over as `Reading.printed` and the targets
+  are found as if it were there. Word captions and "Theorem 1." paragraphs hold their words
+  already. LaTeX's own `\ref`, `\eqref` and `\cite` links (a `#` link in the XHTML) are not
+  kept: the text of a reference stays and the guessed link above is the only one.
 - A link never wraps an inline equation: a wide one is a tab stop of its own, and a tab
   stop cannot sit inside a link (axe `nested-interactive`). A link across an equation is
   written in two pieces around it.

@@ -25,9 +25,10 @@ from readablestem.core.types import (
     Status,
     inline_marker,
 )
-from readablestem.pipeline.combine import CombineError, Part, join
+from readablestem.pipeline.combine import CombineError, Part, common_language, join
 from readablestem.pipeline.combine import combine as combine_html
 from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.text_pass import set_document_language
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
@@ -226,10 +227,58 @@ def test_a_part_with_a_pdf_contents_page_keeps_it_and_no_second_list_is_made():
     assert "<nav" not in combine_html([first, second], title="Chapter")
 
 
-def test_the_language_is_the_one_most_parts_have():
+def lang_of(html: str, text: str) -> str | None:
+    """The `lang` on the block that holds `text`, None when it has none of its own."""
+    block = re.search(rf"<(?:p|h\d|li)\b([^>]*)>[^<]*{text}", html)
+    assert block, text
+    found = re.search(r'\blang="([^"]+)"', block.group(1))
+    return found.group(1) if found else None
+
+
+def test_the_language_is_the_one_most_parts_have_and_a_part_in_another_keeps_its_own():
     parts = three()
-    parts[0].result.lang, parts[1].result.lang, parts[2].result.lang = "de", "fr", "fr"
+    parts[0].result.lang, parts[1].result.lang, parts[2].result.lang = "de", "fr", "fr-CA"
     assert join(parts).lang == "fr"
+    html = combine_html(parts, title="Chapter")
+    assert '<html lang="fr">' in html
+    # the part in German is read with a German voice; the French ones are the file's language
+    assert [lang_of(html, f"{t} speed") for t in "ABC"] == ["de", None, None]
+    assert [lang_of(html, f"{t} heading 1") for t in "ABC"] == ["de", None, None]
+    # a passage the part found in another language keeps it
+    parts[0].result.elements[1].lang = "es"
+    assert lang_of(combine_html(parts, title="Chapter"), "A speed") == "es"
+
+
+def test_a_language_nobody_confirmed_votes_for_nothing_and_marks_nothing():
+    parts = three()
+    parts[0].result.lang, parts[1].result.lang, parts[2].result.lang = "en", "fr", "fr"
+    parts[0].result.notices = [Notice(code="lang_assumed", review="required")]
+    joined = join(parts)
+    assert joined.lang == "fr"
+    html = combine_html(parts, title="Chapter")
+    assert lang_of(html, "A speed") is None  # a guess is not written as the part's language
+    # the owner answers on the part's own page: the file follows, and the part now marks itself
+    done = set_document_language(parts[0].result, "German")
+    assert join([Part(done, parts[0].crops, parts[0].pages), *parts[1:]]).lang == "fr"
+    changed = combine_html([Part(done, parts[0].crops, parts[0].pages), *parts[1:]], title="C")
+    assert lang_of(changed, "A speed") == "de"
+
+
+@pytest.mark.parametrize(
+    ("langs", "waiting", "tag", "check"),
+    [
+        (["en", "en", "fr"], [False] * 3, "en", ""),
+        (["en", "en-US", "fr"], [False] * 3, "en", ""),
+        (["en", "fr"], [False] * 2, "en", "split"),
+        (["fr", "en", "de"], [False] * 3, "fr", "split"),
+        (["en", "fr", "fr"], [True, False, False], "fr", "unconfirmed"),
+        (["en", "en"], [True, True], "en", "unconfirmed"),
+    ],
+)
+def test_one_check_when_a_language_is_waiting_or_the_parts_have_no_majority(
+    langs, waiting, tag, check
+):
+    assert common_language(list(zip(langs, waiting, strict=True))) == (tag, check)
 
 
 @pytest.mark.parametrize(

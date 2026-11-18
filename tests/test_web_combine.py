@@ -180,3 +180,39 @@ def test_the_combine_page_offers_the_ready_parts_and_says_what_it_leaves_out(web
         row.open_decisions = len(result["fixes"])
     page = text_of(web.alice.get(f"/jobs/{jobs[0].id}/combine/parts").text)
     assert "Combine the 2 ready parts (leaves out 1)" in page
+
+
+def test_the_language_is_asked_once_for_the_whole_file_and_each_part_keeps_its_own(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    page_url = f"/jobs/{jobs[0].id}/combine/parts"
+    assert "combine-language" not in web.alice.get(page_url).text  # all three read the same
+
+    def set_result(job: Job, lang: str, notices: tuple[str, ...] = ()) -> None:
+        with session_scope(web.ctx.factory) as session:
+            row = session.get(Job, job.id)
+            result = dict(row.result_json)
+            kept = [n for n in result.get("notices", []) if not n["code"].startswith("lang_")]
+            result["lang"] = lang
+            result["notices"] = [*kept, *({"code": c, "review": "required"} for c in notices)]
+            row.result_json = result
+
+    # two parts assumed to be English: one sentence, not one per part, and the file stays English
+    set_result(jobs[0], "en", ("lang_assumed",))
+    set_result(jobs[1], "en", ("lang_assumed",))
+    set_result(jobs[2], "en")
+    page = text_of(web.alice.get(page_url).text)
+    assert page.count("confirm the language") == 1
+    assert "The language of 2 parts was assumed" in page
+    assert '<html lang="en">' in combine(web, jobs[0]).text
+    # no part waits, and no language has most of the parts: said once, each part marked
+    set_result(jobs[0], "de")
+    set_result(jobs[1], "fr")
+    set_result(jobs[2], "es")
+    page = text_of(web.alice.get(page_url).text)
+    assert page.count("no language has most of them") == 1
+    html = combine(web, jobs[0]).text
+    assert '<html lang="de">' in html and 'lang="fr"' in html and 'lang="es"' in html
+    # two of three agree: nothing to ask, the third is marked
+    set_result(jobs[1], "de")
+    assert "combine-language" not in web.alice.get(page_url).text
+    assert '<html lang="de">' in combine(web, jobs[0]).text

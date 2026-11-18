@@ -1129,7 +1129,9 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
   its sibling parts in page order, with a "Combine the parts" link to the combine page. Parts are separate documents; "Combine parts" on
   the results page of a part (when two or more finished parts are kept) joins the ones the
   person still keeps into one HTML file (`web/combine.py`, docs/output.md "Combining the parts
-  of a long source").
+  of a long source"). The combine page says once when a part's language is assumed or mixed
+  and unconfirmed, or the parts share no majority language (`CombineView.language`); each part
+  keeps its own language in the file.
 - **Scanned and handwritten pages (WS7.8).** With the offer on and the box not checked, the
   upload probe's count (`page_type.ImagePageCount`) is kept on the row (`pending_uploads.scans_json`)
   and the page says it in the words of every other place (`routes.jobs.scans_note`). A file

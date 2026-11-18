@@ -21,6 +21,7 @@
   </li>
   {% endfor %}
 </ul>
+{% if view.language %}<p id="combine-language">{{ view.language }}</p>{% endif %}
 {% if view.ready >= 2 %}
 <p><a class="button" href="/jobs/{{ job_id }}/combine">Combine the {{ view.ready }} ready parts{% if view.left_out %} (leaves out {{ view.left_out }}){% endif %}</a></p>
 <p>The same file as {% if word_export %}<a href="/jobs/{{ job_id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job_id }}/combine?format=epub">EPUB</a>.</p>

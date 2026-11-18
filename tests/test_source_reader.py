@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from readablestem.core.types import Kind, Status
+from readablestem.core.types import Element, Kind, Status
 from readablestem.source import ltx_reader as reader
 from source_support import png_bytes
 
@@ -443,7 +443,7 @@ def _cells(*rows: str, marked: bool) -> str:
     return out + "</w:tbl>"
 
 
-def word(body: str) -> bytes:
+def word(body: str, rels: str = "") -> bytes:
     parts = office.docx_parts()
     document = (
         str(parts["word/document.xml"])
@@ -467,7 +467,8 @@ def word(body: str) -> bytes:
     rels = str(parts["word/_rels/document.xml.rels"]).replace(
         "</Relationships>",
         f'<Relationship Id="rId20" Type="{office.OD}/numbering" Target="numbering.xml"/>'
-        "</Relationships>",
+        + rels
+        + "</Relationships>",
     )
     types = str(parts["[Content_Types].xml"]).replace(
         "</Types>",
@@ -573,3 +574,37 @@ def test_a_member_name_that_leaves_the_package_is_refused_before_pandoc(member):
     with pytest.raises(OfficeRejected) as refused:
         docx_package.check(office._zip(parts))
     assert refused.value.code == "office_unsafe"
+
+
+@needs_pandoc
+def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_links_kept():
+    from readablestem.config import get_settings
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.source import envelope
+    from readablestem.source.convert import convert_source
+
+    link = f'<Relationship Id="rId30" Type="{office.OD}/hyperlink" Target="https://example.org/x" '
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Motion</w:t></w:r></w:p>'
+        "<w:p><w:r><w:t xml:space='preserve'>Write to a@b.org or see www.example.org, </w:t></w:r>"
+        '<w:hyperlink r:id="rId30"><w:r><w:t>the page</w:t></w:r></w:hyperlink>'
+        "<w:r><w:t xml:space='preserve'> and www.example.org/typed. See Table 1.</w:t></w:r></w:p>"
+        "<w:p><w:r><w:t>Theorem 1. A statement.</w:t></w:r></w:p>"
+        "<w:p><w:r><w:t>Then Theorem 1 gives the table's answer.</w:t></w:r></w:p>"
+    )
+    data = word(body, rels=link + 'TargetMode="External"/>')
+    blob = envelope.wrap("docx", "notes.docx", None, data)
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    _, first, theorem, last = result.elements
+
+    def found(element: Element) -> list[tuple[str, str]]:
+        return [(k.kind, (element.text or "")[k.start : k.end]) for k in element.links]
+
+    assert found(first) == [
+        ("typed", "a@b.org"),
+        ("typed", "www.example.org"),
+        ("uri", "the page"),  # the file's own link, unchanged
+        ("typed", "www.example.org/typed"),
+    ]
+    assert found(last) == [("crossref", "Theorem 1")]
+    assert last.links[0].target_id == theorem.id and not theorem.links

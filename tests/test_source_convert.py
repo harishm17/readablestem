@@ -459,3 +459,42 @@ def test_every_error_node_is_counted_and_placed():
     assert report is not None and report.error_nodes == 2 and report.unplaced_errors == 0
     assert {m.name for m in report.marks} == {r"\mysterycommand", r"\anotherunknown"}
     assert all(m.in_formula and m.element_id for m in report.marks)
+
+
+def links_of(result: DocumentResult, element_id: str) -> list[tuple[str, str, str | None]]:
+    element = next(e for e in result.elements if e.id == element_id)
+    return [
+        (k.kind, (element.text or "")[k.start : k.end], k.href or k.target_id)
+        for k in element.links
+    ]
+
+
+def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_pdfs():
+    tex = (
+        "\\documentclass{article}\\usepackage{amsmath,hyperref}\n\\begin{document}\n"
+        "\\section{Kinematics}\n"
+        "Mail a@b.org or see www.example.org and \\href{https://example.org/h}{the page}.\n"
+        "See Section 1, Equation (1), Table 1 and Figure 1, and $x=3$ in Table~\\ref{tab:d}.\n"
+        "\\begin{equation}v=v_0+at\\end{equation}\n"
+        "\\begin{table}\\caption{Data}\\label{tab:d}\\begin{tabular}{lc}A&1\\\\\\end{tabular}"
+        "\\end{table}\n\\section{Next}Back to Section 1.\n\\end{document}\n"
+    )
+    blob = envelope.wrap("tex", "refs.tex", None, tex.encode())
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    by_kind = {e.kind: e.id for e in result.elements if e.display != "inline"}
+    heading, body = result.elements[0].id, result.elements[1].id
+    equation, table, last = by_kind[Kind.EQUATION], by_kind[Kind.TABLE], result.elements[-1].id
+    assert links_of(result, body) == [
+        ("typed", "a@b.org", "mailto:a@b.org"),
+        ("typed", "www.example.org", "https://www.example.org"),
+        ("uri", "the page", "https://example.org/h"),  # the file's own link, as it was
+        ("crossref", "Section 1", heading),
+        ("crossref", "Equation (1)", equation),
+        ("crossref", "Table 1", table),  # "Figure 1": no figure has that number, so no link
+        ("crossref", "Table 1", table),
+    ]
+    assert links_of(result, last) == [("crossref", "Section 1", heading)]
+    for target in (heading, equation, table):  # every link goes to a place in the file
+        assert f'href="#{target}"' in result.html and f'id="{target}"' in result.html
+    # the count the job page keeps ("links kept of N in the file") is still the file's own
+    assert sum(k.kind in ("uri", "internal") for e in result.elements for k in e.links) == 1

@@ -49,7 +49,7 @@ from readablestem.core.types import (
     SourceReport,
 )
 from readablestem.models.base import VisionClient
-from readablestem.pipeline import assemble, decoration, html_checks, step_facts
+from readablestem.pipeline import assemble, decoration, html_checks, step_facts, text_pass
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline import run as pipeline
@@ -386,7 +386,11 @@ def _finish(
     report: SourceReport | None = None,
 ) -> ConversionOutput:
     """From a reading to a stored result: the figure steps, the assembler, the checks."""
-    elements = sorted(reading.elements, key=lambda e: e.order)
+    # Addresses typed with no link, and references by number ("Figure 2", "Section 3"), get the
+    # links the PDF text pass gives them; the links the file has are kept as they are.
+    elements = text_pass.source_links(
+        sorted(reading.elements, key=lambda e: e.order), reading.printed
+    )
     for element in elements:  # a source has no pages to number (the reading's are estimates)
         element.page = 0
     # Struck text (`\\sout`) is written only with CONTENT_RUNS; off, it is counted, as the
