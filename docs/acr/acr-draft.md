@@ -37,7 +37,7 @@ file.
 | **Reflow and text spacing** at 320 CSS px and with the WCAG 1.4.12 override, 400% zoom viewport sizes, landscape and portrait. | 1.4.4, 1.4.10, 1.4.12, 1.3.4. | Browsers other than Chromium. |
 | **Stylesheet checks** (`tests/test_web_focus_style.py`, `tests/test_web_review_split.py`): color pairs and the focus ring. | 1.4.3, 1.4.11, 2.4.7 colors. | Colors the stylesheet does not declare (images). |
 | **Code inspection** of the templates (`src/readablestem/web/templates/`), `app.css` and `app.js`. | Structure that is true by construction. | Behavior. |
-| **Screen reader session** (VoiceOver in Safari, [../screen-reader-test.md](../screen-reader-test.md)). | | **Not done yet.** Rows that depend on it say so. |
+| **Screen reader session** (VoiceOver in Safari, [../device-checks.md](../device-checks.md), D3 and D4). | | **Not done yet.** Rows that depend on it say so. |
 
 ## 3. Terms
 
@@ -132,7 +132,7 @@ of the sheet that feeds it (R1 to R17).
 
 ## 8. What is still needed before this can be published
 
-1. A VoiceOver session in Safari ([../screen-reader-test.md](../screen-reader-test.md)), by the
+1. A VoiceOver session in Safari ([../device-checks.md](../device-checks.md), D3 and D4), by the
    owner. It feeds the rows marked VoiceOver: 1.1.1, 1.3.1, 1.3.2, 2.4.1, 2.4.2, 2.4.4, 2.4.6, 3.1.2, 3.3.1, 4.1.2,
    4.1.3.
 2. A look by a person at the rows marked "Not reviewed": 1.3.3, 1.4.13, 3.2.4, 3.3.7, and a

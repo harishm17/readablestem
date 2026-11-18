@@ -113,7 +113,10 @@ def strict_violations(page, axe_source: str) -> list[dict]:
 
 PAGES = {
     "/app": ALICE,
+    "/help": None,
+    "/help/review": None,
     "/help/posting": None,
+    "/help/latex": None,
     "/guides/ada-title-ii-stem-course-materials": None,
     "/guides/readablestem-mathpix-latexml": None,
     "/jobs/{decide}/feedback": ALICE,
@@ -156,7 +159,9 @@ def test_pages_pass_axe_at_desktop_and_phone_widths(
     [
         "/app",
         "/jobs/{decide}/feedback",
+        "/help/review",
         "/help/posting",
+        "/help/latex",
         "/guides/ada-title-ii-stem-course-materials",
         "/guides/readablestem-mathpix-latexml",
     ],

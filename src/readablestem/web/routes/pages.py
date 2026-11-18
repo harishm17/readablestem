@@ -287,6 +287,26 @@ def security_page(request: Request) -> Response:
     return render(request, "security.html", context | {"active": "security"})
 
 
+@router.get("/help")
+def help_index(request: Request) -> Response:
+    """The help pages and what each answers (WS25.4). Public, like each of them."""
+    return render(request, "help_index.html", {"active": "help"})
+
+
+@router.get("/help/review")
+def review_help(request: Request) -> Response:
+    """How to review a converted document: what each decision, button and shortcut does and
+    when a document is ready to post (WS25.4). Public, so a colleague can read it first."""
+    return render(request, "help_review.html", {"active": "help-review"})
+
+
+@router.get("/help/latex")
+def latex_help(request: Request) -> Response:
+    """What a LaTeX file or zip may hold and what each message about one means (WS25.4).
+    Public. It reads the same limits and lists the upload checks use."""
+    return render(request, "help_latex.html", {"active": "help-latex"} | _features(request))
+
+
 @router.get("/help/posting")
 def posting_help(request: Request) -> Response:
     """How to put the file in front of students (UX review MF11): upload it and link it,

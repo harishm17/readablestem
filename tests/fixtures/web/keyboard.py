@@ -6,7 +6,7 @@ keyboard meets. It checks WCAG 2.1.1 (keyboard), 2.1.2 (no keyboard trap), 2.4.1
 blocks, the skip link), 2.4.3 (focus order), 2.4.7 (focus visible) and 2.4.11 (focus not
 obscured), and that every stop has an accessible name (4.1.2, the part a script can see).
 What a script cannot judge (whether the order reads well, whether the name is a good one) is
-left to the person's screen-reader session (docs/screen-reader-test.md).
+left to the person's screen-reader session (docs/device-checks.md, D3 and D4).
 """
 
 from __future__ import annotations

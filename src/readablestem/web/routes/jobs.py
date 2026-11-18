@@ -834,9 +834,11 @@ def _upload_error_page(
     else:
         summary_field = field_id
     errors = [{"field_id": summary_field, "message": summary}]
+    # A refused LaTeX upload links to the page that says what each of its messages means.
+    help_link = "/help/latex" if code.startswith("source_") else ""
     context |= {
         "errors": errors,
-        "field_errors": {"pdf": {"field_id": field_id, "message": message}},
+        "field_errors": {"pdf": {"field_id": field_id, "message": message, "help": help_link}},
     }
     return render(request, "app.html", context, status_code=status, headers=headers)
 

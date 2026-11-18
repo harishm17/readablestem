@@ -96,12 +96,14 @@
           {% if latex_source and not revising %}
           <li>A LaTeX file (.tex) or project zip (up to {{ project_zip }}) also works; every
             {{ chars_per_page }} characters or figure count as one page. Upload Beamer decks, and sources that
-            use the {{ refused_classes }} class or the {{ refused_packages }} package, as PDF.</li>
+            use the {{ refused_classes }} class or the {{ refused_packages }} package, as PDF.
+            <a href="/help/latex">What a LaTeX upload may hold</a>.</li>
           {% endif %}
         </ul>
       </details>
       {% if pdf_error %}
       <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
+      {% if pdf_error.help %}<p class="hint"><a href="{{ pdf_error.help }}">What this message means</a></p>{% endif %}
       {% endif %}
       {# app.js checks the size and type as soon as a file is chosen and puts what is
          wrong here, before anything is sent (UX review MF21). #}

@@ -134,6 +134,7 @@
     <div class="{{ self.main_class() }}">
       <nav aria-label="Footer">
         <ul class="footer-compact-links">
+          <li><a href="/help">Help</a></li>
           <li><a href="/help/posting">Posting in your course</a></li>
           <li><a href="/limits">Known limits</a></li>
           <li><a href="/privacy">Privacy</a></li>
@@ -159,6 +160,7 @@
           <h2>Product</h2>
           <ul>
             <li><a href="/demo"{% if active == "demo" %} aria-current="page"{% endif %}>Demo</a></li>
+            <li><a href="/help"{% if active in ("help", "help-review", "help-latex") %} aria-current="page"{% endif %}>Help</a></li>
             <li><a href="/help/posting"{% if active == "posting" %} aria-current="page"{% endif %}>Posting in your course</a></li>
             <li><a href="/status"{% if active == "status" %} aria-current="page"{% endif %}>Service status</a></li>
             {% if showcase_on %}
