@@ -63,21 +63,27 @@
 
 - SW34b: an entry of a glossary, an index or a bibliography starts a block of its own, by three
   signals that need no heading over them: a lead term (bold, italic or small capitals) at a
-  line's start, ending in a period or a colon (`_lead_end`, `_starts_entry`); a single capital
-  letter alone on its line in an alphabetical run of three or more (`_letter_rows`: a heading
-  one level under the section); and a hanging indent shared by three or more entries
-  (`_hanging_entries`). Three or more lead-term blocks in a row are one definition list through
-  the existing writer. No new flag. Measured with layout only, base against head, on 113 files
-  (28 corpus files and 85 tracked files) and 154 more development files (the fetched layout set
-  and the real-world papers the scripts name; no held-out folder): 7 of the 113 files change
-  and 78 of the 154, no table in either. The letter signal turns 74 lines into headings: 71 in
-  the indexes of 8 OpenStax books, and the 3 panel labels A, B and C of one figure, which are
-  wrong (a figure's words are not known as a figure when the letters are read; left). A hanging
-  indent splits reference lists (one paper gains 101 paragraphs) and the lead term splits
-  "Term: definition" lines (19 development files and 4 of the 113 gain definition lists). A run
-  of "Remark 2.", "Case 1:" or "Simon:" lines is also a definition list: that is how the
-  rule reads any run of three. Still glued: a one-line entry between wrapped entries (the
-  list-marker work).
+  line's start, ending in a period or a colon (`_lead_end`, `_starts_entry`); a bold or larger
+  single capital alone on its line whose next line starts with that letter, when three or more
+  different letters of one size and face do so (`_letter_rows`: a heading one level under the
+  section; the order of the columns does not matter); and a hanging indent shared by three or
+  more wrapped entries (`_hanging_entries`: a ragged right edge counts when the next line's
+  first word would not have fitted, and a one-line entry between wrapped ones is an entry).
+  Three or more lead-term blocks in a row are one definition list through the existing writer
+  only when their terms run in alphabetical order (`_listed_terms`): a run of "Remark 2.",
+  "Case 1:" or "Simon:" lines stays paragraphs. A term keeps its length when its entry runs
+  over a page break. No new flag. Measured with layout only on 277 files (28 corpus files, the
+  tracked files, and the fetched layout set and real-world papers the scripts name; no
+  held-out folder), the branch's first version against its last: 46 files change. 20 files
+  lose definition lists whose terms were not alphabetical (one had 68); the glossary the work
+  was built on goes from 1 term to 22; six OpenStax books gain terms (one from 1 to 29); papers
+  gain paragraphs where a reference list is now split by entry (2 to 28 a file; 6 read, all
+  split at the references, and one numbered listing of a prompt is split line by line, which
+  is wrong); no entry is all term any more. Index letters found rise in the OpenStax books
+  (16 to 21, 6 to 13 and 5 to 7 in three of them) and the 3 panel labels A, B and C of one
+  figure are no longer headings. Still wrong: an index set in two or three columns of short
+  lines is read across its columns (the same before this branch; WS15.1), and a lone capital
+  at the foot of a column can still be taken for a letter heading.
 - WS2.7: a contents list with no leaders is found by its shape (`_shape_entries`): three or more
   lines in one column that end in a page number (or are followed by a line that is only the
   number), the numbers at one right edge, or six lines or more with each number after its
@@ -90,9 +96,9 @@
   development papers with 25 headings fewer in all), no table. Not read: a list of fewer than
   six lines with no common edge, a title that wraps onto a second line, a two-column page.
 - SW34a follow-up: the 18 joins the indented-first-line rule makes in the development files
-  (not the corpus), read one by one: 12 right, 6 wrong (two centred author and affiliation
+  (not the corpus), read one by one: 12 right, 6 wrong (two centered author and affiliation
   lines, two lines that open with a "[n]" reference number, a label in a diagram, one pair of
-  ▷ items). Two wrong classes fixed in `_continues` (lines centred on one another are not an
+  ▷ items). Two wrong classes fixed in `_continues` (lines centered on one another are not an
   indent; a line that opens with a reference number starts the next reference; one test); the
   diagram label and the ▷ pair are left. None of the 113 files changes.
 - `PIPELINE_VERSION` is not bumped here. The kinds on contents pages and entries change, so

@@ -167,7 +167,7 @@ Element conventions:
    column's lines of that size reach), is no list item or caption and does not end a
    sentence, the next line may start up to 4 em to its left (`INDENT_REACH`): the second
    line of a paragraph that opens with a typewriter's tab is not a new paragraph. Two lines
-   centred on one another (an author over an affiliation) and a line that opens with a
+   centered on one another (an author over an affiliation) and a line that opens with a
    reference number ("[20]") are not that. A
    two-line paragraph whose second line falls short of the first stays cut. A row continuing a list item never starts left of the item's
    marker (so the paragraph after a list is not swallowed by its last item).
@@ -175,13 +175,17 @@ Element conventions:
    signals that need no heading over them: a lead term (bold, italic or small capitals, at a
    line's start at the paragraph's left edge, ending in a period or a colon, after a line that
    does not end in a lead term or run full to the right edge in mid-sentence; `_lead_end`,
-   `_starts_entry`); a single capital letter alone on a line, bold or larger than the text, in
-   an alphabetical run of three or more through the document (`_letter_rows`: a heading one
-   level under the section's, `REASON_LETTER`); and a hanging indent shared by three or more
-   entries in a row, each a line at the left edge with lines that start 1 to 4 em further
-   right, the same distance for every entry, the lines that go on running to the right edge
-   (`_hanging_entries`, `_flows`; a contents list nested by indent does not run full, so it is
-   not one). A one-line entry followed by an indented paragraph starts a paragraph of its own
+   `_starts_entry`); a single capital letter alone on a line, bold or larger than the text, with
+   the line right under it starting with that letter, three or more different letters set that
+   way in one size and typeface through the document (`_letter_rows`: a heading one level
+   under the section's, `REASON_LETTER`; the test reads the line under the letter and not the
+   order of the columns, so it holds on an index of three columns and never takes the panel
+   labels of a figure); and a hanging indent shared by three or more entries in a row, each a
+   line at the left edge with lines that start 1 to 4 em further right, the same distance for
+   every entry, the lines that go on running to the right edge or stopping where the next
+   line's first word no longer fits (`_hanging_entries`, `_flows`; a contents list nested by
+   indent stops where each title does, so it is not one). An entry of one line between such
+   entries, at their left edge and short of the right edge, is an entry too (`_one_line`). A one-line entry followed by an indented paragraph starts a paragraph of its own
    (`_continues`). A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
@@ -504,10 +508,12 @@ the capitals drawn in an RSFS or EUSM face (`scr`): `docs/steps.md`, "Correction
   in the dev set), an entry split across a page break, and terms and definitions that
   share a line without a bold term.
   Outside such a section, three or more paragraph blocks in a row that open with a lead term
-  are entries too (`_lead_entries`): the run is one `<dl>`. Two are a sentence with a bold
-  start. The same rule reads dialogue ("Simon: ..."), "Case 1:", "Part A:" and "Proof."
-  lines as a list of terms; that is how the assembler writes any such run, and it is the
-  stated rule, not a reading of the words.
+  are entries too when their terms are in alphabetical order (`_lead_entries`,
+  `_listed_terms`): the run is one `<dl>`. Two are a sentence with a bold start. A theorem
+  and its proof, the cases of a proof ("Case 1:", "Part A:") and the speakers of a dialogue
+  ("Simon: ...") open with a lead too and are not a list of terms: their leads are in no
+  alphabetical order, carry numbers, or differ only in the last word, and they stay
+  paragraphs, each a block of its own. One term in ten may be out of place.
 - **Teacher tags.** OpenStax's level tags at the start of a paragraph or item, `[BL]`,
   `[OL]`, `[AL]`, `[All]` and runs of them (`[BL][OL] Describe a scenario ...`), are dropped
   (`_strip_teacher_tags`); a screen reader would spell them out. Only those four, in
