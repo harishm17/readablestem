@@ -95,7 +95,7 @@ cannot skip these checks unnoticed.
 |---|---|
 | Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/terms`, `/limits`, `/pricing`, `/security`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
 | Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` and `POST /account/name` (CSRF-checked; set the caller's own "keep 7 days by default" and name only), `GET /account/export` ("Download everything": the caller's own ready documents in each file type, their review records, courses and settings, built from the same rows as `/app/download`), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages, including the owner-only `GET /uploads/{id}/preview`), everything under `/courses/...` (including `/courses/{id}/download`, and the CSRF-checked `POST /courses/{id}/starter` and `POST /courses/{id}/documents`, which touch only the caller's own course and documents) |
-| Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
+| Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove`, `GET /admin/reports`, `POST /admin/reports/{report_id}/close` (the problem reports, readable by the operator only) |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare; production refuses a `CRON_TOKEN` shorter than 32 characters; wrong tokens count against the cron limit below) |
 
@@ -704,6 +704,14 @@ a wrong alt text or equation, which the instructor reviews.
   day. Accounts, the daily spend and quota counters and the content-free aggregates are kept
   until a person deletes the account (counters and aggregates hold no content or link to
   them). Details: docs/operations.md, "Retention".
+- Problem reports (`reports` table, "Report this item" and the stopped job's report line): ids,
+  the item's kind and page, a failure code, the pipeline version and up to 1,000 typed
+  characters; no picture and no item text. Written by the owner or a person with the Review
+  right (5 per 10 minutes per account), read by admins only at `/admin/reports`, text escaped
+  and never made a link. Deleted 30 days after being closed, 180 days after being made whatever
+  the state, and with the sender's account (`ops.retention.purge_closed_reports`,
+  `purge_old_reports`, `erase_user`). The privacy page states the numbers from
+  `web.reports`.
 - Erasure of a person (`readablestem users delete EMAIL --yes`, or the person's own "Delete my
   account", `ops.retention.erase_user`)
   removes their jobs, blobs, review edits, courses and notation, events, sign-in identities,

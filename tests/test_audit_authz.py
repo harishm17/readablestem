@@ -77,6 +77,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/logout"): PUBLIC,
     ("POST", "/internal/cron/aggregate-and-purge"): CRON,
     ("GET", "/admin"): ADMIN_ONLY,
+    ("GET", "/admin/reports"): ADMIN_ONLY,  # SW25: problem reports; ids, codes and typed text
+    ("POST", "/admin/reports/{report_id}/close"): ADMIN_ONLY,
     ("GET", "/admin/health"): ADMIN_ONLY,  # stale task names, storage, sandbox probe
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
@@ -123,6 +125,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/combine/parts"): USER,  # the parts of a source and what each needs
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("POST", "/jobs/{job_id}/draft"): USER,  # SW21: the draft page's confirm
+    ("GET", "/jobs/{job_id}/report"): USER,  # SW25: review right; the problem-report form
+    ("POST", "/jobs/{job_id}/report"): USER,  # CSRF, review right, 5 per 10 minutes per person
     ("GET", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/contact"): USER,  # T1-17: CSRF, owner only, not rate limited
@@ -257,6 +261,7 @@ def site(tmp_path):
             "course_id": course_id,
             "entry_id": entry_id,
             "share_id": "1" * 32,
+            "report_id": "1",
             "element_id": "p1-e3",
             "slug": "equations",
             "number": "1",

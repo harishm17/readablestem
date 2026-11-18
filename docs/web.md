@@ -2265,8 +2265,12 @@ From top to bottom:
    a top-level heading when the body has none, the job page heading and tab, My documents,
    the delete page and the download name. Empty, or the suggestion, clears the choice. The
    contact line is an email or an http(s) address (`titles.clean_contact`); it goes in the
-   student note's "tell your instructor" sentence as a `mailto:` or web link
-   (`assemble._contact_sentence`, which checks it again). Both are CSRF-checked, owner
+   student note's "tell your instructor" sentence and in each note about something not
+   converted (an equation, picture, table, figure or page), as a `mailto:` or web link
+   (`assemble.contact_link`, which checks it again). The `mailto:` subject is the document's
+   title and the item by kind and page ("Equation on page 3"), never its content; the body is
+   empty. The link text says what it does ("Email your instructor about this equation").
+   Nothing is sent or stored by the app. Both are CSRF-checked, owner
    only, finished jobs only; an unusable line shows the job page again, status 400, with
    the error under the field and the typed text kept. Neither is logged.
 9. **Deleting**: "Delete now" at the end of the page, styled as a danger entry point
@@ -3213,12 +3217,29 @@ document are ignored (the list is shown whole). Filtering only hides cards; it d
 and the accept-many actions always list everything that qualifies.
 
 *Report this item.* Each card, on both screens, ends with "Report this item"
-(`templates/_report_item.html`, `web/report_item.py`). It opens the footer's feedback path
-(`FEEDBACK_URL` with `job` and `item` added to its query, else a `mailto:` to `CONTACT_EMAIL`
-with the subject, "Job: <id>" and "Item: <id>" and a line asking not to paste text from the
-document). Only the two ids are put in the address: no LaTeX, alt text, heading text or page
-content. With neither setting there is no link. There is no mail provider in production, so
-nothing is sent by the app.
+(`templates/_report_item.html`, `web/report_item.py`). It is a link to the short in-app form
+`/jobs/{id}/report?item=<id>` (below); only the two ids are in the address. The form is also
+where the stopped job's "Tell us about it" line goes (`templates/_job_body.html`); the mail
+address stays printed beside it as text.
+
+*Problem reports to the operator (SW25).* `web/routes/reports.py`, `web/reports.py`, the
+`reports` table (migration `e4b7a1c9d352`).
+
+| Route | Who | What it does |
+|---|---|---|
+| GET `/jobs/{id}/report?item=` | owner, or a person shared with at Review | The form: what is stored, who reads it, how long it is kept, a textarea of at most 1,000 characters (optional), "Send report". Works without script; a failed send is 422 with the error summary and focus on it |
+| POST `/jobs/{id}/report` | the same | Stores one row (CSRF, one-submit rule, `report` limit: 5 per 10 minutes per account), then 303 back to the item or the document with a confirmation and a reference number |
+| GET `/admin/reports` | admins | Open reports first, oldest first, then closed; ids, code, version, sender, the text escaped (never a link) |
+| POST `/admin/reports/{id}/close` | admins | Closes a report |
+
+A row holds the kind (`tool`), the sender (deleted with their account), the job id, the item
+id, the item's kind and page, the stored failure code and pipeline version, the typed text,
+a status and two dates. The kind, page, code and version are read from the stored document on
+the server, never from the form. No picture, no item text, no reply address. Retention
+(`ops.retention`): with the sender's account; 30 days after it is closed
+(`reports.CLOSED_DAYS`); 180 days after it was made whatever its state (`reports.MAX_DAYS`).
+The privacy page states both numbers from the same constants, and `ops.launch` checks the
+rendered text.
 
 *Accessibility.* Every control is a native link, button, select or number field with a visible
 label; the preview list is an ordered list whose equations scroll in a focusable named group; the

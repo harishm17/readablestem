@@ -132,3 +132,32 @@ def test_review_count_failure_never_blocks_deletion(factory, monkeypatch, capsys
     out = capsys.readouterr().out
     assert "review_count_failed" in out and "RuntimeError" in out
     assert SENTINEL not in out
+
+
+def test_problem_reports_go_on_three_clocks_and_with_their_senders_account(factory):
+    day = timedelta(days=1)
+    with db.session_scope(factory) as s:
+        sender, leaving = add_user(s).id, add_user(s, "leaving@example.org").id
+        s.add_all(
+            [  # (what it is) -> created, closed
+                db.Report(from_user_id=sender, item_ref="open-young", created_at=NOW - 10 * day),
+                db.Report(from_user_id=sender, item_ref="open-old", created_at=NOW - 181 * day),
+                db.Report(
+                    from_user_id=sender, item_ref="closed-recent", status="closed",
+                    created_at=NOW - 60 * day, closed_at=NOW - 29 * day,
+                ),
+                db.Report(
+                    from_user_id=sender, item_ref="closed-old", status="closed",
+                    created_at=NOW - 60 * day, closed_at=NOW - 31 * day,
+                ),
+                db.Report(from_user_id=leaving, item_ref="leaving", created_at=NOW - day),
+            ]
+        )  # fmt: skip
+
+    assert purge_expired(factory, NOW).reports_deleted == 2
+    with db.session_scope(factory) as s:
+        kept = {r.item_ref for r in s.query(db.Report)}
+        assert kept == {"open-young", "closed-recent", "leaving"}
+        retention.erase_user(s, leaving, NOW)
+    with db.session_scope(factory) as s:
+        assert {r.item_ref for r in s.query(db.Report)} == {"open-young", "closed-recent"}

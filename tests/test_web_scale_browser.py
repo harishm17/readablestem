@@ -205,7 +205,7 @@ def test_report_this_item_is_a_link_with_a_full_name(site, browser, job):
     page.locator("#more-about > summary").click()  # "More about this item"
     link = page.locator('[data-role="report-item"]')
     href = link.get_attribute("href") or ""
-    assert href.startswith("mailto:") and job in href and "p1-e6" in href.replace("%20", " ")
+    assert href == f"/jobs/{job}/report?item=p1-e6"  # the app's own form, no mail program
     name = link.inner_text()
     assert "Report this item" in name and "Figure 1" in name
     tab_to(page, link)  # reachable by Tab

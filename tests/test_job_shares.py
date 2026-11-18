@@ -53,6 +53,8 @@ NEEDS: dict[tuple[str, str], str] = {
     # never given one, nor shown or read it (`web.output`); a ready document's need only "view".
     ("GET", "/jobs/{job_id}/view"): "review",
     ("GET", "/jobs/{job_id}/listen"): "review",
+    ("GET", "/jobs/{job_id}/report"): "review",
+    ("POST", "/jobs/{job_id}/report"): "review",
     ("GET", "/jobs/{job_id}/draft"): "review",
     ("POST", "/jobs/{job_id}/draft"): "review",
     ("GET", "/jobs/{job_id}/download"): "review",
