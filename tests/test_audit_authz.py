@@ -90,7 +90,9 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/admin/reports/{report_id}/close"): ADMIN_ONLY,
     ("GET", "/admin/health"): ADMIN_ONLY,  # stale task names, storage, sandbox probe
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
+    ("GET", "/admin/allowlist/remove"): ADMIN_ONLY,  # the question before a removal
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
+    ("GET", "/admin/users/block"): ADMIN_ONLY,  # the question before a block
     ("POST", "/admin/users/block"): ADMIN_ONLY,  # open sign-up: stop an account
     ("POST", "/admin/users/unblock"): ADMIN_ONLY,
     ("POST", "/admin/linked-emails"): ADMIN_ONLY,  # T3-10: another Google account per instructor
@@ -115,6 +117,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/courses/{course_id}/entries"): USER,
     ("GET", "/courses/{course_id}/entries/{entry_id}"): USER,
     ("POST", "/courses/{course_id}/entries/{entry_id}"): USER,
+    ("GET", "/courses/{course_id}/entries/{entry_id}/delete"): USER,  # the question first
     ("POST", "/courses/{course_id}/entries/{entry_id}/delete"): USER,
     ("POST", "/courses/{course_id}/remember"): USER,
     ("POST", "/courses/{course_id}/suggestions"): USER,  # T3-12: CSRF, owner of course (and job)
@@ -192,6 +195,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/share/link"): USER,
     ("POST", "/jobs/{job_id}/share/link/pause"): USER,
     ("POST", "/jobs/{job_id}/share/link/resume"): USER,
+    ("GET", "/jobs/{job_id}/share/link/remove"): USER,  # the question before removing it
     ("POST", "/jobs/{job_id}/share/link/remove"): USER,
     ("POST", "/jobs/{job_id}/share/link/update"): USER,
     # T3-3: a large file kept while its owner chooses the pages; owner only like a job

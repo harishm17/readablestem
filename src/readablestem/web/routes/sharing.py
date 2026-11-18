@@ -342,6 +342,33 @@ def resume_link(request: Request, job_id: str, user: UserDep) -> Response:
     return _link_change(request, job_id, user, "resume")
 
 
+@router.get("/jobs/{job_id}/share/link/remove")
+def confirm_remove_link(request: Request, job_id: str, user: UserDep) -> Response:
+    """The question the share page's "Remove the link" opens: the address cannot be got back."""
+    ctx = _link_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, OWNER)
+        require_done(job)
+        if job.is_sample:
+            raise PageError(404, *NOT_FOUND)
+        owned_id, title = job.id, _title(job)
+        row = links.current_link(session, owned_id)
+        context = (
+            None
+            if row is None
+            else {
+                "job_id": owned_id,
+                "doc_title": title,
+                "label": row.label,
+                "opened": row.open_count,
+            }
+        )
+    if context is None:
+        flash(request, "There is no class link to change.", undo=False)
+        return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
+    return render(request, "class_link_remove_confirm.html", context)
+
+
 @router.post("/jobs/{job_id}/share/link/remove", dependencies=[Depends(require_csrf)])
 @submit_once("link.remove")
 def remove_link(request: Request, job_id: str, user: UserDep) -> Response:

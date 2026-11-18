@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: the buttons that lose work or access ask first (branch fix/destructive-actions-confirm)
+
+- WS24.6 (F-106, F-197, F-210, F-432), as far as its triage line: the secondary buttons that acted
+  at once now open a confirmation page that names the thing and says what is lost, with a red
+  button and "No, keep it". They are Remove on a course's symbol, Block and Remove next to a
+  person on the Admin page, the "Block by email" form, and "Remove the link" for a class link
+  (its address cannot be got back). The openers are links or a GET form; each question is a
+  GET page and the POST is as it was, CSRF-checked and answering a repeat as the first click.
+  Removing a symbol joins the one-submit rule (`course.remove_entry`). The class link's opener
+  uses the outlined red look instead of the filled one, as the other openers do. Not built: Undo
+  notices, three levels of buttons, sorting symbols by first use. Unlinking an address,
+  unblocking and removing a person's access to one document stay as they were: each is put back
+  in one step.
+
 ## Unreleased: typed addresses and numbered references are links (branch feat/links-typed-and-references)
 
 - SW52 (F-517, F-518), as far as its triage line: a web address (`https://`, `http://`, `www.`)

@@ -131,6 +131,7 @@ def states(page, site, course: dict[str, str]):
     yield "course page", lambda: page.goto(f"{base}/courses/{course['id']}")
     yield "entry edit", lambda: page.goto(base + course["entry"])
     yield "delete question", lambda: page.goto(f"{base}/courses/{course['id']}/delete")
+    yield "remove symbol question", lambda: page.goto(f"{base}{course['entry']}/delete")
     yield "upload form", lambda: page.goto(f"{base}/app")
     yield "job page", lambda: page.goto(f"{base}/jobs/{course['job']}")
     yield "review card", lambda: page.goto(f"{base}/jobs/{course['job']}/review")

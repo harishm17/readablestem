@@ -323,6 +323,47 @@ def _allow(session: Session, email: str, *, admin: bool | None) -> tuple[str, st
     return (shares.CHANGED, "; ".join(changes)) if changes else (shares.UNCHANGED, "")
 
 
+def _confirm_stop(request: Request, user: AdminDep, email: str, *, blocking: bool) -> Response:
+    """The question before an account is stopped: Block and Remove both sign the person out,
+    stop their queued and running work and take their admin rights, so each is asked first.
+    An address that cannot be stopped gets the notice the POST would give, on the admin page."""
+    normalised = normalise_email(email)
+    word = "block" if blocking else "remove"
+    message = ""
+    context: dict[str, Any] = {"blocking": blocking}
+    if normalised == user.email:
+        message = f"You cannot {word} yourself. Ask another admin."
+    elif normalised is None:
+        message = NO_ADDRESS
+    else:
+        with session_scope(get_ctx(request).factory) as session:
+            person = session.scalar(select(User).where(User.email == normalised))
+            if person is None:
+                message = NO_ACCOUNT
+            elif not person.is_allowed:
+                message = NOTHING + (
+                    "that account was already blocked."
+                    if blocking
+                    else "that address was already off the allowlist."
+                )
+            else:
+                context |= {"email": person.email, "is_admin": person.is_admin}
+    if message:
+        flash(request, message, undo=False)
+        return RedirectResponse("/admin", status_code=303)
+    return render(request, "admin_stop_confirm.html", context)
+
+
+@router.get("/admin/users/block")
+def confirm_block(request: Request, user: AdminDep, email: str = "") -> Response:
+    return _confirm_stop(request, user, email, blocking=True)
+
+
+@router.get("/admin/allowlist/remove")
+def confirm_remove(request: Request, user: AdminDep, email: str = "") -> Response:
+    return _confirm_stop(request, user, email, blocking=False)
+
+
 @router.post("/admin/allowlist/remove", dependencies=[Depends(require_csrf)])
 @submit_once("admin.remove")
 def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:

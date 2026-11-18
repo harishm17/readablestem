@@ -344,7 +344,24 @@ def save_entry(
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
+@router.get("/courses/{course_id}/entries/{entry_id}/delete")
+def confirm_remove_entry(
+    request: Request, course_id: str, entry_id: str, user: UserDep
+) -> Response:
+    """The question the entry page's "Remove" link opens: it names the symbol and the course."""
+    _require_feature(request)
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        row = _entry(course, entry_id)
+        context = {
+            "course": notation.CourseView(course.id, course.name, len(course.notation)),
+            "entry": next(v for v in notation.entries(course) if v.id == row.id),
+        }
+    return render(request, "course_entry_delete_confirm.html", context)
+
+
 @router.post("/courses/{course_id}/entries/{entry_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("course.remove_entry")
 def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep) -> Response:
     _require_feature(request)
     with session_scope(get_ctx(request).factory) as session:

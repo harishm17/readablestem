@@ -86,12 +86,15 @@ def test_the_public_pages_in_open_mode_pass_axe(site, browser, axe_source, path)
     assert not violations, describe(violations)
 
 
-@pytest.mark.parametrize("path", ["/account", "/account/delete", "/admin", "/app"])
+@pytest.mark.parametrize(
+    "path",
+    ["/account", "/account/delete", "/admin", "/admin/users/block?email=bob@example.org", "/app"],
+)
 def test_the_account_and_admin_pages_pass_axe(site, browser, axe_source, path):
     context = browser.new_context(bypass_csp=True)
     page = context.new_page()
     sign_in(page, site.base, CAROL)  # makes the account (open tier)
-    if path == "/admin":
+    if path.startswith("/admin"):
         context.close()
         context = browser.new_context(bypass_csp=True)
         page = context.new_page()

@@ -92,6 +92,7 @@ NEEDS: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/share/link"): "owner",
     ("POST", "/jobs/{job_id}/share/link/pause"): "owner",
     ("POST", "/jobs/{job_id}/share/link/resume"): "owner",
+    ("GET", "/jobs/{job_id}/share/link/remove"): "owner",
     ("POST", "/jobs/{job_id}/share/link/remove"): "owner",
     ("POST", "/jobs/{job_id}/share/link/update"): "owner",
     ("GET", "/jobs/{job_id}/review"): "review",
@@ -872,6 +873,9 @@ def test_only_the_owner_makes_pauses_or_removes_a_link(ready_site):
             assert link_post(ready_site, action, actor).status_code == 403, (actor, action)
     for actor in (STRANGER, REVOKED):
         assert link_post(ready_site, "remove", actor).status_code == 404
+    for actor in (VIEWER, REVIEWER, STRANGER, REVOKED):  # the question is the owner's too
+        asked = ready_site.who[actor].get(f"/jobs/{ready_site.job_id}/share/link/remove")
+        assert asked.status_code == link_post(ready_site, "remove", actor).status_code, actor
     assert snapshot(ready_site) == before
     assert ready_site.client().get(f"/s/{token}").status_code == 200
 
@@ -912,6 +916,12 @@ def test_a_closed_removed_paused_or_wrong_link_gets_one_404_page(ready_site, mon
         link.opens_at, link.closes_at = None, utcnow() - timedelta(minutes=1)
     same_answer()
     other = link_token(ready_site)  # a new link removes the old; removing it closes the new
+    assert anyone.get(f"/s/{other}").status_code == 200
+    owner = ready_site.who[OWNER]
+    path = f"/jobs/{ready_site.job_id}/share/link/remove"
+    assert f'href="{path}"' in owner.get(f"/jobs/{ready_site.job_id}/share").text
+    question = owner.get(path)  # "Remove the link" only asks; the link still works
+    assert question.status_code == 200 and f'action="{path}"' in question.text
     assert anyone.get(f"/s/{other}").status_code == 200
     assert link_post(ready_site, "remove").status_code == 303
     assert anyone.get(f"/s/{other}").status_code == 404

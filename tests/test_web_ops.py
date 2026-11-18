@@ -129,6 +129,18 @@ def test_admin_can_allow_and_remove_people_but_not_themselves(web):
         user = session.scalar(select(User).where(User.email == "new@example.org"))
         assert user is not None and user.is_allowed and user.is_admin
 
+    question = web.browser.get("/admin/allowlist/remove", params={"email": "new@example.org"})
+    assert (
+        question.status_code == 200
+        and "Remove new@example.org from the allowlist?" in question.text
+    )
+    assert (
+        'action="/admin/allowlist/remove"' in question.text
+        and "stop being an admin" in question.text
+    )
+    with session_scope(web.ctx.factory) as session:  # asking changes nothing
+        asked = session.scalar(select(User).where(User.email == "new@example.org"))
+        assert asked is not None and asked.is_allowed
     web.browser.post(
         "/admin/allowlist/remove", data={"csrf_token": csrf, "email": "new@example.org"}
     )
