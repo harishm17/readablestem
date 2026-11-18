@@ -692,15 +692,21 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   more: a member name with `..`, an absolute path, a backslash or a drive letter, a name twice,
   a folder with a size, an unpacked part over 80 MB (20 MB for the small parts), a ratio over 400
   above 4 MB, and an XML nesting over 300 deep. Refusals use the Office codes (`office_unsafe`,
-  `office_unsupported`).
+  `office_unsupported`). A file in Strict Open XML (the `purl.oclc.org` namespace, which pandoc
+  cannot read, 3.1 and 3.7 alike) is `office_unsupported` here, so the route leaves it to the
+  PDF route.
 - **Working copy** (`docx_package.prepare`): pandoc is not given the upload. It is given a new
   package of the parts it needs (document, footnotes, endnotes, styles, numbering), with the
   relationships filtered to styles, numbering, notes, hyperlinks and pictures; each picture
   replaced by a 1x1 PNG of the same name (the reader takes the real picture from the upload
   later); no embeddings, macros, headers, footers, comments, settings or themes. External
   targets (`TargetMode="External"` pictures, templates, OLE) are never copied, so nothing is
-  fetched. Hidden runs and paragraphs are taken out here, and each table's style id is replaced
-  by a mark that carries whether the author marked a header row.
+  fetched. Hidden runs and paragraphs are taken out here, a simple field (`w:fldSimple`: page
+  number, reference, merge field) is written as its runs (pandoc drops its result), a carriage
+  return is written as a line break (pandoc reads it as nothing), and each table's style id is
+  replaced by a mark that carries whether the author marked a header row (pandoc 3.1, the
+  Dockerfile's pin, does not give the style id back; the reader then goes by the file's own list
+  of marks when it lines up with the tables of the tree).
 - **pandoc step** (`source/pandoc.py`): one sandboxed run (`--sandbox`, no network, the working
   copy read-only, output to the JSON tree, a heap cap), under the lock LaTeXML uses
   (`source.convert.GATE_NAME`), with limits of its own (pandoc needs 2 GB of address space and
@@ -717,11 +723,16 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
 - **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
   copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
   `w:lang`, the document language is the most common one; headers and footers (dropped) are
-  counted (`word_headers_footers`); a default table style (read as a header row by pandoc) is told
-  from a marked header row; SmartArt, charts and embedded objects (silent) are counted as the
-  required notice `word_objects`; a title in the document properties is not read, the Title
-  style is. Text in text boxes is read only when pandoc finds it in the flow and is otherwise
-  counted by the coverage rule: every word of the file is in pandoc's tree or counted as
+  counted (`word_headers_footers`, optional); a default table style (read as a header row by
+  pandoc) is told from a marked header row; SmartArt, charts and embedded objects (silent) are
+  counted as the required notice `word_objects`; the Title style, which pandoc moves to its
+  metadata (with Subtitle, Author, Date and Abstract), is the title and a level 1 heading, the
+  others paragraphs before the body; a title in the document properties is not read.
+  Right-to-left paragraphs are read in logical order and counted (`word_rtl_text`, optional): no
+  direction is kept. A table of contents is left out and made again from the headings. Comments
+  are dropped (the census notice says so). Text in text boxes is read only when pandoc finds it
+  in the flow (a drawing box with its fallback once; a lone old-style box is not) and is
+  otherwise counted by the coverage rule: every word of the file is in pandoc's tree or counted as
   `source_unread` (a required notice) so nothing is left out without a number. Tracked changes
   are read as accepted, and say so (`word_tracked_changes`, required).
 - **What it changes** (the switch on, against off): no LibreOffice conversion and no PDF are

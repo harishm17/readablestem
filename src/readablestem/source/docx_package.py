@@ -42,6 +42,7 @@ import posixpath
 import re
 import zipfile
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from xml.etree import ElementTree as ET
 from xml.parsers import expat
@@ -339,13 +340,17 @@ def _zip(parts: dict[str, bytes]) -> bytes:
 
 
 def _filter_rels(
-    data: bytes, folder: str, kept: set[str], names: set[str], keep_present: object = None
+    data: bytes,
+    folder: str,
+    kept: set[str],
+    names: set[str],
+    keep_present: Iterable[str] | None = None,
 ) -> bytes:
     """The relationships part with only the kinds in `kept`; an internal one only when its
     target is in the working copy (`keep_present`) or, for the package's root, in the file."""
     root = SafeET.fromstring(data, forbid_dtd=True)
     out = ET.Element(f"{{{PKG_RELS}}}Relationships")
-    present = set(keep_present) if keep_present is not None else names  # type: ignore[call-overload]
+    present = set(keep_present) if keep_present is not None else names
     for rel in root:
         kind = rel.get("Type", "").rsplit("/", 1)[-1]
         if kind not in kept:

@@ -806,11 +806,12 @@ def _tables_of(tree: dict[str, Any]) -> list[Any]:
 
 
 def _meta_blocks(value: dict[str, Any]) -> list[Any]:
-    kind, content = value.get("t"), value.get("c")
+    kind = value.get("t")
+    content: Any = value.get("c") or []
     if kind == "MetaInlines":
         return [{"t": "Para", "c": content}]
     if kind == "MetaString":
-        return [{"t": "Para", "c": [{"t": "Str", "c": str(content)}]}]
+        return [{"t": "Para", "c": [{"t": "Str", "c": str(value.get("c") or "")}]}]
     if kind == "MetaBlocks":
         return list(content)
     if kind == "MetaList":

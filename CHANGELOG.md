@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased: a Word file is read from the file itself, behind `FEATURE_WORD_SOURCE` (branch feat/word-reader)
+
+- WS18.14 and WS18.15: with `FEATURE_WORD_SOURCE` on (off by default), a `.docx` is not turned into
+  a LibreOffice PDF. One gate (`source/docx_package.check`: the Office preflight plus member
+  names, ratios, part sizes, XML depth, Strict Open XML left to the PDF route) runs in a child,
+  then one sandboxed pandoc step (`source/pandoc.py`) reads a working copy of the file (no
+  macros, embeddings, external targets or headers; pictures as placeholders), and
+  `source/docx_reader.py` fills the same content model the PDF path does: headings, lists with
+  levels, tables with spans and exact header rows, pictures with the author's alt text,
+  footnotes, links, and every typed equation (`m:oMath`) through `check_latex` and
+  `safe_latex_to_mathml`, with no model call. Pandoc's six silences (hidden text, run language,
+  headers and footers, default table style as header, SmartArt and charts, title in metadata)
+  are handled or counted, and every word of the file is in the tree or in the required notice
+  `source_unread`. It plugs into the existing source path (envelope kind `docx`, origin `docx`).
+- Turning the switch on changes what a `.docx` upload becomes (no PDF, no page images, typed
+  equations without a model call, new notices); with it off nothing changes. The LibreOffice route
+  stays for revisions, long files, refusals and servers without pandoc or a sandbox.
+- No `PIPELINE_VERSION` bump: no PDF or LaTeX result changes, and a Word document made this way
+  is a new document. No migration, no new dependency (pandoc was already in the image; the
+  Dockerfile pins 3.1.11.1, the box has 3.7.0.2, and the reader gives the same reading under both
+  on 75 of the 79 Word files compared; in the other four, 3.7 drops a few cells of malformed
+  table grids that 3.1 keeps, and a later element number differs by one).
+- Hostile-input cases for the Word gate in `tests/workflows` (inflating part, member leaving the
+  package, macro part, linked picture, external entity, deep nesting, embedded object).
+
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 
 - SW36 follow-up: a drawn rule was written as a blank to fill in ("_____") when the nearest
