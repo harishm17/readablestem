@@ -342,6 +342,8 @@ def reviewing(tmp_path):
 
 
 BOX = {"left": "10", "top": "55", "right": "50", "bottom": "70"}
+OTHER_BOX = {"left": "10", "top": "20", "right": "50", "bottom": "35"}
+THIRD_BOX = {"left": "10", "top": "35", "right": "50", "bottom": "50"}
 ANSWER = {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
 
 
@@ -355,10 +357,10 @@ def with_model(env, sent: list | None = None) -> None:
     env.ctx.client_factory = factory
 
 
-def mark_region(env, kind: str = "equation"):
+def mark_region(env, kind: str = "equation", box: dict = BOX):
     path = f"/jobs/{env.job_id}/review"
     version = str(env.job(env.job_id).result_version or 0)
-    data = {"csrf_token": token(env.browser, path), "version": version, "kind": kind} | BOX
+    data = {"csrf_token": token(env.browser, path), "version": version, "kind": kind} | box
     if kind == "picture":
         data["alt"] = "A cart on a ramp."
     return env.browser.post(f"/jobs/{env.job_id}/pages/1/add", data=data)
@@ -368,10 +370,12 @@ def test_a_read_refused_by_the_allowance_sends_nothing_to_the_model(reviewing):
     sent: list = []
     with_model(reviewing, sent)
     mark_region(reviewing)
-    mark_region(reviewing)
-    assert len(sent) == 2
-    assert mark_region(reviewing).status_code == 422
-    assert len(sent) == 2
+    mark_region(reviewing, box=OTHER_BOX)
+    assert sum(len(c.requests) for c in sent) == 2
+    assert mark_region(reviewing, box=THIRD_BOX).status_code == 422
+    assert sum(len(c.requests) for c in sent) == 2
+    assert mark_region(reviewing).status_code == 303  # answered from the record: it asks nothing
+    assert sum(len(c.requests) for c in sent) == 2
 
 
 def reread(env, element_id: str):
@@ -405,7 +409,7 @@ def test_a_read_that_comes_back_empty_is_not_counted_and_a_read_with_something_i
     assert reads_today(reviewing) == 0
 
     with_model(reviewing)  # now it reads x^2 + 1
-    assert reread(reviewing, "p1-e2").status_code == 303
+    assert mark_region(reviewing, box=OTHER_BOX).status_code == 303
     assert reads_today(reviewing) == 1
 
 

@@ -38,6 +38,7 @@ from test_audit_authz import ROUTES
 CAROL = "carol@example.org"  # a viewer
 DAVE = "dave@example.org"  # a reviewer
 ERIN = "erin@example.org"  # shared, then removed
+ANSWER = {"is_equation": True, "latex": "x^2", "confidence": 0.99}
 OWNER, VIEWER, REVIEWER, REVOKED, STRANGER = "owner", "viewer", "reviewer", "revoked", "stranger"
 ACTORS = (OWNER, VIEWER, REVIEWER, REVOKED, STRANGER)
 
@@ -595,25 +596,57 @@ def test_deleting_the_document_deletes_its_shares_and_erasing_a_person_those_tha
         assert session.scalar(select(func.count()).select_from(JobShare)) == 0
 
 
-def test_a_reread_by_a_reviewer_counts_against_the_owner(monkeypatch):
-    """`reread.read_equation` takes the allowance of the job's owner, whoever asked."""
-    from types import SimpleNamespace
+def test_a_reread_by_a_reviewer_counts_against_the_owner(site):
+    """The allowance used is the document owner's, whoever asks, and the reviewer is told so
+    before they ask (F-093)."""
+    from html import unescape
 
+    from readablestem.models.fake import FakeVisionClient
     from readablestem.web import reread
+    from readablestem.web.database import utc_today
+    from readablestem.web.quota import rereads_used
 
-    seen: list[str] = []
+    asked: list[FakeVisionClient] = []
 
-    def stop(request, user_id):
-        seen.append(user_id)
-        raise reread.ReadRefused("stop")
+    def client(settings, budget):
+        asked.append(FakeVisionClient(budget=budget, defaults={"equation": ANSWER}))
+        return asked[-1]
 
-    monkeypatch.setattr(reread, "_count_against_allowance", stop)
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(ctx=None)))
-    job = SimpleNamespace(id="j" * 32, user_id="the-owner")
-    with pytest.raises(reread.ReadRefused):
-        reread.read_equation(request, job, "the-reviewer", None, b"")  # type: ignore[arg-type]
-    assert seen == ["the-owner"]
-    assert not reread.GATE._users  # the reviewer's turn was given back
+    site.ctx.client_factory = client
+    box = {"left": "10", "top": "55", "right": "50", "bottom": "70"}
+    owner_id = site.job(site.job_id).user_id
+
+    def counts() -> tuple[int, int]:
+        with session_scope(site.ctx.factory) as session:
+            reviewer_id = session.scalar(select(User.id).where(User.email == DAVE))
+            return (
+                rereads_used(session, owner_id, utc_today()),
+                rereads_used(session, reviewer_id, utc_today()),
+            )
+
+    def tools(actor: str) -> str:
+        page = site.who[actor].get(
+            f"/jobs/{site.job_id}/review",
+            params={"page": "1", "tools": "1", "add": "equation"} | box,
+        )
+        return unescape(page.text)
+
+    assert reread.SHARED_NOTE in tools(REVIEWER)
+    assert reread.SHARED_NOTE not in tools(OWNER)
+
+    reviewer = site.who[REVIEWER]
+    path = f"/jobs/{site.job_id}/review"
+    data = {"csrf_token": page_token(reviewer, path), "kind": "equation"} | box
+    version = str(site.job(site.job_id).result_version or 0)
+    assert counts() == (0, 0)
+    assert (
+        reviewer.post(
+            f"/jobs/{site.job_id}/pages/1/add", data=data | {"version": version}
+        ).status_code
+        == 303
+    )
+    assert counts() == (1, 0)  # the owner's day, not the reviewer's
+    assert len(asked) == 1 and len(asked[0].requests) == 1
 
 
 # --------------------------------------------------------------------------- security review

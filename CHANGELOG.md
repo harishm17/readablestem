@@ -50,6 +50,19 @@
   digits. MathML is stored in `Fix` records; stored speech and stored MathML are not rewritten,
   the page writer applies the form when the page is built. No model call, no stored-data change,
   no migration, no version bump.
+## Unreleased: re-reads cached and counted (branch feat/rereads-cached-and-counted)
+
+- WS10.2 (F-093): a read from the review screen (a marked region, a table cell, "Read again") is
+  answered from the document's step records when the model has already answered the same
+  question (same crop, prompt version, model, text sent): no call, no reservation, no charge, no
+  unit of the day's count. The record is the one the conversion's page passes use
+  (`web.step_cache`, the `q:` slots), so it is deleted with the job like the rest; no new table,
+  no migration. The request a first read sends is unchanged. The unit is counted when a request is
+  really sent, not before the lookup, and given back as before when nothing was read.
+- Every account's reads are now counted, invited ones too (no limit): the Account page states
+  the count where it states an open-tier allowance. The beside-the-button line a person a
+  document was shared with sees now says the owner's allowance is the one used.
+- A second "Read again" on one item returns the stored reading, not a new sample.
 
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 

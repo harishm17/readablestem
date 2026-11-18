@@ -20,7 +20,16 @@ Spending is controlled exactly as in the worker, because the money is the same m
   (`OPEN_TIER_DAILY_REREADS`, `web.quota.try_consume_reread`). The count is made before
   the call, so two clicks cannot start more than the allowance, and given back when nothing
   was read (`give_back`): a read that returned no equation, a cap that stopped it, a model
-  that was not there. Invited accounts have neither.
+  that was not there. An invited account has no allowance and no pool, but its reads are
+  counted all the same, for the Account page to say how many it used today;
+- a question the model has already answered for this document is answered from the record
+  (F-093): the answer is kept in the job's step records under `models.question.question_key`
+  (the crop, the prompt version, the model, the text sent with it: the same record the
+  conversion's page-level passes use, `web.step_cache`), and a read that finds it makes no
+  call, reserves nothing, is charged nothing and counts nothing. The count is therefore made
+  at the first call that is really sent, not before the lookup. The keys and what is logged
+  are hashes and counts, never the crop or its text; the records go with the job
+  (`ops.retention`).
 
 The call is made with no database transaction open and no row locked (it takes seconds);
 the route locks the job afterwards, to check that nothing changed meanwhile, and applies
@@ -31,14 +40,17 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from fastapi import Request
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
-from readablestem.core.types import Element, Fix
+from readablestem.core.types import Element, Fix, ModelCall
+from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.web import access, notation
 from readablestem.web.database import rowcount, utc_today
 from readablestem.web.db import Job, JobStatus, session_scope
@@ -50,6 +62,7 @@ from readablestem.web.quota import (
     retry_after,
     try_consume_reread,
 )
+from readablestem.web.step_cache import DbStepCache
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +194,14 @@ class ReadBudget(JobBudget):
             log_exception(logger, "job_spend_update_failed", exc, job_id=self.job_id)
 
 
+# Said beside a button that starts a read, to a person the document was shared with: the owner's
+# allowance is the one used, whoever asks. No name: the review page does not show the owner's.
+SHARED_NOTE = (
+    "This uses the document owner's allowance for reading with the model, not yours. "
+    "Asking again for the same picture uses none."
+)
+
+
 def reread_allowance_message(allowance: int) -> str:
     """What the reviewer is told when an open-tier account has started all the reads it may
     today (the number is the setting; a read is counted when it starts; the count starts
@@ -216,28 +237,41 @@ def read_budget(request: Request, job: Job) -> ReadBudget:
     )
 
 
-def _count_against_allowance(request: Request, user_id: str) -> bool:
-    """One more read started today for an open-tier account; `ReadRefused` when they have
-    used the day's allowance. True when a read was counted, False for an invited account
-    (nothing counted)."""
+def _count_against_allowance(request: Request, user_id: str) -> None:
+    """One more read started today for the document's owner. `ReadRefused` when an open-tier
+    account has used the day's allowance; an invited account has none, but its reads are
+    counted all the same (the Account page says how many)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         allowance = access.reread_allowance(ctx.settings, access.tier_of(session, user_id))
-        if allowance is None:
-            return False
         counted = try_consume_reread(session, user_id, allowance=allowance, day=utc_today())
     if not counted:
         log_event(logger, "reread_refused", scope="allowance")
+        assert allowance is not None
         raise ReadRefused(reread_allowance_message(allowance))
-    return True
 
 
-def counts_reads(request: Request, user_id: str) -> bool:
-    """Does a read for this person's document count against a daily allowance (an open-tier
-    account's), so that the card may say an empty one was given back?"""
-    ctx = get_ctx(request)
-    with session_scope(ctx.factory) as session:
-        return access.reread_allowance(ctx.settings, access.tier_of(session, user_id)) is not None
+class _CountsWhenSent:
+    """The client of a read, behind the record of answers (`_PageAnswers`): the first request
+    that is really sent counts the read against the owner's day, before the model is asked.
+    A request the record answers never gets here, so it counts nothing. The request itself
+    passes on as it is."""
+
+    def __init__(self, inner: VisionClient, count: Callable[[], None]) -> None:
+        self._inner = inner
+        self._count = count
+        self.counted = False
+
+    def run(
+        self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
+    ) -> tuple[T | None, ModelCall]:
+        if not self.counted:
+            self._count()
+            self.counted = True
+        return self._inner.run(request, schema, is_fallback=is_fallback)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
 
 
 def give_back(request: Request, user_id: str) -> None:
@@ -265,11 +299,13 @@ def read_equation(
     context_text: str | None = None,
     *,
     escalate: bool = False,
-) -> Fix:
+) -> tuple[Fix, bool]:
     """Read the crop `png` of `element` (an equation) with the equation step. Returns its
-    fix (possibly FAILED or ABSTAINED: the reviewer decides). The read counts against the job's
-    owner (the day's allowance, spend pool and caps), whoever asked; `user_id` is who is
-    waiting for it, so one person has one read going at a time. A read that returns no
+    fix (possibly FAILED or ABSTAINED: the reviewer decides) and whether the model was asked
+    (False: the record answered, so the page must not say it was read anew). The read counts
+    against the job's owner (the day's allowance, spend pool and caps), whoever asked;
+    `user_id` is who is waiting for it, so one person has one read going at a time. A read
+    that returns no
     equation, or is stopped by a cap or the model's availability, is given back against the
     day's allowance. Raises ReadRefused when a cap or the model's availability stopped it.
     The caller holds no database lock.
@@ -279,17 +315,22 @@ def read_equation(
     the request the main model gets in the pipeline, drawn from the same caps and the same
     count, and the person sees the answer of the last one only."""
     from readablestem.pipeline import equation_step
+    from readablestem.pipeline.run import _PageAnswers
 
     ctx = get_ctx(request)
     job_id = job.id
     GATE.enter(user_id)
-    counted = False
+    sending: _CountsWhenSent | None = None
     kept = False
     try:
-        # The owner's allowance, not the reviewer's (G1).
-        counted = _count_against_allowance(request, job.user_id)
         budget = read_budget(request, job)
-        client = ctx.client_factory(ctx.settings, budget)
+        # The owner's allowance, not the reviewer's (G1), counted when a request is sent.
+        sending = _CountsWhenSent(
+            ctx.client_factory(ctx.settings, budget),
+            lambda: _count_against_allowance(request, job.user_id),
+        )
+        # A question this document's model has already answered is answered from the record.
+        client = _PageAnswers(sending, DbStepCache(ctx.factory, job_id), ctx.settings)
         try:
             with notation.in_force(ctx.factory, ctx.settings, job_id):
                 fix = equation_step.transcribe(
@@ -318,11 +359,19 @@ def read_equation(
             raise ReadRefused(FAILED) from None
         kept = not is_empty(fix)
     finally:
-        if counted and not kept:
+        if sending is not None and sending.counted and not kept:
             give_back(request, job.user_id)
         GATE.leave(user_id)
-    log_event(logger, "reread", job_id=job_id, status=fix.status.value, cost=round(fix.cost_usd, 4))
-    return fix
+    asked = sending.counted
+    log_event(
+        logger,
+        "reread",
+        job_id=job_id,
+        status=fix.status.value,
+        cost=round(fix.cost_usd, 4) if asked else 0.0,
+        asked=asked,
+    )
+    return fix, asked
 
 
 def _asked_cheaper(fix: Fix, main_model: str) -> bool:

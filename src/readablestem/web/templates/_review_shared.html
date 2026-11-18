@@ -77,7 +77,7 @@
 
 {% macro own_notes(item) %}
 {% set eid = item.element_id %}
-{% if item.can_read_again %}<p class="hint decide-note" id="reread-note-{{ eid }}">Read again reads the picture once more and replaces the proposal.</p>{% endif %}
+{% if item.can_read_again %}<p class="hint decide-note" id="reread-note-{{ eid }}">Read again reads the picture once more and replaces the proposal.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>{% endif %}
 {% if item.can_not_equation %}<p class="hint decide-note" id="not-equation-note-{{ eid }}">Not an equation gives it back to the page as text, as the PDF has it.</p>{% endif %}
 {% endmacro %}
 

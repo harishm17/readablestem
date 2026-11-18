@@ -60,11 +60,7 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
     allowance = access.reread_allowance(s, user.access_tier)
     with session_scope(ctx.factory) as session:
         left = pages_left(session, user.id, quota=quota, day=utc_today(now))
-        rereads_left = (
-            None
-            if allowance is None
-            else max(0, allowance - rereads_used(session, user.id, utc_today(now)))
-        )
+        rereads = rereads_used(session, user.id, utc_today(now))
         # The same documents storage counts: not the sample, not one past its deletion time.
         documents = int(
             session.scalar(
@@ -89,7 +85,7 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
         "page_quota": quota,
         "pages_left": left,
         "reread_allowance": allowance,
-        "rereads_left": rereads_left,
+        "rereads_used": rereads,
         "documents": documents,
         "name": user.name or "",
         "is_admin": user.is_admin,

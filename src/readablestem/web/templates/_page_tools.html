@@ -97,7 +97,7 @@
                   aria-describedby="addalt-hint-{{ tools.number }}{% if add.errors.get('addalt') %} addalt-error-{{ tools.number }}{% endif %}"{% if add.errors.get('addalt') %} aria-invalid="true"{% endif %}>{{ add.values.get("alt", "") }}</textarea>
       </div>
       {% else %}
-      <p id="add-note-{{ tools.number }}">The tool will read this part as an equation. It takes a few seconds and uses part of this document's allowance for reading with the model. You then check what it read, as a decision.</p>
+      <p id="add-note-{{ tools.number }}">The tool will read this part as an equation. It takes a few seconds and uses part of this document's allowance for reading with the model. You then check what it read, as a decision.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>
       {% endif %}
       {{ tool_error(add.errors.get("add"), "add-error-" ~ tools.number) }}
       <div class="decide-row" id="add-{{ tools.number }}" tabindex="-1">
