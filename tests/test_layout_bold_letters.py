@@ -75,6 +75,16 @@ def test_a_lone_bold_letter_with_the_same_letter_in_maths_becomes_maths():
     assert paragraph.text is not None and paragraph.text.count("⟦") == 5
 
 
+def test_a_hat_set_before_its_letter_is_read_with_the_letter():
+    # TeX sets the hat of an estimate before the letter; left in the prose, the letter was
+    # written from the file without it.
+    html = "<p>The estimated matrix \u02c6\u03a3 and the true matrix \u03a3 differ.</p>"
+    elements = analyze(html_pdf(html))
+    assert [e.text for e in elements if e.kind is Kind.EQUATION] == ["\u02c6\u03a3", "\u03a3"]
+    assert "\u02c6" not in (elements[0].text or "")
+    assert not bold_letters_of(elements)  # a letter with a hat is never the one-letter shortcut
+
+
 def test_labels_bold_words_capitals_and_letters_without_evidence_stay_text():
     pdf = html_pdf(NEGATIVES)
     on, off = analyze(pdf), analyze(pdf, on=False)

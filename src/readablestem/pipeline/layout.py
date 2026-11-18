@@ -3825,7 +3825,10 @@ def _inline_runs(
     runs: list[tuple[int, int, list[str]]] = []
     i, n = 0, len(chars)
     while i < n:
-        if not info.mathy(i) or chars[i].c in ")]}":
+        # A hat or tilde is set before its letter ("ˆΣ"): the run starts at the accent, or the
+        # accent stays in the prose and the equation is read without it.
+        leading = chars[i].c in _ACCENTS and i + 1 < n and info.mathy(i + 1)
+        if not (info.mathy(i) or leading) or chars[i].c in ")]}":
             i += 1
             continue
         start, depth = i, 0

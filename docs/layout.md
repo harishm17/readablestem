@@ -719,7 +719,9 @@ other. A minus sign alone is not math evidence: groff prints command-line option
   with a real minus sign (`−3`); or a relation with operands on both sides (`x = 5`, not
   markup such as `<a><b/>`). Without a math character the run's brackets must also
   open and close in order. A lone italic word, `[3]`, `10-12` and `2019` are not math.
-  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run; math
+  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run, and a run
+  starts at the accent TeX sets before its first letter (left in the prose, the accent was
+  lost: 7 inline equations in the first four pages of 15 arXiv papers); math
   function names (`sin`, `lim`, `proj`, `rank`, `diag` ...) are not English words. List
   bullets (`•`, `▪`, Word's Symbol bullet (U+F0B7, mapped to `•` by `font_codes`), and a
   `·` or `∙` that starts a line) are never math, even in the Symbol font Word draws them in.

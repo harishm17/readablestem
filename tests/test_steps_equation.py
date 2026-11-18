@@ -382,6 +382,19 @@ def test_any_symbol_difference_needs_a_decision(text_layer, latex):
 
 
 @pytest.mark.parametrize(
+    ("text", "cause"),
+    [
+        ("\u2192", "no_usable_characters"),  # an arrow and nothing else
+        ("\ue000\ue001 \ue002", "unmapped_characters"),  # a font the file gives no mapping for
+    ],
+)
+def test_a_reading_the_file_has_nothing_to_hold_against_is_accepted_and_says_why(text, cause):
+    fix = run(by_model(main=out(r"a \to b", 0.95)), equation_element(text=text))
+    assert fix.status == Status.ACCEPTED and not fix.failed_checks
+    assert [c.code for c in fix.checks if c.name == "equation.not_compared"] == [cause]
+
+
+@pytest.mark.parametrize(
     ("text_layer", "latex"),
     [
         ("\U0001d454= 9.80m/s2", r"g = 9.80\ \text{m/s}^2"),
