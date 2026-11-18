@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from readablestem.config import Settings
-from readablestem.core import sandbox
+from readablestem.core import sandbox, triage
 from readablestem.core.types import (
     ConversionOptions,
     ConversionOutput,
@@ -457,6 +457,7 @@ def _finish(
         step_facts.capped(ordered),
     )
     wall_ms = round((time.perf_counter() - started) * 1000)
+    triage.stamp(ordered)  # the risk band each decision was asked at
     stats = pipeline._stats(page_list, elements, ordered, run.page_ms, wall_ms)
     derived = [
         *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),

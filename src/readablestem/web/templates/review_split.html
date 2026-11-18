@@ -532,6 +532,7 @@
       <p class="steps-count" id="steps-count">{{ decided }} of {{ total }} decided</p>
     </div>
     {% endif %}
+    {% if stopping_line %}<p class="stopping-line">{{ stopping_line }}</p>{% endif %}
     <ul class="review-links">
       <li><a href="{{ list_url }}">List view</a></li>
       {% for o in bulk_offers %}

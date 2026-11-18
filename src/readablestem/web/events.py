@@ -76,6 +76,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
+from readablestem.core import triage
 from readablestem.web.database import as_utc
 from readablestem.web.db import Event, Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.logsafe import log_exception
@@ -123,8 +124,10 @@ OUTCOME_KINDS = ("heading", "paragraph", "equation", "figure", "list_item", "tab
 OUTCOMES = ("kept", "edited", "replaced", "rejected", "removed", "added")
 ORIGINS = ("page", "source")  # read from a page (a PDF), or from a LaTeX source
 # What put the thing in front of the reviewer: a flag the pipeline raised, or nothing (the
-# reviewer found it). The sources of WS8.22 add their names here when they arrive.
-SOURCES = ("pipeline", "browsing")
+# reviewer found it). The flags' names are the rows of `core.triage.SOURCES`, so a row added
+# there can be recorded here, and a name outside the table cannot.
+BROWSING = "browsing"
+SOURCES = (*triage.SOURCES, BROWSING)
 MODES = ("single", "group")  # the write changed one thing, or several
 WRITE_MODES = ("single", "group", "structure")
 NO_REASON = "none"  # nobody was asked about it
@@ -173,7 +176,6 @@ def reason_codes() -> frozenset[str]:
     """Every reason a flag can carry: the codes and check names of the review screen's
     message tables (which `tests/test_web_review_messages.py` keeps equal to what the
     pipeline emits), the triage codes, "none" and "other"."""
-    from readablestem.core import triage
     from readablestem.web.messages import CHECK_MESSAGES, REASON_MESSAGES, TABLE_CHECK_PARTS
 
     codes = {c for pair in CHECK_MESSAGES for c in pair} | set(REASON_MESSAGES)
@@ -668,11 +670,11 @@ TRUE_OUTCOMES = frozenset({"edited", "replaced", "rejected", "removed", "added"}
 # What a flag's source is, by source name (decision A16.4): a "doubt" flag is one a check or a
 # reader raised because readings disagreed, and counts in false flags per true flag; a "rule"
 # flag is a look a rule asks for whatever the readers say, and is counted on its own line,
-# never in that ratio. WS8.22's one table of sources fills this in; until a source is here its
-# flags are "not classified" and no ratio is claimed for them.
-DOUBT = "doubt"
-RULE = "rule"
-SOURCE_CLASSES: dict[str, str] = {}
+# never in that ratio. Made from the one table of sources (`core.triage.SOURCES`); a flag whose
+# source is not in it is "not classified" and no ratio is claimed for it.
+DOUBT = triage.DOUBT
+RULE = triage.RULE
+SOURCE_CLASSES: dict[str, str] = {name: row.flag for name, row in triage.SOURCES.items()}
 
 
 @dataclass

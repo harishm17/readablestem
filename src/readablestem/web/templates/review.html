@@ -441,6 +441,7 @@
   <p>{% if remaining %}<strong>{{ remaining }} {{ "decision" if remaining == 1 else "decisions" }} left:</strong>
     {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left to decide.{% endif %}{% if optional %}
     {{ counted(optional|length, "optional check", "optional checks") }} below{% if second_checks %}, {{ second_checks }} worth a look{% endif %}.{% endif %}</p>
+  {% if stopping_line %}<p class="stopping-line">{{ stopping_line }}</p>{% endif %}
   <p class="list-links">{% if has_pages %}<a href="/jobs/{{ job.id }}/review">Review screen</a>
     {% endif %}    {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols</a>
     {% endif %}

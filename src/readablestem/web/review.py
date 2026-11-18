@@ -255,8 +255,9 @@ class FixGroup:
 
     @property
     def units(self) -> list[list[Fix]]:
-        """The decisions waiting: one per fix, one per group of repeated headings."""
-        return triage.units(self.pending)
+        """The decisions waiting: one per fix, one per group of repeated headings, the
+        higher risk bands first (`triage.risk_rank`), each band in page order."""
+        return sorted(triage.units(self.pending), key=lambda unit: triage.risk_rank(unit[0]))
 
 
 # --------------------------------------------------------------------------- order

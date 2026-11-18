@@ -26,6 +26,7 @@ import hashlib
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, MutableMapping
 
+from readablestem.core import triage
 from readablestem.core.types import (
     IMAGE_PAGE_OMISSION_REASON,
     IMAGE_PAGE_ORIGINAL_REASON,
@@ -45,6 +46,7 @@ PERSON: Decoration = "person"
 RULE_RATIO = 8.0  # a rule is at least this many times as long as it is thick
 RULE_MAX_PT = 16.0  # ... and at most this thick (layout drops one under 12 pt)
 CHECK_NAME = "figure.decoration"
+DECORATION_SOURCE = "decoration"  # its row in `core.triage.SOURCES`
 UNPROVEN = "decoration_unproven"  # called decorative, nothing else says so: a decision
 BY_RULE = "decoration_by_rule"  # its reading failed, and it is decoration by the rule
 
@@ -133,9 +135,9 @@ def settle(
                     fix.figure = figure.model_copy(update={"decoration": found})
                     changed += 1
                 continue
+            triage.add_source(fix, DECORATION_SOURCE)  # before the status: it asks if not asked
             if fix.status is Status.ACCEPTED:
                 fix.status = Status.NEEDS_REVIEW
-            fix.review = "required"
             if not any(c.code == UNPROVEN for c in fix.checks):
                 unproven = Check(name=CHECK_NAME, passed=False, severity="warning", code=UNPROVEN)
                 fix.checks = [*fix.checks, unproven]

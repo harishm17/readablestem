@@ -627,6 +627,9 @@ def _sum_loads(loads: Iterable[dict]) -> dict:
                 optional_by_kind=Counter(load["optional_by_kind"]),
                 required_by_reason=Counter(load["required_by_reason"]),
                 optional_by_reason=Counter(load["optional_by_reason"]),
+                required_by_band=Counter(load.get("required_by_band", {})),
+                required_by_source=Counter(load.get("required_by_source", {})),
+                required_by_class=Counter(load.get("required_by_class", {})),
             )
         )
     return total.as_dict()
@@ -694,7 +697,7 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "review": fix.review,
         "tier_reasons": triage.tier_reasons(fix),
         "wrong": not score.exact_lenient,
-        "wrong_not_required": not score.exact_lenient and fix.review != "required",
+        "wrong_not_required": not score.exact_lenient and triage.tier_for(fix) != "required",
         **_calls_summary(fix.calls),
         # Second automated check, shadow mode (ADR 0005; eval.verifier_metrics).
         **vm.equation_fields(fix),

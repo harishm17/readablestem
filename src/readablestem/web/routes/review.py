@@ -79,6 +79,7 @@ from readablestem.web import (
     notice_places,
     outcomes,
     page_edits,
+    queue,
     shares,
 )
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
@@ -1675,6 +1676,7 @@ def _page(
         "flash": [],  # placed by _place_flashes instead of at the top of <main>
         "notices": top,
         "remaining": sum(len(g.units) for g in fix_groups),
+        "stopping_line": queue.stopping_words(result.fixes),
         "remaining_by_kind": [decisions_label(g.units, g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
         "result_version": version,
