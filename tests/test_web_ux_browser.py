@@ -246,7 +246,7 @@ def test_a_used_up_page_limit_says_when_uploads_open_again(site, browser, axe_so
     page.goto(f"{site.base}/app")
     notice = page.locator("#upload-closed")
     assert "You have converted all 20 pages you can today." in notice.inner_text()
-    assert "Uploads open again at" in notice.inner_text()
+    assert "Resets" in notice.inner_text()
     assert page.locator("#pdf").count() == 0
     violations = strict_violations(page, axe_source)
     context.close()

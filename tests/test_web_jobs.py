@@ -141,7 +141,7 @@ def test_upload_rejects_encrypted_pdfs(web):
 def test_upload_rejects_too_many_pages(web):
     response = upload(web.browser, make_pdf(6))  # max_pages_per_job=5 in tests
     assert response.status_code == 422
-    assert "notes.pdf has 6 pages; the limit is 5 per upload" in response.text
+    assert "notes.pdf has 6 pages; one file is up to 5 pages" in response.text
     assert count(web, Job) == 0
 
 

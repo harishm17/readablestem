@@ -56,7 +56,7 @@
   {# The same for this person's daily page limit (MF20): no form that can only fail. #}
   <div class="notice" id="upload-closed" tabindex="-1">
     <p><strong>You have converted all {{ page_quota }} pages {% if new_account %}a new account can convert{% else %}you can{% endif %} today.</strong>
-      Uploads open again at {{ next_reset|utc }}.</p>
+      {{ allowance(page_quota, page_quota, "page", next_reset) }} {{ PAGES_RULE }}</p>
   </div>
   {% else %}
   {% set pdf_error = field_errors.get("pdf") %}
@@ -70,8 +70,8 @@
           <li>{% with accepted_types = acc %}{% include "_accepted_types.html" %}{% endwith %}</li>
           <li>{% if revising %}One file, up to {{ one_document }}.{% else %}Up to {{ max_files }} files at a time, each up to {{ one_file }}.{% endif %}</li>
           {% if pages_left is not none %}
-          <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
-            (a new account can convert {{ page_quota }} pages a day){% endif %}; resets at {{ next_reset|utc }}.</li>
+          <li>{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% if new_account %}
+            That is the limit for a new account.{% endif %} {{ PAGES_RULE }}</li>
           {% endif %}
           <li>Your own materials only, with no student records.</li>
         </ul>
