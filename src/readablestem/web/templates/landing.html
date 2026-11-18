@@ -39,14 +39,14 @@
   <h2 id="hear-title">Hear the difference</h2>
   <div class="diff-rows">
     <div class="diff-row">
-      <h3>In the PDF</h3>
+      <h3 class="card-title">In the PDF</h3>
       <div class="sheet diff-eq"><img src="{{ static_url('hero/before.png') }}" width="{{ hero.crop_display_width }}" height="{{ hero.crop_display_height }}"
         alt="Equation 2.4 cut from the PDF page: delta d over delta t, number 2.4."></div>
       <p class="diff-says"><span class="diff-says-label">What a screen reader would say, from the PDF&rsquo;s own text</span> <span class="diff-says-text">{{ hero.text_layer }}</span></p>
       <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play" data-hear-a="{{ hero.text_layer_speech }}" data-hear-a-lead="In the PDF a screen reader says"><span data-hear-label>Play</span><span class="visually-hidden"> the PDF reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
     </div>
     <div class="diff-row">
-      <h3>In the ReadableSTEM page</h3>
+      <h3 class="card-title">In the ReadableSTEM page</h3>
       <div class="sheet diff-eq"><div class="eq">{{ hero.mathml|safe }}<span class="eq-label"><span class="visually-hidden">Equation </span>{{ hero.label }}</span></div></div>
       <p class="diff-says"><span class="diff-says-label">What a screen reader would say (written by the rules the converter uses)</span> <span class="diff-says-text">{{ hero.speech }}</span></p>
       <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play" data-hear-a="{{ hero.speech }}" data-hear-a-lead="On the converted page a screen reader says"><span data-hear-label>Play</span><span class="visually-hidden"> the converted reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>

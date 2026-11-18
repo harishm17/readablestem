@@ -82,7 +82,7 @@
   <div class="{{ frame_wrap }}">
     <nav aria-label="Footer" class="footer-cols">
       <div>
-        <h2>Product</h2>
+        <h2 class="card-title">Product</h2>
         <ul>
           {% for key in ("demo", "help", "posting", "status") %}
           <li>{{ link(key) }}</li>
@@ -93,7 +93,7 @@
         </ul>
       </div>
       <div>
-        <h2>Trust</h2>
+        <h2 class="card-title">Trust</h2>
         <ul>
           {% for key in ("privacy", "terms", "limits", "offices") %}
           <li>{{ link(key) }}</li>
@@ -101,7 +101,7 @@
         </ul>
       </div>
       <div>
-        <h2>Guides</h2>
+        <h2 class="card-title">Guides</h2>
         <ul>
           {% for key in ("guides", "guide-ada", "guide-compare") %}
           <li>{{ link(key) }}</li>
@@ -109,7 +109,7 @@
         </ul>
       </div>
       <div>
-        <h2>Source</h2>
+        <h2 class="card-title">Source</h2>
         <ul>
           <li>{{ link("source") }}</li>
           <li>{{ link("open-source") }}</li>
