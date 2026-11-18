@@ -500,6 +500,13 @@ NOTE_CODES = frozenset(
 )
 # A picture of an equation: no text layer to check the reading against, so a person decides.
 NO_TEXT_LAYER_CODE = "no_text_layer"
+# A reading that was held against nothing: the region has no characters, none of them can be
+# used (operators and marks only, or characters the font does not map), or the letter was
+# written from the file's own bold character with no reading at all. Written as a passed
+# check with the cause as its code, so the record says it and no card is made: these were
+# 0.6% of accepted equations when counted, too few and too rarely fixable to ask a person.
+NOT_COMPARED = "equation.not_compared"
+BOLD_LETTER_CAUSE = "bold_letter"
 # Layout found a fraction bar against the equation's region with the bar's other side
 # holding glyphs of something else (`layout.REASON_HALF_FRACTION`): the crop shows half of
 # a fraction, so whatever is read from it cannot be trusted. Never accepted without a
@@ -770,6 +777,21 @@ def text_layer_symbols_differ(text_layer: str | None, mathml: str) -> bool | Non
     return expected != _mathml_symbols(mathml)
 
 
+def not_compared(text_layer: str | None) -> Check:
+    """The check written when `text_layer_symbols_differ` has nothing to compare, with why:
+    `no_characters`, `unmapped_characters` (private-use, unassigned or replacement
+    characters: a font the file gives no mapping for) or `no_usable_characters` (operators,
+    punctuation or marks only)."""
+    text = (text_layer or "").strip()
+    if not text:
+        cause = "no_characters"
+    elif any(unicodedata.category(c) in ("Co", "Cn", "Cs", "Cc") or c == "�" for c in text):
+        cause = "unmapped_characters"
+    else:
+        cause = "no_usable_characters"
+    return Check(name=NOT_COMPARED, passed=True, severity="warning", code=cause)
+
+
 def text_layer_number_case_checks(text_layer: str | None, mathml: str) -> list[Check]:
     """The two checks the symbol bag cannot make, for a pair whose bags already agree (the
     caller asks `text_layer_symbols_differ` first and passes only a `False`):
@@ -962,6 +984,8 @@ def _evaluate(
         if mismatch and similarity is not None:
             # scale towards half confidence as the symbol overlap goes to zero
             candidate.confidence = output.confidence * (0.5 + 0.5 * similarity)
+    else:
+        candidate.checks.append(not_compared(layer.text))
     if differ is False:
         # The letters and digits agree as multisets: are the numbers the same numbers,
         # and the capitals the same capitals?
@@ -1390,6 +1414,9 @@ def transcribe(
     spoken = notation_memory.readings(entries)
     fixed = notation_memory.bold_letter_fix(element, spoken=spoken)
     if fixed is not None:
+        fixed.checks.append(
+            Check(name=NOT_COMPARED, passed=True, severity="warning", code=BOLD_LETTER_CAUSE)
+        )
         return fixed
     course_bold = notation_memory.course_bold_letters(entries)
     if entries:

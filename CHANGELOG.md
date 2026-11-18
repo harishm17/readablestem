@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
+
+- SW57 (F-574): a reading the file's characters could not be held against (no characters in
+  the region, operators and marks only, or characters the font does not map) now carries the
+  passed check `equation.not_compared` with the cause as its code; so does a bold letter
+  written from the file with no reading (`bold_letter`). The record says it; no card is made
+  and nothing is asked again, because the count was small (53 of 8,397 accepted equations)
+  and the file's characters would have fixed none of the wrong ones.
+- A hat, tilde or bar that TeX sets before the first letter of an inline equation was left in
+  the prose, and the equation was read without it; a bold letter under such an accent was
+  written from the file as the bare letter. A run now starts at the accent. Stored documents
+  change for those equations, so this goes out with the next pipeline version.
+
 ## Unreleased: exam mode is in view at upload and said wherever the document is handled (branch feat/exam-mode-visible-and-used)
 
 - WS11.3c (F-047, F-015 exam half), points 1 and 2: the "Exam or quiz" box is under the file field,
