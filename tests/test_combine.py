@@ -227,6 +227,47 @@ def test_a_part_with_a_pdf_contents_page_keeps_it_and_no_second_list_is_made():
     assert "<nav" not in combine_html([first, second], title="Chapter")
 
 
+@pytest.mark.parametrize(
+    ("entries", "headings", "linked"),
+    [
+        # a part holds one namesake: its number is not the entry's
+        (["3.1 The model"], ["2.1 The model"], [None]),
+        # two namesakes: the number says which one each entry means
+        (
+            ["2.1 The model", "3.1 The model"],
+            ["2.1 The model", "3.1 The model"],
+            ["2.1 The model", "3.1 The model"],
+        ),
+        # a number on one side only, or none: the title decides as before
+        (["The model"], ["2.1 The model"], ["2.1 The model"]),
+        (["Appendix A Tables"], ["Appendix A  Tables"], ["Appendix A  Tables"]),
+    ],
+)
+def test_a_contents_entry_links_to_the_heading_with_its_number_not_a_namesake(
+    entries, headings, linked
+):
+    result, _ = part_result("A", pages=1, headings=0)
+    box = {"bbox": (0, 0, 1, 1), "page": 0, "order": 0}
+    result.fixes = []
+    result.elements = [
+        Element(id=f"p1-e{i}", kind=Kind.LIST_ITEM, text=text, reasons=["contents entry"], **box)
+        for i, text in enumerate(entries)
+    ] + [
+        Element(id=f"p1-e{len(entries) + i}", kind=Kind.HEADING, text=text, **box)
+        for i, text in enumerate(headings)
+    ]
+    for order, element in enumerate(result.elements):
+        element.order = order
+    joined = join([Part(result, {}, [0])]).elements
+    by_id = {e.id: e for e in joined}
+    got = [
+        by_id[e.links[0].target_id].text if e.links else None
+        for e in joined
+        if "contents entry" in e.reasons
+    ]
+    assert got == linked
+
+
 def lang_of(html: str, text: str) -> str | None:
     """The `lang` on the block that holds `text`, None when it has none of its own."""
     block = re.search(rf"<(?:p|h\d|li)\b([^>]*)>[^<]*{text}", html)

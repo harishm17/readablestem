@@ -523,7 +523,8 @@ and each part's equations, figures and tables as in the part.
   later chapter, or "Chapter 2" or "Figure 3" naming something in the next part, stay plain
   words there. After the join `pipeline/combine.join` runs the passes that made those links in
   the parts once more over all the elements (`layout.elements._contents_links`, then
-  `text_pass.source_links`: contents entries, typed addresses and references by number), so a
+  `text_pass.source_links`: contents entries, typed addresses and references by number; an entry
+  with a section number links only to a heading with the same number), so a
   contents entry and a reference whose target is in the file link to it. A link a part already
   has is kept and moves with its target's new id. A link the PDF itself made to a page of
   another part is not restored (the part did not keep it). The combined file has no link to an
@@ -949,12 +950,12 @@ items and headings; offsets are into the stored text, markers included.
   file is written). Any other PDF link (ftp, a file, a program, javascript) is not
   written; its text stays, and the job page lists the notice `link_scheme_dropped`.
 - **Links inside the document** ("internal": a PDF link to a place in it; "crossref":
-  "Figure 2.3", "Eq. (3)", "Table 1", "Section 3.2", "Chapter 4", "Theorem 2.1" in the
-  text) point at `#` + the target element's id. Figures, tables, display equations,
+  "Figure 2.3", "Eq. (3)", "Table 1", "Section 3.2", "Chapter 4", "Appendix A",
+  "Theorem 2.1" in the text) point at `#` + the target element's id. Figures, tables, display equations,
   headings, paragraphs and list items already carry their ids, so nothing new is written
   at the target. A reference is a link only when exactly one thing in the document has
   that number: "Section 3.2" needs a heading that starts with 3.2, "Chapter 4" a heading
-  "Chapter 4", and "Theorem 2.1" (also Lemma, Proposition, Corollary, Definition,
+  "Chapter 4", "Appendix A" (or "Appendices A and B") a heading that starts "Appendix A", and "Theorem 2.1" (also Lemma, Proposition, Corollary, Definition,
   Example) a paragraph or heading that starts "Theorem 2.1." or "Theorem 2.1 (name).".
   No such target, or two, and the words stay plain text; so does a reference inside its
   own target.

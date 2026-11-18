@@ -228,6 +228,8 @@ FIGURES = [
     el("i1", Kind.EQUATION, display="inline", equation_label="(9)"),
     el("s32", Kind.HEADING, text="3.2 Rates of change"),
     el("c4", Kind.HEADING, text="Chapter 4: Waves"),
+    el("apa", Kind.HEADING, text="Appendix A  Units"),
+    el("apb2", Kind.HEADING, text="B.2 Tables of constants"),
     el("th21", Kind.PARAGRAPH, text="Theorem 2.1 (Rolle). Let f be continuous."),
     el("d3", Kind.PARAGRAPH, text="Definition 3. A group is a set."),
     el("s5a", Kind.HEADING, text="5 Methods"),
@@ -261,6 +263,8 @@ def refs(text: str, *, taken=(), elements=FIGURES) -> list[tuple[str, str | None
         ("as Section 3.2 shows", [("Section 3.2", "s32")]),
         ("see Chapter 4 and § 3.2", [("Chapter 4", "c4"), ("\u00a7 3.2", "s32")]),
         ("By Theorem 2.1 and Definition 3, the", [("Theorem 2.1", "th21"), ("Definition 3", "d3")]),
+        ("see Appendix A and Appendix B.2.", [("Appendix A", "apa"), ("Appendix B.2", "apb2")]),
+        ("Appendices A and B.2 hold them", [("Appendices A", "apa"), ("B.2", "apb2")]),
     ],
 )
 def test_references_link_to_the_one_target_with_that_number(text, expected):
@@ -288,6 +292,8 @@ def test_references_link_to_the_one_target_with_that_number(text, expected):
         "Section 7 is not in this document.",  # no heading starts with 7
         "Section 5 covers both.",  # two headings start with 5: nothing is guessed
         "Chapter 9 and Lemma 2 are not here.",
+        "Appendix Z is not here.",
+        "In an appendix a reader may look.",  # "a" in lower case is a word, not an appendix letter
         "For example 3 of them fail.",  # "example" in lower case is not a reference
     ],
 )

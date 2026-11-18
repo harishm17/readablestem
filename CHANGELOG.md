@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: a contents entry links by its number, and "Appendix A" is a reference (branch fix/contents-by-number)
+
+- F-515 (first half) and a sibling. A contents entry was linked to the one later heading with
+  its title once the section number was left out of both, so in a part of a book the entry "3.1
+  The model" linked to the heading "2.1 The model", and in a whole file with both headings each
+  entry saw two candidates and stayed plain text. Now, when the entry and a candidate heading
+  both print a number (digits and dots, "A.1", a chapter, part or appendix label with its
+  number or letter, a roman numeral), it must be the same one; a number on one side only, or
+  none, leaves the title to decide as before, and an entry that still names none or more than
+  one heading stays plain (`layout.elements._contents_links`). The reading of "the number in
+  front" is one function, `heading_number`, which `text_pass` now uses for the targets of
+  "Section 3.2" and "Chapter 4" too (it replaces its two patterns; "Chapter 4.1" is no longer
+  the chapter 4).
+- "Appendix A", "Appendix B.2", "Appendix 1" and "Appendices A and B" are references by number
+  like "Chapter 4": the target is the heading "Appendix A ..." or "B.2 ..."; none or two with
+  that number, no link (`text_pass.APPENDIX_REF`; whole files, LaTeX and Word sources, combined
+  files). The LaTeX and Word readers make a contents entry's link from the file's own ids, or
+  make the list again from the headings, so they needed no change. No migration; no model
+  request changed; `PIPELINE_VERSION` and `RENDER_VERSION` not bumped (the next bump covers it:
+  stored documents get the links when they are converted again).
 ## Unreleased: the icons are drawn from one SVG (branch fix/brand-icons-one-source)
 
 - WS24.9 (F-424), as far as its triage line. The favicon, the 192 and 512 px icons and the touch
