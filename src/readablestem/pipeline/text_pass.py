@@ -988,10 +988,17 @@ def token_runs(element: Element, fields: Sequence[FormField] = ()) -> list[Run]:
     return sorted(found, key=lambda r: (r.start, r.end))
 
 
-def deleted_runs(element: Element, aligner: _Aligner, strikes: Sequence[Strike]) -> list[Run]:
+def deleted_runs(
+    element: Element,
+    aligner: _Aligner,
+    strikes: Sequence[Strike],
+    equations: Mapping[str, Element] | None = None,
+) -> list[Run]:
     """The element's struck runs (offsets into its text): its struck glyphs mapped onto the
     text, each run trimmed of spaces and kept only when it has a letter, a digit or an
-    inline equation."""
+    inline equation. An inline equation (`equations`, by id) is struck when most of its glyphs
+    are; it has no glyph in the text, so it is a run of its own, joined to a struck run
+    beside it with only spaces between."""
     box = element.bbox
     near = [s for s in strikes if _overlaps(s.bbox, box, BOX_SLACK)]
     if not near:
@@ -1001,14 +1008,27 @@ def deleted_runs(element: Element, aligner: _Aligner, strikes: Sequence[Strike])
     if not struck:
         return []
     text = element.text or ""
-    runs = labelled_runs(
-        text, alignment, lambda i: True if i in struck else None, across_markers=True
-    )
-    return [
-        Run(start=start, end=end, kind="deleted")
-        for start, end, _ in runs
+    runs = [
+        (start, end)
+        for start, end, _ in labelled_runs(
+            text, alignment, lambda i: True if i in struck else None, across_markers=True
+        )
         if INLINE_MARKER_RE.search(text[start:end]) or any(c.isalnum() for c in text[start:end])
     ]
+    for match in INLINE_MARKER_RE.finditer(text):
+        equation = (equations or {}).get(match.group(1))
+        if equation is None:
+            continue
+        inside = [i for i, g in enumerate(glyphs) if _centre_in(g.bbox, equation.bbox, 0.0)]
+        if inside and sum(i in struck for i in inside) * 2 > len(inside):
+            runs.append((match.start(), match.end()))
+    merged: list[list[int]] = []
+    for start, end in sorted(runs):
+        if merged and not text[merged[-1][1] : start].strip():
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [Run(start=start, end=end, kind="deleted") for start, end in merged]
 
 
 # ============================================================================ language
@@ -1184,11 +1204,12 @@ def annotate(
                 if found_runs:
                     coloured[element.id] = found_runs
     struck: dict[str, list[Run]] = {}
+    inline_equations = {e.id: e for e in elements if e.kind is Kind.EQUATION}
     for element in elements:
         strikes = pdf.strikes.get(element.page)
         if not strikes or element.kind not in LINK_KINDS or not element.text:
             continue
-        if found_struck := deleted_runs(element, aligner, strikes):
+        if found_struck := deleted_runs(element, aligner, strikes, inline_equations):
             struck[element.id] = found_struck
     lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang, chosen_lang)
     langs = passages(elements, lang)
