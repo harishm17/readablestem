@@ -14,7 +14,10 @@ claim.
 |---|---|---|---|---|
 | The private corpus (counts only; no file, page or word of it is named here) | 27 of 28 | 280 | 225 | 71,809 |
 | Every tracked public PDF of the repository, held-out and sealed sets left out | 100 of 117 | 428 | 326 | 89,616 |
+| The wide list (the cached arXiv papers and the layout development set; anything named held-out or sealed, or under `data/`, left out) | 131 of 158 | 3,446 | 3,380 | 1,573,237 |
 
+The wide list has 23 repeated paths and two files that fail the same way before and after this
+change (`IndexError` in `_layout_notices` on `2404.05746`, a `LayoutError` on `2410.12036`).
 The 117 tracked files are 100 different PDFs (16 are copies: the demo and site examples are
 the same files as the proof bundle's) and one that cannot be read on purpose
 (`tests/fixtures/layout/damaged_render_abort.pdf`). The corpus has one file layout cannot
@@ -25,28 +28,30 @@ read. Copies are counted once.
 Share of a page's words in no element, over pages of 40 words or more (the same pages the line
 is judged on). A cell is the number of pages at or over that share.
 
-| Share of words | Corpus (225 pages) | Public (326 pages) |
-|---|---|---|
-| any (0.1% or more) | 9 | 15 |
-| 1% | 4 | 0 |
-| 2% | 1 | 0 |
-| 5% | 0 | 0 |
-| 15% (the reviewer's line) | 0 | 0 |
-| median, 90th, 99th percentile, largest | 0, 0, 1.1%, 2.1% | 0, 0, 0.4%, 0.7% |
-| all words, all pages | 0.046% (33 words) | 0.028% (25 words) |
+| Share of words | Corpus (225 pages) | Public (326 pages) | Wide (3,380 pages) |
+|---|---|---|---|
+| any (0.1% or more) | 9 | 15 | 551 |
+| 1% | 4 | 0 | 55 |
+| 2% | 1 | 0 | 16 |
+| 5% | 0 | 0 | 5 |
+| 10% | 0 | 0 | 3 |
+| 15% (the reviewer's line) | 0 | 0 | 1 |
+| 25% | 0 | 0 | 0 |
+| median, 90th, 99th percentile, largest | 0, 0, 1.1%, 2.1% | 0, 0, 0.4%, 0.7% | 0, 0.2%, 1.3%, 15.5% |
+| all words, all pages | 0.046% (33 words) | 0.028% (25 words) | 0.083% (1,308 words) |
 
 Share of a page's words said twice (`two_places`, `place_and_text`, `said_twice`):
 
-| Share of words | Corpus | Public |
-|---|---|---|
-| 1% | 36 | 12 |
-| 5% | 19 | 6 |
-| 10% | 11 | 4 |
-| 15% | 8 | 3 |
-| 50% | 2 | 1 |
-| all words, all pages | 1.54% | 0.46% |
+| Share of words | Corpus | Public | Wide |
+|---|---|---|---|
+| 1% | 36 | 12 | 780 |
+| 5% | 19 | 6 | 318 |
+| 10% | 11 | 4 | 122 |
+| 15% | 8 | 3 | 66 |
+| 50% | 2 | 1 | 15 |
+| all words, all pages | 1.54% | 0.46% | 1.54% |
 
-Nearly all of it is `place_and_text` (805 words in the corpus, 377 in public): a word inside an
+Nearly all of it is `place_and_text` (805 words in the corpus, 377 in public, 14,331 in the wide list): a word inside an
 equation, table or figure box that a paragraph also says. It is not a duplicate in the page
 a student gets in every case, but it is a place where two elements claim the same words, and the
 public cases below are real overlaps in layout.
@@ -64,10 +69,17 @@ different count (the reviewer counted words of the page absent from the converte
 counts words no element has, with the page's own furniture and hidden text left out).
 
 - At 15% and 40 words the line flags **0 of 551 pages** (225 and 326), so 0 are real and 0 are
-  false. The cleanest reading is that it is quiet on all of them; it says nothing about whether
-  it would find a page that is missing a block, because none of these pages is.
-- The largest share of any page is 2.1% in the corpus and 0.7% in public. A line anywhere from
-  3% to 15% is therefore equally quiet on what we have. Nothing here picks within that range.
+  false. It flags **1 of the 3,380 pages of the wide list**, and that one is not real:
+  `2503.08264` page 33 (15.5%) is a page of formulas with subscripted names, where the page
+  holds `qualityweightj` as one word and the elements say `QualityWeight` and `j` apart. Its
+  pages 32 and 28 are at 12% and 10% for the same reason. All five wide-list pages at 5% or
+  more are in that one paper (pages 33, 32, 28, 35 and 27). So 0 of 1 flagged pages is a lost
+  block: the 15% line in shadow has one false page in the 3,380 pages of 40 words or more. It says nothing about whether it would find a page that is missing a block, because none
+  of these pages is.
+- The largest share of any page outside that paper is 2.1% in the corpus, 0.7% in public and
+  4.6% in the wide list (`2405.15050` page 28, 31 of 676 words; not opened). A line anywhere from 3% to 15% is therefore about equally quiet on what
+  we have, and the page that crosses it is maths in a line, not a loss. Nothing here picks
+  within that range.
 - A planted fault is found: the generated page of three paragraphs with one taken out of
   layout's answer is 33% missing, and the same page whole is 0%
   (`tests/test_layout_silent_loss.py`, "say once"). A page that lost one block of eight
