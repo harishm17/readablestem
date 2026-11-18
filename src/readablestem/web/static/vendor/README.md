@@ -42,7 +42,9 @@ Latin Modern Math (checked by `tests/test_web_pages.py`):
   `MANIFEST-Latin-Modern-Math.txt`, `README-Latin-Modern-Math.txt`.
 
 The font is not changed (no subsetting, no renaming): the GUST Font License requests that
-a derived font be renamed. The review screen draws the proposal of an equation in it
+a derived font be renamed. The EPUB export packs the woff2 file as it is, with the license and
+manifest from this folder, in every book that has maths (`pipeline/math_font.py` lists the file
+names, so a rename here needs a change there). The review screen draws the proposal of an equation in it
 (`app.css`, `.cmp-math`), so the same-size compare shows a LaTeX PDF's Computer Modern
 next to the same family; the browser only downloads it when an equation is shown, and uses
 an installed copy if there is one. What it downloads is the WOFF2 file (392 KB, against

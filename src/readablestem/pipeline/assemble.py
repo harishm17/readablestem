@@ -39,6 +39,7 @@ before.
 from __future__ import annotations
 
 import base64
+import math
 import re
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -76,6 +77,7 @@ from readablestem.pipeline import (
     figure_details,
     figure_images,
     inline_text,
+    math_font,
     navigation,
     output_chars,
     table_html,
@@ -102,8 +104,10 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # documents converted before it, not only new ones and ones somebody edits again.
 # 4: the statement of what was reviewed and converted (SW7). 5: the note "About this version"
 # inside `<main>` (WS22.1); 5 on its own branch too: one H1, the title not said twice (SW6c), and
-# empty alt text only for decoration with evidence (WS6.4). 6: both together.
-RENDER_VERSION = 6
+# empty alt text only for decoration with evidence (WS6.4). 6: both together. 7: nothing is cut
+# on paper, long descriptions print open, every code block that can scroll is a tab stop, the
+# maths font stack (SW45, WS21.2, WS21.4) and the words of a part kept as a picture (WS21.9).
+RENDER_VERSION = 7
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -177,43 +181,50 @@ EQUATION_WRITTEN_NOTE = (
 FIGURE_NOTE = (
     "This figure has no text description yet. Ask your instructor for a description of it."
 )
-# Pages and handwriting kept as images (pipeline.page_type: there is no handwriting or
-# scan conversion): their alt text ("{page}" is the page number) and the note students
-# see, by the fix's reason. Rendered from the stored reason, so a stored result renders
-# the same. These words are the beta wording (handwriting design, section 3.3).
+# Pages and pictures kept as images (pipeline.page_type: there is no handwriting or scan
+# conversion): by the fix's reason, ONE table of the picture's alt text ("{page}" is the page
+# number), the label of its note and the note students see. Rendered from the stored reason,
+# so a stored result renders the same. A reason that names what the picture is (a handwritten
+# page, a scanned page) is a page-level finding; `handwriting_on_page` is also what a box of
+# vector lines got named before the reader had pen evidence (WS6.10, WS3.5), so it says only
+# that the part is a picture and never names handwriting (WS21.9). A drawing has no reason
+# of its own yet (P1 and P3 record it); it is added to this table then.
 KEPT_IMAGE_LABEL = "Not converted."
+KEPT_PICTURE_LABEL = "Shown as a picture, not converted to text."
+_ASK = "Ask your instructor for a text version."
 KEPT_IMAGE_WORDS = {
     "handwritten_page": (
         "Page {page}: handwritten notes, not converted to text.",
-        "This page is a picture of handwritten notes, so a screen reader cannot read it. "
-        "Ask your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This page is a picture of handwritten notes, so a screen reader cannot read it. {_ASK}",
     ),
     "scanned_page": (
         "Page {page}: a scanned page, not converted to text.",
-        "This page is a picture of a scanned page, so a screen reader cannot read it. Ask "
-        "your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This page is a picture of a scanned page, so a screen reader cannot read it. {_ASK}",
     ),
     "unread_page": (
         "Page {page}: not converted to text.",
-        "This page is shown as a picture, so a screen reader cannot read it. Ask your "
-        "instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This page is shown as a picture, so a screen reader cannot read it. {_ASK}",
     ),
     "page_read_failed": (
         "Page {page}: this page could not be read.",
+        KEPT_IMAGE_LABEL,
         "This page could not be read, so it is shown as a picture and a screen reader cannot "
-        "read it. Ask your instructor for a text version.",
+        f"read it. {_ASK}",
     ),
     "handwriting_on_page": (
-        "Handwriting on page {page}, not converted to text.",
-        "This is a picture of handwriting on the page, so a screen reader cannot read it. "
-        "Ask your instructor for a text version.",
+        "Part of page {page}, shown as a picture, not converted to text.",
+        KEPT_PICTURE_LABEL,
+        f"A screen reader cannot read this picture. {_ASK}",
     ),
     # A block of a page converted from an image that the instructor chose to keep as the
     # picture (`_kept_prose`): not a page, and not a whole-page reason either.
     "image_page_text": (
         "Text on page {page}, not converted to text.",
-        "This is a picture of text on the page, so a screen reader cannot read it. Ask your "
-        "instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        f"This is a picture of text on the page, so a screen reader cannot read it. {_ASK}",
     ),
 }
 # A page kept as a picture because something painted on it was read into nothing (an
@@ -513,6 +524,36 @@ def _scroller_attrs(mathml: str, label: str | None) -> str:
         return ""
     name = f"Equation {' '.join(label.split())}" if label and label.strip() else "Equation"
     return f' tabindex="0" role="group" aria-label="{_escape(name)}"'
+
+
+# An equation estimated at least this wide (em of the maths font) may not fit a sheet: at
+# Letter and 150% the text column is about 22 em of it. On paper it is scaled to fit the
+# column down to 70% of its size; wider than that it keeps 70% and the page prints a note
+# (`PRINT_CSS`, SW45 rule 6). The estimate is not calibrated (A23); it errs wide.
+PRINT_FIT_EM = 14.0
+_PRINT_FLOOR = 0.7  # of the size on screen, whose maths is set at 1.1 em
+
+
+def print_width_bucket(mathml: str) -> int | None:
+    """The estimated width of an equation, rounded up to a step (4 em, then 16 em), when it
+    may not fit a sheet; None when it does. Few steps, so the stylesheet gets few rules."""
+    width = min(estimate_width_em(mathml), 512.0)
+    if width < PRINT_FIT_EM:
+        return None
+    step = 4 if width <= 48 else 16
+    return math.ceil(width / step) * step
+
+
+def print_fit_css(bucket: int) -> str:
+    """The rules of one width step: the width the sheet fits the equation to, and the note
+    that shows where even 70% is too wide (the column, in em of its 1.125 rem text, is
+    narrower than the equation at 70% of 1.1 em)."""
+    narrower = round(bucket * _PRINT_FLOOR * 1.1, 2)
+    return (
+        f"@media print {{ .pw-{bucket} {{ --pw: {bucket}; }}\n"
+        f"@container (inline-size < {narrower:g}em) "
+        f"{{ .pw-{bucket}::after {{ display: block; }} }} }}\n"
+    )
 
 
 def _fix_attrs(fix: Fix | None, reason: str | None) -> str:
@@ -1175,11 +1216,20 @@ class _Renderer:
             return None, "mathml_rejected"
         return mathml, ""
 
+    def print_fit(self, mathml: str) -> str:
+        """The classes that fit an equation to the sheet on paper (" pw pw-24") and the rules
+        of its width step, or "" when it fits any sheet (SW45 rule 6)."""
+        bucket = print_width_bucket(mathml)
+        if bucket is None:
+            return ""
+        self.add_style(f"print-fit-{bucket:03d}", print_fit_css(bucket))
+        return f" pw pw-{bucket}"
+
     def block_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "block", with_id=False)
         label = _equation_label(element.equation_label)
         if mathml is not None:
-            css = "equation equation-labelled" if label else "equation"
+            css = ("equation equation-labelled" if label else "equation") + self.print_fit(mathml)
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
         original = self.original(element, self.image_alt(element, equation_alt(element))) + label
@@ -1203,7 +1253,8 @@ class _Renderer:
             # (only those, since a scroll box sits on the text's baseline differently).
             scroller = _scroller_attrs(mathml, None)
             if scroller:
-                return f'<span class="equation-scroll"{scroller}>{mathml}</span>'
+                fit = self.print_fit(mathml)
+                return f'<span class="equation-scroll{fit}"{scroller}>{mathml}</span>'
             return mathml
         self.flagged.add(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
@@ -1260,10 +1311,10 @@ class _Renderer:
             )  # fmt: skip
         if fix is not None and fix.status in NOT_CONVERTED and fix.reason in KEPT_IMAGE_WORDS:
             # A page (or handwriting) kept as an image: what it is, never "a figure".
-            alt, note = KEPT_IMAGE_WORDS[fix.reason]
+            alt, label, note = KEPT_IMAGE_WORDS[fix.reason]
             alt = self.image_alt(element, alt.format(page=element.page + 1))
             figure = f"<figure>{picture(alt)}</figure>"
-            return self.flag_block(element, fix.reason, figure, KEPT_IMAGE_LABEL, note)
+            return self.flag_block(element, fix.reason, figure, label, note)
         if fix is None:
             reason = "no_fix"
         elif fix.status in NOT_CONVERTED:
@@ -1547,7 +1598,10 @@ def _contact_sentence(contact: str | None) -> str:
 
 # Added to a document's stylesheet only when it has a code block / a definition list
 # (`_Renderer.add_style`), so documents without them are written as before.
-CODE_WIDE_CHARS = 36  # characters in a line that may not fit a 320 px screen at 0.9 rem
+# A line longer than this is a tab stop. Measured in Chromium at 320 px: a block first scrolls
+# at 30 characters, and at 25 with WCAG 1.4.12 text spacing, so 24 leaves no scrolling block
+# without one (it was 36, F-448).
+CODE_WIDE_CHARS = 24
 CODE_CSS = """\
 pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px solid #c8c8c8;
   border-radius: 4px; overflow-x: auto; }
@@ -1555,6 +1609,9 @@ pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, mono
   white-space: pre; }
 @media screen and (prefers-color-scheme: dark) {
   pre { background: #1f1f1f; border-color: #767676; }
+}
+@media print {
+  pre, pre code { overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 """
 DEFINITIONS_CSS = """\
@@ -1578,7 +1635,7 @@ img { max-width: 100%; height: auto; }
 .equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
 .equation-labelled > math { flex: 1 0 auto; }
 .equation-label { flex: none; margin-left: auto; }
-math { font-size: 1.1em; }
+math { font-size: 1.1em; font-family: @MATH_FONT@; }
 math[display="block"] { margin: 0 auto; }
 math[intent] mi { text-transform: none; }
 ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
@@ -1608,7 +1665,16 @@ figcaption { margin-top: 0.5em; }
   color: #0b57d0; }
 .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@media print { .flagged { break-inside: avoid; } .skip-link { display: none; } }
+@media print {
+  .flagged { break-inside: avoid; } .skip-link { display: none; }
+  /* Nothing is cut on paper without a mark (SW45 rule 6). The sheet is the container. An
+     equation too wide even at 70% stays in its box, which clips on paper (letting it out
+     would make the browser shrink the whole sheet), and prints a note. */
+  main { container: sheet / inline-size; }
+  .pw math { font-size: max(0.77em, min(1.1em, 100cqw / var(--pw))); }
+  .pw::after { display: none; font-size: 0.8em; font-style: italic;
+    content: "This equation is wider than the paper. It is complete on the web page."; }
+}
 @media screen and (prefers-color-scheme: dark) {
   body { background: #121212; color: #ececec; }
   .flagged, .notice, .flagged-inline { border-color: #ffa066; }
@@ -1617,7 +1683,7 @@ figcaption { margin-top: 0.5em; }
   .skip-link { background: #121212; color: #8ab4f8; }
   img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
 }
-"""
+""".replace("@MATH_FONT@", math_font.MATH_FONT_STACK)
 
 
 # The tool's own words (notes, labels, the student note) are English. In a document in
@@ -1650,7 +1716,7 @@ _FIXED_ALT_IMG = re.compile(
             # A kept page's alt names its page: any number in its place.
             *(
                 re.escape(alt).replace(re.escape("{page}"), r"\d+")
-                for alt, _ in KEPT_IMAGE_WORDS.values()
+                for alt, *_ in KEPT_IMAGE_WORDS.values()
             ),
         ]
     )

@@ -187,6 +187,25 @@ def test_math_stays_native_with_namespace_and_property():
     assert 'properties="mathml"' in export.package
 
 
+def test_a_book_with_maths_carries_the_maths_font_with_its_license_and_one_without_does_not():
+    """A reader's device may have no maths font. The book has the vendored font as a file, and
+    the license it is distributed under beside it (GUST Font License, THIRD_PARTY_NOTICES.md);
+    a book with no maths carries neither."""
+    _export, parts = make(PAGE)
+    fonts = {n for n in parts if n.startswith("EPUB/fonts/")}
+    assert fonts == {
+        "EPUB/fonts/latinmodern-math-1.959.woff2",
+        "EPUB/fonts/GUST-FONT-LICENSE.txt",
+        "EPUB/fonts/MANIFEST-Latin-Modern-Math.txt",
+    }
+    assert parts["EPUB/fonts/latinmodern-math-1.959.woff2"][:4] == b"wOF2"
+    types = {i.get("href"): i.get("media-type") for i in xml(parts, ee.PACKAGE).iter(f"{OPF}item")}
+    assert types["fonts/latinmodern-math-1.959.woff2"] == "font/woff2"
+    assert b"fonts/latinmodern-math-1.959.woff2" in parts[ee.CONTENT]  # the page asks for it
+    _, plain = make(PAGE.replace("math", "span"))
+    assert not [n for n in plain if "fonts/" in n]
+
+
 CHEMISTRY_PAGE = PAGE.replace(
     "</main>",
     '<p><math display="block" intent=":chemical-equation"><mrow><mn>2</mn><msub><mi>H</mi>'

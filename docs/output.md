@@ -112,13 +112,15 @@ equation its MathML, and headings, tables (caption, `th`, `scope`, spans), links
 language and text are as in the source.
 
 The equations carry a math font stack in the Canvas versions (T3-8,
-`export_canvas.MATH_FONT_STACK`): `font-family` on each `<math>`, written as a `style`
+`math_font.MATH_FONT_STACK`, shared with the student file's stylesheet): `font-family` on each `<math>`, written as a `style`
 attribute like every other carried rule. Canvas keeps `font-family` (it is in its list) but
 has no style block and no `@font-face`, so the stack can only name fonts the reader's
 computer has; native MathML in Chrome, Edge, Firefox and Safari needs a font with an
 OpenType MATH table, and the stack lists the families that have one, with the browser's own
-`math` family last. The default student file is unchanged (the golden files cover that), so
-it uses the browser's default math font as before. If Canvas draws the equations with its
+`math` family last. The student file's stylesheet names the same stack on `math` (WS21.4), so
+it helps a device that has one of those fonts and changes nothing on one with none: the file is
+one HTML file and `/view` allows no font file (`web.security.VIEW_CSP`), so the font itself is
+only in the EPUB. If Canvas draws the equations with its
 MathJax instead, the stack is not used; `docs/canvas-sandbox-test.md` has the step that
 shows which happens.
 
@@ -251,6 +253,7 @@ no network, no model.
 |---|---|
 | `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
 | `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
+| `EPUB/fonts/latinmodern-math-1.959.woff2` | The math font, in a book that has math, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
 
@@ -315,11 +318,11 @@ no network, no model.
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
-| Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 36 characters is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
+| Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 24 characters (it first scrolls at 30 at 320 px, at 25 with WCAG text spacing) is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |
-| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text."; for `handwriting_on_page`, "Part of page 3, shown as a picture, not converted to text.", the label "Shown as a picture, not converted to text." and the note "A screen reader cannot read this picture. Ask your instructor for a text version."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
 | Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
 | Decorative figure (with evidence, see "Decoration") | `<div class="decorative"><img alt="">` (a `<figure class="decorative">` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
@@ -659,6 +662,29 @@ a scroll box sits on the line differently. `tests/test_assemble_wide.py` checks 
 Chromium at 320 px that the page does not scroll sideways, that every gold equation
 that overflows is a tab stop, that arrow keys scroll it, and axe.
 
+## On paper
+
+Nothing scrolls on a sheet, so the print block of the stylesheet (`assemble.STYLE`,
+`TABLE_CSS`, `CODE_CSS`) makes sure nothing is cut without a mark (SW45 rule 6; the rest of
+the print build waits for WS21.1):
+
+- A table wraps inside the sheet (`overflow-wrap: anywhere` in its cells, no scroll box).
+- Code wraps (`pre-wrap`).
+- An equation of at least `PRINT_FIT_EM` (14 em, estimated) has the classes `pw pw-N`, N its
+  estimated width rounded up to 4 em (16 em above 48), and is scaled to the sheet down to
+  70%: `font-size: max(0.77em, min(1.1em, 100cqw / var(--pw)))`, `main` being the container.
+  An equation still too wide at 70% stays in its box, which clips on paper, and prints "This
+  equation is wider than the paper. It is complete on the web page." The note is generated
+  content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
+  The rules of each width step are added to the stylesheet only when an equation has it.
+- A picture is never wider than the sheet (`max-width: 100%`).
+- A figure's long description prints open (`details.figure-description`); where the browser
+  has no `::details-content`, its summary says "open this description before printing".
+
+The estimate is not calibrated (A23); a table cell with math that is wider than its column
+is not scaled. Canvas has no style block, so none of this is in it; Word and the EPUB
+reader's own pagination do not use these rules.
+
 ## Flagged items
 
 Anything the pipeline could not convert keeps the original crop. Sighted readers lose
@@ -690,8 +716,16 @@ and label are unchanged. In a document in another language the alt text is marke
   original image is not available."
 - A page (or handwriting) kept as an image is never called a figure: its alt text names
   the page and what it is, and its note says a screen reader cannot read it and to ask
-  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, by the fix's reason,
-  so a stored result renders the same; the design's draft wording is the beta wording).
+  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, one table of alt text,
+  label and note by the fix's reason, so a stored result renders the same; the design's
+  draft wording is the beta wording). `handwriting_on_page` is also what a box of vector
+  lines was named before the reader had pen evidence, so it never says "handwriting": the
+  part is "shown as a picture, not converted to text" in its alt text, label and note, and
+  in its link in the statement ("Part 2 not converted: picture, page 1",
+  `checked_words.STUDENT_KIND_WORDS`). The review screen and the job page keep their own
+  words for it. A drawing has no reason of its own yet and joins the table when it has.
+  Alt text is never made at render: it is the instructor's own description, the stored
+  proposal's text, or these fixed words, in that order.
   Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
@@ -1156,7 +1190,7 @@ About 35 lines of inline CSS:
   item, since `text-indent` is inherited), equation numbers to the right of their
   equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
   readers still read it);
-- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together;
+- a visible `:focus-visible` outline and a print block (below, "On paper");
 - only in documents that have one: a figure's folded description (a bold summary with
   the browser's own marker, no new colors) and table rules.
 
@@ -1396,8 +1430,10 @@ Keep the two in step when a limit changes.
   printed with rules becomes a list of its terms.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
-- A figure's long description and data table are folded: they print only if opened
-  first. A chart's data table read from the image is in the file only when a reviewer
+- A figure's long description and data table are folded on screen. On paper they print open
+  where the browser can draw a folded `<details>` (`::details-content`: Chromium 131 and later);
+  where it cannot, the summary says "open this description before printing" and they print
+  only if opened first (not run in Firefox or Safari yet, WF44). A chart's data table read from the image is in the file only when a reviewer
   added it, and is approximate (its caption says so).
 - A PDF link over an image or a drawing (not over text) is not kept; neither is a link
   in a figure's caption. A link whose rectangle covers only part of a word links that

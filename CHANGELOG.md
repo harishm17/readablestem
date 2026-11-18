@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased: nothing is cut on paper, long descriptions print open, the maths font stack, the words of a picture kept from a page (branch fix/wide-content-print-math-font)
+
+- SW45 (reduced), rules 5 and 6: on paper a table wraps inside the sheet, code wraps, and an
+  equation is scaled to fit the sheet down to 70% of its size; one still too wide prints a
+  note that it is complete on the web page (`assemble.print_width_bucket`, the `pw` classes,
+  the print block of the stylesheet). Before, the scroll box of a wide table or equation was
+  cut at the edge of the sheet with no mark (F-435). A code block with a line of 25 or more
+  characters is a named tab stop (the line was 36; a block scrolls at 30 characters at 320 px
+  and at 25 with text spacing, F-448). A long equation stays a scroll box on screen; no width
+  calibration. Word, EPUB and Canvas are unaffected (the rules are print CSS; Canvas has no
+  style block). `RENDER_VERSION` 7, so stored pages are made again when opened.
+- WS21.2 (reduced to its wave 1a rules): a figure's folded long description prints open
+  (`figure_details.DETAILS_CSS`, `::details-content`), where before paper had only the summary
+  (F-436); in a browser without `::details-content` the summary says "open this description
+  before printing". Only the print block of today's sheet; the print build (breaks, the
+  contents list, link addresses, page markers, 12 pt text) waits for WS21.1. Word, EPUB and
+  Canvas are unaffected.
+- WS21.4 (reduced): the student file's `math` asks for the maths font stack Canvas already
+  used, from one constant (`pipeline/math_font.MATH_FONT_STACK`), where it asked for none and
+  a device without a maths font drew a row of letters; this helps a device that has one of
+  the named fonts and changes nothing on one with none. The EPUB of a document with maths
+  carries the vendored Latin Modern Math 1.959 (GUST Font License, unmodified, already in the
+  repository for the review screen) as a font file with its license and manifest beside it,
+  and asks for an installed copy first. Not built: the subset embedded in each page (a
+  `data:` font needs a `font-src` in the page policy, fontTools and brotli at run time, and
+  WS21.1), the face comparison, the chemistry attribute, the prime, the spoken fallback. The
+  downloaded HTML and `/view` get the stack only; Canvas cannot carry a font; Word uses
+  Office's.
+- WS21.9 parts 1 and 4: the words of a picture kept from a page are one table
+  (`assemble.KEPT_IMAGE_WORDS`: alt text, label and note by the fix's reason). A part kept as
+  `handwriting_on_page` (which a box of vector lines was also named, before the reader had pen
+  evidence) said "This is a picture of handwriting on the page" to a student; every stored
+  result now says "Shown as a picture, not converted to text" there, in the note, the alt text
+  and the statement's link ("Part 2 not converted: picture, page 1"), and never "handwriting",
+  in the downloaded HTML, Word, EPUB and Canvas alike, since all are made from that page. A
+  stored page is re-rendered by `RENDER_VERSION`. Alt text is never made at render, and what
+  a person wrote for a picture still replaces ours (checked in
+  `test_a_part_kept_as_a_picture_never_says_handwriting_and_a_persons_words_win`). Not built:
+  a drawing's own reason and words, labels said once, the larger picture, checked and
+  estimated chart values (WS21.9 parts 2, 3, 5), the short label with the full text once in the
+  top notice (WS11.5). The review screen's and the job page's "handwriting" words wait for P1
+  and P5.
+
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 
 - WS2.8 (g), footnotes: a file that names its footnotes is read from the file. hyperref writes a
