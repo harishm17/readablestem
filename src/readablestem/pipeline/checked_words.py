@@ -264,16 +264,21 @@ def checks_ran(s: CheckedSummary) -> str:
     return f"{plural(s.checks_run, 'structure check')}."
 
 
-def finish_sentence(s: CheckedSummary) -> str:
-    """The owner's finish line: what people reviewed (never the optional notes nobody
-    opened) and when."""
+def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
+    """The finish line: what people reviewed (never the optional notes nobody opened) and
+    when. The owner is told "You reviewed"; a reviewer, who need not have, is told what was."""
     if not s.reviewed:
         if not s.flagged:
             return "The tool flagged nothing in this file for review, and nobody has reviewed it."
         text = "Nobody has reviewed this file yet."
     else:
         when = f", the last on {s.reviewed_on:%B} {s.reviewed_on.day}" if s.reviewed_on else ""
-        text = f"You reviewed {s.load.decided} of {plural(s.flagged, 'flagged part')}{when}."
+        flagged = plural(s.flagged, "flagged part")
+        text = (
+            f"You reviewed {s.load.decided} of {flagged}{when}."
+            if owner
+            else f"{s.load.decided} of {flagged} reviewed{when}."
+        )
         if k := s.accepted_failing:
             text += f" {plural(k, 'part')} kept with a check failing."
     if u := s.unopened:

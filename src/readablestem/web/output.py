@@ -13,7 +13,8 @@ preview) asks `export_state` before it builds anything. The answer is one of:
   to the draft page (`DraftConfirm`), so the question cannot be skipped. The file's name
   ends in `-draft` (`file_name`), and the file itself says so first
   (`pipeline.assemble.mark_draft`). A person the document was shared with to view only is
-  never given a draft: they cannot make the decisions, and the route refuses.
+  never given a draft: they cannot make the decisions, and the route refuses (so do the
+  student preview and Listen, `shown`).
   The zips and "Combine parts" never take a draft: they hold it back and say how many.
 - `not available`: not finished (or nothing written yet). Nothing leaves.
 
@@ -61,9 +62,9 @@ NOT_FINISHED = (
     "This document has not finished converting, so there is nothing to show yet.",
 )
 DRAFT_NOT_FOR_VIEWERS = (
-    "This document is still a draft",
-    "Decisions are still open in it, and only the owner or a reviewer can make them. You can "
-    "read it here; a file to download is offered once the decisions are made.",
+    "The owner is still checking this document",
+    "Nothing of it is shown or offered to download until the owner has made the decisions "
+    "still open in it. Come back later.",
 )
 
 
@@ -119,6 +120,17 @@ def check(request: Request, job: Job, role: str, file_type: str, **query: str) -
         raise PageError(403, *DRAFT_NOT_FOR_VIEWERS, context={"job_id": job.id})
     if not token_valid(request, job, request.query_params.get(TOKEN_PARAM, "")):
         raise DraftConfirm(confirm_url(job.id, file_type, **query))
+    return state
+
+
+def shown(job: Job, role: str) -> ExportState:
+    """The gate of a page that shows the document without handing out a file (the student
+    preview and Listen): the same answer as `check`, so a person who may not take a draft is
+    not shown one either. The owner and a reviewer are shown a draft, with its banner
+    (`marked`). Raises the refusal for a reader; the caller has made sure the job is done."""
+    state = export_state(job)
+    if state.draft and not may_take_draft(role):
+        raise PageError(403, *DRAFT_NOT_FOR_VIEWERS, context={"job_id": job.id})
     return state
 
 

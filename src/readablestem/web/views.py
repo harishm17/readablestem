@@ -24,7 +24,7 @@ from readablestem.pipeline import checked
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import documents, fair_queue, job_page, office_census, states
+from readablestem.web import documents, fair_queue, job_page, office_census, output, states
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
@@ -376,6 +376,9 @@ class JobView:
     # gave them, and who shared it. The page shows only what that right allows.
     role: str = "owner"
     shared_by: str = ""
+    # No decision is open, so the file may leave for anyone (`web.output.export_state`): the
+    # one answer the reader page asks before it offers Open, Listen or a download.
+    exportable: bool = False
     # The job's state (`web.states`): its label, tone, message, next steps and gap notes.
     # Every word about where the job stands on the job page comes from it.
     state: states.State | None = None
@@ -437,8 +440,8 @@ class JobView:
 
     @property
     def audience(self) -> str:
-        """Who is reading, for the state's words and steps: "owner", "review" or "view"."""
-        return "owner" if self.is_owner else ("review" if self.can_review else "view")
+        """Who is reading, for the state's words and steps: "owner", "reviewer" or "reader"."""
+        return audience_of(self.role)
 
     @property
     def retry(self) -> states.Step | None:
@@ -747,6 +750,7 @@ def job_view(
         combinable=len(combine_rules.kept_parts(session, job)) if with_page and owner else 0,
         role=role,
         shared_by=_owner_name(session, job) if not owner else "",
+        exportable=with_page and output.export_state(job).key == output.READY,
     )
     if with_page:
         # Counts are read only for a finished job: a stopped or waiting job may still hold an

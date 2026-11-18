@@ -1,3 +1,4 @@
+{# Audiences: owner, reviewer #}
 {% if stale|default(none) %}
 {# A write from a page drawn before the document's last review write (routes/review.py
    `_stale_page`): nothing was saved. Like the error summary, it takes focus. #}

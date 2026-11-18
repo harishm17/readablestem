@@ -305,17 +305,19 @@ def breakdown(fixes: list[Fix], notices: Iterable[Notice] = ()) -> Breakdown:
 # --------------------------------------------------------------------------- decisions
 
 
+# What a reader is told while the owner has decisions open: no number, because the count
+# describes work the reader can neither see nor do.
+OWNER_STILL_CHECKING = "The owner is still checking this document."
+
+
 def open_decisions_line(count: int, audience: str = "owner") -> str:
-    """The sentence about the decisions still open, for who is reading. The owner has them to
-    make before sharing; a reviewer may make them; a person who can only view cannot, and
-    is told a download now is a draft."""
+    """The sentence about the decisions still open, for who is reading (`views.audience_of`).
+    The owner has them to make before sharing; a reviewer may make them; a reader cannot, and
+    is told only that the owner is still checking."""
     many = plural(count, "decision")
-    if audience == "view":
-        return (
-            f"{many} {'is' if count == 1 else 'are'} still open. Only the owner or a reviewer "
-            "can make them, so a download now is a draft."
-        )
-    if audience == "review":
+    if audience == "reader":
+        return OWNER_STILL_CHECKING
+    if audience == "reviewer":
         return f"{many} {'is' if count == 1 else 'are'} still open. You can review them."
     # "Before you give it to students", not "before you share it": sharing with a colleague
     # to work on it together is fine at any time, and is a different act (`_job_sharing.html`).
@@ -933,9 +935,9 @@ class Finish:
     summary: CheckedSummary
     not_handled: int
 
-    @property
-    def sentence(self) -> str:
-        return checked_words.finish_sentence(self.summary)
+    def line(self, audience: str) -> str:
+        """The sentence, in the words of who is reading (`views.audience_of`)."""
+        return checked_words.finish_sentence(self.summary, owner=audience == "owner")
 
     @property
     def notes(self) -> int:

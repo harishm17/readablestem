@@ -1665,7 +1665,10 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     context = job_page_context(request, job_id, user, job) | {"auto_reload": auto == "1"}
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
-    return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
+    # A person the document was shared with to read gets their own page, not the owner's
+    # (SW16); a reviewer gets the owner's page without the owner's blocks.
+    template = "job_reader.html" if job.audience == "reader" else "job.html"
+    return render(request, template, context | {"auto_reload_s": AUTO_RELOAD_S})
 
 
 @router.get("/jobs/{job_id}/status")
@@ -2302,8 +2305,9 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         require_done(job)
-        # The preview can be saved as it is, so a draft says so here as in its download.
-        state = output.export_state(job)
+        # The preview can be saved as it is, so a draft says so here as in its download; a
+        # reader is never shown one (`output.shown`).
+        state = output.shown(job, role_of(session, job, user))
         html = output.marked(current_html(ctx, session, job).html or "", state)
     events.record(
         ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True

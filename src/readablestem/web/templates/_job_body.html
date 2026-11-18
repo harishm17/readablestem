@@ -1,3 +1,4 @@
+{# Audiences: owner, reviewer #}
 {# Everything on the job page that differs between a waiting, a stopped and a finished job: the
    waiting note and steps, then the results, the settings and the delete box. The page holds it in
    #job-body, and the status answer of a job that has just finished sends it again out of band, so
@@ -53,7 +54,7 @@
     <li><a href="#results-heading">Results and checks</a></li>
     {% if job.is_owner %}<li><a href="#for-students-heading">For students</a></li>{% endif %}
     {% if owns %}<li><a href="#settings-heading">Settings and sharing</a></li>{% endif %}
-    <li><a href="#record-link-heading">Record</a></li>
+    {% if job.is_owner %}<li><a href="#record-link-heading">Record</a></li>{% endif %}
     {% if job.is_owner %}<li><a href="#delete-heading">Delete</a></li>{% endif %}
   </ul>
 </nav>
@@ -67,12 +68,12 @@
   <ul class="actions" id="next-actions">
     {% if job.can_review %}<li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>{% endif %}
     <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
-    <li><a href="/jobs/{{ job.id }}/listen">Listen as a student</a></li>
+    <li><a href="/jobs/{{ job.id }}/listen">{{ "Listen as a student" if job.is_owner else "Listen to it" }}</a></li>
     {# A person who can only view is never offered a draft (SW21); the route refuses it too. #}
     {% if job.can_review %}<li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>{% endif %}
   </ul>
-  {# ux-a: under the download link, where to post the file and the two questions. #}
-  {% include "_after_download.html" %}
+  {# ux-a: under the download link, where to post the file and the two questions: the owner's. #}
+  {% if job.is_owner %}{% include "_after_download.html" %}{% endif %}
 </section>
 {% else %}
 {% include "_job_ready.html" %}
@@ -191,7 +192,7 @@
   </section>
 </div>
 {% endif %}
-{% include "_job_record.html" %}
+{% if job.is_owner %}{% include "_job_record.html" %}{% endif %}
 {% elif state.stopped %}
 {# The reason is in the status box above, once. This section is what to do about it: the
    state's next steps (web/states.py): try again while a try is left and can help, otherwise

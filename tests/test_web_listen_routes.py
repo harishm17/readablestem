@@ -19,6 +19,7 @@ from fixtures.web.support import (
 )
 from readablestem.web import listen
 from readablestem.web.db import Job, session_scope
+from test_job_shares import _settled, give
 
 CAROL = "carol@example.org"
 
@@ -43,12 +44,12 @@ def site(tmp_path):
         login(stranger, BOB)
         env.owner, env.viewer, env.stranger = owner, viewer, stranger
         env.job_id = job_id_from(upload(owner, make_pdf(1)))
+        _settled(env)  # nothing left to decide: a reader is never read a draft
         assert env.run_worker() == env.job_id
         with session_scope(env.ctx.factory) as session:
             job = session.get(Job, env.job_id)
             job.html = HTML
             job.html_stale = False
-        from test_job_shares import give
 
         env.who = {"owner": owner}
         assert give(env, CAROL, "view").status_code in {200, 303}

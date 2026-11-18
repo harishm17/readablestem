@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{# The page of a document shared with you to read (a View right: `views.audience_of` says
+   `reader`). One column: who shared it, what you can do, when it goes, and Open, Listen and the
+   files once the owner has finished checking. Nothing of the owner's work is on it: no posting,
+   Canvas, decisions, checks or record (SW16). The state words are `state` (web/states.py), as
+   on the owner's page. #}
+{% block title %}{{ state.label }}: {{ job.title }}{% endblock %}
+{% block content %}
+{% include "_job_heading.html" %}
+{% include "_job_shared.html" %}
+<div id="job-status-region" role="status">
+  {% include "_job_status.html" %}
+</div>
+{% if not job.finished %}
+<p class="hint" id="last-checked" hidden>Last checked <span data-last-checked></span></p>
+{% endif %}
+<div id="job-body">
+{% include "_job_reader_body.html" %}
+</div>
+{% endblock %}

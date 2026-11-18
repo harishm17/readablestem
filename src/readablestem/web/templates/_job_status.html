@@ -1,3 +1,4 @@
+{# Audiences: owner, reviewer, reader #}
 {# The status box, inside the page's polite live region (job.html): the job's state
    (web/states.py), said once. Its label, message and gap notes change per step, not per
    element, so a screen reader hears each step once. Polled by htmx (204 while unchanged). #}
@@ -43,6 +44,6 @@
    ones (web/poll.py). Out of band, so the status box above is the only thing in the live region. #}
 {% include "_job_heading.html" %}
 <div id="job-body" hx-swap-oob="true">
-{% include "_job_body.html" %}
+{% if job.audience == "reader" %}{% include "_job_reader_body.html" %}{% else %}{% include "_job_body.html" %}{% endif %}
 </div>
 {% endif %}
