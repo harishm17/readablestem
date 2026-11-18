@@ -89,6 +89,11 @@ RULES: dict[str, Rule] = {
     # A problem report to the operator (`web.reports`), per signed-in person: more than five in
     # ten minutes is a script or a loop, not a person with five problems.
     "report": Rule(5, 600),
+    # Class links (`web.links`, `/s/{token}`), per address, with no sign-in to count: every
+    # request (a class opening the page together from one campus address has room), and
+    # separately the ones that opened nothing, which only a person trying tokens makes.
+    "class_link": Rule(600, 600),
+    "class_link_miss": Rule(20, 600),
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound
 

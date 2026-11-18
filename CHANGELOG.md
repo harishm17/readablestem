@@ -55,6 +55,30 @@
   LaTeX; a figure's card gives the sentence that refers to it; where the only evidence is the
   page image the card says "This can only be checked against the page image." Handing the
   check to someone else is not built.
+## Unreleased: the class link, behind `FEATURE_CLASS_LINK` (branch feat/class-link)
+
+- WS27.2 (F-482, class half; triage: "reduce"): with `FEATURE_CLASS_LINK` on (off by default, and
+  not to be turned on before docs/deploy-railway.md, "Before `FEATURE_CLASS_LINK` is turned on"), the
+  owner of a ready document can make one link, at `/s/{token}`, that opens the published student
+  version without a sign-in until a last day at most 180 days away. It is not a role and never
+  passes through `job_access`: a token opens that one address and nothing under `/jobs/...`. The
+  page has no app header or footer and sets no cookie; it carries `noindex`, `no-referrer` and
+  `no-store`, and the same sandbox as `/jobs/{id}/view` (one serving function). A wrong, paused,
+  removed, not-yet-open or closed token gets one identical 404 page; guesses are limited by
+  address. The token is made and stored as a sign-in link's is (SHA-256 only) and shown to the
+  owner once; later the share page shows that a link exists, its label, dates, open count, first
+  open and published version. The link serves a copy of the student HTML kept with the document
+  (a `Blob` of kind `published`), so an edit afterwards changes nothing a class sees until the
+  owner chooses "Update the published copy"; a link is made, and the copy updated, only while the
+  document is ready. Only the owner makes, pauses, resumes, removes or updates; a person the
+  document is shared with cannot. While a link is kept the document is kept until its last day
+  (no new retention mode; the job page says why); when the last link ends or is removed it goes
+  back to its earlier retention with the clock starting then, and its row goes 30 days later.
+  New table `job_links` (migration `b7d2f4a8c613`). With the switch off there is no section on
+  the share page, `/s/...` answers 404 and no public page changes. Not built: `/s/{token}/listen`,
+  Word or EPUB through a link, a link for a named person, and the privacy, terms and limits
+  words (docs/deploy-railway.md lists what must change first). `PIPELINE_VERSION` and
+  `RENDER_VERSION` are not bumped: no document is made differently.
 
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 

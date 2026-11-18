@@ -79,6 +79,18 @@ def restart_clock(job: Job, settings: Settings, now: datetime | None = None) -> 
     return True
 
 
+def clock_after_link(job: Job, settings: Settings, now: datetime) -> None:
+    """The class link that was keeping the document has ended or been removed (`web.links`):
+    it goes back to the retention it had, with the clock starting now, so nobody is surprised
+    by a deletion in the same minute. `day` and `week` get a full window from now; `dev` its
+    30 days from upload, or a day from now when those have gone."""
+    target = now + window(settings, job.retention_mode)
+    if job.retention_mode == "dev":
+        uploaded = as_utc(job.created_at) or now
+        target = max(uploaded + window(settings, "dev"), now + window(settings, "day"))
+    job.retain_until = target
+
+
 def can_keep_longer(job: Job) -> bool:
     """The job page offers "Keep for 7 days" unless the developer's 30 days apply."""
     return job.retention_mode != "dev"
@@ -122,11 +134,29 @@ def window_words(settings: Settings, mode: str) -> str:
     return span_words(window(settings, mode))
 
 
-def kept_line(settings: Settings, mode: str, retain_until: datetime | None) -> str:
-    """The job page's one line: the day and time the document is kept until, and why."""
+def after_link_words(settings: Settings, mode: str) -> str:
+    """What happens to a document when its class link ends: "kept for 24 hours more"."""
+    if mode == "dev":
+        return f"kept for the rest of its {window_words(settings, mode)}"
+    return f"kept for {window_words(settings, mode)} more"
+
+
+def kept_line(
+    settings: Settings,
+    mode: str,
+    retain_until: datetime | None,
+    link_until: datetime | None = None,
+) -> str:
+    """The job page's one line: the day and time the document is kept until, and why.
+    `link_until`: the end of the class link that is keeping it (`web.links.held_until`)."""
     when = format_when(retain_until)
     if not when:
         return ""
+    if link_until is not None and as_utc(retain_until) == as_utc(link_until):
+        return (
+            f"Kept until {when}, while its class link is open. "
+            f"After that it is {after_link_words(settings, mode)}."
+        )
     if mode == "dev":
         return (
             f"Kept until {when}, {window_words(settings, mode)} after upload. "

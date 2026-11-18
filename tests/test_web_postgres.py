@@ -514,3 +514,51 @@ def test_settlements_and_releases_racing_for_the_same_holds_release_each_once(fa
     assert snapshot.spent_usd == pytest.approx(0.05 * 40)
     with db.session_scope(factory) as session:
         assert session.scalar(select(func.count()).select_from(db.SpendHold)) == 0
+
+
+def test_the_class_link_purge_and_cascade_on_postgres(factory):
+    """WS27.2: the purge's release step (`FOR UPDATE SKIP LOCKED`, an EXISTS over `job_links`)
+    and the job-to-link cascade run on Postgres, not only on SQLite."""
+    from datetime import UTC, datetime
+
+    from readablestem.config import Settings
+    from readablestem.ops.retention import purge_expired
+    from readablestem.web import links
+
+    now = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+    closes = now - timedelta(minutes=30)
+    user_id = add_user(factory)
+    with db.session_scope(factory) as session:
+        job = db.Job(
+            user_id=user_id,
+            filename="a.pdf",
+            page_count=1,
+            status=db.JobStatus.DONE,
+            retain_until=closes,
+            created_at=now - timedelta(days=3),
+        )
+        session.add(job)
+        session.flush()
+        job_id = job.id
+        session.add(
+            db.JobLink(job_id=job_id, token_hash="p" * 64, closes_at=closes, created_at=now)
+        )
+        session.add(
+            db.Blob(
+                job_id=job_id,
+                kind=links.PUBLISHED,
+                element_id="v1",
+                media_type="text/html",
+                content=b"<p>x</p>",
+            )
+        )
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert purge_expired(factory, now, settings=settings).jobs_deleted == 0  # restored, not deleted
+    with db.session_scope(factory) as session:
+        kept = session.get(db.Job, job_id)
+        assert kept.retain_until > now
+        assert session.scalar(select(func.count()).select_from(db.Blob)) == 0
+    with db.session_scope(factory) as session:
+        session.delete(session.get(db.Job, job_id))  # the foreign key cascades the link row
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.JobLink)) == 0

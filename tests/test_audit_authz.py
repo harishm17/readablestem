@@ -66,6 +66,10 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/showcase/{rel:path}"): PUBLIC,
     ("GET", "/login"): PUBLIC,
     ("POST", "/login"): PUBLIC,
+    # WS27.2: the one address that shows a document without a sign-in. The token is the
+    # credential; it shows the published student version and nothing else, sets no cookie, and
+    # is 404 unless FEATURE_CLASS_LINK is on (tests/test_job_shares.py).
+    ("GET", "/s/{token}"): PUBLIC,
     ("POST", "/login/microsoft"): PUBLIC,
     (
         "POST",
@@ -180,6 +184,14 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/share"): USER,
     ("POST", "/jobs/{job_id}/share"): USER,  # CSRF, owner only
     ("POST", "/jobs/{job_id}/share/{share_id}/revoke"): USER,  # CSRF, owner only
+    # WS27.2: the class link. Owner only and CSRF-checked, and 404 for everyone while
+    # FEATURE_CLASS_LINK is off: make one (the answer shows its address once), pause, resume,
+    # remove it, and update the published copy.
+    ("POST", "/jobs/{job_id}/share/link"): USER,
+    ("POST", "/jobs/{job_id}/share/link/pause"): USER,
+    ("POST", "/jobs/{job_id}/share/link/resume"): USER,
+    ("POST", "/jobs/{job_id}/share/link/remove"): USER,
+    ("POST", "/jobs/{job_id}/share/link/update"): USER,
     # T3-3: a large file kept while its owner chooses the pages; owner only like a job
     ("GET", "/uploads/{upload_id}"): USER,
     ("GET", "/uploads/{upload_id}/preview"): USER,  # owner only: the parts list for typed pages

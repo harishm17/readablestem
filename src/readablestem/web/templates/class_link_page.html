@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/controls.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <!-- A fixed page, read as it is by web/routes/class_link.py (not rendered by Jinja): the answer to every address under /s/ that opens nothing. It has no header or footer, no link out and no script, and it is the same page for a wrong, removed, paused, not yet open or closed link, so it tells a person guessing nothing. Its title and text are two fixed strings. -->
+  <main id="main" class="wrap" tabindex="-1">
+    <h1>{{title}}</h1>
+    <p>{{text}}</p>
+  </main>
+</body>
+</html>
