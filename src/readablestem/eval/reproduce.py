@@ -47,8 +47,9 @@ RERUN_DIR = Path(".local/reproduce")
 # Reports that `eval pipeline` writes as data/eval/latest-<task>.json; the tables task
 # writes latest-tables-<mode>.json.
 RERUN_TASKS = (
-    # Headings call no model; the command still wants a cap, so it gets the smallest one.
-    ("headings", ["--task", "headings", "--max-usd", "0.01"], "latest-headings.json"),
+    # Headings call no model, so the run is made with the fake client (the command would ask
+    # for a key otherwise); it still wants a cap, so it gets the smallest one.
+    ("headings", ["--task", "headings", "--fake", "--max-usd", "0.01"], "latest-headings.json"),
     ("tables (local)", ["--task", "tables", "--mode", "local"], "latest-tables-local.json"),
 )
 TOLERANCE = 1e-9

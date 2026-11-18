@@ -8,6 +8,7 @@
     "sha256": "213535ac0803b65f153e0c81abfef42b3c9e26cdf742fe7299335b6eb7c7998c",
     "confirmed": false,
     "differs": [
+      "CHEAP_MODEL",
       "DECISIONS_EQUATION_SHADOW",
       "DECISIONS_FIGURE_VERIFY",
       "EQUATION_GLYPH_CHECKS",
@@ -18,7 +19,9 @@
       "FEATURE_LONG_DESCRIPTIONS",
       "FEATURE_NOTATION_MEMORY",
       "FEATURE_TABLES",
-      "FLAG_POLICY"
+      "FLAG_POLICY",
+      "MAIN_MODEL",
+      "MODEL_PROVIDER"
     ],
     "counted_off": [
       "OFFICE_INPUT_ENABLED"
@@ -26,11 +29,11 @@
   },
   "prompt_versions": {},
   "models": {
-    "main": "claude-opus-5-5",
-    "cheap": "claude-haiku-5-5"
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
   },
   "models_used": [],
-  "client": "anthropic",
+  "client": "fake",
   "dataset": {
     "gold_dir": "data/gold",
     "manifest_sha256": "b74e1fa4a67bd67ff37c048e992fdf518308ad0e063ed4522129aa43a82981de",
@@ -487,23 +490,5 @@
     "p95": 0.0,
     "n": 3,
     "basis": "sum of model-call latencies per item (excludes rendering)"
-  },
-  "answers_file": {
-    "by_step": {},
-    "steady_cost_usd": 0,
-    "answers_file_hits": 0,
-    "answers_file_misses": 0,
-    "live_cost_usd": 0.0,
-    "replayed_cost_usd": 0.0
-  },
-  "recording": {
-    "run": "gold/runs/20261118T092940Z",
-    "sha": "a98b678ca1d7e5c8650b40c21367f7864df8a96b+dirty",
-    "files": [
-      "answers.jsonl",
-      "items.jsonl",
-      "report.json",
-      "run.json"
-    ]
   }
 }
