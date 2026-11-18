@@ -708,7 +708,22 @@ the print build waits for WS21.1):
   equation is wider than the paper. It is complete on the web page." The note is generated
   content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
   The rules of each width step are added to the stylesheet only when an equation has it.
-- A picture is never wider than the sheet (`max-width: 100%`).
+- A picture is never wider than the sheet (`max-width: 100%`) on paper, and on screen while the
+  window is wider than 40 em.
+
+### Kept pictures on screen (WS21.3, reduced)
+
+- A kept picture (`.flagged > img`: a crop of an equation, a table, a drawing or a whole page)
+  holds what could not be read as text. In a window narrower than 40 em, which is what zoom to
+  200% or more makes of a desktop window (and a phone), it keeps its printed size and the
+  `.flagged` box scrolls sideways, so the writing in it stays as large as the text around it
+  instead of shrinking with the column. Wider than that, it fits the column as before.
+- An inline kept equation (`.flagged-inline`) is an inline block with its own line height: the
+  line grows to hold the crop instead of the crop overlapping the lines next to it.
+- Left out (triage: reduce): the "Larger" switch, the box's name and focus on every scroll box
+  (browsers that make a scroller focusable by default do; Safari does not), moving an inline
+  crop wider than half the column to its own line, and the dark-mode inversion of crops. The
+  EPUB sheet already frames pictures and does not invert them.
 - A figure's long description prints open (`details.figure-description`); where the browser
   has no `::details-content`, its summary says "open this description before printing".
 

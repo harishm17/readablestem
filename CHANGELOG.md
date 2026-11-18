@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: kept pictures hold their size when the window is narrow (branch feat/exports-links-epub-title)
+
+- WS21.3 (F-441, F-442, F-443), reduced: `img { max-width: 100% }` shrank a kept picture with
+  the column, so at 200% zoom or more the writing in a crop got smaller than the text beside
+  it. In a window under 40 em a kept picture now keeps its printed size and its box scrolls
+  sideways. An inline kept equation is an inline block with its own line height, so the line
+  grows to hold it. The student sheet changed, so a document converted earlier shows the old
+  sheet until it is converted again or `RENDER_VERSION` is bumped at the merge: a bump is owed.
+
 ## Unreleased: the EPUB has its own sheet, landmarks, chapters and true metadata (branch feat/exports-links-epub-title)
 
 - WS22.4 (F-456, F-457, F-516): the book carried the page's stylesheet whole, so its dark and

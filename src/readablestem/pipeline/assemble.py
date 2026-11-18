@@ -816,7 +816,7 @@ def title_plan(
             unshifted=frozenset(section),
         )
     shift = 2 - min((level for _, level, _ in written), default=2)
-    return TitlePlan(text=chosen, heading_id=None, shift=shift)
+    return TitlePlan(text=chosen.text, heading_id=None, shift=shift, source=chosen.source)
 
 
 # --------------------------------------------------------------------------- renderer
@@ -892,6 +892,9 @@ class _Renderer:
     def page_mark(self, element: Element) -> str:
         """The page marker to write before `element` when it is on a page after the last one
         written; "" otherwise (and always in a one-page document). Never inside a block of
+            source=(
+                chosen.source if same_title(chosen.text, h1[2]) or title_set else TITLE_HEADING
+            ),
         text: callers ask only between blocks, or at the start of a list item."""
         if not self.mark_pages or element.page == self.last_page:
             return ""
