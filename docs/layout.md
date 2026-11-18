@@ -1400,7 +1400,7 @@ math by the document's evidence; the equation step's own tiers then decide it.
   tick or category labels of an axis set in one row, or several short ones far apart on
   one line: a timeline's events). A turned row (an axis title) is never a line of a
   paragraph, so it may stand up to `LABEL_TURNED` = 2.5 times as far and hold
-  `LABEL_SHORT_TURNED` = 40 characters. Any kind of row counts, maths and rotated ones
+  `LABEL_SHORT_TURNED` = 40 characters. Any kind of row counts, math and rotated ones
   too: a circuit's "R1 = 4 ohm", a triangle's sides and angle, a force arrow's "N". Never
   a label: a line of running text (a paragraph that passes by a figure, a title; for a
   row inside the drawing, found among the rows inside it), a caption, a line of code.
@@ -1417,7 +1417,7 @@ math by the document's evidence; the equation step's own tiers then decide it.
   the picture cut for the figure step, grows to its labels. Replaces `_absorb_labels`,
   `_absorb_outer_labels` and the dropped rows' own reach (`_take_labels`), five reaches
   that disagreed: the figure with no tick labels took nothing, a circuit's part names
-  were equations (the label take refused maths of more than three glyphs), a triangle's
+  were equations (the label take refused math of more than three glyphs), a triangle's
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).

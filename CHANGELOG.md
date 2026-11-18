@@ -2,7 +2,9 @@
 
 ## Unreleased: one label rule by distance, and three vanishing shapes (branch fix/figure-labels-vanishing-shapes)
 
-`PIPELINE_VERSION` needs a bump at merge.
+`PIPELINE_VERSION` needs a bump at merge. Three workflow replays ask a model for answers
+their recordings lack (r15_openstax_chem_ch3 2, r19_poster_codesign 4, r20_newsletter_drp 2):
+they need re-recording, which costs a model run.
 
 - SW40 (with WS6.12's reaches): a figure's labels were found by five reaches that disagreed
   (`LABEL_REACH`, `AXIS_LABEL_REACH`, `_absorb_labels`, `_absorb_outer_labels` and the dropped
