@@ -93,7 +93,7 @@ New cause; it holds for 29 of the 44.
 
 | Cause | Checks | Step | In the plan |
 |---|---|---|---|
-| Newspaper and magazine columns read across (text of the neighbouring column inside the target text) | 45 | same as multi_column | In the plan: WS15.1 (F-355) |
+| Newspaper and magazine columns read across (text of the neighboring column inside the target text) | 45 | same as multi_column | In the plan: WS15.1 (F-355) |
 | The page's text is in pictures or the text layer has almost nothing | 6 | figure and image-page steps | A model reads it: not a $0 case |
 | Word spaces missing in the PDF's text layer ("Whattypesofmattress") | 1 | text as given | New, n = 1; the same fused-word pattern appears in multi_column's near matches |
 
@@ -104,7 +104,7 @@ New cause; it holds for 29 of the 44.
 | No table built, and the text of the cell is on the page as plain text (a table without ruling lines, a leader-dot table, a table inside a column page) | 148 (36%) | `tables.find` | In the plan: K187g (27 of 297 sealed tables not found, "most of them unruled or beside prose"). New: on this set the rate is much higher than the plan's 9% |
 | No table built, the cell's text is not in the output either (columns of the page joined across the table, or the table is a picture; 18 of these are pages with almost no text) | 156 (38%) | layout order first, then `tables.find` | Same as above, plus WS15.1. Pictured tables cannot be told from missed tables at $0: the figure type `table_image` is set by the model. They are therefore not dropped, and this group is an upper bound on them |
 | A table was built but the cell's text is not found in one cell (two cells merged, or a row lost) | 71 (17%) | table grid | In the plan: WS5 table work; new as a rate |
-| The cell is found and its heading or a neighbour is not the expected one (header rows read as data, two header rows) | 38 (9%) | header detection | In the plan: WS5.2 (F-091, F-092) |
+| The cell is found and its heading or a neighbor is not the expected one (header rows read as data, two header rows) | 38 (9%) | header detection | In the plan: WS5.2 (F-091, F-092) |
 
 ### baseline: 6 failed of 586
 

@@ -78,7 +78,7 @@ counts words no element has, with the page's own furniture and hidden text left 
   of these pages is.
 - The largest share of any page outside that paper is 2.1% in the corpus, 0.7% in public and
   4.6% in the wide list (`2405.15050` page 28, 31 of 676 words; not opened). A line anywhere from 3% to 15% is therefore about equally quiet on what
-  we have, and the page that crosses it is maths in a line, not a loss. Nothing here picks
+  we have, and the page that crosses it is math in a line, not a loss. Nothing here picks
   within that range.
 - A planted fault is found: the generated page of three paragraphs with one taken out of
   layout's answer is 33% missing, and the same page whole is 0%
@@ -96,7 +96,7 @@ and each was read against the page:
 | Cause | Pages | Words | Where |
 |---|---|---|---|
 | Scoring artifact of my own function: a hyphenation test document, where the element holds a whole word that the page's halves or its greedy match do not account for | 4 | 8 | `data/dev-v2/dev/authored/latex-hyphenation` pages 1 to 4 |
-| Maths drawn inside a line: an underscript or a hat sits under the word, so the page reads `argmθin` and the element `argmθ in`, and a word and a letter run together | 3 | 5 | `data/real-tables/2407.13734.pdf` pages 5 and 6, `data/real-tables/2505.03022.pdf` page 2 |
+| Math drawn inside a line: an underscript or a hat sits under the word, so the page reads `argmθin` and the element `argmθ in`, and a word and a letter run together | 3 | 5 | `data/real-tables/2407.13734.pdf` pages 5 and 6, `data/real-tables/2505.03022.pdf` page 2 |
 | A word broken across a page break: its first half ends one page and its second starts the next, and a page's words are matched with that page's elements | 2 | 2 | `data/real-tables/2409.08224.pdf` pages 1 and 2 |
 | A figure box beside text: a hyphen half and two words round the three boxes drawn over the page's quoted text | 1 | 3 | `data/real-tables/2409.08224.pdf` page 8 |
 | A whole ordinary word the elements say, left over by the match: not explained | 3 | 3 | `2409.08224.pdf` page 6, `data/dev-v2/dev/authored/word-lecture` pages 3 and 4 |
