@@ -165,7 +165,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
-| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
+| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `mode=page` (with `page=`) is "Fix something on a page" (WS19.6): the page's tools are the first panel under the heading "Page N", no decision is shown above them, and the optional checks of that page follow; `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list?kind=&page=&part=&at=` | review | "All items as a list": every fix, grouped by kind, 25 cards a view; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below); `part` (1-based) picks the view and `at` (an item, heading group or section id) picks the view that holds it |
 | GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
@@ -1684,8 +1684,13 @@ made before a page was left out is found.
   is told apart from another blank page by that, not by its number alone.
 
 What was not carried is counted (`edits_dropped`, the card says "N changes you made by hand
-were not carried over, because the part of the page it was made on is not the same any
-more"); what was is a `carried` `ReviewEdit` with the kind in its `after`
+were not made again, because the part of the page it was made on is not the same any
+more") and listed by name and page under it (`edits_not_applied` in `carried_json`, the words
+in `carry.NOT_REAPPLIED_WORDS`: "Page 2: words you changed"). An equation read again and a
+page operation that has no carry (a paragraph made a heading, a picture added, an equation
+marked or given back to the text) are listed there when they are not made again, so nothing a
+person did disappears silently; an equation read again is never made again (the new file has
+the tool's own reading) and one that was undone is not listed. What was carried is a `carried` `ReviewEdit` with the kind in its `after`
 (`carried_edit`), shown on the record. A document **tried again** is the same file, so the
 comparison needs no drawing; a picture added by hand on a page the tool could not read before
 is not added a second time once the tool reads it. Any failure leaves the result as the
@@ -1720,7 +1725,11 @@ now says; its positional id still names it.
 
 For the person's accessibility office. `GET /jobs/{id}/record` is a page made to print
 (site navigation and the buttons are hidden by `@media print`); `GET /jobs/{id}/record.csv`
-has the same facts as one table. Both are made on request from what is stored, are owner
+has the same facts as one table. The count line reads "N decisions made by a person. M changes
+to pages." (`Record.count_line`; the CSV has the two numbers as "Decisions made by a person" and
+"Changes to pages made by a person"): a text edit, a heading, a picture or equation added, a
+page left out or put back and the like are changes to pages, not decisions
+(`record.PAGE_CHANGES`). Both are made on request from what is stored, are owner
 only, and change nothing (no deletion-clock restart, unlike a download). The job page links to
 both under "Record for your accessibility office".
 

@@ -624,6 +624,12 @@ class SplitBuilder:
             page_mode=self.page_mode and item is None,
         )
 
+    @property
+    def page_anchor(self) -> str:
+        """Where a link to another page lands: the page image, or in page mode the page's
+        tools, which are the first panel."""
+        return "decision-title" if self.page_mode else "page-view"
+
     def page_of(self, fix: Fix) -> int | None:
         page = queue.page_of(fix, self.elements)
         return None if page is None else page + 1
@@ -1164,14 +1170,14 @@ class SplitBuilder:
     def _page_href(self, number: int, current_key: str | None) -> str | None:
         if not 1 <= number <= self.page_count:
             return None
-        return self.url(item=current_key, page=number, anchor="page-view")
+        return self.url(item=current_key, page=number, anchor=self.page_anchor)
 
     def page_links(self, shown: int, current_key: str | None) -> list[PageLink]:
         counts = queue.open_by_page(self.queue, self.elements)
         return [
             PageLink(
                 n,
-                self.url(item=current_key, page=n, anchor="page-view"),
+                self.url(item=current_key, page=n, anchor=self.page_anchor),
                 counts.get(n - 1, 0),
                 n == shown,
                 n - 1 in self.omitted,

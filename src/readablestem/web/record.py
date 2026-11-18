@@ -240,7 +240,7 @@ class Record:
 
     @property
     def count_line(self) -> str:
-        """"N decisions made by a person. M changes to pages." The page and the CSV say it
+        """ "N decisions made by a person. M changes to pages." The page and the CSV say it
         with these two numbers."""
         decided = self.counts.decided
         return (

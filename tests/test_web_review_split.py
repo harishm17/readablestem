@@ -166,7 +166,7 @@ def test_fix_something_on_a_page_opens_that_pages_tools_first_with_no_decision(s
     assert "Decision" not in text_of(before_tools)  # nothing of a decision above the tools
     assert "Decision 1 of" not in text_of(html) and 'class="steps"' not in html
     assert "No optional checks." in html  # the one note is on page 1
-    assert "?page=1&amp;mode=page#page-view" in html  # the page chips keep the mode
+    assert "?page=1&amp;mode=page#decision-title" in html  # the page chips keep the mode
     # An address that names an item is the ordinary screen.
     assert "Decision 1 of" in text_of(screen(split, "?mode=page&page=2&item=p1-e2"))
 

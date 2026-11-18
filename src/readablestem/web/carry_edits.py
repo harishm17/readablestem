@@ -277,9 +277,16 @@ def _carry_words(
         kind = None
         if new_id is not None:
             kind = _apply_words(
-                old, old_crops, old_by[old_id], origin, old_fixes.get(old_id), new, new_crops, new_id
+                old,
+                old_crops,
+                old_by[old_id],
+                origin,
+                old_fixes.get(old_id),
+                new,
+                new_crops,
+                new_id,
             )
-        if kind is None:
+        if kind is None or new_id is None:
             out.drop(HEADING if "make_heading" in origin.ops else TEXT, old_by[old_id].page)
         else:
             out.items.append((kind, new_id))
@@ -456,9 +463,8 @@ def _carry_read_again(old: DocumentResult, rows: list[EditRow]) -> EditsCarried:
     for row in rows:
         if row.action == READ_AGAIN:
             made[row.element_id].append(row.action)
-        elif row.action == "undo" and STRUCTURE_KEY in (row.before or {}):
-            if made[row.element_id]:
-                made[row.element_id].pop()
+        elif row.action == "undo" and STRUCTURE_KEY in (row.before or {}) and made[row.element_id]:
+            made[row.element_id].pop()
     pages = {e.id: e.page for e in old.elements}
     for element_id, actions in made.items():
         for _ in actions:
