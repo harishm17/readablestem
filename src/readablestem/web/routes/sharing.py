@@ -38,6 +38,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# What the owner is told, by what happened. No address is in a notice (the session cookie
+# holds it). "Nothing was sent" is said only when a person was added: the one case where the
+# owner has something to do next.
+SHARE_OUTCOME = {
+    shares.ADDED: (
+        "Added with the right to {right}. Nothing was sent: copy the link below and give it "
+        "to the person yourself."
+    ),
+    shares.CHANGED: "Changed. Their right is now {right}. Nothing was sent.",
+    shares.UNCHANGED: "No change: that person already has the right to {right}.",
+}
+
+
 def _title(job: Job) -> str:
     return documents.display_title(documents.stored_title(job), job.filename, job.title_override)
 
@@ -118,7 +131,7 @@ def add_share(
         owned_id = job.id  # redirects are built from the owned row, not the request
         title = _title(job)
         try:
-            row = shares.share(session, job, user.email, email, role)
+            row, outcome = shares.share(session, job, user.email, email, role)
             kept_role = row.role
         except shares.ShareError as exc:
             log_event(logger, "share_refused", job_id=owned_id, code=exc.code)
@@ -133,11 +146,7 @@ def add_share(
                 status_code=422,
             )
     log_event(logger, "share_set", job_id=owned_id, role=kept_role)
-    flash(
-        request,
-        "Saved. Nothing was sent: copy the document's address below and give it to the person.",
-        undo=False,
-    )
+    flash(request, SHARE_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]), undo=False)
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
 
 

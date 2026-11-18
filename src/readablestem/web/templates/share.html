@@ -46,6 +46,7 @@
 
 <section aria-labelledby="people-heading">
   <h2 id="people-heading">People with access</h2>
+  <p class="hint" id="share-count">{{ shares|length }} of {{ max_shares }} people.{% if shares|length >= max_shares %} To add someone else, remove a person first.{% endif %}</p>
   {% if shares %}
   <ul class="share-list">
     {% for row in shares %}
