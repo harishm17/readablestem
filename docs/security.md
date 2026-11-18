@@ -180,7 +180,8 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   and every download ask the one export-state function (`output.shown`, `output.check`), so
   while a decision is open they refuse (a 403 page), and the page says only that the owner is
   still checking. `review`: also the review screen and every decision and edit. The owner alone
-  can delete, retry, change the title, contact line, language or retention, upload a revision,
+  can delete, retry, change the title, contact line, language or retention, answer the
+  question of a file that looks cut off, upload a revision,
   combine parts, use "Download all", add or change or remove a share, or read the course
   notation. A person who is shared a document cannot share it further.
 - **One check.** `job_access(session, job_id, user, need)` with `need` `view`, `review` or

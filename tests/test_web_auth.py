@@ -273,6 +273,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/accept/{slug}",  # many accepts at once, after a preview
         "/jobs/{job_id}/cancel",  # stop a waiting or converting document
         "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
+        "/jobs/{job_id}/cut-off",  # "continue" on a file that looks cut off (WS14.5)
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/draft",  # "Download the draft anyway": makes the confirm (SW21)
         "/jobs/{job_id}/edit/{element_id}",  # the words of a paragraph; a heading made (T3-5)

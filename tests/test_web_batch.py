@@ -381,10 +381,19 @@ def _set_state(job: Job, key: str) -> None:
             "stopped_unknown": "a_code_this_version_does_not_know",
         }[key]
         job.retries = 3 if key == "stopped_no_tries" else 0
-    elif key in {"partly_converted", "ready", "ready_remains", "sample", "confirm_language"}:
+    elif key in {
+        "partly_converted",
+        "ready",
+        "ready_remains",
+        "sample",
+        "confirm_language",
+        "file_cut_off",
+    }:
         job.result_json = _decide_all(job.result_json or {})
-        if key == "confirm_language":  # the language was assumed and nobody has confirmed it
+        if key in {"confirm_language", "file_cut_off"}:  # a question nobody has answered yet
             asks = {"code": "lang_assumed", "review": "required"}
+            if key == "file_cut_off":  # the file's last page is empty after a repair
+                asks = {"code": "file_cut_off", "page": 1, "count": 1, "review": "required"}
             job.result_json = {
                 **job.result_json,
                 "notices": [*job.result_json.get("notices", []), asks],

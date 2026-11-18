@@ -144,6 +144,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/contact"): USER,  # T1-17: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/keep"): USER,  # T1-8: CSRF, owner only, per-person kept cap
     ("POST", "/jobs/{job_id}/language"): USER,
+    ("POST", "/jobs/{job_id}/cut-off"): USER,  # WS14.5: CSRF, owner only; "continue"
     ("GET", "/jobs/{job_id}/pages/{number}.png"): USER,
     # T3-16: leave a page out of review and of the student file, and put it back. CSRF,
     # owner only, review version checked; not rate limited (like a decision).

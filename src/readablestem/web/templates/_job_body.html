@@ -94,7 +94,7 @@
 {% include "_job_carry.html" %}
 {% endif %}
 
-{% include "_job_cut_off.html" %}
+{% if job.is_owner %}{% include "_job_cut_off.html" %}{% endif %}
 
 {% if pg.notices.total %}
 {% include "_job_notices.html" %}
