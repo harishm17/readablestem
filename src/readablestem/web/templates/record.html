@@ -41,7 +41,7 @@
     <li>{{ c.items }} {{ "part" if c.items == 1 else "parts" }} found
       {%- if record.by_kind %} ({% for kind, n in record.by_kind.items() %}{{ n }} {{ kind }}{{ ", " if not loop.last }}{% endfor %}){% endif %}.</li>
     <li>{{ c.accepted }} accepted by the tool after its own automatic checks, with no decision from a person.</li>
-    <li>{{ c.decided }} decided by a person ({{ record.decisions|length }} {{ "step" if record.decisions|length == 1 else "steps" }} listed below).</li>
+    <li>{{ record.count_line }} Each is listed below.</li>
     <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
     {% if record.checked.pictures %}<li>{{ checked_words.as_image_sentence(record.checked) }}</li>
     {% elif record.checked.all_found_converted %}<li>{{ checked_words.READY_ALL }}</li>{% endif %}
@@ -52,7 +52,7 @@
 </section>
 
 <section aria-labelledby="record-decisions">
-  <h2 id="record-decisions">Decisions made by a person</h2>
+  <h2 id="record-decisions">Decisions and changes made by a person</h2>
   {% if record.decisions %}
   <div class="table-scroll" role="group" aria-label="Decisions table" tabindex="0">
   <table>
@@ -75,7 +75,7 @@
   </table>
   </div>
   {% else %}
-  <p>No decision was made by a person on this document.</p>
+  <p>No decision was made and no page was changed by a person on this document.</p>
   {% endif %}
   {% if record.open_items %}
   <h3 id="record-open">Waiting for a decision</h3>

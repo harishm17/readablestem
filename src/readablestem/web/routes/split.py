@@ -1311,7 +1311,9 @@ def _notice(
         if open_count == 0
         else f"{open_count} {'decision' if open_count == 1 else 'decisions'} left."
     )
-    return f"{label + ': ' if label else ''}{message} {left}"
+    if entry.get("edit") and open_count == 0:
+        left = ""  # a change to a page closed no decision
+    return f"{label + ': ' if label else ''}{message} {left}".strip()
 
 
 def split_page(
@@ -1412,6 +1414,7 @@ def split_page(
         "undo": bool(notice)
         and flashes[-1].get("undo", True) is not False
         and undo_offer(request, builder.job_id, user, builder.version),
+        "undo_of_edit": bool(notice) and flashes[-1].get("edit") is True,
         # The item the last decision saved (app.js forgets a kept draft of it).
         "saved_target": target if ELEMENT_ID.match(target) else "",
     }

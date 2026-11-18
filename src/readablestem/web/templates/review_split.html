@@ -588,7 +588,7 @@
       {% if undo %}
       {% call form("review.undo", "/jobs/" ~ job.id ~ "/undo", {"class": "undo-form"}) %}
         {{ hidden_fields() }}
-        <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> this decision</span></button>
+        <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> {{ "this change" if undo_of_edit else "this decision" }}</span></button>
       {% endcall %}
       {% endif %}
     </div>
