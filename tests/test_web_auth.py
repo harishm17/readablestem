@@ -251,6 +251,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/admin/allowlist/remove",
         "/admin/linked-emails",  # another Google account for an instructor (T3-10)
         "/admin/linked-emails/remove",
+        "/admin/reports/{report_id}/close",  # the operator closes a problem report
         "/admin/users/block",  # open sign-up: stop an account, or let it back
         "/admin/users/unblock",
         # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
@@ -268,6 +269,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
         "/jobs/{job_id}/accept/{slug}",  # many accepts at once, after a preview
+        "/jobs/{job_id}/cancel",  # stop a waiting or converting document
         "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/draft",  # "Download the draft anyway": makes the confirm (SW21)
@@ -278,6 +280,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/pages/{number}/add",  # a picture or an equation the tool missed (T3-5)
         "/jobs/{job_id}/pages/{number}/omit",  # a page left out (T3-16)
         "/jobs/{job_id}/pages/{number}/restore",
+        "/jobs/{job_id}/report",  # a problem report to the operator
         "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
@@ -304,6 +307,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
             url.replace("{upload_id}", JOB)
             .replace("{slug}", "equations")
             .replace("{share_id}", JOB)
+            .replace("{report_id}", JOB)
         )
         if path == "/jobs":
             response = web.browser.post(
