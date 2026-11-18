@@ -1419,8 +1419,10 @@ Keep the two in step when a limit changes.
   printed with rules becomes a list of its terms.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
-- A figure's long description and data table are folded: they print only if opened
-  first. A chart's data table read from the image is in the file only when a reviewer
+- A figure's long description and data table are folded on screen. On paper they print open
+  where the browser can draw a folded `<details>` (`::details-content`: Chromium 131 and later);
+  where it cannot, the summary says "open this description before printing" and they print
+  only if opened first (not run in Firefox or Safari yet, WF44). A chart's data table read from the image is in the file only when a reviewer
   added it, and is approximate (its caption says so).
 - A PDF link over an image or a drawing (not over text) is not kept; neither is a link
   in a figure's caption. A link whose rectangle covers only part of a word links that

@@ -412,3 +412,26 @@ def test_the_keyboard_opens_the_description_and_reaches_the_table_at_320_px():
     name, table_overflows, page_width, viewport = box
     assert name == "table-scroll" and table_overflows  # the table scrolls in its box...
     assert page_width <= viewport  # ...and the page does not (WCAG 1.4.10)
+
+
+@pytest.mark.browser
+def test_a_folded_description_and_its_wide_table_are_in_the_printed_file():
+    """Paper has nobody to open a folded description (F-436) or scroll a table: the printed
+    file holds the description's words and the table's last column."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch()
+        except sync_api.Error:
+            pytest.skip("Playwright's Chromium is not installed")
+        try:
+            page = browser.new_page()
+            page.set_content(described_page())
+            page.emulate_media(media="print")
+            pdf = page.pdf(format="Letter", margin={"left": "0.5in", "right": "0.5in"})
+        finally:
+            browser.close()
+    document = pymupdf.open(stream=pdf, filetype="pdf")
+    printed = " ".join(" ".join(p.get_text().split()) for p in document)
+    assert "Position rises in a straight line" in printed
+    assert "cart 7" in printed

@@ -11,6 +11,12 @@
   and at 25 with text spacing, F-448). A long equation stays a scroll box on screen; no width
   calibration. Word, EPUB and Canvas are unaffected (the rules are print CSS; Canvas has no
   style block). `RENDER_VERSION` 7, so stored pages are made again when opened.
+- WS21.2 (reduced to its wave 1a rules): a figure's folded long description prints open
+  (`figure_details.DETAILS_CSS`, `::details-content`), where before paper had only the summary
+  (F-436); in a browser without `::details-content` the summary says "open this description
+  before printing". Only the print block of today's sheet; the print build (breaks, the
+  contents list, link addresses, page markers, 12 pt text) waits for WS21.1. Word, EPUB and
+  Canvas are unaffected.
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 
