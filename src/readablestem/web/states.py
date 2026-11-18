@@ -526,27 +526,21 @@ def _unanalysed_pages(result: Mapping[str, Any] | None) -> int:
     return len({n.get("page") for n in notices if n.get("code") == "drawings_not_analysed"})
 
 
-_OPEN_CHANGES_MESSAGE = (
-    "The Word file still has tracked changes, so check the notices before you share it."
-)
+# Required notices that no decision stands behind, so the summary cannot count them: each keeps a
+# finished job at "Ready", with its sentence. A required notice whose fix is the decision (a
+# table kept as an image, a formula LaTeX could not read) is not here: the summary counts that.
+_HOLDS = {
+    # `web.office_census`: the PDF may show deleted words, so it is not known to be the final text
+    "office_tracked_changes": (
+        "The Word file still has tracked changes, so check the notices before you share it."
+    ),
+}
 
 
-_NOT_HANDLED_MESSAGE = (
-    "Part of this file was not handled, so check the notices before you share it."
-)
-
-
-def _required_notices(result: Mapping[str, Any] | None) -> set[str]:
-    """The codes of a stored result's notices that need a person (review "required") and have
-    no decision behind them: a notice on an element with a fix is that fix's, and the summary
-    counts it."""
-    result = result or {}
-    decided = {f.get("element_id") for f in result.get("fixes") or []}
-    return {
-        str(n.get("code"))
-        for n in result.get("notices") or []
-        if n.get("review") == "required" and n.get("element_id") not in decided
-    }
+def _held_by_notice(result: Mapping[str, Any] | None) -> str:
+    """The sentence of a stored result's notice that holds it back (`_HOLDS`), "" when none."""
+    codes = {n.get("code") for n in (result or {}).get("notices") or []}
+    return next((message for code, message in _HOLDS.items() if code in codes), "")
 
 
 def _unanalysed_message(pages: int) -> str:
@@ -577,13 +571,8 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str) -> State:
             # The ink analysis ran out of work on these pages (`drawings_not_analysed`): the
             # page cannot say everything was converted.
             return _make("ready_remains", _unanalysed_message(pages), steps)
-        if required := _required_notices(job.result_json):
-            # A required notice with no decision behind it, so the summary does not count it: a
-            # Word file whose tracked changes nobody accepted or rejected (`web.office_census`:
-            # the PDF may show deleted words), or a fact of the text no decision can hold yet.
-            changes = "office_tracked_changes" in required
-            message = _OPEN_CHANGES_MESSAGE if changes else _NOT_HANDLED_MESSAGE
-            return _make("ready_remains", message, steps)
+        if held := _held_by_notice(job.result_json):
+            return _make("ready_remains", held, steps)
         return _make("ready", checked_words.READY_ALL, steps)
     # Not known to be whole (no summary), or a part is a picture, a page is left out or a
     # structure check failed: "Ready", and what remains, never "Ready to share".
