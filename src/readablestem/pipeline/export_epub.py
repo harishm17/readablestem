@@ -42,12 +42,12 @@ import hashlib
 import re
 import uuid
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html import escape
 from io import BytesIO
 
-from readablestem.pipeline import checked_words, output_chars
+from readablestem.pipeline import checked_words, math_font, output_chars
 from readablestem.pipeline.assemble import DECORATIVE_CLASS, SUFFICIENT_META, SUMMARY_META
 from readablestem.pipeline.export_canvas import (
     _VOID,
@@ -86,6 +86,7 @@ _ATTR_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.:-]*\Z")
 # Characters XML 1.0 does not allow at all.
 _XML_BAD = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 _MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}
+_FONT_TYPES = {"woff2": "font/woff2", "txt": "text/plain"}
 _EPUB_TYPES = {
     "doc-pagebreak": "pagebreak",
     "doc-noteref": "noteref",
@@ -112,6 +113,7 @@ class EpubExport:
     features: list[str]  # the accessibilityFeature values written
     page_labels: int  # entries in the page list
     headings: int  # entries in the contents (not counting a fallback entry)
+    fonts: dict[str, bytes] = field(default_factory=dict)  # "fonts/..." -> bytes: the maths font
 
 
 # --------------------------------------------------------------------------- the content
@@ -418,6 +420,7 @@ def _package_document(
     sufficient: list[str],
     features: list[str],
     images: dict[str, bytes],
+    fonts: dict[str, bytes],
     item_properties: list[str],
     paginated: bool,
     summary: str = ACCESSIBILITY_SUMMARY,
@@ -443,6 +446,9 @@ def _package_document(
     for i, name in enumerate(sorted(images), 1):
         media = _MEDIA_TYPES[name.rsplit(".", 1)[1]]
         manifest.append(f'<item id="image-{i:02d}" href="{name}" media-type="{media}"/>')
+    for i, name in enumerate(sorted(fonts), 1):
+        media = _FONT_TYPES[name.rsplit(".", 1)[1]]
+        manifest.append(f'<item id="font-{i:02d}" href="{name}" media-type="{media}"/>')
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<package xmlns="{NS_OPF}" version="3.0" unique-identifier="pub-id" '
@@ -527,8 +533,12 @@ def export_epub(
         text_sufficient=text_sufficient,
     )
     lang_attr = escape(lang, quote=True)
-    head = f'<meta charset="utf-8"/><title>{escape(_clean(title))}</title>' + "".join(
-        f"<style>{escape(_clean(css), quote=False)}</style>" for css in stylesheets
+    fonts = math_font.epub_files() if has_math else {}
+    face = f"<style>{escape(math_font.EPUB_FONT_FACE, quote=False)}</style>" if fonts else ""
+    head = (
+        f'<meta charset="utf-8"/><title>{escape(_clean(title))}</title>'
+        + face
+        + "".join(f"<style>{escape(_clean(css), quote=False)}</style>" for css in stylesheets)
     )
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -553,6 +563,7 @@ def export_epub(
         sufficient=sufficient,
         features=features,
         images=images,
+        fonts=fonts,
         item_properties=properties,
         paginated=bool(pages),
         summary=statement or ACCESSIBILITY_SUMMARY,
@@ -564,7 +575,17 @@ def export_epub(
         # The page never holds a character that is not text, so this is the export's own.
         raise EpubExportError("the file holds a character that is not text", NOT_TEXT)
     return EpubExport(
-        title, lang, identifier, package, nav, content, images, features, len(pages), n_headings
+        title,
+        lang,
+        identifier,
+        package,
+        nav,
+        content,
+        images,
+        features,
+        len(pages),
+        n_headings,
+        fonts,
     )
 
 
@@ -577,6 +598,7 @@ def build_epub(export: EpubExport) -> bytes:
         (NAV, export.nav.encode("utf-8")),
         (CONTENT, export.content.encode("utf-8")),
         *((f"EPUB/{name}", data) for name, data in sorted(export.images.items())),
+        *((f"EPUB/{name}", data) for name, data in sorted(export.fonts.items())),
     ]
     out = BytesIO()
     with zipfile.ZipFile(out, "w") as archive:

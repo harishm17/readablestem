@@ -112,13 +112,15 @@ equation its MathML, and headings, tables (caption, `th`, `scope`, spans), links
 language and text are as in the source.
 
 The equations carry a math font stack in the Canvas versions (T3-8,
-`export_canvas.MATH_FONT_STACK`): `font-family` on each `<math>`, written as a `style`
+`math_font.MATH_FONT_STACK`, shared with the student file's stylesheet): `font-family` on each `<math>`, written as a `style`
 attribute like every other carried rule. Canvas keeps `font-family` (it is in its list) but
 has no style block and no `@font-face`, so the stack can only name fonts the reader's
 computer has; native MathML in Chrome, Edge, Firefox and Safari needs a font with an
 OpenType MATH table, and the stack lists the families that have one, with the browser's own
-`math` family last. The default student file is unchanged (the golden files cover that), so
-it uses the browser's default math font as before. If Canvas draws the equations with its
+`math` family last. The student file's stylesheet names the same stack on `math` (WS21.4), so
+it helps a device that has one of those fonts and changes nothing on one with none: the file is
+one HTML file and `/view` allows no font file (`web.security.VIEW_CSP`), so the font itself is
+only in the EPUB. If Canvas draws the equations with its
 MathJax instead, the stack is not used; `docs/canvas-sandbox-test.md` has the step that
 shows which happens.
 
@@ -251,6 +253,7 @@ no network, no model.
 |---|---|
 | `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
 | `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
+| `EPUB/fonts/latinmodern-math-1.959.woff2` | The maths font, in a book that has maths, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
 

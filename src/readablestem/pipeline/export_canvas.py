@@ -43,6 +43,7 @@ from io import BytesIO
 
 from readablestem.pipeline import checked_words, navigation, output_chars
 from readablestem.pipeline.assemble import SUMMARY_META
+from readablestem.pipeline.math_font import MATH_FONT_STACK
 
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
@@ -123,17 +124,9 @@ _VOID = frozenset(
 _IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 _DATA_URI = re.compile(r"data:(?P<type>[A-Za-z0-9.+/-]+);base64,(?P<data>[A-Za-z0-9+/=\s]+)\Z")
 _COURSE_NUMBER = re.compile(r"[0-9]{1,20}\Z")
-# The fonts a `<math>` element asks for, in order (T3-8). Canvas keeps `font-family` in a
-# `style` attribute but has no `@font-face` or style block, so the stack can only name fonts
-# the reader's computer has. Native MathML in Chrome, Edge, Firefox and Safari needs one with
-# an OpenType MATH table; this list is the families that have one, most widely installed
-# last-resort first: Latin Modern Math and STIX Two Math (TeX distributions, Linux, recent
-# macOS), Cambria Math (Windows, Office for Mac), Noto Sans Math, Libertinus, TeX Gyre,
-# XITS, Asana and DejaVu (Linux packages), then the browser's own `math` family.
-MATH_FONT_STACK = (
-    "'Latin Modern Math','STIX Two Math','Cambria Math','Noto Sans Math','Libertinus Math',"
-    "'TeX Gyre Pagella Math','XITS Math','Asana Math','DejaVu Math TeX Gyre',math"
-)
+# The fonts a `<math>` element asks for (T3-8): `math_font.MATH_FONT_STACK`, the stack of the
+# student file's stylesheet. Canvas keeps `font-family` in a `style` attribute but has no
+# `@font-face` or style block, so the stack can only name fonts the reader's computer has.
 _MATH_RULE = f"\nmath {{ font-family: {MATH_FONT_STACK}; }}\n"
 HIDDEN_CLASS = "visually-hidden"
 CANVAS_HIDDEN_CLASS = "screenreader-only"  # Canvas's own class for the same thing

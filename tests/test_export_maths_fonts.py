@@ -2,7 +2,9 @@
 
 Canvas keeps `font-family` in a `style` attribute but has no style block and no `@font-face`,
 so the stack has to be written onto each `<math>` element and can only name fonts a
-reader's computer already has. The default student file is not changed.
+reader's computer already has. The student file's stylesheet and this export name the same
+stack (`math_font.MATH_FONT_STACK`); the EPUB also carries the font as a file
+(tests/test_export_epub.py).
 """
 
 from __future__ import annotations

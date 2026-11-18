@@ -77,6 +77,7 @@ from readablestem.pipeline import (
     figure_details,
     figure_images,
     inline_text,
+    math_font,
     navigation,
     output_chars,
     table_html,
@@ -543,7 +544,8 @@ def print_fit_css(bucket: int) -> str:
     narrower = round(bucket * _PRINT_FLOOR * 1.1, 2)
     return (
         f"@media print {{ .pw-{bucket} {{ --pw: {bucket}; }}\n"
-        f"@container (inline-size < {narrower:g}em) {{ .pw-{bucket}::after {{ display: block; }} }} }}\n"
+        f"@container (inline-size < {narrower:g}em) "
+        f"{{ .pw-{bucket}::after {{ display: block; }} }} }}\n"
     )
 
 
@@ -1601,7 +1603,9 @@ pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, mono
 @media screen and (prefers-color-scheme: dark) {
   pre { background: #1f1f1f; border-color: #767676; }
 }
-@media print { pre, pre code { overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; } }
+@media print {
+  pre, pre code { overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
+}
 """
 DEFINITIONS_CSS = """\
 dl { margin: 0 0 1em; }
@@ -1624,7 +1628,7 @@ img { max-width: 100%; height: auto; }
 .equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
 .equation-labelled > math { flex: 1 0 auto; }
 .equation-label { flex: none; margin-left: auto; }
-math { font-size: 1.1em; }
+math { font-size: 1.1em; font-family: @MATH_FONT@; }
 math[display="block"] { margin: 0 auto; }
 math[intent] mi { text-transform: none; }
 ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
@@ -1672,7 +1676,7 @@ figcaption { margin-top: 0.5em; }
   .skip-link { background: #121212; color: #8ab4f8; }
   img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
 }
-"""
+""".replace("@MATH_FONT@", math_font.MATH_FONT_STACK)
 
 
 # The tool's own words (notes, labels, the student note) are English. In a document in

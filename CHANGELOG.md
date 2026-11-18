@@ -17,6 +17,17 @@
   before printing". Only the print block of today's sheet; the print build (breaks, the
   contents list, link addresses, page markers, 12 pt text) waits for WS21.1. Word, EPUB and
   Canvas are unaffected.
+- WS21.4 (reduced): the student file's `math` asks for the maths font stack Canvas already
+  used, from one constant (`pipeline/math_font.MATH_FONT_STACK`), where it asked for none and
+  a device without a maths font drew a row of letters; this helps a device that has one of
+  the named fonts and changes nothing on one with none. The EPUB of a document with maths
+  carries the vendored Latin Modern Math 1.959 (GUST Font License, unmodified, already in the
+  repository for the review screen) as a font file with its license and manifest beside it,
+  and asks for an installed copy first. Not built: the subset embedded in each page (a
+  `data:` font needs a `font-src` in the page policy, fontTools and brotli at run time, and
+  WS21.1), the face comparison, the chemistry attribute, the prime, the spoken fallback. The
+  downloaded HTML and `/view` get the stack only; Canvas cannot carry a font; Word uses
+  Office's.
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 
