@@ -481,6 +481,7 @@ class Worker:
         timeout_grace_s: float = TIMEOUT_GRACE_S,
         headroom_usd: float | None = None,
         tracer: Tracer | None = None,
+        purge: bool = True,
     ) -> None:
         self.settings = settings
         self.factory = factory
@@ -509,7 +510,8 @@ class Worker:
         self._thread: threading.Thread | None = None
         self._current: _Attempt | None = None
         self._paused = False
-        self._next_purge = time.monotonic() + PURGE_FIRST_S
+        # `purge=False`: another slot of the `worker` command runs the retention backstop.
+        self._next_purge = time.monotonic() + PURGE_FIRST_S if purge else float("inf")
         # When the loop (or a running conversion's heartbeat) last showed life; /readyz.
         self._seen_at = time.monotonic()
         self._shutdown_thread: threading.Thread | None = None

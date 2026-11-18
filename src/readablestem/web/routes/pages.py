@@ -23,7 +23,6 @@ from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import SESSION_FLASH, current_user, get_ctx, render
 from readablestem.web.health import ops_freshness, readiness
-from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.recipients import privacy_context
 from readablestem.web.sample import DEMO_DIR
@@ -354,6 +353,7 @@ def status(request: Request) -> Response:
     """
     ctx = get_ctx(request)
     database_ok = ping(ctx.engine)
+    provider = ctx.provider_health()
     context: dict[str, object] = {
         "active": "status",
         "database_ok": database_ok,
@@ -364,11 +364,11 @@ def status(request: Request) -> Response:
         # When these facts were read: the page does not update itself.
         "checked_at": utcnow(),
         # The AI service, as this server's own recent requests saw it (web.provider_health).
-        "provider_down_since": HEALTH.down_since(),
+        "provider_down_since": provider.down_since(),
         # Optional: the page reloads itself every minute while this is on (`?refresh=1`).
         "refresh": request.query_params.get("refresh") == "1",
     }
-    requests_seen, requests_failed, last_request = HEALTH.observed()
+    requests_seen, requests_failed, last_request = provider.observed()
     context |= {
         "provider_requests": requests_seen,
         "provider_failed": requests_failed,

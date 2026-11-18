@@ -37,12 +37,14 @@ from readablestem.web import (
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
+from readablestem.web.provider_health import HEALTH, ProviderHealth
 from readablestem.web.quota import retry_after
 from readablestem.web.sandbox_status import SandboxStatus
 from readablestem.web.security import CARRIES_SECRET
 from readablestem.web.spend import DbSpendGuard
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import ClientFactory, Converter, Worker
+from readablestem.web.worker_rows import RowReader
 
 CSRF_FIELD = "csrf_token"
 SESSION_USER = "uid"
@@ -81,6 +83,13 @@ class AppContext:
     limiter: RateLimiter = field(default_factory=RateLimiter)
     # The last sandbox probe of this process (`web.sandbox_status`): LaTeX source needs a PASS.
     sandbox: SandboxStatus = field(default_factory=SandboxStatus)
+    # With `WORKER_MODE=service`: the worker process's rows (`web.worker_rows`); None inline.
+    rows: RowReader | None = None
+
+    def provider_health(self) -> ProviderHealth:
+        """The AI service as the worker's recent requests saw it: this process's own memory
+        when the worker is a thread here, the worker process's `ops_heartbeat` row when not."""
+        return HEALTH if self.rows is None else self.rows.provider()
 
     @property
     def dev_login_enabled(self) -> bool:
