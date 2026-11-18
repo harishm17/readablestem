@@ -55,6 +55,7 @@ from readablestem.pipeline.assemble import (
     DEFAULT_TITLE,
     SUFFICIENT_META,
     SUMMARY_META,
+    with_medium,
 )
 from readablestem.pipeline.export_canvas import (
     _VOID,
@@ -639,7 +640,9 @@ def export_epub(
     `modified` is the `dcterms:modified` time (default now, UTC); `identifier` is the
     publication's id (default a UUID made from the document, so the same document keeps the
     same one)."""
-    root = _parse(html)
+    root = _parse(with_medium(html, "EPUB"))
+    for link in [n for n in root.walk() if "skip-link" in n.classes()]:
+        _remove(link)  # a book has its own way in; the link only a web page needs
     statement = page_meta(root, SUMMARY_META)  # read before `_prepare` drops the head
     text_sufficient = page_meta(root, SUFFICIENT_META) == "textual"
     html_tag = _find(root, "html")

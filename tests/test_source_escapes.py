@@ -247,7 +247,7 @@ def test_a_job_with_a_plain_escape_is_refused_before_anything_runs(body):
 
 def test_a_job_that_never_ends_fails_with_the_timeout_code(monkeypatch):
     monkeypatch.setattr(latexml, "LIMITS", sandbox.Limits(wall_s=4, cpu_s=60))
-    assert failure(job({"main.tex": document("\\def\\a{x\\a}\\a")})) == "timeout"
+    assert failure(job({"main.tex": document("\\def\\a{x\\a}\\a")})) == "source_timeout"
 
 
 def test_the_error_codes_carry_no_content(monkeypatch):
@@ -256,5 +256,5 @@ def test_the_error_codes_carry_no_content(monkeypatch):
         try:
             run(job({"main.tex": document(body)}))
         except SourceFailed as exc:
-            assert exc.code in {"source_refused", "timeout", "source_failed", "source_unreadable"}
+            assert exc.code in {"source_refused", "source_timeout", "source_failed", "source_unreadable"}
             assert "passwd" not in str(exc) and "write18" not in str(exc)

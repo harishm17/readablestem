@@ -67,7 +67,8 @@ FAILURE_CODES = {
     "source_failed",  # LaTeXML (or pandoc, for a Word file) did not produce a document
     "source_unreadable",  # it did, and it is not usable
     "source_refused",  # the source is not allowed (the child checks again)
-    "timeout",
+    "timeout",  # it waited too long for another conversion's turn: worth trying again
+    "source_timeout",  # the program ran out of time on this source: trying again will not help
     *source_report.STOP_CODES,  # it would lose content outside a formula
 }
 
@@ -190,8 +191,8 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
         raise SourceFailed("timeout") from None
     except (sandbox.SandboxUnavailable, OSError):
         raise SourceFailed("source_unavailable") from None
-    if outcome.timed_out:
-        raise SourceFailed("timeout")
+    if outcome.timed_out:  # the program hit its own limit: a macro that calls itself, say
+        raise SourceFailed("source_timeout")
     if outcome.busy:
         raise SourceFailed("source_busy")
     document = out / latexml.DOC_PATH
@@ -226,7 +227,7 @@ def _read_word(blob: bytes) -> ltx_reader.Reading:
         raise SourceFailed("source_unavailable") from None
     if result.tree is None:
         if result.timed_out:
-            raise SourceFailed("timeout")
+            raise SourceFailed("source_timeout")
         code = {
             pandoc_step.NO_PANDOC: "source_unavailable",
             pandoc_step.NO_SANDBOX: "source_unavailable",

@@ -538,7 +538,7 @@ def export_docx(
     program = pandoc_command(pandoc)
     if program is None:
         raise DocxExportError("unavailable")
-    root = _parse(html)
+    root = _parse(assemble.with_medium(html, "Word"))
     html_tag, body = _find(root, "html"), _find(root, "body")
     if html_tag is None or body is None:
         raise DocxExportError("invalid")

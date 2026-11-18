@@ -164,6 +164,7 @@ FILE_FAILURES = frozenset(
         "source_failed",
         "source_unreadable",
         "source_refused",
+        "source_timeout",
         "source_missing_file",
         "source_syntax_error",
         "source_undefined",

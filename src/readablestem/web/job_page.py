@@ -58,7 +58,13 @@ from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import language as languages
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary, word_kind
-from readablestem.pipeline.checked_words import KIND_WORDS, join_words, kinds_phrase, plural
+from readablestem.pipeline.checked_words import (
+    KIND_WORDS,
+    join_words,
+    kinds_phrase,
+    plural,
+    source_noun,
+)
 from readablestem.pipeline.source_facts import flattened_parts
 from readablestem.pipeline.speech import GREEK, SYMBOLS
 from readablestem.web import notice_places
@@ -813,7 +819,7 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
             what = unread_phrase(report.unread_words, report.unread_pictures)
             one = report.unread_words + report.unread_pictures == 1
             text = (
-                f"This tool could not read {what} of the LaTeX source, so "
+                f"This tool could not read {what} of the {source_noun(result.origin)}, so "
                 f"{'it is' if one else 'they are'} not in the file."
             )
             first = (report.unread_start,) if report.unread_start else ()
@@ -1003,7 +1009,7 @@ def suggested_title(result: DocumentResult, filename: str = "") -> str:
 # What the title field says about the title it starts with, by source (SW14, F-052, F-322).
 TITLE_SOURCE_WORDS = {
     "yours": "You chose this title.",
-    "pdf": "From the title in your PDF.",
+    "pdf": "From the title in your {source}.",
     "heading": "From the first heading.",
     "file": "From the file name.",
     "stock": "No title found: students will hear “Converted document”. Type one.",
@@ -1043,5 +1049,5 @@ def page_data(result: DocumentResult, last_decision: date | None, filename: str 
         finish=Finish(summary, not_handled=len(notices.not_handled)),
         draft=draft_sentence(result.fixes),
         title_suggested=plan.text,
-        title_source=TITLE_SOURCE_WORDS[plan.source],
+        title_source=TITLE_SOURCE_WORDS[plan.source].format(source=source_noun(result.origin)),
     )

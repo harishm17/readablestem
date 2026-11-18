@@ -196,23 +196,46 @@ DECORATIVE_CLASS = "decorative"
 # `pipeline.checked_words` (SW7): a person "reviewed", never "checked", which can read as
 # a certificate.
 ABOUT_TITLE = "About this version"
-ABOUT_WORDING = (
-    "This is a web version of a PDF from your course, made with ReadableSTEM, a tool that "
-    "assists with accessibility."
-)
-# The first sentence for a document made from a LaTeX source (`DocumentResult.origin`).
-ABOUT_WORDING_SOURCE = (
-    "This is a web version of a LaTeX document from your course, made with ReadableSTEM, "
-    "a tool that assists with accessibility."
-)
-ABOUT_WORDING_BEAMER = (
-    "This is a web version of a slide deck from your course, made with ReadableSTEM, "
-    "a tool that assists with accessibility."
-)
-ABOUT_WORDING_DOCX = (
-    "This is a web version of a Word document from your course, made with ReadableSTEM, "
-    "a tool that assists with accessibility."
-)
+# The first sentence names what the file is made from (`checked_words.source_noun`, the one
+# noun every sentence about the job's source uses) and what the file itself is (`ABOUT_MEDIA`;
+# each export sets its own, `with_medium`).
+ABOUT_MEDIA = {
+    "web": "a web",
+    "EPUB": "an EPUB",
+    "Word": "a Word",
+    "Canvas": "a Canvas",
+    "Common Cartridge": "a Common Cartridge",
+}
+
+
+def about_opening(origin: str = "pdf", medium: str = "web") -> str:
+    """"This is a web version of a PDF from your course, made with ReadableSTEM, ..." for the
+    source `origin` names (`DocumentResult.origin`) and the file's `medium` (`ABOUT_MEDIA`)."""
+    noun = checked_words.source_noun(origin)
+    return (
+        f"This is {ABOUT_MEDIA[medium]} version of a {noun} from your course, made with "
+        "ReadableSTEM, a tool that assists with accessibility."
+    )
+
+
+ABOUT_WORDING = about_opening()
+
+
+def with_medium(html: str, medium: str) -> str:
+    """The finished page with the note's first sentence saying what this file is ("an EPUB
+    version"), for the exports made from the page, which read the page and not the result. The
+    page itself says "web version"; a page with no such note is returned as it is."""
+    at = html.find(f'id="{ABOUT_ID}"')
+    if at < 0:
+        return html
+    kinds = "|".join(re.escape(m) for m in ABOUT_MEDIA.values())
+    note = re.sub(
+        f"This is (?:{kinds}) version of a ",
+        f"This is {ABOUT_MEDIA[medium]} version of a ",
+        html[at:],
+        count=1,
+    )
+    return html[:at] + note
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.
@@ -1683,11 +1706,7 @@ def _about_section(
     the file, with no review vocabulary ("needs review", "rejected"). `kept_pages`: 0-based
     pages kept whole as an image. The sentence about pages left out carries an id, so the
     notice at the top can link to it."""
-    opening = {
-        "latex": ABOUT_WORDING_SOURCE,
-        "beamer": ABOUT_WORDING_BEAMER,
-        "docx": ABOUT_WORDING_DOCX,
-    }.get(summary.origin, ABOUT_WORDING)
+    opening = about_opening(summary.origin)
     maths = checked_words.maths_sentence(summary)
     lines = [f"<p>{opening} {maths}</p>" if maths else f"<p>{opening}</p>"]
     left_out = checked_words.left_out_sentence(summary)

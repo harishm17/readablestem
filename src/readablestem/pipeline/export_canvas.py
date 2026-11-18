@@ -42,7 +42,7 @@ from html.parser import HTMLParser
 from io import BytesIO
 
 from readablestem.pipeline import checked_words, navigation, output_chars
-from readablestem.pipeline.assemble import SUMMARY_META
+from readablestem.pipeline.assemble import SUMMARY_META, with_medium
 from readablestem.pipeline.math_font import MATH_FONT_STACK
 
 # Canvas stores a Page's body in a column of at most this many characters
@@ -526,6 +526,7 @@ def export_canvas(
     if course_number is not None and not valid_course_number(course_number):
         raise CanvasExportError("a course number is digits only")
 
+    html = with_medium(html, "Canvas")
     notes = Notes()
     standalone = _parse(html)
     statement = page_meta(standalone, SUMMARY_META) or ""

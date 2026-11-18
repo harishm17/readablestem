@@ -289,14 +289,19 @@ def queue_source(web, filename: str = "paper.tex", data: bytes | None = None) ->
     return job_id_from(response)
 
 
-def test_a_failed_source_conversion_fails_the_job_cleanly(web):
+@pytest.mark.parametrize(
+    ("code", "words"),
+    [("source_failed", "Upload the PDF instead"), ("source_timeout", "Trying again will not")],
+)
+def test_a_failed_source_conversion_fails_the_job_cleanly(web, code, words):
     job_id = queue_source(web)
-    web.converter.raises = SourceFailed("source_failed")
+    web.converter.raises = SourceFailed(code)
     web.run_worker()
     job = web.job(job_id)
-    assert job.status == JobStatus.FAILED and job.error_code == "source_failed"
+    assert job.status == JobStatus.FAILED and job.error_code == code
     page = web.browser.get(f"/jobs/{job_id}")
-    assert page.status_code == 200 and "Upload the PDF instead" in page.text
+    assert page.status_code == 200 and words in page.text
+    assert "Try again" not in page.text and "splitting the PDF" not in page.text
     assert web.browser.get(f"/jobs/{job_id}/view").status_code in {404, 409, 303, 200}
     assert job.result_json is None  # nothing half-made is kept
 
@@ -308,7 +313,7 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
     result = fake_result()
     result.origin = "latex"
     html = rerender_html(result, {})
-    assert "web version of a LaTeX document from your course" in html
+    assert "web version of a LaTeX source from your course" in html
     assert "web version of a PDF" not in html
     result.origin = "pdf"
     assert "web version of a PDF from your course" in rerender_html(result, {})
@@ -377,12 +382,15 @@ class TestRealConversion:
 
     def test_the_job_page_and_the_review_list_work_and_the_split_view_redirects(self, done):
         env, job_id = done
-        assert env.browser.get(f"/jobs/{job_id}").status_code == 200
+        page = env.browser.get(f"/jobs/{job_id}")
+        assert page.status_code == 200 and "LaTeX source" in page.text
+        assert "revised version" not in page.text and "?revises=" not in page.text
         split = env.browser.get(f"/jobs/{job_id}/review")
         assert split.status_code == 303 and split.headers["location"].endswith("/review/list")
         review = env.browser.get(f"/jobs/{job_id}/review/list")
         assert review.status_code == 200 and "Figure" in review.text
-        assert "of the PDF" not in review.text or "PDF" in review.text
+        assert "LaTeX source" in review.text
+        assert "in the PDF" not in review.text and "your PDF" not in review.text
         # No choice that leads nowhere (SW18.5): no link back to this list, and a link to
         # an item lands on it.
         assert f'href="/jobs/{job_id}/review"' not in review.text
@@ -408,6 +416,17 @@ class TestRealConversion:
         assert after.fix_for(formula.element_id).status is Status.REJECTED  # ty: ignore[possibly-missing-attribute]
         student = env.browser.get(f"/jobs/{job_id}/view").text
         assert "not available" not in student and "\\badmacro" in student
+        assert "web version of a LaTeX source from your course" in student
+
+    def test_a_document_made_from_a_source_cannot_be_replaced_by_a_new_version(self, done):
+        """Revising a source is held (WS18.8): the page, the link and a direct request say so."""
+        env, job_id = done
+        before = len(jobs(env))
+        link = env.browser.get(f"/app?revises={job_id}")
+        assert link.status_code == 400 and "cannot be replaced with a new version" in link.text
+        sent = send(env.browser, ARTICLE.encode(), "v2.tex", revises=job_id)
+        assert sent.status_code == 400 and "cannot be replaced with a new version" in sent.text
+        assert len(jobs(env)) == before
 
 
 # ------------------------------------------------------- Word read from the file (WS18.14, 18.15)
@@ -438,7 +457,7 @@ def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_
         assert result.origin == "docx" and result.stats.model_calls == 0
         equation = next(f for f in result.fixes if f.kind is Kind.EQUATION)
         assert equation.status is Status.ACCEPTED and equation.equation is not None
-        assert "web version of a Word document" in (done.html or "")
+        assert "web version of a Word file" in (done.html or "")
         page = client.get(f"/jobs/{job_id}").text
         assert "was read from the file itself" in page and "turned into a tagged PDF" not in page
         assert client.get(f"/jobs/{job_id}/review/list").status_code == 200

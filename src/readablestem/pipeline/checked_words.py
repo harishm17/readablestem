@@ -134,6 +134,22 @@ def review_sentence(s: CheckedSummary) -> str:
     return text
 
 
+# What a document's source is called in every sentence about it ("your Word file"): the
+# `DocumentResult.origin` to its noun. One table, so that no sentence types "PDF" or "LaTeX"
+# for the job's source by itself.
+SOURCE_NOUNS = {
+    "pdf": "PDF",
+    "latex": "LaTeX source",
+    "beamer": "LaTeX slide deck",
+    "docx": "Word file",
+}
+
+
+def source_noun(origin: str) -> str:
+    """The noun for a job's source: "PDF", "LaTeX source", "LaTeX slide deck", "Word file"."""
+    return SOURCE_NOUNS.get(origin, "PDF")
+
+
 def pictures_sentence(s: CheckedSummary) -> str:
     """The parts shown as pictures (as written, for a LaTeX source), with their count."""
     k = s.pictures
@@ -145,7 +161,7 @@ def pictures_sentence(s: CheckedSummary) -> str:
         shown += " of the original"
     else:
         shown = "is shown as it was written" if k == 1 else "are shown as they were written"
-        shown += " in the Word file" if s.origin == "docx" else " in LaTeX"
+        shown += f" in the {source_noun(s.origin)}"
     return (
         f"{parts} and {shown}, marked “Not converted” or “No description”: ask your "
         "instructor for a version you can read."
@@ -169,11 +185,11 @@ def _unread_phrase(s: CheckedSummary) -> str:
     c = s.converted
     parts = [plural(c.unread_words, "word")] if c.unread_words else []
     parts += [plural(c.unread_pictures, "picture")] if c.unread_pictures else []
-    return f"{join_words(parts)} of the LaTeX source" if parts else ""
+    return f"{join_words(parts)} of the {source_noun(s.origin)}" if parts else ""
 
 
 def unread_sentence(s: CheckedSummary) -> str:
-    """What the reader of a LaTeX source did not read, for the student ("" when none)."""
+    """What the reader of a source did not read, for the student ("" when none)."""
     if not (what := _unread_phrase(s)):
         return ""
     verb = "is" if s.unread == 1 else "are"

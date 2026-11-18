@@ -193,11 +193,13 @@
 <div class="job-group" id="settings">
   <h2 id="settings-heading">Settings and sharing</h2>
   {% with hl = 3 %}{% include "_job_sharing.html" %}{% endwith %}
+  {% if not job.summary or job.summary.checked.origin == "pdf" %}{# a source file has no revised version yet (WS18.8) #}
   <section aria-labelledby="revise-heading">
     <h3 id="revise-heading">If you change the PDF</h3>
     <p><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a>
       (your decisions carry over)</p>
   </section>
+  {% endif %}
 </div>
 {% endif %}
 {% if job.is_owner %}{% include "_job_record.html" %}{% endif %}
@@ -228,7 +230,7 @@
 <section aria-labelledby="delete-heading" class="job-group">
   <h2 id="delete-heading">Delete this document</h2>
   {% if not state.keeps %}{% include "_job_retention.html" %}{% endif %}
-  <p>Removes the PDF and everything made from it, after you confirm.</p>
+  <p>Removes {{ "your file" if job.summary and job.summary.checked.origin != "pdf" else "the PDF" }} and everything made from it, after you confirm.</p>
   <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <button type="submit" class="button-danger-outline">Delete now</button>

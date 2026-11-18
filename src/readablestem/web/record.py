@@ -144,8 +144,13 @@ ALWAYS_NOT_CHECKED = (
     "in a live course.",
     "The Word and EPUB files. They are made from the HTML file, and the structure checks "
     "above are of the HTML file. Nobody has checked how they open in Word or a reading app.",
-    "The PDF itself. This record is about the HTML file made from it.",
 )
+
+
+def source_not_checked(origin: str) -> str:
+    """The last fixed fact: the file this one was made from was not checked either."""
+    noun = checked_words.source_noun(origin)
+    return f"The {noun} itself. This record is about the HTML file made from it."
 
 
 @dataclass(frozen=True)
@@ -337,7 +342,7 @@ def _page_number(element_id: str) -> int | None:
 def not_checked_list(result: DocumentResult, summary: CheckedSummary) -> list[str]:
     """What was not checked: the fixed facts plus the parts a person did not look at (the
     summary's open decisions, pictures, notes never opened and "Accept anyway")."""
-    out = list(ALWAYS_NOT_CHECKED)
+    out = [*ALWAYS_NOT_CHECKED, source_not_checked(result.origin)]
     by_tool = Counter(
         f.kind for f in result.fixes if f.status is Status.ACCEPTED and not f.decided_by_reviewer
     )

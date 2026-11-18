@@ -62,15 +62,15 @@
 {% endif %}
 
 <div class="fix-body">
-  {% if item.kind in ("equation", "figure", "table", "paragraph", "list_item") %}
+  {% if item.kind in ("equation", "figure", "table", "paragraph", "list_item") and (item.crop_url or not from_source) %}
   <figure class="crop">
     {% if item.crop_url %}
     <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} loading="lazy"
-         alt="The original {{ name }} from page {{ item.page }} of the PDF, as an image.">
+         alt="The original {{ name }} from page {{ item.page }} of the {{ source|default("PDF") }}, as an image.">
     {% else %}
     <p>No image of the original is available.</p>
     {% endif %}
-    <figcaption>PDF</figcaption>
+    <figcaption>{{ source|default("PDF") }}</figcaption>
   </figure>
   {% endif %}
 
@@ -98,7 +98,7 @@
     {% else %}
     <p>No proposal yet: this figure needs a description.</p>
     {% endif %}
-    {% if item.caption %}<p><strong>Caption in the PDF:</strong> {{ item.caption }}</p>{% endif %}
+    {% if item.caption %}<p><strong>Caption in the {{ source|default("PDF") }}:</strong> {{ item.caption }}</p>{% endif %}
     {# Long descriptions on: what students will also get. A data table whose values were
        read from the image is not in the student file: an optional extra, added below. #}
     {% if item.long_description %}

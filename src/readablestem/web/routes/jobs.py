@@ -197,6 +197,12 @@ UPLOAD_BUSY_WAIT_S = 10
 # A refused upload costs nothing: the probe runs before the daily page count.
 PDF_ADVICE = " Save a copy as a PDF first."
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
+# A document made from a source file (LaTeX, Word) has no revised version yet: what carries a
+# decision over to a new version is the picture of the item, and a source item has none.
+SOURCE_REVISE_REFUSED = (
+    "A document made from a LaTeX or Word file cannot be replaced with a new version yet. "
+    "Upload the new file as a new document. " + NOTHING_TAKEN
+)
 
 
 def upload_error_message(
@@ -309,6 +315,7 @@ def upload_error_message(
         "unknown_revision": "The document you wanted to replace with a new version was not "
         f"found. It may have been deleted. Upload {name} as a new document, or choose "
         "another document to revise.",
+        "revise_source": SOURCE_REVISE_REFUSED,
         "too_many_active": f"You already have {access.files_per_upload(tier)} documents waiting or "
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
@@ -722,6 +729,8 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
 @router.get("/app")
 def app_home(request: Request, user: UserDep, revises: str = "", image_pages: str = "") -> Response:
     ctx = get_ctx(request)
+    if revises and _users_revision(ctx, user, revises) and _is_source_job(ctx, revises):
+        return _upload_error_page(request, user, "revise_source", 400)
     context = app_context(ctx, user)
     if revises:
         context |= revision_context(ctx, user, revises)
@@ -1014,6 +1023,8 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
 
     if revises is not None and not await run_in_threadpool(_users_revision, ctx, user, revises):
         return await refuse("unknown_revision", 400, form.filename)
+    if revises is not None and await run_in_threadpool(_is_source_job, ctx, revises):
+        return await refuse("revise_source", 400, form.filename)
     if revises is not None and len(form.files) > 1:
         return await refuse("revise_one_file")
     if not form.files:
@@ -1686,6 +1697,14 @@ def _users_course(ctx: AppContext, user: CurrentUser, course_id: str) -> bool:
         return False
     with session_scope(ctx.factory) as session:
         return notation.owned_course(session, course_id, user.id) is not None
+
+
+def _is_source_job(ctx: AppContext, job_id: str) -> bool:
+    """The finished document was read from a source file (`DocumentResult.origin`)."""
+    with session_scope(ctx.factory) as session:
+        job = session.get(Job, job_id)
+        origin = ((job.result_json if job is not None else None) or {}).get("origin", "pdf")
+        return origin != "pdf"
 
 
 def _users_revision(ctx: AppContext, user: CurrentUser, job_id: str) -> bool:
