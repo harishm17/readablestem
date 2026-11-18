@@ -267,8 +267,10 @@ def delete_jobs(
     # The student-file images made from the figures are kept in memory for a while
     # (`pipeline.figure_images`); a deleted document's go with it.
     from readablestem.pipeline import figure_images
+    from readablestem.web import page_images
 
     figure_images.clear_cache()
+    page_images.forget_job(ids)  # and the review screen's page pictures (this process's memory)
     return PurgeStats(jobs_deleted=jobs, blobs_deleted=blobs, unaggregated_deleted=unaggregated)
 
 

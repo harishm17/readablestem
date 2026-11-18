@@ -28,7 +28,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from readablestem.config import Settings
-from readablestem.web import access
+from readablestem.web import access, export_store
 from readablestem.web.db import Blob, Job, JobStatus, PendingUpload, StepRecord, User, utcnow
 
 MB = 1024 * 1024
@@ -73,7 +73,7 @@ def user_bytes(session: Session, user_id: str, now: datetime | None = None) -> i
         select(func.coalesce(func.sum(_BLOB_BYTES), 0))
         .select_from(Blob)
         .join(Job, Job.id == Blob.job_id)
-        .where(*live)
+        .where(*live, Blob.kind != export_store.KIND)  # a kept export can be made again
     )
     texts = session.scalar(
         select(func.coalesce(func.sum(_HTML_BYTES + _RESULT_BYTES), 0)).where(*live)
@@ -145,7 +145,9 @@ def report(session: Session, settings: Settings) -> dict[str, int | bool]:
 @dataclass(frozen=True)
 class JobBytes:
     """What one finished document stores: its upload (the source PDF), its crops, the HTML
-    file, the result and the step records "Try again" reuses. Bytes of content, no name."""
+    file, the result, the step records "Try again" reuses and the Word, EPUB and Canvas files
+    kept after a download (`web.export_store`; not part of a person's cap). Bytes of content,
+    no name."""
 
     job_id: str
     upload: int
@@ -153,10 +155,11 @@ class JobBytes:
     html: int
     result: int
     steps: int
+    exports: int = 0
 
     @property
     def total(self) -> int:
-        return self.upload + self.crops + self.html + self.result + self.steps
+        return self.upload + self.crops + self.html + self.result + self.steps + self.exports
 
 
 def finished_job_bytes(session: Session) -> list[JobBytes]:
@@ -187,6 +190,7 @@ def finished_job_bytes(session: Session) -> list[JobBytes]:
             html=int(html),
             result=int(result),
             steps=steps.get(job_id, 0),
+            exports=blobs.get((job_id, export_store.KIND), 0),
         )
         for job_id, html, result in jobs
     ]

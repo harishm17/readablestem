@@ -55,6 +55,7 @@ from readablestem.web import (
     bundle,
     documents,
     events,
+    export_store,
     notation,
     office_convert,
     output,
@@ -2137,11 +2138,20 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             context={"job_id": job_id},
         )
     ctx = get_ctx(request)
-    html, title, job_ref, state = _canvas_source(request, user, job_id, "canvas", number)
+    html, title, job_ref, state, version = _canvas_source(request, user, job_id, "canvas", number)
     name = canvas_filename(title, job_ref)
     if is_head(request):
         return head_reply("application/zip", output.file_name(name, state))
-    export = _canvas_export(html, title, job_ref, number)
+    data = export_store.get_or_build(
+        lambda: session_scope(ctx.factory),
+        job_ref,
+        version,
+        "canvas",
+        html,
+        title,
+        lambda: export_canvas.build_zip(_canvas_export(html, title, job_ref, number)),
+        options=f"course={number or ''}",
+    )
     events.record_download(
         ctx.factory,
         ctx.settings,
@@ -2151,7 +2161,7 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
         file_type="canvas",
     )
     return Response(
-        export_canvas.build_zip(export),
+        data,
         media_type="application/zip",
         headers={
             "Content-Disposition": content_disposition(output.file_name(name, state)),
@@ -2171,11 +2181,19 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     which Canvas, Blackboard, Moodle and D2L import. A GET like the other downloads, for the
     owner only."""
     ctx = get_ctx(request)
-    html, title, job_ref, state = _canvas_source(request, user, job_id, "cartridge", None)
+    html, title, job_ref, state, version = _canvas_source(request, user, job_id, "cartridge", None)
     name = cartridge_filename(title, job_ref)
     if is_head(request):
         return head_reply("application/zip", output.file_name(name, state))
-    export = _canvas_export(html, title, job_ref, None)
+    data = export_store.get_or_build(
+        lambda: session_scope(ctx.factory),
+        job_ref,
+        version,
+        "cartridge",
+        html,
+        title,
+        lambda: export_cartridge.build_cartridge(_canvas_export(html, title, job_ref, None)),
+    )
     events.record_download(
         ctx.factory,
         ctx.settings,
@@ -2185,7 +2203,7 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
         file_type="cartridge",
     )
     return Response(
-        export_cartridge.build_cartridge(export),
+        data,
         media_type="application/zip",
         headers={
             "Content-Disposition": content_disposition(output.file_name(name, state)),
@@ -2334,23 +2352,27 @@ def export_failed_words(version: str, code: str) -> str:
 
 def _canvas_source(
     request: Request, user: CurrentUser, job_id: str, file_type: str, number: str | None
-) -> tuple[str, str, str, output.ExportState]:
-    """(html, title, job id, state) of the finished document for a Canvas download: done, up
-    to date, through the draft gate `output.check` (a draft carries its banner). The deletion
-    clock restarts, except for a HEAD, which only asks (`head_reply`)."""
+) -> tuple[str, str, str, output.ExportState, int]:
+    """(html, title, job id, state, result version) of the finished document for a Canvas
+    download: done, up to date, through the draft gate `output.check` (a draft carries its
+    banner). The deletion clock restarts, except for a HEAD, which only asks (`head_reply`)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         role = role_of(session, job, user)
         state = output.check(request, job, role, file_type, course=number or "")
         if is_head(request):  # the headers need the title only, not a re-render
-            return "", documents.document_title(job).text, job.id, state
+            return "", documents.document_title(job).text, job.id, state, 0
         job = current_html(ctx, session, job)
         title = documents.document_title(job).text
-        html, job_ref = output.marked(job.html or "", state), job.id
+        html, job_ref, version = (
+            output.marked(job.html or "", state),
+            job.id,
+            job.result_version or 0,
+        )
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
-    return html, title, job_ref, state
+    return html, title, job_ref, state, version
 
 
 def _canvas_export(

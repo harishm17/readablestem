@@ -43,7 +43,7 @@ from readablestem.observability.logging import configure_logging, request_loggin
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
 from readablestem.pipeline import checked_words
-from readablestem.web import analytics, dev_only, forms, output, poll, seo
+from readablestem.web import analytics, dev_only, forms, output, page_images, poll, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -450,6 +450,7 @@ def create_app(
     check_web_secrets(settings)
     engine = make_engine(settings.database_url)
     factory = make_sessionmaker(engine)
+    page_images.CACHE.configure(settings.page_image_cache_mb * 1024 * 1024)
     forms.install(factory)  # a form's request token rides on its action's commit (SW43)
     ctx = AppContext(
         settings=settings,

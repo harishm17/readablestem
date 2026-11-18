@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 from urllib.parse import quote, urlencode
@@ -448,6 +449,20 @@ def _upload(request: Request, job_id: str, user: CurrentUser) -> bytes:
     if pdf is None:
         raise PageError(404, *NOT_FOUND)
     return pdf
+
+
+def _upload_ref(request: Request, job_id: str, user: CurrentUser) -> tuple[str, str]:
+    """(job id, id of the job's upload row) after the same access check as `_upload`, without
+    loading the PDF: what a picture is kept under (`page_images.render_region`, `cache_as`)."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        require_done(job)
+        upload_id = session.scalar(
+            select(Blob.id).where(Blob.job_id == job.id, Blob.kind == "upload")
+        )
+    if upload_id is None:
+        raise PageError(404, *NOT_FOUND)
+    return job_id, upload_id
 
 
 SIZES = TypeAdapter(dict[int, tuple[float, float]])
@@ -1679,7 +1694,8 @@ def page_image(request: Request, job_id: str, number: str, user: UserDep) -> Res
         raise PageError(404, *NOT_FOUND)
     try:
         with page_images.render_slot(user.id):
-            return _png(page_images.render_page(_upload(request, job_id, user), int(number) - 1))
+            pdf, kept = _lazy_upload(request, job_id, user)
+            return _png(page_images.render_page(pdf, int(number) - 1, cache_as=kept))
     except page_images.RenderFailed as exc:
         return _render_failed(job_id, exc, "page")
 
@@ -1700,15 +1716,27 @@ def region_image(request: Request, job_id: str, element_id: str, user: UserDep) 
         with page_images.render_slot(user.id):
             # The same sizes as marks.css, so the crop and the proposal under it line up.
             sizes = resolve_page_sizes(request, job_id, user, result, slot_held=True)
-            pdf = _upload(request, job_id, user)
-            png = _render_region(pdf, element, fix, sizes.get(element.page))
+            pdf, kept = _lazy_upload(request, job_id, user)
+            png = _render_region(pdf, element, fix, sizes.get(element.page), kept)
     except page_images.RenderFailed as exc:
         return _render_failed(job_id, exc, fix.kind.value)
     return _png(png)
 
 
+def _lazy_upload(
+    request: Request, job_id: str, user: CurrentUser
+) -> tuple[Callable[[], bytes], tuple[str, str]]:
+    """The upload as a loader called only when a picture has to be made, and what the
+    picture is kept under: a repeat request loads no PDF (`page_images.CACHE`)."""
+    return (lambda: _upload(request, job_id, user)), _upload_ref(request, job_id, user)
+
+
 def _render_region(
-    pdf: bytes, element: Element, fix: Fix, size: tuple[float, float] | None
+    pdf: bytes | Callable[[], bytes],
+    element: Element,
+    fix: Fix,
+    size: tuple[float, float] | None,
+    kept: tuple[str, str] | None = None,
 ) -> bytes:
     if fix.kind is Kind.EQUATION:
         clip = context_clip(element, size)
@@ -1724,6 +1752,7 @@ def _render_region(
             mark=element.bbox,
             chars=compare_equation(element, fix).pdf_marks,
             trim=True,
+            cache_as=kept,
         )
     if fix.kind is Kind.HEADING:
         return page_images.render_region(
@@ -1734,6 +1763,7 @@ def _render_region(
             clip=band_clip(element, size),
             box=element.bbox,
             snap=True,
+            cache_as=kept,
         )
     x0, y0, x1, y1 = element.bbox
     if fix.kind is Kind.TABLE:
@@ -1748,6 +1778,7 @@ def _render_region(
             clip=(x0 - m, y0 - m, x1 + m, y1 + m),
             box=element.bbox,
             snap=True,
+            cache_as=kept,
         )
     return page_images.render_region(
         pdf,
@@ -1755,4 +1786,5 @@ def _render_region(
         zoom=FIGURE_REGION_ZOOM,
         max_side=page_images.REGION_MAX_SIDE_PX,
         clip=(x0 - 4, y0 - 4, x1 + 4, y1 + 4),
+        cache_as=kept,
     )
