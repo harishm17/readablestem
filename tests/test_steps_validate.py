@@ -346,6 +346,10 @@ def test_safe_latex_to_mathml_output_is_always_allowlisted(latex):
         (f"<math {NS}><mfrac><mrow/><mi>b</mi></mfrac></math>", "empty_argument"),
         (f"<math {NS}><msqrt><mrow/></msqrt></math>", "empty_argument"),
         (f"<math {NS}><msup><mi>x</mi><mrow/></msup></math>", "empty_argument"),
+        (
+            f"<math {NS}><munderover><mo>∑</mo><mi>i</mi><mrow/></munderover></math>",
+            "empty_argument",
+        ),
         (f"<math {NS}><mi>\\foo</mi></math>", "unconverted_command"),
         (f"<math {NS}><mtext>\\textbf{{x</mtext></math>", "unconverted_command"),
         (f"<math {NS}><merror><mtext>x</mtext></merror></math>", "unconverted_command"),

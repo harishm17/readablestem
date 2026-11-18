@@ -113,6 +113,7 @@ def test_every_gold_equation_has_speech(record):
         # a sign is said for what it does: a bar, a dot, a cross, a script
         (r"P(A \mid B)", "capital P open parenthesis capital A given capital B close parenthesis"),
         (r"\{x \mid x>0\}", "open brace x such that x greater than 0 close brace"),
+        (r"\{n \mid 3 \mid n\}", "open brace n such that 3 divides n close brace"),
         (r"3 \mid 12", "3 divides 12"),
         (r"\mathbf{a} \cdot \mathbf{b}", "bold a dot bold b"),
         (r"\mathbf{a} \times \mathbf{b}", "bold a cross bold b"),

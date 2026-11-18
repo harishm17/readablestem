@@ -724,9 +724,9 @@ _OVER_UNDER_ELEMENTS = frozenset({"munder", "mover", "munderover"})
 
 def _has_empty_argument(elem: ET.Element, name: str) -> bool:
     """A fraction with an empty part, a root with an empty radicand or index, a script that
-    holds nothing, or a base with nothing under it. Not flagged: an empty base that carries
-    scripts (`{}^{14}C`, the nuclide and index notation), and an arrow with a label on one
-    side only (`\\xrightarrow[x]{}`)."""
+    holds nothing, a base with nothing under it, or a limit left empty (`\\sum_{i}^{}`). Not
+    flagged: an empty base that carries scripts (`{}^{14}C`, the nuclide and index notation),
+    and an arrow with a label on one side only (`\\xrightarrow[x]{}`)."""
     kids = list(elem)
     if name in {"mfrac", "mroot"}:
         return any(_blank(kid) for kid in kids)
@@ -735,8 +735,15 @@ def _has_empty_argument(elem: ET.Element, name: str) -> bool:
     if name in _SCRIPT_ELEMENTS:
         return any(_blank(kid) for kid in kids[1:])
     if name in _OVER_UNDER_ELEMENTS:
-        return _blank(kids[0]) or all(_blank(kid) for kid in kids[1:])
+        empty = [_blank(kid) for kid in kids[1:]]
+        return _blank(kids[0]) or all(empty) or (any(empty) and not _is_arrow(kids[0]))
     return False
+
+
+def _is_arrow(elem: ET.Element) -> bool:
+    """One character of the arrows blocks: the base `\\xrightarrow` stretches over its label."""
+    text = "".join(elem.itertext()).strip()
+    return len(text) == 1 and (0x2190 <= ord(text) <= 0x21FF or 0x27F0 <= ord(text) <= 0x27FF)
 
 
 def _is_leftover(elem: ET.Element, name: str) -> bool:

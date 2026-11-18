@@ -1082,7 +1082,8 @@ def _mark_bars(kids: list[ET.Element]) -> None:
                 depth -= 1
             elif depth == 0 and text in {"∣", "|"}:
                 bars.append(inner)
-        for bar in bars:
+        # In "{n \mid 3 \mid n}" the first bar is "such that" and the second divides.
+        for bar in bars[:1] if opener == "{" else bars:
             if _mo_text(bar) == "∣" or len(bars) == 1:
                 bar.set(_MARK, word)
 
