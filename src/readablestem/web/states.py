@@ -109,6 +109,10 @@ TABLE: dict[str, Row] = {
     "being_checked": Row("Being checked", NEEDS_YOU, True),
     "partly_converted": Row("Partly converted", GAPS, True),
     "ready": Row("Ready to share", DONE, True),
+    # Finished with no decision open, but the language is a guess (SW20a): the owner confirms or
+    # changes it first, with the control on the job page. Said to the owner only; a document
+    # already shared stays shared.
+    "confirm_language": Row("Converted: confirm the language", GAPS, True),
     # Finished with no decision open, but a part is a picture, a page is left out or a
     # structure check failed (or none is stored): "Ready" and what remains (SW7).
     "ready_remains": Row("Ready", GAPS, True),
@@ -116,7 +120,9 @@ TABLE: dict[str, Row] = {
     "deleted": Row("Deleted on {date}", WAITING, True),
 }
 # The states that have something to keep, so "Keep for 7 days" is offered (F-316).
-KEEPS = frozenset({"needs_decisions", "partly_converted", "ready", "ready_remains"})
+KEEPS = frozenset(
+    {"needs_decisions", "partly_converted", "ready", "ready_remains", "confirm_language"}
+)
 # The finished states with no decision open and no gap note: their message is the
 # summary's (`pipeline.checked`), never a template's.
 READY_KEYS = frozenset({"ready", "ready_remains"})
@@ -669,6 +675,28 @@ _HOLDS = {
 }
 
 
+# The language checks (SW20a), the one place they are counted: the job page, the documents list and
+# the batch page all read the state, so none keeps a rule of its own. `lang_assumed` and
+# `lang_mixed` are on the result until the owner confirms or changes the language
+# (`text_pass.set_document_language` takes them off).
+_LANGUAGE_CHECKS = {
+    "lang_assumed": (
+        "The language of this document is assumed to be English, so confirm it before you "
+        "share it: a screen reader reads the whole file in that language's voice."
+    ),
+    "lang_mixed": (
+        "No one language makes up most of this document, so confirm which it is before you "
+        "share it: a screen reader reads the whole file in that language's voice."
+    ),
+}
+
+
+def _language_check(result: Mapping[str, Any] | None) -> str:
+    """The sentence of the language check a stored result still has, "" when it has none."""
+    codes = {n.get("code") for n in (result or {}).get("notices") or []}
+    return next((text for code, text in _LANGUAGE_CHECKS.items() if code in codes), "")
+
+
 def _held_by_notice(result: Mapping[str, Any] | None) -> str:
     """The sentence of a stored result's notice that holds it back (`_HOLDS`), "" when none.
     A text notice whose element has the decision (`pipeline.notices.text_decisions`) does not:
@@ -705,7 +733,8 @@ def _facts_stamp() -> str:
 
 def _facts_current(stored: object) -> bool:
     """`jobs.state_facts` made by this code."""
-    return isinstance(stored, dict) and stored.get("by") == _facts_stamp()
+    # A result stored before the language check has no "language" fact: read once, made again.
+    return isinstance(stored, dict) and stored.get("by") == _facts_stamp() and "language" in stored
 
 
 def finished_facts(result: object) -> dict[str, Any] | None:
@@ -730,8 +759,10 @@ def finished_facts(result: object) -> dict[str, Any] | None:
         "remains": counts.remains,
         "version": version if isinstance(version, str) else None,
         "by": _facts_stamp(),
+        "language": bool(_language_check(result)),
         "plain": not (
-            words.outage_message(result)
+            _language_check(result)
+            or words.outage_message(result)
             or words.unread_message(result)
             or _unanalysed_pages(result)
             or _held_by_notice(result)
@@ -755,6 +786,11 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | Non
         steps = (*actions, download) if actions else (download,)
         return _make("partly_converted", " ".join(g.text for g in gaps), steps, gaps)
     steps = (download, share) if viewer == "owner" else (download,)
+    if viewer == "owner" and (check := _language_check(job.result_json)):
+        confirm = Step("language", "Confirm the language", f"/jobs/{job.id}#language-heading")
+        return _make(
+            "confirm_language", " ".join(p for p in (check, counts.remains) if p), (confirm, *steps)
+        )
     if counts.whole:
         if pages := _unanalysed_pages(job.result_json):
             # The ink analysis ran out of work on these pages (`drawings_not_analysed`): the

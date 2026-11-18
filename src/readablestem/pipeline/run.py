@@ -832,6 +832,7 @@ def _text_pass(
             layout_lang=layout_lang,
             colour=options.colour,
             runs=options.content_runs,
+            chosen_lang=options.language,
         )
         _annotate(span, lang_source=text.lang_source, **text.counts())
     return text

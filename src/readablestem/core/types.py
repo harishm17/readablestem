@@ -894,7 +894,8 @@ NOTICE_CODES = frozenset(
         "link_scheme_dropped",  # a PDF link that is not http, https or mailto: text only
         "link_text_unclear",  # link text that says nothing on its own ("click here")
         "lang_detected",  # the document language was detected from the text
-        "lang_assumed",  # no language in the PDF and none detected: the default is used
+        "lang_assumed",  # no language chosen or found in the text, and the file's own does not fit
+        "lang_mixed",  # no one language holds most of the text: the largest is the document's
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
         "struck_text",  # text the page shows struck through, kept and marked as deleted
@@ -1481,6 +1482,10 @@ class ConversionOptions(BaseModel):
     # `long_descriptions` is on. A per-job choice (the upload form), not a deployment
     # flag, so `from_settings` leaves it off.
     exam_mode: bool = False
+    # The language the person chose at upload ("Language of the document"): the document's
+    # language, stated (`text_pass`). Left out of the dump, so it is no part of a step's key:
+    # no step reads the language, only the text pass and the page's `lang`.
+    language: str | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ConversionOptions:

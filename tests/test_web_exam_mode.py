@@ -57,6 +57,18 @@ def test_a_ticked_box_is_stored_and_the_conversion_runs_in_exam_mode(web):
     assert options.tables == web.settings.feature_tables
 
 
+def test_a_language_chosen_at_upload_is_the_documents_language(web):
+    job_id = job_id_from(upload(web.browser, make_pdf(1), language="es"))
+    assert web.job(job_id).language == "es"
+    web.run_worker()
+    options = web.converter.calls[-1]["options"]
+    assert options.language == "es"
+    # Anything the page does not offer is "Detect it".
+    other = job_id_from(upload(web.browser, make_pdf(1), language="xx"))
+    assert web.job(other).language is None
+    assert 'name="language"' in web.browser.get("/app").text
+
+
 def test_the_choice_is_said_wherever_the_document_is_handled_and_never_to_the_student(web):
     exam = job_id_from(upload(web.browser, make_pdf(1), filename="midterm.pdf", exam=True))
     plain = job_id_from(upload(web.browser, make_pdf(1), filename="notes.pdf"))

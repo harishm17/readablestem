@@ -525,8 +525,12 @@ NOTICE_MESSAGES: dict[str, str] = {
     "here), so reword it.",
     "lang_detected": "The language of the document was detected from its text, so check it "
     "is right.",
-    "lang_assumed": "The PDF does not say which language it is in and none was detected, "
-    "so English is assumed: check it is right.",
+    "lang_assumed": "The language of this document could not be found: the PDF does not say "
+    "which it is in and the text is too short to tell, so English is assumed. Confirm the "
+    "language before you share it, because a screen reader reads the whole file in its voice.",
+    "lang_mixed": "No one language makes up most of this document, so the one with the most "
+    "text is used for the whole file and passages in other languages are marked. Confirm the "
+    "language before you share it, because a screen reader reads the file in its voice.",
     "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
     "long description yet.",
     "image_page_converted": "A scanned or handwritten page was converted from an image of "

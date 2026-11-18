@@ -42,7 +42,7 @@ from readablestem.core import sandbox
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
-from readablestem.pipeline import checked_words
+from readablestem.pipeline import checked_words, language
 from readablestem.web import analytics, dev_only, forms, output, page_images, poll, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
@@ -225,6 +225,11 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     # Every sentence about what was converted, checked or reviewed (SW7): templates print
     # these, read from a `pipeline.checked.CheckedSummary`, and compose none of their own.
     env.globals["checked_words"] = checked_words  # ty: ignore[invalid-assignment]
+    # The upload form's "Language of the document" choices: the same tags and names as the job
+    # page's language control, by name.
+    env.globals["language_options"] = sorted(  # ty: ignore[invalid-assignment]
+        language.LANGUAGE_NAMES.items(), key=lambda item: item[1]
+    )
     # The exam choice's words (web/exam.py), the same on every page that says it.
     env.globals["exam_words"] = EXAM_WORDS  # ty: ignore[invalid-assignment]
     # Structured data for the public pages (web.seo), with the same absolute address.

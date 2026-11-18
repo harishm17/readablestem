@@ -281,6 +281,7 @@ def _start_parts(
         data, name, total = bytes(row.content), row.filename, row.pages
         done = {p for p in (row.done_pages or []) if isinstance(p, int)}
         course, exam, mode = row.course_id, bool(row.exam_mode), row.retention_mode
+        chosen_language = row.language
         asked_images = bool(row.image_pages) and s.feature_image_pages
         office = dict(row.office_json) if row.office_json else None
     if whole:
@@ -324,6 +325,7 @@ def _start_parts(
                 mode,
                 course_id=course,
                 exam=exam,
+                language=chosen_language,
                 image_pages=asked_images and may_have,
                 part_group=None if whole else upload_id,
                 part_label=None if whole else part.label,

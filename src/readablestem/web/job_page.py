@@ -873,7 +873,7 @@ def _one_line_per_kept_page(
 # --------------------------------------------------------------------------- language
 
 # Notices that ask the instructor to confirm the language; confirming answers them.
-LANGUAGE_NOTICES = frozenset({"lang_detected", "lang_assumed"})
+LANGUAGE_NOTICES = frozenset({"lang_detected", "lang_assumed", "lang_mixed"})
 SOURCE_WORDS = {
     "pdf": "from your PDF",
     "detected": "detected; your PDF did not say",
@@ -912,7 +912,11 @@ def language_line(result: DocumentResult) -> str:
 
 
 def language_needs_check(result: DocumentResult) -> bool:
-    return language_source(result) in ("detected", "default")
+    """The language was not stated by the file or the person: worth confirming. When the
+    notice that holds the job (`notices.LANGUAGE_CODES`) is there, confirming is required."""
+    return language_source(result) in ("detected", "default") or any(
+        n.code in notice_rules.LANGUAGE_CODES for n in result.notices
+    )
 
 
 def language_choices(current: str) -> list[tuple[str, str]]:

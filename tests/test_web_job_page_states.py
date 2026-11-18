@@ -143,7 +143,7 @@ def section_of_status(html: str) -> str:
     return html[start : html.index("</div>", start)]
 
 
-def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
+def nothing_to_decide(web) -> None:
     decide_everything(web, keep_as_image=())
     result = web.converter.output.result
     # No image left: the abstained equation goes, its element too (an element with no fix
@@ -152,6 +152,22 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     result.elements = [e for e in result.elements if e.id != "p1-e5"]
     for fix in result.fixes:
         fix.reviewed = False  # accepted by the pipeline: nothing needed a decision
+
+
+def test_an_assumed_language_is_not_ready_to_share_until_the_owner_confirms_it(web):
+    nothing_to_decide(web)
+    job_id = convert(
+        web, lang_source="default", notices=[Notice(code="lang_assumed", review="required")]
+    )
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert not title(html).startswith("Ready to share")
+    assert "Confirm the language" in page_text(html)
+    assert post_language(web, job_id, "en").status_code == 303
+    assert title(web.browser.get(f"/jobs/{job_id}").text).startswith("Ready to share")
+
+
+def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
+    nothing_to_decide(web)
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Ready to share: SECRET-HEADING Kinematics | ReadableSTEM"

@@ -437,7 +437,7 @@ def _finish(
     pipeline._send(stage_progress, "assemble")
     html = assemble.render_html(
         title=reading.title,
-        lang=reading.lang,
+        lang=options.language or reading.lang,
         elements=elements,
         fixes=ordered,
         crops=run.crops,
@@ -470,7 +470,7 @@ def _finish(
         pipeline_version=pipeline.PIPELINE_VERSION,
         prompt_versions=pipeline._prompt_versions(ordered),
         title=reading.title,
-        lang=reading.lang,
+        lang=options.language or reading.lang,
         elements=elements,
         fixes=ordered,
         stats=stats,
@@ -478,7 +478,7 @@ def _finish(
         stopped_by=run.stop.reason() if run.stop.scope is not None else None,
         html_checks=checks,
         notices=notices,
-        lang_source="default",
+        lang_source="user" if options.language else "default",
         origin=origin,
         source_report=report,
     )
