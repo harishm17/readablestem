@@ -372,6 +372,14 @@ def _is_plain_token(node: ET.Element) -> bool:
     return node.tag in {"mi", "mn", "mtext"} and _text_of(node) not in FUNCTIONS
 
 
+def _starts_plain(node: ET.Element) -> bool:
+    """A plain token, or a script on one (`b^2` after `a_a` can be taken for the rest of its
+    subscript)."""
+    while node.tag in {"msub", "msup", "msubsup"} and len(node):
+        node = node[0]
+    return _is_plain_token(node)
+
+
 # Nodes a plain token follows directly in the call in progress (`_mark_followed`). A short
 # fraction or subscript there says where it ends, or `\frac{1}{2}mv^2` and `\frac{1}{2m}v^2`
 # would be said alike.
@@ -390,10 +398,37 @@ def _mark_followed(root: ET.Element) -> frozenset[int]:
         transparent = node.tag in {"math", "mrow"}
         for k, kid in enumerate(kids):
             more = k + 1 < len(kids)
-            after = _is_plain_token(kids[k + 1]) if more else followed and transparent
+            after = _starts_plain(kids[k + 1]) if more else followed and transparent
             if after:
                 found.add(id(kid))
             stack.append((kid, after))
+    return frozenset(found)
+
+
+# Fractions a plain token directly precedes in the call in progress: `a\\frac{b}{2}` takes the
+# long form, or it would be said as `\\frac{ab}{2}` is.
+_PRECEDED: ContextVar[frozenset[int]] = ContextVar("speech_preceded", default=frozenset())
+
+
+def _mixed_number(prev: ET.Element, node: ET.Element) -> bool:
+    """`2\\frac{1}{2}`: a number before a fraction of numbers; `\\frac{21}{2}` is one number."""
+    return prev.tag == "mn" and node.tag == "mfrac" and len(node) == 2 and node[0].tag == "mn"
+
+
+def _mark_preceded(root: ET.Element) -> frozenset[int]:
+    """The ids of the nodes a plain token directly precedes (a first node in a row follows
+    what the row follows)."""
+    found: set[int] = set()
+    stack = [(root, None)]
+    while stack:
+        node, before = stack.pop()
+        transparent = node.tag in {"math", "mrow"}
+        prev = before if transparent else None
+        for kid in node:
+            if prev is not None and _is_plain_token(prev) and not _mixed_number(prev, kid):
+                found.add(id(kid))
+            stack.append((kid, prev))
+            prev = kid
     return frozenset(found)
 
 
@@ -420,7 +455,8 @@ def _speak_fraction(node: ET.Element) -> list[str]:
     num, den = node[0], node[1]
     if node.get("linethickness") == "0":
         return [*_speak(num), "choose", *_speak(den)]
-    if _is_simple(num) and _is_simple(den):
+    long_form = id(node) in _PRECEDED.get() and _is_plain_token(num)
+    if _is_simple(num) and _is_simple(den) and not long_form:
         end = ["end fraction"] if id(node) in _FOLLOWED.get() else []
         return [*_speak(num), "over", *_speak(den), *end]
     return ["the fraction", *_speak(num), "over", *_speak(den), "end fraction"]
@@ -469,7 +505,9 @@ def _is_transpose(sup: ET.Element, base: ET.Element) -> bool:
     return sup.tag == "mi" and text == "T" and plain_or_upright and _transposable(base)
 
 
-def _power_words(sup: ET.Element, base: ET.Element | None = None) -> list[str]:
+def _power_words(
+    sup: ET.Element, base: ET.Element | None = None, *, followed: bool = False
+) -> list[str]:
     text = _text_of(sup)
     if sup.tag == "mn" and text == "2":
         return ["squared"]
@@ -483,7 +521,7 @@ def _power_words(sup: ET.Element, base: ET.Element | None = None) -> list[str]:
         return ["star" if text in {"*", "∗"} else SYMBOLS[text]]
     if base is not None and base.tag == "mn" and sup.tag == "mo" and text in {"+", "−", "-"}:
         return ["plus" if text == "+" else "minus"]  # a one-sided limit: 0 plus, 0 minus
-    if _is_signed_token(sup):
+    if _is_signed_token(sup) and not (followed and sup.tag == "mo"):  # `e^{-}x` is not `e^{-x}`
         return ["to the power", *_speak(sup)]
     return ["to the power", *_speak(sup), "end power"]
 
@@ -548,6 +586,20 @@ def _pre_script(word: str, script: ET.Element) -> list[str]:
     return [word, *_speak(script), f"end {word}"]
 
 
+def _base_words(base: ET.Element) -> list[str]:
+    r"""A base of several tokens that is not bracketed ("{ab}_2") is said as a quantity, or it
+    would be said as `ab_2`, whose script belongs to the last token only."""
+    words = _speak(base)
+    first = base[0] if len(base) else None
+    if base.tag != "mrow" or first is None or len(base) < 2:
+        return words
+    if first.tag == "mo" and _text_of(first) in _OPENERS:
+        return words
+    if all(k.tag == "mi" and k.get("mathvariant") == "normal" for k in base):
+        return words  # upright letters are a unit or a word: \mathrm{km}^2
+    return ["the quantity", *words, "end quantity"]
+
+
 def _speak_msub(node: ET.Element) -> list[str]:
     if len(node) != 2:
         return _speak_children(node)
@@ -560,7 +612,7 @@ def _speak_msub(node: ET.Element) -> list[str]:
     limits = _with_limits(base, sub, None)
     if limits is not None:
         return limits
-    return [*_speak(base), *_sub_words(sub, followed=id(node) in _FOLLOWED.get())]
+    return [*_base_words(base), *_sub_words(sub, followed=id(node) in _FOLLOWED.get())]
 
 
 def _speak_msup(node: ET.Element) -> list[str]:
@@ -577,7 +629,7 @@ def _speak_msup(node: ET.Element) -> list[str]:
         return limits
     if _inverts(base, sup):
         return ["inverse", FUNCTIONS[_text_of(base)]]
-    return [*_speak(base), *_power_words(sup, base)]
+    return [*_base_words(base), *_power_words(sup, base, followed=id(node) in _FOLLOWED.get())]
 
 
 def _speak_msubsup(node: ET.Element) -> list[str]:
@@ -592,7 +644,11 @@ def _speak_msubsup(node: ET.Element) -> list[str]:
     limits = _with_limits(base, sub, sup)
     if limits is not None:
         return limits
-    return [*_speak(base), *_sub_words(sub), *_power_words(sup, base)]
+    return [
+        *_base_words(base),
+        *_sub_words(sub),
+        *_power_words(sup, base, followed=id(node) in _FOLLOWED.get()),
+    ]
 
 
 def _speak_munder(node: ET.Element) -> list[str]:
@@ -1224,9 +1280,11 @@ def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) 
     _drop_trailing_punctuation(root)
     token = _READINGS.set(readings or None)
     followed = _FOLLOWED.set(_mark_followed(root))
+    preceded = _PRECEDED.set(_mark_preceded(root))
     try:
         words = _speak(root)
     finally:
+        _PRECEDED.reset(preceded)
         _FOLLOWED.reset(followed)
         _READINGS.reset(token)
     text = " ".join(word for word in words if word)

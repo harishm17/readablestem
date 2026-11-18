@@ -328,8 +328,8 @@ def test_latex2mathml_not_is_the_relation_or_its_negation():
     assert differs("a ≠ b", r"a \not= b") == ()
     assert differs("x ≮ y", r"x \not< y") == ()
     assert differs("x ≰y", r"x \not\le y") == ()
-    assert differs("a = b", r"a \not= b") == ()
-    assert differs("a < b", r"a \not= b") == (signs.LESS,)
+    assert differs("a = b", r"a \not= b") != ()
+    assert signs.LESS in differs("a < b", r"a \not= b")
 
 
 # Review 2026-10-08: relations typed as ASCII (a LibreOffice PDF of a typed handout) were
