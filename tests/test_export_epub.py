@@ -237,10 +237,10 @@ def test_nav_has_contents_nested_by_level_and_a_page_list():
     labels = [(a.get("href"), a.text) for a in pages.iter(f"{XHTML}a")]
     assert labels == [("content.xhtml#pb2", "Page 2"), ("content.xhtml#page-2", "Page iii")]
     assert export.page_labels == 2
-    # the landmarks: the contents, and where the text starts (the first heading)
+    # the landmarks: where the text starts (the first heading). Every entry is in the reading
+    # order: EPUBCheck refuses one that points at this file, which is outside it.
     assert landmarks.get(f"{EPUB_NS}type") == "landmarks"
     assert [(a.get(f"{EPUB_NS}type"), a.get("href")) for a in landmarks.iter(f"{XHTML}a")] == [
-        ("toc", "nav.xhtml#toc"),
         ("bodymatter", "content.xhtml#p1-e0"),
     ]
     assert 'property="source-of">pagination<' in export.package  # what the pages belong to

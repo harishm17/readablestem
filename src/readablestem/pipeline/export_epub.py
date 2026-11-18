@@ -449,9 +449,10 @@ def _nav_document(
     start = toc[0][1] if toc else ""
     start_file = file_of.get(start, CONTENT_FILE)
     start_href = f"{start_file}#{escape(start, quote=True)}" if start else start_file
+    # No entry for the contents: this file is not in the reading order (a reading system
+    # shows it as its own menu), and EPUBCheck refuses a landmark outside it (RSC-011).
     landmarks = (
         '<nav epub:type="landmarks" hidden="hidden"><ol>'
-        '<li><a epub:type="toc" lang="en" href="nav.xhtml#toc">Contents</a></li>'
         f'<li><a epub:type="bodymatter" lang="en" href="{start_href}">Start of content</a></li>'
         "</ol></nav>"
     )

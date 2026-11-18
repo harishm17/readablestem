@@ -76,19 +76,24 @@ def contents_nav(html: str) -> str:
 # ----------------------------------------------------------------------------- skip link
 
 
-def test_the_skip_link_comes_first_and_jumps_to_the_h1_which_takes_focus():
+def test_the_skip_link_comes_first_and_jumps_to_the_notice_or_the_h1_which_takes_focus():
     html = render([block(0, Kind.PARAGRAPH, "Hello.")])
     body = html.split("<body>", 1)[1]
+    # nobody reviewed this page, so it opens with the notice: a link past it would hide it
     assert body.lstrip().startswith(
-        '<a class="skip-link readablestem" href="#main-content">Skip to main content</a>'
+        '<a class="skip-link readablestem" href="#checked-notice">Skip to main content</a>'
     )
-    # the target is the page's one h1: focusable by the link (Firefox, VoiceOver), but not a
-    # tab stop; the only tabindex
+    # the notice and the page's one h1 take focus from a link (Firefox, VoiceOver) and are
+    # not tab stops; nothing else carries a tabindex
     assert html.count('id="main-content"') == 1
     assert '<h1 id="main-content" tabindex="-1">Doc</h1>' in html
-    assert re.findall(r"tabindex=\"[^\"]*\"", html) == ['tabindex="-1"']
-    # a heading that is the title is the target under its own id
-    titled = render(three_headings())
+    assert re.findall(r"tabindex=\"[^\"]*\"", html) == ['tabindex="-1"'] * 2
+    # with no notice (a person reviewed the page and nothing is a picture) the target is the
+    # h1, and a heading that is the title is the target under its own id
+    reviewed = three_headings()
+    reviewed[0][1].reviewed = True
+    titled = render(reviewed)
+    assert "checked-notice" not in titled.split("<body>", 1)[1]
     assert 'href="#p1-e0">Skip' in titled
     assert '<h1 id="p1-e0" tabindex="-1">Motion</h1>' in titled
 
@@ -111,9 +116,9 @@ def test_three_headings_make_a_nested_contents_list_of_links_to_their_ids():
     html = render(three_headings())
     nav = contents_nav(html)
     assert nav.startswith('<nav class="toc" aria-label="Contents">')
+    # the title stands right above the list and is not an entry of it
     assert (
-        '<ul><li><a href="#p1-e0">Motion</a><ul><li><a href="#p1-e2">Speed</a></li>'
-        '<li><a href="#p1-e4">Velocity</a></li></ul></li></ul>'
+        '<ul><li><a href="#p1-e2">Speed</a></li><li><a href="#p1-e4">Velocity</a></li></ul>'
     ) in nav
     assert html.count("<nav") == 1
     # after the title, so the title is the first thing on a phone, and closed under 40rem
@@ -169,10 +174,10 @@ def test_an_equation_in_a_heading_is_called_equation_in_the_list():
 
 def test_the_contents_list_text_is_escaped():
     pairs = numbered(
-        [heading(0, "<b>One</b>", 1), heading(1, "Two & three", 2), heading(2, "Four", 2)]
+        [heading(0, "Title", 1), heading(1, "<b>One</b> & two", 2), heading(2, "Four", 2)]
     )
     nav = contents_nav(render(pairs))
-    assert "<b>" not in nav and "&lt;b&gt;One&lt;/b&gt;" in nav and "Two &amp; three" in nav
+    assert "<b>" not in nav and "&lt;b&gt;One&lt;/b&gt; &amp; two" in nav
 
 
 # ----------------------------------------------------------------------------- page markers

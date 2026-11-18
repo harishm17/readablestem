@@ -276,7 +276,7 @@ no network, no model.
 | File | What it is |
 |---|---|
 | `EPUB/content.xhtml` | The document as XHTML (a long one continues in `chapter-NN.xhtml` files, below). Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet goes in as the book's own sheet (below). The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
-| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); a `page-list` from `role="doc-pagebreak"` markers when the document has them, and `landmarks` (the contents, and the start of the text at the first heading); both are hidden in the book and used by reading systems. |
+| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); a `page-list` from `role="doc-pagebreak"` markers when the document has them, and `landmarks` (the start of the text at the first heading; the contents file is not in the reading order, so it is not a landmark); both are hidden in the book and used by reading systems. |
 | `EPUB/fonts/latinmodern-math-1.959.woff2` | The math font, in a book that has math, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
