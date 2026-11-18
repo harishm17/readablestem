@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: platform guards, second batch (branch fix/platform-guards-2)
+
+- WS26.3 (ZS-3, F-159, F-366): the per-person upload rule (`upload_user`) counts accepted files
+  only. A refused upload, or a part that is not started, gives its count back
+  (`RateLimiter.give_back`, from `create_job` and `convert_parts`). The per-address `upload` rule
+  stays on requests. Before, 3 refused files followed by good files from one account stopped at
+  the 13th good file (12 taken); now all 15 are taken. No request, prompt or stored document
+  changes, so no version bump.
+
 ## Unreleased: exam mode is in view at upload and said wherever the document is handled (branch feat/exam-mode-visible-and-used)
 
 - WS11.3c (F-047, F-015 exam half), points 1 and 2: the "Exam or quiz" box is under the file field,

@@ -103,6 +103,14 @@ class RateLimiter:
             hits.append(now)  # refused attempts are not counted: the wait always ends
             return None
 
+    def give_back(self, rule_name: str, key: str, count: int = 1) -> None:
+        """Take back `count` attempts counted for `key`, newest first: a refusal that used no
+        allowance (the per-person upload rule counts accepted files only)."""
+        with self._lock:
+            hits = self._hits.get((rule_name, key))
+            for _ in range(min(count, len(hits)) if hits else 0):
+                hits.pop()
+
     def _forget(self, now: float) -> None:
         """Drop keys with nothing inside their window; if that is not enough, the oldest."""
         for key in [k for k, hits in self._hits.items() if self._idle(k[0], hits, now)]:

@@ -276,6 +276,14 @@ def enforce(request: Request, rule_name: str, key: str | None = None) -> None:
     )
 
 
+def give_back(request: Request, rule_name: str, key: str, count: int = 1) -> None:
+    """Take `count` attempts back from `rule_name` for `key`: a request that was refused
+    used none of the allowance of a rule that counts accepted work only."""
+    ctx = get_ctx(request)
+    if ctx.settings.rate_limits_enabled and count > 0:
+        ctx.limiter.give_back(rule_name, key, count)
+
+
 def limited(rule_name: str) -> Any:
     """A route dependency: `dependencies=[limited("login")]` counts the call per address."""
 

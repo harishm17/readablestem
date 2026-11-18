@@ -40,6 +40,7 @@ from readablestem.web.deps import (
     enforce,
     flash,
     get_ctx,
+    give_back,
     limited,
     render,
     require_csrf,
@@ -349,7 +350,7 @@ def _remember(ctx: AppContext, upload_id: str, sent: set[int]) -> None:
 @submit_once("upload.parts")
 async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
-    enforce(request, "upload_user", user.id)
+    counted, outcome = [0], Outcome()
     form = await request.form()
     text = str(form.get("parts") or "")
     shrink = form.get("shrink") == "on"
@@ -364,16 +365,21 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
         raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
     try:
+        enforce(request, "upload_user", user.id)
+        counted[0] = 1
 
         def enforce_each(count: int) -> None:
             for _ in range(max(0, count - 1)):
                 enforce(request, "upload_user", user.id)
+                counted[0] += 1
 
         outcome = await run_in_threadpool(
             _start_parts, ctx, user, upload_id, text, shrink, enforce_each
         )
     finally:
         ctx.uploads.leave(user.id)
+        # The per-person rule counts accepted parts only: a part not started gives its count back.
+        give_back(request, "upload_user", user.id, counted[0] - len(outcome.started))
     if not outcome.error and outcome.started:
         if len(outcome.started) == 1:
             return RedirectResponse(f"/jobs/{outcome.started[0]['id']}", status_code=303)
