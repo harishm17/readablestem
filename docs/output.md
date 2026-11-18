@@ -271,8 +271,8 @@ no network, no model.
 
 | File | What it is |
 |---|---|
-| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
-| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
+| `EPUB/content.xhtml` | The document as XHTML (a long one continues in `chapter-NN.xhtml` files, below). Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet goes in as the book's own sheet (below). The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
+| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); a `page-list` from `role="doc-pagebreak"` markers when the document has them, and `landmarks` (the contents, and the start of the text at the first heading); both are hidden in the book and used by reading systems. |
 | `EPUB/fonts/latinmodern-math-1.959.woff2` | The math font, in a book that has math, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
@@ -311,12 +311,12 @@ no network, no model.
   when there is a page list. Also `schema:accessMode` (textual, and visual when there are
   pictures). The `accessibilitySummary` is the page's statement (`readablestem-summary` in
   its head: how many equations are MathML, how much a person reviewed, what is a picture or
-  left out, "Check it before students use it."); `accessModeSufficient` `textual` only when
-  the page says the text alone is enough and no item is flagged; `accessibilityHazard`
-  `none` (no script, audio or video is written) only for a page with that statement. A page
-  without it (made before it existed) gets "This file does not record what was converted or
-  reviewed." and the hazard `unknown`. A page list
-  also adds `dc:source` ("Source PDF", `source-of` pagination).
+  left out, "Check it before students use it."); a page without it (made before it existed)
+  gets "This file does not record what was converted or reviewed." `accessModeSufficient` is
+  always written: `textual` only when the page says the text alone is enough and no item is
+  flagged, else `textual,visual`. `accessibilityHazard` is `none` (no script, audio or video
+  is written), and `unknown` only when a picture is a GIF or WebP file, which can move. A page
+  list also adds `dc:source` ("Source PDF", `source-of` pagination).
 - **No claim of conformance.** The package has no `dcterms:conformsTo` and the summary says the
   tool assists with accessibility. The tests run EPUBCheck 5.4 (no errors or warnings) and
   DAISY Ace (no serious or critical violation) on the golden documents, the demo, the LaTeX
@@ -326,8 +326,19 @@ no network, no model.
   those two programs found nothing on those documents; it does not show a reading system reads
   the file well. The page list is built from `role="doc-pagebreak"` markers; a file
   without them has none.
-- One content document, not one per chapter: ids and links inside the file keep working as they
-  are. A very long document is one long file.
+- **The book's own sheet** (`export_epub.epub_sheet`). The page's colors, font family, base
+  size and column (the rules of `body`, `html` and `:root`, and `max-width`, `margin` and
+  `padding` on `main`) are left to the reading system, so its dark, sepia or large-text theme
+  and its margins apply instead of being fought. No rule keeps a `color` or `background`, and
+  the `prefers-color-scheme` and print blocks are not carried. The components keep their shape
+  (borders, spacing, wrapping). A book with pictures frames each in the text's own color
+  (`outline: currentColor`), so a picture shows on any theme.
+- **Chapters.** A document of at most 100,000 characters of XHTML is one file. A longer one is
+  cut inside `<main>` before a top-level `h1` or `h2` once the file so far is 40,000 characters
+  long (`content.xhtml`, `chapter-02.xhtml`, ...). Each file has its own `<main>`; the skip link
+  is in the first and the footer in the last. A link to a place in another file names that file
+  (`chapter-02.xhtml#p3-e4`), and the contents, page list, landmarks, manifest and spine list
+  every file. A document with no top-level heading to cut at stays one file.
 
 ## How each element is written
 

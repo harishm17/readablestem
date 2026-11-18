@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: the EPUB has its own sheet, landmarks, chapters and true metadata (branch feat/exports-links-epub-title)
+
+- WS22.4 (F-456, F-457, F-516): the book carried the page's stylesheet whole, so its dark and
+  light colors, font, base size and column fought the reading system's own theme and margins.
+  `export_epub.epub_sheet` leaves page colors, font, size and column to the reader and keeps the
+  components' shape; a book with pictures frames them in the text's own color. `nav.xhtml` gains
+  `landmarks` (the contents and the start of the text). `accessModeSufficient` is always written
+  (`textual` when the page says the text is enough and nothing is flagged, else
+  `textual,visual`; it was missing otherwise) and the hazard is `none` unless a GIF or WebP
+  picture may move. A document past 100,000 characters is cut at top-level headings into chapter
+  files, with the links, contents, page list, manifest and spine naming each file. EPUBs are made
+  on request, so a document converted earlier gets this at its next download; no `RENDER_VERSION`
+  bump is owed.
+
 ## Unreleased: Word links land (branch feat/exports-links-epub-title)
 
 - WS22.2 (F-514, F-566): pandoc keeps an id as a Word bookmark on a heading, `div`, `span`,
