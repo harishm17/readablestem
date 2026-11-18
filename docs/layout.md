@@ -841,13 +841,23 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   codes Word uses for bullets and an arrow (U+F0A7 `▪`, U+F0D8 `➢`, U+F0FC `✓`, U+F076 `❖`,
   U+F0E0 `→`, or the Latin-1 letters a font with no ToUnicode gives); MT-Extra (U+F06C `ℓ`); the
   APS math font AdvP4C4E74 (thorn is "+",
-  one-quarter "=", eth and capital thorn the parentheses). The same code is another glyph in
+  one-quarter "=", eth and capital thorn the parentheses); and the MathTime Pro 2 fonts (MT2MIT,
+  MT2MIS, MT2MIF, MT2BMIT, MT2SYT, MT2SYS, MT2SYF, MT2SYAT, MT2EXA: their parentheses read as "."
+  and "/", "+" and "=" as "C" and "D", their big delimiters, sums and bracket pieces as digits
+  and capitals). A MathTime row is keyed on the font and on what its glyph is read as, which is
+  the same in every form of the font a file holds. A glyph the reader gives as U+FFFD or a
+  private-use code is keyed on the name the file gives it (`_Table.named`, asked by
+  `glyph_names.recover` before its own table: a Type 1 slot name such as "NUL", or for the CID
+  form the glyph number as text); the names the table knows must agree on one character. A big
+  delimiter is the character it is sized from, a piece of a built-up one the Unicode piece
+  character. Glyphs not settled by eye have no row (a lozenge in MT2SYAT, the stretched part of
+  a long brace in MT2EXE) and a glyph read as a space cannot have one. The same code is another glyph in
   another font (U+F0A7 is a club in Symbol), so a code is never mapped without its font. Also, for
   fonts with no table: TeX's ligatures, dashes and quotes at control codes (OT1 or T1, told by the
   font's own codes), a spacing accent printed over a letter becomes the accented letter ("Ren´e"),
   and an unreadable glyph that starts two or more lines of a page, set off from the text by a gap
   and nowhere inside a line, is a bullet. A code with no row stays as it was (and is a gap
-  mark by the end of `_text_blocks`). Left out: Wingdings 2 and 3, Webdings, ZapfDingbats, MSAM, the MathTime families, and MSBM, whose
+  mark by the end of `_text_blocks`). Left out: Wingdings 2 and 3, Webdings, ZapfDingbats, MSAM, the other MathTime fonts (MT2BMIS, MT2EXE and any not named above), and MSBM, whose
   double-struck letters `_Char.styled` already gives equation text (`_LETTER_STYLE_FONTS`). With the setting
   off, only U+F0B7 and U+F0A7 are mapped (to `•` and `▪`), whatever the font.
 

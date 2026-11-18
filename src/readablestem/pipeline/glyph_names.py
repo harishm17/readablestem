@@ -8,7 +8,9 @@ private-use codes. The file still names each glyph, inside the embedded font pro
 `glyph-names.tsv` (data/README.md) says which character each name is.
 
 `recover` is the second step of the ladder `layout._text_blocks` runs, for the glyphs the
-file's own table left undecoded (the first step is MuPDF's); `font_codes.remap` is the third
+file's own table left undecoded (the first step is MuPDF's; a font whose slot names are not
+in the data file, the MathTime fonts, has its own names in `font_codes`, asked first);
+`font_codes.remap` is the third
 (a table by font name, for fonts whose names are absent or wrong); `mark_gaps` is the last:
 a glyph still undecoded is passed on as `output_chars.GAP`, a glyph the file does not name,
 not as U+FFFD and not dropped. A character recovered here has `"how": "name"` in its raw
@@ -34,6 +36,7 @@ from typing import Any
 
 import pymupdf
 
+from readablestem.pipeline import font_codes
 from readablestem.pipeline.output_chars import GAP
 
 _SUBSET_PREFIX = re.compile(r"^[A-Z]{6}\+")
@@ -154,8 +157,10 @@ def recover(page: pymupdf.Page, blocks: list[dict[str, Any]]) -> None:
             if ucs == ord(char["c"])
             for lookup in lookups[font]
         }
-        name = found.pop() if len(found) == 1 else None  # two names: not told apart
-        text = _stroked(span, char) if name == _STROKE else name and character(name)
+        text = font_codes.named(font, char["c"], found)
+        if text is None:
+            name = found.pop() if len(found) == 1 else None  # two names: not told apart
+            text = _stroked(span, char) if name == _STROKE else name and character(name)
         if text:
             char["c"], char["how"] = text, "name"
 

@@ -401,7 +401,9 @@ _BOLD_FONT = re.compile(
 _ITALIC_FONT = re.compile(r"italic|oblique|cmti|cmsl|sfti|-it$|,it|ital", re.IGNORECASE)
 # Bold italic: `\boldsymbol` and `\bm` (CMMIB, newtx's bmi, Nimbus MediItal, ...), against `\mathbf`
 # (CMBX, upright). The text layer gives both as a bold letter; the equation step restores it.
-_BOLD_ITALIC_FONT = re.compile(r"cmmib|bmi\d*$|bold-?ital|bold-?obl|medi-?ital|bdit", re.IGNORECASE)
+_BOLD_ITALIC_FONT = re.compile(
+    r"cmmib|bmi\d*$|bold-?ital|bold-?obl|medi-?ital|bdit|mt2bmi[ts]", re.IGNORECASE
+)
 # Regular-weight text and maths fonts known to have a bold face that PDFs name as bold
 # (CMBX, Times-Bold, DejaVuSerif-Bold, ...), or OpenType maths fonts that write bold as
 # Unicode maths bold. A letter drawn in one of them, not bold, is known to be plain, so
@@ -743,7 +745,8 @@ STYLE_BOLD_ITALIC = "bold-italic"
 # Math-italic faces that no font-name rule above calls italic: CMMI, Latin Modern and TeX
 # Gyre math italics, newtx and pxfonts' math italic.
 _MATH_ITALIC_FONT = re.compile(
-    r"^(?:cmmi\d|lmmi\d|lmmathitalic|txmi|pxmi|newtxmi|mathit|stixmathital|stixgeneral-?ital)",
+    r"^(?:cmmi\d|lmmi\d|lmmathitalic|txmi|pxmi|newtxmi|mathit|stixmathital|stixgeneral-?ital|"
+    r"mt2mi[tsf])",
     re.IGNORECASE,
 )
 _CODE_POINT_STYLE = {
@@ -761,7 +764,7 @@ _CODE_POINT_STYLE = {
 # (`_LETTER_STYLE_FONTS`, which names the ones the text layer can show).
 _MATH_SYMBOL_FONT = re.compile(
     r"^(?:lmmathsymbols|lmmathextension|cmsy|cmbsy|cmex|msam|msbm|txsy|txex|pxsy|pxex|"
-    r"symbol|stixmathsymbols|stixsizeone|mnsy|rsfs|eusm|eusb|eufm|eufb)",
+    r"symbol|stixmathsymbols|stixsizeone|mnsy|rsfs|eusm|eusb|eufm|eufb|mt2sy|mt2ex)",
     re.IGNORECASE,
 )
 LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first

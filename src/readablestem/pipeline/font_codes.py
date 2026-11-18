@@ -10,8 +10,9 @@ dictionary of one page (`layout._text_blocks`) before anything else reads it, so
 markers, maths detection and every output see the mapped character:
 
 - tables keyed on the font's base name (`_TABLES`): the Symbol family, Wingdings, MT-Extra,
-  and the APS math font `AdvP4C4E74`, each for the private-use form of a code (Word and
-  LibreOffice write Symbol's alpha as U+F061) and for the plain form where one is known. The
+  the APS math font `AdvP4C4E74` and the MathTime Pro 2 fonts, each for the private-use form
+  of a code (Word and LibreOffice write Symbol's alpha as U+F061) and for the plain form where
+  one is known. The
   same code is a different glyph in another font (U+F0A7 is a small square in Wingdings and a
   club in Symbol), so a code is never mapped without its font;
 - the ligatures, dashes and quotes of TeX's two text encodings, which sit at control codes;
@@ -110,14 +111,86 @@ _WINGDINGS = {0xA7: "▪", 0xD8: "➢", 0xFC: "✓", 0x76: "❖", 0xE0: "→"}  
 _APS = {0xFE: "+", 0xBC: "=", 0xF0: "(", 0xDE: ")"}  # fmt: skip
 
 
+# MathTime Pro 2 (Y&Y, PCTeX; "MT2" and a family name after the subset prefix). Its fonts carry
+# no usable table from their codes to characters, and the codes are slots of MathTime's own
+# layout: the italic fonts (MT2MIT, MT2MIS, MT2MIF, MT2BMIT) read right for letters and digits,
+# but their parentheses, punctuation and Greek letters come out as other characters; the symbol
+# fonts (MT2SYT, MT2SYS, MT2SYF, MT2SYAT) read "+" as "C" and "=" as "D"; the extension font
+# MT2EXA reads the big delimiters, sums and the pieces of built-up brackets as digits and
+# capitals. The same file holds a font object in several forms (a macOS re-save reads the
+# slots as Apple keyboard symbols, a CID form has no name for a glyph but its number), and a
+# slot reads the same in every form of one font, so a row is keyed on the font and on what its
+# glyph is read as. A glyph the reader gives as U+FFFD or a private-use code has no character
+# to key on: the file names it ("NUL", or for the CID form its glyph number as text), and
+# `named` is keyed on that. A big delimiter is the character it is sized from
+# (`glyph-names.tsv`: parenleftBigg is "("), a piece of a built-up one the Unicode piece
+# character (U+239B-U+23B3, U+23D0, U+23DE/U+23DF for a brace over or under a line). One
+# glyph here (a black lozenge in MT2SYAT, the stretched part of a long brace in MT2EXE) was not
+# settled by eye and has no row, and a glyph read as a space (a left arrow in MT2SYT) cannot
+# have one: MuPDF's own spaces are in the same font.
+_MT2_NAMED_CODES = (
+    *range(49, 59),
+    *(66, 67, 68, 69, 73, 74, 75, 76, 77, 79, 80, 82, 85, 87, 88),
+    *range(98, 114),
+    *range(115, 124),
+)  # fmt: skip
+_MT2MIT = {
+    ".": "(", "/": ")", ":": ".", ";": ",", "=": "/", "!": "ω", "'": "φ", "?": "⋆", "`": "ℓ",
+    "ä": "!", "ç": "]", "ı": "δ", "Œ": "[", "ˇ": "β", "˛": "α", "‚": "Θ", "‹": "?",
+    "⇡": "π", "⇣": "ζ", "⌫": "ν", "✏": "ϵ",
+}  # fmt: skip
+_MT2MIT_NAMED = {
+    "CR": "γ", "DEL": "Ω", "ESC": "σ", "NAK": "λ", "RS": "ϕ", "SYN": "μ", "US": "χ", "c141": "]",
+    "47": "(", "48": ")", "59": ".", "60": ",", "62": "/", "140": "?", "163": "σ",
+    **{str(g): chr(g - 1) for g in _MT2_NAMED_CODES},
+}  # fmt: skip
+# The script-size face draws what the text size does, in the slots seen in it.
+_MT2MIS = {c: _MT2MIT[c] for c in ".:;/='!çıŒˇ‹⇡⌫✏"}
+_MT2SYT = {
+    "!": "→", "$": "↔", "%": "↗", "&": "↘", ")": "⇒", "-": "−", ":": "¬", ";": "∅", "[": "∪",
+    "\\": "∩", "^": "∧", "_": "∨", "|": "♣", "}": "♢", "~": "♡", "¤": "≠", "ı": "∘", "˙": "±",
+    "˚": "⊕", "˝": "⊗", "…": "∉", "⇠": "∼", "⇡": "≈", "⇢": "⊂", "⇤": "∗", "⇥": "×", "⌅": "÷",
+    "⌘": "≡", "◆": "⊇", "✏": "•", "✓": "⊆", "": "≤", "1": "∞", "2": "∈", "6": "̸",
+    "8": "∀", "9": "∃", "C": "+", "D": "=", "W": ":", "b": "⌊", "c": "⌋", "d": "⌈", "e": "⌉",
+    "f": "{", "g": "}", "h": "⟨", "i": "⟩", "j": "|", "p": "√", "v": "⊑",
+}  # fmt: skip
+_MT2SYT_NAMED = {
+    "NUL": "−", "SOH": "⋅", "DEL": "♠", "ESC": "⊃", "NAK": "≥", "RS": "≺", "SYN": "≼", "US": "≻",
+    "1": "−", "2": "⋅", "34": "→", "68": "+", "69": "=",
+}  # fmt: skip
+_MT2SYS = {
+    "!": "→", ";": "∅", "¤": "≠", "ı": "∘", "⇤": "∗", "✓": "⊆", "": "≤", "0": "′", "1": "∞",
+    "2": "∈", "C": "+", "D": "=", "f": "{", "g": "}", "h": "⟨", "i": "⟩", "j": "|", "p": "√",
+}  # fmt: skip
+_MT2SYS_NAMED = {
+    "NUL": "−", "SOH": "⋅", "NAK": "≥", "1": "−", "2": "⋅", "69": "=", "103": "{", "104": "}",
+    "125": "♣", "126": "♢", "127": "♡", "128": "♠",
+}  # fmt: skip
+_MT2EXA = {
+    "!": ")", '"': "[", "#": "]", "(": "{", "0": "⎛", "1": "⎞", "2": "⎡", "3": "⎤", "4": "⎣",
+    "5": "⎦", "8": "⎧", ":": "⎩", "<": "⎨", "@": "⎝", "A": "⎠", "P": "∑", "Q": "∏", "R": "∫",
+    "S": "⋃", "T": "⋂", "V": "⋀", "X": "∑", "Y": "∏", "Z": "∫", "[": "⋃", "\\": "⋂", "b": "ˆ",
+    "c": "ˆ", "h": "[", "i": "]", "j": "⌊", "k": "⌋", "l": "⌈", "m": "⌉", "p": "√", "q": "√",
+    "r": "√", "s": "√", "t": "⎷", "u": "⏐", "v": "⌜", "ƒ": "⏟", "ˆ": "⎪", "ˇ": "⏐", "˘": "⌋",
+    "˛": "⟩", "˝": "⟨", "‚": "⏟", "„": "⏟", "…": "⏟", "⇠": "⌈", "⇡": "⌉", "⇢": "{", "⇣": "(",
+    "⇤": "]", "⇥": "[", "⌅": "⌊", "⌘": ")", "◆": ")", "✓": "(", "": "[",
+}  # fmt: skip
+
+
 @dataclass(frozen=True)
 class _Table:
     """The rows for one family of fonts. `private`: code -> character, read at U+F000 + code;
-    `plain`: code -> character, read at the plain code point."""
+    `plain`: code -> character, read at the plain code point; `named`: glyph name -> character,
+    for a glyph the reader gave as U+FFFD or a private-use code (`named`)."""
 
     name: re.Pattern[str]
     private: dict[int, str] = field(default_factory=dict)
     plain: dict[int, str] = field(default_factory=dict)
+    named: dict[str, str] = field(default_factory=dict)
+
+
+def _codes(rows: dict[str, str]) -> dict[int, str]:
+    return {ord(char): printed for char, printed in rows.items()}
 
 
 _TABLES = (
@@ -134,6 +207,27 @@ _TABLES = (
     _Table(re.compile(r"^Wingdings(?:[,\-].*)?$", re.I), _WINGDINGS, _WINGDINGS),
     _Table(re.compile(r"^MT[\- ]?Extra(?:[,\-].*)?$", re.I), {0x6C: "ℓ"}),
     _Table(re.compile(r"^AdvP4C4E74$"), plain=_APS),
+    # MathTime Pro 2: one table per font, for the slots seen in it (`_MT2MIT`).
+    _Table(re.compile(r"^MT2MIT(?:[,\-].*)?$", re.I), plain=_codes(_MT2MIT), named=_MT2MIT_NAMED),
+    _Table(re.compile(r"^MT2MIS(?:[,\-].*)?$", re.I), plain=_codes(_MT2MIS), named={"RS": "ϕ"}),
+    _Table(re.compile(r"^MT2MIF(?:[,\-].*)?$", re.I), plain=_codes({"=": "/"})),
+    _Table(re.compile(r"^MT2BMIT(?:[,\-].*)?$", re.I), plain=_codes({";": ","}), named={"RS": "ϕ"}),
+    _Table(re.compile(r"^MT2SYT(?:[,\-].*)?$", re.I), plain=_codes(_MT2SYT), named=_MT2SYT_NAMED),
+    _Table(re.compile(r"^MT2SYS(?:[,\-].*)?$", re.I), plain=_codes(_MT2SYS), named=_MT2SYS_NAMED),
+    _Table(
+        re.compile(r"^MT2SYF(?:[,\-].*)?$", re.I),
+        plain=_codes({"2": "∈", "C": "+", "D": "="}),
+        named={"NUL": "−", "51": "∈"},
+    ),
+    _Table(
+        re.compile(r"^MT2SYAT(?:[,\-].*)?$", re.I),
+        plain=_codes({"@": "⊏", "~": "⊛", "⇤": "□", "⌅": "■"}),
+    ),
+    _Table(
+        re.compile(r"^MT2EXA(?:[,\-].*)?$", re.I),
+        plain=_codes(_MT2EXA),
+        named={"ESC": "}", "ETX": "]", "NAK": "]", "NUL": "(", "SOH": ")"},
+    ),
 )
 _SUBSET_PREFIX = re.compile(r"^[A-Z]{6}\+")
 
@@ -209,6 +303,19 @@ def _mapped(table: _Table, c: str) -> str | None:
     if 0xF000 <= code <= 0xF0FF:
         return table.private.get(code - 0xF000)
     return table.plain.get(code)
+
+
+def named(font: str, char: str, names: set[str]) -> str | None:
+    """The character the table of `font` has for a glyph the file names: `names` are what the
+    page's font objects of this name call the glyph the reader gave as `char` (U+FFFD or a
+    private-use code; one object is the right one, `glyph_names.recover` cannot tell which).
+    Taken when the names that the table knows agree on one character, and never for a `char`
+    that has a row of its own."""
+    table = _table(font) if _ENABLED else None
+    if table is None or not table.named or _mapped(table, char) is not None:
+        return None
+    known = {table.named[name] for name in names if name in table.named}
+    return known.pop() if len(known) == 1 else None
 
 
 def _remap_code_only(blocks: list[dict[str, Any]]) -> None:
