@@ -47,7 +47,8 @@ from readablestem.web import analytics, dev_only, forms, output, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
-from readablestem.web.database import as_utc, prepare_database
+from readablestem.web.database import prepare_database
+from readablestem.web.dates import format_when, machine_date
 from readablestem.web.db import make_engine, make_sessionmaker
 from readablestem.web.deps import (
     AppContext,
@@ -150,8 +151,7 @@ ERROR_TEXT = {
 
 
 def _utc_text(value: datetime | None) -> str:
-    value = as_utc(value)
-    return f"{value:%b} {value.day}, {value.year}, {value:%H:%M} UTC" if value else ""
+    return format_when(value, "short")
 
 
 def _allowance(
@@ -173,12 +173,10 @@ def _utc(value: datetime | None) -> Markup:
     in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
     JavaScript the UTC text stays (UX review MF16). Not for <title> or attributes: use
     `utc_text` there."""
-    value = as_utc(value)
     if value is None:
         return Markup("")
-    stamp = value.strftime("%Y-%m-%dT%H:%M:%SZ")
     return Markup('<time class="local-time" datetime="{}">{}</time>').format(
-        stamp, _utc_text(value)
+        machine_date(value), format_when(value, "short")
     )
 
 
