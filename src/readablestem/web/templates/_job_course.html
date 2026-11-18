@@ -1,8 +1,22 @@
-{# Audiences: owner #}
-{# The job's course (notation memory): set only with FEATURE_NOTATION_MEMORY on and a
-   course chosen at upload. #}
+{# Audiences: owner, reviewer #}
+{# The course notation the document was read with (notation memory): set only with
+   FEATURE_NOTATION_MEMORY on and a course chosen at upload, for the owner and a person who
+   reviews it. `course.applied` is the record kept with the result: the symbols the
+   conversion was handed. None: converted before it was kept, so no list and no guess. Only
+   the owner may open the course. #}
 {% if course is defined and course %}
-<p id="job-course">Course: <a href="/courses/{{ course.id }}">{{ course.name }}</a>. The
-  symbols the course had when this document was converted were sent with each equation.
-  Symbols added since are not applied to it: upload the PDF again to apply them.</p>
+{% set from_course = "from " ~ course.name if course.name else "from a course that has since been deleted" %}
+<div id="job-course">
+{% if course.applied is none %}
+<p>Read with the notation of {% if course.id %}<a href="/courses/{{ course.id }}">{{ course.name }}</a>{% elif course.name %}{{ course.name }}{% else %}a course that has since been deleted{% endif %}. This document was converted before the symbols were recorded, so they are not listed.{% if job.is_owner %} Symbols added to the course since are not applied to it: upload the PDF again to apply them.{% endif %}</p>
+{% elif course.applied %}
+<p>Read with {{ course.applied|length }} symbol{{ "" if course.applied|length == 1 else "s" }} {% if course.id %}from <a href="/courses/{{ course.id }}">{{ course.name }}</a>{% else %}{{ from_course }}{% endif %}:</p>
+<ul>
+{% for phrase in course.applied %}<li>{{ phrase }}</li>
+{% endfor %}</ul>
+{% if job.is_owner %}<p class="hint">Symbols added to the course since are not applied to it: upload the PDF again to apply them.</p>{% endif %}
+{% else %}
+<p>Read with no symbols: {% if course.id %}<a href="/courses/{{ course.id }}">{{ course.name }}</a>{% else %}{{ course.name or "the course" }}{% endif %} had none when this document was converted.</p>
+{% endif %}
+</div>
 {% endif %}

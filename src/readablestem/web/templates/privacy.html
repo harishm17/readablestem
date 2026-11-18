@@ -84,7 +84,9 @@
   {% if notation_on %}
   <li>Your courses and their notation (course names, symbols, what they mean, your notes,
     and the letters you chose to remember for a course during a review) are kept until
-    you delete them or your account; they are not deleted with your documents.</li>
+    you delete them or your account; they are not deleted with your documents. A document
+    converted in a course keeps the list of symbols it was read with, and their meanings,
+    until the document is deleted, also when you delete the course first.</li>
   {% endif %}
 </ul>
 </details>
@@ -234,7 +236,9 @@
   <li>The site is served over HTTPS only.</li>
   <li>Only you can open your documents, and the people you name. You can give a named
     person the right to view or to review one document; they must sign in with the exact email
-    address you entered, and you can remove it at any time. Everyone else on the beta, and the
+    address you entered, and you can remove it at any time.{% if notation_on %} A person you share a
+    document with to review also sees the name of its course and the symbols it was read
+    with.{% endif %} Everyone else on the beta, and the
     people who run it, are told "not found" for an address that is yours.</li>
   <li>The converted document is shown in a sandbox that stops it running scripts.</li>
   <li>An uploaded PDF is first opened in a separate short-lived process with its own time

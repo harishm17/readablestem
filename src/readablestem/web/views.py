@@ -24,7 +24,15 @@ from readablestem.pipeline import checked
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import documents, fair_queue, job_page, office_census, output, states
+from readablestem.web import (
+    documents,
+    fair_queue,
+    job_page,
+    notation,
+    office_census,
+    output,
+    states,
+)
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
@@ -379,6 +387,9 @@ class JobView:
     # No decision is open, so the file may leave for anyone (`web.output.export_state`): the
     # one answer the reader page asks before it offers Open, Listen or a download.
     exportable: bool = False
+    # The course symbols the conversion was handed (`DocumentResult.notation_applied`), as
+    # "bold d is a vector"; None where there is no record. Set with the page of a finished job.
+    notation_applied: list[str] | None = None
     # The job's state (`web.states`): its label, tone, message, next steps and gap notes.
     # Every word about where the job stands on the job page comes from it.
     state: states.State | None = None
@@ -701,8 +712,10 @@ def job_view(
         slow_s = job_page.slow_after((job.page_count or 0) * pace)
     page = None
     carried = None
+    applied = None
     if with_page and job.status == JobStatus.DONE and job.result_json:
         result = DocumentResult.model_validate(job.result_json)
+        applied = notation.applied_phrases(result.notation_applied)
         page = job_page.page_data(result, last_decision(session, job), job.filename)
         carried = carry_view(job, result)
     # Only a finished job has a summary (the job page shows it for no other); a poll of one
@@ -751,6 +764,7 @@ def job_view(
         role=role,
         shared_by=_owner_name(session, job) if not owner else "",
         exportable=with_page and output.export_state(job).key == output.READY,
+        notation_applied=applied,
     )
     if with_page:
         # Counts are read only for a finished job: a stopped or waiting job may still hold an

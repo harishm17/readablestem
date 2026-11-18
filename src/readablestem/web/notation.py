@@ -36,6 +36,7 @@ from readablestem.config import Settings
 from readablestem.core.mathchars import STYLE_GROUPS, base_char, char_variant
 from readablestem.core.notation import MAX_SYMBOL_CHARS, canonical_from_parts, canonical_symbol
 from readablestem.core.types import (
+    AppliedSymbol,
     ConversionOptions,
     DocumentResult,
     Element,
@@ -535,6 +536,28 @@ def conversion_options(
     return options.model_copy(
         update={"notation": found, "exam_mode": exam, "image_pages": image_pages}
     )
+
+
+def applied_record(
+    settings: Settings, job: Job, result: DocumentResult, handed: Iterable[NotationEntry]
+) -> list[AppliedSymbol] | None:
+    """What to keep with a finished conversion of the symbols it was handed (`handed`: the
+    entries the worker passed to the pipeline, `conversion_options`): each one's key and
+    meaning, nothing else. None where no course notation was in play: the feature is off, the
+    job has no course, or the document is not a PDF (a source file never gets the course's
+    list). An empty list says the course had no symbols then. User content: it is stored with
+    the result, deleted with the job and never logged."""
+    if not enabled(settings) or job.course_id is None or result.origin != "pdf":
+        return None
+    return [AppliedSymbol(canonical=e.canonical, meaning=e.meaning) for e in handed]
+
+
+def applied_phrases(record: list[AppliedSymbol] | None) -> list[str] | None:
+    """The record kept with a result (`applied_record`) as the job page lists it, "bold d is
+    a vector"; None when there is no record (never a guess from the course as it is now)."""
+    if record is None:
+        return None
+    return [notation_memory.phrase(symbol.canonical, symbol.meaning) for symbol in record]
 
 
 @contextmanager

@@ -10,7 +10,7 @@
 {% block content %}
 <h1>{{ course.name }}</h1>
 {% include "_error_summary.html" %}
-<p class="lede">The symbols this course writes in a special way. Only you see this list in ReadableSTEM. Its symbols and meanings are sent to the model provider with each equation of the documents you convert in this course.</p>
+<p class="lede">The symbols this course writes in a special way. {{ notation_words.course }}</p>
 
 <section aria-labelledby="entries-heading" id="course-notation">
   <h2 id="entries-heading">Notation</h2>

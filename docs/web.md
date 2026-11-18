@@ -1516,8 +1516,22 @@ notation" and docs/layout.md "Bold letters in prose".
   ("No course" first); without any, one line links to `/courses`. The choice must be one
   of the user's courses, checked after the CSRF token and before the PDF is opened;
   otherwise the form comes back with an error and nothing is uploaded or counted. The job
-  stores `course_id`, and the job page says "Course: <name>. This document is read with
-  its notation."
+  stores `course_id`. The choice's hint says, from `recipients.notation_words`, that the
+  course's symbols and meanings go to the model provider (named from `model_vendor`) with
+  each equation of the document, at most `MAX_CONTEXT_ENTRIES` (24) symbols with each, and
+  the notes do not; the course pages carry the same sentence and who else sees the list.
+- **What a document was read with.** The worker keeps the symbols it hands the pipeline
+  with the finished result (`DocumentResult.notation_applied`, each symbol's key and
+  meaning; `notation.applied_record`): a list, empty when the course had no symbols then,
+  and none for a document with no course, a source file, or a result from before it was
+  kept. The job page of a document with a course says "Read with 6 symbols from <course>"
+  and lists them, to the owner and to a person who reviews it (`views.audience_of`), not to
+  a reader and not on the reader page or in the student file; only the owner gets the link to
+  the course. A document with no record says the notation of the course was applied and
+  lists nothing, and is never filled in from the course as it is now. The record is the
+  instructor's own notation: it is content, stored with the result, deleted with the job,
+  and never logged or put in an event. Not built: "Convert again to apply" and the course
+  page's marks on older documents.
 - **Suggestions (T3-12).** Typing `\mathbf{d}` is not needed: the course page ("Symbols
   found in your documents", the course's five latest finished documents) and the finished
   job page ("Symbols found in this document", for a job with a course) list the notation
@@ -1554,7 +1568,9 @@ notation" and docs/layout.md "Bold letters in prose".
   job's, adds the symbol with source "review", and goes back to the same decision with
   "Remembered for <course>: ...".
 
-Course names, symbols and notes are user content: shown only to their owner, logged only
+Course names, symbols and notes are user content: opened only by their owner (a person a
+document is shared with to review sees the course's name, the symbols the document was read
+with and, on the review screen, the ones that apply to an equation, never the notes), logged only
 as ids and counts (`course_created`, `course_renamed`, `course_deleted`,
 `notation_added` with its source, `notation_changed`, `notation_removed`), sent to a
 model only as the fenced course notation block, and erased with the user
