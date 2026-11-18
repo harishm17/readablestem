@@ -26,7 +26,7 @@ from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm import Session
 
 from readablestem.config import Settings
-from readablestem.web import access
+from readablestem.web import access, export_store
 from readablestem.web.db import Blob, Job, PendingUpload, User, utcnow
 
 MB = 1024 * 1024
@@ -61,7 +61,7 @@ def user_bytes(session: Session, user_id: str, now: datetime | None = None) -> i
         select(func.coalesce(func.sum(func.length(Blob.content)), 0))
         .select_from(Blob)
         .join(Job, Job.id == Blob.job_id)
-        .where(*live)
+        .where(*live, Blob.kind != export_store.KIND)  # a kept export can be made again
     )
     # Text lengths are characters, near enough to bytes for a cap in megabytes.
     texts = session.scalar(

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 
 from fastapi import APIRouter, Request
@@ -108,7 +109,14 @@ def _ready_files(
                 content: str | bytes = job.html or ""
             else:
                 try:
-                    content = exports.make_file(file_type, job.html or "", title)
+                    content = exports.stored_file(
+                        lambda: nullcontext(session),
+                        job.id,
+                        job.result_version or 0,
+                        file_type,
+                        job.html or "",
+                        title,
+                    )
                 except exports.Busy:
                     raise exports.busy_page() from None
                 except (export_docx.DocxExportError, export_epub.CanvasExportError) as exc:

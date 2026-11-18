@@ -2,9 +2,14 @@
 
 The review screen shows each page of the PDF with the fixes marked on it, and a wider
 crop around an equation for the side-by-side compare. Both are rendered here when the
-browser asks, from the job's own upload, and never stored: the route answers with
-`Cache-Control: private, no-store` (like the crops), and nothing is cached in this
-process either, so a deleted or expired job has no page images anywhere.
+browser asks, from the job's own upload, and never stored on disk: the route answers with
+`Cache-Control: private, no-store` (like the crops). The web process keeps the pictures
+it just made in a small memory cache (`RenderCache`), so a page asked for again, or the
+review screen opened a second time, does not start MuPDF again (F-284). The cache holds at
+most `Settings.page_image_cache_mb` of picture bytes, lives in this process only, and a
+job's pictures leave it when the job is deleted or expires (`forget_job`, called by
+`ops.retention.delete_jobs`). It sits behind the routes' access check: a hit is only ever
+answered to a request that has already been allowed to see the job.
 
 MuPDF runs in the upload probe's child process (`web.pdf_probe`, with its 768 MB address
 space cap), never in the web process: a page that crashes or hangs MuPDF kills a child,
@@ -31,7 +36,8 @@ import json
 import subprocess
 import sys
 import threading
-from collections.abc import Generator, Iterable
+from collections import OrderedDict
+from collections.abc import Callable, Generator, Iterable
 from contextlib import AbstractContextManager, contextmanager
 
 from readablestem.core.childenv import child_env
@@ -105,6 +111,70 @@ class RenderGate:
                     self._users.pop(user_id, None)
 
 
+class RenderCache:
+    """Pictures already made, by (job, upload, what was drawn): a least-recently-used cache
+    bounded by the bytes of the pictures it holds (and by `MAX_ENTRIES`, so that many tiny
+    ones cannot fill it). A picture bigger than a quarter of the bound is not kept. A bound
+    of 0 keeps nothing. Per process, thread safe."""
+
+    MAX_ENTRIES = 512
+
+    def __init__(self, limit_bytes: int = 0) -> None:
+        self._limit = limit_bytes
+        self._items: OrderedDict[tuple[str, str, tuple[str, ...]], bytes] = OrderedDict()
+        self._bytes = 0
+        self._lock = threading.Lock()
+
+    def configure(self, limit_bytes: int) -> None:
+        """Set the bound (megabytes in `Settings.page_image_cache_mb`) and empty the cache."""
+        with self._lock:
+            self._limit = max(0, limit_bytes)
+            self._items.clear()
+            self._bytes = 0
+
+    def get(self, job_id: str, upload_id: str, what: tuple[str, ...]) -> bytes | None:
+        with self._lock:
+            png = self._items.get((job_id, upload_id, what))
+            if png is not None:
+                self._items.move_to_end((job_id, upload_id, what))
+            return png
+
+    def put(self, job_id: str, upload_id: str, what: tuple[str, ...], png: bytes) -> None:
+        if len(png) * 4 > self._limit:
+            return
+        key = (job_id, upload_id, what)
+        with self._lock:
+            old = self._items.pop(key, None)
+            if old is not None:
+                self._bytes -= len(old)
+            self._items[key] = png
+            self._bytes += len(png)
+            while self._items and (
+                self._bytes > self._limit or len(self._items) > self.MAX_ENTRIES
+            ):
+                _, gone = self._items.popitem(last=False)
+                self._bytes -= len(gone)
+
+    def forget_job(self, job_ids: Iterable[str]) -> None:
+        ids = set(job_ids)
+        with self._lock:
+            for key in [k for k in self._items if k[0] in ids]:
+                self._bytes -= len(self._items.pop(key))
+
+    def size(self) -> tuple[int, int]:
+        """(entries, bytes)."""
+        with self._lock:
+            return len(self._items), self._bytes
+
+
+CACHE = RenderCache()
+
+
+def forget_job(job_ids: Iterable[str]) -> None:
+    """Drop every picture of these jobs (they were deleted or expired)."""
+    CACHE.forget_job(job_ids)
+
+
 GATE = RenderGate(MAX_CONCURRENT_RENDERS, MAX_RENDERS_PER_USER, SLOT_WAIT_S)
 
 
@@ -139,7 +209,7 @@ def _numbers(box: BBox) -> str:
 
 
 def render_region(
-    pdf: bytes,
+    pdf: bytes | Callable[[], bytes],
     page: int,
     *,
     zoom: float = PAGE_ZOOM,
@@ -150,12 +220,19 @@ def render_region(
     box: BBox | None = None,
     snap: bool = False,
     trim: bool = False,
+    cache_as: tuple[str, str] | None = None,
 ) -> bytes:
     """PNG of page `page` (0-based), or of `clip` on it; glyphs of `chars` inside `mark`
     are outlined, and so is `box` as a whole; with `snap` the clip's edges move to whole
     lines and words (`pdf_probe.snap_band`); with `trim` the words its left and right
     edges cut are painted over, the clip unchanged (`pdf_probe.cut_words`). Raises
-    RenderFailed."""
+    RenderFailed.
+
+    `cache_as=(job_id, upload_id)` is what the web routes pass: the picture is looked up
+    in, and kept in, `CACHE` under the exact arguments of the render. `upload_id` names the
+    upload row, which is never rewritten (a different upload is a different row), so a hit
+    is always the picture of this upload. `pdf` may then be a function that loads the PDF,
+    called only on a miss: a repeat loads nothing."""
     args = ["render", str(page), f"{zoom:.4f}", str(max_side)]
     if clip is not None:
         args += ["--clip", _numbers(clip)]
@@ -168,15 +245,22 @@ def render_region(
         args += ["--snap", "1"]
     if trim:
         args += ["--trim", "1"]
-    png = _child(args, pdf, RENDER_TIMEOUT_S)
+    what = tuple(args)
+    if cache_as is not None and (hit := CACHE.get(*cache_as, what)) is not None:
+        return hit
+    png = _child(args, pdf if isinstance(pdf, bytes) else pdf(), RENDER_TIMEOUT_S)
     if not png.startswith(PNG_MAGIC):
         raise RenderFailed()
+    if cache_as is not None:
+        CACHE.put(*cache_as, what, png)
     return png
 
 
-def render_page(pdf: bytes, page: int) -> bytes:
+def render_page(
+    pdf: bytes | Callable[[], bytes], page: int, cache_as: tuple[str, str] | None = None
+) -> bytes:
     """The whole page at `PAGE_ZOOM`."""
-    return render_region(pdf, page)
+    return render_region(pdf, page, cache_as=cache_as)
 
 
 def page_sizes(pdf: bytes) -> dict[int, tuple[float, float]]:

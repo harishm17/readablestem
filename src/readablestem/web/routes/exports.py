@@ -1,8 +1,9 @@
 """Word and EPUB downloads of a finished document: `/jobs/{id}/download.docx` and
 `/jobs/{id}/download.epub`.
 
-Both are made from the finished HTML on request (`pipeline/export_docx.py`,
-`pipeline/export_epub.py`), in memory, and are not stored. They follow the HTML download
+Both are made from the finished HTML (`pipeline/export_docx.py`, `pipeline/export_epub.py`)
+the first time they are asked for and kept per version of the document (`web.export_store`),
+so the next download is answered from the store. They follow the HTML download
 (`routes.jobs.download`) in every rule: a plain GET for the owner (another person's or an
 expired document is a 404, a document that has not finished is a 409), the file is brought
 up to date first (`jobs.current_html`), the deletion clock restarts, the download is
@@ -26,7 +27,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from readablestem.pipeline import export_docx, export_epub
-from readablestem.web import bundle, documents, events, output, retention
+from readablestem.web import bundle, documents, events, export_store, output, retention
 from readablestem.web.db import session_scope
 from readablestem.web.deps import PageError, UserDep, get_ctx
 from readablestem.web.logsafe import log_event
@@ -62,22 +63,27 @@ def _filename(title: str, job_id: str, ending: str, state: output.ExportState) -
 
 def _source(
     request: Request, job_id: str, user, file_type: str
-) -> tuple[str, str, output.ExportState]:
-    """(html, title, export state) of the finished document, up to date and through the draft
-    gate (`output.check`; a draft's HTML carries its banner, so the file made from it does
-    too); the deletion clock restarts, as for the HTML download. For a HEAD the html is empty
-    and the clock stays (`routes.jobs.head_reply`)."""
+) -> tuple[str, str, output.ExportState, int]:
+    """(html, title, export state, result version) of the finished document, up to date and
+    through the draft gate (`output.check`; a draft's HTML carries its banner, so the file
+    made from it does too); the deletion clock restarts, as for the HTML download. For a HEAD
+    the html is empty and the clock stays (`routes.jobs.head_reply`)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         state = output.check(request, job, role_of(session, job, user), file_type)
         if is_head(request):  # the headers need the title only, not a re-render
-            return "", documents.document_title(job).text, state
+            return "", documents.document_title(job).text, state, 0
         job = current_html(ctx, session, job)
         title = documents.document_title(job).text
         if job.user_id == user.id:  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
-        return output.marked(job.html or "", state), title, state
+        return output.marked(job.html or "", state), title, state, job.result_version or 0
+
+
+def _sessions(request: Request) -> export_store.Opener:
+    factory = get_ctx(request).factory
+    return lambda: session_scope(factory)
 
 
 def _recorded(request: Request, user, job_id: str, still_open: int, file_type: str) -> None:
@@ -115,6 +121,28 @@ def make_file(file_type: str, html: str, title: str) -> bytes:
     return export_epub.build_epub(export_epub.export_epub(html, title=title))
 
 
+def stored_file(
+    sessions: export_store.Opener,
+    job_id: str,
+    result_version: int,
+    file_type: str,
+    html: str,
+    title: str,
+) -> bytes:
+    """`make_file`, built once per version of the job's document and kept
+    (`web.export_store`). The single downloads and "Download all" call this; "Combine parts"
+    joins several jobs, has no version of its own, and calls `make_file`."""
+    return export_store.get_or_build(
+        sessions,
+        job_id,
+        result_version,
+        file_type,
+        html,
+        title,
+        lambda: make_file(file_type, html, title),
+    )
+
+
 def media_type(file_type: str) -> str:
     return export_docx.DOCX_MEDIA_TYPE if file_type == "docx" else EPUB_MEDIA_TYPE
 
@@ -130,11 +158,11 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             "job page.",
             context={"job_id": job_id},
         )
-    html, title, state = _source(request, job_id, user, "docx")
+    html, title, state, version = _source(request, job_id, user, "docx")
     if is_head(request):
         return head_reply(export_docx.DOCX_MEDIA_TYPE, _filename(title, job_id, ".docx", state))
     try:
-        data = make_file("docx", html, title)
+        data = stored_file(_sessions(request), job_id, version, "docx", html, title)
     except Busy:
         raise PageError(
             503,
@@ -166,11 +194,11 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
 @router.get("/jobs/{job_id}/download.epub")
 def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
     """The document as an EPUB 3 publication with MathML (pipeline/export_epub.py)."""
-    html, title, state = _source(request, job_id, user, "epub")
+    html, title, state, version = _source(request, job_id, user, "epub")
     if is_head(request):
         return head_reply(EPUB_MEDIA_TYPE, _filename(title, job_id, ".epub", state))
     try:
-        data = make_file("epub", html, title)
+        data = stored_file(_sessions(request), job_id, version, "epub", html, title)
     except export_epub.CanvasExportError as exc:  # EpubExportError is one
         log_event(logger, "epub_export_failed", code=exc.code)
         raise PageError(

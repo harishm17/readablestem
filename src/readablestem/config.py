@@ -598,6 +598,13 @@ class Settings(BaseSettings):
     # away navigation inside the equation. Steps: docs/mathml-alttext.md.
     mathml_alttext: bool = False
 
+    # The web process keeps the review screen's page and region pictures it just made, so a page
+    # asked for again does not start MuPDF again (`web.page_images.RenderCache`). The bound is
+    # the bytes of the pictures: a 144 dpi page is 100 to 400 KB, so 32 MB holds a 100-page
+    # review, and the web process on the small production plan has little memory to give. 0
+    # keeps nothing.
+    page_image_cache_mb: int = Field(default=32, ge=0, le=512)
+
     # --- tracing (off by default; never on for private-inputs/ runs)
     tracing_enabled: bool = False
     langfuse_public_key: str | None = None

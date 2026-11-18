@@ -380,7 +380,12 @@ def region_clip(box: tuple[float, float, float, float]) -> tuple[float, float, f
     return box[0] - p, box[1] - p, box[2] + p, box[3] + p
 
 
-def render_region_crop(pdf: bytes, page: int, box: tuple[float, float, float, float]) -> bytes:
+def render_region_crop(
+    pdf: bytes | Callable[[], bytes],
+    page: int,
+    box: tuple[float, float, float, float],
+    cache_as: tuple[str, str] | None = None,
+) -> bytes:
     """The crop of a marked region as the student file will carry it (about 200 dpi)."""
     from readablestem.web import page_images
 
@@ -390,6 +395,7 @@ def render_region_crop(pdf: bytes, page: int, box: tuple[float, float, float, fl
         zoom=REGION_DPI / 72.0,
         max_side=REGION_MAX_SIDE_PX,
         clip=region_clip(box),
+        cache_as=cache_as,
     )
 
 
@@ -408,7 +414,7 @@ def region_preview(
     anything is added. Rendered now from the job's own upload in the render child, never
     stored; owner only, `private, no-store` like every page image."""
     from readablestem.web import page_images
-    from readablestem.web.routes.split import _png, _render_failed, _upload
+    from readablestem.web.routes.split import _lazy_upload, _png, _render_failed
 
     page, width, height = _page_size(request, job_id, user, number)
     try:
@@ -417,7 +423,8 @@ def region_preview(
         raise PageError(404, *NOT_FOUND) from None
     try:
         with page_images.render_slot(user.id):
-            png = render_region_crop(_upload(request, job_id, user), page, box)
+            pdf, kept = _lazy_upload(request, job_id, user)
+            png = render_region_crop(pdf, page, box, cache_as=kept)
     except page_images.RenderFailed as exc:
         return _render_failed(job_id, exc, "region")
     return _png(png)
