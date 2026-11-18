@@ -43,6 +43,7 @@ the one just changed.
 from __future__ import annotations
 
 import logging
+import struct
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
@@ -51,7 +52,7 @@ from urllib.parse import parse_qsl, urlencode
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
@@ -449,6 +450,7 @@ class ReviewItem:
     checks: list[CheckView]
     reason: Explained | None
     crop_url: str | None
+    crop_size: tuple[int, int] | None  # the picture's width and height in pixels
     mathml: Markup | None
     speech: str | None
     alt: str | None
@@ -859,6 +861,7 @@ class GroupView:
     notices: list[str] = field(default_factory=list)
     error: str | None = None
     clean: int = 0  # tables waiting with nothing wrong found in them (T3-11)
+    of: int = 0  # decisions in all when `units` is one view of them (0: all are in it)
 
     @property
     def total(self) -> int:
@@ -873,7 +876,7 @@ def _item(
     element: Element | None,
     number: int,
     job_id: str,
-    crop_ids: set[str],
+    crop_ids: Mapping[str, tuple[int, int] | None],
     place: HeadingPlace | None = None,
     label: str | None = None,
     source_note: str = "",
@@ -921,6 +924,7 @@ def _item(
         crop_url=f"/jobs/{job_id}/crops/{fix.element_id}.png"
         if fix.element_id in crop_ids
         else None,
+        crop_size=crop_ids.get(fix.element_id),
         mathml=try_sanitize_mathml(fix.equation.mathml) if fix.equation else None,
         speech=fix.equation.speech if fix.equation else None,
         alt=fix.figure.alt if fix.figure else None,
@@ -1173,14 +1177,14 @@ def _group(
 
 def _load(
     request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, set[str]]:
+) -> tuple[JobView, DocumentResult, Mapping[str, tuple[int, int] | None]]:
     view, result, crop_ids, _ = _load_versioned(request, job_id, user)
     return view, result, crop_ids
 
 
 def _load_versioned(
     request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, set[str], int]:
+) -> tuple[JobView, DocumentResult, Mapping[str, tuple[int, int] | None], int]:
     """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
@@ -1188,13 +1192,26 @@ def _load_versioned(
         role = shares.role_of(session, job, user) or REVIEW
         view = job_view(session, job, with_summary=True, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
-        crop_ids = set(
-            session.scalars(
-                select(Blob.element_id).where(Blob.job_id == job.id, Blob.kind == "crop")
-            ).all()
-        )
+        # The picture's size is in the first bytes of the PNG: the list gives each picture
+        # its width and height, so a page does not jump when one loads.
+        crop_ids = {
+            element_id: _png_size(head)
+            for element_id, head in session.execute(
+                select(Blob.element_id, func.substr(Blob.content, 1, 24)).where(
+                    Blob.job_id == job.id, Blob.kind == "crop"
+                )
+            )
+            if element_id
+        }
         version = job.result_version or 0
-    return view, result, {c for c in crop_ids if c}, version
+    return view, result, crop_ids, version
+
+
+def _png_size(head: bytes | None) -> tuple[int, int] | None:
+    if not head or len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    width, height = struct.unpack(">II", head[16:24])
+    return (width, height) if width and height else None
 
 
 def _place_flashes(
@@ -1339,6 +1356,195 @@ def filter_decisions(deciding: list[GroupView], kind: str, page: str, pages: int
     )
 
 
+# --------------------------------------------------------------------------- parts of the list
+
+# A view of the list holds about this many cards (a heading group counts as its copies: they
+# are cards inside it), so the largest document in the tests stays under 300 KB and 5,000
+# DOM nodes a view (PF2). A line of the notes or of the page links is small: it counts a fifth.
+PART_CARDS = 25
+ROW_WEIGHT = 0.2
+
+
+@dataclass
+class ListEntry:
+    """One thing the list shows, in the order it shows them: decisions (by kind), optional
+    checks, notes, the reviewer's decisions, what was accepted for them, the page links."""
+
+    section: str  # "decisions", "optional", "notes", "decided", "accepted", "pages"
+    payload: Any  # a UnitView, a ReviewItem, a notice row, or (page number, left out)
+    weight: float = 1.0
+    anchors: tuple[str, ...] = ()  # the ids of what it holds that a link can point to
+    slug: str = ""  # decisions: the kind it is listed under
+    card: bool = True  # counted as an item of the list (a row of notes or links is not)
+
+
+def _unit_entry(slug: str, unit: UnitView) -> ListEntry:
+    if unit.item is not None:
+        return ListEntry("decisions", unit, 1.0, (f"item-{unit.item.element_id}",), slug)
+    card = unit.group or unit.pages
+    assert card is not None
+    members = tuple(f"item-{m.element_id}" for m in card.members)
+    weight = float(max(1, len(card.members)))
+    return ListEntry("decisions", unit, weight, (card.anchor, *members), slug)
+
+
+def list_entries(
+    deciding: list[GroupView],
+    optional: list[ReviewItem],
+    note_rows: list[Any],
+    mine: list[ReviewItem],
+    auto: list[ReviewItem],
+    tool_pages: list[tuple[int, bool]],
+) -> tuple[list[ListEntry], dict[str, int]]:
+    """Everything the list shows as one sequence, and where each section starts in it (the
+    index of its first entry, which an empty section takes from the one after it)."""
+    entries: list[ListEntry] = []
+    starts: dict[str, int] = {"needs-decision": 0}
+    for g in deciding:
+        starts[f"group-{g.slug}"] = len(entries)
+        entries += [_unit_entry(g.slug, u) for u in g.units]
+    starts["optional-checks"] = len(entries)
+    entries += [ListEntry("optional", i, 1.0, (f"item-{i.element_id}",)) for i in optional]
+    entries += [ListEntry("notes", r, ROW_WEIGHT, card=False) for r in note_rows]
+    starts["decided"] = len(entries)
+    entries += [ListEntry("decided", i, 1.0, (f"item-{i.element_id}",)) for i in mine]
+    starts["accepted"] = len(entries)
+    entries += [ListEntry("accepted", i, 1.0, (f"item-{i.element_id}",)) for i in auto]
+    starts["page-changes"] = len(entries)
+    entries += [ListEntry("pages", t, ROW_WEIGHT, card=False) for t in tool_pages]
+    return entries, starts
+
+
+@dataclass
+class ListPart:
+    """One view of the list: a run of entries that fits a page, and how to reach the others.
+    Every link is a plain GET (works without script) that keeps the decision filter."""
+
+    job_id: str
+    number: int  # 1-based
+    count: int
+    entries: list[ListEntry]
+    first: int  # items on the views before this one
+    items: int  # items on this view
+    total: int  # items in the list (under the filter)
+    filter_query: str
+    part_of: dict[str, int]  # anchor -> the view that holds it (1-based)
+    starts: dict[str, int]  # section anchor -> the view that holds its start
+    sections: dict[str, int]  # entries of each section in the whole list
+
+    def url(self, number: int, anchor: str = "list-part") -> str:
+        found = parse_qsl(self.filter_query)
+        query = urlencode([*found, *([("part", str(number))] if number > 1 else [])])
+        return f"/jobs/{self.job_id}/review/list{'?' + query if query else ''}#{anchor}"
+
+    def link(self, anchor: str) -> str:
+        """A link to an item or a section: in this view, or to the view that holds it."""
+        number = self.part_of.get(anchor) or self.starts.get(anchor)
+        if number is None or number == self.number:
+            return f"#{anchor}"
+        query = urlencode([*parse_qsl(self.filter_query), ("at", anchor)])
+        return f"/jobs/{self.job_id}/review/list?{query}#{anchor}"
+
+    @property
+    def previous(self) -> str:
+        return self.url(self.number - 1) if self.number > 1 else ""
+
+    @property
+    def next(self) -> str:
+        return self.url(self.number + 1) if self.number < self.count else ""
+
+    @property
+    def form_query(self) -> str:
+        """The filter and the view a decision form carries back (the hidden `flt`)."""
+        found = parse_qsl(self.filter_query)
+        return urlencode([*found, *([("part", str(self.number))] if self.number > 1 else [])])
+
+    @property
+    def status(self) -> str:
+        """Which items of how many this view shows: the count a reader is told."""
+        n = "item" if self.total == 1 else "items"
+        if not self.items:
+            return f"{self.total} {n} in all."
+        if self.items == self.total:
+            return f"Showing all {self.total} {n}."
+        last = self.first + self.items
+        return (
+            f"Showing items {self.first + 1} to {last} of {self.total}. "
+            f"Part {self.number} of {self.count}."
+        )
+
+    def shown(self, section: str, slug: str = "") -> list[Any]:
+        return [
+            e.payload
+            for e in self.entries
+            if e.section == section and (not slug or e.slug == slug)
+        ]
+
+    def shows(self, anchor: str, *sections: str) -> bool:
+        """Whether this view draws a section (of one or two kinds of entry): it holds some
+        of it, or it is empty and this is the view where it would start."""
+        if any(e.section in sections for e in self.entries):
+            return True
+        return not any(self.sections.get(name) for name in sections) and (
+            self.starts.get(anchor) == self.number
+        )
+
+
+def split_list(
+    job_id: str,
+    entries: list[ListEntry],
+    starts: dict[str, int],
+    filter_query: str,
+    *,
+    part: str = "",
+    at: str = "",
+) -> ListPart:
+    """Cut the sequence into views of `PART_CARDS` cards and pick the one asked for: the
+    one holding `at` (an item or a section), else the `part`, else the first. An item or a
+    section that is not in the list (a filter hides it) is not an error: the first view."""
+    runs: list[list[ListEntry]] = [[]]
+    weight = 0.0
+    for entry in entries:
+        if runs[-1] and weight + entry.weight > PART_CARDS:
+            runs.append([])
+            weight = 0.0
+        runs[-1].append(entry)
+        weight += entry.weight
+    part_of: dict[str, int] = {}
+    for number, run in enumerate(runs, 1):
+        for entry in run:
+            for anchor in entry.anchors:
+                part_of.setdefault(anchor, number)
+
+    def holding(index: int) -> int:
+        seen = 0
+        for number, run in enumerate(runs, 1):
+            seen += len(run)
+            if index < seen:
+                return number
+        return len(runs)
+
+    section_part = {anchor: holding(index) for anchor, index in starts.items()}
+    wanted = part_of.get(at) or section_part.get(at)
+    if wanted is None:
+        number = int(part) if part.isascii() and part.isdigit() else 0
+        wanted = number if 1 <= number <= len(runs) else 1
+    run = runs[wanted - 1]
+    return ListPart(
+        job_id,
+        wanted,
+        len(runs),
+        run,
+        sum(e.card for earlier in runs[: wanted - 1] for e in earlier),
+        sum(e.card for e in run),
+        sum(e.card for e in entries),
+        filter_query,
+        part_of,
+        section_part,
+        {name: sum(e.section == name for e in entries) for name in {e.section for e in entries}},
+    )
+
+
 def _page(
     request: Request,
     job_id: str,
@@ -1349,6 +1555,8 @@ def _page(
     status_code: int = 200,
     kind: str = "",
     page: str = "",
+    part: str = "",
+    at: str = "",
 ) -> Response:
     view, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
@@ -1408,27 +1616,57 @@ def _page(
     count = page_edits.page_count(result, view.page_count)
     deciding = [g for g in groups.values() if g.units or g.error or g.notices]
     filtered = filter_decisions(deciding, kind, page, count)
+    mine = [item for item in done if item.by_you]
+    auto = [item for item in done if not item.by_you]
+    tool_pages = (
+        [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)]
+        if result.origin == "pdf"
+        else []
+    )
+    entries, starts = list_entries(filtered.groups, optional, note_rows, mine, auto, tool_pages)
+    # A refused or out-of-date form comes back on the view that holds its item.
+    where = at
+    if not where and invalid:
+        card = cards.get(invalid[0])
+        where = card.anchor if card is not None else f"item-{invalid[0]}"
+        if invalid[0] in groups:
+            where = f"group-{invalid[0]}"
+    parts = split_list(view.id, entries, starts, filtered.query, part=part, at=where)
+    shown_groups = []
+    for g in filtered.groups:
+        units = [u for u in parts.shown("decisions", g.slug) if u in g.units]
+        if units or (not g.units and parts.number == 1):
+            shown_groups.append(replace(g, units=units, of=len(g.units)))
     context: dict[str, Any] = {
         "note_rows": note_rows,
         # Accept many at once (web.bulk_accept), and the filter of the decision list.
         "bulk_offers": bulk_accept.offers(result),
         "symbols_offer": inventory.handwritten_count(result),
         "decision_filter": filtered,
+        "parts": parts,
         "filter_kinds": [(g.slug, g.title, len(g.units)) for g in deciding if g.units],
         "page_count": count,
         # T3-5, T3-16: the page tools are on the review screen; one link to each page's.
-        "tool_pages": [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)],
+        "tool_pages": parts.shown("pages"),
+        "tool_pages_all": len(tool_pages),
         # A LaTeX source has no page pictures, so no review screen and no page tools (the
         # screen redirects here, `routes.split`): no link that leads back to this page.
         "has_pages": result.origin == "pdf",
         "job": view,
         "groups": list(groups.values()),
-        "deciding": filtered.groups,
+        "deciding": shown_groups,
+        "deciding_all": filtered.groups,
         "optional": optional,
-        "optional_open": any(item.open for item in optional),
+        "optional_shown": parts.shown("optional"),
+        "optional_open": any(item.open for item in parts.shown("optional")),
         "second_checks": sum(item.second_check for item in optional),
-        "done": done,
-        "done_open": any(item.open for item in done),
+        "mine": mine,
+        "mine_shown": parts.shown("decided"),
+        "mine_open": any(item.open for item in parts.shown("decided")),
+        "auto": auto,
+        "auto_shown": parts.shown("accepted"),
+        "auto_open": any(item.open for item in parts.shown("accepted")),
+        "notes_shown": parts.shown("notes"),
         "errors": [{"field_id": e.field_id, "message": e.message} for e in errors],
         "flash": [],  # placed by _place_flashes instead of at the top of <main>
         "notices": top,
@@ -1451,8 +1689,15 @@ def _page(
 LIST_VIEW = "list"
 
 
+# Anchors that every view of the list has: a link to one needs no view named.
+_EVERY_VIEW = {"review-progress"}
+
+
 def list_url(job_id: str, anchor: str) -> str:
-    return f"/jobs/{job_id}/review/list#{anchor}"
+    """The list at this anchor: `at` names it, and the list shows the view that holds it."""
+    if anchor in _EVERY_VIEW:
+        return f"/jobs/{job_id}/review/list#{anchor}"
+    return f"/jobs/{job_id}/review/list?{urlencode({'at': anchor})}#{anchor}"
 
 
 # The Symbols screen's address for each view it can come back to; nothing typed goes in.
@@ -1471,9 +1716,15 @@ def symbols_url(job_id: str, view: str) -> str:
 
 @router.get("/jobs/{job_id}/review/list")
 def review_list(
-    request: Request, job_id: str, user: UserDep, kind: str = "", page: str = ""
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    kind: str = "",
+    page: str = "",
+    part: str = "",
+    at: str = "",
 ) -> Response:
-    response = _page(request, job_id, user, kind=kind, page=page)
+    response = _page(request, job_id, user, kind=kind, page=page, part=part, at=at)
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "list")
     return response
@@ -1795,8 +2046,9 @@ def list_query(raw: str) -> str:
     query = {}
     if found.get("kind") in slugs:
         query["kind"] = found["kind"]
-    if found.get("page", "").isascii() and found.get("page", "").isdigit():
-        query["page"] = found["page"]
+    for name in ("page", "part"):
+        if found.get(name, "").isascii() and found.get(name, "").isdigit():
+            query[name] = found[name]
     return urlencode(query)
 
 
@@ -1804,9 +2056,16 @@ def keep_filter(response: Response, flt: str) -> Response:
     """A redirect back to the list view keeps the decision filter the form was drawn with."""
     query = list_query(flt) if flt else ""
     location = response.headers.get("location", "")
-    marker = "/review/list#"
-    if query and response.status_code == 303 and marker in location:
-        response.headers["location"] = location.replace(marker, f"/review/list?{query}#", 1)
+    if not query or response.status_code != 303:
+        return response
+    if "/review/list?" in location:  # it names the view that holds its item (`at`)
+        response.headers["location"] = location.replace(
+            "/review/list?", f"/review/list?{query}&", 1
+        )
+    elif "/review/list#" in location:
+        response.headers["location"] = location.replace(
+            "/review/list#", f"/review/list?{query}#", 1
+        )
     return response
 
 

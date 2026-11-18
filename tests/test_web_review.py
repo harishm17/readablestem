@@ -285,7 +285,7 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 303
     # Next fix still waiting after equation 2 is the abstained equation 3.
-    assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#item-p1-e5"
+    assert response.headers["location"] == f"/jobs/{web.job_id}/review/list?at=item-p1-e5#item-p1-e5"
     after = result(web)
     fix = after.fix_for("p1-e3")
     assert fix is not None and fix.status.value == "accepted"

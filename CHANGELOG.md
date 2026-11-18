@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: the review list in parts (branch perf/review-list-paged)
+
+- PF2: the list view (`/jobs/{id}/review/list`) shows 25 cards at a time instead of every card.
+  On a generated document of 300 items a view was 1.30 MB and 40,359 DOM nodes; it is now about
+  130 KB and 4,100 nodes at most. The parts are real links (`?part=`, kept filter, "Previous part",
+  "Next part", "Skip to the next part of the list") and a line says which items of how many the
+  view shows. `?at=<id>` shows the part that holds an item or section; the redirects after a
+  decision, the notices, the job page and the review screen use it. Crop pictures get their width
+  and height from the PNG so the page does not move when one loads. Bulk actions are unchanged:
+  they were already over the whole document. No migration and no version bump.
+
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
 - WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per

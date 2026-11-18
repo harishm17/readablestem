@@ -37,6 +37,7 @@ Words inside `\text{}` and similar commands are not symbols.
 from __future__ import annotations
 
 import re
+from collections.abc import Container
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Final
@@ -391,7 +392,7 @@ def _family_name(family: tuple[str, ...]) -> str:
     return ", ".join(_rendered(k)[0] for k in family)
 
 
-def inventory(result: DocumentResult, crop_ids: set[str]) -> Inventory:
+def inventory(result: DocumentResult, crop_ids: Container[str]) -> Inventory:
     """Every symbol of the handwritten equations, grouped with the ones that look alike:
     the families with more than one symbol read first, then the others, then the symbols in
     no family. Within a family, the order of the family's own list."""

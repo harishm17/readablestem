@@ -147,7 +147,7 @@
   {% if pictures and state.key not in ["ready", "ready_remains"] %}<p id="items-count">{{ pictures }}</p>{% endif %}
   {% set notes = checked_words.notes_line(s.checked) %}
   {% if notes %}
-  <p id="notes-line">{{ notes }}{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. {{ checked_words.NOTES_HOLD }}</p>
+  <p id="notes-line">{{ notes }}{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list?at=optional-checks#optional-checks">see the notes</a>{% endif %}. {{ checked_words.NOTES_HOLD }}</p>
   {% endif %}
   {% if c.decisions and job.can_review %}
   {# One link per kind, straight to its first decision on the review screen. A group of

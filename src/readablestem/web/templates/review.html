@@ -10,7 +10,7 @@
 
 {% macro notice_box(notice) %}
 <div class="notice" role="status"{% if notice.element_id %} data-saved="/jobs/{{ job.id }}/review/{{ notice.element_id }}"{% endif %}>
-  <p>{% if notice.href %}<a href="{{ notice.href }}">{{ notice.label }}</a>: {% endif %}{{ notice.message }}</p>
+  <p>{% if notice.href %}<a href="{{ parts.link(notice.href[1:]) }}">{{ notice.label }}</a>: {% endif %}{{ notice.message }}</p>
 </div>
 {% endmacro %}
 
@@ -21,7 +21,7 @@
 {# Every decision form: the CSRF token, the view to come back to (and the list's filter), and
    the review version the page was drawn at (a form from an out-of-date tab is refused, not
    applied). #}
-{% macro hidden_fields() -%}{{ shared_hidden("list", decision_filter.query) }}{%- endmacro %}
+{% macro hidden_fields() -%}{{ shared_hidden("list", parts.form_query) }}{%- endmacro %}
 
 {% macro group_counts(g) %}
 {%- if g.needs_review %}{{ g.needs_review }} {{ "needs" if g.needs_review == 1 else "need" }} review, {% endif -%}
@@ -65,7 +65,7 @@
   {% if item.kind in ("equation", "figure", "table", "paragraph", "list_item") %}
   <figure class="crop">
     {% if item.crop_url %}
-    <img src="{{ item.crop_url }}" loading="lazy"
+    <img src="{{ item.crop_url }}" loading="lazy"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %}
          alt="The original {{ name }} from page {{ item.page }} of the PDF, as an image.">
     {% else %}
     <p>No image of the original is available.</p>
@@ -207,7 +207,7 @@
 <div class="fix-body">
   <figure class="crop">
     {% if item.crop_url %}
-    <img src="{{ item.crop_url }}" loading="lazy" alt="{{ item.label }} of the PDF, as an image.">
+    <img src="{{ item.crop_url }}" loading="lazy"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} alt="{{ item.label }} of the PDF, as an image.">
     {% else %}
     <p>No image of the original is available.</p>
     {% endif %}
@@ -349,6 +349,81 @@
 </li>
 {% endmacro %}
 
+{# Which items of how many this view shows, and the way to the other views (plain links,
+   the filter kept). The first is the target of the links that move between views. #}
+{% macro pager(end=False) %}
+{% if parts.count > 1 %}
+<nav class="list-pager" aria-label="Parts of the list{% if end %}, end{% endif %}">
+  {% if end %}<p id="list-part-end">{{ parts.status }}</p>
+  {% else %}<p id="list-part" class="list-part" tabindex="-1">{{ parts.status }}</p>
+  {% if parts.next %}<p><a href="{{ parts.next }}" rel="next">Skip to the next part of the list</a></p>{% endif %}{% endif %}
+  <p class="list-links">{% if parts.previous %}<a href="{{ parts.previous }}" rel="prev">Previous part<span class="visually-hidden"> of the list</span></a>
+    {% endif %}{% if parts.next %}<a href="{{ parts.next }}"{% if end %} rel="next"{% endif %}>Next part<span class="visually-hidden"> of the list</span></a>{% endif %}</p>
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro list_tools() %}
+<details class="list-tools" id="list-tools"{% if decision_filter.active %} open{% endif %}>
+  <summary>Sections{% if remaining > 1 %}, filter{% endif %}{% if bulk_offers %} and accepting many at once{% endif %}</summary>
+  {% if second_checks %}<p class="hint">A second automated check found a possible mismatch between alt text and image in some optional checks: worth a look, but it can be wrong.</p>
+  {% endif %}
+  <nav class="review-toc" aria-labelledby="review-toc-title">
+    <h3 id="review-toc-title">Sections</h3>
+    <ul>
+      <li><a href="{{ parts.link('needs-decision') }}">Needs your decision</a>: {{ remaining }}
+        {% if deciding_all %}<ul>
+          {% for g in deciding_all %}
+          <li><a href="{{ parts.link('group-' ~ g.slug) }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
+          {% endfor %}
+        </ul>{% endif %}</li>
+      <li><a href="{{ parts.link('optional-checks') }}">Optional checks</a>: {{ optional|length + note_rows|length }}</li>
+      <li><a href="{{ parts.link('decided') }}">Your decisions</a>: {{ mine|length }}</li>
+      <li><a href="{{ parts.link('accepted') }}">Accepted automatically</a>: {{ auto|length }}</li>
+      {% if has_pages %}<li><a href="{{ parts.link('page-changes') }}">Page changes</a></li>{% endif %}
+    </ul>
+  </nav>
+  {# Many decisions: accept the ones no check found fault with, after seeing the list. #}
+  {% if bulk_offers %}
+  <div class="bulk-offers" id="bulk-offers">
+    <h3 id="bulk-offers-title">Accept many at once</h3>
+    <p class="hint" id="bulk-offers-hint">You see the list first and confirm. Undo takes the whole action back in one step.</p>
+    <ul class="bulk-list" aria-labelledby="bulk-offers-title">
+      {% for o in bulk_offers %}
+      <li><a class="button-secondary" href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=list" aria-describedby="bulk-offers-hint">{{ o.title }} ({{ o.count }})</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {# Narrow the list by kind and by page: a plain GET form, so it works without JavaScript. #}
+  {% if remaining > 1 %}
+  <form method="get" action="/jobs/{{ job.id }}/review/list#filter-result" class="decision-filter" aria-labelledby="filter-title">
+    <h3 id="filter-title">Show only some decisions</h3>
+    <div class="filter-fields">
+      <div class="field">
+        <label for="filter-kind">Kind</label>
+        <select id="filter-kind" name="kind">
+          <option value="">All kinds</option>
+          {% for slug, title, n in filter_kinds %}
+          <option value="{{ slug }}"{% if decision_filter.kind == slug %} selected{% endif %}>{{ title }} ({{ n }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-page">Page</label>
+        <input type="number" id="filter-page" name="page" class="input-short" min="1" max="{{ page_count }}" inputmode="numeric" autocomplete="off" aria-describedby="filter-page-hint"{% if decision_filter.page %} value="{{ decision_filter.page }}"{% endif %}>
+        <p class="hint" id="filter-page-hint">1 to {{ page_count }}. Leave it empty for every page.</p>
+      </div>
+    </div>
+    <div class="button-row">
+      <button type="submit" class="button-secondary">Show these decisions</button>
+      {% if decision_filter.active %}<a class="button-secondary" href="/jobs/{{ job.id }}/review/list#needs-decision">Show all decisions</a>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+</details>
+{% endmacro %}
+
 {% block content %}
 <h1>All items as a list</h1>
 <p class="lede">{{ job.filename }}{% if page_count %} · {{ counted(page_count, "page", "pages") }}{% endif %}</p>
@@ -373,79 +448,26 @@
     <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Accessible HTML</a>
     <a href="/jobs/{{ job.id }}/listen">Listen as a student</a></p>
 </div>
+{{ pager() }}
 
 {% if not groups %}
 <p>There is nothing to review in this document.</p>
 {% else %}
+{% set decide_here = parts.shows("needs-decision", "decisions") %}
+{% if not decide_here %}{{ list_tools() }}{% endif %}
+{% if decide_here %}
 <section id="needs-decision" class="review-section" aria-labelledby="needs-decision-title" tabindex="-1">
   <h2 id="needs-decision-title">Needs your decision ({{ remaining }})</h2>
   {# The first decision comes first. What helps to find or to speed up the others (the sections of
      the page, accepting many at once, the filter) is one disclosure, open only while a filter is
      in use. Every item keeps its own anchor, so a link to one still lands on it. #}
-  <details class="list-tools" id="list-tools"{% if decision_filter.active %} open{% endif %}>
-    <summary>Sections{% if remaining > 1 %}, filter{% endif %}{% if bulk_offers %} and accepting many at once{% endif %}</summary>
-    {% if second_checks %}<p class="hint">A second automated check found a possible mismatch between alt text and image in some optional checks: worth a look, but it can be wrong.</p>
-    {% endif %}
-    <nav class="review-toc" aria-labelledby="review-toc-title">
-      <h3 id="review-toc-title">Sections</h3>
-      <ul>
-        <li><a href="#needs-decision">Needs your decision</a>: {{ remaining }}
-          {% if deciding %}<ul>
-            {% for g in deciding %}
-            <li><a href="#group-{{ g.slug }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
-            {% endfor %}
-          </ul>{% endif %}</li>
-        <li><a href="#optional-checks">Optional checks</a>: {{ optional|length + note_rows|length }}</li>
-        <li><a href="#decided">Your decisions</a>: {{ done|selectattr("by_you")|list|length }}</li>
-        <li><a href="#accepted">Accepted automatically</a>: {{ done|rejectattr("by_you")|list|length }}</li>
-        {% if has_pages %}<li><a href="#page-changes">Page changes</a></li>{% endif %}
-      </ul>
-    </nav>
-    {# Many decisions: accept the ones no check found fault with, after seeing the list. #}
-    {% if bulk_offers %}
-    <div class="bulk-offers" id="bulk-offers">
-      <h3 id="bulk-offers-title">Accept many at once</h3>
-      <p class="hint" id="bulk-offers-hint">You see the list first and confirm. Undo takes the whole action back in one step.</p>
-      <ul class="bulk-list" aria-labelledby="bulk-offers-title">
-        {% for o in bulk_offers %}
-        <li><a class="button-secondary" href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=list" aria-describedby="bulk-offers-hint">{{ o.title }} ({{ o.count }})</a></li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
-    {# Narrow the list by kind and by page: a plain GET form, so it works without JavaScript. #}
-    {% if remaining > 1 %}
-    <form method="get" action="/jobs/{{ job.id }}/review/list#filter-result" class="decision-filter" aria-labelledby="filter-title">
-      <h3 id="filter-title">Show only some decisions</h3>
-      <div class="filter-fields">
-        <div class="field">
-          <label for="filter-kind">Kind</label>
-          <select id="filter-kind" name="kind">
-            <option value="">All kinds</option>
-            {% for slug, title, n in filter_kinds %}
-            <option value="{{ slug }}"{% if decision_filter.kind == slug %} selected{% endif %}>{{ title }} ({{ n }})</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="field">
-          <label for="filter-page">Page</label>
-          <input type="number" id="filter-page" name="page" class="input-short" min="1" max="{{ page_count }}" inputmode="numeric" autocomplete="off" aria-describedby="filter-page-hint"{% if decision_filter.page %} value="{{ decision_filter.page }}"{% endif %}>
-          <p class="hint" id="filter-page-hint">1 to {{ page_count }}. Leave it empty for every page.</p>
-        </div>
-      </div>
-      <div class="button-row">
-        <button type="submit" class="button-secondary">Show these decisions</button>
-        {% if decision_filter.active %}<a class="button-secondary" href="/jobs/{{ job.id }}/review/list#needs-decision">Show all decisions</a>{% endif %}
-      </div>
-    </form>
-    {% endif %}
-  </details>
+  {{ list_tools() }}
   {% if decision_filter.active %}
   <p id="filter-result" class="filter-result" role="status" tabindex="-1">{{ decision_filter.summary }}</p>
   {% elif not deciding %}<p>Nothing is waiting for a decision.</p>{% endif %}
   {% for g in deciding %}
   <section id="group-{{ g.slug }}" class="review-group" aria-labelledby="group-{{ g.slug }}-title" tabindex="-1">
-    <h3 id="group-{{ g.slug }}-title">{{ g.title }} <span class="group-count">({{ counted(g.units|length, "decision", "decisions") }})</span></h3>
+    <h3 id="group-{{ g.slug }}-title">{{ g.title }} <span class="group-count">({% if g.of and g.of != g.units|length %}{{ g.units|length }} of {{ counted(g.of, "decision", "decisions") }}{% else %}{{ counted(g.units|length, "decision", "decisions") }}{% endif %})</span></h3>
     {% for message in g.notices %}
     <div class="notice" role="status"><p>{{ message }}</p></div>
     {% endfor %}
@@ -465,7 +487,7 @@
          and one editor is open at a time (static/app.js); the first, and one that was just
          worked on or has a message, starts open. Every row keeps its anchor, so a link to a
          decision still lands on it open. #}
-      {% set compact = g.units|length > 1 %}
+      {% set compact = (g.of or g.units|length) > 1 %}
       <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
         {% for notice in item.notices %}{{ notice_box(notice) }}{% endfor %}
         {% if compact %}<details class="compact-item"{% if loop.first or item.open or item.changed %} open{% endif %}>
@@ -485,7 +507,9 @@
   </section>
   {% endfor %}
 </section>
+{% endif %}
 
+{% if parts.shows("optional-checks", "optional", "notes") %}
 <section id="optional-checks" class="review-section" aria-labelledby="optional-checks-title" tabindex="-1">
   <h2 id="optional-checks-title">Optional checks ({{ optional|length + note_rows|length }})</h2>
   {% if optional %}
@@ -495,21 +519,22 @@
   {% else %}
   <p>Accepted automatically with a small note; you can still change any.</p>
   {% endif %}
+  {% if optional_shown %}
   <details class="done-group"{% if optional_open %} open{% endif %}>
-    <summary>Show the {{ counted(optional|length, "optional check", "optional checks") }}</summary>
+    <summary>Show {% if optional_shown|length != optional|length %}{{ optional_shown|length }} of the {% else %}the {% endif %}{{ counted(optional|length, "optional check", "optional checks") }}</summary>
     <ol class="fix-list done-list">
-      {% for item in optional %}{{ folded_item(item, true) }}{% endfor %}
+      {% for item in optional_shown %}{{ folded_item(item, true) }}{% endfor %}
     </ol>
   </details>
+  {% endif %}
   {% elif not note_rows %}
   <p>There are no optional checks.</p>
   {% endif %}
   {# T3-7: notes about a link, a line or a figure, each with its place on the review screen. #}
-  {% if note_rows %}
-  <h3 id="notes-title">Notes on links, text and figures ({{ note_rows|length }})</h3>
-  
+  {% if notes_shown %}
+  <h3 id="notes-title">Notes on links, text and figures ({% if notes_shown|length != note_rows|length %}{{ notes_shown|length }} of {% endif %}{{ note_rows|length }})</h3>
   <ul class="check-list" aria-labelledby="notes-title">
-    {% for r in note_rows %}
+    {% for r in notes_shown %}
     <li><strong>{{ r.label }}:</strong> {{ r.sentence }}{% if r.what %} <span class="notice-names">“{{ r.what }}”.</span>{% endif %} <a href="{{ r.href }}">Show it on the page<span class="visually-hidden">: {{ r.label }}{% if r.what %}, {{ r.what }}{% endif %}</span></a></li>
     {% endfor %}
   </ul>
@@ -517,42 +542,45 @@
 </section>
 
 {# Your decisions apart from what was accepted for you (UX review MF14). #}
-{% set mine = done|selectattr("by_you")|list %}
-{% set auto = done|rejectattr("by_you")|list %}
+{% endif %}
+{% if parts.shows("decided", "decided") %}
 <section id="decided" class="review-section" aria-labelledby="decided-title" tabindex="-1">
   <h2 id="decided-title">Your decisions ({{ mine|length }})</h2>
   {% if mine %}
-  <details class="done-group"{% if mine|selectattr("open")|list %} open{% endif %}>
-    <summary>Show the {{ counted(mine|length, "item", "items") }} you decided</summary>
+  <details class="done-group"{% if mine_open %} open{% endif %}>
+    <summary>Show {% if mine_shown|length != mine|length %}{{ mine_shown|length }} of the {% else %}the {% endif %}{{ counted(mine|length, "item", "items") }} you decided</summary>
     <ol class="fix-list done-list">
-      {% for item in mine %}{{ folded_item(item, false) }}{% endfor %}
+      {% for item in mine_shown %}{{ folded_item(item, false) }}{% endfor %}
     </ol>
   </details>
   {% else %}
   <p>None yet.</p>
   {% endif %}
 </section>
+{% endif %}
 
+{% if parts.shows("accepted", "accepted") %}
 <section id="accepted" class="review-section" aria-labelledby="accepted-title" tabindex="-1">
   <h2 id="accepted-title">Accepted automatically ({{ auto|length }})</h2>
   {% if auto %}
-  <details class="done-group"{% if auto|selectattr("open")|list %} open{% endif %}>
-    <summary>Show the {{ counted(auto|length, "item", "items") }} accepted for you</summary>
+  <details class="done-group"{% if auto_open %} open{% endif %}>
+    <summary>Show {% if auto_shown|length != auto|length %}{{ auto_shown|length }} of the {% else %}the {% endif %}{{ counted(auto|length, "item", "items") }} accepted for you</summary>
     <ol class="fix-list done-list">
-      {% for item in auto %}{{ folded_item(item, false) }}{% endfor %}
+      {% for item in auto_shown %}{{ folded_item(item, false) }}{% endfor %}
     </ol>
   </details>
   {% else %}
   <p>None.</p>
   {% endif %}
 </section>
+{% endif %}
 
 {# T3-5, T3-16: what the tool did not propose. The tools sit beside the page, on the review
    screen; one link to each page's. #}
-{% if has_pages %}
+{% if has_pages and parts.shows("page-changes", "pages") %}
 <section id="page-changes" class="review-section" aria-labelledby="page-changes-title" tabindex="-1">
   <h2 id="page-changes-title">Page changes</h2>
-  <p>Change words, add a missed picture or equation, or leave a page out, on the review screen.</p>
+  <p>Change words, add a missed picture or equation, or leave a page out, on the review screen.{% if tool_pages|length != tool_pages_all %} Pages {{ tool_pages[0][0] }} to {{ tool_pages[-1][0] }} of {{ tool_pages_all }} are listed here.{% endif %}</p>
   <ul class="check-list">
     {% for number, out in tool_pages %}
     <li><a href="/jobs/{{ job.id }}/review?page={{ number }}&amp;tools=1#page-tools-summary">Page {{ number }}<span class="visually-hidden">: change its text, add something, or leave it out</span></a>{% if out %} (left out of the student file){% endif %}</li>
@@ -560,5 +588,6 @@
   </ul>
 </section>
 {% endif %}
+{{ pager(true) }}
 {% endif %}
 {% endblock %}
