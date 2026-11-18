@@ -359,6 +359,36 @@ def test_a_region_off_the_page_or_too_small_is_refused(edits):
     assert not any(e.id.startswith("p1-x") for e in stored(edits).elements)
 
 
+def test_a_region_given_by_two_lines_is_the_box_the_four_numbers_for_it_would_make(edits):
+    path = f"/jobs/{edits.job_id}/review"
+    # The lines are offered by their first words, with both ends of the page.
+    first = edits.browser.get(path, params={"page": 1, "tools": 1, "add": "picture"})
+    assert "Discuss vectors and scalars with the class." in first.text
+    assert "The top of the page" in first.text and "The bottom of the page" in first.text
+    page = edits.browser.get(
+        path,
+        params={"page": 1, "tools": 1, "add": "picture", "after": PLAIN, "before": "p1-e7"}
+        | {"left": "1", "top": "2", "right": "3", "bottom": "4"},  # the lines win over these
+    )
+    assert page.status_code == 200
+    query = re.search(r"region\.png\?([^\"]+)\"", page.text)
+    assert query is not None
+    edges = dict(pair.split("=") for pair in unescape(query.group(1)).split("&"))
+    above, below = element(edits, PLAIN).bbox, element(edits, "p1-e7").bbox
+    assert float(edges["top"]) >= 100 * above[3] / 792
+    assert float(edges["bottom"]) <= 100 * below[1] / 792
+    response = add_post(edits, "picture", alt="A sketch of a cart on a ramp.", **edges)
+    assert response.status_code == 303
+    added = element(edits, "p1-x1")
+    assert added.bbox == page_edits.region_box(
+        (612.0, 792.0), edges["left"], edges["top"], edges["right"], edges["bottom"], "region"
+    )
+    assert above[3] <= added.bbox[1] and added.bbox[3] <= below[1]
+    # One line alone says what is missing.
+    alone = edits.browser.get(path, params={"page": 1, "add": "picture", "after": PLAIN})
+    assert "Choose both lines" in alone.text and "region.png" not in alone.text
+
+
 def test_the_most_that_can_be_added_is_limited(edits):
     for n in range(page_edits.MAX_ADDED):
         assert (

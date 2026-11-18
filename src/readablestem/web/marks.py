@@ -33,7 +33,9 @@ grows with the marks that are near each other, not with the square of all of the
 
 A mark's number sits just left of its frame, except for an equation in a line of text,
 where it would cover the word before: its number goes in the page margin on the same
-line (`Mark.tag_x`), when the margin has room.
+line (`Mark.tag_x`), when the margin has room. Numbers of neighbouring lines are 22 px high
+and the lines 12 pt apart, so a number that would cover an earlier one moves outward along
+its line, as far as the margin goes (`_space_tags`).
 """
 
 from __future__ import annotations
@@ -55,9 +57,14 @@ TRIES_PER_MARK = 150  # pairs tried for each mark before laying out gives up (`_
 # Bump when `place` or the rules made from its marks (`routes.split._box_rules`) change what
 # they write for the same boxes: the stylesheet's `ETag` carries it, so a browser holding
 # the old stylesheet asks again.
-PLACEMENT_VERSION = 1
+PLACEMENT_VERSION = 2
 NEAR_PT = 1e-6  # two boxes this close count as touching (rounding never hides a neighbour)
 MARGIN_TAG_PT = 28.0  # room a number needs in the page margin
+TAG_WIDTH_PX = 26  # a two-digit number (app.css `.box-tag`: 14 px digits, 5 px padding)
+TAG_HEIGHT_PX = 22
+TAG_HALF_PX = 11  # a number's `left` is its middle less this (`routes.split._box_rules`)
+TAG_GAP_PX = 4  # between a number and the frame it sits left of
+MAX_TAG_COLUMNS = 4  # a number moves out at most this many numbers' widths
 
 
 @dataclass
@@ -191,7 +198,85 @@ def place(
         marks.append(Mark(element_id, element, frame, link, tag_x))
     _separate_all(marks, side)
     _grow(marks, page_size, comfortable_pt(page_size[0]))
+    _space_tags(marks, page_size, text)
     return {m.element_id: m for m in marks}
+
+
+def tag_box(mark: Mark, page_width: float) -> BBox:
+    """Where the mark's number is, in points, on a page drawn `MIN_PAGE_PX` wide (app.css
+    `.box-tag`: beside the frame, or at `tag_x`, on the middle of the frame's height)."""
+    px = page_width / MIN_PAGE_PX
+    width, height = TAG_WIDTH_PX * px, TAG_HEIGHT_PX * px
+    left = (
+        mark.frame[0] - TAG_GAP_PX * px - width
+        if mark.tag_x is None
+        else mark.tag_x - TAG_HALF_PX * px
+    )
+    middle = (mark.frame[1] + mark.frame[3]) / 2
+    return (left, middle - height / 2, left + width, middle + height / 2)
+
+
+def overlapping_tags(placed: dict[str, Mark], page_width: float) -> list[tuple[str, str]]:
+    """Pairs of numbers that still cover each other (for tests and the docs' claim)."""
+    items = [(m.element_id, tag_box(m, page_width)) for m in placed.values()]
+    return [
+        (a, b)
+        for i, (a, box_a) in enumerate(items)
+        for b, box_b in items[i + 1 :]
+        if _overlaps_box(box_a, box_b)
+    ]
+
+
+def _space_tags(
+    marks: list[Mark], page_size: tuple[float, float], text: tuple[float, float] | None
+) -> None:
+    """Keep two numbers from covering each other. A number is 22 CSS px high, so the numbers
+    of items on neighbouring lines (12 pt apart) overlap when they sit one above the other.
+    A number that covers another moves along its own line to a free place: in a margin one
+    of the places one number wide that fit in it (nearest first), beside a frame further
+    left; where there is none it stays. Every number counts, shown at rest or not: the layout
+    never depends on a decision. Sizes are those of a page drawn `MIN_PAGE_PX` wide, the
+    smallest, where the numbers are largest against the page."""
+    px = page_size[0] / MIN_PAGE_PX  # points in a CSS px
+    tag_w = TAG_WIDTH_PX * px
+    base = [tag_box(m, page_size[0]) for m in marks]
+    middles = [(b[1] + b[3]) / 2 for b in base]
+    lefts = [b[0] for b in base]  # each number's left edge, which is what moves
+    tag_h = base[0][3] - base[0][1] if base else 0.0
+
+    def box(at: float, i: int) -> BBox:
+        return (at, base[i][1], at + tag_w, base[i][3])
+
+    order = sorted(range(len(marks)), key=lambda i: middles[i])
+    crowded: set[int] = set()
+    for at, i in enumerate(order):
+        for j in order[at + 1 :]:
+            if middles[j] - middles[i] >= tag_h:
+                break
+            if _overlaps_box(box(lefts[i], i), box(lefts[j], j)):
+                crowded.update((i, j))
+    taken = [box(lefts[i], i) for i in range(len(marks)) if i not in crowded]
+    for i in sorted(crowded):
+        margin = None  # the margin the number is in, if it is in one
+        tag_x = marks[i].tag_x
+        if text is not None and tag_x is not None:
+            margin = (text[1], page_size[0]) if tag_x > page_size[0] / 2 else (0.0, text[0])
+        elif text is not None and lefts[i] >= 0.0 and lefts[i] + tag_w <= text[0] + NEAR_PT:
+            margin = (0.0, text[0])  # beside a frame, and in the left margin
+        if margin is None:
+            places = [lefts[i] - k * tag_w for k in range(1, MAX_TAG_COLUMNS + 1)]
+            places = [at for at in places if at >= 0.0]
+        else:
+            count = int((margin[1] - margin[0]) / tag_w + 1e-6)
+            places = sorted(
+                (margin[0] + k * tag_w for k in range(count)), key=lambda at: abs(at - lefts[i])
+            )
+        for at in places[:MAX_TAG_COLUMNS]:
+            if not any(_overlaps_box(box(at, i), other) for other in taken):
+                marks[i].tag_x = at + TAG_HALF_PX * px
+                lefts[i] = at
+                break
+        taken.append(box(lefts[i], i))
 
 
 def _separate_all(marks: list[Mark], side: float) -> None:
@@ -308,9 +393,13 @@ def _grow(marks: list[Mark], page_size: tuple[float, float], goal: float) -> Non
         mark.link = grown(low)
 
 
-def _overlaps(a: Mark, b: Mark) -> bool:
-    ox, oy = _overlap(a.link, b.link)
+def _overlaps_box(a: BBox, b: BBox) -> bool:
+    ox, oy = _overlap(a, b)
     return ox > 1e-6 and oy > 1e-6
+
+
+def _overlaps(a: Mark, b: Mark) -> bool:
+    return _overlaps_box(a.link, b.link)
 
 
 def overlapping(marks: dict[str, Mark]) -> list[tuple[str, str]]:

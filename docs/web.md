@@ -2934,7 +2934,13 @@ tried for each mark): 200 marks that can be separated take about 12 ms, and a pa
 elements overlap each other, which cannot be separated whatever is done, stops at the bound
 with those links still overlapping, as it did before after about 2.7 s of rounds. A mark's number sits left of its
 frame, or for an equation in a line of text in the page margin on the same line (its
-"Note" label and check mark too), so it covers no word. The marks keep their own colors in forced-colors mode
+"Note" label and check mark too), so it covers no word. Numbers of neighboring lines are 22 CSS
+px high and the lines 12 pt apart, so numbers that would cover each other move along their line
+to a free place (`marks._space_tags`: in a margin one of the places one number wide that fit in
+it, nearest first; beside a frame further left; where none fits they stay), at the sizes of the
+smallest page, whatever is decided; `marks.overlapping_tags` reports the ones still covering.
+Under the page image the same marks are a text list in reading order (`PageView.listed`), each
+a link to the item its frame opens, with its number, kind and first words. The marks keep their own colors in forced-colors mode
 (`forced-color-adjust: none` on the page frame): the page image stays white whatever the
 theme, and system colors would make them white on white. The page itself never scrolls
 sideways (320 CSS px included).
@@ -3196,9 +3202,23 @@ an edit or an error, and when `tools=1`) with, in this order:
   any heading; the element becomes a heading with a fix the reviewer made (`edited`), so
   "Make plain text" and Undo take it back, and later headings are repaired in the outline as
   always (the notice says how many moved).
+- *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
+  the proposal read aloud in its place (the sentence before and after for one on its own line),
+  and both readings, as speech and as LaTeX, where the page witness read it differently; a
+  figure's card gives the sentence that refers to it by number ("Figure 2"), after the caption it
+  already shows. Where the only evidence is the page's picture (a page whose content did not
+  come from a text layer, a page kept as an image, an equation with no text from the PDF and no
+  sentence, a figure with no caption and no reference) the card says "This can only be checked
+  against the page image." (`SplitBuilder.evidence`).
 - *Add something the tool missed.* Step 1 is a plain GET form: a picture or an equation on its
   own line, and the region as four numbers from 0 to 100 (left and right across the page, top
-  and bottom down it). Step 2 shows the region cut out (`pages/{n}/region.png`, the same crop
+  and bottom down it), or by two lines: "Starts after line" and "Ends before line", two selects
+  filled from the page's paragraphs, list items and headings in reading order (each option is
+  the line's first words, with "the top of the page" and "the bottom of the page" as ends; no
+  view of the image, no JavaScript). The server writes the box the lines make into the four
+  numbers (`page_edits.region_between`: below the first line, above the second, as wide as the
+  page's text margins, rounded outward), so step 2 and the add route are the same for both; when
+  lines are chosen they win over the four numbers, which the form says. Step 2 shows the region cut out (`pages/{n}/region.png`, the same crop
   the file will carry, at 200 dpi with 2 pt of page round it) with **Add the picture** (alt text,
   checked like any alt text before anything is cut) or **Read it as an equation**. A picture is
   a new figure element in the reading order (placed after the last element above it in its

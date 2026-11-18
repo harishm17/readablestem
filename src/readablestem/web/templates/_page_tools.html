@@ -125,6 +125,26 @@
           <div class="field"><label for="region-bottom-{{ tools.number }}">Bottom edge</label><input type="number" id="region-bottom-{{ tools.number }}" name="bottom" min="0" max="100" step="any" inputmode="decimal" value="{{ add.values.get('bottom', '') }}" data-edit-field></div>
         </div>
       </fieldset>
+      {% if add.lines %}
+      <fieldset class="table-fieldset region-lines" aria-describedby="lines-hint-{{ tools.number }}">
+        <legend>Or choose it by the lines around it</legend>
+        <p class="hint" id="lines-hint-{{ tools.number }}">It is the part of the page between the two lines, across the width of the text. If you choose lines here, they are used and the four edges above are not.</p>
+        <div class="region-grid">
+          <div class="field"><label for="after-{{ tools.number }}">Starts after line</label>
+            <select id="after-{{ tools.number }}" name="after">
+              <option value="">No line chosen</option>
+              <option value="top"{% if add.after == "top" %} selected{% endif %}>The top of the page</option>
+              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.after == line.element_id %} selected{% endif %}>{{ line.preview }}</option>{% endfor %}
+            </select></div>
+          <div class="field"><label for="before-{{ tools.number }}">Ends before line</label>
+            <select id="before-{{ tools.number }}" name="before">
+              <option value="">No line chosen</option>
+              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.before == line.element_id %} selected{% endif %}>{{ line.preview }}</option>{% endfor %}
+              <option value="bottom"{% if add.before == "bottom" %} selected{% endif %}>The bottom of the page</option>
+            </select></div>
+        </div>
+      </fieldset>
+      {% endif %}
       {{ tool_error(add.errors.get("add"), "add-error-" ~ tools.number) }}
       <div id="add-{{ tools.number }}" tabindex="-1">
         <button type="submit" class="button-secondary" data-role="show-region">Show the part I described</button>
