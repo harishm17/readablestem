@@ -1,8 +1,29 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-11-02",
-  "pipeline_version": "0.5.1",
+  "date": "2026-11-18",
+  "pipeline_version": "0.5.11",
+  "profile": {
+    "name": "development settings",
+    "sha256": "213535ac0803b65f153e0c81abfef42b3c9e26cdf742fe7299335b6eb7c7998c",
+    "confirmed": false,
+    "differs": [
+      "DECISIONS_EQUATION_SHADOW",
+      "DECISIONS_FIGURE_VERIFY",
+      "EQUATION_GLYPH_CHECKS",
+      "EQUATION_GLYPH_RECONCILE",
+      "EQUATION_LINE_CONTEXT",
+      "FEATURE_IMAGE_PAGES",
+      "FEATURE_LATEX_SOURCE",
+      "FEATURE_LONG_DESCRIPTIONS",
+      "FEATURE_NOTATION_MEMORY",
+      "FEATURE_TABLES",
+      "FLAG_POLICY"
+    ],
+    "counted_off": [
+      "OFFICE_INPUT_ENABLED"
+    ]
+  },
   "prompt_versions": {},
   "models": {
     "main": "claude-opus-5-5",
@@ -466,5 +487,23 @@
     "p95": 0.0,
     "n": 3,
     "basis": "sum of model-call latencies per item (excludes rendering)"
+  },
+  "answers_file": {
+    "by_step": {},
+    "steady_cost_usd": 0,
+    "answers_file_hits": 0,
+    "answers_file_misses": 0,
+    "live_cost_usd": 0.0,
+    "replayed_cost_usd": 0.0
+  },
+  "recording": {
+    "run": "gold/runs/20261118T092940Z",
+    "sha": "a98b678ca1d7e5c8650b40c21367f7864df8a96b+dirty",
+    "files": [
+      "answers.jsonl",
+      "items.jsonl",
+      "report.json",
+      "run.json"
+    ]
   }
 }

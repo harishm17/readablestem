@@ -1044,8 +1044,9 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     """`eval burden`: decisions a page asks of a reviewer, by page kind, by what is decided
     and by why it was asked, from a replay of the corpus under the production profile, and
     the bar against an earlier record (`eval.burden`). Spends nothing. Exit code 0: the bar
-    is met or none was asked; 1: a page kind asks for more than before; 2: the two records
-    cannot be compared."""
+    is met or none was asked; 1: a page kind asks for more than before (with `--same`: an
+    upload asks for other decisions than the record has); 2: the two records cannot be
+    compared."""
     from readablestem.eval import burden, measure
 
     before = None
@@ -1061,7 +1062,11 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     metrics = burden.report(run)
     record = measure.record(run, settings, metrics)
     _write_record(args.out, record)
-    verdict = None if before is None else burden.judge(record, before, allowance=args.allowance)
+    verdict = (
+        None
+        if before is None
+        else burden.judge(record, before, allowance=args.allowance, same=args.same)
+    )
     print(burden.render(record, verdict))
     if not metrics["uploads"]["measured"]:
         return _error("no upload could be measured")
@@ -2065,6 +2070,13 @@ def register(
         type=float,
         default=0.0,
         help="how many more decisions a page a page kind may ask for than before (0)",
+    )
+    burden.add_argument(
+        "--same",
+        action="store_true",
+        help="with --against: every upload measured now must ask for exactly the decisions "
+        "the record has, fewer or more (CI's eval gate); an upload this machine cannot "
+        "replay is not compared",
     )
     burden.set_defaults(func=_cmd_burden)
 

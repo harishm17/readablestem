@@ -11,6 +11,24 @@
 - WS6.8, the part that changes no request: the conversion options reach every step already
   (`pipeline/options.py`); only the figure step acts on exam mode. The page-image reader's figure
   descriptions would need a line in `image_page.md` (proposed in the report, not made here).
+## Unreleased: the eval gate measures the code as it is (branch feat/gate-on-current-pipeline)
+
+- F-579: CI's `eval-gate` job passed on five reports made at pipeline 0.5.0 and 0.5.1 while
+  the code was 0.5.11. `eval gate --require-current` now also refuses a report whose
+  `pipeline_version` is not the code's. The job gates the two reports that cost nothing to make
+  (headings, tables-local), both re-made at 0.5.11 by command. Equations, figures and
+  document cost money to re-make (their recordings hold none of the replay: 0 of 60, 26 and
+  114 requests answered), so they are historical records in the PR gate and stay gated by the
+  weekly paid run (`eval-live.yml`). The job also replays the corpus's public files from the
+  recorded answers when a change touches the package (`eval burden --same`): every upload must
+  ask for the decisions `data/eval/burden-corpus.json` has, fewer or more, so the record is
+  re-made in the same pull request as a change that moves them. The record is re-made at
+  0.5.11 (45 of the 73 uploads: the others ask for answers the recording lacks, and a paid
+  recording is owed). The eval guard also fires when a change touches a rule that decides acceptance
+  (module constants and accept functions of the pipeline steps), found by what a module does
+  and compared by parsed value; `eval-unchanged` still opts out. The README's version is
+  checked against `PIPELINE_VERSION` (`tests/test_eval_docs.py`).
+  No version bump, no migration.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

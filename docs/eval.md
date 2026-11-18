@@ -43,12 +43,25 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-figures.json` | 2026-10-14 | 0.5.0 | same |
-| `latest-headings.json` | 2026-11-02 | 0.5.1 | same (the task calls no model; run with the fake client, model fields kept from the earlier run; `baseline-headings.json` stays the 2026-10-14 file) |
-| `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-18 | 0.5.11 | headings: claude-opus-5-5, claude-haiku-5-5 (the task calls no model; run with a placeholder key and no call made); tables local: no model. Made by `eval pipeline` and kept with `eval promote --as latest --out-dir data/eval` |
+| `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
+| `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
+
+**What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
+report is held to its baseline only when this pipeline version made it (`eval gate
+--require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
+so CI's `eval-gate` job gates those two, re-made at 0.5.11. Equations, figures and document
+need a paid run: their latest and baseline reports are historical records of the 0.5.0
+system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
+the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
+answered). `eval-live.yml` re-measures them weekly on the current code and compares them
+with the baselines; a paid recording of the three is owed before they can gate a pull
+request again. The same job replays the corpus against the committed record (`eval burden
+--same`, "The replay record, and CI" under `eval burden`) when a change touches the package,
+which finds a change of behavior that a version number alone would not.
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
-latest report from going stale is the gate's `--require-current` check on prompt versions and
+latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions and
 model ids, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
@@ -588,7 +601,9 @@ Changed pipeline version, step prompt versions, model ids or client are listed u
 table (they are usually why the gate is being run). With `--require-current` (CI uses
 it) the gate also refuses (`stale_report`) a current report produced with other prompts
 or models than the code under test, so a prompt change cannot pass on an old committed
-`latest-<task>.json`. Tolerances live in `data/eval/tolerances.json`; an entry with only
+`latest-<task>.json`. The pipeline version counts too (`pipeline X (code: Y)`): a report made
+by another version than the code's is refused whatever its prompts and models were, and a
+`--fake` report has no models to compare. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -1009,8 +1024,19 @@ needs all four Claude reports (equations, headings, figures, document); the Open
 needs the tables report, which records it; any other model setting needs the document
 report.
 
-Opt-out, for a change that does not alter what a model is asked or which model answers (a
-renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
+**What decides acceptance.** A change to a rule that decides whether a reading is accepted or
+goes to a person needs the replay record, `data/eval/burden-corpus.json` ("The replay
+record"), re-made in the same pull request. The rule is small and has no line numbers. A
+module under `src/readablestem/pipeline/` with a function that sets `Status.ACCEPTED` or
+`Status.NEEDS_REVIEW` decides acceptance: its module-level `UPPER_CASE` constants and those
+deciding functions are the rules, and so is a `config.py` setting with `accept` in its name.
+They are compared by parsed value (`ast`; a function without its docstring), so a comment, a
+docstring or `0.80` written `0.8` is no change, and a constant in a module that decides
+nothing (`layout.py`) is not a rule. A module is found by what it does, so a new step that
+sets a status is covered without a list to update.
+
+Opt-out, for a change that does not alter what a model is asked, which model answers or what
+is accepted (a renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
 trailer `Eval-Unchanged: <reason>` in the last paragraph of any of its commit messages (the reason is required). The guard
 prints the waiver and the reports it did not need, so a reviewer sees it. Prompt text a
 model reads is never a refactor: change it and re-run.
@@ -3205,15 +3231,51 @@ number of uploads.
 |---|---|
 | 0 | the bar is met, or no record was given |
 | 1 | the set or a page kind asks for more than before; the lines name each |
-| 2 | not judged: other documents, or a different number of uploads measured |
+| 2 | not judged: other documents, or a different number of uploads measured (with `--same`: no upload was measured) |
 
 **Fewer is not better by itself.** A change that stops asking about something wrong lowers
 this figure and raises the errors nobody is told about. The bar is read with the counts of
 silent errors (the lane evals and the page audit), never alone.
 
-Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
-pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
-report leaves out, for the same 126 answers.
+**The replay record, and CI.** `data/eval/burden-corpus.json` is also the record CI's eval
+gate holds a pull request to. With `--same` the bar is not "no more decisions" but "the
+decisions the record has": every upload measured now must ask for exactly the decisions, on
+exactly the pages, that the record has, fewer as well as more, because a rule that stops
+asking about something wrong is as much a change as one that asks more (and raises the
+silent errors the lane evals count). An upload measured now and not in the record is a
+difference; an upload the record has and this machine cannot replay is not compared. CI
+holds the public files only: the answers for the CC BY-NC-SA files are kept out of the
+repository (`corpus.KEPT_OUT`), so CI replays about half the uploads and the box replays
+all. The record is made on the box, with the kept-out answers, by this command and never by
+hand:
+
+```bash
+uv run readablestem eval burden --out data/eval/burden-corpus.json
+uv run readablestem eval burden --against data/eval/burden-corpus.json --same   # what CI runs
+```
+
+A pull request that changes the pipeline fails the second command when its change moves any
+upload's decisions, and passes when the record was re-made in the same pull request. The
+eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
+decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
+
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-18 at pipeline 0.5.11 by
+`eval burden --out`, production profile, 45 of the 73 uploads, 122 pages, 70 decisions,
+0.574 a page). Fewer uploads than the first baseline below: the changes of 0.5.11 (the
+MathTime fonts, blanks, the legend and axis rules) make the pipeline ask questions the
+recording does not hold, so 28 uploads are left out for 1,250 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 646, `w_lecture_5111`, `w_slides_60001_lec10`,
+`r17_arxiv_ligo`). The decisions a page of the two records are not comparable: the dense
+mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
+0.5.10 record, 43 of the 45 uploads ask the same; `d3_arabic_doc` asks for 3 decisions where
+it asked for 0 and `s05_form_acroform` for 0 where it asked for 1, which is why the record
+was re-made. **A paid recording of the answers is owed** (about 1,250 requests on the
+current code) to bring those uploads back into the gate. The cost, order and outputs records
+are still the 0.5.10 ones, and CI does not compare them.
+
+First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; the figures below are that record's, no longer the file's). The ten uploads left out
+are the ones the cost report leaves out, for the same 126 answers.
 
 | | |
 |---|---|

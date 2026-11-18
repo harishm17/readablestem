@@ -97,3 +97,21 @@ def test_what_was_not_measured_whole_is_left_out_and_not_judged(tmp_path, capsys
     now = json.loads(after.read_text())["metrics"]
     assert now["uploads"]["not_measured"] == ["w_lecture_5111"]
     assert (now["pages"], now["decisions"]) == (2, 2)
+
+
+def test_a_record_kept_up_to_date_fails_a_change_in_either_direction(tmp_path, capsys):
+    """CI's eval gate (`--same`): a rule that asks about less is as much a change as one that
+    asks about more, and an upload this machine cannot replay is not compared."""
+    record, after = tmp_path / "record.json", tmp_path / "after.json"
+    more = measured(asked(3, "table", "table.ragged_rows"))
+    assert burden("--from", records(tmp_path, "a", more), "--out", record) == 0
+
+    fewer = records(tmp_path, "b", measured())
+    assert burden("--from", fewer, "--out", after, "--against", record) == 0  # the old bar
+    assert burden("--from", fewer, "--out", after, "--against", record, "--same") == 1
+    assert "w_lecture_5111: 2 decisions on 10 pages, 3 on 10 in the record" in (
+        capsys.readouterr().out
+    )
+
+    # The same documents on a machine that has the answers of the lecture only.
+    assert burden("--from", records(tmp_path, "c", more[:1]), "--against", record, "--same") == 0

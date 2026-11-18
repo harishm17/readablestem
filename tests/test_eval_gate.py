@@ -148,11 +148,17 @@ def test_a_changed_judge_is_refused_not_compared():
 
 def test_require_current_refuses_a_report_made_with_other_prompts(tmp_path, capsys):
     """A committed latest-<task>.json that predates a prompt change would let the change
-    through without anyone re-running the eval."""
+    through without anyone re-running the eval; so would one made by an older pipeline,
+    whose rules and constants are not in any prompt."""
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
     versions = gate.code_versions()
     fresh = report()
     fresh["prompt_versions"] = {"equation": versions["equation"]}
+    fresh["pipeline_version"] = PIPELINE_VERSION
     stale = report()  # equation-aaaa1111, not the code's prompt
+    stale["pipeline_version"] = PIPELINE_VERSION
+    older = {**fresh, "pipeline_version": "0.5.0"}
     baseline = write(tmp_path, "base.json", fresh)
     args = ["eval", "gate", "--require-current", "--baseline", str(baseline), "--current"]
     assert main([*args, str(write(tmp_path, "fresh.json", fresh))]) == 0
@@ -160,6 +166,8 @@ def test_require_current_refuses_a_report_made_with_other_prompts(tmp_path, caps
     assert main([*args, str(write(tmp_path, "stale.json", stale))]) == 2
     err = capsys.readouterr().err
     assert "stale_report" in err and "equation prompt equation-aaaa1111" in err
+    assert main([*args, str(write(tmp_path, "older.json", older))]) == 2
+    assert "pipeline 0.5.0" in capsys.readouterr().err
     # Without the flag (comparing two historical runs) it is only a note.
     plain = ["eval", "gate", "--baseline", str(baseline), "--current"]
     assert main([*plain, str(tmp_path / "stale.json")]) == 0

@@ -7,7 +7,8 @@
 - 2 when the two reports cannot be compared fairly: different task, different gold
   manifest, different item selection, a partial run on either side, a different judge
   (prompt or model: the measuring instrument changed), or, with `--require-current`, a
-  current report produced with other prompts or models than the code under test has.
+  current report produced with other prompts, models or another pipeline version than the
+  code under test has.
 
 Why refuse instead of comparing anyway: a score on a different gold set, or on the 12 of
 30 equations a run reached before its budget ran out, is a different measurement. So is
@@ -316,10 +317,20 @@ def code_versions() -> dict[str, str]:
     return versions
 
 
-def check_current(report: dict, versions: dict[str, str], models: dict[str, str]) -> None:
-    """Raise GateRefused("stale_report") when `report` was produced with other prompts
-    or models than `versions` / `models` (the code under test)."""
+def check_current(
+    report: dict,
+    versions: dict[str, str],
+    models: dict[str, str],
+    pipeline_version: str | None = None,
+) -> None:
+    """Raise GateRefused("stale_report") when `report` was produced with other prompts,
+    other models or another pipeline version than the code under test (`versions`, `models`,
+    `pipeline_version`). A rule or a constant of the pipeline changes what a report measures
+    without moving a prompt or a model, so the version is what tells a number of this code
+    from a number of an older one."""
     stale = []
+    if pipeline_version is not None and report.get("pipeline_version") != pipeline_version:
+        stale.append(f"pipeline {report.get('pipeline_version')} (code: {pipeline_version})")
     for key, version in sorted((report.get("prompt_versions") or {}).items()):
         if key in versions and version != versions[key]:
             stale.append(f"{key} prompt {version} (code: {versions[key]})")
@@ -508,13 +519,18 @@ def run_gate(
                 CHEAP_MODEL,
                 MAIN_MODEL,
             )
+            from readablestem.pipeline.run import PIPELINE_VERSION
 
             if current.get("client") == "anthropic":
                 main, cheap = ANTHROPIC_MAIN_MODEL, ANTHROPIC_CHEAP_MODEL
             else:
                 main, cheap = MAIN_MODEL, CHEAP_MODEL
             models = {"main": main, "cheap": cheap, "judge": main}
-            check_current(current, code_versions(), models)
+            if (
+                current.get("client") == "fake"
+            ):  # a run that called no model has no model to be stale
+                models = {}
+            check_current(current, code_versions(), models, PIPELINE_VERSION)
         result = gate(
             current, baseline, load_tolerances(tolerance_path), load_floors(tolerance_path)
         )
