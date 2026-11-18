@@ -243,6 +243,13 @@ def _fold(ch: str) -> str:
     return unicodedata.normalize("NFKC", ch).casefold()
 
 
+def turn_page(page: pymupdf.Page) -> int:
+    """`page_type.turn_page`: the page upright, as layout read it (WS14.3)."""
+    from readablestem.pipeline.page_type import turn_page as turn
+
+    return turn(page)
+
+
 def _open(data: bytes) -> pymupdf.Document:
     import pymupdf
 
@@ -262,10 +269,14 @@ def _open(data: bytes) -> pymupdf.Document:
 
 def page_sizes(data: bytes) -> list[tuple[float, float]]:
     """Every page's (width, height) in points, as `page.rect` gives them (after rotation,
-    the frame layout's boxes are in)."""
+    and after the turn of a page saved sideways: the frame layout's boxes are in)."""
     doc = _open(data)
     try:
-        return [(round(p.rect.width, 2), round(p.rect.height, 2)) for p in doc]
+        sizes = []
+        for p in doc:
+            turn_page(p)
+            sizes.append((round(p.rect.width, 2), round(p.rect.height, 2)))
+        return sizes
     finally:
         doc.close()
 
@@ -416,6 +427,7 @@ def render(
         if not 0 <= page < doc.page_count:
             raise ProbeRejected("no_such_page")
         current = doc[page]
+        turn_page(current)  # the page as layout read it (a page saved sideways is turned)
         if max(current.rect.width, current.rect.height) > MAX_PAGE_SIDE_PT:
             raise ProbeRejected("page_too_large")
         area = current.rect if clip is None else pymupdf.Rect(clip) & current.rect
@@ -495,6 +507,7 @@ def region_text(data: bytes, *, page: int, clip: tuple[float, float, float, floa
         if not 0 <= page < doc.page_count:
             raise ProbeRejected("no_such_page")
         current = doc[page]
+        turn_page(current)  # the page as layout read it (a page saved sideways is turned)
         if max(current.rect.width, current.rect.height) > MAX_PAGE_SIDE_PT:
             raise ProbeRejected("page_too_large")
         area = pymupdf.Rect(clip) & current.rect

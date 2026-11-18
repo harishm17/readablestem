@@ -20,6 +20,7 @@ from readablestem.pipeline.layout import (
     REASON_NUMBERED,
     LayoutError,
     analyze,
+    crop,
     heading_levels,
 )
 
@@ -444,6 +445,40 @@ def test_a_single_page_keeps_unrepeated_margin_text_but_drops_the_page_number():
         "Draft handout for discussion",
         "The only body paragraph on this page.",
     ]
+
+
+@pytest.mark.parametrize("turn", [90, 270])
+def test_a_page_saved_sideways_with_no_rotate_is_read_as_the_page_it_shows(turn):
+    # A landscape page printed to PDF: every line runs up (or down) the page and /Rotate is 0.
+    # It is turned before it is read, so the title is the heading above its paragraph and a
+    # crop shows it upright; a short label set sideways on an upright page turns nothing.
+    title = "Results of the second experiment"
+    body = [
+        "The measured values agree with the model within the error of the instrument.",
+        "Each run was repeated three times and the mean of the three is reported.",
+    ]
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    for i, (size, line) in enumerate([(20, title), (12, body[0]), (12, body[1])]):
+        at = (90 + 26 * i, 760) if turn == 90 else (500 - 26 * i, 80)
+        page.insert_text(at, line, fontsize=size, rotate=turn)
+    pdf = doc.tobytes()
+
+    out = analyze(pdf)
+    assert [(e.kind, e.text) for e in out.elements] == [
+        (Kind.HEADING, title),
+        (Kind.PARAGRAPH, " ".join(body)),
+    ]
+    assert out.page_sizes == [(842.0, 595.0)]
+    assert crop(pdf, out.elements[0]).startswith(b"\x89PNG")
+    shown = pymupdf.Pixmap(crop(pdf, out.elements[0]))
+    assert shown.width > 5 * shown.height  # a one-line title, upright
+
+    upright = pymupdf.open()
+    plain = upright.new_page(width=595, height=842)
+    write(plain, 72, 100, ["An upright page whose body text runs along its lines, as usual."] * 3)
+    plain.insert_text((30, 600), "Axis label", fontsize=9, rotate=90)
+    assert analyze(upright.tobytes()).page_sizes == [(595.0, 842.0)]
 
 
 # ---------------------------------------------------------------- document properties

@@ -112,7 +112,10 @@ CASES: tuple[Case, ...] = (
     # Text on the page that tells a model what to write. That the model was not steered is
     # read from its answers, which are not recorded yet: two a file (docs/eval.md).
     done("injection-visible.pdf", as_text=TO_THE_MODEL, unanswered=2),
-    done("injection-white.pdf", as_text=TO_THE_MODEL, unanswered=2),
+    # The white text is left out of the page (WS14.2), so it is never read and never sent. It is
+    # longer than the page's visible text, so the page is called a scan under a text layer
+    # (`hidden_ratio`), as one with the same text in render mode 3 is, and the file ends there.
+    failed("injection-white.pdf", "scanned_ocr", never=TO_THE_MODEL),
     done("injection-exam.pdf", as_text=TO_THE_MODEL_EXAM, unanswered=2),
     # ------------------------------------------------------------------------------- zips
     refused("zip-traversal.zip", "source_unsafe_zip"),

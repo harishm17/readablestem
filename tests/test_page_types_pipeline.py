@@ -67,6 +67,37 @@ def test_layout_reads_no_hidden_text_and_keeps_the_clip_mode_title():
     assert doc.kept_pages == {}
 
 
+def test_text_in_the_colour_of_its_background_or_too_small_to_see_is_left_out_and_counted():
+    # Painted, in a normal render mode, and still not seen: white on the white page, a
+    # near-white grey, one point high, navy on a navy box, black on a black box. Light grey
+    # text and white text on a dark box are read, so they stay.
+    lines = [
+        ("Visible black line about circuits", (0, 0, 0), 12, None),
+        ("Hidden white on the page", (1, 1, 1), 12, None),
+        ("Visible grey seventy five percent", (0.75, 0.75, 0.75), 12, None),
+        ("Hidden near white grey", (0.98, 0.98, 0.98), 12, None),
+        ("Hidden one point text", (0, 0, 0), 1, None),
+        ("Hidden navy on navy", (0, 0, 0.5), 12, (0, 0, 0.5)),
+        ("Hidden black on black", (0, 0, 0), 12, (0, 0, 0)),
+        ("Visible white on navy", (1, 1, 1), 12, (0, 0, 0.5)),
+        ("Visible black line about voltage", (0, 0, 0), 12, None),
+    ]
+    doc = pymupdf.open()
+    page = doc.new_page()
+    for i, (text, colour, size, box) in enumerate(lines):
+        y = 80 + 30 * i
+        if box:
+            page.draw_rect(pymupdf.Rect(60, y - 14, 540, y + 5), color=None, fill=box)
+        page.insert_text((72, y), text, fontsize=size, color=colour)
+
+    out = layout.analyze(doc.tobytes())
+    assert [e.text for e in out.elements] == [t for t, *_ in lines if t.startswith("Visible")]
+    hidden = sum(len(t.replace(" ", "")) for t, *_ in lines if t.startswith("Hidden"))
+    assert [(n.code, n.page, n.count, n.review) for n in out.notices] == [
+        ("hidden_text_ignored", 0, hidden, "optional")
+    ]
+
+
 def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     doc = layout.analyze(data("typed_with_ink.pdf"))
     ink = [e for e in doc.elements if "handwriting" in e.reasons]

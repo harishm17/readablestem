@@ -53,19 +53,25 @@ def real_labels() -> dict[str, dict]:
     return {d["file"]: d for d in json.loads((REAL / "labels.json").read_text())["documents"]}
 
 
-def found_on(file: str, page: int) -> list[tuple[int, tuple[float, float, float, float]]]:
-    """The data tables of one page of a data/real-tables PDF, as (page, box) pairs."""
+def one_page(file: str, page: int) -> bytes:
     with pymupdf.open(REAL / file) as source:
         one = pymupdf.open()
         one.insert_pdf(source, from_page=page, to_page=page)
-        data = one.tobytes()
-    return [(page, e.bbox) for e in data_tables(data)]
+        return one.tobytes()
+
+
+def found_on(file: str, page: int) -> list[tuple[int, tuple[float, float, float, float]]]:
+    """The data tables of one page of a data/real-tables PDF, as (page, box) pairs."""
+    return [(page, e.bbox) for e in data_tables(one_page(file, page))]
 
 
 def scored(file: str, page: int) -> dict:
     from readablestem.eval import tables as eval_tables
 
-    labelled = [(page, t["bbox"]) for t in real_labels()[file]["tables"] if t["page"] == page]
+    labelled = [(0, t["bbox"]) for t in real_labels()[file]["tables"] if t["page"] == page]
+    labelled = [
+        (page, box) for _, box in eval_tables.labelled_as_read(one_page(file, page), labelled)
+    ]
     return eval_tables.score_real_document(found_on(file, page), labelled)
 
 
@@ -197,20 +203,19 @@ def test_a_table_set_sideways_on_an_upright_page_is_read_upright():
     # detector, the rows and the columns all saw nothing (the page was never looked at).
     from readablestem.pipeline import layout
 
-    with pymupdf.open(REAL / "2505.03022.pdf") as source:
-        one = pymupdf.open()
-        one.insert_pdf(source, from_page=24, to_page=24)
-        data = one.tobytes()
-    assert one[0].rotation == 0
+    data = one_page("2505.03022.pdf", 24)
+    with pymupdf.open(stream=data) as check:
+        assert check[0].rotation == 0
     [table] = data_tables(data)
     grid = table.table
-    assert grid.turned == 90 and grid.caption == "Table 4: Summary of Balls"
+    assert grid.caption == "Table 4: Summary of Balls"
     first = {c.text for c in grid.cells if c.row == 0}
     assert {"Dataset", "Ball", "Variable: X1", "Obs"} <= first
     assert "0.772" in {c.text for c in grid.cells}
-    # The box is in the page's own frame (tall and narrow), the picture is turned upright.
+    # The page is read turned: the box is in the turned frame (wide and short), as on a
+    # page with /Rotate, and the picture of the table is upright.
     x0, y0, x1, y1 = table.bbox
-    assert y1 - y0 > 2 * (x1 - x0)
+    assert x1 - x0 > 2 * (y1 - y0)
     png = layout.crop(data, table)
     pixmap = pymupdf.Pixmap(png)
     assert pixmap.width > 2 * pixmap.height

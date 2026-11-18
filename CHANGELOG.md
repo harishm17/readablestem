@@ -42,6 +42,28 @@
   estimated chart values (WS21.9 parts 2, 3, 5), the short label with the full text once in the
   top notice (WS11.5). The review screen's and the job page's "handwriting" words wait for P1
   and P5.
+## Unreleased: text is judged from the page it is on, and a sideways page is turned (branch fix/visible-text-sideways-pen)
+
+- WS14.2: text a reader cannot see is left out of the rows. A span under 2 pt is hidden
+  (`page_type.span_hidden`), and so is a span whose box on the rendered page is flat, its lightest
+  and darkest pixels under a contrast ratio of 1.25 apart (white on white, navy on a navy box,
+  black on a black box: `page_type._flat_spans`, added to the covered characters, counted in
+  `hidden_text_ignored`). The page is rendered once, at 100 dpi, and only when it has a span that
+  could be flat (text lighter than 2:1 against white, or text over an image or an opaque fill),
+  and never when a picture on it is over the pixel budget; the box is judged with one pixel of
+  margin (a hairline minus sign is thinner than a pixel), and a space paints nothing and is not
+  counted. The notice's tier is unchanged: this branch has no tier between "optional" and
+  "required". A page whose hidden text is longer than its visible text is a scan under a text
+  layer (`hidden_ratio`), so the hostile file `injection-white.pdf` now ends as `scanned_ocr`.
+- WS14.3: a page saved sideways with no /Rotate is turned before it is read
+  (`page_type.turn_page`): when 80 % or more of its 60 or more visible characters run up the
+  page it is turned 90 degrees, down the page 270, so its rows are horizontal and its headings,
+  order, tables, crops and page size follow. The crop cache, the text pass, tagged figures, the
+  source facts, the page labels and the review page image read the page the same way.
+  Element boxes on such a page are in the turned frame, as on a page with /Rotate, and a table on
+  it is found upright (`TableGrid.turned` is 0; `tables._page_turn` still turns a table set
+  sideways alone on an upright page). The real-document table scoring maps the labelled boxes
+  into that frame (`eval.tables.labelled_as_read`).
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 

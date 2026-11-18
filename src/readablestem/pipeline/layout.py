@@ -622,7 +622,7 @@ def crop(
             if not 0 <= element.page < doc.page_count:
                 raise ValueError(f"element page {element.page} is not in the PDF")
             _ensure_probed(pdf_bytes, key, [element.page])
-            page = doc[element.page]
+            page = _CACHE.page(key, element.page)
             x0, y0, x1, y1 = element.bbox
             clip = pymupdf.Rect(x0 - pad, y0 - pad, x1 + pad, y1 + pad) & page.rect
             if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
@@ -700,7 +700,7 @@ def crop_line(
             if not 0 <= element.page < doc.page_count:
                 raise ValueError(f"element page {element.page} is not in the PDF")
             _ensure_probed(pdf_bytes, key, [element.page])
-            page = doc[element.page]
+            page = _CACHE.page(key, element.page)
             x0, y0, x1, y1 = element.bbox
             clip = _line_clip(page, element, across)
             zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
@@ -807,7 +807,7 @@ def line_glyphs(
             if not 0 <= element.page < doc.page_count:
                 raise ValueError(f"element page {element.page} is not in the PDF")
             _ensure_probed(pdf_bytes, key, [element.page])
-            page = doc[element.page]
+            page = _CACHE.page(key, element.page)
             if page.rotation % 360:
                 return None
             x0, y0, x1, y1 = element.bbox
@@ -881,7 +881,7 @@ def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int
             if not 0 <= page < doc.page_count:
                 raise ValueError(f"page {page} is not in the PDF")
             _ensure_probed(pdf_bytes, key, [page])
-            sheet = doc[page]
+            sheet = _CACHE.page(key, page)
             rect = sheet.rect
             zoom = min(dpi / 72.0, (max_side_px - 1) / max(rect.width, rect.height))
             pixmap = sheet.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
@@ -903,7 +903,7 @@ def page_ink(pdf_bytes: bytes, page: int, *, budget: Any = None) -> tuple[Any, B
             if not 0 <= page < doc.page_count:
                 raise ValueError(f"page {page} is not in the PDF")
             _ensure_probed(pdf_bytes, key, [page])
-            sheet = doc[page]
+            sheet = _CACHE.page(key, page)
             rect = sheet.rect
             return ink_strokes.extract_ink(sheet, budget=budget), (
                 rect.x0,
@@ -1061,6 +1061,7 @@ class _Cached:
     data: bytes
     doc: pymupdf.Document
     used: float  # time.monotonic() of the last use
+    turned: set[int] = field(default_factory=set)  # pages `page_type.turn_page` has seen
 
 
 class _DocumentCache:
@@ -1100,6 +1101,16 @@ class _DocumentCache:
         self.entries.move_to_end(key)
         self.schedule()
         return key, entry.doc
+
+    def page(self, key: str, number: int) -> pymupdf.Page:
+        """A page of the cached document `key`, set upright if it was saved sideways
+        (`page_type.turn_page`: the turn `analyze` read it with)."""
+        entry = self.entries[key]
+        page = entry.doc[number]
+        if number not in entry.turned:
+            entry.turned.add(number)
+            page_type.turn_page(page)
+        return page
 
     def release(self, pdf_bytes: bytes | None) -> None:
         if pdf_bytes is None:
@@ -2743,6 +2754,7 @@ def _margin_filter(
         with guard(number):
             page = doc[number]
             if number not in frags:
+                page_type.turn_page(page)  # a reference page is read upright too
                 frags[number] = _page_rows(page)
             if number not in paths:
                 paths[number] = _page_paths(page)
@@ -10590,7 +10602,10 @@ def _read_page(
     page: pymupdf.Page, budget: page_type.InkBudget, producer: str
 ) -> tuple[list[_Row], list[_Path], page_type.PageTypeResult]:
     """The page's rows and paths, and its page type, from one text extraction and one
-    drawings list (`pipeline.page_type` reads the same two)."""
+    drawings list (`pipeline.page_type` reads the same two). A page saved sideways with no
+    /Rotate is turned first (`page_type.turn_page`): its rows are horizontal and every later
+    step, here and in the readers that open the file again, sees the display frame."""
+    page_type.turn_page(page)
     raw = _raw_blocks(page)
     drawings = page.get_cdrawings()
     images = page_type.image_boxes(page)

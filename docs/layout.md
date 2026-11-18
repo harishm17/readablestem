@@ -34,7 +34,8 @@ Element conventions:
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
   `text` does not include the marker.
-- **Boxes** are PDF points in display space: the page's `/Rotate` is applied, so a
+- **Boxes** are PDF points in display space: the page's `/Rotate` is applied (and the turn of
+  a page saved sideways with none, "A page saved sideways" below), so a
   landscape page reports `(792, 612)` in `page_sizes` and `crop` uses the boxes as they are.
   The origin is the top-left of the CropBox; content outside it is ignored and figure boxes
   are clipped to the page.
@@ -42,8 +43,8 @@ Element conventions:
   `"larger font"`, `"raster image"`, ...). They never contain document text.
 - **Text** is copied from the PDF with whitespace collapsed and invisible characters
   (zero-width and control characters) removed. Text nobody sees on the page is never
-  content: render mode 3, 5 % opacity or less, or painted over by an image or a filled
-  shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
+  content: render mode 3, 5 % opacity or less, under 2 pt, in the color of what is behind it,
+  or painted over by an image or a filled shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
   look-alikes `〚` `〛` (U+301A/U+301B) in every piece of document text, so a PDF cannot
   fake a marker: every marker in an element's `text` is a real inline child of it. Private-use
   codes of symbol fonts (Word's Symbol bullet U+F0B7 is `•`) are mapped by `font_codes`, by font name.
@@ -1522,6 +1523,7 @@ the pass cannot read stays a kept image exactly as described here.
 **What is never content** (`_page_rows`, the same extraction as before, no second one):
 
 - a span in render mode 3 (MuPDF's char flags show neither fill nor stroke);
+- a span under 2 pt (`page_type.TINY_PT`);
 - a span at 5 % opacity or less (rawdict `alpha` <= 13), unless it is text used as a
   clip (render mode 7, a gradient- or picture-filled title: MuPDF gives it alpha 0 with
   the CLIPPED flag), `page_type.span_hidden`. Clip text is visible only when something
@@ -1542,7 +1544,35 @@ the pass cannot read stays a kept image exactly as described here.
   stencil masks, constant alpha, blend modes and a yellow highlight all let the text
   show, and then it is kept. Up to 24 runs are tested per page, the rest follow them.
 
+- a span the rendered page shows nothing of: white on white, navy on a navy box, black on a
+  black box, a grey too faint to read. The page is rendered once (100 dpi, with its
+  annotations) and the lightest and darkest pixels inside the span's box are compared: under
+  a contrast ratio of 1.25 (WCAG's measure) the box is flat and the span is left out
+  (`page_type._flat_spans`). The render is made only for a page with a span that could be
+  flat, text lighter than 2:1 against white or text over an image or an opaque fill (dark
+  text on the bare page is seen), and never on a page with a picture over the pixel budget.
+  The earlier test that compared fill colors gave false positives and is not used. Their
+  characters are counted with the other hidden ones (`hidden_text_ignored`) and leave
+  `Element.text`, Listen, Word, EPUB and the other outputs at the row. The glyph reads for
+  an equation's line (`line_glyphs`) and the text pass (`page_glyphs`) do not look at the
+  render: they skip only the spans of the first three kinds above, as they skip covered
+  ones.
+
 The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
+
+**A page saved sideways.** A page with no `/Rotate` whose text runs up or down the page (a
+landscape page printed to PDF, a `sidewaystable` page) has only "vertical" rows if it is read
+as it is. When at least 80 % of its visible characters (60 or more of them) run one way,
+the page is turned before anything reads it (`page_type.turn_page`: 90 degrees clockwise when
+the text runs up, 270 when it runs down): its `/Rotate` is set in the open document, so
+rows, headings, reading order, tables, crops and page sizes are in the turned frame, as for a
+page that has a `/Rotate`. Every reader that opens the PDF again and uses layout's boxes
+calls the same function on the pages it uses (the crop cache, the text pass, tagged figures,
+the source facts, the page labels and the review page image in `web/pdf_probe.py`). A table
+set sideways on an otherwise upright page is still turned by the table step alone
+(`tables._page_turn`); a short label set sideways (an axis title, an arXiv stamp) turns
+nothing. The turn is in the document the readers open, not in the PDF file: no output says it
+yet (the checks list line "Page N was turned to read it" is not built).
 
 **Page types.** `page_type.classify` reads the rawdict and the drawings layout already
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no

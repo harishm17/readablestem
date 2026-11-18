@@ -27,6 +27,8 @@ from collections.abc import Iterable
 
 import pymupdf
 
+from readablestem.pipeline import page_type
+
 MAX_LABEL = 16
 # A label from the PDF: letters, digits, and the few joiners real labels use ("A-3", "2.1").
 _LABEL = re.compile(rf"[A-Za-z0-9][A-Za-z0-9.\-]{{0,{MAX_LABEL - 1}}}")
@@ -147,6 +149,7 @@ def read(pdf_bytes: bytes, pages: Iterable[int]) -> dict[int, str]:
                 continue
             with contextlib.suppress(Exception):
                 page = doc[index]
+                page_type.turn_page(page)
                 if label := pdf_label(page):
                     labels[index] = label
                 elif (number := _margin_number(page)) is not None:
