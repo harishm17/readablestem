@@ -43,6 +43,7 @@
   .listen-bar button { min-height: 2rem; min-width: 1.5rem; flex: 0 0 auto; padding-inline: var(--space-2); }
   /* Beside the buttons when they fit; on its own short line under them at 320 px. */
   .listen-bar .listen-position { flex: 1 1 auto; min-width: 6rem; font-size: var(--step--1); line-height: 1.2; }
+  .listen-bar .listen-position:empty { display: none; }
   /* "Resume from item 5 of 12": the place is beside it, so only the first word shows here
      (the button's name for a screen reader stays whole). */
   .listen-tail { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
