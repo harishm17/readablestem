@@ -8092,6 +8092,16 @@ def _short_label(row: _Row) -> bool:
     return len(groups) >= 2 and max(groups) <= LABEL_SHORT
 
 
+_ITEM_START = re.compile(r"^\(?[A-Za-z0-9]{1,2}[.)]\s+[A-Za-z]{3}")
+
+
+def _starts_like_item(row: _Row) -> bool:
+    """The row opens with a list or section marker and a word ("5. Blocks and springs",
+    "(b) Find the speed"): the title or item of the text, not a label. A decimal ("3.7 ORCID
+    iDs") has no space after its point; a part's own tag ("(a)", "R1 = 4 ohm") has no word."""
+    return _ITEM_START.match(row.clean) is not None
+
+
 def _edge_gap(edge: tuple[float, float, float, float], box: BBox) -> float:
     """How far a straight stroke lies from a box (0 when it crosses or touches it)."""
     x0, y0, x1, y1 = edge
@@ -8167,9 +8177,10 @@ def _label_owners(
     drawing's box (an inside row of any length: the text in a flowchart's boxes), and it is
     no line of running text (`_running_text`: among the rows inside the drawing for an
     inside row, among the page's for another: a paragraph that passes by a figure, a
-    title). Outside the drawing it is also short (`_short_label`) and no code (a program
-    listing in a box). Any kind of row counts, maths and rotated ones too: a part's name
-    on a circuit, an axis title, "R1 = 4 ohm". A caption never does (`_attach_captions`).
+    title). Outside the drawing it is also short (`_short_label`), no list item or numbered
+    title (`_starts_like_item`) and no code (a program listing in a box). Any kind of row
+    counts, maths and rotated ones too: a part's name on a circuit, an axis title,
+    "R1 = 4 ohm". A caption never does (`_attach_captions`).
     Found again and again from the figure and the labels it holds until nothing more is,
     since an axis title stands a line beyond the tick labels; a row two figures could
     claim goes to the nearer, by its distance to their strokes."""
@@ -8212,7 +8223,12 @@ def _label_owners(
                     on_page = _running_text([r for r in rows if not r.absorbed], ctx)
                 running = on_page
             if id(row) in running or not (
-                inside or (_short_label(row) and not (row.code and len(row.ink) >= CODE_MIN_GLYPHS))
+                inside
+                or (
+                    _short_label(row)
+                    and not _starts_like_item(row)
+                    and not (row.code and len(row.ink) >= CODE_MIN_GLYPHS)
+                )
             ):
                 continue  # never a label, wherever it lies
             found.append((row, figure))
@@ -11682,15 +11698,24 @@ def _drawn_rules(paths: Sequence[_Path]) -> set[int]:
 
 def _edge_band(path: _Path, page_rect: pymupdf.Rect) -> bool:
     """A filled, straight-edged band along an edge of the page (a slide template's title
-    bar or side strip): touching an edge, and at most FRAME_EDGE_BAND of the page deep."""
+    bar, footer bar or side strip): touching an edge, and at most FRAME_EDGE_BAND of the
+    page deep; or running the length of the page (PAGE_SIZED_FRACTION of it) within
+    FRAME_EDGE_BAND of an edge, a slide's footer bar set in from the edge by a margin: its
+    footer text lies on it, and a line of the slide that stands close above it was taken
+    as a label of the "figure" it made (the 6.0001 deck, 35 pages)."""
     if not path.filled or path.curved:
         return False
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
     touches_x = x0 <= 1.0 or x1 >= w - 1.0
     touches_y = y0 <= 1.0 or y1 >= h - 1.0
-    return (touches_y and y1 - y0 <= FRAME_EDGE_BAND * h) or (
-        touches_x and x1 - x0 <= FRAME_EDGE_BAND * w
+    long_band = _in_edge_band(path.bbox, page_rect) and (
+        x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h
+    )
+    return (
+        (touches_y and y1 - y0 <= FRAME_EDGE_BAND * h)
+        or (touches_x and x1 - x0 <= FRAME_EDGE_BAND * w)
+        or long_band
     )
 
 

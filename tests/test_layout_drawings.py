@@ -378,6 +378,31 @@ def test_a_diagram_of_lines_and_boxes_with_labels_inside_is_a_figure(case):
     assert "It has a direction" in _text_of(out) and "Acceleration is" in _text_of(out)
 
 
+def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():
+    # A numbered title a few points over a drawing stays text, a heading of the page, not a
+    # label that the figure's picture takes in (a blind student loses the heading). A slide
+    # template's footer bar, set in from the page's edge, is no figure: the line standing
+    # just over it was taken as a label of the "figure" it made.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    _label(page, (72, y + 28), "5. Blocks and springs", 11, font="hebo")
+    _rect(page, (100, y + 40, 200, y + 90), width=1.2)
+    _label(page, (146, y + 70), "m", 10)
+    _running_text(page, y + 120, 1, start=1)
+    page = _page(doc)
+    _running_text(page, 72, 2)
+    _label(page, (72, 690), "Total of the three: 12", 11)
+    _rect(page, (36, 700, 576, 740), colour=None, width=0, fill=BLUE)
+    _label(page, (60, 724), "LECTURE 10", 8)
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out, 0)
+    assert "Blocks and springs" in _text_of(out)
+    assert figure.bbox[0] > 90  # the picture does not reach out to the title
+    assert _figures(out, 1) == []
+    assert "Total of the three" in _text_of(out)
+
+
 def test_a_worked_example_box_with_a_grid_of_cell_borders_is_still_not_a_figure():
     # Controls: a worked example's frames round paragraphs, with a grid of cells drawn as
     # separate border pieces inside (an open chain of rules); and a box of four lines whose

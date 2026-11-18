@@ -17,6 +17,14 @@ they need re-recording, which costs a model run.
   strokes: only the rows on it are its labels. A triangle's sides and angle, a circuit's part
   names, "R1 = 4 ohm" and a graph's tick labels are labels of their figure, not equations and
   stray paragraphs.
+- A row that starts like a list item or a numbered title ("5. Blocks and springs": a marker
+  of one or two characters and a word of three letters) is never a figure's label: a title
+  beside a figure was taken as its label and lost as a heading (`_starts_like_item`; chosen
+  by a count on the tracked files and the corpus, see docs/layout.md). A slide's footer bar
+  set in from the page's edge is furniture like one at the edge (`_edge_band`): before, a
+  code line or a total above it was its label and each of the deck's pages kept an empty
+  figure for the bar. A caption's tail line is the caption's own, and a table's header rule
+  alone is not a timeline's ruler (`thin_ruler` needs ticks of more than 1 pt).
 - WS6.15 step 1: a timeline's ruler (a thin line with ticks) fell under the 24 pt a figure
   needs on both sides, so its drawing was dropped and its labels became a paragraph: a long
   ruler with ticks is a figure (`thin_ruler`). A free-body diagram's force arrows, each thin

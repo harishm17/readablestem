@@ -1409,10 +1409,24 @@ math by the document's evidence; the equation step's own tiers then decide it.
   were labels all lie within 1.0; beyond 1.0 the rows are prose fragments, headings and
   list items; turned rows that are labels reach about 2.0 and no turned row that is not
   one lies nearer than 2.5. So one reach, 1.0, with the turned rows' 2.5 times that.
-  Known limit: a short numbered title (a problem's "5. Blocks and springs") within a
-  font size of a figure is taken as its label, as a short title is no running text and no
-  size cap tells it from a large graph label; the list markers are not known yet where
-  the labels are found.
+  Not a label either: a short numbered title (a problem's "5. Blocks and springs"), a row
+  that starts like a list item, a marker of one or two characters ("5.", "(a)", "B)") and
+  a word of three letters or more (`_starts_like_item`). The list markers are not known yet
+  where the labels are found, so the row's own start is read. A title taken as a figure's
+  label is lost as a heading, and a label kept out stays a paragraph as before, so the
+  rule leans toward the title. Measured (2026-11-18, the labels the rule claimed outside their figure and not
+  turned, on the tracked files and in the corpus; the corpus has one title among them, the
+  tracked files none): a row a candidate would keep out of the labels, tracked / corpus.
+  A marker and a word of three letters: 0 / 1, the title, so no label released. A font
+  larger than the figure's other labels: 5 / 62, nearly all true labels (chart titles,
+  braces) and the title too. Bold unlike the others: 0 / 2, not the title. At the left
+  margin with the figure to its right: 1 / 8. Running text below it: 20 / 175, and the
+  title has none. Only the first keeps the title and releases no true label.
+  A slide's footer bar set in from the page's edge (`_edge_band`, a rule or box at least 85
+  % of the page wide inside the top or bottom 15 %) is furniture like one that touches
+  the edge: before, a line of code or a total just above it was read as the bar's label
+  (the 6.0001 deck, 35 pages, each with an empty figure for the bar). The tail line of a
+  caption counts as the caption's own, not a label (`_running_text`).
   A picture has no strokes: only the rows on it are its labels. The figure's box, and so
   the picture cut for the figure step, grows to its labels. Replaces `_absorb_labels`,
   `_absorb_outer_labels` and the dropped rows' own reach (`_take_labels`), five reaches
