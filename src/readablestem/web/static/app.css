@@ -273,6 +273,8 @@ input[type="file"]::file-selector-button:hover { background: var(--accent-tint);
 .field-error { border: 2px solid var(--err); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
 .error-message { color: var(--err); font-weight: 700; margin: 0 0 var(--space-2); }
 [aria-invalid="true"] { border-color: var(--err); }
+/* Forced colors drop the red, so a field in error gets a different edge: a thick double line. */
+@media (forced-colors: active) { [aria-invalid="true"] { border-width: 4px; border-style: double; } }
 .error-summary {
   border: 4px solid var(--err);
   border-radius: var(--radius-frame);
@@ -321,6 +323,7 @@ tbody th { font-weight: 700; }
 
 .job-status { padding: var(--space-3) var(--space-4); background: var(--surface); border-radius: var(--radius-control); }
 .job-status p { margin: var(--space-1) 0; }
+@media (forced-colors: active) { .job-status { border: 1px solid CanvasText; } }
 .progress-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .progress-row label { font-weight: 700; }
 progress { width: 16rem; height: 1.1rem; }
@@ -332,6 +335,7 @@ progress { width: 16rem; height: 1.1rem; }
 /* An address or a file name: the full row, normal weight, breaking only at its <wbr> points. */
 .summary-list .summary-long { grid-column: 1 / -1; }
 .summary-list .summary-long dd { font-weight: 400; font-size: var(--step-0); overflow-wrap: break-word; }
+@media (forced-colors: active) { .summary-list div { border: 1px solid CanvasText; } }
 /* A state's symbol (✓ fine, ⚠ needs attention, – not known) beside its word: the shape says it
    without colour, and the word still says it to a screen reader (the symbol is aria-hidden). */
 .state { margin-right: var(--space-1); }
@@ -370,11 +374,13 @@ progress { width: 16rem; height: 1.1rem; }
 }
 @media (forced-colors: active) { .crop-box[data-more]::after { background: none; border-right: 4px solid CanvasText; opacity: 1; } }
 .mathml-preview { font-size: var(--step-2); padding: var(--space-3); background: var(--surface); border-radius: var(--radius-control); overflow-x: auto; }
+@media (forced-colors: active) { .mathml-preview { border: 1px solid CanvasText; } }
 /* An equation that is all chemistry has no style on its element symbols (the MathML carries
    intent on <math>; Speech Rule Engine would read an explicit style aloud). Draw them upright
    wherever MathML is shown: the proposal, the comparison rows, the item lines and tables. */
 math[intent] mi { text-transform: none; }
 .alt-proposal { background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); }
+@media (forced-colors: active) { .alt-proposal { border: 1px solid CanvasText; } }
 .review-form { margin-top: var(--space-4); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
 
 /* Review screen: progress, sections, groups, folded decided fixes.
@@ -382,6 +388,7 @@ math[intent] mi { text-transform: none; }
 .review-progress { margin: var(--space-4) 0; }
 .review-progress, .review-toc, .review-group, .fix-card { overflow-wrap: anywhere; }
 .review-toc { background: var(--surface); border-radius: var(--radius-control); padding: var(--space-1) var(--space-4) var(--space-3); margin: var(--space-5) 0; }
+@media (forced-colors: active) { .review-toc { border: 1px solid CanvasText; } }
 .review-toc h2 { font-size: var(--step-1); margin: var(--space-3) 0 var(--space-1); }
 .review-toc ul { margin: 0; padding-left: var(--space-4); }
 .review-group { border-top: 2px solid var(--border-subtle); margin-top: var(--space-6); }
@@ -401,6 +408,7 @@ math[intent] mi { text-transform: none; }
 .changed-note { border: 1px solid var(--ok); border-radius: var(--radius-control); background: var(--ok-tint); padding: var(--space-2) var(--space-4); margin: var(--space-3) 0; }
 @media (forced-colors: active) { .changed-note { border: 1px solid CanvasText; } }
 .heading-proposal { background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); font-weight: 700; }
+@media (forced-colors: active) { .heading-proposal { border: 1px solid CanvasText; } }
 .prose-input { font-family: inherit; }
 .review-item { scroll-margin-top: var(--space-2); }
 .review-item:focus { outline: none; }
@@ -527,6 +535,7 @@ math[intent] mi { text-transform: none; }
    size container; marks.css gives each equation its natural width and the proposal's
    font size and left edge in cqw (percent of the crop's width). */
 .compare { background: var(--surface); border-radius: var(--radius-frame); padding: var(--space-3) var(--space-4) var(--space-3); margin: var(--space-2) 0 var(--space-4); }
+@media (forced-colors: active) { .compare { border: 1px solid CanvasText; } }
 .compare .part-label { font-size: var(--step-0); margin: 0 0 var(--space-2); }
 .cmp-frame { container-type: inline-size; width: 100%; }
 .cmp-label { margin: var(--space-1) 0 var(--space-1); font-size: var(--step--1); font-weight: 700; color: var(--ink-muted); }
@@ -750,6 +759,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 /* Optional checks */
 .optional-area { overflow-wrap: anywhere; }
 .optional-box { background: var(--surface); border-radius: var(--radius-frame); padding: var(--space-1) var(--space-4); }
+@media (forced-colors: active) { .optional-box { border: 1px solid CanvasText; } }
 .optional-box[open] { padding-bottom: var(--space-4); }
 .optional-box > summary { cursor: pointer; padding: var(--space-3) 0; font-weight: 700; font-size: var(--step-0); }
 .optional-list { list-style: none; margin: 0; padding: 0; }
@@ -780,6 +790,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
   .page-chip[aria-current="page"] { outline: 3px solid Highlight; outline-offset: 2px; }
 }
 .chip-count { background: var(--mark-required); color: var(--on-mark); border-radius: var(--radius-control); padding: 0 var(--space-2); font-size: var(--step--1); font-weight: 700; white-space: nowrap; }
+@media (forced-colors: active) { .chip-count { border: 1px solid CanvasText; } }
 .page-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0; font-size: var(--step--1); }
 .toggle-accepted { margin-left: auto; display: inline-flex; align-items: center; min-height: 1.5rem; }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: var(--ink); }
@@ -788,10 +799,12 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
   display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem;
   padding: 0 var(--space-1); font-weight: 700; font-size: var(--step--1); line-height: 1;
 }
-.key-required { background: var(--mark-required); color: var(--on-mark); border-radius: 0.7rem; }
-.key-optional { background: var(--bg); min-width: 1.9rem; border: 1.5px dashed var(--mark-optional); border-radius: var(--radius-control); }
-.key-repeat { background: var(--bg); color: var(--mark-required); border: 2px solid var(--mark-required); border-radius: 0.7rem; }
-.key-accepted { background: var(--bg); min-width: 1.9rem; color: var(--mark-accepted); border: 1.5px dotted var(--mark-accepted); border-radius: var(--radius-control); }
+/* The keys explain marks drawn on the white page image, so they are drawn on white with the marks'
+   own (--pmark-*) colors, in the dark theme too. */
+.key-required { background: var(--pmark-required); color: #fff; border-radius: 0.7rem; }
+.key-optional { background: var(--paper); min-width: 1.9rem; border: 1.5px dashed var(--pmark-optional); border-radius: var(--radius-control); }
+.key-repeat { background: var(--paper); color: var(--pmark-required); border: 2px solid var(--pmark-required); border-radius: 0.7rem; }
+.key-accepted { background: var(--paper); min-width: 1.9rem; color: var(--pmark-accepted); border: 1.5px dotted var(--pmark-accepted); border-radius: var(--radius-control); }
 @media (forced-colors: active) {
   /* The legend keys show what the marks look like, and the marks keep their colours. */
   .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
@@ -825,6 +838,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
    scrolls inside its region. */
 .page-frame { position: relative; margin: 0 auto; min-width: 36rem; background: var(--paper); box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); forced-color-adjust: none; }
 .page-image { display: block; width: 100%; height: auto; }
+@media (forced-colors: active) { .page-frame { border: 1px solid CanvasText; } }
 .page-note { margin: var(--space-2) 0 0; font-size: var(--step-0); }
 .page-failed:not([hidden]) { display: block; }
 /* Fit the page to the screen: no sideways scrolling of the page image. */
@@ -1239,7 +1253,9 @@ details.option-group[open] .group-change { display: none; }
 .field .role-row:hover { border-color: var(--accent-hover); background: var(--accent-tint); }
 .field .role-row:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); }
 .copy-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; max-width: 40rem; }
-.copy-row input[type="text"] { flex: 1 1 16rem; width: auto; min-width: 0; }
+/* The address a person copies is a read-only box that wraps, so all of it shows (never one line
+   cut off). `field-sizing` grows it to the text where the browser can; `rows` is the fallback. */
+.copy-row textarea { flex: 1 1 16rem; width: auto; min-width: 0; field-sizing: content; resize: none; overflow-wrap: anywhere; }
 .copy-row [hidden] { display: none; }
 #share-copy-state:empty { display: none; }
 .share-list { list-style: none; margin: 0; padding: 0; }
@@ -1525,12 +1541,14 @@ details.option-group[open] .group-change { display: none; }
 .parts-builder-note { flex-basis: 100%; margin: 0; min-height: 1.4em; }
 .parts-summary { margin: var(--space-3) 0 var(--space-2); font-weight: 700; }
 .parts-list { list-style: none; margin: 0 0 var(--space-4); padding: 0; max-width: 40rem; }
-.parts-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+/* One line per row, the label wrapping inside its own space, so the action (Remove, Review, Open)
+   sits at the right edge of every row, also on a 320px screen. */
+.parts-row { display: flex; align-items: baseline; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .parts-row:last-child { border-bottom: 1px solid var(--border-subtle); }
-.parts-name { font-weight: 700; min-width: 5rem; }
+.parts-name { font-weight: 700; flex: 1 1 5rem; min-width: 0; }
 .parts-count { color: var(--ink-muted); }
-.parts-problem { color: var(--err); flex: 1 1 14rem; }
-.parts-row .link-button { margin-left: auto; min-height: 2rem; }
+.parts-problem { color: var(--err); flex: 1 1 8rem; min-width: 0; }
+.parts-row .link-button { margin-left: auto; flex: none; min-height: 2rem; }
 .parts-row .link-button[hidden] { display: none; }
 .parts-empty { margin: 0 0 var(--space-4); }
 .parts-advanced { margin: var(--space-3) 0 var(--space-4); max-width: 40rem; }

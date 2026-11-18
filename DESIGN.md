@@ -170,6 +170,7 @@ Shared constants (`tokens.css`):
 - Do show the real PDF and the real converted page, with the numbers' sample sizes.
 - Do keep any text at 7:1 or better, 14px or larger.
 - Do add a forced-colors rule for anything that relies on a background or a shadow.
+- Do keep modes honest. Anything marked only by a background also has a border in forced colors; anything marked only by color also has a word or a shape (an error field gets a thick double edge, the filled danger button too). A read-only value a person must see whole wraps; it is not a one-line input. An element that shows the source or the converted page keeps paper colors in dark mode with a visible frame, and what explains marks on paper (the legend) uses the same `--pmark-*` tokens as the marks.
 - Don't add a second accent, gradients, glass, eyebrows, section numbers or identical icon-card grids.
 - Don't put a colored stripe on one side of a card or notice; use a full border or a top rule.
 - Don't use a pill shape, or a radius other than 4 and 8.

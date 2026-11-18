@@ -57,6 +57,8 @@ button[aria-busy="true"], .button[aria-busy="true"] { cursor: progress; outline:
   .button:hover, button.button:hover { background: Highlight; color: HighlightText; border-color: Highlight; }
   button[disabled], button.button[disabled] { background: ButtonFace; color: GrayText; border-color: GrayText; }
   .button-danger-outline { border-color: ButtonText; color: ButtonText; }
+  /* The red fill is dropped, so the filled danger button gets a thick double edge: it must not look like Save. */
+  .button-danger { border: 4px double ButtonText; }
   button[aria-disabled="true"], .button[aria-disabled="true"] { background: ButtonFace; color: GrayText; border-color: GrayText; }
   button:active, .button:active { box-shadow: none; outline: 2px solid Highlight; }
   button[aria-busy="true"], .button[aria-busy="true"] { outline: 2px dashed GrayText; }
