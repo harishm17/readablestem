@@ -256,5 +256,10 @@ def test_the_error_codes_carry_no_content(monkeypatch):
         try:
             run(job({"main.tex": document(body)}))
         except SourceFailed as exc:
-            assert exc.code in {"source_refused", "source_timeout", "source_failed", "source_unreadable"}
+            assert exc.code in {
+                "source_refused",
+                "source_timeout",
+                "source_failed",
+                "source_unreadable",
+            }
             assert "passwd" not in str(exc) and "write18" not in str(exc)

@@ -209,7 +209,7 @@ ABOUT_MEDIA = {
 
 
 def about_opening(origin: str = "pdf", medium: str = "web") -> str:
-    """"This is a web version of a PDF from your course, made with ReadableSTEM, ..." for the
+    """ "This is a web version of a PDF from your course, made with ReadableSTEM, ..." for the
     source `origin` names (`DocumentResult.origin`) and the file's `medium` (`ABOUT_MEDIA`)."""
     noun = checked_words.source_noun(origin)
     return (
@@ -236,6 +236,8 @@ def with_medium(html: str, medium: str) -> str:
         count=1,
     )
     return html[:at] + note
+
+
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.

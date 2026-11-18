@@ -101,7 +101,8 @@ def test_every_equation_is_a_native_equation(made):
 
 
 @pytest.mark.parametrize(
-    "fixture", ["golden/sample", "golden/stored_demo_0_2_0", "latex/rich", "latex/tables"]
+    "fixture",
+    ["golden/sample", "golden/stored_demo_0_2_0", "latex/tables.pdf", "latex/problem_set.pdf"],
 )
 def test_the_note_about_this_version_is_in_every_output_once(fixture):
     """One page, one note: the Word file, the EPUB, the Canvas page and Listen's transcript

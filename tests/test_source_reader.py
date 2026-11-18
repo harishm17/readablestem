@@ -163,6 +163,28 @@ def test_a_table_becomes_a_grid_with_spans_and_headers(tmp_path):
     assert result.fixes[table.id].status is Status.ACCEPTED
 
 
+def test_row_heads_and_a_cell_of_words_and_a_formula_are_read_as_such(tmp_path):
+    """`header_cols` comes from the `th` cells LaTeXML wrote; a cell that mixes words and a
+    formula is the whole cell as maths (`\\text{}` for the words), not the formula's TeX in
+    text (SW18.3, WS18.10)."""
+    mixed = "Value " + math("y^{2}", "<msup><mi>y</mi><mn>2</mn></msup>") + " units"
+    body = (
+        '<table class="ltx_tabular"><thead><tr><th class="ltx_th ltx_th_column">Quantity</th>'
+        '<th class="ltx_th ltx_th_column">Value</th></tr></thead><tbody>'
+        f'<tr><th class="ltx_th ltx_th_row">Rate</th><td>{mixed}</td></tr>'
+        '<tr><th class="ltx_th ltx_th_row">Mass</th><td>3</td></tr></tbody></table>'
+    )
+    result = read(body, tmp_path)
+    [table] = result.elements
+    grid = result.fixes[table.id].table.grid  # type: ignore[union-attr]
+    assert (grid.header_rows, grid.header_cols) == (1, 1)
+    assert [c.header for c in grid.cells if c.col == 0] == ["col", "row", "row"]
+    cell = next(c for c in grid.cells if (c.row, c.col) == (1, 1))
+    assert cell.latex == "\\text{Value } y^{2} \\text{ units}"
+    assert cell.mathml is not None and "<mtext>Value" in cell.mathml and "<msup>" in cell.mathml
+    assert result.fixes[table.id].status is Status.ACCEPTED
+
+
 def test_a_ragged_table_is_padded_and_a_huge_one_becomes_a_list(tmp_path):
     ragged = (
         '<table class="ltx_tabular"><tbody><tr><td>a</td><td>b</td></tr>'
@@ -255,7 +277,9 @@ def test_a_huge_canvas_in_a_small_file_is_refused(tmp_path):
 def test_links_keep_safe_schemes_only_and_scripts_become_runs(tmp_path):
     body = (
         '<p class="ltx_p">See <a href="https://example.org/x">the page</a>, '
-        '<a href="javascript:alert(1)">bad</a>, <a href="#S1">ref</a> and x<sup>2</sup>.</p>'
+        '<a href="javascript:alert(1)">bad</a>, <a href="#S1">ref</a> and x<sup>2</sup>, '
+        '<span class="ltx_text" style="color:#FF0000;">red words</span> and '
+        '<span class="ltx_text" style="color:#333333;">dark grey</span>.</p>'
     )
     [paragraph] = read(body, tmp_path).elements
     assert [link.href for link in paragraph.links] == ["https://example.org/x"]
@@ -263,6 +287,10 @@ def test_links_keep_safe_schemes_only_and_scripts_become_runs(tmp_path):
     assert (paragraph.text or "")[link.start : link.end] == "the page"
     run = paragraph.script_runs[0]
     assert run.kind == "sup" and (paragraph.text or "")[run.start : run.end] == "2"
+    # the colour a source sets on words is kept as on the PDF path; body-dark text is not a run
+    [colour] = paragraph.colour_runs
+    assert (paragraph.text or "")[colour.start : colour.end] == "red words"
+    assert colour.rgb == (255, 0, 0)
 
 
 def test_a_footnote_is_kept_in_the_text(tmp_path):
@@ -272,6 +300,37 @@ def test_a_footnote_is_kept_in_the_text(tmp_path):
         '<span class="ltx_note_content">The note.</span></span> goes on.</p>'
     )
     assert "(note: The note.)" in (read(body, tmp_path).elements[0].text or "")
+
+
+def test_the_front_matter_is_a_title_a_line_for_each_author_and_the_date(tmp_path):
+    """LaTeXML's own front matter (SW18.3): `\\thanks` on the title is a line of its own and not
+    part of it; each author is a line with where they work and their own note, never merged
+    into the name; the date follows."""
+    note = (
+        '<span class="ltx_note ltx_role_thanks"><sup class="ltx_note_mark">†</sup>'
+        '<span class="ltx_note_outer"><span class="ltx_note_content">'
+        '<sup class="ltx_note_mark">†</sup><span class="ltx_note_type">thanks: </span>'
+        "Funded by X.</span></span></span>"
+    )
+    body = (
+        f'<h1 class="ltx_title ltx_title_document">A Study{note}</h1>'
+        '<div class="ltx_authors"><span class="ltx_creator ltx_role_author">'
+        '<span class="ltx_personname">Ada Lovelace\n<br class="ltx_break"/>Dept of Maths, Univ A\n'
+        '</span><span class="ltx_author_notes">Corresponding author.</span></span>'
+        '<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">'
+        '<span class="ltx_personname">Bob Babbage\n<br class="ltx_break"/>Univ B\n'
+        '<br class="ltx_break"/><span class="ltx_text ltx_font_typewriter">bob@b.edu</span>\n'
+        '</span></span></div><div class="ltx_dates">(Fall 2026)</div>'
+    )
+    result = read(body, tmp_path)
+    assert result.title == "A Study"
+    assert [e.text for e in result.elements] == [
+        "A Study",
+        "(note: Funded by X.)",
+        "Ada Lovelace, Dept of Maths, Univ A (note: Corresponding author.)",
+        "Bob Babbage, Univ B, bob@b.edu",
+        "Fall 2026",
+    ]
 
 
 def test_a_theorem_title_leads_its_paragraph(tmp_path):

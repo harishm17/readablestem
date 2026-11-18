@@ -889,6 +889,19 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   adds the required notice `source_unread`, whose line on the job page gives the counts and the
   first words, and the finished job has the gap note "Parts not read" (`states.gaps_of`), so
   it is "Partly converted" and never "Ready to share".
+- **Front matter and table heads** (SW18.3, WS18.10). The title is a heading with no `\thanks`
+  in it; the `\thanks` of the title is a line of its own after it ("(note: ...)"). Each author
+  is one line: the name, then the lines under it (where they work, an address, an email) after
+  commas, and the author's own `\thanks` as " (note: ...)" on that line, never in the name. A
+  cell of words and formulas is the whole cell as math (`TableCell.latex`, the words in
+  `\text{}`; `mathml`: LaTeXML's MathML for each formula and `<mtext>` for the words, through the
+  sanitiser); a cell that does not pass is its text. The reader fills the fields of today's
+  content model that the PDF path fills and it did not: `TableGrid.header_cols` (the leading
+  columns LaTeXML wrote as `th`; nothing is guessed from the look of a table) and
+  `Element.colour_runs` (a color `xcolor` set on words, by the PDF path's own rule
+  `text_pass.is_run_colour`). Runs for emphasis, line breaks, notes, roles, the language of a
+  span and the quotation and `babel` definitions need Element v2 (WS16.2) and WS18.2 and are not
+  read yet.
 - **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
   read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
   frame is a heading (its title) and its content: sections are the top level, frames sit one level
@@ -923,10 +936,14 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   as image" (`web.review.reject_keeps`): the student file shows its LaTeX, marked "Not
   converted", never "The original image is not available."; an item with no picture and no
   text (a source table) offers no such choice, and a posted one is refused.
-  `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
+  `DocumentResult.origin` is `latex`; the student note says "a LaTeX source" (`checked_words.source_noun`,
+  the one function for the noun: the job page, the review list, the record and the stop advice use
+  it). "Upload a revised version" is not offered on a source job (`_job_body.html`, `_job_exam.html`),
+  and `/app?revises=` and a `revises` upload for one are refused with `revise_source` (WS18.8).
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
-  room for the conversion's tasks: "The server is busy ... Try again") or `timeout` and the message "Upload
+  room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time limit: a macro that
+  calls itself, a very large file; not offered "Try again") or `timeout` and the message "Upload
   the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
   itself is refused at once.
 - **Lost content stops the job.** LaTeXML exits 0 when it drops content; what it said is in its

@@ -52,6 +52,7 @@ import defusedxml.ElementTree as SafeET
 from readablestem.core import inline
 from readablestem.core.types import (
     Check,
+    ColourRun,
     Element,
     EquationFix,
     Fix,
@@ -107,6 +108,7 @@ SKIP: dict[str, str] = {
     "ltx_tag": "a number LaTeX made: an item's marker and an equation's number are read from "
     "it, a heading's and a caption's are left out",
     "ltx_note_mark": "a footnote's mark: the note is written where the mark is",
+    "ltx_note_type": 'the word LaTeXML writes before a note\'s text ("thanks:")',
     "earlier step": "a step of a Beamer frame whose every block is also on its last step "
     "(`_Reader._frame`)",
 }
@@ -362,10 +364,7 @@ class _Reader:
             self._theorem(node, depth)
             return True
         if "ltx_authors" in classes:
-            text = _squash(self._plain(node))
-            if text:
-                self._new(Kind.PARAGRAPH, text=text)
-                self.chars += len(text)
+            self._authors(node)
             return True
         if tag in ("span", "a", "em", "strong", "b", "i") and not _children_blocks(node):
             # loose inline text directly inside a container: a paragraph of its own, whose
@@ -430,6 +429,25 @@ class _Reader:
             else:
                 self.walk(child, depth + 1)
 
+    def _authors(self, node: Node) -> None:
+        """The author block: one paragraph for each author, the lines under the name (where
+        they work, an address, an email) after it, and what `\\thanks` says about that author
+        on the same line as " (note: ...)", never in the name (SW18.3). A block with no
+        author in it is read as one paragraph."""
+        creators = [c for c in node.iter() if "ltx_creator" in _classes(c)]
+        self._take(node)
+        for creator in creators or [node]:
+            notes = [
+                _squash(_text_without_tag(n))
+                for n in creator.iter()
+                if "ltx_author_notes" in _classes(n)
+            ]
+            lines = _lines(creator, drop=frozenset({"ltx_author_notes"}))
+            text = ", ".join(lines) + "".join(f" (note: {n})" for n in notes if n)
+            if text:
+                self._new(Kind.PARAGRAPH, text=text)
+                self.chars += len(text)
+
     def _section_heading(self, node: Node, level: int, classes: set[str]) -> None:
         if "ltx_runin" in classes:  # a theorem's "Theorem 1." title: handled with its body
             return
@@ -438,14 +456,19 @@ class _Reader:
         if self.beamer and classes & _SECTION_TITLES:
             level = max(level - 1, 1)  # a deck's sections are its top level; frames sit below
             self.section_level = level
-        text, _ = self._inline_text(node, skip_tags=True)
+        titled = bool(classes & {"ltx_title_document", "ltx_title_titlepage"})
+        notes: list[str] = []  # `\thanks` on the title: a line of its own, not in the title
+        text, _ = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
         if not text:
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
         self._heading_fix(element, level, text)
         self.chars += len(text)
-        if classes & {"ltx_title_document", "ltx_title_titlepage"} and self.out.title is None:
+        if titled and self.out.title is None:
             self.out.title = text
+        for note in notes:
+            self._new(Kind.PARAGRAPH, text=f"(note: {note})")
+            self.chars += len(note)
 
     def _theorem(self, node: Node, depth: int) -> None:
         title = ""
@@ -486,13 +509,19 @@ class _Reader:
         self._flush_pictures()
 
     def _inline_text(
-        self, node: Node, *, owner: Element | None = None, skip_tags: bool = False
+        self,
+        node: Node,
+        *,
+        owner: Element | None = None,
+        skip_tags: bool = False,
+        notes: list[str] | None = None,
     ) -> tuple[str, list[tuple[str, int, int, object]]]:
         """The text of `node` with an inline marker where each formula is (formulas become
         equation elements whose parent is `owner`; without an owner their TeX is written in
         the text, and an error node in one is tied to the next element made), and the spans
         (links, raised and lowered runs, struck text) as (kind, start, end, data). A picture
-        met here is left for the caller's block (`self.loose`, `_flush_pictures`)."""
+        met here is left for the caller's block (`self.loose`, `_flush_pictures`). A note is
+        written where it stands as " (note: ...)", or, with `notes`, handed to the caller."""
         parts: list[str] = []
         spans: list[tuple[str, int, int, object]] = []
         length = [0]
@@ -545,7 +574,9 @@ class _Reader:
                         if "ltx_note_content" in _classes(c)
                     )
                 )
-                if note:
+                if note and notes is not None:
+                    notes.append(note)
+                elif note:
                     emit(f" (note: {note})")
             else:
                 start = length[0]
@@ -563,6 +594,8 @@ class _Reader:
                     spans.append((tag, start, length[0], None))
                 if classes & STRUCK and length[0] > start:
                     spans.append(("deleted", start, length[0], None))
+                if tag == "span" and length[0] > start and (rgb := _style_colour(item)):
+                    spans.append(("colour", start, length[0], rgb))
 
         if node.text:
             emit(_SPACE.sub(" ", node.text))
@@ -599,6 +632,8 @@ class _Reader:
                     inline.add(element, ScriptRun(start=start, end=end, kind=kind))
                 elif kind == "deleted":
                     inline.add(element, Run(start=start, end=end, kind="deleted"))
+                elif kind == "colour":
+                    _add_colour(element, start, end, extra)
             except ValueError:
                 continue
 
@@ -1078,6 +1113,61 @@ def _non_paragraph_nodes(node: Node) -> list[Node]:
     return [node]
 
 
+_STYLE_COLOUR = re.compile(r"(?:^|;)\s*color\s*:\s*#([0-9a-fA-F]{6})\s*(?:;|$)")
+
+
+def _style_colour(node: Node) -> tuple[int, int, int] | None:
+    """The colour LaTeXML wrote on a span (`style="color:#FF0000;"`, xcolor), as sRGB."""
+    found = _STYLE_COLOUR.search(node.get("style") or "")
+    if found is None:
+        return None
+    hexed = found.group(1)
+    return int(hexed[0:2], 16), int(hexed[2:4], 16), int(hexed[4:6], 16)
+
+
+def _add_colour(element: Element, start: int, end: int, extra: object) -> None:
+    """A colour run for text printed in a colour that is not body text (the PDF path's own
+    rule: `text_pass.is_run_colour`), trimmed of spaces and kept only when it has a letter, a
+    digit or a formula in it."""
+    from readablestem.pipeline.text_pass import is_run_colour
+
+    rgb = extra
+    if not (isinstance(rgb, tuple) and len(rgb) == 3) or not is_run_colour(rgb, None):
+        return
+    text = element.text or ""
+    while start < end and text[start].isspace():
+        start += 1
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    piece = text[start:end]
+    if any(c.isalnum() for c in piece) or any(True for _ in _markers(piece)):
+        inline.add(element, ColourRun(start=start, end=end, rgb=rgb))
+
+
+def _lines(node: Node, drop: frozenset[str] = frozenset()) -> list[str]:
+    """The lines of `node`: its text split where LaTeX broke the line (`\\\\`), each line
+    squashed, empty ones left out; a node with a class in `drop` or in `SKIP` is left out."""
+    lines = [""]
+
+    def visit(item: Node) -> None:
+        if item.text:
+            lines[-1] += item.text
+        for child in _children(item):
+            if _local(child.tag) == "br":
+                lines.append("")
+            elif _classes(child) & (drop | _SKIP_CLASSES):
+                pass
+            elif _local(child.tag) == "math":
+                lines[-1] += child.get("alttext") or ""
+            else:
+                visit(child)
+            if child.tail:
+                lines[-1] += child.tail
+
+    visit(node)
+    return [line for line in (_squash(x) for x in lines) if line]
+
+
 def _text_without_tag(node: Node, *, maths: bool = True) -> str:
     """The text of `node` without what `SKIP` leaves out by class; each formula as its TeX
     (`maths`), or left out."""
@@ -1276,6 +1366,8 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
             if len(maths) == 1 and not _squash(_text_without_math(cell)):
                 latex = (maths[0].get("alttext") or "").strip() or None
                 mathml = _serialise_math(maths[0]) or None
+            elif maths and not any("ltx_ERROR" in _classes(n) for n in cell.iter()):
+                latex, mathml = _mixed_cell(cell)  # words and formulas: the whole cell as maths
             header = None
             if tag == "th":
                 header = "col" if section == "thead" or "ltx_th_column" in _classes(cell) else "row"
@@ -1302,13 +1394,29 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                 cells.append(TableCell(row=r, col=c, text=""))
     if header_rows >= n_rows:
         header_rows = 0
+    header_cols = _header_cols(cells, header_rows, n_cols)
     grid = TableGrid(
-        rows=n_rows, cols=n_cols, cells=cells, header_rows=header_rows, caption=caption,
-        is_data=True, source="local",
+        rows=n_rows, cols=n_cols, cells=cells, header_rows=header_rows, header_cols=header_cols,
+        caption=caption, is_data=True, source="local",
     )  # fmt: skip
     from readablestem.core.types import grid_problems
 
+    if grid_problems(grid) and header_cols:
+        grid = grid.model_copy(update={"header_cols": 0})
     return grid if not grid_problems(grid) else _lenient(grid)
+
+
+def _header_cols(cells: list[TableCell], header_rows: int, n_cols: int) -> int:
+    """How many leading columns are row headers: those whose every filled cell below the header
+    rows LaTeXML wrote as `th` (a `ltx_th_row` cell). Nothing is guessed from the look of the
+    table, and a table that LaTeXML gave no `th` has none."""
+    count = 0
+    while count < n_cols - 1:
+        column = [c for c in cells if c.col == count and c.row >= header_rows and not c.is_empty]
+        if not column or any(c.header != "row" for c in column):
+            break
+        count += 1
+    return count
 
 
 def _lenient(grid: TableGrid) -> TableGrid | None:
@@ -1336,6 +1444,70 @@ def _cell_text(cell: Node):
             yield from _cell_text(child)
         if child.tail:
             yield child.tail
+
+
+_LATEX_TEXT = {
+    "\\": "\\textbackslash{}", "{": "\\{", "}": "\\}", "%": "\\%", "$": "\\$", "&": "\\&",
+    "#": "\\#", "_": "\\_", "^": "\\^{}", "~": "\\~{}",
+}  # fmt: skip
+
+
+def _mixed_cell(cell: Node) -> tuple[str | None, str | None]:
+    """A cell of words and formulas as one formula (SW18.3): the cell in LaTeX, the words in
+    `\\text{}`, and the MathML of it, LaTeXML's own for each formula and `<mtext>` for the words,
+    through the sanitiser every source equation goes through. (None, None) when it does not
+    pass: the cell is then its text, as before."""
+    from html import escape
+    from xml.etree.ElementTree import tostring
+
+    parts: list[str | Node] = []  # words, and each formula's node
+
+    def visit(item: Node) -> None:
+        if item.text:
+            parts.append(item.text)
+        for child in _children(item):
+            if _local(child.tag) == "math":
+                parts.append(child)
+            else:
+                visit(child)
+            if child.tail:
+                parts.append(child.tail)
+
+    visit(cell)
+    latex: list[str] = []
+    inner: list[str] = []
+    for index, part in enumerate(parts):
+        if isinstance(part, str):
+            words = _SPACE.sub(" ", part)
+            if index == 0:
+                words = words.lstrip(" ")
+            if index == len(parts) - 1:
+                words = words.rstrip(" ")
+            if words:
+                latex.append("\\text{" + "".join(_LATEX_TEXT.get(c, c) for c in words) + "}")
+                inner.append(f"<mtext>{escape(words.replace(' ', chr(160)), quote=False)}</mtext>")
+            continue
+        _drop_empty_tokens(part)
+        latex.append((part.get("alttext") or "").strip())
+        tail, part.tail = part.tail, None
+        try:
+            inner.extend(tostring(child, encoding="unicode") for child in part)
+        finally:
+            part.tail = tail
+    source = " ".join(piece for piece in latex if piece)
+    markup = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow>'
+        + "".join(inner)
+        + "</mrow></math>"
+    )
+    if len(markup) > MAX_MATH_CHARS or not source:
+        return None, None
+    from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
+
+    try:
+        return source, str(sanitize_mathml(markup, normal=True))
+    except UnsafeMathML:
+        return None, None
 
 
 def _text_without_math(cell: Node) -> str:

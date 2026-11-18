@@ -32,7 +32,7 @@
    the differing words marked, when the checks found a difference; the list view has none. #}
 {% macro speech_lines(item, spoken=None) %}
 {% if item.speech|speakable %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{% if spoken %}{{ said(spoken.said) }}{% else %}{{ item.speech|speakable }}{% endif %}”</p>{% endif %}
-{% if from_source %}{% elif item.text_layer %}
+{% if from_source|default(false) %}{% elif item.text_layer %}
 <p class="speech"><span class="speech-label">From your {{ source|default("PDF") }} a screen reader gets:</span> “<span class="text-layer">{{ item.text_layer }}</span>”{% if spoken %}, roughly “{{ said(spoken.pdf_said) }}”{% endif %}</p>
 {% if spoken %}<p class="hint said-key">Marked words differ.</p>{% endif %}
 {% else %}
@@ -49,7 +49,7 @@
 {% set err = item.errors.get("latex") %}
 <div class="field{% if err %} field-error{% endif %}">
   <label for="latex-{{ eid }}">LaTeX for {{ item.label|lower }}</label>
-  <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}{% if from_source %}Checked when you save.{% else %}Checked against the PDF when you save.{% endif %}{% else %}Type the LaTeX, then save.{% endif %}</p>
+  <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}{% if from_source|default(false) %}Checked when you save.{% else %}Checked against the PDF when you save.{% endif %}{% else %}Type the LaTeX, then save.{% endif %}</p>
   {{ error_line(item, "latex") }}
   <textarea id="latex-{{ eid }}" name="latex" rows="{{ rows }}" spellcheck="false" autocapitalize="off" data-edit-field
             {% if live %}hx-post="/jobs/{{ job.id }}/review/{{ eid }}/check" hx-trigger="input changed delay:600ms" hx-target="#live-check-{{ eid }}" hx-swap="innerHTML" hx-sync="this:replace"
