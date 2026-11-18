@@ -42,9 +42,6 @@
 <section aria-labelledby="remove-heading">
   <h2 id="remove-heading">Remove it</h2>
   <p>Documents you convert for this course will no longer use {{ entry.words }}.</p>
-  <form method="post" action="/courses/{{ course.id }}/entries/{{ entry.id }}/delete">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="button-secondary">Remove {{ entry.words }}</button>
-  </form>
+  <p><a class="button-danger-outline" href="/courses/{{ course.id }}/entries/{{ entry.id }}/delete">Remove {{ entry.words }}</a></p>
 </section>
 {% endblock %}

@@ -2,7 +2,7 @@
    Tokens only (tokens.css loads first). Primary (filled), secondary (outlined), danger, small,
    disabled and the link-styled button; 44px high; the label says the action. */
 
-button, .button, .button-secondary, .button-danger {
+button, .button, .button-secondary, .button-danger, .button-danger-outline {
   font: inherit;
   font-weight: 700;
   display: inline-flex;

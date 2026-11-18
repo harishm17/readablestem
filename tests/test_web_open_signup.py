@@ -432,6 +432,14 @@ def post_admin(env, path: str, **fields):
 
 def test_an_admin_can_block_and_unblock_an_open_tier_account(admin_web):
     carol = client_for(admin_web, CAROL)
+    # The Block button and the typed address only open the question; nothing is blocked yet.
+    listed = admin_web.browser.get("/admin").text
+    assert f"/admin/users/block?email={CAROL.replace('@', '%40')}" in listed
+    question = admin_web.browser.get("/admin/users/block", params={"email": CAROL})
+    assert question.status_code == 200 and f"Block {CAROL}?" in question.text
+    assert 'action="/admin/users/block"' in question.text and 'href="/admin"' in question.text
+    assert carol.get("/app").status_code == 200
+    assert carol.get("/admin/users/block", params={"email": BOB}).status_code == 403
     response = post_admin(admin_web, "/admin/users/block", email=CAROL)
     assert response.status_code == 303
     assert carol.get("/app").status_code == 303  # signed out at once

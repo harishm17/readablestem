@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{# Confirm removing one symbol from a course (routes/courses.py). #}
+{% block title %}Remove {{ entry.words }}?{% endblock %}
+{% block body_class %}page-confirm{% endblock %}
+{% block content %}
+<h1>Remove {{ entry.words }} from “{{ course.name }}”?</h1>
+<p>It means “{{ entry.meaning_label }}”{% if entry.note %}, with your note “{{ entry.note }}”{% endif %}. Documents you convert for this course will no longer use it. Documents already converted keep their results.</p>
+<p>To bring it back, add it again from the course page; the note is not kept.</p>
+<div class="confirm-actions">
+  {% call form("course.remove_entry", "/courses/" ~ course.id ~ "/entries/" ~ entry.id ~ "/delete", {"class": "inline-form"}) %}
+    <button type="submit" class="button-danger">Remove {{ entry.words|truncate(48, True, "…") }}</button>
+  {% endcall %}
+  <a class="button-secondary" href="/courses/{{ course.id }}/entries/{{ entry.id }}">No, keep it</a>
+</div>
+{% endblock %}

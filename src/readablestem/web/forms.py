@@ -180,6 +180,8 @@ FORMS: dict[str, FormRow] = {
                 "none: renaming to the same name again changes nothing"),
         FormRow("course.delete_ask", "POST /courses/{course_id}/delete", Kind.DELETE,
                 "opening", "none: the course page's button only asks first"),
+        FormRow("course.remove_entry", "POST /courses/{course_id}/entries/{entry_id}/delete",
+                Kind.DELETE, "removing", "a second click answered 'Page not found'"),
         FormRow("share.add", "POST /jobs/{job_id}/share", Kind.CREATE, "saving",
                 "a second click said 'Saved' again for access already given"),
         FormRow("share.revoke", "POST /jobs/{job_id}/share/{share_id}/revoke", Kind.STATE,

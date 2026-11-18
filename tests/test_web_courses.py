@@ -209,7 +209,12 @@ def test_another_users_course_is_not_found(web):
     bob = web.client()
     login(bob, BOB)
     base = f"/courses/{course_id}"
-    for path in (base, f"{base}/delete", f"{base}/entries/{entry.id}"):
+    for path in (
+        base,
+        f"{base}/delete",
+        f"{base}/entries/{entry.id}",
+        f"{base}/entries/{entry.id}/delete",
+    ):
         assert bob.get(path).status_code == 404, path
     for path, fields in (
         (f"{base}/rename", {"name": "Mine"}),
@@ -244,8 +249,15 @@ def test_an_entry_is_edited_and_removed(web):
     assert (changed.meaning, changed.note) == ("other", "distance")
     clash = post(web.browser, path, path, symbol="bold v", meaning="vector")
     assert clash.status_code == 422 and "already has bold v" in clash.text
+    # "Remove" only opens the question; the symbol stays until it is answered.
+    assert f'href="{path}/delete"' in web.browser.get(path).text
+    question = web.browser.get(f"{path}/delete")
+    assert question.status_code == 200 and "Remove bold d from" in question.text
+    assert f'action="{path}/delete"' in question.text and f'href="{path}"' in question.text
+    assert len(rows(web, CourseNotation)) == 2
     removed = post(web.browser, f"{path}/delete", f"/courses/{course_id}")
     assert removed.status_code == 303
+    assert post(web.browser, f"{path}/delete", f"/courses/{course_id}").status_code in (303, 404)
     assert [e.canonical for e in rows(web, CourseNotation)] == ["\U0001d42f"]
 
 

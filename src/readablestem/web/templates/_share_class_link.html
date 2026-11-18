@@ -48,9 +48,7 @@
       <button type="submit" class="button-secondary">Pause the link</button>
     {% endcall %}
     {% endif %}
-    {% call form("link.remove", "/jobs/" ~ job_id ~ "/share/link/remove", {"class": "inline-form"}) %}
-      <button type="submit" class="button-danger">Remove the link</button>
-    {% endcall %}
+    <a class="button-danger-outline" href="/jobs/{{ job_id }}/share/link/remove">Remove the link</a>
   </div>
   {% endif %}
   {% endif %}
