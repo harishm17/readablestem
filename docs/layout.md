@@ -42,8 +42,8 @@ Element conventions:
   `"larger font"`, `"raster image"`, ...). They never contain document text.
 - **Text** is copied from the PDF with whitespace collapsed and invisible characters
   (zero-width and control characters) removed. Text nobody sees on the page is never
-  content: render mode 3, 5 % opacity or less, or painted over by an image or a filled
-  shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
+  content: render mode 3, 5 % opacity or less, under 2 pt, in the color of what is behind it,
+  or painted over by an image or a filled shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
   look-alikes `〚` `〛` (U+301A/U+301B) in every piece of document text, so a PDF cannot
   fake a marker: every marker in an element's `text` is a real inline child of it. Private-use
   codes of symbol fonts (Word's Symbol bullet U+F0B7 is `•`) are mapped by `font_codes`, by font name.
@@ -1522,6 +1522,7 @@ the pass cannot read stays a kept image exactly as described here.
 **What is never content** (`_page_rows`, the same extraction as before, no second one):
 
 - a span in render mode 3 (MuPDF's char flags show neither fill nor stroke);
+- a span under 2 pt (`page_type.TINY_PT`);
 - a span at 5 % opacity or less (rawdict `alpha` <= 13), unless it is text used as a
   clip (render mode 7, a gradient- or picture-filled title: MuPDF gives it alpha 0 with
   the CLIPPED flag), `page_type.span_hidden`. Clip text is visible only when something
@@ -1541,6 +1542,20 @@ the pass cannot read stays a kept image exactly as described here.
   than 1 % of its pixels. That render is the opacity check: soft masks, color-key and
   stencil masks, constant alpha, blend modes and a yellow highlight all let the text
   show, and then it is kept. Up to 24 runs are tested per page, the rest follow them.
+
+- a span the rendered page shows nothing of: white on white, navy on a navy box, black on a
+  black box, a grey too faint to read. The page is rendered once (100 dpi, with its
+  annotations) and the lightest and darkest pixels inside the span's box are compared: under
+  a contrast ratio of 1.25 (WCAG's measure) the box is flat and the span is left out
+  (`page_type._flat_spans`). The render is made only for a page with a span that could be
+  flat, text lighter than 2:1 against white or text over an image or an opaque fill (dark
+  text on the bare page is seen), and never on a page with a picture over the pixel budget.
+  The earlier test that compared fill colors gave false positives and is not used. Their
+  characters are counted with the other hidden ones (`hidden_text_ignored`) and leave
+  `Element.text`, Listen, Word, EPUB and the other outputs at the row. The glyph reads for
+  an equation's line (`line_glyphs`) and the text pass (`page_glyphs`) do not look at the
+  render: they skip only the spans of the first three kinds above, as they skip covered
+  ones.
 
 The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
 

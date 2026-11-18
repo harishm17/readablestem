@@ -51,6 +51,7 @@ Content-free: kinds, reason codes and counts, never text (`to_record`).
 
 from __future__ import annotations
 
+import functools
 import itertools
 import math
 import re
@@ -63,7 +64,9 @@ from typing import TYPE_CHECKING, Any
 
 import pymupdf
 
+from readablestem.core.images import within_budget
 from readablestem.core.types import PageType
+from readablestem.pipeline import contrast
 
 if TYPE_CHECKING:  # ink_strokes imports this module; the helpers are imported where used
     from readablestem.pipeline import ink_strokes
@@ -91,6 +94,16 @@ BBox = tuple[float, float, float, float]
 # 0, but it carries the CLIPPED flag and is visible, so alpha alone never hides it.
 INVISIBLE_OPACITY = 0.05  # alpha at or under this paints nothing a reader can see
 INVISIBLE_ALPHA = round(INVISIBLE_OPACITY * 255)  # 13 on rawdict's 0-255 scale
+# Text a sighted reader cannot see although it is painted (WS14.2): a span under TINY_PT
+# points, or one whose box on the rendered page is flat, its lightest and darkest pixels
+# under FLAT_CONTRAST (WCAG contrast ratio) apart: white on white, navy on navy, black on a
+# black box. Visible text leaves glyph-coloured pixels beside background ones. The render
+# is made only for a page with a span that could be flat (`_may_be_flat`): light text, or
+# text over an image or an opaque fill; dark text on the bare page is seen without one.
+TINY_PT = 2.0
+FLAT_CONTRAST = 1.25
+FLAT_DPI = 100
+FLAT_LIGHT = 2.0  # text lighter than this contrast against white can be lost on the page
 CHAR_FILLED, CHAR_STROKED, CHAR_CLIPPED = 16, 32, 64  # mupdf.FZ_STEXT_FILLED, ...
 IMAGE_FLAGS = pymupdf.TEXT_PRESERVE_IMAGES | pymupdf.TEXT_MEDIABOX_CLIP
 # The flags of the one text extraction per page (`layout.TEXT_FLAGS` is this): defined
@@ -286,10 +299,13 @@ HANDWRITING_REGION = "handwriting"
 
 
 def span_hidden(span: dict[str, Any]) -> bool:
-    """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), or an alpha
-    of 5 % or less, unless it is text used as a clip (C1.4)."""
+    """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), a size under
+    TINY_PT points, or an alpha of 5 % or less, unless it is text used as a clip (C1.4).
+    Text in the colour of what is behind it needs the rendered page (`_flat_spans`)."""
     flags = int(span.get("char_flags", CHAR_FILLED))
     if not flags & (CHAR_FILLED | CHAR_STROKED):
+        return True
+    if float(span.get("size", TINY_PT)) < TINY_PT:
         return True
     return int(span.get("alpha", 255)) <= INVISIBLE_ALPHA and not flags & CHAR_CLIPPED
 
@@ -582,6 +598,8 @@ def text_stats(
     spans: list[BBox] = []
     glyphs: list[BBox] = []  # what the visible text covers, for the shares
     clips: list[tuple[BBox, list[tuple[int, int]], int]] = []
+    fills = _fill_boxes(images, drawings)
+    maybe_flat: list[tuple[BBox, list[tuple[int, int]], int]] = []  # `_flat_spans`
     for block in raw_blocks:
         if block.get("type") != 0:
             continue
@@ -615,6 +633,15 @@ def text_stats(
                     )
                 if (run := _clip_run(span)) is not None:
                     clips.append(run)
+                elif _may_be_flat(span, b, fills):
+                    # A thin or no-break space paints nothing anywhere: not "text left out".
+                    origins = [
+                        origin_key(ch["origin"])
+                        for ch in span["chars"]
+                        if _ink(ch["c"]) and not ch["c"].isspace()
+                    ]
+                    if origins:
+                        maybe_flat.append(((b[0], b[1], b[2], b[3]), origins, len(origins)))
     _text_shares(page, stats, glyphs, images)
     if spans and _maybe_covered(spans, images, drawings):
         covered = _covered(page, _thick_strokes(drawings))
@@ -626,12 +653,104 @@ def text_stats(
         hidden = _cover_test(page, clips)
         for (_, origins, _), gone in zip(clips, hidden, strict=True):
             if gone:  # a clip that nothing was painted through: nobody sees it
-                new = {o for o in origins if o not in stats.covered}
-                stats.covered |= new
-                n = min(len(new), stats.visible_chars)
-                stats.invisible_chars += n
-                stats.visible_chars -= n
+                _hide(stats, origins)
+    # Text the render shows nothing of (`_flat_spans`): left out like text in render mode 3.
+    # What a cover already hides is not looked at again.
+    maybe_flat = [run for run in maybe_flat if not stats.covered.issuperset(run[1])]
+    if maybe_flat:
+        for (_, origins, _), gone in zip(maybe_flat, _flat_spans(page, maybe_flat), strict=True):
+            if gone:
+                _hide(stats, origins)
     return stats
+
+
+def _hide(stats: TextStats, origins: Iterable[tuple[int, int]]) -> None:
+    """Characters nobody sees although their span looks visible: counted as invisible, and
+    their origins are what layout leaves out (`TextStats.covered`)."""
+    new = {o for o in origins if o not in stats.covered}
+    stats.covered |= new
+    n = min(len(new), stats.visible_chars)
+    stats.invisible_chars += n
+    stats.visible_chars -= n
+
+
+def _fill_boxes(
+    images: Sequence[BBox], drawings: Sequence[dict[str, Any]] | None
+) -> list[BBox] | None:
+    """What can lie behind text and change its background: the images (MuPDF's image
+    blocks include shadings) and the opaque filled shapes, each at least 4 pt^2. None when
+    the drawings were not read (`_maybe_covered` looks at the paint order then)."""
+    if drawings is None:
+        return None
+    shapes = list(images)
+    for d in drawings:
+        fill = d.get("fill")
+        opacity = d.get("fill_opacity")
+        if fill is None or (isinstance(opacity, int | float) and opacity <= INVISIBLE_OPACITY):
+            continue
+        rect = d.get("rect")
+        if rect is not None and _area(rect) >= 4.0:
+            shapes.append((rect[0], rect[1], rect[2], rect[3]))
+    return shapes
+
+
+@functools.cache
+def _linear_levels() -> Any:
+    """Linear light of each of the 256 levels of an sRGB channel, as a numpy array."""
+    import numpy as np
+
+    return np.array([contrast.relative_luminance((v, v, v)) for v in range(256)])
+
+
+def _may_be_flat(span: dict[str, Any], box: Sequence[float], fills: Sequence[BBox] | None) -> bool:
+    """The span could be lost on the page: its colour is light (`FLAT_LIGHT` against white),
+    or it lies over an image or an opaque fill. Dark text on the bare page is seen, and
+    needs no render."""
+    if fills is None:
+        return False  # drawings not read: a page that complex is kept as its image anyway
+    rgb = int(span.get("color") or 0)
+    white = contrast.contrast_ratio((rgb >> 16 & 0xFF, rgb >> 8 & 0xFF, rgb & 0xFF), contrast.WHITE)
+    if white < FLAT_LIGHT:
+        return True
+    return any(f[0] < box[2] and box[0] < f[2] and f[1] < box[3] and box[1] < f[3] for f in fills)
+
+
+def _flat_spans(
+    page: pymupdf.Page, runs: Sequence[tuple[BBox, list[tuple[int, int]], int]]
+) -> list[bool]:
+    """For each run (a span's box, unrotated): is the rendered page flat inside it? One
+    render of the page at FLAT_DPI, with its annotations (the whole page: MuPDF paints a
+    clipped region of a picture whose stated size is not its real one as one black patch).
+    The lightest and darkest pixels of the box are compared as WCAG luminance; a box whose
+    contrast is under FLAT_CONTRAST shows no text. Nothing is rendered, and no text is hidden,
+    on a page with a picture over the pixel budget (`core.images`: it is never decoded), or
+    when the page cannot be rendered: the text is kept."""
+    import numpy as np
+
+    try:
+        if not all(within_budget(i["width"], i["height"]) for i in page.get_image_info()):
+            return [False] * len(runs)
+        pix = page.get_pixmap(dpi=FLAT_DPI, colorspace=pymupdf.csRGB, alpha=False)
+    except Exception:  # a page MuPDF cannot paint: its text is kept
+        return [False] * len(runs)
+    pixels = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
+    scale = FLAT_DPI / 72
+    display = _Display(page)
+    levels, weights = _linear_levels(), np.array([0.2126, 0.7152, 0.0722])
+    verdicts = []
+    for run in runs:
+        x0, y0, x1, y1 = display.box(run[0])
+        # One pixel more on every side: a hairline glyph (a minus sign, a bar) has a box thinner
+        # than a pixel, and its ink lands on the rows beside it. Ink next to the box can only
+        # keep text, never hide it.
+        left, top = max(0, int(x0 * scale) - 1), max(0, int(y0 * scale) - 1)
+        right, bottom = min(pix.width, int(x1 * scale) + 2), min(pix.height, int(y1 * scale) + 2)
+        if right <= left or bottom <= top:
+            verdicts.append(False)
+            continue
+        lum = levels[pixels[top:bottom, left:right]] @ weights
+        verdicts.append((float(lum.max()) + 0.05) / (float(lum.min()) + 0.05) < FLAT_CONTRAST)
+    return verdicts
 
 
 def _furniture(
@@ -737,18 +856,10 @@ def _maybe_covered(
     overlaps it sideways, so a box over one word of a line counts (`_covered` then looks
     glyph by glyph). Annotations count: MuPDF lists their appearance with the drawings.
     MuPDF's image blocks include shadings."""
-    shapes = list(images)
-    if drawings is None:
-        shapes.append((-1e9, -1e9, 1e9, 1e9))  # unknown: look at the paint order
+    shapes = _fill_boxes(images, drawings)
+    if shapes is None:
+        shapes = [*images, (-1e9, -1e9, 1e9, 1e9)]  # unknown: look at the paint order
     else:
-        for d in drawings:
-            fill = d.get("fill")
-            opacity = d.get("fill_opacity")
-            if fill is None or (isinstance(opacity, int | float) and opacity <= INVISIBLE_OPACITY):
-                continue
-            rect = d.get("rect")
-            if rect is not None and _area(rect) >= 4.0:
-                shapes.append((rect[0], rect[1], rect[2], rect[3]))
         shapes += _thick_strokes(drawings) or []
     return any(_across(s, b) for s in spans for b in shapes)
 

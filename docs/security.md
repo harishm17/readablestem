@@ -633,6 +633,12 @@ link, images only as `data:image/png`. It also feeds 12 hostile MathML strings (
 bombs, an external entity, `mglyph`, `annotation-xml`, `maction`, XLink, style URLs) to the
 sanitizer and to the renderer, and shows the review screen hostile alt text and LaTeX.
 
+Text a person cannot see never becomes content, so it cannot carry instructions into a
+prompt through the page's rows: render mode 3, 5 % opacity or less, under 2 pt, in the color
+of the background (white on white, navy on a navy box), or painted over (`docs/layout.md`,
+"Hidden text and page types"). The glyph context of an equation's line skips the first three
+kinds only.
+
 PDF text reaches a model only inside a fenced context field. The model has no tools and no
 way to act; its output is validated as above. A prompt injection in a PDF can at worst make
 a wrong alt text or equation, which the instructor reviews.
