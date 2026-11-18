@@ -34,3 +34,6 @@ def test_nothing_else_loses_its_no_store_and_traversal_is_still_refused(client):
     assert client.get("/privacy").headers["cache-control"] == "no-store"
     assert client.get("/static/../config.py").status_code in {400, 404}
     assert client.get("/static/%2e%2e/config.py").status_code in {400, 404}
+    # A name with a null byte, shaped like a hashed one, never reaches the file system.
+    assert client.get("/static/a%00b.0123456789ab.css").status_code in {400, 404}
+    assert client.get("/static/%2e%2e/%2e%2e/etc/passwd.0123456789ab.txt").status_code in {400, 404}

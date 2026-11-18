@@ -2,6 +2,17 @@
 
 ## Unreleased: platform guards, second batch (branch fix/platform-guards-2)
 
+- Code-scanning alerts 9 to 13 (`py/path-injection`, `routes/discovery.py`): not a way out of the
+  showcase folder (the `is_relative_to` check already refused `..`, an absolute path and a symlink
+  out), but a request with a null byte in the address reached `Path.resolve()` and answered 500.
+  The showcase now answers from a listing of the build's own files (`_showcase_files`): the
+  request value only picks a key, and no path is built from it. Hidden files, `404.html` and
+  anything resolving outside the build are left out of the listing.
+- Sibling: `/static/<name>.<12 hex>.<ext>` with a null byte in the name reached
+  `assets.content_hash` and answered 500; it is now a 404. The other places that build a path
+  from a request value are bounded (`archive_intake` zip member names are cleaned and checked
+  under the folder, `office_convert` names its file from a fixed pair of kinds, a source's
+  `main_file` must name a file the archive holds).
 - WS12.5 (F-215, F-342, F-343), parts (a), (b) and (f). (a) was already built (WS26.2): `/admin`
   shows the late backup, cron and the full storage from `ops_freshness`, the function
   `/healthz/ops` uses; it now also shows the latest result of each daily canary ("Daily checks",
