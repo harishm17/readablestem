@@ -1833,6 +1833,7 @@ def rerender_html(
     title_override: str | None = None,
     contact: str | None = None,
     math_alttext: bool | None = None,
+    filename: str = "",
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
 
@@ -1865,6 +1866,7 @@ def rerender_html(
         origin=result.origin,
         unread=checked.unread_of(result),
         title=title_override or result.title,
+        filename=filename,
         **chosen,
         lang=result.lang,
         elements=result.elements,
@@ -1902,4 +1904,5 @@ def rerender_job_html(
         title_override=job.title_override,
         contact=job.contact_line,
         math_alttext=math_alttext,
+        filename=job.filename,
     )

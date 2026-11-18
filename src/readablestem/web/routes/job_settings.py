@@ -105,14 +105,16 @@ def set_title(
         owned_id = job.id  # redirects are built from the owned row, not the request
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
-        chosen = typed if typed and typed != page_rules.suggested_title(result) else None
+        chosen = (
+            typed if typed and typed != page_rules.suggested_title(result, job.filename) else None
+        )
         if chosen == job.title_override:
             flash(request, "The title is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.title_override = chosen
         _remake_html(session, job, ctx.settings)
         retention.restart_clock(job, ctx.settings)
-        now_title = chosen or page_rules.suggested_title(result)
+        now_title = chosen or page_rules.suggested_title(result, job.filename)
     log_event(logger, "title_set", job_id=job_id, own=chosen is not None)
     flash(
         request,

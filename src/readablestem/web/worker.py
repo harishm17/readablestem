@@ -105,6 +105,7 @@ from readablestem.core.types import (
     StepFacts,
 )
 from readablestem.ops import limits
+from readablestem.pipeline import assemble
 from readablestem.pipeline import step_facts as pipeline_step_facts
 from readablestem.web import access, carry_edits, events, office_census, step_facts
 from readablestem.web import combine as combine_rules
@@ -1194,7 +1195,15 @@ class Worker:
             )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
-            job.html_stale = numbered  # False: the file is made from this result
+            # False: the file is made from this result. The file name is the page's title when
+            # the PDF and its headings have none (SW14), which the pipeline does not see, so
+            # that page is made again from the stored result on first use.
+            job.html_stale = numbered or (
+                assemble.title_plan(
+                    result.elements, result.fixes, title=result.title, filename=job.filename
+                ).source
+                == assemble.TITLE_FILE
+            )
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
             # The steps given back by the cache cost this much when they were first run: it

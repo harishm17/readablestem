@@ -72,13 +72,9 @@ def _source(
         job = job_access(session, job_id, user, VIEW)
         state = output.check(request, job, role_of(session, job, user), file_type)
         if is_head(request):  # the headers need the title only, not a re-render
-            title = documents.display_title(
-                documents.stored_title(job), job.filename, job.title_override
-            )
-            return "", title, state
+            return "", documents.document_title(job).text, state
         job = current_html(ctx, session, job)
-        result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename, job.title_override)
+        title = documents.document_title(job).text
         if job.user_id == user.id:  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
         return output.marked(job.html or "", state), title, state
@@ -110,7 +106,10 @@ def make_file(file_type: str, html: str, title: str) -> bytes:
         if not _turns.acquire(timeout=WAIT_S):
             raise Busy
         try:
-            return export_docx.export_docx(html, title=title).data
+            made = export_docx.export_docx(html, title=title)
+            if made.not_word:  # the count only: which equation is document content
+                log_event(logger, "docx_equations_as_words", count=len(made.not_word))
+            return made.data
         finally:
             _turns.release()
     return export_epub.build_epub(export_epub.export_epub(html, title=title))

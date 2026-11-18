@@ -52,7 +52,7 @@ SHARE_OUTCOME = {
 
 
 def _title(job: Job) -> str:
-    return documents.display_title(documents.stored_title(job), job.filename, job.title_override)
+    return documents.document_title(job).text
 
 
 def _page(

@@ -10,7 +10,7 @@
     <div class="field{% if title_error %} field-error{% endif %}">
       <label for="title">Title students hear</label>
       <p class="hint" id="title-hint">Read out when the file opens; names the download.
-        {% if job.title_override %}Clear the box to use the title from your PDF.{% else %}Taken from your PDF.{% endif %}</p>
+        {% if job.title_override %}Clear the box to use the title the file has without yours: “{{ pg.title_suggested }}”. {{ pg.title_source }}{% else %}{{ pg.title_source }} Type your own to replace it; a blank box keeps this one.{% endif %}</p>
       {% if title_error %}
       <p class="error-message" id="title-error"><span class="visually-hidden">Error: </span>{{ title_error.message }}</p>
       {% endif %}

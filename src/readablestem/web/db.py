@@ -226,7 +226,9 @@ def _keep_list_facts(target: Job, value: object, _old: object, _initiator: objec
     """Whenever a result is stored, store the two facts the list reads next to it."""
     from readablestem.web import documents
 
-    target.open_decisions, target.result_title = documents.list_facts(value)
+    target.open_decisions, target.result_title = documents.list_facts(
+        value, getattr(target, "filename", None) or ""
+    )
 
 
 @event.listens_for(Job.html, "set")

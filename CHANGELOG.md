@@ -224,6 +224,76 @@
 - No change to the stored result shape, a model request or a prompt. `PIPELINE_VERSION` and
   `RENDER_VERSION` are not bumped: nothing here changes what a conversion or a render writes, and
   no migration was added.
+## Unreleased: one title for a document (branch feat/exports-links-epub-title)
+
+- SW14 (F-044, F-052, F-056, F-124, F-125, F-321, F-322, F-368): three title chains and callers
+  that picked one or none gave a document one name in the list, another on the page, another in
+  the Word and EPUB files and a fourth in Canvas, where the instructor's title was dropped. One
+  function, `assemble.document_title`, now gives the title and its source (yours, the PDF's,
+  the first heading, the file name, the stock title last), and every place reads it: the page's
+  `<title>` (made with the file name), Word, EPUB, Canvas, Cartridge, the download and zip
+  names, feedback, the record, Listen, the share page, the delete page, My documents and the
+  batch table (which lead with the title and show the file name under it). A "title" that is a
+  file name written out ("MIT6_0001F16_Welcome") is skipped. The title field says where the
+  suggestion comes from. A page whose title is the file name is made again from its stored
+  result on first use. The stored title column is recomputed whenever a result is stored; rows
+  from before keep the PDF's own title until then. Stored pages made before this say "Converted
+  document" until they are made again, which a `RENDER_VERSION` bump does at the next
+  request: a bump is owed for this, with WS21.3.
+
+## Unreleased: kept pictures hold their size when the window is narrow (branch feat/exports-links-epub-title)
+
+- WS21.3 (F-441, F-442, F-443), reduced: `img { max-width: 100% }` shrank a kept picture with
+  the column, so at 200% zoom or more the writing in a crop got smaller than the text beside
+  it. In a window under 40 em a kept picture now keeps its printed size and its box scrolls
+  sideways. An inline kept equation is an inline block with its own line height, so the line
+  grows to hold it. The student sheet changed, so a document converted earlier shows the old
+  sheet until it is converted again or `RENDER_VERSION` is bumped at the merge: a bump is owed.
+
+## Unreleased: the EPUB has its own sheet, landmarks, chapters and true metadata (branch feat/exports-links-epub-title)
+
+- WS22.4 (F-456, F-457, F-516): the book carried the page's stylesheet whole, so its dark and
+  light colors, font, base size and column fought the reading system's own theme and margins.
+  `export_epub.epub_sheet` leaves page colors, font, size and column to the reader and keeps the
+  components' shape; a book with pictures frames them in the text's own color. `nav.xhtml` gains
+  `landmarks` (the contents and the start of the text). `accessModeSufficient` is always written
+  (`textual` when the page says the text is enough and nothing is flagged, else
+  `textual,visual`; it was missing otherwise) and the hazard is `none` unless a GIF or WebP
+  picture may move. A document past 100,000 characters is cut at top-level headings into chapter
+  files, with the links, contents, page list, manifest and spine naming each file. EPUBs are made
+  on request, so a document converted earlier gets this at its next download; no `RENDER_VERSION`
+  bump is owed.
+
+## Unreleased: Word links land (branch feat/exports-links-epub-title)
+
+- WS22.2 (F-514, F-566): pandoc keeps an id as a Word bookmark on a heading, `div`, `span`,
+  `section`, `table`, `pre`, list item and picture only, so a link to a paragraph, figure, list or
+  cell led nowhere in Word. `export_docx._land_links` moves such an id to an empty span at the
+  start of the element; a link still without a bookmark in the built file is written as its
+  words and counted (`DocxExport.links_unlinked`). A footnote is a real Word footnote: the
+  mark was an empty note beside a body paragraph with a dead "Back to the text" link; the
+  filter moves the note's words to the mark and writes neither the block nor the link. Word
+  files are made on request, so a document converted earlier gets this at its next download; no
+  `RENDER_VERSION` bump is owed.
+  F-581: before pandoc 3.2 a figure's id is no Word bookmark, so under production's 3.1.11.1 a
+  link to a figure with a picture was written as its words. The filter now wraps the figure in a div
+  that has the id, which every version writes as a bookmark.
+  The output audit no longer counts a note's "Back to the text" link as words of the note, which
+  a Word footnote leaves to Word (it had reported 11 notes lost in Word files).
+
+## Unreleased: one equation cannot fail the Word file (branch feat/exports-links-epub-title)
+
+- WS22.3 (F-502): one equation pandoc cannot write as an Office equation (a bold `"` in a
+  MathML token leaves raw TeX in the text; an empty `<math>` leaves nothing) made the whole
+  download fail with "cannot be made as a Word file". The page now wraps each `<math>` in a
+  span, and the pandoc filter (`pipeline/data/export_docx.lua`) tries every equation once with
+  the writer that makes the file; one it cannot write is the equation's reading and "This
+  equation could not be written as a Word equation; it is complete on the web page" in the
+  "Not Converted" style, never raw TeX. `DocxExport.not_word` names the element ids; the CLI
+  prints them and the route logs the count. The check that every equation is in the file, or
+  said, stays. Word files are made on request, so a document converted earlier gets this at its
+  next download; no `RENDER_VERSION` bump is owed. The job page's note and a link to the item
+  wait for an export state the app does not store yet.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

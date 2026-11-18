@@ -175,22 +175,18 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
         listed = {row.id for row in listing.rows}
         gone = _deleted(session, [i for i in ids if i not in listed])
     by_id = {row.id: row for row in listing.rows}
-    titles = [r.title for r in listing.rows]
     rows: list[dict[str, Any]] = []
     for item in placed:
         if not item.job_id:
             continue
         row = by_id.get(item.job_id)
         name = row.title if row else item.filename
-        # Files that came out with the same title (a slide deck's every part, say) are told
-        # apart by their file names: the file name leads and the title follows it.
-        same = bool(row) and titles.count(name) > 1 and name != item.filename
         state = row.state if row and row.state else gone[item.job_id]
         rows.append(
             {
                 "id": item.job_id,
-                "name": item.filename if same else name,
-                "also": name if same else (item.filename if name != item.filename else ""),
+                "name": name,
+                "also": row.file_note if row else "",
                 "pages": item.pages,
                 "exam_mode": bool(row and row.exam_mode),
                 "label": row.label if row else state.label,

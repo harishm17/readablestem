@@ -40,7 +40,7 @@ from typing import Any
 from readablestem.core.types import DocumentResult
 from readablestem.eval import measure
 from readablestem.eval.measure import Converted
-from readablestem.pipeline import output_audit
+from readablestem.pipeline import assemble, output_audit
 from readablestem.pipeline.output_audit import CODES, OUTPUTS, Facts, Inventory
 
 # What an inventory holds, counted: the size of what was read, so that a count has
@@ -87,7 +87,7 @@ def build(
     title = read[output_audit.HTML].title if output_audit.HTML in read else ""
     try:
         canvas = export_canvas.export_canvas(
-            html, title=title or "Document", folder=_FOLDER, course_number=_COURSE
+            html, title=title or assemble.DEFAULT_TITLE, folder=_FOLDER, course_number=_COURSE
         )
     except Exception as exc:
         for output in (output_audit.CANVAS_INDEX, output_audit.CANVAS_PAGE, output_audit.CARTRIDGE):

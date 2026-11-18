@@ -41,7 +41,8 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - Links (`<a href>`, see "Links and cross-references") load nothing: following one is
   the reader's choice, and opening the file still sends no request.
 - `<title>` is the text of the page's one `<h1>` (see "One h1"): the first top-level
-  heading when it is the title, or the title itself, else "Converted document".
+  heading when it is the title, or the title itself, else the first heading, else the file
+  name, else "Converted document" (see "One title", `assemble.document_title`).
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
 - If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
@@ -198,11 +199,26 @@ our own would be a second MathML reader to keep right.
   in bold and its paragraphs, after the figure. `<main>` is unwrapped, so the Contents and a
   draft's banner, which stand before it, are in the file; the note "About this version" is
   inside `<main>`. A WebP picture is written as a PNG. The page's language and title are
-  passed on.
+  passed on. Every id an in-page link names is put where pandoc writes a Word bookmark:
+  pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
+  picture and drops it on a paragraph, a list, a row or a cell, so there the id moves to an
+  empty `<span>` at the element's start (F-514). A figure's id is a bookmark only from pandoc
+  3.2 on (production runs 3.1.11.1, CI 3.1.3), so the filter wraps the figure in a div that
+  has the id, the same in every version (F-581). A footnote's mark (`doc-noteref`)
+  is renamed so pandoc's reader does not turn it into an empty note.
 - **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
   (`div.pagebreak`: `role="doc-pagebreak"` and their visible label) and the skip link are left
   out, and a figure with no picture is written as paragraphs (pandoc would make it a one-cell
-  table). A Word document has its own pages and its own navigation.
+  table). A Word document has its own pages and its own navigation. The same filter tries every
+  equation once, all together in a test file written by the writer that makes the real one: an
+  equation pandoc cannot write as an Office equation (a MathML shape its TeX step refuses
+  leaves raw TeX in the text, as `<mi mathvariant="bold">"</mi>` does, or nothing, as an
+  empty `<math>` does) is written, in the "Not Converted" character style, as its reading and
+  "This equation could not be written as a Word equation; it is complete on the web page."
+  The other equations are unchanged and the file is made (F-502). The filter also writes each
+  footnote as a real Word footnote: the note's words go to its mark, and the page's block and its
+  "Back to the text" link are not written (F-566; a second mark for one note is its text, no
+  link).
 - **The child.** Its own process group, an environment of `PATH`, `LANG` and the like only
   (`core.childenv`: no keys, no database URL), a private temporary directory removed
   afterwards, 90 s of CPU, a file-size cap, 256 open files, a 2 GB heap (`+RTS -M2g`), and 60 s
@@ -215,11 +231,18 @@ our own would be a second MathML reader to keep right.
   - a table whose first row is a header gets `w:tblHeader`, so it repeats on each page and is
     read as a header;
   - pandoc's title paragraph is dropped when the first heading says the same thing (the
-    title stays in the document properties).
+    title stays in the document properties);
+  - an in-page link whose bookmark is not in the file (the target was a page marker, which Word
+    leaves out, or an id the page does not have) is written as its words, not as a link that
+    leads nowhere, and counted (`DocxExport.links_unlinked`, printed by the CLI).
 - **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
   (inside the document by bookmark); tables with their caption; alt text on each picture; the
-  document language and title; equations as `m:oMath`. The export fails
-  (`equations`) rather than hand over a file with fewer equations than the HTML has `<math>`.
+  document language and title; equations as `m:oMath`, or, where one could not be written, its
+  words (above; `DocxExport.not_word` lists their element ids, `readablestem export docx`
+  prints them, the route logs the count). The export fails (`equations`) rather than hand over
+  a file with fewer equations than the HTML has `<math>` and no words in place of the missing
+  ones. A stored document picks this up the next time it is downloaded: the file is made on
+  request from the stored page.
 - **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colors
   of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
   pictures, and any conformance claim: the tool assists, and nobody has checked how the file
@@ -251,8 +274,8 @@ no network, no model.
 
 | File | What it is |
 |---|---|
-| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
-| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
+| `EPUB/content.xhtml` | The document as XHTML (a long one continues in `chapter-NN.xhtml` files, below). Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet goes in as the book's own sheet (below). The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
+| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); a `page-list` from `role="doc-pagebreak"` markers when the document has them, and `landmarks` (the contents, and the start of the text at the first heading); both are hidden in the book and used by reading systems. |
 | `EPUB/fonts/latinmodern-math-1.959.woff2` | The math font, in a book that has math, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
@@ -291,12 +314,12 @@ no network, no model.
   when there is a page list. Also `schema:accessMode` (textual, and visual when there are
   pictures). The `accessibilitySummary` is the page's statement (`readablestem-summary` in
   its head: how many equations are MathML, how much a person reviewed, what is a picture or
-  left out, "Check it before students use it."); `accessModeSufficient` `textual` only when
-  the page says the text alone is enough and no item is flagged; `accessibilityHazard`
-  `none` (no script, audio or video is written) only for a page with that statement. A page
-  without it (made before it existed) gets "This file does not record what was converted or
-  reviewed." and the hazard `unknown`. A page list
-  also adds `dc:source` ("Source PDF", `source-of` pagination).
+  left out, "Check it before students use it."); a page without it (made before it existed)
+  gets "This file does not record what was converted or reviewed." `accessModeSufficient` is
+  always written: `textual` only when the page says the text alone is enough and no item is
+  flagged, else `textual,visual`. `accessibilityHazard` is `none` (no script, audio or video
+  is written), and `unknown` only when a picture is a GIF or WebP file, which can move. A page
+  list also adds `dc:source` ("Source PDF", `source-of` pagination).
 - **No claim of conformance.** The package has no `dcterms:conformsTo` and the summary says the
   tool assists with accessibility. The tests run EPUBCheck 5.4 (no errors or warnings) and
   DAISY Ace (no serious or critical violation) on the golden documents, the demo, the LaTeX
@@ -306,8 +329,19 @@ no network, no model.
   those two programs found nothing on those documents; it does not show a reading system reads
   the file well. The page list is built from `role="doc-pagebreak"` markers; a file
   without them has none.
-- One content document, not one per chapter: ids and links inside the file keep working as they
-  are. A very long document is one long file.
+- **The book's own sheet** (`export_epub.epub_sheet`). The page's colors, font family, base
+  size and column (the rules of `body`, `html` and `:root`, and `max-width`, `margin` and
+  `padding` on `main`) are left to the reading system, so its dark, sepia or large-text theme
+  and its margins apply instead of being fought. No rule keeps a `color` or `background`, and
+  the `prefers-color-scheme` and print blocks are not carried. The components keep their shape
+  (borders, spacing, wrapping). A book with pictures frames each in the text's own color
+  (`outline: currentColor`), so a picture shows on any theme.
+- **Chapters.** A document of at most 100,000 characters of XHTML is one file. A longer one is
+  cut inside `<main>` before a top-level `h1` or `h2` once the file so far is 40,000 characters
+  long (`content.xhtml`, `chapter-02.xhtml`, ...). Each file has its own `<main>`; the skip link
+  is in the first and the footer in the last. A link to a place in another file names that file
+  (`chapter-02.xhtml#p3-e4`), and the contents, page list, landmarks, manifest and spine list
+  every file. A document with no top-level heading to cut at stays one file.
 
 ## How each element is written
 
@@ -677,7 +711,22 @@ the print build waits for WS21.1):
   equation is wider than the paper. It is complete on the web page." The note is generated
   content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
   The rules of each width step are added to the stylesheet only when an equation has it.
-- A picture is never wider than the sheet (`max-width: 100%`).
+- A picture is never wider than the sheet (`max-width: 100%`) on paper, and on screen while the
+  window is wider than 40 em.
+
+### Kept pictures on screen (WS21.3, reduced)
+
+- A kept picture (`.flagged > img`: a crop of an equation, a table, a drawing or a whole page)
+  holds what could not be read as text. In a window narrower than 40 em, which is what zoom to
+  200% or more makes of a desktop window (and a phone), it keeps its printed size and the
+  `.flagged` box scrolls sideways, so the writing in it stays as large as the text around it
+  instead of shrinking with the column. Wider than that, it fits the column as before.
+- An inline kept equation (`.flagged-inline`) is an inline block with its own line height: the
+  line grows to hold the crop instead of the crop overlapping the lines next to it.
+- Left out (triage: reduce): the "Larger" switch, the box's name and focus on every scroll box
+  (browsers that make a scroller focusable by default do; Safari does not), moving an inline
+  crop wider than half the column to its own line, and the dark-mode inversion of crops. The
+  EPUB sheet already frames pictures and does not invert them.
 - A figure's long description prints open (`details.figure-description`); where the browser
   has no `::details-content`, its summary says "open this description before printing".
 
@@ -1114,12 +1163,48 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
+### One title (SW14)
+
+A document has one title, said the same in every place and file: the student page's
+`<title>` and `<h1>`, the Word and EPUB title, the Canvas and Cartridge names, manifest and
+README, the download file name and the names in a zip of documents, the job page, My
+documents and the batch table, feedback, the record, Listen, the share page and the delete
+page. One function makes it, `assemble.document_title(override, raw, headings, filename)`,
+which returns the text and where it came from (`DocumentTitle.source`), in this order:
+
+1. `yours`: the title the instructor typed.
+2. `pdf`: the document's own title, without its section number, when it is not generic
+   ("Contents", "Overview") and not a file name written out (no spaces and an underscore or
+   letters mixed with digits, such as "MIT6_0001F16_Welcome").
+3. `heading`: the first heading that is not generic.
+4. `file`: the file name without its extension, `_` and `-` read as spaces.
+5. `stock`: "Converted document", only when there is nothing else.
+
+`assemble.title_plan` keeps the one-H1 rule (below), so a single top-level heading that
+is not the title still becomes the H1 and the page's `<title>`, and then the title is that
+heading (`heading`). The web layer reads it through `documents.document_title(job)`
+(`jobs.title_override`, the stored `jobs.result_title` and `jobs.filename`; no result is
+loaded) and `titles.effective_title` for a caller with only the columns. `jobs.result_title`
+is what the page writes without the instructor's choice (`documents.list_facts`, set
+whenever a result is stored); a row from before is the PDF's own title until its result is
+stored again, and shows the same words except where the page took a heading or the file name.
+A page is made with the file name (`render_html(filename=)`); the pipeline does not know it,
+so the worker marks a page whose title is the file name out of date and it is made again
+from the stored result on first use. A combined document is titled by the file its parts came
+from (`web.combine.title_of`), not by the first part's heading.
+
+My documents and the batch table lead with the title and put the file name on the line
+under it; when the title is the file name as written there is one line. The job page's title field
+says where the suggestion comes from ("From the title in your PDF.", "From the first
+heading.", "From the file name.", or "No title found: students will hear “Converted
+document”. Type one.").
+
 ### One h1 (T3-13, SW6c)
 
 A file has exactly one `<h1>`, and the title is said once (`assemble.title_plan`, one rule
 for the page, the contents list, the EPUB, the Word file and Listen, which all read the
 page). The title is the one the instructor typed on the job page, else the PDF's title as
-`suggested_title` gives it. Two titles are the same when they match with case folded,
+`document_title` gives it ("One title" below). Two titles are the same when they match with case folded,
 punctuation and spaces collapsed and the section number removed ("2.3 Kinematics" and
 "KINEMATICS." are one title, `assemble.same_title`).
 

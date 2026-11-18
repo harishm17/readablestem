@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline import combine, output_chars
+from readablestem.pipeline import assemble, combine, output_chars
 from readablestem.web import ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
@@ -80,13 +80,15 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
 
 
 def title_of(first: Job) -> str:
-    """What the file is called: the title the instructor chose for the first part, else the
-    source's file name without the part tag and extension. It names the Word and EPUB files
-    too, so a character that is not text in it is written as `output_chars.UNREADABLE`."""
-    if first.title_override and first.title_override.strip():
-        return output_chars.plain(first.title_override.strip())
-    stem = _PART_SUFFIX.sub("", first.filename.rpartition(".")[0] or first.filename)
-    return output_chars.plain(" ".join(stem.split())) or DEFAULT_TITLE
+    """What the file is called (`assemble.document_title`): the title the instructor chose for
+    the first part, else the title of the file the parts came from (its name without the part
+    tag, the extension and separators), never one part's own heading. It names the Word and
+    EPUB files too, so a character that is not text in it is written as
+    `output_chars.UNREADABLE`."""
+    stem, dot, extension = first.filename.rpartition(".")
+    name = f"{_PART_SUFFIX.sub('', stem)}{dot}{extension}" if dot else first.filename
+    found = assemble.document_title(first.title_override, "", (), name)
+    return DEFAULT_TITLE if found.source == assemble.TITLE_STOCK else output_chars.plain(found.text)
 
 
 def combined_html(

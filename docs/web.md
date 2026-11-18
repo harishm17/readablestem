@@ -2181,7 +2181,7 @@ From top to bottom:
 8. **For students** (`web/routes/job_settings.py`, `web/titles.py`): the title students
    hear (T1-7) and a contact line (T1-17). The title field starts with the stored
    `jobs.title_override`, else what the file's `<title>` already is
-   (`assemble.suggested_title`: the PDF's title or first top-level heading without its
+   (`assemble.document_title`, `docs/output.md` "One title": the PDF's title or first heading without its
    section number, "1 Derivatives" to "Derivatives"; "Contents" and similar names of
    parts are skipped for the first heading that is not one). Saving a different title
    stores it and makes the HTML again (`assemble.render_html(title_set=True)`): `<title>`,

@@ -34,9 +34,7 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
         require_done(job)
         audience = audience_of(role_of(session, job, user))
         html = current_html(ctx, session, job).html or ""
-        title = documents.display_title(
-            (job.result_json or {}).get("title"), job.filename, job.title_override
-        )
+        title = documents.document_title(job).text
         result_json, version = job.result_json, job.result_version or 0
 
     def speeches() -> dict[str, str]:

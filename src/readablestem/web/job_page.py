@@ -959,14 +959,30 @@ class PageData:
     draft: str  # what students get from a draft download
     # The title the file has without the instructor's choice (T1-7): the field's start.
     title_suggested: str = ""
+    title_source: str = ""  # where it comes from, in words (`TITLE_SOURCE_WORDS`)
 
 
-def suggested_title(result: DocumentResult) -> str:
-    """The title students hear when the instructor has not chosen one (T1-7): what the HTML
-    file's `<title>` is, so the field starts with what the file already says."""
+def suggested_plan(result: DocumentResult, filename: str = ""):
+    """The title students hear when the instructor has not chosen one (T1-7) and where it
+    comes from: what the HTML file's `<title>` is (SW14), so the field starts with what the
+    file already says."""
     from readablestem.pipeline import assemble
 
-    return assemble.title_plan(result.elements, result.fixes, title=result.title).text
+    return assemble.title_plan(result.elements, result.fixes, title=result.title, filename=filename)
+
+
+def suggested_title(result: DocumentResult, filename: str = "") -> str:
+    return suggested_plan(result, filename).text
+
+
+# What the title field says about the title it starts with, by source (SW14, F-052, F-322).
+TITLE_SOURCE_WORDS = {
+    "yours": "You chose this title.",
+    "pdf": "From the title in your PDF.",
+    "heading": "From the first heading.",
+    "file": "From the file name.",
+    "stock": "No title found: students will hear “Converted document”. Type one.",
+}
 
 
 def found_sentence(result: DocumentResult) -> str:
@@ -980,10 +996,11 @@ def found_sentence(result: DocumentResult) -> str:
     return f"Found {found} on {pages}." if found else f"Read {pages}."
 
 
-def page_data(result: DocumentResult, last_decision: date | None) -> PageData:
+def page_data(result: DocumentResult, last_decision: date | None, filename: str = "") -> PageData:
     from readablestem.web import queue
 
     counts = breakdown(result.fixes, result.notices)
+    plan = suggested_plan(result, filename)
     summary = checked.of_result(result, reviewed_on=last_decision)
     notices = notice_lists(result)
     first = queue.first_open(queue.decisions(result))
@@ -1000,5 +1017,6 @@ def page_data(result: DocumentResult, last_decision: date | None) -> PageData:
         first_open=first.key if first is not None else None,
         finish=Finish(summary, not_handled=len(notices.not_handled)),
         draft=draft_sentence(result.fixes),
-        title_suggested=suggested_title(result),
+        title_suggested=plan.text,
+        title_source=TITLE_SOURCE_WORDS[plan.source],
     )

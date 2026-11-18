@@ -49,12 +49,13 @@ def test_the_documents_list_reads_titles_and_open_decisions_on_postgres(factory)
         listing = documents.documents(session, user_id, now=now, budget_closed=False)
         version = documents.list_version(session, user_id, now=now, budget_closed=False)
     (decide,) = listing.group(states.NEEDS).rows
+    # The title is the page's: the result's one heading, which the one-H1 rule makes the title.
     assert (decide.title, decide.filename, decide.open_decisions) == (
-        "Week 1: Vectors",
+        "SECRET-HEADING Kinematics",
         "week1.pdf",
         3,
     )
-    assert [row.title for row in listing.group(states.WORK).rows] == ["queued.pdf"]
+    assert [row.title for row in listing.group(states.WORK).rows] == ["queued"]
     assert listing.version == version and listing.unfinished == 1
 
 

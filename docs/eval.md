@@ -3386,7 +3386,7 @@ the document's words. Each place is counted once.
 | `out_table_header` | a table has no header cell where the page's has one |
 | `out_heading` | a heading is empty or skips a level, or the title is said twice |
 | `out_lang` | the file states no language, or another than the document's |
-| `out_note_lost` | a note of the page is not in the output |
+| `out_note_lost` | a note of the page is not in the output (its back-link is no part of the note) |
 | `out_hole` | a sentence has a gap: a space before its full stop or comma, "the -x" |
 | `out_notice_missing` | an open decision or a kept picture has no note at its place |
 

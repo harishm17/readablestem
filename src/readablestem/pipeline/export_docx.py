@@ -33,9 +33,15 @@ What this module does around pandoc:
   dropped when the first heading says the same thing. Headings are Word's Heading 1 to 6
   styles, lists are Word lists, links are hyperlinks, and the document language is set.
 
-Equations are counted: the file must hold as many `m:oMath` as the HTML had `<math>`. If
-pandoc could not convert one, the export fails (`DocxExportError("equations")`) rather than
-hand over a file that silently lacks an equation; the HTML and EPUB stay available.
+Equations are counted: the file must hold as many `m:oMath` as the HTML had `<math>`, less the
+ones the file says it could not write. One equation pandoc cannot write as an Office equation
+(a MathML shape its TeX step refuses leaves raw TeX in the text, or nothing) does not fail the
+file: the filter tries each equation once and writes, where it cannot, the equation's reading
+and the words "This equation could not be written as a Word equation; it is complete on the
+web page" in the "Not Converted" style (`DocxExport.not_word` lists their element ids; the
+failure is said in the file, never hidden). If the count still does not add up (an equation
+lost with nothing said) the export fails (`DocxExportError("equations")`) rather than hand
+over a file that silently lacks an equation; the HTML and EPUB stay available.
 
 What is not carried: scripts and styles (the Word styles are pandoc's), inline SVG,
 remote pictures, the page markers, and the colours of the flagged boxes (the words of a flag
@@ -49,6 +55,7 @@ import contextlib
 import io
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -98,6 +105,8 @@ for _prefix, _uri in _NAMESPACES.items():
 # list styles draw their bullets with Symbol and Wingdings glyphs at private-use code points
 # (U+F0B7, U+F0A7), as Word itself does; Word shows them as list markers, not as text.
 _STYLE_PARTS = frozenset({"word/numbering.xml"})
+# The parts that hold text, and so links.
+_LINK_PARTS = ("word/document.xml", "word/footnotes.xml")
 
 
 class DocxExportError(ValueError):
@@ -119,8 +128,10 @@ class DocxExport:
     equations: int  # `<math>` in the HTML, and `m:oMath` in the file
     headings: int
     images: int  # pictures with alt text written
+    not_word: list[str]  # element ids of equations written as words, not as a Word equation
     tables: int
     header_rows: int  # tables whose first row is marked as a header
+    links_unlinked: int = 0  # in-page links with no target in the file, written as their words
 
 
 # --------------------------------------------------------------------------- pandoc
@@ -152,7 +163,9 @@ def _limits() -> None:  # pragma: no cover - runs in the forked child, before ex
         pass
 
 
-def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
+def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> tuple[bytes, str]:
+    """The Word file pandoc makes, and what the filter said on stderr (`_failed_keys` reads it:
+    pandoc's own warnings quote the document, so nothing else of it is kept)."""
     work = Path(tempfile.mkdtemp(prefix="readablestem-docx-"))
     try:
         work.chmod(0o700)
@@ -181,7 +194,7 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
                 cwd=work,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 start_new_session=True,
                 preexec_fn=_limits,
             )
@@ -189,7 +202,7 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
             raise DocxExportError("unavailable") from None
         try:
             try:
-                process.communicate(html.encode("utf-8"), timeout=timeout_s)
+                _, said = process.communicate(html.encode("utf-8"), timeout=timeout_s)
             except subprocess.TimeoutExpired:
                 raise DocxExportError("timeout") from None
         finally:
@@ -199,7 +212,7 @@ def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> bytes:
                 process.wait(timeout=5)
         if process.returncode != 0 or not out.is_file():
             raise DocxExportError("failed")
-        return out.read_bytes()
+        return out.read_bytes(), said.decode("utf-8", "replace")
     except OSError:
         raise DocxExportError("failed") from None
     finally:
@@ -246,6 +259,11 @@ def _prepare(root: _Node) -> None:
     for node in list(root.walk()):
         if node.parent is None:
             continue
+        if node.tag == "a" and "doc-noteref" in node.attrs.get("role", "").split():
+            # The reader would make the mark an empty note (the note stands after it): the
+            # filter moves the note's words to the mark (`data/export_docx.lua`).
+            del node.attrs["role"]
+            node.attrs["data-rsnote"] = "1"
         if node.tag == "main":
             _replace(node, list(node.children))
         elif node.tag == "summary":
@@ -257,19 +275,144 @@ def _prepare(root: _Node) -> None:
             strong.parent = paragraph
             _replace(node, [paragraph])
         elif node.tag == "details":
-            _replace(node, list(node.children))
+            inner: list[_Node | str] = list(node.children)
+            if node.attrs.get("id"):  # a link to the description still lands at its start
+                inner.insert(0, _Node("span", {"id": node.attrs["id"]}))
+            _replace(node, inner)
 
 
 def _normal(text: str) -> str:
     return " ".join(text.split())
 
 
+# The longest reading written in place of an equation the file could not hold: a long one
+# is left out, since a reading cut short would mislead more than the words alone.
+_READING_MAX = 400
+
+
+def _mark_equations(root: _Node, token: str) -> list[str]:
+    """Wrap every `<math>` in `<span data-eq="TOKEN-N" data-reading="...">`, so the filter
+    can try each equation and write words where Word cannot hold it (`data/export_docx.lua`).
+    The reading is the stored speech (`alttext`) or else the equation's own characters.
+    Returns the element id of each equation (the nearest id on or above it, "" when none),
+    by N."""
+    ids: list[str] = []
+    for node in [n for n in root.walk() if n.tag == "math"]:
+        holder: _Node | None = node
+        while holder is not None and not holder.attrs.get("id"):
+            holder = holder.parent
+        ids.append(holder.attrs["id"] if holder is not None else "")
+        reading = _normal(node.attrs.get("alttext", "")) or _normal(_text(node))
+        attrs = {"data-eq": f"{token}-{len(ids) - 1}"}
+        if 0 < len(reading) <= _READING_MAX:
+            attrs["data-reading"] = reading
+        span = _Node("span", attrs, [node])
+        _replace(node, [span])
+        node.parent = span
+    return ids
+
+
+def _failed(said: str, token: str) -> set[int]:
+    """The equations the filter could not write as Word equations, by number (its lines on
+    stderr; anything else pandoc said quotes the document and is not read)."""
+    found = re.findall(rf"^RSFAIL {re.escape(token)}-(\d+)$", said, re.MULTILINE)
+    return {int(n) for n in found}
+
+
+# Where pandoc writes an element's id as a Word bookmark in every version we run (3.1.3 in CI,
+# 3.1.11.1 in production, 3.7 here; checked by running each with each tag): a heading, `div`,
+# `span`, `section`, `table`, `pre`, list item and picture. On any other element it drops the
+# id, and a link to it leads nowhere. (A figure's id is a bookmark only from 3.2 on: the filter
+# puts the figure in a div that has the id.)
+_BOOKMARKED = frozenset(["div", "span", "section", "table", "pre", "li", "img"]) | {
+    f"h{n}" for n in range(1, 7)
+}
+# A link target's id goes on an empty span (which pandoc writes as a bookmark) at the start of
+# the element; for these it goes before the element, since a span cannot start inside them.
+_INLINE = frozenset(
+    ["math", "a", "em", "strong", "i", "b", "code", "sup", "sub", "mark", "small", "u", "s"]
+)
+# ... and for a list, a row or a table's body, at the start of its first item or cell.
+_GROUPS = frozenset(["ul", "ol", "dl", "tr", "tbody", "thead", "tfoot"])
+
+
+def _land_links(root: _Node) -> None:
+    """Every id an in-page link names is on something pandoc keeps (F-514): where it is not
+    (a paragraph, a figure, a list, a cell, a row), the id moves to an empty span at the start
+    of the element. A link whose target is still missing after pandoc is plain text
+    (`_unlink`)."""
+    targets = {
+        n.attrs["href"][1:]
+        for n in root.walk()
+        if n.tag == "a" and n.attrs.get("href", "").startswith("#") and len(n.attrs["href"]) > 1
+    }
+    for node in list(root.walk()):
+        ident = node.attrs.get("id")
+        if not ident or ident not in targets or node.parent is None:
+            continue
+        if node.tag in _BOOKMARKED:
+            continue
+        # A figure with a picture keeps its id for the filter, which wraps the figure in a
+        # div with it (a span inside the figure makes pandoc write a one-cell layout table);
+        # one without is written as paragraphs by the filter.
+        if node.tag == "figure" and any(n.tag == "img" for n in node.walk()):
+            continue
+        if node.tag == "hr":  # nothing can stand in it (a page marker, which is left out)
+            continue
+        del node.attrs["id"]
+        mark = _Node("span", {"id": ident})
+        inside = node
+        while inside.tag in _GROUPS:
+            first = next((c for c in inside.children if isinstance(c, _Node)), None)
+            if first is None:
+                break
+            inside = first
+        if inside.tag in _INLINE:
+            before = inside.parent if inside.parent and "data-eq" in inside.parent.attrs else inside
+            assert before.parent is not None
+            siblings = before.parent.children
+            siblings.insert(siblings.index(before), mark)
+            mark.parent = before.parent
+        else:
+            inside.children.insert(0, mark)
+            mark.parent = inside
+
+
 # --------------------------------------------------------------------------- after
 
 
-def _fix_document(xml: bytes, title: str) -> tuple[bytes, tuple[int, int, int, int]]:
-    """Alt text on the picture itself, header rows, the duplicate title paragraph. Returns the
-    new part and the counts (equations, pictures with alt text, tables, header rows)."""
+def _unlink(root: ET.Element, bookmarks: set[str]) -> int:
+    """A link inside the document to a bookmark the file does not have is its words, not a
+    link that leads nowhere; returns how many. (A link is dead when the page's id was on
+    something pandoc does not write, or nothing at all, `_land_links`.)"""
+    parent_of = {child: parent for parent in root.iter() for child in parent}
+    count = 0
+    for link in list(root.iter(f"{{{W}}}hyperlink")):
+        anchor = link.get(f"{{{W}}}anchor")
+        if anchor is None or anchor in bookmarks:
+            continue
+        parent = parent_of[link]
+        at = list(parent).index(link)
+        parent.remove(link)
+        for offset, run in enumerate(list(link)):
+            properties = run.find(f"{{{W}}}rPr")
+            style = properties.find(f"{{{W}}}rStyle") if properties is not None else None
+            if properties is not None and style is not None:
+                if style.get(f"{{{W}}}val") == "Hyperlink":
+                    properties.remove(style)
+                if len(properties) == 0:
+                    run.remove(properties)
+            parent.insert(at + offset, run)
+        count += 1
+    return count
+
+
+def _fix_document(
+    xml: bytes, title: str, bookmarks: set[str]
+) -> tuple[bytes, tuple[int, int, int, int, int]]:
+    """Alt text on the picture itself, header rows, the duplicate title paragraph, links with
+    no target. Returns the new part and the counts (equations, pictures with alt text, tables,
+    header rows, links turned into words)."""
     root = SafeET.fromstring(xml)
     pictures = 0
     for inline in root.iter(f"{{{WP}}}inline"):
@@ -302,8 +445,20 @@ def _fix_document(xml: bytes, title: str) -> tuple[bytes, tuple[int, int, int, i
     if body is not None:
         _drop_title_paragraph(body, title)
     equations = sum(1 for _ in root.iter(f"{{{M}}}oMath"))
+    unlinked = _unlink(root, bookmarks)
     out = ET.tostring(root, encoding="UTF-8", xml_declaration=True)
-    return out, (equations, pictures, tables, headers)
+    return out, (equations, pictures, tables, headers, unlinked)
+
+
+def _bookmarks(source: zipfile.ZipFile) -> set[str]:
+    """The names of the bookmarks in the body and the notes: a link in either may name one in
+    the other."""
+    names: set[str] = set()
+    for part in _LINK_PARTS:
+        if part in source.namelist():
+            root = SafeET.fromstring(source.read(part))
+            names.update(b.get(f"{{{W}}}name", "") for b in root.iter(f"{{{W}}}bookmarkStart"))
+    return names
 
 
 def _paragraph_text(paragraph: ET.Element) -> str:
@@ -329,23 +484,43 @@ def _drop_title_paragraph(body: ET.Element, title: str) -> None:
         body.remove(paragraphs[0])
 
 
-def _rebuild(data: bytes, title: str) -> tuple[bytes, tuple[int, int, int, int]]:
+def _fix_notes(xml: bytes, bookmarks: set[str]) -> tuple[bytes, int, int]:
+    """The footnotes part: links with no target, and the equations in it (counted with the
+    body's). Returns the new part, those equations and the links turned into words."""
+    root = SafeET.fromstring(xml)
+    unlinked = _unlink(root, bookmarks)
+    equations = sum(1 for _ in root.iter(f"{{{M}}}oMath"))
+    return ET.tostring(root, encoding="UTF-8", xml_declaration=True), equations, unlinked
+
+
+def _rebuild(data: bytes, title: str) -> tuple[bytes, tuple[int, int, int, int, int]]:
     try:
         source = zipfile.ZipFile(io.BytesIO(data))
         names = source.namelist()
         if "word/document.xml" not in names:
             raise DocxExportError("invalid")
+        bookmarks = _bookmarks(source)
         out = io.BytesIO()
-        counts = (0, 0, 0, 0)  # equations, pictures, tables, header rows
+        counts = (0, 0, 0, 0, 0)  # equations, pictures, tables, header rows, unlinked
+        in_notes = (0, 0)  # equations, unlinked
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target:
             for info in source.infolist():
                 content = source.read(info.filename)
                 if info.filename == "word/document.xml":
-                    content, counts = _fix_document(content, title)
+                    content, counts = _fix_document(content, title, bookmarks)
+                elif info.filename == "word/footnotes.xml":
+                    content, *in_notes = _fix_notes(content, bookmarks)
                 target.writestr(info, content)
     except (zipfile.BadZipFile, ET.ParseError, SafeET.ParseError):
         raise DocxExportError("invalid") from None
-    return out.getvalue(), counts
+    equations, pictures, tables, headers, unlinked = counts
+    return out.getvalue(), (
+        equations + in_notes[0],
+        pictures,
+        tables,
+        headers,
+        unlinked + in_notes[1],
+    )
 
 
 # --------------------------------------------------------------------------- export
@@ -371,24 +546,39 @@ def export_docx(
     lang = lang if _LANGUAGE.match(lang) else "en"
     page_title = _find(root, "title")
     title = (
-        _normal(title or (_text(page_title) if page_title else "") or "") or "Converted document"
+        _normal(title or (_text(page_title) if page_title else "") or "") or assemble.DEFAULT_TITLE
     )
 
     images = {n.attrs["src"] for n in root.walk() if n.tag == "img" and n.attrs.get("src")}
     _sanitise(root, {s for s in images if _DATA_URI.match(s)})
     _prepare(root)
     _webp_to_png(root)
-    n_math = sum(1 for n in body.walk() if n.tag == "math")
+    token = secrets.token_hex(6)
+    equation_ids = _mark_equations(body, token)
+    _land_links(body)
+    n_math = len(equation_ids)
     n_headings = sum(1 for n in body.walk() if _HEADING.match(n.tag))
     document = (
         f'<!doctype html><html lang="{escape(lang, quote=True)}"><head><meta charset="utf-8">'
         f"<title>{escape(title, quote=False)}</title></head>"
         f"<body>{''.join(_write(c) for c in body.children)}</body></html>"
     )
-    data = _run_pandoc(document, lang, program, timeout_s)
-    data, (equations, pictures, tables, headers) = _rebuild(data, title)
-    if equations != n_math:
+    data, said = _run_pandoc(document, lang, program, timeout_s)
+    data, (equations, pictures, tables, headers, unlinked) = _rebuild(data, title)
+    not_word = sorted(_failed(said, token) & set(range(n_math)))
+    if equations + len(not_word) != n_math:
         raise DocxExportError("equations")
     if output_chars.count_in_zip(data, skip=_STYLE_PARTS):
         raise DocxExportError("unreadable_character")
-    return DocxExport(title, lang, data, equations, n_headings, pictures, tables, headers)
+    return DocxExport(
+        title,
+        lang,
+        data,
+        equations,
+        n_headings,
+        pictures,
+        [equation_ids[n] for n in not_word],
+        tables,
+        headers,
+        unlinked,
+    )

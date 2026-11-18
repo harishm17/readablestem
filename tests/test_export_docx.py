@@ -21,6 +21,7 @@ import threading
 import zipfile
 from html import unescape
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import docx
 import pytest
@@ -281,6 +282,76 @@ def test_a_file_that_lacks_an_equation_is_refused(tmp_path):
     with pytest.raises(ed.DocxExportError) as error:
         ed.export_docx(html, pandoc=program)
     assert error.value.code == "equations"
+
+
+def test_one_equation_pandoc_cannot_write_does_not_fail_the_file():
+    """F-502: a bold `"` (an instructor's edit) makes pandoc leave raw TeX in the text, and an
+    empty `<math>` leaves nothing. The file is made; each such equation is words in its place
+    (its reading and the sentence, in the Not Converted style), the export names its element,
+    the other equations are Office equations, and no TeX is left."""
+    bad = '<mi mathvariant="bold">&quot;</mi>'
+    html = (
+        '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
+        f'<p>a <math id="m1" alttext="quote">{bad}</math> b <math id="m2"><mi>x</mi></math>'
+        ' c <math id="m3"></math></p>'
+        f'<div class="equation" id="m4"><math display="block">{bad}</math></div>'
+        '<div class="equation" id="m5"><math display="block"><mi>y</mi></math></div>'
+        "</main></body></html>"
+    )
+    export = ed.export_docx(html)
+    assert export.not_word == ["m1", "m3", "m4"]
+    assert export.equations == 2
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        xml = archive.read("word/document.xml").decode()
+    assert xml.count("<m:oMath>") == 2
+    assert xml.count("it is complete on the web page") == 3
+    assert xml.count('<w:rStyle w:val="NotConverted" />') == 3
+    assert "quote. This equation could not be written" in xml
+    assert "$" not in xml and "mathbf" not in xml
+
+
+LINKS = (
+    '<html lang="en"><head><title>T</title></head><body><nav><a href="#h1">One</a></nav><main>'
+    '<h1 id="h1">One</h1><p id="p1">Text<a id="noteref-n1" role="doc-noteref" href="#n1">1</a>'
+    ' and <a role="doc-noteref" href="#n1">1</a>: <a href="#p3">a paragraph</a>,'
+    ' <a href="#fig">a figure</a>, <a href="#l2">a list</a>, <a href="#c">a cell</a>,'
+    ' <a href="#d">a description</a>, <a href="#pic">a picture</a>,'
+    ' <a href="#gone">nothing</a>.</p>'
+    '<p id="p3">Three</p><figure id="fig"><p>words</p><figcaption>F</figcaption></figure>'
+    '<ul id="l2"><li>a</li></ul><table><tr><th>h</th></tr><tr><td id="c">x</td></tr></table>'
+    '<details id="d"><summary>S</summary><p>long</p></details>'
+    f'<figure id="pic"><img src="{DATA_URI}" alt="A dot" width="1" height="1">'
+    "<figcaption>G</figcaption></figure>"
+    '<div role="doc-footnote" id="n1"><p>The note says <math><mi>x</mi></math>.'
+    ' <a role="doc-backlink" href="#noteref-n1">Back to the text</a></p></div>'
+    "</main></body></html>"
+)
+
+
+def test_every_link_in_a_word_file_lands_and_a_note_is_a_word_footnote():
+    """F-514, F-566: pandoc keeps an id on a heading, a div or a span and drops it on a
+    paragraph, figure, list or cell, so most links led nowhere; a footnote's mark was an empty
+    Word footnote beside a body paragraph. Now a link lands on a bookmark, the note's words are
+    in the Word footnote (its equation too), and the one link with no target is its words."""
+    export = ed.export_docx(LINKS)
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        body = ET.fromstring(archive.read("word/document.xml"))
+        notes = ET.fromstring(archive.read("word/footnotes.xml"))
+    bookmarks = {b.get(f"{W}name") for b in body.iter(f"{W}bookmarkStart")}
+    anchors = [h.get(f"{W}anchor") for h in body.iter(f"{W}hyperlink")]
+    assert anchors == ["h1", "p3", "fig", "l2", "c", "d", "pic"]
+    assert set(anchors) <= bookmarks
+    # One bookmark to a name, with any pandoc: 3.7 writes a figure's own id as well as the span.
+    names = [b.get(f"{W}name") for b in body.iter(f"{W}bookmarkStart")]
+    assert len(names) == len(set(names))
+    assert export.links_unlinked == 1  # "nothing" is text
+    real = [n for n in notes if n.get(f"{W}type") is None]
+    assert len(real) == 1
+    note = "".join(t.text or "" for t in real[0].iter(f"{W}t"))
+    assert "The note says" in note and "Back to the text" not in note
+    assert len(list(real[0].iter(f"{M}oMath"))) == 1 == export.equations
+    assert len(list(body.iter(f"{W}footnoteReference"))) == 1
+    assert "The note says" not in "".join(t.text or "" for t in body.iter(f"{W}t"))
 
 
 def test_output_that_is_not_a_word_file_is_refused(tmp_path):

@@ -7,7 +7,7 @@ pipeline wrote, docs/output.md) and nothing from the pipeline's steps. It writes
     META-INF/container.xml
     EPUB/package.opf              metadata, manifest, spine
     EPUB/nav.xhtml                contents from the headings, page list from page markers
-    EPUB/content.xhtml            the document as XHTML
+    EPUB/content.xhtml            the document as XHTML (and chapter-NN.xhtml when it is long)
     EPUB/images/image-01.png ...  every `data:` picture, as a file
 
 What is kept and what changes:
@@ -17,11 +17,13 @@ What is kept and what changes:
   is marked `mathml`. Nothing is turned into an image.
 - Each `data:` image becomes a file in `images/` (one file per distinct picture); `alt` stays
   on the `<img>`.
-- The page's own stylesheet is kept in the content document. Scripts are not carried.
+- The page's stylesheet is carried as the book's own sheet (`epub_sheet`): the page's colors,
+  font and column are left to the reading system. A document past `CHAPTER_LIMIT` is cut into
+  chapter files at top-level headings. Scripts are not carried.
 - ARIA roles stay; the DPUB ones (`doc-pagebreak`, `doc-noteref`, `doc-footnote`,
   `doc-backlink`) also get the matching `epub:type`.
 - `nav.xhtml`: a `toc` from the document's headings (nested by level), and a `page-list` from
-  the page markers (`role="doc-pagebreak"`) when the document has them.
+  the page markers (`role="doc-pagebreak"`) when the document has them, and `landmarks`.
 
 Accessibility metadata is written from what is in the document, not from a fixed list:
 `schema:accessMode`, `accessibilityFeature` (structural navigation, tableOfContents, MathML,
@@ -29,8 +31,8 @@ alternativeText, longDescription, describedMath, pageNavigation). `accessibility
 `accessModeSufficient` and `accessibilityHazard` are the page's statement of what was converted
 and reviewed (`pipeline.checked`, read from the page's head): the summary says how many
 equations are MathML, how much a person reviewed and what is a picture or left out;
-`accessModeSufficient` "textual" only when nothing is a picture, left out or flagged; the
-hazard "none" only for a page this tool made with that statement, else "unknown". The
+`accessModeSufficient` "textual" only when nothing is a picture, left out or flagged, else
+"textual,visual"; the hazard "none", and "unknown" only for a GIF or WebP picture. The
 package never carries `dcterms:conformsTo`: the tool assists and does not claim conformance
 with any standard (CONTRIBUTING.md). The tests run the package through EPUBCheck and DAISY
 Ace when they are installed.
@@ -48,7 +50,12 @@ from html import escape
 from io import BytesIO
 
 from readablestem.pipeline import checked_words, math_font, output_chars
-from readablestem.pipeline.assemble import DECORATIVE_CLASS, SUFFICIENT_META, SUMMARY_META
+from readablestem.pipeline.assemble import (
+    DECORATIVE_CLASS,
+    DEFAULT_TITLE,
+    SUFFICIENT_META,
+    SUMMARY_META,
+)
 from readablestem.pipeline.export_canvas import (
     _VOID,
     NOT_TEXT,
@@ -68,7 +75,12 @@ NS_SVG = "http://www.w3.org/2000/svg"
 NS_OPF = "http://www.idpf.org/2007/opf"
 ZIP_TIME = (2020, 1, 1, 0, 0, 0)  # fixed, so the same document gives the same bytes
 
-CONTENT = "EPUB/content.xhtml"
+CONTENT_FILE = "content.xhtml"
+CONTENT = f"EPUB/{CONTENT_FILE}"
+# A book longer than this (characters of XHTML) is written as chapters, cut at top-level
+# headings with at least CHAPTER_MIN in each: one huge file is slow to open and to move in.
+CHAPTER_LIMIT = 100_000
+CHAPTER_MIN = 40_000
 NAV = "EPUB/nav.xhtml"
 PACKAGE = "EPUB/package.opf"
 
@@ -114,6 +126,9 @@ class EpubExport:
     page_labels: int  # entries in the page list
     headings: int  # entries in the contents (not counting a fallback entry)
     fonts: dict[str, bytes] = field(default_factory=dict)  # "fonts/..." -> bytes: the maths font
+    chapters: dict[str, str] = field(
+        default_factory=dict
+    )  # "chapter-02.xhtml" -> XHTML, after `content`
 
 
 # --------------------------------------------------------------------------- the content
@@ -178,6 +193,82 @@ def _clean_css(css: str) -> str:
     """The stylesheet without `@import` and without any declaration that loads a file
     (`url(...)`): the book fetches nothing."""
     return _CSS_URL_DECLARATION.sub("", _CSS_IMPORT.sub("", css))
+
+
+# What the book leaves to the reading system (F-456, F-457): the page's colors, its font, base
+# size and column. A reader's own theme (dark, sepia, large text), margins and font choice
+# apply instead of being fought or doubled. The components keep their shape and their borders.
+_PAGE_ONLY = frozenset(["body", "html", ":root"])
+_COLOR_PROPERTIES = frozenset(["color", "background", "background-color", "color-scheme"])
+_COLUMN_PROPERTIES = frozenset(["max-width", "margin", "padding"])
+# The pictures, framed (the reading system's theme may be dark, and a picture is never
+# inverted): the frame is the text's own color, so it shows on any theme.
+EPUB_PICTURE_FRAME = "img { outline: 1px solid currentColor; outline-offset: -1px; }"
+
+
+def _css_rules(css: str) -> list[tuple[str, str]]:
+    """The top-level rules of a stylesheet as (prelude, body): `main { ... }` is ("main", " ..."),
+    `@media x { a { ... } }` is ("@media x", " a { ... } "). Comments are dropped."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    rules: list[tuple[str, str]] = []
+    depth = start = last = 0
+    prelude = ""
+    quote = ""
+    for at, char in enumerate(css):
+        if quote:
+            quote = "" if char == quote else quote
+        elif char in "\"'":
+            quote = char
+        elif char == "{":
+            if depth == 0:
+                prelude, start = css[last:at], at + 1
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                rules.append((prelude.strip(), css[start:at]))
+                last = at + 1
+    return rules
+
+
+def epub_sheet(css: str) -> str:
+    """The page's stylesheet as the book carries it: no page colors, font family, base size or
+    column (the rules of `body`, `html` and `:root` go; `main` keeps only its word breaking),
+    no color or background on a component (the reader's text color is on the reader's
+    background, whichever theme), and no `prefers-color-scheme` or print block. What is
+    left is the components' shape."""
+
+    def declarations(body: str, drop: frozenset[str]) -> str:
+        kept = [
+            d.strip()
+            for d in re.split(r";(?![^(]*\))", body)
+            if d.strip() and d.split(":", 1)[0].strip().lower() not in drop
+        ]
+        return " ".join(f"{d};" for d in kept)
+
+    def process(rules: list[tuple[str, str]]) -> list[str]:
+        out: list[str] = []
+        for prelude, body in rules:
+            if prelude.startswith("@"):
+                if "prefers-color-scheme" in prelude or re.search(r"\bprint\b", prelude):
+                    continue
+                if prelude.startswith(("@media", "@supports")):
+                    inner = " ".join(process(_css_rules(body)))
+                    if inner:
+                        out.append(f"{prelude} {{ {inner} }}")
+                else:
+                    out.append(f"{prelude} {{{body}}}")
+                continue
+            selectors = [s.strip() for s in prelude.split(",")]
+            if all(s in _PAGE_ONLY for s in selectors):
+                continue
+            drop = _COLOR_PROPERTIES | (_COLUMN_PROPERTIES if "main" in selectors else frozenset())
+            kept = declarations(body, drop)
+            if kept:
+                out.append(f"{prelude} {{ {kept} }}")
+        return out
+
+    return "\n".join(process(_css_rules(css)))
 
 
 def _remove(node: _Node, replacement: list[_Node | str] | None = None) -> None:
@@ -304,7 +395,7 @@ def _marker_label(node: _Node) -> str:
 # ------------------------------------------------------------------------ the navigation
 
 
-def _build_toc(entries: list[tuple[int, str, str]]) -> str:
+def _build_toc(entries: list[tuple[int, str, str]], file_of: dict[str, str]) -> str:
     """The contents as nested lists, built as a tree so the nesting is always well formed. A
     heading that skips a level (h1 then h3) nests one step down, not two."""
 
@@ -317,7 +408,8 @@ def _build_toc(entries: list[tuple[int, str, str]]) -> str:
     top: list[Item] = []
     stack: list[Item] = []
     for level, element_id, text in entries:
-        link = f'<a href="content.xhtml#{escape(element_id, quote=True)}">{escape(text)}</a>'
+        file = file_of.get(element_id, CONTENT_FILE)
+        link = f'<a href="{file}#{escape(element_id, quote=True)}">{escape(text)}</a>'
         item = Item(level, link, [])
         while stack and stack[-1].level >= level:
             stack.pop()
@@ -335,25 +427,41 @@ def _build_toc(entries: list[tuple[int, str, str]]) -> str:
 
 
 def _nav_document(
-    title: str, lang: str, toc: list[tuple[int, str, str]], pages: list[tuple[str, str]]
+    title: str,
+    lang: str,
+    toc: list[tuple[int, str, str]],
+    pages: list[tuple[str, str]],
+    file_of: dict[str, str],
 ) -> str:
     lang_attr = escape(lang, quote=True)
     page_list = ""
     if pages:
         items = "".join(
-            f'<li><a href="content.xhtml#{escape(i, quote=True)}">{escape(label)}</a></li>'
+            f'<li><a href="{file_of.get(i, CONTENT_FILE)}#{escape(i, quote=True)}">'
+            f"{escape(label)}</a></li>"
             for i, label in pages
         )
         page_list = (
             f'<nav epub:type="page-list" role="doc-pagelist" hidden="hidden"><ol>{items}</ol></nav>'
         )
+    # Landmarks: where a reading system's "go to" menu jumps. The labels are the tool's own
+    # English words, so the entries say so.
+    start = toc[0][1] if toc else ""
+    start_file = file_of.get(start, CONTENT_FILE)
+    start_href = f"{start_file}#{escape(start, quote=True)}" if start else start_file
+    landmarks = (
+        '<nav epub:type="landmarks" hidden="hidden"><ol>'
+        '<li><a epub:type="toc" lang="en" href="nav.xhtml#toc">Contents</a></li>'
+        f'<li><a epub:type="bodymatter" lang="en" href="{start_href}">Start of content</a></li>'
+        "</ol></nav>"
+    )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<html xmlns="{NS_XHTML}" xmlns:epub="{NS_EPUB}" lang="{lang_attr}" '
         f'xml:lang="{lang_attr}">\n'
         f'<head><meta charset="utf-8"/><title>{escape(title)}</title></head>\n'
         f'<body><nav epub:type="toc" role="doc-toc" id="toc">'
-        f"<h1>{escape(title)}</h1>{_build_toc(toc)}</nav>{page_list}</body>\n"
+        f"<h1>{escape(title)}</h1>{_build_toc(toc, file_of)}</nav>{page_list}{landmarks}</body>\n"
         "</html>\n"
     )
 
@@ -404,9 +512,10 @@ def _features(
     if n_pages:
         features.append("pageNavigation")
     # Text alone is enough only when the page's statement says so (nothing is a picture,
-    # nothing is left out, nothing is open) and no part is flagged.
+    # nothing is left out, nothing is open) and no part is flagged. Always written: with the
+    # field missing a reading system cannot tell "the text is enough" from "not known".
     flagged = any("flag-note" in n.classes() or "data-status" in n.attrs for n in root.walk())
-    sufficient = ["textual"] if text_sufficient and not flagged else []
+    sufficient = ["textual"] if text_sufficient and not flagged else ["textual,visual"]
     return modes, sufficient, sorted(features)
 
 
@@ -421,10 +530,10 @@ def _package_document(
     features: list[str],
     images: dict[str, bytes],
     fonts: dict[str, bytes],
-    item_properties: list[str],
+    chapters: list[tuple[str, list[str]]],
     paginated: bool,
     summary: str = ACCESSIBILITY_SUMMARY,
-    hazard: str = "unknown",
+    hazard: str = "none",
 ) -> str:
     meta = [
         f'<dc:identifier id="pub-id">{escape(identifier)}</dc:identifier>',
@@ -438,11 +547,17 @@ def _package_document(
         f'<meta property="schema:accessibilityHazard">{hazard}</meta>',
         f'<meta property="schema:accessibilitySummary">{escape(summary)}</meta>',
     ]
-    props = f' properties="{" ".join(item_properties)}"' if item_properties else ""
     manifest = [
-        '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
-        f'<item id="content" href="content.xhtml" media-type="application/xhtml+xml"{props}/>',
+        '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
     ]
+    spine = []
+    for n, (file, properties) in enumerate(chapters, 1):
+        item = "content" if n == 1 else f"chapter-{n:02d}"
+        props = f' properties="{" ".join(properties)}"' if properties else ""
+        manifest.append(
+            f'<item id="{item}" href="{file}" media-type="application/xhtml+xml"{props}/>'
+        )
+        spine.append(f'<itemref idref="{item}"/>')
     for i, name in enumerate(sorted(images), 1):
         media = _MEDIA_TYPES[name.rsplit(".", 1)[1]]
         manifest.append(f'<item id="image-{i:02d}" href="{name}" media-type="{media}"/>')
@@ -457,7 +572,9 @@ def _package_document(
         + "\n  ".join(meta)
         + "\n</metadata>\n<manifest>\n  "
         + "\n  ".join(manifest)
-        + '\n</manifest>\n<spine>\n  <itemref idref="content"/>\n</spine>\n</package>\n'
+        + "\n</manifest>\n<spine>\n  "
+        + "\n  ".join(spine)
+        + "\n</spine>\n</package>\n"
     )
 
 
@@ -477,6 +594,38 @@ CONTAINER = (
 
 
 # ------------------------------------------------------------------------------- export
+
+
+def _chapters(body: _Node) -> list[list[_Node | str]]:
+    """What each file of the book holds, as the nodes of its `<body>`. A book of at most
+    CHAPTER_LIMIT characters is one file. A longer one is cut inside `<main>` before a top-level
+    `h1` or `h2`, once the file so far is at least CHAPTER_MIN long; each file gets its own
+    `<main>`, the lead-in (skip link) goes in the first and the footer in the last."""
+    main = next((c for c in body.children if isinstance(c, _Node) and c.tag == "main"), None)
+    if main is None or sum(len(_serialize(c)) for c in body.children) <= CHAPTER_LIMIT:
+        return [list(body.children)]
+    chunks: list[list[_Node | str]] = [[]]
+    size = 0
+    for child in main.children:
+        if isinstance(child, _Node) and child.tag in ("h1", "h2") and size >= CHAPTER_MIN:
+            chunks.append([])
+            size = 0
+        chunks[-1].append(child)
+        size += len(_serialize(child))
+    if len(chunks) == 1:
+        return [list(body.children)]
+    at = body.children.index(main)
+    out: list[list[_Node | str]] = []
+    for n, chunk in enumerate(chunks):
+        attrs = {k: v for k, v in main.attrs.items() if n == 0 or k != "id"}
+        out.append(
+            [
+                *(body.children[:at] if n == 0 else []),
+                _Node("main", attrs, chunk, body),
+                *(body.children[at + 1 :] if n == len(chunks) - 1 else []),
+            ]
+        )
+    return out
 
 
 def export_epub(
@@ -502,12 +651,15 @@ def export_epub(
     page_title = _find(root, "title")
     title = (
         " ".join((title or (_text(page_title) if page_title else "") or "").split())
-        or "Converted document"
+        or DEFAULT_TITLE
     )
 
     images = _extract_images(root, Notes(), lambda name: name)
-    has_math, has_svg = _prepare(root, set(images))
-    stylesheets = [_text(n) for n in root.walk() if n.tag == "style"]
+    has_math, _ = _prepare(root, set(images))
+    stylesheets = [epub_sheet(_text(n)) for n in root.walk() if n.tag == "style"]
+    if images:
+        stylesheets.append(EPUB_PICTURE_FRAME)
+    stylesheets = [css for css in stylesheets if css.strip()]
 
     taken = {n.attrs["id"] for n in body.walk() if n.attrs.get("id")}
     headings = [n for n in body.walk() if _HEADING.match(n.tag)]
@@ -535,25 +687,53 @@ def export_epub(
     lang_attr = escape(lang, quote=True)
     fonts = math_font.epub_files() if has_math else {}
     face = f"<style>{escape(math_font.EPUB_FONT_FACE, quote=False)}</style>" if fonts else ""
-    head = (
-        f'<meta charset="utf-8"/><title>{escape(_clean(title))}</title>'
-        + face
-        + "".join(f"<style>{escape(_clean(css), quote=False)}</style>" for css in stylesheets)
-    )
-    content = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        f'<html xmlns="{NS_XHTML}" xmlns:epub="{NS_EPUB}" lang="{lang_attr}" '
-        f'xml:lang="{lang_attr}">\n<head>{head}</head>\n'
-        f"<body>{''.join(_serialize(c) for c in body.children)}</body>\n</html>\n"
-    )
-    nav = _nav_document(title, lang, toc, pages)
+    sheets = "".join(f"<style>{escape(_clean(css), quote=False)}</style>" for css in stylesheets)
 
-    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    parts = _chapters(body)
+    files = [CONTENT_FILE, *(f"chapter-{n:02d}.xhtml" for n in range(2, len(parts) + 1))]
+    file_of = {
+        node.attrs["id"]: file
+        for file, nodes in reversed(list(zip(files, parts, strict=True)))
+        for top in nodes
+        if isinstance(top, _Node)
+        for node in top.walk()
+        if node.attrs.get("id")
+    }
+    documents: list[str] = []
+    chapter_properties: list[tuple[str, list[str]]] = []
+    for file, nodes in zip(files, parts, strict=True):
+        tops = [top for top in nodes if isinstance(top, _Node)]
+        found = {node.tag for top in tops for node in top.walk()}
+        for top in tops:  # a link to a place in another chapter names that chapter's file
+            for node in top.walk():
+                href = node.attrs.get("href", "") if node.tag == "a" else ""
+                if href.startswith("#") and file_of.get(href[1:], file) != file:
+                    node.attrs["href"] = file_of[href[1:]] + href
+        head = (
+            f'<meta charset="utf-8"/><title>{escape(_clean(title))}</title>'
+            + (face if "math" in found else "")
+            + sheets
+        )
+        documents.append(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<html xmlns="{NS_XHTML}" xmlns:epub="{NS_EPUB}" lang="{lang_attr}" '
+            f'xml:lang="{lang_attr}">\n<head>{head}</head>\n'
+            f"<body>{''.join(_serialize(c) for c in nodes)}</body>\n</html>\n"
+        )
+        chapter_properties.append((file, [p for p in ("math", "svg") if p in found]))
+    chapter_properties = [
+        (file, ["mathml" if p == "math" else p for p in properties])
+        for file, properties in chapter_properties
+    ]
+    content, *later = documents
+    nav = _nav_document(title, lang, toc, pages, file_of)
+
+    digest = hashlib.sha256("".join(documents).encode("utf-8")).hexdigest()
     identifier = identifier or f"urn:uuid:{uuid.UUID(digest[:32])}"
     stamp = (modified or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    properties = ["mathml"] if has_math else []
-    if has_svg:
-        properties.append("svg")
+    # A moving picture may flash, and a gif or webp file can be one; this tool's own pages hold
+    # no sound or motion otherwise.
+    hazard = "unknown" if any(name.endswith((".gif", ".webp")) for name in images) else "none"
     package = _package_document(
         identifier=identifier,
         title=title,
@@ -564,14 +744,12 @@ def export_epub(
         features=features,
         images=images,
         fonts=fonts,
-        item_properties=properties,
+        chapters=chapter_properties,
         paginated=bool(pages),
         summary=statement or ACCESSIBILITY_SUMMARY,
-        # This tool's pages hold no sound, motion or flashing; a page it did not make, or
-        # made before the statement existed, is not known.
-        hazard="none" if statement else "unknown",
+        hazard=hazard,
     )
-    if any(output_chars.count(part) for part in (package, nav, content)):
+    if any(output_chars.count(part) for part in (package, nav, *documents)):
         # The page never holds a character that is not text, so this is the export's own.
         raise EpubExportError("the file holds a character that is not text", NOT_TEXT)
     return EpubExport(
@@ -586,6 +764,7 @@ def export_epub(
         len(pages),
         n_headings,
         fonts,
+        dict(zip(files[1:], later, strict=True)),
     )
 
 
@@ -597,6 +776,7 @@ def build_epub(export: EpubExport) -> bytes:
         (PACKAGE, export.package.encode("utf-8")),
         (NAV, export.nav.encode("utf-8")),
         (CONTENT, export.content.encode("utf-8")),
+        *((f"EPUB/{name}", text.encode("utf-8")) for name, text in export.chapters.items()),
         *((f"EPUB/{name}", data) for name, data in sorted(export.images.items())),
         *((f"EPUB/{name}", data) for name, data in sorted(export.fonts.items())),
     ]

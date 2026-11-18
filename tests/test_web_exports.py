@@ -11,16 +11,19 @@ import re
 import threading
 import zipfile
 from datetime import UTC, datetime, timedelta
+from html import unescape
 
 import docx
 import pytest
 
 from fixtures.web.support import BOB, as_current, fetch, job_id_from, login, make_pdf, upload
+from readablestem.core.types import Kind
 from readablestem.pipeline import export_docx
-from readablestem.web import events
+from readablestem.web import documents, events
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.routes import exports
+from readablestem.web.routes.jobs import download_filename
 from readablestem.web.security import VIEW_CSP
 from test_web_canvas_download import (  # noqa: F401
     finished_job,
@@ -355,3 +358,58 @@ def test_download_everything_holds_each_file_type_the_records_and_the_settings(w
     other = zipfile.ZipFile(io.BytesIO(bob.get("/account/export").content)).namelist()
     assert not any(n.startswith(("documents/", "records/")) for n in other)
     bob.close()
+
+
+# ------------------------------------------------------------------------------ one title
+
+
+def _title_in(markup: str, tag: str) -> str:
+    found = re.search(rf"<{tag}[^>]*>(.*?)</{tag}>", markup, re.S)
+    assert found, tag
+    return unescape(found.group(1)).strip()
+
+
+def _titles_of(env, job_id: str) -> dict[str, str]:
+    """What each place calls the document: the student page, the Word and EPUB files, the
+    Canvas page, the Cartridge manifest and the feedback page."""
+    found = {"html": _title_in(fetch(env.browser, f"/jobs/{job_id}/download").text, "title")}
+    epub = zipfile.ZipFile(io.BytesIO(fetch(env.browser, f"/jobs/{job_id}/download.epub").content))
+    found["epub"] = _title_in(epub.read("EPUB/package.opf").decode(), "dc:title")
+    if export_docx.available():
+        word = fetch(env.browser, f"/jobs/{job_id}/download.docx").content
+        found["word"] = docx.Document(io.BytesIO(word)).core_properties.title
+    canvas = fetch(env.browser, f"/jobs/{job_id}/download/canvas").content
+    found["canvas"] = _title_in(
+        zipfile.ZipFile(io.BytesIO(canvas)).read("index.html").decode(), "title"
+    )
+    cartridge = fetch(env.browser, f"/jobs/{job_id}/download/cartridge").content
+    manifest = zipfile.ZipFile(io.BytesIO(cartridge)).read("imsmanifest.xml").decode()
+    found["cartridge"] = _title_in(manifest, "title")
+    feedback = _title_in(fetch(env.browser, f"/jobs/{job_id}/feedback").text, "h1")
+    found["feedback"] = feedback.removeprefix("Two questions about ")
+    return found
+
+
+def test_a_document_has_one_title_in_every_place_and_file(web):  # noqa: F811
+    typed = ready_job(web)
+    set_job(web, typed, title_override="Unit 4 handout", html_stale=True)
+    own = ready_job(web)  # the document's own title and heading, as its page writes them
+    set_job(web, own, html_stale=True)  # the fake converter's page is not made by the renderer
+
+    nameless = web.converter.output.result  # no title and no headings: the file name is it
+    nameless.title = None
+    nameless.elements = [e for e in nameless.elements if e.kind is not Kind.HEADING]
+    kept = {e.id for e in nameless.elements}
+    nameless.fixes = [f for f in nameless.fixes if f.element_id in kept]
+    named = job_id_from(upload(web.browser, make_pdf(2), filename="week_3-notes.pdf"))
+    assert web.run_worker() == named
+
+    zipped = zipfile.ZipFile(io.BytesIO(fetch(web.browser, "/app/download").content)).namelist()
+    for job_id, expected in ((typed, "Unit 4 handout"), (own, None), (named, "week 3 notes")):
+        with session_scope(web.ctx.factory) as session:
+            job = session.get(Job, job_id)
+            wanted = documents.document_title(job).text
+        assert expected is None or wanted == expected
+        found = _titles_of(web, job_id)
+        assert set(found.values()) == {wanted}, found
+        assert download_filename(wanted, job_id) in zipped

@@ -24,7 +24,7 @@ from readablestem.pipeline import checked
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import documents, fair_queue, job_page, office_census, states, titles
+from readablestem.web import documents, fair_queue, job_page, office_census, states
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
@@ -695,7 +695,7 @@ def job_view(
     carried = None
     if with_page and job.status == JobStatus.DONE and job.result_json:
         result = DocumentResult.model_validate(job.result_json)
-        page = job_page.page_data(result, last_decision(session, job))
+        page = job_page.page_data(result, last_decision(session, job), job.filename)
         carried = carry_view(job, result)
     # Only a finished job has a summary (the job page shows it for no other); a poll of one
     # that is waiting or converting does not load its result.
@@ -725,11 +725,7 @@ def job_view(
         slow_after_s=slow_s,
         progress=job.progress_json if job.status == JobStatus.RUNNING else None,
         page=page,
-        title=titles.effective_title(
-            job.title_override,
-            documents.stored_title(job) if done else None,
-            job.filename,
-        ),
+        title=documents.document_title(job).text,
         title_override=job.title_override,
         contact_line=job.contact_line,
         retention_mode=job.retention_mode,
