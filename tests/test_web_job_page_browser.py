@@ -335,3 +335,44 @@ def test_the_word_and_epub_buttons_download_in_one_click(site, browser, jobs):
             link.click()
         assert download.value.suggested_filename.endswith(f"-{jobs['ready'][:6]}{ending}")
     context.close()
+
+
+def test_a_hidden_tab_does_not_poll_and_asks_again_when_it_is_shown(site, browser, jobs):
+    """A tab the person is not looking at sends no status request (3 poll intervals pass), and
+    one within an interval of the tab being shown. The headless browser cannot hide a tab, so
+    the page is told it is hidden the way the browser tells it: `document.hidden` and a
+    `visibilitychange` event."""
+    from readablestem.web.poll import POLL_S
+
+    context, page = open_page(browser, site)
+    context.add_init_script(
+        "window.__hidden = false;"
+        "Object.defineProperty(document, 'hidden', {get: () => window.__hidden});"
+        "Object.defineProperty(document, 'visibilityState',"
+        " {get: () => window.__hidden ? 'hidden' : 'visible'});"
+    )
+    asked: list[str] = []
+
+    def note(request) -> None:
+        if request.url.split("?")[0].endswith(("/status", "/progress")):
+            asked.append(request.url)
+
+    page.on("request", note)
+
+    def show(hidden: bool) -> None:
+        page.evaluate(
+            "hidden => { window.__hidden = hidden;"
+            " document.dispatchEvent(new Event('visibilitychange')); }",
+            hidden,
+        )
+
+    page.goto(f"{site.base}/jobs/{jobs['running']}")
+    page.wait_for_load_state("networkidle")
+    show(True)
+    asked.clear()
+    page.wait_for_timeout((3 * POLL_S + 1) * 1000)
+    assert asked == []
+    show(False)
+    page.wait_for_timeout((POLL_S + 1) * 1000)
+    assert 1 <= len(asked) <= 2  # the status box and the progress list each poll once
+    context.close()

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: a hidden tab does not poll (branch test/wf52-startup-and-polling)
+
+- WF52 (F-497): a tab nobody is looking at no longer asks the server for the job's status,
+  progress, the documents list or the batch rows every 3 seconds. htmx keeps polling in a
+  background tab and its trigger filter needs an expression (`allowEval` is off), so
+  `static/app.js` cancels a poll request while `document.hidden` is true; the timer runs on and
+  the first tick after the tab is shown asks again, within one interval. Measured with the rest
+  of WF52: the one-page replay is claimed 0.01 to 0.03 s after upload (wake on upload, PF14), a
+  finished job's page makes 0 requests, and importing `pipeline.run` loads 0 modules of
+  `anthropic` or `openai` (now a test). No model call, no stored-data change, no migration, no
+  version bump.
+
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 
 - WS7.2 (F-014): the box "Convert scanned or handwritten pages" says what reading a page costs
