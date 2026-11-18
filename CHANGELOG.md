@@ -12,6 +12,29 @@
   page's count of links in the PDF leaves typed links out. A text edit keeps a computed link on
   the words that did not change, as it does for the others, and does not compute a new one.
   `PIPELINE_VERSION` is not bumped here.
+## Unreleased: the document's language (branch fix/document-language)
+
+- SW20d and SW20a (F-543, F-272, the detection half of F-350): the language of a document is
+  decided by one order, with no voting between sources: the language chosen on the upload form
+  ("Language of the document", "Detect it" by default; it is stated, never assumed); then the
+  text, counted by script (kana is Japanese, Hangul Korean, Hebrew, Greek and Thai their own,
+  Han with no kana Chinese; Latin, Cyrillic and Arabic text goes to the detector, restricted
+  to the languages written in that script, with the same bar for every language, and one table
+  maps "ary" and "arz" to "ar"); then the file's own /Lang, only when the text could not decide
+  and its script fits the text (Word writes "en-US" into files in other languages, so /Lang no
+  longer outranks the text); otherwise English, assumed. Passages are found block by block with
+  the same rules. When no language holds 60 % of the letters the document is "mixed" (notice
+  `lang_mixed`) and takes the largest. An assumed or mixed language is a required check: the
+  job is "Converted: confirm the language", not "Ready to share", and the open item is counted,
+  until the owner confirms or changes the language with the existing control; old results with
+  `lang_assumed` show it at their next view, and a shared document is not un-shared. The choice
+  is stored on the job and the pending upload (`language`, migration `c5d9e1a3b7f4`); it is
+  not part of a step's key, and no model request reads the language, so no recorded answer
+  changes. Measured on the 42 corpus files that replay
+  (replays only, no model call): 4 documents change language, documents with an assumed
+  language fall from 6 to 3, 2 are
+  marked mixed, passages found rise from 6 to 8, and no replay answer is missing that was not
+  missing before.
 
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 

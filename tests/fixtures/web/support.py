@@ -348,9 +348,12 @@ def upload(
     share: bool = False,
     exam: bool = False,
     image_pages: bool = False,
+    language: str | None = None,
     csrf: str | None = None,
 ):
     fields = {"csrf_token": csrf if csrf is not None else token(client)}
+    if language:
+        fields["language"] = language
     if image_pages:
         fields["image_pages"] = "on"
     if keep:

@@ -431,10 +431,13 @@ ENGLISH = (
 FRENCH = "La vitesse moyenne est le quotient du déplacement par la durée du trajet."
 
 
-def test_the_pdfs_language_comes_first():
+def test_the_pdfs_language_is_kept_when_the_text_agrees_and_decides_when_it_cannot():
     result = annotate([el("p1-e0", text=ENGLISH)], PdfText(lang="en-GB"))
     assert (result.lang, result.lang_source, result.notices) == ("en-GB", "pdf", [])
+    # English text outranks a layout language of "de"; a short text takes it.
     result = annotate([el("p1-e0", text=ENGLISH)], PdfText(), layout_lang="de")
+    assert (result.lang, result.lang_source) == ("en", "detected")
+    result = annotate([el("p1-e0", text="Speeds are below.")], PdfText(), layout_lang="de")
     assert (result.lang, result.lang_source) == ("de", "pdf")
 
 
@@ -446,9 +449,10 @@ def test_without_lang_the_language_is_detected_and_flagged():
 
 def test_a_passage_in_another_language_is_marked():
     elements = [el("p1-e0", text=ENGLISH), el("p1-e1", text=FRENCH, order=1),
-                el("p1-e2", Kind.HEADING, text=FRENCH, order=2)]  # fmt: skip
+                el("p1-e2", Kind.HEADING, text=FRENCH, order=2),
+                el("p1-e3", text=ENGLISH, order=3), el("p1-e4", text=ENGLISH, order=4)]  # fmt: skip
     result = annotate(elements, PdfText(lang="en"))
-    assert [e.lang for e in result.elements] == [None, "fr", None]  # not on headings
+    assert [e.lang for e in result.elements] == [None, "fr", None, None, None]  # not on headings
 
 
 # --------------------------------------------------------------------------- language change
@@ -653,7 +657,7 @@ def test_a_failing_pass_leaves_the_elements_as_they_were(monkeypatch):
     # With no language from the PDF either, English is assumed and the job page asks.
     result = text_pass.apply(b"not a pdf", elements, pages=[0])
     assert (result.lang, result.lang_source) == ("en", "default")
-    assert result.notices == [Notice(code="lang_assumed")]
+    assert result.notices == [Notice(code="lang_assumed", review="required")]
 
 
 def test_a_language_detector_that_cannot_load_leaves_links_and_references(monkeypatch, caplog):
@@ -674,7 +678,7 @@ def test_a_language_detector_that_cannot_load_leaves_links_and_references(monkey
     assert (result.lang, result.lang_source, result.notices) == (
         "en",
         "default",
-        [Notice(code="lang_assumed")],
+        [Notice(code="lang_assumed", review="required")],
     )
     assert "language detection failed: OSError" in caplog.text
 

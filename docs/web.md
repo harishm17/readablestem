@@ -703,7 +703,7 @@ Listen text never say it. Changing the choice is a revised upload (the file agai
 carried over); a change in place that re-describes only the description steps is not built.
 
 **The form's shape** (`_upload_form.html`, ux2-lane-a): the file field with its facts, then two
-groups that are one line each until opened, then "Upload and convert". The exam box sits between the
+groups that are one line each until opened, then "Upload and convert". The "Language of the document" select ("Detect it" by default; stored as `Job.language` and `PendingUpload.language`, and handed to the converter as `ConversionOptions.language`, which is not part of a step's key) and the exam box sit between the
 file field and the groups. "How to convert it" (course and scanned and handwritten pages, each when
 offered) and "How long to keep it" each say what
 is set now ("No course · Scanned pages kept as pictures"; "Deleted 24
@@ -2417,13 +2417,15 @@ From top to bottom:
    structure checks ran; the axe test and screen-reader testing did not.
 7. **Language**, one line with a "Change" control folded behind a details element:
    "Language: English (detected; your PDF did not say)" ("from your PDF",
-   "assumed; ...", "you chose it"; a result made before detection existed counts as
+   "assumed; ...", "you chose it" (an assumed or mixed language is a required check: the
+   job's state is "Converted: confirm the language" until this control is used,
+   `web.states`); a result made before detection existed counts as
    "from your PDF" when the PDF has /Lang) and a select of the languages in
    `pipeline.language.LANGUAGE_NAMES` (35) with "Confirm this language" (when it was
    detected or assumed) or "Use this language". The POST (CSRF-checked, owner only,
    finished jobs only, only a listed language or the document's own) goes through the
    text pass's rule (`text_pass.set_document_language`): `lang` and
-   `lang_source="user"`, the `lang_detected` and `lang_assumed` notices dropped, and the
+   `lang_source="user"`, the `lang_detected`, `lang_assumed` and `lang_mixed` notices dropped, and the
    passage languages worked out again against the new language. Then it makes the HTML
    again (`review.rerender_html`, with the day of the last decision for the student
    note) and bumps `jobs.result_version`. The language tag is not logged.

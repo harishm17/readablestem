@@ -37,9 +37,10 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 `external_resource` rule if that ever changes. It must not be pasted into an LMS page
 (see "Posting it in a course").
 
-- `lang` is `DocumentResult.lang`: the PDF's `/Lang`, else the language detected from the
-  text, else `en` (see "Language"). Anything that is not a language tag falls back to
-  `en`, so a crafted PDF cannot inject attributes.
+- `lang` is `DocumentResult.lang`: the language chosen at upload, else the language of the
+  text, else the PDF's `/Lang` when the text is too short to say, else `en` (see
+  "Language"). Anything that is not a language tag falls back to `en`, so a crafted PDF
+  cannot inject attributes.
 - Links (`<a href>`, see "Links and cross-references") load nothing: following one is
   the reader's choice, and opening the file still sends no request.
 - `<title>` is the text of the page's one `<h1>` (see "One h1"): the first top-level
@@ -961,15 +962,33 @@ found confidently in another language carries its own (`Element.lang`), written 
 ```
 
 A screen reader switches voice for that paragraph (WCAG 3.1.2), and MathCAT speaks math
-in the page's language. Where the document language came from is
-`DocumentResult.lang_source`: "pdf" (`/Lang`), "detected" (from the body text, notice
-`lang_detected`), "default" ("en" because nothing else was found, notice `lang_assumed`)
-or "user". The job page shows the language and lets the instructor change it: the route
-calls `text_pass.set_document_language(result, tag)` (a BCP 47 tag such as "fr" or
-"pt-BR", or an English name such as "French"; ValueError otherwise), which sets the
-language and source "user", drops the two notices and works out the passages again
-against the new language, then re-renders the file with `web.review.rerender_html` and
-stores both, as after a review decision.
+in the page's language. The sources are tried in this order, with no voting between
+them (`text_pass._document_language`):
+
+1. The language chosen on the upload form ("Language of the document"; "Detect it" is the
+   default). It is stated, never assumed: source "user".
+2. The text. Letters are counted by script: kana makes Japanese, Hangul Korean, Hebrew,
+   Greek and Thai their own languages, and Han with no kana is Chinese. Latin, Cyrillic and
+   Arabic text goes to the detector, restricted to the languages written in that script,
+   with the same bar for every language. Source "detected" (notice `lang_detected`, unless
+   the file's own `/Lang` names the same language, then "pdf").
+3. The file's `/Lang`, only when the text could not decide and its script fits the text.
+   Word writes `en-US` into files in other languages, so it is not trusted over the text.
+4. Otherwise `en`, assumed: source "default" and the notice `lang_assumed`.
+
+A passage is found the same way, block by block. When no language holds 60 % of the
+letters the document is mixed: its language is the largest one, and the notice
+`lang_mixed` says so.
+
+`lang_assumed` and `lang_mixed` are required checks: until the owner confirms the language
+or changes it, the job is not "Ready to share" (the state "Converted: confirm the
+language", `web.states`) and the open item is counted. Where the document language
+came from is `DocumentResult.lang_source`. The job page shows the language and lets the
+instructor change it: the route calls `text_pass.set_document_language(result, tag)` (a
+BCP 47 tag such as "fr" or "pt-BR", or an English name such as "French"; ValueError
+otherwise), which sets the language and source "user", drops the three notices and works
+out the passages again against the new language, then re-renders the file with
+`web.review.rerender_html` and stores both, as after a review decision.
 
 Text the tool itself writes (the notes, "Equation" before an equation number, the about
 section) is English whatever the document's language.
@@ -1649,10 +1668,11 @@ Keep the two in step when a limit changes.
   part.
 - Link text is kept as printed, also when it says nothing on its own ("click here"):
   only the instructor can reword it (the job page lists it as worth checking).
-- Language detection needs about 20 words of prose; a short handout of mostly math is
-  assumed to be English unless the PDF says otherwise. A passage is marked only when it
-  is a whole paragraph or list item in another language (a quoted phrase inside an
-  English sentence is not).
+- Language detection needs about 100 letters of prose; a short handout of mostly math is
+  assumed to be English unless the PDF says otherwise, and the job then waits for you to
+  confirm the language. You can also choose the language when you upload. A passage is
+  marked only when it is a whole paragraph or list item in another language (a quoted
+  phrase inside an English sentence is not).
 - Color inside figures stays in the image; color in headings is not kept.
 
 

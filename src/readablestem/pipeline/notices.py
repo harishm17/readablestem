@@ -96,6 +96,9 @@ Section = Literal["handled", "not_handled", "worth_checking"]
 # a footnote kept where it falls, a block of program code kept as code. They are counted
 # under "Handled in this file", never listed as left out (F-043).
 HANDLED_CODES = frozenset({"footnote", "code_block"})
+# The language is a check on the document (SW20a): the owner confirms or changes it before the
+# file is "Ready to share" (`web.states`), whatever `review` an older stored notice has.
+LANGUAGE_CODES = frozenset({"lang_assumed", "lang_mixed"})
 
 
 def section(notice: Notice) -> Section:
@@ -103,6 +106,8 @@ def section(notice: Notice) -> Section:
     handled in this file" for the other required and none, "Worth checking" for optional."""
     if notice.code in HANDLED_CODES:
         return "handled"
+    if notice.code in LANGUAGE_CODES:
+        return "not_handled"
     return "worth_checking" if notice.review == "optional" else "not_handled"
 
 

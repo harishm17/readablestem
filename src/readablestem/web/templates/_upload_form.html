@@ -8,6 +8,7 @@
 {% set fv = form_values|default(none) %}
 {% set revising = revises|default(none) %}
 {% set exam_on = fv.exam if fv else exam_default|default(false) %}
+{% set chosen_language = fv.language if fv else language_default|default("") %}
 {% set pages_on = fv.image_pages if fv else image_pages_default|default(false) %}
 {% set keep_on = fv.keep if fv else keep_default|default(false) %}
 {% set share_on = fv.share if fv else false %}
@@ -133,6 +134,19 @@
     <div class="field checkbox-field exam-choice">
       <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}>
       <label for="exam">{{ exam_words.choice }}</label>
+    </div>
+
+    {# The language, when the person knows it (Job.language). "Detect it" leaves it to the
+       converter, which then asks for a confirmation when it is not sure. #}
+    <div class="field">
+      <label for="language">Language of the document</label>
+      <select id="language" name="language" aria-describedby="language-hint">
+        <option value=""{% if not chosen_language %} selected{% endif %}>Detect it</option>
+        {% for tag, name in language_options %}
+        <option value="{{ tag }}"{% if tag == chosen_language %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint" id="language-hint">Screen readers use it to choose a voice. If you pick one, we use it as given and do not detect.</p>
     </div>
 
     {# Two groups, in the order they are decided. Each says its setting in one line; the

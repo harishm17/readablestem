@@ -762,6 +762,7 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
             "revises": {"id": job.id, "title": title, "filename": job.filename},
             "chosen_course": job.course_id or "",
             "exam_default": bool(job.exam_mode),
+            "language_default": job.language or "",
             "image_pages_default": bool(job.image_pages),
         }
 
@@ -852,10 +853,18 @@ def _upload_error_page(
     return render(request, "app.html", context, status_code=status, headers=headers)
 
 
+def chosen_language(fields: Mapping[str, str]) -> str:
+    """The upload form's "Language of the document": a tag the job page's control offers
+    (`pipeline.language.LANGUAGE_NAMES`), or "" for "Detect it" and for anything else."""
+    value = (fields.get("language") or "").strip()
+    return value if value in languages.LANGUAGE_NAMES else ""
+
+
 def form_values(fields: Mapping[str, str]) -> dict[str, Any]:
     """The upload form's options as the person sent them, to show the form again as it was."""
     return {
         "exam": fields.get("exam") == "on",
+        "language": chosen_language(fields),
         "image_pages": fields.get("image_pages") == "on",
         "keep": fields.get("keep") == "on",
         "share": fields.get("share") == "on",
@@ -1041,12 +1050,23 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     )
     # "Exam or quiz": figures are described without giving answers (T1-14).
     exam = form.fields.get("exam") == "on"
+    language = chosen_language(form.fields) or None
     # "Convert scanned or handwritten pages" (ADR 0007): offered by FEATURE_IMAGE_PAGES, used
     # only for a file whose probe finds such pages.
     image_pages = form.fields.get("image_pages") == "on" and s.feature_image_pages
     main_file = (form.fields.get("main_file") or "").strip()[:200] or None
     placed = await run_in_threadpool(
-        _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages, main_file
+        _place_files,
+        ctx,
+        user,
+        form.files,
+        mode,
+        course_id,
+        exam,
+        revises,
+        image_pages,
+        main_file,
+        language,
     )
     request.state.upload_accepted = sum(1 for item in placed if item.job_id or item.pending_id)
     for item in placed:  # product analytics (web.analytics): counts only, never a file name
@@ -1099,6 +1119,7 @@ def _place_files(
     revises: str | None,
     image_pages: bool = False,
     main_file: str | None = None,
+    language: str | None = None,
 ) -> PlacedList:
     """Check each file and queue it, or keep it for choosing its pages, or say why not.
     A refusal of one file does not stop the others: each is its own document."""
@@ -1113,14 +1134,16 @@ def _place_files(
         if s.feature_latex_source and source_intake.kind_of(file.filename, file.data):
             placed.append(
                 _place_source(
-                    ctx, user, file, mode, course_id, exam, revises, main_file, len(files)
+                    ctx, user, file, mode, course_id, exam, revises, main_file, len(files), language
                 )
             )
             continue
         # A Word file the reader takes (`FEATURE_WORD_SOURCE`) is read from the file itself:
         # no PDF is made. Anything it will not take goes on as below.
         if s.feature_word_source:
-            word = _place_word(ctx, user, file, mode, course_id, exam, revises, len(files))
+            word = _place_word(
+                ctx, user, file, mode, course_id, exam, revises, len(files), language
+            )
             if word is not None:
                 placed.append(word)
                 continue
@@ -1193,6 +1216,7 @@ def _place_files(
                     convert_images,
                     office=census.to_json() if census else None,
                     scans=scans,
+                    language=language,
                 )
             )
             placed[-1].office = office
@@ -1213,6 +1237,7 @@ def _place_files(
                 convert_images,
                 office=census.to_json() if census else None,
                 scans=scans,
+                language=language,
             )
             if held.pending_id:
                 held.office = office
@@ -1229,6 +1254,7 @@ def _place_files(
                 mode,
                 course_id=course_id,
                 exam=exam,
+                language=language,
                 image_pages=convert_images,
                 revises=revises,
                 now=utcnow(),
@@ -1388,6 +1414,7 @@ def _place_source(
     revises: str | None,
     main_file: str | None,
     files: int,
+    language: str | None = None,
 ) -> Placed:
     """Check a `.tex` or `.zip` and queue it as a job, or say why not. The pages counted
     against the day's quota are an estimate made from the source (`source.intake`)."""
@@ -1418,6 +1445,7 @@ def _place_source(
             mode,
             course_id=course_id,
             exam=exam,
+            language=language,
             now=utcnow(),
             media_type=SOURCE_MEDIA_TYPES[info.kind],
         )
@@ -1445,6 +1473,7 @@ def _place_word(
     exam: bool,
     revises: str | None,
     files: int,
+    language: str | None = None,
 ) -> Placed | None:
     """A `.docx` the Word reader takes, queued as a source job (`source.docx_reader`), or None:
     the file goes the PDF route instead (a revision, a file that is not a Word file, no sandbox
@@ -1479,6 +1508,7 @@ def _place_word(
             mode,
             course_id=course_id,
             exam=exam,
+            language=language,
             now=utcnow(),
             media_type=SOURCE_MEDIA_TYPES["docx"],
             office=replace(census, read_from_file=True).to_json(),
@@ -1517,6 +1547,7 @@ def _keep_for_parts(
     image_pages: bool = False,
     office: dict | None = None,
     scans: dict[str, int] | None = None,
+    language: str | None = None,
 ) -> Placed:
     """A file over the page or size limit is kept for the person to choose its pages
     (T3-3, `web.pending`); nothing is converted or counted until they do. `scans`: the count of
@@ -1535,6 +1566,7 @@ def _keep_for_parts(
                 mode=mode,
                 course_id=course_id,
                 exam=exam,
+                language=language,
                 image_pages=image_pages,
                 office=office,
                 scans=scans,

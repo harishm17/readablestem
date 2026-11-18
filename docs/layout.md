@@ -1530,7 +1530,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
 `title` is the PDF metadata title unless it is empty, a file name (`notes.docx`) or a tool
 default (`Untitled document`, `Microsoft Word - ...`); otherwise the first level-1 heading.
 `lang` is the catalog `/Lang` when it looks like a language tag, else `en`. The text pass
-decides the document's language from there (it detects one when the PDF has none).
+decides the document's language from there (the chosen language, then the text, then
+`/Lang`; see "Language" below).
 
 ### Code blocks, footnotes and contents pages (T2-16, T2-17)
 
@@ -2422,20 +2423,34 @@ it points at, keeping the PDF's own target (`widen_internal`).
 
 The document's language (`DocumentResult.lang`, `lang_source`):
 
-1. the catalog `/Lang` when it is a tag whose language is a real two- or three-letter
-   code (`language.document_tag`; "x-none" and "und" do not count): source "pdf";
-2. else detected from the body text: source "detected" and the notice `lang_detected`;
-3. else "en": source "default" and the notice `lang_assumed`.
+1. the language chosen at upload (`ConversionOptions.language`, from `Job.language`):
+   source "user", no notice. It is not part of a step's key (`exclude=True`), as no model
+   request reads the language;
+2. else the body text (`language.document_language`): source "detected" and the notice
+   `lang_detected`, or "pdf" when the catalog `/Lang` names the same language;
+3. else the catalog `/Lang`, when it is a tag whose language is a real two- or
+   three-letter code (`language.document_tag`; "x-none" and "und" do not count) and its
+   script fits the text (`language.fits_text`): source "pdf". It is below the text because
+   Word writes `en-US` into files in other languages;
+4. else "en": source "default" and the notice `lang_assumed`.
 
-Both notices are optional; the job page lets the instructor confirm or change the
-language (`text_pass.set_document_language`, source "user").
+No language holding 60 % of the letters adds `lang_mixed`. `lang_assumed` and
+`lang_mixed` are required checks (`web.states`): the job is not "Ready to share" until the
+owner confirms or changes the language on the job page
+(`text_pass.set_document_language`, source "user"). `lang_detected` stays optional.
 
-Detection (`pipeline/language.py`) classifies words only: inline equations, numbers,
+Detection (`pipeline/language.py`) counts letters by script (Chinese, Japanese and Korean
+count like any other text) and classifies words only: inline equations, numbers,
 single letters (mostly variables), symbols, styled math letters and code-like tokens
-(anything with a digit, an underscore or a bracket in it) are left out. The document
-needs at least 100 letters of such prose and a probability of 0.90; a language other
-than English needs at least 250 letters and 0.99, and Latin and the constructed
-languages (Esperanto, Volapük) are never taken from detection alone: py3langid reads a
+(anything with a digit, an underscore or a bracket in it) are left out. Kana, Hangul,
+Hebrew, Greek and Thai fix the language by script; Han with no kana is Chinese. Latin,
+Cyrillic and Arabic text goes to the detector, restricted to the languages written in that
+script, and one table maps the labels with no voice ("ary", "arz") to the tag a voice
+exists for ("ar"). The document needs at least 100 letters of such text (a letter of Chinese,
+Japanese, Korean or Thai counts three, as it carries about that much) and a
+probability of 0.90, the same for every language (an earlier rule asked 250 letters and
+0.99 of any language other than English). Latin and the constructed languages
+(Esperanto, Volapük) are never taken from detection alone: py3langid reads a
 one-page list of English terms (reagents, element names, species) as Latin at 0.99,
 and a wrong document language puts the whole file in the wrong voice, while the
 default only asks for a check. A paragraph or list

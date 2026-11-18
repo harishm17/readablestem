@@ -21,9 +21,11 @@ keep, and adds to the elements without changing their text or anything a model s
   "Theorem 2.1", "Lemma", "Proposition", "Corollary", "Definition" and "Example" (a
   paragraph or heading that starts with that label and number). A reference inside its own
   target is not linked.
-- `DocumentResult.lang` and `lang_source`: the PDF's /Lang ("pdf"), else detected from
-  the body text ("detected", notice `lang_detected`), else "en" ("default", notice
-  `lang_assumed`); and `Element.lang` on a paragraph or list item confidently in
+- `DocumentResult.lang` and `lang_source`: the language chosen at upload ("user"), else
+  detected from the body text ("detected", notice `lang_detected`; "pdf" when the PDF's own
+  /Lang names the same language; `lang_mixed` when no language holds 60% of the letters),
+  else the PDF's /Lang when the text is too short to say ("pdf"), else "en" ("default",
+  notice `lang_assumed`); and `Element.lang` on a paragraph or list item confidently in
   another language (`pipeline.language`).
 - `Element.colour_runs` (only with FEATURE_COLOUR): text printed in a colour other than
   the body's, and the notice `colour_reference` when text near coloured text refers to
@@ -1002,22 +1004,50 @@ def deleted_runs(element: Element, aligner: _Aligner, strikes: Sequence[Strike])
 
 
 def _document_language(
-    elements: Sequence[Element], pdf_lang: str | None, layout_lang: str
+    elements: Sequence[Element],
+    pdf_lang: str | None,
+    layout_lang: str,
+    chosen: str | None = None,
 ) -> tuple[str, LangSource, list[Notice]]:
-    if pdf_lang:
-        return pdf_lang, "pdf", []
-    if layout_lang and layout_lang != language.DEFAULT_LANG:
+    """The document language, from the first of these that has one (SW20d): what the person
+    chose at upload (stated, so no notice); the text, by script and then the detector
+    (`language.document_language`; the file's own /Lang says the tag when it agrees, and
+    otherwise loses: Word writes en-US into files in other languages); the file's own /Lang
+    when the text is too short to say and is in its script; else English, assumed. A text in
+    no one language (`lang_mixed`) and an assumed one (`lang_assumed`) are checks the
+    instructor answers on the job page (SW20a)."""
+    if chosen and (tag := language.document_tag(chosen)):
+        return tag, "user", []
+    stated = pdf_lang
+    if not stated and layout_lang and layout_lang != language.DEFAULT_LANG:
         # Layout only reports a language other than the default from the PDF's /Lang.
-        return language.document_tag(layout_lang) or language.DEFAULT_LANG, "pdf", []
+        stated = language.document_tag(layout_lang)
     texts = [e.text or "" for e in elements if e.kind in (*RUNNING_KINDS, Kind.HEADING)]
     try:
-        detected = language.document_language(texts)
+        found = language.document_language(texts)
     except Exception as exc:  # the detector (its model file, NumPy) failing to load
         log.warning("language detection failed: %s", type(exc).__name__)
-        detected = None
-    if detected is not None:
-        return detected, "detected", [Notice(code="lang_detected")]
-    return language.DEFAULT_LANG, "default", [Notice(code="lang_assumed")]
+        return (
+            stated or language.DEFAULT_LANG,
+            "pdf" if stated else "default",
+            ([] if stated else [Notice(code="lang_assumed", review="required")]),
+        )
+    mixed = [Notice(code="lang_mixed", review="required")] if found and found.mixed else []
+    if found is not None:
+        if stated and _agrees(stated, found.lang):
+            return stated, "pdf", mixed  # the file says it, and the text agrees
+        return found.lang, "detected", [Notice(code="lang_detected"), *mixed]
+    if stated and language.fits_text(stated, texts):
+        return stated, "pdf", []
+    return language.DEFAULT_LANG, "default", [Notice(code="lang_assumed", review="required")]
+
+
+def _agrees(stated: str, detected: str) -> bool:
+    """The file's tag names the language the text is in. Han text without kana is Chinese
+    to the detector and may be a Japanese file in kanji alone."""
+    if language.primary(stated) == detected:
+        return True
+    return detected == "zh" and language.primary(stated) == "ja"
 
 
 def passages(elements: Sequence[Element], document_lang: str) -> dict[str, str | None]:
@@ -1075,6 +1105,7 @@ def annotate(
     layout_lang: str = "en",
     colour: bool = False,
     runs: bool = False,
+    chosen_lang: str | None = None,
 ) -> TextPassResult:
     """The pass on elements and what was read from the PDF (pure; see `apply`)."""
     aligner = _Aligner(pdf.glyphs)
@@ -1119,7 +1150,7 @@ def annotate(
             continue
         if found_struck := deleted_runs(element, aligner, strikes):
             struck[element.id] = found_struck
-    lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang)
+    lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang, chosen_lang)
     langs = passages(elements, lang)
     updated = []
     for element in elements:
@@ -1160,13 +1191,15 @@ def apply(
     layout_lang: str = "en",
     colour: bool = False,
     runs: bool = False,
+    chosen_lang: str | None = None,
 ) -> TextPassResult:
     """The text pass for one conversion (the module docstring says what it adds).
 
     `pages` are the analysed pages (0-based), `layout_lang` the language layout reported
     (`Layout.lang`: the PDF's /Lang, else "en"), `colour` the FEATURE_COLOUR flag in
-    force, `runs` the CONTENT_RUNS flag (off: struck runs are counted, not written). Never
-    raises: a PDF that cannot be read again gives no links or colours (the
+    force, `runs` the CONTENT_RUNS flag (off: struck runs are counted, not written),
+    `chosen_lang` the language the person chose at upload (`ConversionOptions.language`).
+    Never raises: a PDF that cannot be read again gives no links or colours (the
     cross-references and the language still come from the text), and a failure of the
     pass itself leaves the elements as they were, with the language layout reported.
     """
@@ -1176,13 +1209,22 @@ def apply(
         log.warning("text pass could not read the PDF: %s", type(exc).__name__)
         pdf = PdfText()
     try:
-        return annotate(elements, pdf, layout_lang=layout_lang, colour=colour, runs=runs)
+        return annotate(
+            elements,
+            pdf,
+            layout_lang=layout_lang,
+            colour=colour,
+            runs=runs,
+            chosen_lang=chosen_lang,
+        )
     except Exception as exc:
         log.warning("text pass failed: %s", type(exc).__name__)
+        if chosen_lang and (tag := language.document_tag(chosen_lang)):
+            return TextPassResult(list(elements), tag, "user", [])
         if pdf.lang or layout_lang != language.DEFAULT_LANG:
             return TextPassResult(list(elements), pdf.lang or layout_lang, "pdf", [])
         # Nothing says which language this is: assumed, and the job page asks.
-        notices = [Notice(code="lang_assumed")]
+        notices = [Notice(code="lang_assumed", review="required")]
         return TextPassResult(list(elements), language.DEFAULT_LANG, "default", notices)
 
 
@@ -1194,7 +1236,7 @@ def set_document_language(result: DocumentResult, tag: str) -> DocumentResult:
 
     `tag` is a BCP 47 tag ("fr", "pt_br") or the English name of a language in
     `language.LANGUAGE_NAMES` ("French"); `lang` becomes its usual form ("fr", "pt-BR")
-    and `lang_source` "user". The `lang_detected` / `lang_assumed` notices go (the
+    and `lang_source` "user". The `lang_detected`, `lang_assumed` and `lang_mixed` notices go (the
     instructor has answered them), and the passage languages are worked out again
     against the new language, so a passage is marked only where it differs from it.
     Raises ValueError for anything else, including tags that name no language ("und",
@@ -1210,7 +1252,8 @@ def set_document_language(result: DocumentResult, tag: str) -> DocumentResult:
         e.model_copy(update={"lang": langs.get(e.id)}) if e.id in langs or e.lang else e
         for e in result.elements
     ]
-    notices = [n for n in result.notices if n.code not in ("lang_detected", "lang_assumed")]
+    answered = ("lang_detected", "lang_assumed", "lang_mixed")
+    notices = [n for n in result.notices if n.code not in answered]
     return result.model_copy(
         update={"lang": lang, "lang_source": "user", "elements": elements, "notices": notices}
     )
