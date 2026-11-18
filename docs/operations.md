@@ -112,6 +112,21 @@ free their own space at once by deleting documents ("Delete" on My documents).
 
 Every daily backup copies what is stored that day, so look at the `backup` volume too.
 
+### Where the bytes are: `ops storage-report`
+
+`uv run readablestem ops storage-report [--largest N]` prints, from the database alone (sizes
+and random ids, nothing of a document's content): the bytes on disk of each table with its
+indexes and large values; on Postgres a row for the database's own catalogs, so the rows add
+up to `pg_database_size` (99.9% on a 60-document test database; on SQLite the total is the
+file's pages and the tables come from `dbstat`); and, for finished documents, the median, 90th
+percentile, largest and total bytes per document split into upload, crops, HTML, result and step
+records, with the N largest documents by id.
+
+The per-document figures are the document's content bytes (the same terms as the per-person cap
+above, plus step records). The table figures are what is on disk, and Postgres compresses large
+HTML out of line, so the document totals can add up to more than the tables do. Use the tables
+for "how full is the volume" and the per-document figures for "what does one document cost".
+
 ### Large files waiting for their pages
 
 A PDF over the page or size limit is kept as a `pending_uploads` row (`web/pending.py`, docs/web.md

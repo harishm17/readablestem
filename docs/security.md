@@ -263,8 +263,24 @@ script injected into an app page is refused by the policy.
 | Emailed sign-in links, per target address (off) | 3 per 15 minutes, whoever asks | `web/abuse.py` (`email_link`) |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
+| Zip downloads, per person (`/app/download`, `/courses/{id}/download`, `/app/batch/{id}/download`, `/account/export`: one allowance for the four) | 15 per 10 minutes | `web/abuse.py` (`zip_user`), counted in `routes/bundle.py` |
 | Cron route, per address (every call counts, so wrong tokens are limited too) | 10 per 5 minutes | `web/abuse.py` |
 | Analytics relay `/m/` (only with `ANALYTICS_ENABLED`), per address | 300 per 10 minutes | `web/abuse.py` (`analytics`) |
+
+A zip build loads every ready document of the person and builds each one's files, which takes a
+minute or more for a large set; 15 in 10 minutes is more than anyone downloads by hand (the
+upload rule's size). The count is taken when the build starts and is not given back when the
+build fails or answers 409 ("nothing ready"): the work was already done, so refunding would
+let a script repeat a failing build without limit. A HEAD request builds nothing and does not
+count. The refusal is a 429 page that says how long to wait (`Retry-After`). The single-document
+project and source zips (`routes/jobs.py`) build one document's files and are not on this rule.
+
+Compression and BREACH (`web/security.py`, `CompressionMiddleware`): text responses over 1 KB
+are gzip-compressed when the browser asks, but never a page that printed the CSRF token
+(`deps.csrf_token` marks the request `carries_secret`), so a page that holds a secret next to
+text an attacker can influence is never compressed. That leaves the signed-in form pages
+(including the review screen) uncompressed. Downloads (`Content-Disposition: attachment`),
+streamed answers (no `Content-Length`) and answers over 8 MiB are passed through unchanged.
 
 The rate limit is on by default and production refuses to start with `RATE_LIMITS_ENABLED=false`. It is in memory, per instance: with two instances the allowance is doubled, and a
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the

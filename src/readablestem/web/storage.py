@@ -192,8 +192,9 @@ def finished_job_bytes(session: Session) -> list[JobBytes]:
 def table_bytes(session: Session) -> tuple[dict[str, int], int | None]:
     """Bytes on disk of each table with its indexes and out-of-line values, and the database's
     own size figure (Postgres `pg_database_size`; for SQLite the file's pages), both None or
-    empty when the database cannot say. What is in the second and not the first is the
-    database's own catalogs and free pages."""
+    empty when the database cannot say. On Postgres the catalogs are a row of their own, so
+    the rows add up to the database's figure; on SQLite what is in the second and not the
+    first is free pages."""
     dialect = session.get_bind().dialect.name
     if dialect == "postgresql":
         tables = {
@@ -206,6 +207,18 @@ def table_bytes(session: Session) -> tuple[dict[str, int], int | None]:
                 )
             )
         }
+        # The database's own catalogs (this database's copy; the shared ones are not part of
+        # `pg_database_size`), so the tables add up to its figure.
+        catalogs = session.scalar(
+            text(
+                "SELECT sum(pg_total_relation_size(c.oid)) FROM pg_class c "
+                "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE c.relkind = 'r' AND NOT c.relisshared "
+                "AND n.nspname IN ('pg_catalog', 'information_schema')"
+            )
+        )
+        if catalogs:
+            tables["(database catalogs)"] = int(catalogs)
         return tables, int(session.scalar(text("SELECT pg_database_size(current_database())")) or 0)
     if dialect == "sqlite":
         pages = session.scalar(text("PRAGMA page_count")) or 0

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: smaller pages, a zip limit and a storage report (branch perf/delivery-and-zip-limit)
+
+- PF6, PF9, PF17, PF18, PF19: text answers are gzip-compressed when the browser asks
+  (`CompressionMiddleware`), except downloads, streamed answers and any page that printed the
+  CSRF token (BREACH), which includes the signed-in form pages. The landing page goes from
+  19,195 to 5,408 bytes and, with its styles and scripts, from 364,731 to 170,455 bytes
+  transferred in one Lighthouse run (performance 99 to 100, first paint 1.7 s to 1.1 s).
+  `/`, `/privacy` and `/limits` carry an `ETag` and answer 304 to a repeat visit for a
+  signed-out visitor; `/favicon.ico` and `/demo/source.pdf` now answer 304 too (they sent the
+  whole file). Stored crops on the review screen, the list view, bulk accept and the
+  inventory have `width` and `height` from the file.
+- The four zip routes (`/app/download`, the course zip, the batch zip, `/account/export`) share
+  one per-person limit, `zip_user`, 15 per 10 minutes; the refusal is a 429 page with
+  `Retry-After`.
+- PF11, first step: `readablestem ops storage-report` prints bytes per table and per finished
+  document (docs/operations.md). No stored data, hash, migration or version changes.
+
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 
 - SW57 (F-574): a reading the file's characters could not be held against (no characters in
