@@ -1,8 +1,9 @@
 """The review record of a finished document (T3-6): a page to print and a CSV, for the
-person's accessibility office. Owner only; both are GETs that change nothing about the
-document (a record is made on request from what is stored, `web.record`, after the HTML file
-is brought up to date if a review write left it out of date), so they do not restart the
-deletion clock and are not rate limited. The words say what the record is and is not.
+person's accessibility office. For anyone who may open the document (`shares.VIEW`). Both are
+GETs that change nothing about the document (a record is made on request from what is stored,
+`web.record`, after the HTML file is brought up to date if a review write left it out of
+date), so they do not restart the deletion clock and are not rate limited. The words say what
+the record is and is not.
 """
 
 from __future__ import annotations

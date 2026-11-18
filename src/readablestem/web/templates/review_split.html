@@ -586,7 +586,7 @@
     {% if ready.shareable %}
     <p class="done-actions"><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a>
       <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a>
-      <a href="/jobs/{{ job.id }}/listen">Listen as a student</a></p>
+      <a href="/jobs/{{ job.id }}/listen">{{ "Listen as a student" if job.is_owner else "Listen to it" }}</a></p>
     <p>Before you share, read the student version through once, and listen to it: {{ ready.checks_scope }}{% if ready.notes %} {{ ready.notes }}.{% endif %}</p>
     <p><a href="/help/posting">How to post it in your course</a> · <a href="/jobs/{{ job.id }}#ready">Back to the results</a></p>
     {% else %}

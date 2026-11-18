@@ -402,7 +402,9 @@ def _badge(html: str, start: str) -> str:
 
 # Every key of the table that stored facts make on this branch; `waiting_reset` needs the
 # day's budget spent and is checked after the others.
-WALKED = [k for k in states.TABLE if k != "waiting_reset"]
+# `being_checked` is what a reader is told of "needs_decisions": the owner's surfaces never
+# print it, and the reader page has its own test (tests/test_job_shares.py).
+WALKED = [k for k in states.TABLE if k not in {"waiting_reset", "being_checked"}]
 
 
 def test_every_state_reads_the_same_on_every_surface_from_the_one_table(web):

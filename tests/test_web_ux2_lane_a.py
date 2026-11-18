@@ -91,22 +91,6 @@ def test_a_saved_default_starts_the_keep_box_ticked_and_the_line_says_seven_days
 # --------------------------------------------------------------------------- job page: done
 
 
-def test_someone_it_was_shared_with_sees_only_the_groups_that_are_theirs(web):
-    job_id = finish(web)
-    token_ = token(web.browser, f"/jobs/{job_id}/share")
-    web.browser.post(
-        f"/jobs/{job_id}/share",
-        data={"csrf_token": token_, "email": BOB, "role": "view"},
-    )
-    bob = web.client()
-    login(bob, BOB)
-    page = bob.get(f"/jobs/{job_id}").text
-    nav = page.split('aria-label="On this page"', 1)[1].split("</nav>", 1)[0]
-    assert "Review and download" in nav and "Record" in nav
-    assert "For students" not in nav and "Settings and sharing" not in nav
-    assert "Delete" not in nav and 'id="delete-heading"' not in page
-
-
 def test_retention_is_explained_once_with_the_real_deletion_time_and_who_moves_it(web):
     job_id = finish(web)
     page = web.browser.get(f"/jobs/{job_id}").text

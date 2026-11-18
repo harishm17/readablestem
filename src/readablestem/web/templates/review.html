@@ -446,7 +446,7 @@
     {% endif %}
     <a href="/jobs/{{ job.id }}">Results</a>
     <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Accessible HTML</a>
-    <a href="/jobs/{{ job.id }}/listen">Listen as a student</a></p>
+    <a href="/jobs/{{ job.id }}/listen">{{ "Listen as a student" if job.is_owner else "Listen to it" }}</a></p>
 </div>
 {{ pager() }}
 

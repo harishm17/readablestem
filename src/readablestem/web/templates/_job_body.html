@@ -8,7 +8,7 @@
 {# When the document is kept until and why, with the way to keep it longer, right under the
    status box on a state that has something to keep (web/retention.py, `_job_retention.html`);
    a state with nothing to keep has the same line in the Delete group at the end. #}
-{% if state.keeps %}{% include "_job_retention.html" %}{% endif %}
+{% if state.keeps and job.is_owner %}{% include "_job_retention.html" %}{% endif %}
 {% if not job.finished %}
 {# How long it has been, outside the live region (ux2-lane-a, `_wait_note.html`). #}
 {% if job.waiting_since %}

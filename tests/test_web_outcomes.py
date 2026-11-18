@@ -108,8 +108,8 @@ def page_text(html: str) -> str:
     return re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html)))
 
 
-def scanned_pdf(pages: int = 2, *, then_text: bool = False) -> bytes:
-    """Pages that are one full-page image and no text (a scan), optionally then a text page."""
+def scanned_pdf(pages: int = 2, *, then_text: bool = False, text_pages: int = 1) -> bytes:
+    """Pages that are one full-page image and no text (a scan), optionally then text pages."""
     picture = pymupdf.open()
     source = picture.new_page()
     source.insert_text((72, 72), "Scanned lecture notes", fontsize=24)
@@ -118,7 +118,7 @@ def scanned_pdf(pages: int = 2, *, then_text: bool = False) -> bytes:
     for _ in range(pages):
         page = doc.new_page()
         page.insert_image(page.rect, stream=png)
-    if then_text:
+    for _ in range(text_pages if then_text else 0):
         doc.new_page().insert_text((72, 72), "Kinematics: velocity is the rate of change.")
     data = doc.tobytes()
     doc.close()
@@ -217,7 +217,7 @@ def test_the_worker_claims_nothing_while_the_daily_budget_is_spent(env, caplog):
 
     text = page_text(env.browser.get(f"/jobs/{job_id}").text)
     assert "Waiting" in text and "Today's conversion budget has been used up" in text
-    status = env.browser.get(f"/jobs/{job_id}/status")
+    status = env.browser.get(f"/jobs/{job_id}/status", headers={"HX-Request": "true"})
     assert "used up" in status.text and 'hx-get="/jobs/' in status.text
 
     leave_under_cap(env, CAP)  # a new day
@@ -412,7 +412,9 @@ def test_the_pages_note_offers_to_read_them_with_the_price_and_the_form_filled_i
     with env.running() as client:
         env.allow(ALICE)
         login(client, ALICE)
-        job_id = job_id_from(upload(client, scanned_pdf(2, then_text=True)))
+        # Fewer than half are scans: a file of mostly scans waits for the choice first (WS7.8).
+        mixed = scanned_pdf(2, then_text=True, text_pages=3)
+        job_id = job_id_from(upload(client, mixed))
         assert real_worker(env).run_once() == job_id
         page = client.get(f"/jobs/{job_id}").text
         text = page_text(page)
