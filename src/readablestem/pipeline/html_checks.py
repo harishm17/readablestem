@@ -110,7 +110,7 @@ LISTS = frozenset({"ul", "ol", "menu"})
 LIST_CHILDREN = frozenset({"li", "script", "template"})
 _BANNED = re.compile(r"\bcomplian(?:t|ce)\b", re.IGNORECASE)
 _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
-# A colour class rule as `inline_text.colour_css` writes it: ".tc-ff0000 { color: #ee0000; }".
+# A colour class rule as `student_sheet.colour` writes it: ".tc-ff0000 { color: #ee0000; }".
 _COLOUR_RULE = re.compile(
     rf"\.({re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}})\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
 )

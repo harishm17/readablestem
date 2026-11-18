@@ -244,24 +244,6 @@ def has_details(figure: FigureFix | None) -> bool:
     )
 
 
-# Added to the stylesheet of documents with a figure description (and only those). No
-# new colours: the summary is the body text, bold, with the browser's own marker. A closed
-# description prints open (F-436): where the browser can draw a closed `<details>`' content
-# (`::details-content`) it is shown; where it cannot, the summary says to open it first.
-DETAILS_CSS = """\
-.figure-description { margin: -0.75em 0 1.5em; }
-.figure-description > summary { cursor: pointer; font-weight: 700; }
-.figure-description[open] > summary { margin-bottom: 0.5em; }
-@media print {
-  .figure-description::details-content { content-visibility: visible; display: block; }
-  @supports not selector(::details-content) {
-    .figure-description:not([open]) > summary::after {
-      content: " (open this description before printing)"; font-weight: 400; }
-  }
-}
-"""
-
-
 def render_details(
     figure: FigureFix, caption: str | None, *, table_id: str | None, authored_class: str
 ) -> str:

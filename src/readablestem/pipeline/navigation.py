@@ -20,7 +20,7 @@ writes the markup and holds the words, so both can be tested and changed on thei
   above the list. A heading repeated under the same parent is one entry. The list is a
   `<details>`, closed in the markup so that every reader of the file that draws no style (a
   phone's first screen, Canvas, Word, a transcript) gets a short line, and open to the eye
-  from `WIDE` up and on paper (`TOC_CSS`).
+  from `WIDE` up and on paper (`student_sheet.CONTENTS`).
 - `pagebreak`: an `<hr role="doc-pagebreak" aria-label="Page N">` (axe accepts that role on
   `hr` only) and the same words as visible text beside it, so an LMS that drops the role or
   the label, or the CSS (Canvas keeps no pseudo-element rules), still shows the page.
@@ -155,49 +155,3 @@ def backlink(ref_id: str, authored_class: str) -> str:
         f'<a class="backlink {authored_class}" href="#{escape(ref_id, quote=True)}" '
         f'role="doc-backlink">{BACKLINK_TEXT}</a>'
     )
-
-
-# Added to a document's stylesheet only when it has a contents list / page markers / notes
-# (`_Renderer.add_style`), so documents without them are written as before. `border-top`,
-# `margin`, `padding`, `font-size`, `color`, `text-align` and `display` are properties Canvas
-# keeps, so the Canvas export carries these rules into `style` attributes.
-#
-# The list is a closed `<details>` under `WIDE`, so on a phone it is one line below the title.
-# From `WIDE` up, and on paper, where the browser can draw a closed `<details>`' content
-# (`::details-content`), the content is shown and the summary is hidden: with no control there
-# is no state to get wrong, and a screen reader meets the landmark named "Contents" and its
-# list, not a "collapsed" button above a list that is open. The words "Contents" are then
-# written by the sheet in the summary's place. Where it cannot (older browsers) nothing
-# changes: the closed line stays, a real control that works from the keyboard, and on paper
-# its summary says to open it first (as a figure description's does).
-TOC_CSS = f"""\
-.toc {{ margin: 1rem auto; max-width: 42rem; padding: 0 1rem; }}
-.toc-title {{ font-weight: 700; cursor: pointer; padding: 0.25em 0; }}
-.toc ul {{ margin: 0; padding-left: 1.25em; }}
-.toc li {{ margin: 0.15em 0; }}
-@media (min-width: {WIDE}), print {{
-  @supports selector(::details-content) {{
-    .toc-details::details-content {{ content-visibility: visible; display: block; }}
-    .toc-details > summary {{ display: none; }}
-    .toc-details::before {{ content: "{CONTENTS_LABEL}"; display: block; font-weight: 700;
-      margin: 0 0 0.25em; }}
-  }}
-}}
-@media print {{
-  @supports not selector(::details-content) {{
-    .toc-details:not([open]) > summary::after {{
-      content: " (open this list before printing)"; font-weight: 400; }}
-  }}
-}}
-"""
-PAGEBREAK_CSS = """\
-.pagebreak { margin: 1.5em 0 0.5em; padding: 0.25em 0 0; border-top: 1px solid #767676;
-  font-size: 0.8rem; color: #595959; text-align: right; }
-.pagebreak hr { margin: 0; padding: 0; border: 0; height: 0; }
-@media screen and (prefers-color-scheme: dark) {
-  .pagebreak { border-top-color: #8c8c8c; color: #c4c4c4; }
-}
-"""
-FOOTNOTE_CSS = """\
-.backlink { font-size: 0.85em; margin-left: 0.5em; }
-"""

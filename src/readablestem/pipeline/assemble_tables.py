@@ -37,6 +37,7 @@ import unicodedata
 from typing import Protocol
 
 from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, TableCell, TableGrid
+from readablestem.pipeline import student_sheet
 from readablestem.pipeline.safe_html import escape_text
 from readablestem.pipeline.table_html import render_table
 
@@ -45,19 +46,6 @@ _NOT_ID = re.compile(r"[^A-Za-z0-9_.:\-]")
 TABLE_NOT_CONVERTED_ALT = "Table not converted"
 TABLE_NOTE = "Shown as an image of the original."
 TABLE_FLAG_LABEL = "Not converted."
-# Added to the stylesheet of documents that contain a rebuilt table (and only those).
-TABLE_CSS = """\
-.table-scroll { margin: 1.5em 0; overflow-x: auto; }
-table { border-collapse: collapse; }
-caption { caption-side: top; text-align: left; font-weight: 700; padding: 0 0 0.4em; }
-th, td { border: 1px solid #5c5c5c; padding: 0.3em 0.6em; text-align: left;
-  vertical-align: top; }
-thead th { border-bottom-width: 3px; }
-@media screen and (prefers-color-scheme: dark) {
-  th, td { border-color: #a6a6a6; }
-}
-@media print { .table-scroll { overflow: visible; } th, td { overflow-wrap: anywhere; } }
-"""
 # A table estimated at least this wide (em of the body text) may not fit a 320 CSS px
 # screen: the column is then 288 px, 16 em of the 18 px body text. The estimate counts
 # 0.6 em a character (system-ui averages about 0.5, bold header text a little more) and
@@ -66,7 +54,7 @@ thead th { border-bottom-width: 3px; }
 WIDE_TABLE_EM = 13.0
 _CHAR_EM = 0.6
 _CELL_EDGES_EM = 1.4  # 0.6 em padding either side, and the borders
-_MATH_SCALE = 1.1  # maths is set at 1.1 em (assemble.STYLE)
+_MATH_SCALE = 1.1  # maths is set at 1.1 em (student_sheet.EQUATION)
 
 
 class RenderContext(Protocol):
@@ -257,7 +245,7 @@ def render_table_element(element: Element, fix: Fix | None, ctx: RenderContext) 
         return f"<div{ctx.id_attr(element.id)}>{text_html(written, caption)}</div>"
     grid = rebuilt_grid(fix)
     if grid is not None:
-        ctx.add_style("table", TABLE_CSS)
+        ctx.add_style("table", student_sheet.TABLE)
         prefix = id_prefix(element.id)
         if not (grid.caption and grid.caption.strip()) and element.caption:
             # Layout took the "Table N" caption out of the text, so a proposal without it

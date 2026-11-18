@@ -22,8 +22,13 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.pipeline import assemble, assemble_tables, contrast, html_checks, inline_text
-from readablestem.pipeline.assemble import STYLE, render_html
+from readablestem.pipeline import (
+    contrast,
+    html_checks,
+    inline_text,
+    student_sheet,
+)
+from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.html_checks import split_dark_css, static_checks
 
 GOLDEN = Path(__file__).parent / "fixtures" / "assemble" / "golden"
@@ -50,7 +55,7 @@ def ratio(a, b) -> float:
 
 
 def test_the_page_text_reaches_contrast_in_both_schemes():
-    plain, dark = split_dark_css(STYLE)
+    plain, dark = split_dark_css(student_sheet.CORE)
     light_bg, light_fg = declared(plain, "body", "background"), declared(plain, "body", "color")
     dark_bg, dark_fg = declared(dark, "body", "background"), declared(dark, "body", "color")
     assert light_bg == contrast.OUTPUT_BACKGROUND and dark_bg == contrast.DARK_BACKGROUND
@@ -58,7 +63,7 @@ def test_the_page_text_reaches_contrast_in_both_schemes():
 
 
 def test_borders_and_focus_rings_reach_3_to_1_in_both_schemes():
-    plain, dark = split_dark_css(STYLE)
+    plain, dark = split_dark_css(student_sheet.CORE)
     for css, bg in ((plain, contrast.OUTPUT_BACKGROUND), (dark, contrast.DARK_BACKGROUND)):
         boxes = (
             declared(css, ".flagged, .notice, .flagged-inline", "border-color")
@@ -78,14 +83,14 @@ def test_borders_and_focus_rings_reach_3_to_1_in_both_schemes():
 
 
 def test_code_and_table_rules_have_a_dark_version_that_reaches_contrast():
-    _, code_dark = split_dark_css(assemble.CODE_CSS)
+    _, code_dark = split_dark_css(student_sheet.CODE)
     body_dark = (236, 236, 236)
     assert ratio(body_dark, declared(code_dark, "pre", "background")) >= 7
     assert (
         ratio(declared(code_dark, "pre", "border-color"), declared(code_dark, "pre", "background"))
         >= 3
     )
-    table_light, table_dark = split_dark_css(assemble_tables.TABLE_CSS)
+    table_light, table_dark = split_dark_css(student_sheet.TABLE)
     assert ratio(declared(table_light, "th, td", "border"), contrast.OUTPUT_BACKGROUND) >= 3
     assert ratio(declared(table_dark, "th, td", "border-color"), contrast.DARK_BACKGROUND) >= 3
 
@@ -95,7 +100,7 @@ def test_code_and_table_rules_have_a_dark_version_that_reaches_contrast():
     [(255, 0, 0), (0, 0, 255), (255, 235, 59), (210, 210, 210), (0, 100, 0), (128, 0, 128)],
 )
 def test_every_printed_colour_is_readable_on_both_pages(printed):
-    css = inline_text.colour_css(printed)
+    css = student_sheet.colour(inline_text.colour_class(printed), printed)
     plain, dark = split_dark_css(css)
     light_colour = declared(plain, "." + inline_text.colour_class(printed), "color")
     assert ratio(light_colour, contrast.OUTPUT_BACKGROUND) >= 4.5
@@ -216,7 +221,7 @@ def busy_document() -> str:
         '<table><caption>Data</caption><thead><tr><th scope="col">a</th>'
         '<th scope="col">b</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>'
     )
-    return html.replace("</style>", assemble_tables.TABLE_CSS + "</style>").replace(
+    return html.replace("</style>", student_sheet.TABLE + "</style>").replace(
         "</main>", table + "\n</main>"
     )
 

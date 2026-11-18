@@ -333,7 +333,7 @@ no network, no model.
   those two programs found nothing on those documents; it does not show a reading system reads
   the file well. The page list is built from `role="doc-pagebreak"` markers; a file
   without them has none.
-- **The book's own sheet** (`export_epub.epub_sheet`). The page's colors, font family, base
+- **The book's own sheet** (`student_sheet.epub`). The page's colors, font family, base
   size and column (the rules of `body`, `html` and `:root`, and `max-width`, `margin` and
   `padding` on `main`) are left to the reading system, so its dark, sepia or large-text theme
   and its margins apply instead of being fought. No rule keeps a `color` or `background`, and
@@ -585,7 +585,7 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
   approximate"). A table read from the image that nobody added stays on the fix as an
   optional extra and is not in the file (a figure with only that has no `<details>`).
 - Nothing is written for a decorative figure or a proposal that is not used (rejected,
-  failed, abstained). Its CSS (`DETAILS_CSS`, plus the table CSS with a table) is added
+  failed, abstained). Its CSS (`student_sheet.FIGURE_DESCRIPTION`, plus `TABLE` with a table) is added
   only to documents with one.
 
 ## Decoration (WS6.4)
@@ -716,7 +716,7 @@ that overflows is a tab stop, that arrow keys scroll it, and axe.
 
 ## On paper
 
-Nothing scrolls on a sheet, so the print block of the stylesheet (`assemble.STYLE`,
+Nothing scrolls on a sheet, so the print block of the stylesheet (`student_sheet.CORE`,
 `TABLE_CSS`, `CODE_CSS`) makes sure nothing is cut without a mark (SW45 rule 6; the rest of
 the print build waits for WS21.1):
 

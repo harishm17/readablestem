@@ -17,7 +17,7 @@ cross-references", "Language", "Coloured text"):
   spans sit inside links and may wrap maths, which takes the colour too. Raised and
   lowered runs (`Element.script_runs`: Na+, H2O, cm3) are written as `<sup>` and `<sub>`,
   innermost; a lowered and a raised run side by side (SO4 2-, the two numbers before a
-  nuclide's symbol) are written as one stacked pair (`STACK_CSS`). Struck text
+  nuclide's symbol) are written as one stacked pair (`student_sheet.SCRIPT_STACK`). Struck text
   (`Element.runs`, kind "deleted": a cancelled date) sits inside links and outside colour
   and `<sup>`/`<sub>` (a colour span cut in two is not heard; a struck run cut in two would
   be said twice), and is written as `<del>` with the tool's own words "deleted:" before
@@ -33,7 +33,7 @@ output's white background, its hue kept (`pipeline.contrast`), and a second rule
 the dark-scheme `@media` block with the printed colour lightened as far as the dark page
 needs (no colour reaches 4.5:1 on both pages). Text without links or colour runs is written
 exactly as before these features existed, and so is text without struck runs: the `<del>`
-rule (`DELETED_CSS`) is added to the stylesheet only for a document that has one.
+rule (`student_sheet.DELETED`) is added to the stylesheet only for a document that has one.
 
 Rendering reads the stored element only (no options), so the review screen's re-render
 of a stored result writes the same file.
@@ -56,7 +56,7 @@ from readablestem.core.types import (
     ScriptRun,
     is_safe_href,
 )
-from readablestem.pipeline import contrast
+from readablestem.pipeline import contrast, student_sheet
 from readablestem.pipeline.language import is_language_tag
 from readablestem.pipeline.safe_html import escape_text
 from readablestem.pipeline.table_html import AUTHORED_CLASS
@@ -76,13 +76,6 @@ COLOUR_CLASS_PREFIX = "tc-"
 # direction of the column. Added to the stylesheet only for a document that has one.
 STACK_CLASS = "script-stack"
 STACK_LOW_FIRST = "script-stack-low-first"  # the lowered run comes first in the text
-STACK_CSS = (
-    f".{STACK_CLASS} {{ display: inline-flex; flex-direction: column; vertical-align: -0.5em;"
-    f" font-size: 0.75em; line-height: 1.1; text-align: left; }}\n"
-    f".{STACK_CLASS}.{STACK_LOW_FIRST} {{ flex-direction: column-reverse; }}\n"
-    f".{STACK_CLASS} sup, .{STACK_CLASS} sub {{ font-size: inherit; vertical-align: baseline;"
-    f" line-height: inherit; }}\n"
-)
 # Struck text: the words said around it (the tool's own words, so they carry its class and
 # are marked English like every other word of the tool's), and its look. The line through is
 # a text decoration, which forced colors keep, in the text's own colour, so it shows on a
@@ -91,10 +84,6 @@ STACK_CSS = (
 DELETED_BEFORE = "deleted: "
 DELETED_AFTER = " end deleted"
 DELETED_CLASS = "deleted-run"
-DELETED_CSS = (
-    "del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;"
-    " text-decoration-skip-ink: none; }\n"
-)
 # Blanks and printed checkboxes (`Element.runs`, kinds "blank" and "checkbox"; found by
 # `text_pass.token_runs`). The characters the page printed are kept, hidden from a screen
 # reader (`aria-hidden`), and the tool's own words stand in for them, visually hidden, so a
@@ -112,19 +101,6 @@ LINK_TARGET = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
 def colour_class(rgb: tuple[int, int, int]) -> str:
     """The class of text printed in this colour: "tc-" and the colour's hex digits."""
     return COLOUR_CLASS_PREFIX + contrast.hex_colour(rgb)[1:]
-
-
-def colour_css(rgb: tuple[int, int, int]) -> str:
-    """The rules for that class: the colour at 4.5:1 or more on the white page, and, for
-    readers who prefer dark colours, the printed colour lightened as far as it needs on the
-    dark page. No colour reaches 4.5:1 on both (that needs a luminance of at most 0.18 on
-    one and at least 0.20 on the other), so every class has both rules."""
-    name = colour_class(rgb)
-    shown = contrast.hex_colour(contrast.with_contrast(rgb))
-    dark = contrast.hex_colour(contrast.with_contrast(rgb, contrast.DARK_BACKGROUND))
-    return (
-        f".{name} {{ color: {shown}; }}\n{contrast.DARK_MEDIA} {{ .{name} {{ color: {dark}; }} }}\n"
-    )
 
 
 def _href(link: Link) -> str | None:
@@ -211,11 +187,11 @@ def render_inline_text(
     segments = _segments(text, placed, [k for k, _ in links], runs, scripts, struck, tokens)
     for rgb in sorted({s.colour for s in segments if s.colour is not None}):
         if add_style is not None:
-            add_style(f"colour-{colour_class(rgb)}", colour_css(rgb))
+            add_style(f"colour-{colour_class(rgb)}", student_sheet.colour(colour_class(rgb), rgb))
     if add_style is not None and _stacked(segments):
-        add_style(STACK_CLASS, STACK_CSS)
+        add_style(STACK_CLASS, student_sheet.SCRIPT_STACK)
     if add_style is not None and struck:
-        add_style(DELETED_CLASS, DELETED_CSS)
+        add_style(DELETED_CLASS, student_sheet.DELETED)
     return _write(
         text, segments, [href for _, href in links], [k for k, _ in links], link_attrs, tokens
     )
@@ -318,7 +294,7 @@ def _inner(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) 
             if following is not None and following.script and following.script != tag:
                 other = following.script
                 that = f"<{other}>{escape_text(text[following.start : following.end])}</{other}>"
-                # Text order for the reader; the raised run is drawn on top (`STACK_CSS`).
+                # Text order for the reader; the raised run is drawn on top (`SCRIPT_STACK`).
                 css = STACK_CLASS if tag == "sup" else f"{STACK_CLASS} {STACK_LOW_FIRST}"
                 out.append(f'<span class="{css}">{this}{that}</span>')
                 i += 1

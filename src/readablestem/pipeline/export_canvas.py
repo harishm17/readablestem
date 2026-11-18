@@ -21,10 +21,10 @@ steps or its output, and writes two things from it:
   Files folder with that name, expands it, and pastes this into the Page's HTML editor.
 
 The text, MathML, alt text, headings, lists, tables and links are not touched. Presentation
-is: a rule is carried over only if its property is one Canvas keeps (`CANVAS_PROPERTIES`;
-tests check this set against the encoded allowlist), and what cannot be carried is counted
-in `Notes`, so the README and the tests can say it. Nothing here edits, adds or removes
-content.
+is: a rule is carried over only if its property is one Canvas keeps
+(`student_sheet.CANVAS_PROPERTIES`; tests check this set against the encoded allowlist),
+and what cannot be carried is counted in `Notes`, so the README and the tests can say it.
+Nothing here edits, adds or removes content.
 """
 
 from __future__ import annotations
@@ -41,68 +41,14 @@ from html import escape
 from html.parser import HTMLParser
 from io import BytesIO
 
-from readablestem.pipeline import checked_words, navigation, output_chars
+from readablestem.pipeline import checked_words, navigation, output_chars, student_sheet
 from readablestem.pipeline.assemble import SUMMARY_META
-from readablestem.pipeline.math_font import MATH_FONT_STACK
 
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
 # WikiPage validates :body with it). A longer page is not offered for pasting.
 CANVAS_PAGE_LIMIT = 500 * 1024 - 1
 
-# The CSS properties this module writes into `style` attributes: those of the pipeline's
-# own stylesheet (assemble.STYLE and the feature CSS) that Canvas also keeps. Every one is
-# in the sanitizer's `css_properties`; a property of the stylesheet that is not here is
-# dropped and recorded in `Notes.dropped_css`.
-CANVAS_PROPERTIES = frozenset(
-    [
-        "align-items",
-        "background",
-        "border",
-        "border-bottom-width",
-        "border-collapse",
-        "border-radius",
-        "border-top",
-        "clip",
-        "color",
-        "cursor",
-        "display",
-        "flex",
-        "flex-wrap",
-        "font",
-        "font-family",
-        "font-size",
-        "gap",
-        "height",
-        "line-height",
-        "list-style",
-        "margin",
-        "margin-bottom",
-        "margin-left",
-        "margin-top",
-        "max-width",
-        "min-width",
-        "overflow",
-        "overflow-x",
-        "overflow-y",
-        "padding",
-        "padding-bottom",
-        "padding-left",
-        "position",
-        "text-align",
-        "text-indent",
-        "vertical-align",
-        "white-space",
-        "width",
-    ]
-)
-# A property Canvas drops, written as one it keeps (same look, other spelling).
-_REWRITES = {("clip-path", "inset(50%)"): ("clip", "rect(0,0,0,0)")}
-# Rules on these bare elements are the page's typography; Canvas has its own for a Page,
-# so they are left to it in the paste version (the standalone page has none and keeps them).
-_BASELINE_TAGS = frozenset(
-    ["body", "main", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li"]
-)
 _VOID = frozenset(
     [
         "area",
@@ -124,10 +70,6 @@ _VOID = frozenset(
 _IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 _DATA_URI = re.compile(r"data:(?P<type>[A-Za-z0-9.+/-]+);base64,(?P<data>[A-Za-z0-9+/=\s]+)\Z")
 _COURSE_NUMBER = re.compile(r"[0-9]{1,20}\Z")
-# The fonts a `<math>` element asks for (T3-8): `math_font.MATH_FONT_STACK`, the stack of the
-# student file's stylesheet. Canvas keeps `font-family` in a `style` attribute but has no
-# `@font-face` or style block, so the stack can only name fonts the reader's computer has.
-_MATH_RULE = f"\nmath {{ font-family: {MATH_FONT_STACK}; }}\n"
 HIDDEN_CLASS = "visually-hidden"
 CANVAS_HIDDEN_CLASS = "screenreader-only"  # Canvas's own class for the same thing
 
@@ -259,7 +201,7 @@ class _Rule:
     def baseline(self) -> bool:
         """Only bare element names, and the subject one of the page's typography."""
         bare = all(not (c.classes or c.attrs or c.ids) for _, c in self.parts)
-        return bare and self.parts[-1][1].tag in _BASELINE_TAGS
+        return bare and self.parts[-1][1].tag in student_sheet.CANVAS_BASELINE_TAGS
 
 
 _COMPOUND = re.compile(r"(?P<tag>[A-Za-z][\w-]*|\*)?(?P<rest>(?:\.[\w-]+|#[\w-]+|\[[^\]]+\])*)\Z")
@@ -458,8 +400,10 @@ def _inline_styles(root: _Node, rules: list[_Rule], notes: Notes, *, page: bool)
         merged: dict[str, str] = {}
         own = _declarations(node.attrs.get("style", ""))
         for name, value in [*(d for r in matched for d in r.declarations), *own]:
-            name, value = _REWRITES.get((name, value.replace(" ", "")), (name, value))
-            if name not in CANVAS_PROPERTIES:
+            name, value = student_sheet.CANVAS_REWRITES.get(
+                (name, value.replace(" ", "")), (name, value)
+            )
+            if name not in student_sheet.CANVAS_PROPERTIES:
                 notes.dropped_css.add(name)
                 continue
             merged.pop(name, None)  # the later value goes last, as the cascade decides
@@ -529,7 +473,7 @@ def export_canvas(
     notes = Notes()
     standalone = _parse(html)
     statement = page_meta(standalone, SUMMARY_META) or ""
-    rules = _parse_css(_styles_of(standalone) + _MATH_RULE, notes)
+    rules = _parse_css(_styles_of(standalone) + student_sheet.CANVAS_MATH_RULE, notes)
     root_tag = _find(standalone, "html")
     lang = (root_tag.attrs.get("lang") if root_tag else None) or "en"
     notes.tables_with_headers = sum(
