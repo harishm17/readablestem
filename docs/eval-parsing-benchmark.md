@@ -106,6 +106,59 @@ New cause; it holds for 29 of the 44.
 | A table was built but the cell's text is not found in one cell (two cells merged, or a row lost) | 71 (17%) | table grid | In the plan: WS5 table work; new as a rate |
 | The cell is found and its heading or a neighbor is not the expected one (header rows read as data, two header rows) | 38 (9%) | header detection | In the plan: WS5.2 (F-091, F-092) |
 
+#### After the corner-square fix (2026-11-18)
+
+Table checks 51.8% (444 of 857) to 66.2% (567 of 857), $0, same 747 pages. The split of the
+188 table pages into a development half (93 pages) and a check half (95) is by document: the
+page is in the development half when the last hex digit of the SHA-256 of its document id (the
+file name up to `_pg`) is even. Only the development half was read while building; the check
+half was converted and scored once, after the code was fixed.
+
+| Half | Table checks passed before | after | baseline checks passed before | after |
+|---|---|---|---|---|
+| development (432 run) | 229 (53.0%) | 286 (66.2%) | 77 of 78 pages | 78 of 78 |
+| check (425 run) | 215 (50.6%) | 281 (66.1%) | 79 of 80 | 80 of 80 |
+
+No check went from pass to fail on either half; 57 and 66 went from fail to pass.
+
+Cause of the fix: the finder's chart test (`tables._pictured`) counted 12 filled shapes with no
+text on them as the bars of a chart. Word and some other writers draw a table's rules as thin
+filled boxes and fill a 0.5 pt square where two of them cross (or two pieces of one rule meet);
+a table of 8 columns and 11 rows has about 100 of them, so a fully ruled table (alignment 1.0,
+3 to 45 row rules, 4 to 9 column rules) was refused as a `figure`. A filled square no bigger
+than a rule's thickness that lies on a drawn rule is no longer counted (`_PageView.build`).
+In the development half 18 of the 51 pages with a failed table check had a box refused with a
+`figure` verdict; 13 of them now have their table built (8 pass every check, 5 still fail
+cells: grid reading, the table step's).
+
+Causes on the development half, failed table checks (203 before, 146 after), by page and by
+check, split by whether the cell's text is on the page in the output ("on") or not
+("missing"; columns joined across the table, or a pictured table: not the finder's):
+
+| Cause | Pages before | Checks before (on / missing) | Pages after | Checks after (on / missing) |
+|---|---|---|---|---|
+| A proposed box was refused with a `figure` verdict (corner squares counted as bars) | 18 | 57 / 47 | 5 | 16 / 15 |
+| Proposed and refused `no_grid` or as a layout grid (unruled number columns that do not line up, a monospace print-out, a striped table with no rules, a two-line table, a ruled key-value box) | 6 | 27 / 3 | 6 | 27 / 3 |
+| A table was built but the cell is not found in one cell, or the neighbor is wrong (merged cells, a lost row: the grid, WS5) | 23 | 44 / 13 | 28 | 56 / 15 |
+| Found, then written as a flagged block and not as a table (at $0 the table step has no answer) | 3 | 4 / 5 | 4 | 4 / 7 |
+| Not proposed (the probe refused the page: a turned table inside a column page) | 1 | 0 / 3 | 1 | 0 / 3 |
+
+Harm, all $0. New tables over the 29 corpus files replayed at $0 (counts only): 18 to 24,
+every one a drawn cell grid (3 or more rules each way) on 3 files: four are blank-cell forms,
+one is captioned, one a schedule; all 6 are tables, none false. New tables on the
+non-table categories' 559 pages (multi_column, headers_footers, long_tiny_text; their baseline
+checks are the same pages): 80 to 88, 8 new on 6 pages, all of them tables read by eye (a
+captioned one in 5 of the 6 pages' tables); the 31 checks of those 6 pages: 25 passed before and
+25 after, none changed. `eval pipeline --task tables --mode local`: equal to
+`data/eval/latest-tables-local.json` on every count (recall, precision, TEDS, headers, review
+load), 0 differences. Finder seconds a page on the development pages 0.60 before and 0.60 after.
+
+What is left: 11 pages of the development half with a box the finder refuses (5 with a `figure`
+verdict: of those I looked at, a table that is a picture, a table under photographs, a table
+beside charts, and a text box taken for a figure; 6 `no_grid`) and no rule that
+tells it from prose (each kind on one or two pages); 28 pages with a table built and a cell
+not found, which is the table grid (WS5); 156 checks with the text missing (columns joined,
+pictured tables; WS15.1 and the figure step).
 ### baseline: 6 failed of 586
 
 Four pages have the text in a picture and the product asked a model; two were typed `blank` with

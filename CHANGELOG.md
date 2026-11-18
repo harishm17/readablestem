@@ -142,6 +142,21 @@
   report (equations, document, by status and route), `eval reproduce`, `eval gate` (information
   lines; no threshold or gated figure changed) and `scripts/realworld_report.py`. A record made
   before the fields reads as it was; none is re-made here.
+## Unreleased: ruled tables are no longer taken for charts because of their corners (branch feat/tables-without-rules)
+
+- F-249, measured on the olmOCR-Bench table pages at $0: the table finder refused fully ruled
+  tables as a `figure`. Word and others fill a 0.5 pt square where two rules cross; 12 filled
+  shapes with no text on them are the bars of a chart, and a table of 8 columns and 11 rows has
+  about 100 crossings. A filled square no bigger than a rule's thickness that lies on a drawn
+  rule is no longer counted as a bar (`tables._PageView.build`). Table checks passed: 51.8% to
+  66.2% (444 to 567 of 857); on the development half 229 to 286 of 432, on the check half (run
+  once) 215 to 281 of 425; no check changed from pass to fail. New tables: 6 on the 29-file
+  corpus replay (all ruled grids, none false), 8 on the benchmark's non-table pages (all
+  tables); `eval pipeline --task tables --mode local` equal to its record. Stored documents with
+  such a table change when converted again, so this goes out with the next pipeline version.
+  The other misses (unruled tables whose number columns do not line up, striped tables, a
+  monospace print-out, ruled key-value boxes) were measured and not built: no rule told them
+  from prose (docs/eval-parsing-benchmark.md).
 
 ## Unreleased: an equation that was compared with nothing says so (branch fix/equation-not-compared)
 

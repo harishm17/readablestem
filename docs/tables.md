@@ -126,7 +126,9 @@ rules above.
    the captions are attached); columns of justified text, whose padding is narrower than a
    cell gap, come from the strips no word crosses (`_word_gutters`); a numbered equation or
    reaction at the top or bottom of a box is cut off it (`_without_captions`); and a box made
-   here is dropped as a chart (curves, scatter dots, bars, small lettering), page text (two
+   here is dropped as a chart (curves, scatter dots, bars, small lettering; a filled square no
+   bigger than a rule's thickness that lies on a drawn rule is the corner of the rules, which
+   Word fills at every crossing, and is not counted: 12 of them made a ruled table a "chart"), page text (two
    prose columns, or one gutter in the middle of the page), references, numbered or bulleted
    lines, algorithm lines, equations (lines of relations, equation numbers), authors and
    addresses, a block of bare numbers (a matrix) or running text in a box (`_text_block_dropped`).
@@ -335,6 +337,12 @@ local` (docs/eval.md, "Tables").
   documents"). Still missed: lists of relations (`X_n ~ f(n)  if ... -> 1`, 2 of 25 on the real-document
   development set), an unruled table of bare numbers with no caption (a matrix looks the same), and
   label-value pairs joined by leader lines.
+- **Tables found and refused on the olmOCR-Bench pages** (`docs/eval-parsing-benchmark.md`,
+  development half, 2026-11-18): after the corner-square fix, 6 of 79 pages with a failed
+  table check still have a box refused as `no_grid` (and 5 more with a `figure` verdict) (an unruled table whose number columns do
+  not line up, a monospace print-out, a striped table with no rules, a two-line table, a
+  ruled key-value box left as a layout grid) with no cause on more than 2 pages; none was
+  built, because no rule separated them from prose.
 - **A sparse table** with text in one column is kept when it has three rules and a header
   that names two columns (see "How a page's tables are found"). One with only a top and a
   bottom rule, a header-less one, or one whose only filled column lines up with no header

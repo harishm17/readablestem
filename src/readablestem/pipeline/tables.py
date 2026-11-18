@@ -884,7 +884,10 @@ class _PageView:
         view = cls(lines, hsegs, vsegs, curves, pictures, width, height)
         # A series of bars is one drawing of many rectangles: each counts, not their union.
         # A rectangle as thin as a rule is a rule wherever it is drawn, alone or one of many
-        # (cell borders drawn as filled boxes), not a bar.
+        # (cell borders drawn as filled boxes), not a bar. A square no bigger than a rule's
+        # thickness on a rule (Word fills one where two rules cross, or two pieces of a rule
+        # meet) is a corner of such boxes, not a bar either.
+        points: list[BBox] = []
         for p in paths:
             if p.kind != "shape" or not p.filled or p.curved:
                 continue
@@ -893,8 +896,11 @@ class _PageView:
                     view.hsegs.append((x0, x1, (y0 + y1) / 2))
                 elif x1 - x0 <= THIN_IMAGE and y1 - y0 >= 3:
                     view.vsegs.append((y0, y1, (x0 + x1) / 2))
+                elif x1 - x0 <= THIN_IMAGE and y1 - y0 <= THIN_IMAGE:
+                    points.append((x0, y0, x1, y1))
                 else:
                     view.fills.append((x0, y0, x1, y1))
+        view.fills += [f for f in points if not _on_a_rule(view, f)]
         sizes = [c.size for line in lines for c in line.chars if not c.blank and not line.vertical]
         if sizes:
             view.body_size = statistics.median(sizes)
@@ -916,6 +922,16 @@ class _PageView:
             if any(not ch.blank for ch in chars):
                 out.append(chars)
         return out
+
+
+def _on_a_rule(view: _PageView, point: BBox) -> bool:
+    """Does the small square `point` sit on a drawn rule, at a crossing of two or between two
+    pieces of one?"""
+    cx, cy = (point[0] + point[2]) / 2, (point[1] + point[3]) / 2
+    reach = THIN_IMAGE
+    return any(
+        x0 - reach <= cx <= x1 + reach and abs(y - cy) <= reach for x0, x1, y in view.hsegs
+    ) or any(y0 - reach <= cy <= y1 + reach and abs(x - cx) <= reach for y0, y1, x in view.vsegs)
 
 
 def _visual_lines(pieces: list[list[GlyphLike]]) -> list[list[GlyphLike]]:

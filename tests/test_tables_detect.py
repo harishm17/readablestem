@@ -143,6 +143,16 @@ def test_a_table_drawn_with_filled_border_boxes_is_a_table_and_a_chart_stays_a_f
             shape.draw_rect(pymupdf.Rect(100, 150 + 22 * r - 0.5, 340, 150 + 22 * r + 0.5))
         for c in range(4):
             shape.draw_rect(pymupdf.Rect(100 + 80 * c - 0.5, 150, 100 + 80 * c + 0.5, 238))
+        for r in range(5):  # and a small square at every crossing, which is not a bar
+            for c in range(4):
+                shape.draw_rect(
+                    pymupdf.Rect(
+                        100 + 80 * c - 0.25,
+                        150 + 22 * r - 0.25,
+                        100 + 80 * c + 0.25,
+                        150 + 22 * r + 0.25,
+                    )
+                )
         shape.finish(fill=(0, 0, 0), color=None)
         shape.commit()
         for r in range(4):
@@ -158,12 +168,22 @@ def test_a_table_drawn_with_filled_border_boxes_is_a_table_and_a_chart_stays_a_f
         page.draw_line((110, 400), (330, 400), width=0.8)
         page.draw_line((110, 270), (110, 400), width=0.8)
 
+    def scatter(page):
+        # Square markers of the same size, none on a rule: still a plot.
+        write(page, 72, 100, "Rainfall by month, in millimetres.")
+        page.draw_line((110, 400), (330, 400), width=0.8)
+        page.draw_line((110, 270), (110, 400), width=0.8)
+        for k in range(14):
+            x, y = 130 + 14 * k, 380 - 7 * ((k * 5) % 9)
+            page.draw_rect(pymupdf.Rect(x, y, x + 0.5, y + 0.5), fill=(0, 0, 0), color=None)
+
     def kinds(fill):
         return [e.kind for e in analyze(pdf(fill)).elements]
 
     assert kinds(bordered).count(Kind.TABLE) == 1
     assert Kind.FIGURE not in kinds(bordered)
     assert Kind.FIGURE in kinds(chart) and Kind.TABLE not in kinds(chart)
+    assert Kind.TABLE not in kinds(scatter)
 
 
 def test_an_unruled_aligned_grid_is_kept_on_text_alone():
