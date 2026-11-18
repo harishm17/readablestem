@@ -818,6 +818,13 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   otherwise counted by the coverage rule: every word of the file is in pandoc's tree or counted as
   `source_unread` (a required notice) so nothing is left out without a number. Tracked changes
   are read as accepted, and say so (`word_tracked_changes`, required).
+- **What is stored.** The file as uploaded, wrapped in the envelope (`source/envelope.py`, kind
+  `docx`, media type `application/x-readablestem-docx`), as the job's `upload` row of `blobs`: the
+  same row, counted in the person's stored bytes and deleted with the document (`delete_jobs`,
+  the expiry purge and the deletion of the account) as the PDF of any other job. No PDF is made, so
+  no second copy exists. A Word file the reader does not take goes the PDF route above, where the
+  Word file is not kept and the PDF is. The privacy notice, "Delete this document" and the upload
+  form say which, from `AppContext.word_source_on` (the flag, pandoc and a passing sandbox).
 - **What it changes** (the switch on, against off): no LibreOffice conversion and no PDF are
   made for a `.docx` the reader takes; the document has no page images and its original is its
   own text (as a LaTeX source); the pages counted are one per 3,000 characters of the file's text

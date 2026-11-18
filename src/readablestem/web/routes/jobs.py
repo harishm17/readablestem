@@ -722,6 +722,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "image_pages_cost": outcome_words.image_pages_cost(ctx.settings),
         # `.tex` files and zips of a LaTeX project are taken (FEATURE_LATEX_SOURCE).
         "latex_source": ctx.latex_source_on,
+        "word_source": ctx.word_source_on,
         "keep_default": keep_default,
     }
 
@@ -978,6 +979,26 @@ class Placed:
     # Scanned and handwritten pages the box was not checked for (`page_type.ImagePageCount`
     # as a dict): kept as pictures, with the price of reading them said beside the document.
     scans: dict[str, int] | None = None
+
+
+def _storage_placed(
+    filename: str, exc: stored_bytes.StorageRefused | stored_bytes.StorageFull, office: bool = False
+) -> Placed:
+    """The answer for a file that did not fit what the person (or the service) may store,
+    whatever kind of file it is: PDF, Word, PowerPoint or LaTeX source."""
+    if isinstance(exc, stored_bytes.StorageFull):
+        log_event(logger, "upload_rejected", code="storage_full")
+        return Placed(
+            filename,
+            code="storage_full",
+            status=503,
+            retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
+            office=office,
+        )
+    log_event(logger, "upload_rejected", code="storage_user")
+    return Placed(
+        filename, exc.used_mb, code="storage_user", status=413, left=exc.limit_mb, office=office
+    )
 
 
 # How long the probes of one upload may take in all: each file has its own 30 s, but ten
@@ -1265,30 +1286,8 @@ def _place_files(
                 Placed(file.filename, code=exc.code, status=429, retry_after="60", office=office)
             )
             continue
-        except stored_bytes.StorageRefused as exc:
-            log_event(logger, "upload_rejected", code="storage_user")
-            placed.append(
-                Placed(
-                    file.filename,
-                    exc.used_mb,
-                    code="storage_user",
-                    status=413,
-                    left=exc.limit_mb,
-                    office=office,
-                )
-            )
-            continue
-        except stored_bytes.StorageFull:
-            log_event(logger, "upload_rejected", code="storage_full")
-            placed.append(
-                Placed(
-                    file.filename,
-                    code="storage_full",
-                    status=503,
-                    retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
-                    office=office,
-                )
-            )
+        except (stored_bytes.StorageRefused, stored_bytes.StorageFull) as exc:
+            placed.append(_storage_placed(file.filename, exc, office))
             continue
         except QuotaRefused as exc:
             placed.append(
@@ -1451,6 +1450,8 @@ def _place_source(
         )
     except TooManyJobs as exc:
         return Placed(file.filename, code=exc.code, status=429, retry_after="60")
+    except (stored_bytes.StorageRefused, stored_bytes.StorageFull) as exc:
+        return _storage_placed(file.filename, exc)
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
@@ -1515,6 +1516,8 @@ def _place_word(
         )
     except TooManyJobs as exc:
         return Placed(file.filename, code=exc.code, status=429, retry_after="60")
+    except (stored_bytes.StorageRefused, stored_bytes.StorageFull) as exc:
+        return _storage_placed(file.filename, exc)
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,

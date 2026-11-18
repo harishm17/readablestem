@@ -70,6 +70,8 @@ def _features(request: Request) -> dict[str, object]:
         "word_export": export_docx.available(),  # Word downloads need pandoc on the server
         # .tex and project zips: off by default, and only once the sandbox probe has passed
         "latex_source": settings.feature_latex_source and ctx.sandbox.allows_source(),
+        # A .docx read from the file itself and kept as uploaded (FEATURE_WORD_SOURCE)
+        "word_source": ctx.word_source_on,
     }
 
 
@@ -203,6 +205,7 @@ def privacy(request: Request) -> Response:
     ctx = get_ctx(request)
     context = privacy_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
+    context["word_source"] = _features(request)["word_source"]
     return public_page(request, "privacy.html", context)
 
 

@@ -23,6 +23,7 @@ from starlette.responses import Response
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
 from readablestem.source import intake as source_intake
+from readablestem.source import pandoc as pandoc_step
 from readablestem.web import (
     analytics,
     dev_only,
@@ -99,6 +100,16 @@ class AppContext:
     def latex_source_on(self) -> bool:
         """LaTeX source (.tex, a project zip) is taken: the flag is on and the sandbox passed."""
         return self.settings.feature_latex_source and self.sandbox.allows_source()
+
+    @property
+    def word_source_on(self) -> bool:
+        """A `.docx` is read from the file itself and kept as uploaded (`routes.jobs._place_word`):
+        the flag is on, pandoc is installed and the sandbox passed."""
+        return (
+            self.settings.feature_word_source
+            and bool(pandoc_step.installed())
+            and self.sandbox.allows_source()
+        )
 
     def wake_worker(self) -> None:
         """A job was queued: the worker looks for it now, not at its next poll."""

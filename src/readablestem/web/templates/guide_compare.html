@@ -71,7 +71,7 @@
 {% set AE = "https://aelira.ai/us" %}
 {% set LX = "https://dlmf.nist.gov/LaTeXML/manual/usage/" %}
 {% macro cell_0(tool) -%}
-{% if tool == 0 %}A STEM course PDF, including Beamer slide decks{% if office_on %}; also Word (DOCX) and PowerPoint (PPTX), turned into a PDF first{% endif %}{% if latex_source %}; also LaTeX source (a .tex file or a zip of a LaTeX project, not Beamer or {{ refused_classes }} source), converted with LaTeXML{% endif %}{% if image_pages_on %}. Scanned and handwritten pages only when you ask{% endif %}. {{ src(RS, "2026-11-03") }}
+{% if tool == 0 %}A STEM course PDF, including Beamer slide decks{% if word_source %}; also Word (DOCX), read from the file itself{% if office_on %}, and PowerPoint (PPTX), turned into a PDF first{% endif %}{% elif office_on %}; also Word (DOCX) and PowerPoint (PPTX), turned into a PDF first{% endif %}{% if latex_source %}; also LaTeX source (a .tex file or a zip of a LaTeX project, not Beamer or {{ refused_classes }} source), converted with LaTeXML{% endif %}{% if image_pages_on %}. Scanned and handwritten pages only when you ask{% endif %}. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes. {{ src(MX, "2026-10-28") }}
 {% elif tool == 2 %}Scanning workflows for PDF, PowerPoint, Word, Excel, LaTeX, images, video captions and web pages; remediation depth varies by format. {{ src(AE, "2026-11-03") }}
 {% elif tool == 3 %}In the recipe we tested: the PDF and a 150 dpi image of every page, with one sentence of prompt. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}

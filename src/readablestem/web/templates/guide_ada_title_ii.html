@@ -150,7 +150,8 @@
   <li>It makes mistakes, so look over the equations your students rely on.
     <a href="/limits#accuracy">How accurate it is</a> and the
     <a href="/limits">known limits</a>, including scanned and handwritten pages.</li>
-  <li>{% include "_accepted_types.html" %}{% if office_on %} A Word or PowerPoint file is turned
+  <li>{% include "_accepted_types.html" %}{% if word_source %} A Word file is read from the file itself{% if office_on %}; a PowerPoint file is turned
+    into a PDF first{% endif %}.{% elif office_on %} A Word or PowerPoint file is turned
     into a PDF first.{% endif %}{% if not latex_source %} It does not work from LaTeX source files.{% endif %}</li>
 </ul>
 <p>The rule allows a separate accessible version of a page only where it is not possible to
