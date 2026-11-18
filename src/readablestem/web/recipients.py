@@ -324,6 +324,8 @@ def privacy_context(settings: Settings, *, tracer_on: bool = False) -> dict[str,
         # What the content features send and keep, only when they are on.
         "tables_on": settings.feature_tables,
         "notation_on": settings.feature_notation_memory,
+        # A person can be given every document of a course (WS27.1): the page says so.
+        "course_grants_on": settings.feature_course_grants and settings.feature_notation_memory,
         "image_pages_on": settings.feature_image_pages,
         "microsoft_on": settings.ms_sign_in_enabled,
         # Word and PowerPoint uploads are taken (T3-30): the page says how they are handled.
