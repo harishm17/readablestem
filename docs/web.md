@@ -2867,8 +2867,9 @@ the PDF in its place), the equation step reads that crop (`POST
 what it read goes through the cell's edit checks as if typed: saved when it passes, else shown
 in the cell's box with what differs from the PDF (and "Use my edit anyway").
 
-With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
-the cell list. In the list view a table card shows its crop, the proposal (or the grid
+With keyboard shortcuts on (they are on by default), A accepts a proposed table (or, when
+only the headers are missing, moves to "Accept without headers": see "Review screen") and E
+opens "Change the table" at the cell list. In the list view a table card shows its crop, the proposal (or the grid
 read from the PDF) and Accept, Keep as image, Use the grid read from the PDF;
 headers and cells are changed on the review screen ("open it on the review screen").
 
@@ -2889,14 +2890,25 @@ are not compared (both views).
 **JavaScript** (`static/app.js`, and htmx for the live check) only enhances: it scrolls
 the page region so the selected mark is in its visible box, working inside the region
 only (stacked, the region starts below the window, and a window term used to scroll it
-to its end; side by side it also moves the window when the mark is near the foot of a
-page, never so far that the decision's heading leaves the window), asks once more after
+to its end, against the part of the page region that is in the window; the window is never
+moved on load, because side by side the page pane is sized to the space under the header
+(`--page-top`, measured by `app.js`, read by `.page-area` in `app.css`)), asks once more after
 1.5 s for an image that was refused for a moment and only then says the page image could
 not be shown, makes "Save edit" the main button once a field of the decision is changed,
 keeps a draft of what is typed in this tab (above), and offers keyboard shortcuts: N next
-decision, P previous, A accept, E go to the edit field. They are off until turned on
-("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys with Ctrl, Alt
-or Meta, and never act while focus is in a field.
+decision, P previous, A accept, E go to the edit field. They are on until turned off (the
+keys are listed beside the switch, "Use keyboard shortcuts"; the choice is stored in
+`localStorage` as "on" or "off", nothing stored means on; WCAG 2.1.4). A key does nothing
+with Ctrl, Alt, Meta or Shift held, while an input method is composing, behind an open
+dialog, or while focus is in a text field, text area, select, or editable region. A key with
+nothing to act on says so in the status line (`#decision-notice`, `role="status"`, the one
+the saved notice uses; it is on the page empty when nothing was saved). A never presses
+"Accept anyway" (or "Accept without headers", both marked `data-anyway`): it moves focus to
+that button and says why. On a page card (`data-card="page"`) A does nothing and says the
+choice needs a Tab and a press. After N or P, focus goes to the new decision's heading (a
+flag in `sessionStorage`), as it does after a saved decision. On each card the choices come
+first after the heading (equation, heading, text, figure, table, repeated-heading and page
+cards), so Accept is at most three Tab stops from the heading.
 
 **Describe it in words** (T3-16; `web.review.describe_in_words`, `templates/_describe.html`).
 An item shown as an image (an equation or table kept as the original, a page or handwriting
@@ -3421,7 +3433,7 @@ only pages of a signed-in person stay `no-store`. The math font is sent as
 WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
-enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts,
+enhancements (scrolling the page image to the selected mark, keyboard shortcuts that can be turned off,
 drafts kept in the tab; see "Review screen"). The review screen's per-job geometry comes as
 a stylesheet from our origin (`marks.css`), not as inline styles.
 
@@ -3487,7 +3499,7 @@ best-practice rules (target size included) at moderate and above on every state 
 review screen at 1440 and 390 CSS px, checks 320 CSS px reflow with and without text
 spacing, measures every mark (at least 24 x 24 CSS px), completes a whole review with
 JavaScript off, checks that focus lands on the next decision's heading after each
-decision, that shortcuts are opt-in and never fire while typing, and that the marks keep
+decision, that shortcuts are on by default, can be turned off and never fire while typing, that the window stays at the top on load, and that the marks keep
 their colors in forced-colors mode. `test_web_review_ux_browser.py` does the same at
 1280 and 320 CSS px for the states the UX review fixes added (the readings marked, the
 live check, "Use my edit anyway", the notice with Undo, your decisions, a stale write

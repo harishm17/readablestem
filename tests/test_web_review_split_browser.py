@@ -10,7 +10,8 @@ group (3), an optional note.
 - every mark on the page image is a link at least 24 x 24 CSS px;
 - the whole review can be completed without JavaScript, and after each decision focus is
   on the next decision's heading (with and without JavaScript);
-- keyboard shortcuts are off until turned on and never act while typing;
+- keyboard shortcuts are on until turned off, list their keys in view, never act while typing,
+  and say so when a key has nothing to act on;
 - in forced-colors mode the marks keep colours that show on the (white) page image.
 
 Run with: uv run pytest -m browser tests/test_web_review_split_browser.py
@@ -217,19 +218,44 @@ def mark_in_region(page) -> bool:
 
 @pytest.mark.parametrize(
     "viewport",
-    [NARROW, {"width": 320, "height": 180}, {"width": 844, "height": 390}, PHONE],
-    ids=["320x640", "320x180 (400% zoom)", "844x390 (landscape phone)", "390x844"],
+    [
+        NARROW,
+        {"width": 320, "height": 180},
+        {"width": 844, "height": 390},
+        PHONE,
+        DESKTOP,
+        {"width": 1280, "height": 720},
+    ],
+    ids=[
+        "320x640",
+        "320x180 (400% zoom)",
+        "844x390 (landscape phone)",
+        "390x844",
+        "1440x900",
+        "1280x720",
+    ],
 )
 @pytest.mark.parametrize("item", ["", "?item=p1-e6", f"?item={GROUP}&page=2"])
-def test_stacked_the_selected_mark_is_inside_the_page_region(site, browser, job, viewport, item):
+def test_the_selected_mark_is_inside_the_page_region_and_the_window_stays_at_the_top(
+    site, browser, job, viewport, item
+):
     """Stacked, the page region starts below the window. app.js used to add a window term
     to the region's scroll, which scrolled it to its very end: the mark sat above the
-    visible part. It must be inside, and the window must not move."""
+    visible part. Side by side, the pane was as tall as the window while it starts under the
+    header, so a low mark was below the window and the script moved the window (1280x720,
+    the figure: 40 px). The mark must be inside the region, in the window when the pane is
+    beside the decision, and the window must not move."""
     context, page = open_page(browser, site, viewport=viewport)
     page.goto(f"{site.base}/jobs/{job}/review{item}")
     wait_images(page)
     assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
     assert page.evaluate("window.scrollY") == 0
+    if viewport["width"] >= 1024 and viewport["height"] >= 600:  # side by side, pane sticky
+        edges = page.evaluate(
+            "() => { const m = document.querySelector('.box.is-current').getBoundingClientRect();"
+            " return [m.top, m.bottom, innerHeight]; }"
+        )
+        assert edges[0] >= 0 and edges[1] <= edges[2], edges
     # Scrolling the window down to the region shows the mark (nothing scrolls it away).
     page.locator(".page-scroll").scroll_into_view_if_needed()
     assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
@@ -359,15 +385,15 @@ def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site
     assert (fix["status"], fix["equation"]["latex"]) == ("edited", r"\boldsymbol{\omega}")
 
 
-def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser, job):
+def test_keyboard_shortcuts_are_on_by_default_listed_in_view_and_never_fire_while_typing(
+    site, browser, job
+):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(url)
-    page.locator("main").focus()
-    page.keyboard.press("n")
-    assert page.url == url  # off by default
-    page.locator("#shortcuts summary").click()
-    page.get_by_label("Use keyboard shortcuts").check()
+    # On for someone who never chose, with the keys listed beside the switch (no disclosure).
+    assert page.get_by_label("Use keyboard shortcuts").is_checked()
+    assert page.locator("#shortcuts .keys").is_visible()
     page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
         "d => { d.open = true; }"
     )  # closed by default
@@ -376,13 +402,34 @@ def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser
     page.keyboard.type("n a p")
     assert page.url == url and "n a p" in field.input_value()
     page.locator("#decision-title").focus()
+    page.keyboard.press("Shift+N")  # a held modifier is not a shortcut
+    page.keyboard.press("Control+n")
+    assert page.url == url
+    # A key with nothing to act on says so, in the line the saved notice uses.
+    page.keyboard.press("p")
+    status = page.locator("#decision-notice")
+    page.wait_for_function(
+        "() => document.querySelector('#decision-notice').textContent.includes('no previous')"
+    )
+    assert page.url == url and status.get_attribute("role") == "status"
     page.keyboard.press("n")
     page.wait_for_url(re.compile(r"item=p1-e6"))
+    wait_images(page)
+    assert page.evaluate("document.activeElement.id") == "decision-title"  # the new card's heading
     page.keyboard.press("p")
     page.wait_for_url(re.compile(r"item=p1-e2"))
-    page.locator("#decision-title").focus()
+    wait_images(page)
+    assert page.evaluate("document.activeElement.id") == "decision-title"
     page.keyboard.press("e")
     assert page.evaluate("document.activeElement.id") == "latex-p1-e2"
+    # The same switch turns them off, and a reload keeps it off.
+    page.get_by_label("Use keyboard shortcuts").uncheck()
+    page.reload()
+    assert not page.get_by_label("Use keyboard shortcuts").is_checked()
+    page.locator("#decision-title").focus()
+    page.keyboard.press("n")
+    page.wait_for_timeout(300)
+    assert "item=p1-e6" not in page.url
     context.close()
 
 

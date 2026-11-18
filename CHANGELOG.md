@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: shortcuts that can be found and the review that opens at the top (branch feat/review-keys-and-first-load)
+
+- WS8.12 (F-069, F-070): the review screen's keys (N, P, A, E) are on until the reviewer turns
+  them off, with the key list beside the switch and the choice remembered; a person who turned
+  them off keeps them off. A key does nothing with a modifier (Shift too) held, during input
+  method composition or behind an open dialog. A key with nothing to act on says so in the
+  status line the saved notice uses. A never presses "Accept anyway" (or "Accept without
+  headers"): focus goes to that button and the line says why; on a page card A saves nothing
+  and says the choice needs a Tab and a press. After N or P focus is on the new decision's
+  heading. The choices come first after the heading on every card (equation, heading, text,
+  figure, table, repeated headings, page card), so Accept is at most three Tab stops away
+  (12 to 18 before).
+- WS8.16 (F-423): the review opens at the top. The page pane is sized to the space under the
+  header, and the script moves the page image only inside its own region, against the part
+  that is in the window; the window is never moved on load (1280x720 figure: 40 px before).
+  No model call, no stored-data change, no migration, no version bump.
+
 ## Unreleased: the accept-many count and the review fields (branch feat/review-identical-and-counts)
 
 - WS8.1 (identical items decided as one write) is not built: the tracked fixtures hold no
