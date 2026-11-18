@@ -281,6 +281,8 @@ class Census:
     typed_equations: int = 0
     units: int | None = None
     units_exact: bool = False
+    # a Word file the reader took itself (`FEATURE_WORD_SOURCE`): no PDF was made of it
+    read_from_file: bool = False
 
     def to_json(self) -> dict[str, object]:
         return asdict(self)
@@ -304,7 +306,7 @@ class Census:
             raise ValueError("not a census")
         return Census(
             kind=str(data["kind"]), units=units, units_exact=data.get("units_exact") is True,
-            **counts,
+            read_from_file=data.get("read_from_file") is True, **counts,
         )  # fmt: skip
 
 

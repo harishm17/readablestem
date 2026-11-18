@@ -65,12 +65,12 @@ def with_notices(notices: list[Notice], census: Census | None, origin: str = "pd
     return [n for n in notices if n.code not in CODES] + notices_of(census, origin)
 
 
-def read_lines(census: Census | None, origin: str = "pdf") -> list[str]:
+def read_lines(census: Census | None) -> list[str]:
     """The job page's sentences about how the file was read: empty for a PDF."""
     if census is None:
         return []
     word = census.kind == "docx"
-    if origin == "docx":
+    if census.read_from_file:
         return [
             "This Word file was read from the file itself: its headings, lists, tables, "
             "footnotes, links and the descriptions of pictures the author wrote, and its "

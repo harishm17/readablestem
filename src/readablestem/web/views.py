@@ -734,10 +734,7 @@ def job_view(
         carry=carried,
         carried_ids=_carried_ids(job),
         part_label=job.part_label or "",
-        office_lines=office_census.read_lines(
-            office_census.parse(job.office_json),
-            str((job.result_json or {}).get("origin") or "pdf"),
-        )
+        office_lines=office_census.read_lines(office_census.parse(job.office_json))
         if with_page
         else [],
         is_sample=bool(job.is_sample),

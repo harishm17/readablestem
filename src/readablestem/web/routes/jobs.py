@@ -18,7 +18,7 @@ import re
 import time
 import unicodedata
 from collections.abc import Iterator, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Annotated, Any
@@ -1296,7 +1296,7 @@ def _place_word(
             exam=exam,
             now=utcnow(),
             media_type=SOURCE_MEDIA_TYPES["docx"],
-            office=census.to_json(),
+            office=replace(census, read_from_file=True).to_json(),
         )
     except TooManyJobs as exc:
         return Placed(file.filename, code=exc.code, status=429, retry_after="60")
