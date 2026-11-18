@@ -1489,7 +1489,7 @@ details.option-group[open] .group-change { display: none; }
 .confirm-actions .inline-form { display: flex; max-width: 100%; }
 .confirm-actions .button-danger { overflow-wrap: anywhere; }
 .confirm-export { margin: var(--space-4) 0; }
-.confirm-export .actions { margin: 0; gap: var(--space-2) var(--space-5); }
+.confirm-export .actions { margin: 0; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 @media (max-width: 37.5rem) {
   .confirm-actions { flex-direction: column; }
   .confirm-actions .inline-form, .confirm-actions .button-secondary { width: 100%; }
