@@ -12,14 +12,24 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
-from fixtures.web.support import WebEnv, fake_output, job_id_from, make_pdf, upload
+from fixtures.web.support import (
+    ADMIN,
+    WebEnv,
+    fake_output,
+    job_id_from,
+    login,
+    make_pdf,
+    upload,
+)
+from readablestem.ops import heartbeat
 from readablestem.web import health
 from readablestem.web.database import as_utc
-from readablestem.web.db import utcnow
+from readablestem.web.db import session_scope, utcnow
 
 SECRET_KEY = "sk-never-in-the-output-0123456789"
 
@@ -46,27 +56,66 @@ def test_readyz_is_ready_with_a_key_and_shows_no_secret(tmp_path):
     assert SECRET_KEY not in response.text and "gpt" not in response.text
 
 
-def test_readyz_is_not_ready_while_the_database_refuses_writes(tmp_path):
-    """Pages that only read keep working while another connection holds the write lock, and
-    every POST waits: /readyz must say not ready, within about a second (F-343)."""
+def test_the_health_routes_with_stale_tasks_and_under_a_held_write_lock(tmp_path):
+    """WF51. Fresh tasks, then a backup and a cron run made stale by the clock, then the same
+    routes while another connection holds the write lock (F-343): every page that only reads
+    keeps answering, `/readyz` says not ready in about a second and ready again at once when the
+    lock goes (a real second connection, measured, nothing mocked)."""
     import sqlite3
 
-    _env, client = running(tmp_path, openai_api_key=SECRET_KEY)
-    with client as web:
-        assert web.get("/readyz").status_code == 200
+    env, client = running(tmp_path, openai_api_key=SECRET_KEY)
+    anonymous = env.client()
+
+    def beat(backup_age: timedelta, cron_age: timedelta) -> None:
+        now = utcnow()
+        with session_scope(env.ctx.factory) as session:
+            heartbeat.beat(session, heartbeat.BACKUP, now=now - backup_age)
+            heartbeat.beat(session, heartbeat.CRON, now=now - cron_age)
+
+    def seen(web) -> dict[str, tuple[int, float]]:
+        out = {}
+        for path in ("/healthz", "/readyz", "/healthz/ops", "/status"):
+            started = time.monotonic()
+            out[path] = (web.get(path).status_code, time.monotonic() - started)
+        return out
+
+    with client as admin, anonymous:
+        env.allow(ADMIN, admin=True)
+        login(admin, ADMIN)
+        beat(timedelta(hours=1), timedelta(minutes=10))
+        public = anonymous.get("/healthz/ops")
+        assert (public.status_code, public.json()) == (200, {"status": "ok"})
+        assert admin.get("/admin/health").json()["stale"] == []
+
+        # The backup is past its 26 hours and the cron past its 2: both named for the admin,
+        # and the public body is still the status word and nothing else.
+        beat(timedelta(hours=27), timedelta(hours=3))
+        public = anonymous.get("/healthz/ops")
+        assert (public.status_code, public.json()) == (503, {"status": "stale"})
+        detail = admin.get("/admin/health")
+        assert detail.status_code == 503 and detail.json()["stale"] == ["backup", "cron"]
+        row = admin.get("/admin").text.split('id="ops-heading"')[1].split("</section>")[0]
+        assert "backup" in row and "cron" in row
+
         holder = sqlite3.connect(tmp_path / "web.db", isolation_level=None)
         holder.execute("BEGIN IMMEDIATE")
         try:
-            started = time.monotonic()
-            locked = web.get("/readyz")
-            took = time.monotonic() - started
+            for web in (anonymous, admin):
+                locked = seen(web)
+                assert locked["/healthz"][0] == 200
+                assert locked["/healthz/ops"][0] == 503 and locked["/status"][0] == 200
+                assert locked["/readyz"][0] == 503
+                assert locked["/readyz"][1] < 1.5  # the 1 s write limit, and the request around it
+            assert admin.get("/admin/health").json()["stale"] == ["backup", "cron"]
+            assert admin.get("/admin").status_code == 200
+            assert anonymous.get("/healthz/ops").json() == {"status": "stale"}
         finally:
             holder.execute("ROLLBACK")
             holder.close()
-        assert locked.status_code == 503 and took < 3
-        assert locked.json()["checks"]["database_write"] == "failed"
-        assert web.get("/healthz").status_code == 200  # the process and a read still answer
-        assert web.get("/readyz").status_code == 200
+        started = time.monotonic()
+        released = anonymous.get("/readyz")
+        assert released.status_code == 200 and time.monotonic() - started < 1
+        assert seen(anonymous)["/healthz"][0] == 200
 
 
 def test_readyz_without_any_key_is_not_ready_unless_the_models_are_fake(tmp_path):
