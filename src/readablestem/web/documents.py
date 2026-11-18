@@ -35,7 +35,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
@@ -96,6 +96,13 @@ class DocumentRow:
         return "" if self.title == self.filename else self.title
 
     @property
+    def control_name(self) -> str:
+        """The name a screen reader hears on the row's links and buttons ("Delete notes.pdf,
+        titled Kinematics"): the file's name and, when it says something else, the document's
+        title, so two rows are never the same words (F-096)."""
+        return f"{self.name}, titled {self.title_note}" if self.title_note else self.name
+
+    @property
     def label(self) -> str:
         """The state's label, with what it is waiting for or how far it has got: "Needs your
         decisions: 3 decisions to make", "Converting: 4 of 10 pages done"."""
@@ -125,6 +132,18 @@ class DocumentRow:
     def decide(self) -> bool:
         """Finished, with decisions open: a row "Review next" can open."""
         return self.group == states.NEEDS and not (self.state and self.state.stopped)
+
+
+def ready_newest_first(rows: Sequence[DocumentRow]) -> list[DocumentRow]:
+    """The finished documents with no decision open, newest first: the order "Download all"
+    (routes/bundle.py `_ready_files`) takes them in, so the ones past the zip's limit can be
+    named."""
+    ready = sorted(
+        (r for r in rows if r.status == JobStatus.DONE and not r.open_decisions), key=lambda r: r.id
+    )
+    return sorted(
+        ready, key=lambda r: r.created_at or datetime.min.replace(tzinfo=UTC), reverse=True
+    )
 
 
 @dataclass

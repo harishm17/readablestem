@@ -51,6 +51,7 @@ from readablestem.web import (
     access,
     analytics,
     batch_intake,
+    bundle,
     documents,
     events,
     notation,
@@ -599,6 +600,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         # My documents as a to-do list (web/documents.py); expired jobs count as deleted.
         listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
         left = pages_left(session, user.id, quota=quota, day=utc_today())
+        ready = documents.ready_newest_first(listing.rows)
         # The upload form's course choice (notation memory); None hides it.
         courses = (
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
@@ -654,8 +656,12 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "max_files": access.files_per_upload(user.access_tier),
         "batch_zip": ctx.settings.feature_batch_zip,
         "upload_limit_mb": ctx.settings.upload_limit_mb,
-        "ready_documents": sum(
-            1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
+        "ready_documents": len(ready),
+        # What "Download all" holds: the newest `bundle.limit` ready documents (routes/bundle.py
+        # takes them in this order); the others are named on the page.
+        "zip_rest": ready[bundle.limit("html") :],
+        "zip_held_back": sum(
+            1 for row in listing.rows if row.status == JobStatus.DONE and row.open_decisions
         ),
         "word_export": export_docx.available(),  # "Download all as Word" needs pandoc
         # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.

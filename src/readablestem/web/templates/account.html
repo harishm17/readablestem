@@ -64,7 +64,7 @@
 <section aria-labelledby="account-delete">
   <h2 id="account-delete">Delete account</h2>
   <p>Deletes your email, name, documents, decisions and courses. It cannot be undone.</p>
-  {% include "_account_deletion_notes.html" %}
+  {% set heading_level = 3 %}{% set for_account = true %}{% include "_delete_notes.html" %}
   <p><a class="button-danger-outline" href="/account/delete">Delete my account</a></p>
 </section>
 {% endblock %}

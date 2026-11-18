@@ -3,6 +3,6 @@
    (`word_export`). Wording follows the job page's "Other file types" (_job_ready.html).
    `download_all_url` is the HTML zip's address. #}
 <ul class="actions" aria-label="Download all as another file type">
-  {% if word_export|default(false) %}<li><a class="button-secondary" href="{{ download_all_url }}?format=docx">Download all as Word (.docx)</a></li>{% endif %}
+  {% if word_export|default(false) %}<li><a class="button-secondary" href="{{ download_all_url }}?format=docx">Download {% if ready_documents|default(0) > zip_limit("docx") %}the newest {{ zip_limit("docx") }}{% else %}all{% endif %} as Word (.docx)</a></li>{% endif %}
   <li><a class="button-secondary" href="{{ download_all_url }}?format=epub">Download all as EPUB</a></li>
 </ul>

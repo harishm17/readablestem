@@ -151,7 +151,8 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/keep` | owner | "Keep for 7 days": the deletion time becomes seven days from now; 429 and nothing changed when it would put the person over the 40 kept documents |
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | view | The HTML as an attachment |
-| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); 409 with fewer than two such parts, 404 for another person's or an expired document |
+| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); with fewer than two such parts it answers 200 with the combine page below instead of a file; 404 for another person's or an expired document |
+| GET `/jobs/{id}/combine/parts` | owner | The combine page (`templates/combine.html`, `views.combine_view`): always 200 for a part of a file converted in parts. A row per part the person keeps, in page order, with its state as the list words it (`web/states.py`), the open decisions and a Review link to the first open one (the review screen's own queue), then "Combine the N ready parts (leaves out M)" with the Word and EPUB links, or what is still needed when fewer than two are ready. Linked from every part's page (`_job_parts.html`); 404 for another person's, expired or non-part document |
 | GET `/jobs/{id}/download/canvas` | view | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | view | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
 | GET `/jobs/{id}/download.docx` | view | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link in the Word route of "Where will you post it?" on the finish line, shown only when pandoc is installed |
@@ -479,6 +480,11 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031 on the OpenAI pair and about $0.11 on `claude-opus-5-5` at 2026-10 prices:
    a display equation on the main model), a friendly 503 page ("Conversions are paused
    for today"). A smaller threshold admitted uploads that could convert nothing;
+1a. the wait a refusal states (`quota.retry_after`, `Wait`): every refusal that tells a person to come back builds its
+   sentence ("Try again at midnight UTC", "in about 5 minutes") and its `Retry-After` header from the same number
+   (`Wait.words`, `Wait.header`). The daily ones (the page quota, the daily spend cap, sign-ups full) are the seconds to the
+   next midnight UTC, the time `quota.next_day_start` resets at; the rate limiter's are its own wait; the fixed pauses (storage
+   full, busy) are named constants. Refusals that give no time carry a plain `Retry-After` only.
 1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
 2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
@@ -956,15 +962,23 @@ A PDF over `MAX_PAGES_PER_JOB` pages or `MAX_UPLOAD_MB`, and within `MAX_SOURCE_
 with it), nothing is converted or counted, and the person is sent to `/uploads/{id}`:
 
 - **The page** says how many pages and MB the file is, what one part can hold and the pages
-  left today (once), and suggests parts: as few as fit and of nearly equal size (59 pages:
-  `1-30` and `31-59`; `ranges.suggest_parts`). The parts are a list with a page count each and
-  one summary line ("3 parts, 12 pages."); with script, two page fields and "Add part" append a
+  left today (once), and suggests parts (`ranges.suggest_parts(total, limit, taken, left=,
+  chapters=)`): as few as fit and of nearly equal size (59 pages: `1-30` and `31-59`); the first
+  part is sized to the pages left today, so one is never suggested that today's pages cannot
+  start (60 left, 240 pages, 100 a part: `1-60`, `61-150`, `151-240`); and where the PDF has
+  top-level bookmarks (`pdf_probe outline`, read in the child process like every other look at
+  the file; none or a failure means even cuts) a part ends before the latest chapter start that
+  leaves it at least half the limit. The parts are a list, one label each ("Part 2: pages 5 to 8
+  (4 pages)"), and the summary is whole sentences from one count (`ranges.schedule`): "Part 1
+  (pages 1 to 60) starts now. Parts 2 and 3 can start after <time>, when your pages reset."
+  The page does not start the later parts: the file stays and they are sent again after the reset.
+  With script, two page fields and "Add part" append a
   line to the text box and "Remove" takes one out (`static/parts.js`). The box is the form's one
   field and stays under "Type the pages instead" (open without script and when something needs
   fixing): one part per line (or after a semicolon), ranges with a hyphen, ranges joined with
   commas in one part, pages numbered from 1 as in a PDF viewer. What cannot be used is said in
   words naming the part and the page ("Part 2: page 70 is not in this file, which has 59
-  pages", `ranges.parse_parts`); the preview (`ranges.preview`, `GET /uploads/{id}/preview`,
+  pages"; one typed part has no name: "Page 70 is not ..."; `ranges.parse_parts`); the preview (`ranges.preview`, `GET /uploads/{id}/preview`,
   refreshed by htmx as the box changes and drawn again after an error) marks the part that is
   wrong and still counts the others. Pages already sent are left out and cannot be sent twice.
 - **Cutting.** Each part is cut out in the probe's child process (`pdf_probe extract`,
@@ -984,10 +998,15 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
   page names what was started and why it stopped.
 - **Each part is a document** named "chapter2 (pages 31-59).pdf", with `jobs.part_group` (the
   pending upload's id) and `jobs.part_label`; its page says which pages it holds and links
-  its sibling parts in page order. Parts are separate documents; the "Combine parts" link on
+  its sibling parts in page order, with a "Combine the parts" link to the combine page. Parts are separate documents; "Combine parts" on
   the results page of a part (when two or more finished parts are kept) joins the ones the
   person still keeps into one HTML file (`web/combine.py`, docs/output.md "Combining the parts
   of a long source").
+- **Two sizes, each named once.** "One document" is up to `MAX_PAGES_PER_JOB` pages and `MAX_UPLOAD_MB` and is
+  converted as it is; "one file" is up to `MAX_SOURCE_PAGES` pages and `upload_limit_mb` and is kept here so the
+  pages are chosen, each part becoming a document. The words are `uploads.one_document`, `uploads.one_file` and
+  `uploads.zip_limits` (the template globals `one_document`, `one_file`, `project_zip`); no template or refusal types
+  a limit as a number.
 - **Retention.** The pending upload is deleted `RETENTION_HOURS` after it was made, by the
   hourly purge (`ops.retention.purge_pending`), "Discard this file" (asks first), when its last
   page has been sent, and with the person (`erase_user`). Past its time it answers 404 at
@@ -999,7 +1018,9 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
 With `FEATURE_NOTATION_MEMORY` on, the course page lists the documents converted for the
 course ("Documents in this course", the same list as My documents, polling
 `/app/documents?course=<id>` while any is converting) and offers "Download all N ready
-documents (zip)". My documents offers the same for everything the person has
+documents (zip)". My documents offers the same for everything the person has (when more are ready
+than one zip holds the link counts what the zip has, "Download 25 of 34 ready documents (zip)", says the
+limit and how many with decisions open are left out, and lists the others (the zip takes the newest first), so each can be downloaded from its own page; the Word link says "the newest 10" likewise)
 (`web/bundle.py`, `web/routes/bundle.py`):
 
 - Only a document that is **ready to share** goes in (finished, no decision open). One with

@@ -1,6 +1,7 @@
 {# The job's course (notation memory): set only with FEATURE_NOTATION_MEMORY on and a
    course chosen at upload. #}
 {% if course is defined and course %}
-<p id="job-course">Course: <a href="/courses/{{ course.id }}">{{ course.name }}</a>. This
-  document is read with its notation.</p>
+<p id="job-course">Course: <a href="/courses/{{ course.id }}">{{ course.name }}</a>. The
+  symbols the course had when this document was converted were sent with each equation.
+  Symbols added since are not applied to it: upload the PDF again to apply them.</p>
 {% endif %}

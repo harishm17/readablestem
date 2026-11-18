@@ -16,7 +16,7 @@
 </section>
 <h2>What is deleted</h2>
 <p>Your email and name, {% if documents %}{{ documents }} {{ "document" if documents == 1 else "documents" }}{% else %}any documents{% endif %} with their decisions, your courses and notation.</p>
-{% include "_account_deletion_notes.html" %}
+{% set for_account = true %}{% include "_delete_notes.html" %}
 {% if invitation_only %}
 <p>You are on the invitation list. Deleting removes you from it.</p>
 {% elif tier_open %}

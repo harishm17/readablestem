@@ -1,0 +1,18 @@
+{# What deleting something does not reach, in the same two sentences wherever deleting is
+   offered: the document, the file kept while pages are chosen, a course and the account
+   (their confirmation pages, and the Account page). Keep it in step with privacy.html, which
+   has the full policy. `heading_level` (default 2) is the heading's level; `for_account` adds the
+   note that is only true of an account. `recipients` and `sent_short` are in every page's
+   context (`deps.render`: web/recipients.py). #}
+{% from "_recipients.html" import retention_short %}
+{% set ai = recipients|selectattr("gets_documents")|list %}
+{% set level = heading_level|default(2) %}
+<h{{ level }}>Not reached by deleting</h{{ level }}>
+<ul>
+  <li>Backups keep a copy for about a week.</li>
+  <li>{{ sent_short[:1]|upper }}{{ sent_short[1:] }} already sent to {{ ai|map(attribute="name")|join(" and ") }} stay under {{ "its" if ai|length == 1 else "their" }} own retention. {% for r in ai %}{{ retention_short(r.name) }} {% endfor %}</li>
+  {% if for_account|default(false) and signup_open %}
+  <li>A scrambled fingerprint of your address, until tomorrow, so today's limits do not reset.</li>
+  {% endif %}
+</ul>
+<p class="hint">More in the <a href="/privacy">privacy notice</a>.</p>

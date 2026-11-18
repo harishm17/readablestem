@@ -5,6 +5,7 @@
 {% block content %}
 <h1>Discard “{{ filename }}”?</h1>
 <p>Deletes the copy kept here while you choose pages. Parts already sent are not affected. Your own copy is not changed.</p>
+{% include "_delete_notes.html" %}
 <div class="confirm-actions">
   <form method="post" action="/uploads/{{ upload_id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

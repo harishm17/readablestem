@@ -44,12 +44,12 @@
           {% if step and step.form %}
           <form method="post" action="{{ step.href }}" class="inline-form">
             <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-            <button type="submit" id="act-{{ row.id }}" class="button-secondary button-small">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></button>
+            <button type="submit" id="act-{{ row.id }}" class="button-secondary button-small">{{ step.label }}<span class="visually-hidden"> {{ row.control_name }}</span></button>
           </form>
           {% elif step %}
-          <a id="act-{{ row.id }}" class="row-primary" href="{{ step.href }}">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></a>
+          <a id="act-{{ row.id }}" class="row-primary" href="{{ step.href }}">{{ step.label }}<span class="visually-hidden"> {{ row.control_name }}</span></a>
           {% endif %}
-          <a id="del-{{ row.id }}" class="danger-link" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.name }}</span></a>
+          <a id="del-{{ row.id }}" class="danger-link" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.control_name }}</span></a>
         </td>
       </tr>
       {% endfor %}

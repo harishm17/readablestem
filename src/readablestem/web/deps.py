@@ -401,6 +401,7 @@ def render(
         # What is sent to the model, from one list (web/recipients.py `sent_material`): the
         # vendor line, the upload form's scanned-pages box and the deletion notes read it.
         **recipients.material_context(ctx.settings),
+        "recipients": recipients.recipients(ctx.settings),
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,
         # The two sizes an upload is held to, each with one name (`web.uploads`).
