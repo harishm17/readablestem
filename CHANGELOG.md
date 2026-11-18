@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: the type scale checked, and the last text under 14 px (branch fix/student-type-scale-and-voices)
+
+- WS21.5 (F-445) and WS23.2/WS23.3 (F-461, F-462) were already built in this branch's base
+  (401727fb, b910b133); this entry is what a check of both found left. Measured in Chromium at
+  1280 and 390 px on a page with every heading level: h3 to h6, captions, footnotes and page
+  markers have the sizes the type scale gives them, and the one text still under 14 px was the
+  stacked scripts of a nuclide or an ion (13.5 px, `0.75em`); they are now `0.8em` (14.4 px).
+  The EPUB takes the same rule from the same sheet. F-461 and the Play-off fault were
+  reproduced on the files before 3a89e21b (the transport 139 px tall in a 225 px window, Play
+  disabled for a Firefox-shaped voice list) and pass on this branch; the Firefox-shaped voice
+  test now has 14,805 voices. No Listen change, no model call, no migration. The change
+  rides on the `RENDER_VERSION` raise already in this batch (not bumped here).
+
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 
 - WS18.9 (F-557). LaTeXML already wrote `\ref`, `\eqref`, `\autoref`, `\cite` and each contents

@@ -266,7 +266,7 @@ FIGURE_DESCRIPTION = """\
 # class names are `inline_text.STACK_CLASS` and `STACK_LOW_FIRST`.
 SCRIPT_STACK = (
     ".script-stack { display: inline-flex; flex-direction: column; vertical-align: -0.5em;"
-    " font-size: 0.75em; line-height: 1.1; text-align: left; }\n"
+    " font-size: 0.8em; line-height: 1.1; text-align: left; }\n"
     ".script-stack.script-stack-low-first { flex-direction: column-reverse; }\n"
     ".script-stack sup, .script-stack sub { font-size: inherit; vertical-align: baseline;"
     " line-height: inherit; }\n"

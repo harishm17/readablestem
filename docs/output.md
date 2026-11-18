@@ -1449,8 +1449,8 @@ beside them.
   apart from it and from each other by weight and style (h5 bold, h6 bold italic). Captions,
   the notes beside a kept picture, footnotes and page markers are one step smaller, 0.9 em
   (16.2 px), with more room above a caption. No text on the page is under 14 px; the
-  exceptions are sub- and superscripts, the stacked scripts of a nuclide or an ion
-  (`0.75em`) and the scripts inside math, which the browser sizes. The scale is the same
+  stacked scripts of a nuclide or an ion are 0.8 em (14.4 px). The exceptions are
+  the scripts inside math, which the browser sizes. The scale is the same
   in the EPUB (sizes are relative there, so it follows the reader's own text size) and in
   the standalone Canvas page; the Canvas page for pasting leaves heading sizes to Canvas's
   own theme (rules on bare `h1` to `h6` are not carried into it). The Word file is made by

@@ -84,8 +84,9 @@ ONLINE_ONLY = (
     "window.__voices = [{name: 'Google US English', lang: 'en-US', localService: false, "
     "voiceURI: 'cloud', default: false}];\n"
 )
-NOT_KNOWN = (
-    "window.__voices = ['english-us', 'english_rp', 'en-us+Annie', 'german'].map((name, i) => "
+NOT_KNOWN = (  # 14,805 of them, as speech-dispatcher gives Firefox on Linux
+    "window.__voices = ['english-us', 'english_rp', 'en-us+Annie', 'german']"
+    ".concat(Array.from({length: 14801}, (_, i) => 'en-us+variant' + i)).map((name, i) => "
     "({name, lang: name.startsWith('german') ? 'de' : 'en-US', localService: false, "
     "voiceURI: name, default: i === 0}));\n"
 )
