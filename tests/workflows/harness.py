@@ -39,8 +39,9 @@ from typing import Any
 import lxml.html
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
-from fixtures.web.support import fetch, job_id_from, login, make_settings, upload
+from fixtures.web.support import fetch, job_id_from, login, make_settings, token, upload
 from readablestem.config import Settings
 from readablestem.core.types import DocumentResult
 from readablestem.eval import corpus
@@ -284,17 +285,7 @@ class ReplaySite:
             pytest.fail(f"{entry_id}: the upload was refused ({sent.status_code}): {said[-600:]}")
         replayable(entry_id)
         job_id = job_id_from(sent)
-        worker = Worker(
-            self.settings,
-            self.ctx.factory,
-            converter=self.ctx.converter,
-            client_factory=self._client,
-        )
-        assert worker.run_once() == job_id
-        clients = self._clients[before:]
-        missed: Counter[str] = Counter()
-        for client in clients:
-            missed.update(client.missed_because)
+        clients, missed = self._run_queued(job_id, before)
         if LOG:
             line = {
                 "entry": entry_id,
@@ -320,6 +311,64 @@ class ReplaySite:
             )
         return job_id
 
+    def _run_queued(self, job_id: str, before: int) -> tuple[list[Any], Counter[str]]:
+        """Runs the queued job and returns the model clients it used (those made after
+        `before`) with the answers the recording did not hold."""
+        worker = Worker(
+            self.settings,
+            self.ctx.factory,
+            converter=self.ctx.converter,
+            client_factory=self._client,
+        )
+        assert worker.run_once() == job_id
+        clients = self._clients[before:]
+        missed: Counter[str] = Counter()
+        for client in clients:
+            missed.update(client.missed_because)
+        return clients, missed
+
+    def convert_file(
+        self, filename: str, data: bytes, *, image_pages: bool = False, exam: bool = False
+    ) -> str:
+        """Upload a file made for the test (`builders`, or bytes written in the test) as the
+        owner and convert it. Returns the job's id. Fails the test when the upload is
+        refused. Model answers the recording does not hold are refused and the step carries
+        on without them, as it does in production when a model fails: a test that needs an
+        answer says so."""
+        before = len(self._clients)
+        sent = upload(self.browser, data, filename=filename, image_pages=image_pages, exam=exam)
+        if sent.status_code != 303:
+            said = " ".join(sent.text.split())
+            pytest.fail(f"{filename}: the upload was refused ({sent.status_code}): {said[-600:]}")
+        job_id = job_id_from(sent)
+        self._run_queued(job_id, before)
+        return job_id
+
+    def convert_parts(self, filename: str, data: bytes, parts: list[str]) -> list[str]:
+        """Upload a file over the page limit, which the site keeps, choose these parts of it
+        as a person does, and convert each. Returns the jobs' ids in the order of `parts`."""
+        sent = upload(self.browser, data, filename=filename)
+        location = sent.headers.get("location", "")
+        if sent.status_code != 303 or not location.startswith("/uploads/"):
+            pytest.fail(f"{filename}: not kept for parts ({sent.status_code}): {sent.text[-300:]}")
+        chosen = self.browser.post(
+            location,
+            data={"csrf_token": token(self.browser, location), "parts": "\n".join(parts)},
+        )
+        assert chosen.status_code == 303, chosen.text[-300:]
+        with session_scope(self.ctx.factory) as session:
+            rows = session.scalars(select(Job).where(Job.part_group == location.rsplit("/", 1)[-1]))
+            by_label = {job.part_label: job.id for job in rows}
+        for _ in parts:
+            worker = Worker(
+                self.settings,
+                self.ctx.factory,
+                converter=self.ctx.converter,
+                client_factory=self._client,
+            )
+            assert worker.run_once() in by_label.values()
+        return [by_label[label] for label in parts]
+
     def page(self, path: str) -> lxml.html.HtmlElement:
         """The page at `path` as the owner gets it, parsed. A download that is still a draft
         is confirmed the way a person confirms it."""
@@ -339,4 +388,7 @@ class ReplaySite:
             return job
 
     def result(self, job_id: str) -> DocumentResult:
-        return DocumentResult.model_validate(self.job(job_id).result_json)
+        with session_scope(self.ctx.factory) as session:
+            job = session.get(Job, job_id)
+            assert job is not None
+            return DocumentResult.model_validate(job.result_json)
