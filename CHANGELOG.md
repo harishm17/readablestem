@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: sign-in, account, sharing, allowance, audience and date words (branch feat/account-session-sharing)
+
+- WS11.12: one sign-in sentence for every page (`web/signin_words.py`, only the methods that are
+  on); sign-in is limited per method (`login_google`, `login_microsoft`, `login_email`,
+  `login_dev`) and the limit is counted after the form check, so a refused form costs nothing;
+  a page with no form sets no cookie (lazy CSRF token); a provider failure at the callback is a
+  400 "Sign-in did not finish"; signing out says it signs out every device; a name the person
+  typed is not replaced by the provider's at the next sign-in. The emailed sign-in link is
+  issued and sent after the response, so an address that has an account and one that has not
+  answer in the same time (F-508 fixed), and the wait notice shows only in the browser that
+  asked.
+- WS11.13: the account page counts the documents storage counts (no sample, none past its time),
+  keeps a name (`POST /account/name`), offers "Download everything" (`GET /account/export`: each
+  ready document in each file type, the review records, courses and settings), has one "Delete
+  account" button, and a saved notice takes focus; long addresses wrap at set points.
+- WS11.15: sharing says what it did (added, changed, already so), shows how many of the ten
+  places are used before the cap is hit, tells the person shared with when access ends, and the
+  deleted-document page no longer says documents are kept longer "if you share results".
+- SW2: `quota.allowance_phrase` ("0 of 150 pages used today, 150 left. Resets ...") and the rule
+  sentence `PAGES_RULE`, on the account page, the admin sign-up lines, the parts chooser and the
+  re-read refusal.
+- SW16: `views.audience_of(role)`; Listen is worded for a reader; the owner's two questions about
+  posting the file and the feedback page are the owner's alone (they were open to View).
+- SW9: `web/dates.py` (`format_when`, `machine_date`): server-built dates say UTC; no stored zone.
+- No migration, no `PIPELINE_VERSION` or `RENDER_VERSION` change, no change to a stored document.
+
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 
 - SW36 follow-up: a drawn rule was written as a blank to fill in ("_____") when the nearest
