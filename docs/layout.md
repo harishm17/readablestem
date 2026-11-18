@@ -816,7 +816,9 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   and every picture and drawing is there too. Pictures are every raster image (a digest of its
   pixels, `get_image_info(hashes=True)`, empty ones skipped) and the vector drawings in the body
   (kind, color and box; the top fifth and bottom 12 % are the headline and footline), each within
-  3 pt of where it was. So `\pause`, `\item<n->` and `\uncover`, which only add, collapse, and a
+  3 pt of where it was. A page's pictures and drawings are read only when its rows are all on
+  the frame's last page (`slides.LazyMarks`), so a file that is not a deck never decodes its pictures
+  for this. So `\pause`, `\item<n->` and `\uncover`, which only add, collapse, and a
   step with a different picture, a changed row or a reordering stays. A dropped page is removed
   before margins, page types, tables and rows are read, so it costs no crop and no model call, and
   it is not in `Layout.pages`, `page_sizes` or `page_types` (as if the user had not selected it).
