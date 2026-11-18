@@ -13,9 +13,11 @@ from readablestem.core.types import BBox
 from readablestem.pipeline.layout.context import _Document
 from readablestem.pipeline.layout.drawings import (
     _OPENING_BRACES,
+    BARE_EQUATION_NUMBER,
     EQUATION_NUMBER,
     STRAY_BRACE_REACH,
     _number_beside,
+    _number_column,
     _rule_rows,
 )
 from readablestem.pipeline.layout.glyphs import _SIGNS, _Char, _clean, _union
@@ -46,6 +48,11 @@ MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligne
 # or more; a centred "and" between two columns can stand 7 font sizes from either).
 CONNECTIVE_GAP = 9.0
 
+# Narrowest gap between a display's last formula and a bracketed number ending its row: a
+# "(8)" pushed against the right margin of a long `multline` stands 0.9 sizes from it, and
+# a bare "2.4" 1.0 (a space before a function's "(8)" is a third of a size).
+BRACKETED_NUMBER_GAP = 0.7
+
 
 def _split_labels(rows: list[_Row]) -> list[_Row]:
     """Cut an equation number off the end of a maths row into a row of its own.
@@ -53,9 +60,10 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
     `_merge_baselines` joins pieces of a line up to 4 x font size apart, so an equation
     number set close to its equation ("= 2000 m - 525 m ,   2.8") arrives as part of the
     row. It is cut off when the last token reads as an equation number (or the last two
-    do: "Eq. 2.4", "Equation (2.4)"), stands at least one font size clear of the rest,
-    and the rest has maths in it (or is only the comma that ends the maths) and does not
-    end in a relation or operator ("x =   2.4" keeps its right-hand side). Whether it is
+    do: "Eq. 2.4", "Equation (2.4)"), stands clear of the rest (a font size, or
+    `BRACKETED_NUMBER_GAP` for a bracketed number), and the rest has maths in it (or is
+    only the comma that ends the maths) and does not end in a relation or operator
+    ("x =   2.4" keeps its right-hand side). Whether it is
     an equation number is decided later, by where it sits (`_equation_regions`).
     """
     out: list[_Row] = []
@@ -71,10 +79,11 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
             if EQUATION_NUMBER.match(prefixed):  # "Eq. 2.4": the prefix goes with it
                 start, label = tokens[-2][0], prefixed
         before = [c for c in row.chars[:start] if not c.blank]
+        gap = 1.0 if BARE_EQUATION_NUMBER.match(label) else BRACKETED_NUMBER_GAP
         if (
             _is_equation_number(label)
             and before
-            and row.chars[start].x0 - before[-1].x1 >= 1.0 * row.size
+            and row.chars[start].x0 - before[-1].x1 >= gap * row.size
             and before[-1].c not in _CONTINUATION_SIGNS
             and (
                 any(c.math or c.c in _ROW_RELATIONS or c.c in _SIGNS for c in before)
@@ -563,7 +572,7 @@ def _equation_regions(
         beside = [
             line
             for line in lines
-            if line.rows[0].column == label.column
+            if _number_column(label, line.rows[0].column, line.box[2])
             and _number_beside(label, line.box, line.size)
             and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
         ]
