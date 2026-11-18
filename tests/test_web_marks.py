@@ -63,3 +63,15 @@ def test_a_mark_at_the_edge_of_the_page_stays_on_it():
     placed = marks.place({"corner": (0.0, 0.0, 4.0, 4.0)}, LETTER)
     x0, y0, _, _ = placed["corner"].link
     assert x0 >= 0 and y0 >= 0
+
+
+def test_on_a_dense_page_no_two_numbers_cover_each_other():
+    # Beside the frames, and in the margin for equations in a line of text, one to a line.
+    boxes = {k: v for k, v in dense_page().items() if k[0] not in "jr"}
+    inline = frozenset(k for k in boxes if k[0] in "ie")
+    for placed in (
+        marks.place(boxes, LETTER),
+        marks.place(boxes, LETTER, inline=inline, text=(57.6, 540.0)),
+    ):
+        assert marks.overlapping_tags(placed, LETTER[0]) == []
+        assert marks.overlapping(placed) == []
