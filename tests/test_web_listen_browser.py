@@ -396,8 +396,7 @@ def test_without_javascript_the_transcript_is_text_and_the_controls_stay_hidden(
     assert page.locator("[data-listen-controls]").is_hidden()
     assert "Playing needs JavaScript" in page.locator("noscript").inner_text()
     assert (
-        "The speed is v equals d over t."
-        in page.locator("[data-listen-transcript]").inner_text()
+        "The speed is v equals d over t." in page.locator("[data-listen-transcript]").inner_text()
     )
     context.close()
 
