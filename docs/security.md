@@ -131,7 +131,11 @@ needs), and a model read (an equation marked on a page, a table cell read) is 20
 per person (`"reread"`), one at a time per person (`reread.ReadGate`), and reserves its
 worst-case cost against the day's cap and the job's own caps before anything is sent
 (`reread.ReadBudget`, the same conditional UPDATEs as the worker's); a refused reservation is a
-sentence on the page, not an error. Added pictures and equations are at most 30 a document.
+sentence on the page, not an error. A question the model has already answered for the document
+(the same crop, prompt version, model and text sent with it: `models.question.question_key`) is
+answered from the document's step records (`web.step_cache`) with no call, no reservation, no
+charge and no unit of the day's count; the records hold the model's answer and a hash key, and
+go with the job (`ops.retention`). The rate limit still counts the request. Added pictures and equations are at most 30 a document.
 Text the person types reaches the student file exactly as other review edits do: cleaned
 (`validate.clean_alt` or the same without collapsing lines for code; NUL, controls and
 invisible format characters out), checked (`check_alt` for alt text and descriptions), kept in
@@ -196,8 +200,9 @@ the `job_shares` table). It adds a way in, so it is described in full here.
 - **Money and limits.** A re-read a reviewer asks for uses the owner's daily allowance, spend
   pool and the document's caps (`reread.read_equation`), and its rate limit is keyed by the
   owner (`enforce(..., "reread", job.user_id)`), so any number of reviewers share one budget
-  and sharing never raises what a document can spend or how fast. One read at a time per
-  person still applies to each asker. Only the owner's own actions restart the deletion clock
+  and sharing never raises what a document can spend or how fast. The review screen says so
+  beside each button that starts a read (`reread.SHARED_NOTE`), without the owner's name. One
+  read at a time per person still applies to each asker. Only the owner's own actions restart the deletion clock
   (`routes.jobs.restart_owner_clock`): not a viewer's download, nor a reviewer's decision.
 - **Logs.** `share_set`, `share_revoked` and `share_refused` carry the job id, the right and a
   category; never an address. The flash notices on the sharing page are text without addresses,

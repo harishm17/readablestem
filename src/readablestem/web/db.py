@@ -463,7 +463,7 @@ class DeletedAccount(Base):
 
 class QuotaDay(Base):
     """Pages a user has submitted per UTC day, and the model reads from review they have
-    started (`rereads`, counted for open-tier accounts only: `web.quota`), and what their
+    started (`rereads`, counted for every account, limited for open-tier ones: `web.quota`), and what their
     jobs cost that day (`spent_usd`, added by the spend guard when a model call settles).
     Deleted with the user; `spend_days` stays the global total."""
 

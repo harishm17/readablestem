@@ -48,9 +48,7 @@
   <h2 id="account-limits">Daily limits</h2>
   <ul>
     <li>Pages: {% if page_quota is none %}no limit set.{% else %}{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% endif %}</li>
-    {% if reread_allowance is not none %}
-    <li>Model reads from the review screen: {{ allowance(reread_allowance - rereads_left, reread_allowance, "read", next_reset) }}</li>
-    {% endif %}
+    <li>Model reads from the review screen: {{ allowance(rereads_used, reread_allowance, "read", next_reset) }} A read started by someone a document is shared with counts here.</li>
   </ul>
   <p class="hint">{% if tier_open %}New-account limits{% else %}Invited-account limits{% endif %}. {{ PAGES_RULE }} <a href="/limits">Known limits</a>.</p>
 </section>

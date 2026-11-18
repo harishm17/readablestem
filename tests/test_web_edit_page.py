@@ -9,6 +9,7 @@ review's version guard and can be undone.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from html import unescape
 
@@ -27,8 +28,11 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step
 from readablestem.web import page_edits, reread
+from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, session_scope
+from readablestem.web.quota import rereads_used
 
 PARAGRAPH = "p1-e1"  # "A rigid body turning with angular velocity ⟦p1-e2⟧ moves a point ..."
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."
@@ -399,6 +403,37 @@ def test_an_equation_read_is_refused_when_the_document_has_used_its_allowance(tm
         assert "This document has used its allowance" in unescape(response.text)
         assert not any(e.id == "p1-x1" for e in stored(env).elements)
         assert env.job(env.job_id).cost_usd == pytest.approx(0.01, abs=1e-9)  # the conversion's
+
+
+def _rereads_today(env) -> int:
+    with session_scope(env.ctx.factory) as session:
+        return rereads_used(session, next(iter(_user_ids(env))), utc_today())
+
+
+def test_the_same_crop_read_again_is_answered_from_the_record(edits, monkeypatch):
+    """F-093: the second read of one crop makes no call, charges nothing and counts nothing;
+    a changed prompt is another question."""
+    with_model(edits, EQUATION_ANSWER)
+    before = edits.job(edits.job_id)
+    assert add_post(edits, "equation").status_code == 303
+    one = edits.job(edits.job_id)
+    assert add_post(edits, "equation").status_code == 303
+    two = edits.job(edits.job_id)
+    assert sum(len(c.requests) for c in edits.clients) == 1
+    assert one.model_calls == before.model_calls + 1 and two.model_calls == one.model_calls
+    assert one.cost_usd > before.cost_usd and two.cost_usd == one.cost_usd
+    assert _rereads_today(edits) == 1  # an invited account is counted, not limited
+    assert [e.id for e in stored(edits).elements if e.id.startswith("p1-x")] == ["p1-x1", "p1-x2"]
+
+    real = equation_step.load_prompt
+    monkeypatch.setattr(
+        equation_step,
+        "load_prompt",
+        lambda name: dataclasses.replace(real(name), version="changed"),
+    )
+    assert add_post(edits, "equation").status_code == 303
+    assert sum(len(c.requests) for c in edits.clients) == 2
+    assert _rereads_today(edits) == 2
 
 
 def test_one_read_at_a_time_for_each_person(edits):

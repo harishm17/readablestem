@@ -9,9 +9,10 @@ submit, and refunds would let a failing upload be retried without bound. The one
 is a document canceled before a worker began it, on the day it was counted (`give_back_pages`);
 converting it again counts its pages again (`routes.jobs.retry_job`).
 
-The same row counts the model reads an open-tier account starts from the review screen
+The same row counts the model reads started from the review screen on a person's documents
 (`try_consume_reread`: a region marked as an equation, a table cell read as maths, "Read
-again" on an equation), and one `signup_days` row per UTC day counts the accounts open
+again" on an equation; an open-tier account has an allowance, an invited one only the count),
+and one `signup_days` row per UTC day counts the accounts open
 sign-up made (`try_take_signup`). All three are one conditional UPDATE, so the database
 decides who is over the limit. A page and a sign-up are not given back: what is counted is
 what was asked for. A read that comes back with nothing is given back
@@ -156,18 +157,16 @@ def retry_after(seconds: float | None = None, *, now: datetime | None = None) ->
     return Wait(max(1, math.ceil((next_day_start(moment) - moment).total_seconds())), daily=True)
 
 
-def try_consume_reread(session: Session, user_id: str, *, allowance: int, day: date) -> bool:
+def try_consume_reread(session: Session, user_id: str, *, allowance: int | None, day: date) -> bool:
     """Count one model read from review against the user's allowance for `day`. False
-    (nothing changed) when the allowance is used up. Same pattern as `try_consume_pages`,
-    on the same row."""
+    (nothing changed) when the allowance is used up; with no allowance (an invited account)
+    the read is counted and never refused. Same pattern as `try_consume_pages`, on the
+    same row."""
     insert_ignore(session, QuotaDay, {"user_id": user_id, "day": day, "pages": 0, "rereads": 0})
+    within = [] if allowance is None else [QuotaDay.rereads + 1 <= allowance]
     stmt = (
         update(QuotaDay)
-        .where(
-            QuotaDay.user_id == user_id,
-            QuotaDay.day == day,
-            QuotaDay.rereads + 1 <= allowance,
-        )
+        .where(QuotaDay.user_id == user_id, QuotaDay.day == day, *within)
         .values(rereads=QuotaDay.rereads + 1)
         .execution_options(synchronize_session=False)
     )

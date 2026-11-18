@@ -64,6 +64,7 @@ from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.quota import PAGES_RULE, allowance_phrase
+from readablestem.web.reread import SHARED_NOTE as REREAD_SHARED_NOTE
 from readablestem.web.return_to import (
     build_pages,
     decision_link,
@@ -208,6 +209,8 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     env.globals["zip_limit"] = zip_limit  # ty: ignore[invalid-assignment]
     env.globals["allowance"] = _allowance  # ty: ignore[invalid-assignment]
     env.globals["PAGES_RULE"] = PAGES_RULE  # ty: ignore[invalid-assignment]
+    # Beside a button that starts a model read, for a person the document was shared with.
+    env.globals["REREAD_SHARED_NOTE"] = REREAD_SHARED_NOTE  # ty: ignore[invalid-assignment]
     env.filters["utc_text"] = _utc_text
     env.filters["breakable"] = _breakable
     env.filters["usd"] = _usd

@@ -127,7 +127,7 @@
   {% call form("review.read_cell", "/jobs/" ~ job.id ~ "/tables/" ~ eid ~ "/read-cell", {"class": "inline-form read-cell"}) %}
     {{ table_fields("split") }}<input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
     <button type="submit" class="button-secondary" data-role="read-cell" aria-describedby="read-cell-note-{{ eid }}">Read this cell with the model<span class="visually-hidden">: {{ c.position|lower }}</span></button>
-    <p class="hint" id="read-cell-note-{{ eid }}">The model reads the cell from the page; it takes a few seconds and uses part of this document's allowance. What it reads is checked as if you had typed it.</p>
+    <p class="hint" id="read-cell-note-{{ eid }}">The model reads the cell from the page; it takes a few seconds and uses part of this document's allowance. What it reads is checked as if you had typed it.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>
   {% endcall %}
   {% endif %}
   {% else %}

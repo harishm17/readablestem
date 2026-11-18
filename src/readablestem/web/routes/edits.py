@@ -610,7 +610,7 @@ def read_again(
     from sqlalchemy import select
 
     from readablestem.pipeline import run as pipeline_run
-    from readablestem.web.reread import ReadRefused, counts_reads, is_empty, read_equation
+    from readablestem.web.reread import ReadRefused, is_empty, read_equation
 
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
@@ -644,8 +644,7 @@ def read_again(
     except ReadRefused as exc:
         return _item_refusal(request, job_id, user, view, element_id, exc.message)
     if is_empty(read):
-        said = EMPTY_READ + (GIVEN_BACK if counts_reads(request, job.user_id) else "")
-        return _item_refusal(request, job_id, user, view, element_id, said)
+        return _item_refusal(request, job_id, user, view, element_id, EMPTY_READ + GIVEN_BACK)
     try:
         change, result, owned_id = write_structure(
             request,
