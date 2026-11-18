@@ -347,6 +347,28 @@ def test_deleting_a_running_job_stops_its_model_calls_at_once(env, caplog):
     assert not any(m.startswith("job_failed") for m in messages)
 
 
+def test_canceling_a_running_job_stops_its_model_calls_and_keeps_the_upload(env):
+    browser = env.client()
+    login(browser, ALICE)
+    job_id = job_id_from(upload(browser, make_pdf(1)))
+    csrf = token(browser, f"/jobs/{job_id}")
+    sent: list[int] = []
+
+    def cancel_now() -> None:
+        assert browser.post(f"/jobs/{job_id}/cancel", data={"csrf_token": csrf}).status_code == 303
+
+    worker = env.worker()
+    worker.converter = paged_converter(5, after_page={1: cancel_now}, sent=sent)
+    assert worker.run_once() == job_id
+    assert sent == [1]  # nothing was sent to the model after "Cancel"
+    job = env.job(job_id)
+    assert (job.status, job.error_code) == ("failed", "canceled")
+    assert job.lease_until is None and job.result_json is None
+    assert blobs(env, job_id, "upload")  # the upload is kept, so it can be converted later
+    page = browser.get(f"/jobs/{job_id}").text
+    assert "Canceled" in page and "Convert it" in page
+
+
 def test_the_heartbeat_notices_a_deleted_job_without_any_progress(env, caplog):
     caplog.set_level(logging.INFO)
     job_id = queue_job(env)

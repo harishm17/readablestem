@@ -659,7 +659,10 @@ class Worker:
         """
         if attempt.cancelled.is_set():
             raise JobCancelled()
-        under_caps = [Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON]
+        under_caps = [
+            Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON,
+            Job.cancel_requested_at.is_(None),  # "Cancel" pressed: no more model calls
+        ]
         if calls:
             under_caps.append(Job.model_calls + calls <= attempt.max_calls)
         with session_scope(self.factory) as session:
@@ -674,10 +677,16 @@ class Worker:
             if won == 1:
                 return
             row = session.execute(
-                select(Job.cost_usd, Job.model_calls).where(*self._owned(attempt.claim))
+                select(Job.cost_usd, Job.model_calls, Job.cancel_requested_at).where(
+                    *self._owned(attempt.claim)
+                )
             ).one_or_none()
         if row is None:
             self._cancel(attempt, "not_owned")
+            raise JobCancelled()
+        if row.cancel_requested_at is not None:
+            self._finish_failed(attempt, CANCELED)
+            self._cancel(attempt, "canceled")
             raise JobCancelled()
         if calls and int(row.model_calls or 0) + calls > attempt.max_calls:
             raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")

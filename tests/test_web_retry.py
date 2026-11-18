@@ -167,6 +167,36 @@ def fixes_json(result: DocumentResult) -> list[dict]:
     return [f.model_dump(mode="json") for f in result.fixes]
 
 
+# --------------------------------------------------------------------------- cancel
+
+
+def test_a_document_canceled_before_it_starts_gives_its_pages_back_and_counts_them_again(site):
+    """Cancel on a waiting document stops it at once and returns the pages counted at upload;
+    "Convert it" queues it again without using a try, and counts the pages again."""
+    job_id = job_id_from(upload(site.browser, PDF.read_bytes(), filename="waiting.pdf"))
+    counted = site.pages_used()
+    assert counted > 0
+    page = f"/jobs/{job_id}"
+    cancel = site.browser.post(
+        f"{page}/cancel", data={"csrf_token": csrf_from(site.browser.get(page).text)}
+    )
+    assert cancel.status_code == 303
+    job = site.job(job_id)
+    assert (job.status, job.error_code) == ("failed", "canceled")
+    assert site.pages_used() == 0
+    assert site.run_worker() is None  # nothing is waiting any more
+    shown = text_of(site.browser.get(page).text)
+    assert "Canceled" in shown and "Convert it" in shown
+    assert site.post_retry(site.browser, job_id).status_code == 303
+    job = site.job(job_id)
+    assert (job.status, job.retries, job.error_code) == ("queued", 0, None)
+    assert site.pages_used() == counted
+    assert site.run_worker() == job_id and site.job(job_id).status == "done"
+    # Not an upload of someone else's: only the owner may cancel.
+    other = site.bob.post(f"{page}/cancel", data={"csrf_token": csrf_from(site.bob.get("/app").text)})
+    assert other.status_code == 404
+
+
 # --------------------------------------------------------------------------- the pipeline
 
 
