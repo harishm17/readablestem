@@ -2406,7 +2406,13 @@ one target has its number; a bare "(3)" only when an equation prints exactly "(3
 beside it (an equation numbered "2.4" without brackets is not named by "(2.4)"). No link
 when two targets share a number, when none has it, when it would overlap a PDF link or
 an inline equation, or at the very start of a paragraph that reads like an unattached
-caption ("Figure 2: ...").
+caption ("Figure 2: ..."). The same table holds the other numbered things: a heading that
+starts with "3.2" is "Section 3.2", one that starts "Chapter 4" is "Chapter 4", and a
+paragraph or heading that starts "Theorem 2.1." (or "(name)." or ":" after the number) is
+that theorem; Lemma, Proposition, Corollary, Definition and "Example" (capital E, so "for
+example 3" is not one) work the same. A reference is never linked to the element it is in.
+`typed_addresses` makes "typed" links of the web and email addresses in the text that no PDF
+link covers.
 
 hyperref links only the number of `Figure~\ref{fig}` or `\eqref{eq}`; such a PDF link is
 widened to the whole reference ("Figure 1", "Equation (1)") so the link text says what

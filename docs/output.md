@@ -919,9 +919,21 @@ items and headings; offsets are into the stored text, markers included.
   file is written). Any other PDF link (ftp, a file, a program, javascript) is not
   written; its text stays, and the job page lists the notice `link_scheme_dropped`.
 - **Links inside the document** ("internal": a PDF link to a place in it; "crossref":
-  "Figure 2.3", "Eq. (3)", "Table 1" in the text) point at `#` + the target element's id.
-  Figures, tables, display equations, headings, paragraphs and list items already carry
-  their ids, so nothing new is written at the target.
+  "Figure 2.3", "Eq. (3)", "Table 1", "Section 3.2", "Chapter 4", "Theorem 2.1" in the
+  text) point at `#` + the target element's id. Figures, tables, display equations,
+  headings, paragraphs and list items already carry their ids, so nothing new is written
+  at the target. A reference is a link only when exactly one thing in the document has
+  that number: "Section 3.2" needs a heading that starts with 3.2, "Chapter 4" a heading
+  "Chapter 4", and "Theorem 2.1" (also Lemma, Proposition, Corollary, Definition,
+  Example) a paragraph or heading that starts "Theorem 2.1." or "Theorem 2.1 (name).".
+  No such target, or two, and the words stay plain text; so does a reference inside its
+  own target.
+- **Typed addresses** ("typed": `https://...`, `http://...`, `www....` and `name@host.tld`
+  printed in the text with no link in the PDF) are written as web and email links like
+  the PDF's own, after the same `is_safe_href` check. The full stop or comma that ends a
+  sentence is not part of the address, and an address cut at a line end is whole only
+  where the converted text joins it. They are not counted as links of the PDF on the
+  job page and get no `link_text_unclear` notice, because nobody made them links.
 - A link never wraps an inline equation: a wide one is a tab stop of its own, and a tab
   stop cannot sit inside a link (axe `nested-interactive`). A link across an equation is
   written in two pieces around it.
