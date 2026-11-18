@@ -132,6 +132,14 @@ _RELATIONS = """
     supseteq in ni notin perp parallel mid nmid asymp doteq models vdash dashv
     succsim gtrapprox trianglelefteq coloneqq triangleq intercal colon
 """
+# The negated relations the converter writes as one character (`\nleq` is U+2270). `\not` before a
+# relation is the same thing, read by `_NOT_ARGUMENT` and joined by `mathml_shape`.
+_NEGATED_RELATIONS = """
+    nleq ngeq nless ngtr nleqslant ngeqslant nsubseteq nsupseteq nsubseteqq nprec nsucc
+    npreceq nsucceq ncong nsim nparallel nshortparallel nshortmid nrightarrow nleftarrow
+    nleftrightarrow nRightarrow nLeftarrow nLeftrightarrow nvdash nvDash nVdash
+    ntriangleleft ntriangleright ntrianglelefteq ntrianglerighteq napprox nni
+"""
 _ARROWS = """
     to gets rightarrow leftarrow leftrightarrow Rightarrow Leftarrow Leftrightarrow
     longrightarrow longleftarrow longleftrightarrow Longrightarrow Longleftarrow
@@ -179,8 +187,15 @@ ONE_ARG_COMMANDS = _words(
 TWO_ARG_COMMANDS = _words("frac dfrac tfrac cfrac binom dbinom tbinom overset underset stackrel")
 ENVIRONMENT_COMMANDS = frozenset({"begin", "end"})
 SYMBOL_COMMANDS = _words(
-    _GREEK, _BINARY_OPERATORS, _RELATIONS, _ARROWS, _SYMBOLS, _LARGE_OPERATORS, _FUNCTIONS
-) | _words(_SPACING, _SIZING)
+    _GREEK,
+    _BINARY_OPERATORS,
+    _RELATIONS,
+    _NEGATED_RELATIONS,
+    _ARROWS,
+    _SYMBOLS,
+    _LARGE_OPERATORS,
+    _FUNCTIONS,
+) | _words(_SPACING, _SIZING, "not")
 ALLOWED_COMMANDS = SYMBOL_COMMANDS | ONE_ARG_COMMANDS | TWO_ARG_COMMANDS | ENVIRONMENT_COMMANDS
 
 # Control symbols: backslash + one non-letter (spacing, escaped specials, line break).
@@ -205,6 +220,11 @@ _TEXT_MARKUP = frozenset("<>&")
 _HSPACE_ARGUMENT = re.compile(
     r"\s*\{\s*\d+(?:\.\d+)?\s*(?:em|ex|pt|mm|cm|in|pc|bp|dd|cc|sp|mu)\s*\}"
 )
+
+# `\not` strikes the relation that follows it. Anything else after it (a letter, a brace, the end)
+# is a slash through nothing, which the converter writes as a stray solidus.
+_NEGATABLE = _words(_RELATIONS, _ARROWS)
+_NOT_ARGUMENT = re.compile(r"\s*(?:[=<>]|\\([A-Za-z]+))")
 
 _ENV_NAME = re.compile(r"\s*\{\s*([A-Za-z]+\*?)\s*\}")
 
@@ -315,6 +335,13 @@ def check_latex(latex: str) -> list[Check]:
                 markup = markup or bool(_TEXT_MARKUP.intersection(_text_argument(latex, end)))
             elif value == "hspace":
                 bad_argument = bad_argument or not _HSPACE_ARGUMENT.match(latex, end)
+            elif value == "not":
+                after = _NOT_ARGUMENT.match(latex, end)
+                bad_argument = (
+                    bad_argument
+                    or not after
+                    or bool(after.group(1) and after.group(1) not in _NEGATABLE)
+                )
             elif value in ENVIRONMENT_COMMANDS:
                 name = _environment_name(latex, end)
                 if name is None:
@@ -394,6 +421,16 @@ _OPERATOR_NAMES = re.compile(r"\\(arg)(?![A-Za-z])")
 def _rewrite_operator_names(latex: str) -> str:
     r"""`\arg` -> `\operatorname{arg}` (the converter has no `\arg`)."""
     return _OPERATOR_NAMES.sub(r"\\operatorname{\1}", latex)
+
+
+# `\textbf{F}` in maths is set as text, which drops the bold that marks a vector. One letter is
+# the vector (`m\textbf{a}`), so it is `\mathbf`; a word stays text.
+_BOLD_LETTER = re.compile(r"\\textbf\s*\{\s*([A-Za-z])\s*\}")
+
+
+def _rewrite_bold_letters(latex: str) -> str:
+    r"""`\textbf{F}` -> `\mathbf{F}` for one letter."""
+    return _BOLD_LETTER.sub(r"\\mathbf{\1}", latex)
 
 
 def rewrite_alignment_environments(latex: str) -> str:
@@ -521,7 +558,11 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
         raise LatexConversionError("input too long")
     try:
         source = _escape_raw_text(
-            group_delimited_scripts(rewrite_alignment_environments(_rewrite_operator_names(latex)))
+            group_delimited_scripts(
+                rewrite_alignment_environments(
+                    _rewrite_bold_letters(_rewrite_operator_names(latex))
+                )
+            )
         )
         raw = _latex2mathml_convert(source, display=display)
     except Exception as exc:  # latex2mathml raises many exception types
@@ -672,6 +713,32 @@ def _allowlist_code(root: ET.Element) -> str | None:
     return next((code for code in _tree_codes(root).values() if code), None)
 
 
+def _blank(elem: ET.Element) -> bool:
+    """No text anywhere under `elem`: `\\frac{}{x}` leaves an empty row where the top goes."""
+    return not "".join(elem.itertext()).strip()
+
+
+_SCRIPT_ELEMENTS = frozenset({"msub", "msup", "msubsup"})
+_OVER_UNDER_ELEMENTS = frozenset({"munder", "mover", "munderover"})
+
+
+def _has_empty_argument(elem: ET.Element, name: str) -> bool:
+    """A fraction with an empty part, a root with an empty radicand or index, a script that
+    holds nothing, or a base with nothing under it. Not flagged: an empty base that carries
+    scripts (`{}^{14}C`, the nuclide and index notation), and an arrow with a label on one
+    side only (`\\xrightarrow[x]{}`)."""
+    kids = list(elem)
+    if name in {"mfrac", "mroot"}:
+        return any(_blank(kid) for kid in kids)
+    if name == "msqrt":
+        return _blank(elem)
+    if name in _SCRIPT_ELEMENTS:
+        return any(_blank(kid) for kid in kids[1:])
+    if name in _OVER_UNDER_ELEMENTS:
+        return _blank(kids[0]) or all(_blank(kid) for kid in kids[1:])
+    return False
+
+
 def _is_leftover(elem: ET.Element, name: str) -> bool:
     """Unconverted LaTeX: `\\cmd` text in a token, an merror, or a stray `&` cell mark."""
     if name == "merror":
@@ -701,6 +768,8 @@ def check_mathml(mathml: str) -> list[Check]:
         name = _local_name(elem.tag)
         if name in FIXED_ARITY and len(elem) != FIXED_ARITY[name]:
             arity_code = "bad_arity"
+        elif len(elem) and _has_empty_argument(elem, name):
+            arity_code = arity_code or "empty_argument"
         if _is_leftover(elem, name):
             leftover_code = "unconverted_command"
     too_large = len(elements) > MAX_MATHML_ELEMENTS

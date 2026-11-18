@@ -94,6 +94,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("mathml.depth", "too_deep"): "The MathML is nested too deeply to be a real equation.",
     ("mathml.structure", "bad_arity"): "A fraction, root, subscript or similar has the wrong "
     "number of parts, often because an argument is missing.",
+    ("mathml.structure", "empty_argument"): "A fraction, root or script has nothing in it, "
+    "often because a part of the equation was left out.",
     ("mathml.converted", "unconverted_command"): "Part of the LaTeX was copied through as text "
     "instead of becoming math, often because of an unsupported command.",
     # Equations (pipeline.equation_step)
