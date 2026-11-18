@@ -174,7 +174,12 @@ PUBLIC_PAGES = (
         "does not do",
         (_T + "offices.html", _T + "_data_flow.html", _T + "_data_matrix.html"),
     ),
-    PublicPage("/status", "Service status", "whether the service is up and conversions are open", (_T + "status.html",)),
+    PublicPage(
+        "/status",
+        "Service status",
+        "whether the service is up and conversions are open",
+        (_T + "status.html",),
+    ),
     PublicPage(
         ADA_GUIDE,
         "ADA Title II and STEM course materials",

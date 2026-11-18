@@ -204,7 +204,9 @@ def _found(text: str, pattern: str, flags: int = 0) -> re.Match[str]:
     return match
 
 
-def settings_line(results: dict, pipeline: str, date: str, profile_sha256: str | None = None) -> str:
+def settings_line(
+    results: dict, pipeline: str, date: str, profile_sha256: str | None = None
+) -> str:
     """What the run's settings were. Only a result file stamped with the production profile's
     hash may say the run used the live service's settings; a stamp that differs is refused."""
     from readablestem.ops import profile
