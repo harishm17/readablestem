@@ -284,9 +284,10 @@ def rich_output() -> ConversionOutput:
 def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 303
-    # Next fix still waiting after equation 2 is the abstained equation 3.
+    # The abstained equation 3 (band 1) is listed before equation 2 (band 2), so the next fix
+    # still waiting after equation 2 is the figure.
     assert (
-        response.headers["location"] == f"/jobs/{web.job_id}/review/list?at=item-p1-e5#item-p1-e5"
+        response.headers["location"] == f"/jobs/{web.job_id}/review/list?at=item-p1-e4#item-p1-e4"
     )
     after = result(web)
     fix = after.fix_for("p1-e3")
@@ -304,9 +305,9 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     # The reviewer's decisions come before what was accepted for them.
     assert cards(page) == ["p1-e5", "p1-e4", "p1-e3", "p1-e2", "p1-e0"]
     # The notice sits where the redirect lands, linked back to the fix that changed.
-    landing = card(page, "p1-e5")
+    landing = card(page, "p1-e4")
     assert '<a href="#item-p1-e3">Equation 2 on page 1</a>: Accepted.' in landing
-    assert landing.index("Accepted.") < landing.index('<article id="fix-p1-e5"')
+    assert landing.index("Accepted.") < landing.index('<article id="fix-p1-e4"')
     # The changed fix is decided now: the folded list of decided fixes opens to show it.
     changed = card(page, "p1-e3")
     assert '<details class="done-item" open>' in changed

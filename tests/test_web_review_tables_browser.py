@@ -105,16 +105,16 @@ def strict_axe(page, axe_source: str) -> list[dict]:
 def walk(page, site, job: str, check) -> None:
     """Every state of the table card, calling `check(name)` in each."""
     url = f"{site.base}/jobs/{job}/review"
-    page.goto(url)
+    page.goto(f"{url}?item=p1-e1")  # the proposal; the walk opens on a table nothing was read for
     page.wait_for_load_state("networkidle")
-    check("decision 1: a proposal to check")
+    check("a proposal to check")
     page.goto(f"{url}?item=p1-e1&cell=r3c1")
     check("a maths cell's form open")
     page.get_by_label("LaTeX in row 4, columns 2 to 3").fill(r"\notacommand{v}")
     page.get_by_role("button", name=re.compile("^Save cell")).click()
     page.locator(".error-summary").wait_for()
     check("a refused cell")
-    page.goto(url)
+    page.goto(f"{url}?item=p1-e1")
     page.locator(".table-edit > summary").click()
     page.get_by_label("The first row is a header").check()
     page.get_by_role("button", name="Save headers of table 1").click()
@@ -127,9 +127,9 @@ def walk(page, site, job: str, check) -> None:
     page.locator(".error-summary").wait_for()
     check("a stale form refused")
     page.goto(f"{url}?item=p1-e3")
-    check("decision 2: kept as an image, a grid to use")
+    check("kept as an image, a grid to use")
     page.goto(f"{url}?item=p2-e0")
-    check("decision 3: kept as an image")
+    check("kept as an image")
     page.goto(f"{url}?item=p2-e2")
     check("the wide table")
     page.goto(f"{url}/list")
@@ -222,7 +222,7 @@ def tab_until(page, stop: str, limit: int = 40) -> list[str]:
 @pytest.mark.parametrize("javascript", [True, False], ids=["js", "no-js"])
 def test_the_keyboard_reaches_everything_in_reading_order(site, browser, job, javascript):
     context, page = open_page(browser, site, javascript=javascript)
-    page.goto(f"{site.base}/jobs/{job}/review")
+    page.goto(f"{site.base}/jobs/{job}/review?item=p1-e1")
     page.locator("#decision-title").focus()
     seen = tab_until(page, "button:Keep as image")
     stops = [s for s in seen if not s.startswith("a:Decision") and s != "a:"]
@@ -260,13 +260,13 @@ def test_the_table_decisions_can_be_made_without_javascript(site, browser, job):
     url = f"{site.base}/jobs/{job}/review"
     page.goto(url)
     assert page.locator("#decision-title").inner_text().startswith("Decision 1 of 3")
-    page.get_by_role("button", name="Accept table 1").click()
-    page.wait_for_url(f"{url}?item=p1-e3")
+    # Tables nothing was read for come first: table 2, then table 3, then the proposal.
     page.get_by_role("button", name="Use the grid read from the PDF for table 2").click()
     page.wait_for_url(f"{url}?item=p1-e3")  # stays on the table it changed
     assert "Decided: Edited by you" in page.locator("#decision").inner_text()
-    page.get_by_role("link", name="Go on to decision 3").click()
+    page.get_by_role("link", name="Go on to decision 1").click()  # decided ones go last
     page.get_by_role("button", name="Keep as image (table 3)").click()
+    page.get_by_role("button", name="Accept table 1").click()
     page.wait_for_url(url)
     assert page.locator("#decision-title").inner_text() == "Ready"  # a table stays an image
     context.close()
@@ -280,7 +280,7 @@ def test_the_shortcuts_reach_the_table_card(site, browser, job):
     """With shortcuts on, E opens "Change the table" at the cell list; A accepts."""
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"
-    page.goto(url)
+    page.goto(f"{url}?item=p1-e1")
     page.locator("#shortcuts summary").click()
     page.get_by_label("Use keyboard shortcuts").check()
     page.locator("#decision-title").focus()
