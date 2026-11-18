@@ -78,7 +78,6 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
         joined = as_utc(row.created_at) if row is not None else None
         keep_default = bool(row is not None and row.keep_week_default)
     return {
-        "active": "account",
         "joined": joined,
         "keep_default": keep_default,
         "tier_open": access.is_open(user.access_tier),

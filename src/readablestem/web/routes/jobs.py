@@ -691,7 +691,6 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "open_pool_closed": closed == "open",
         # Daily limits and today's budget start again then (shown in local time by app.js).
         "next_reset": next_day_start(now),
-        "active": "app",
         "courses": courses,
         "pending": waiting,
         "sample_available": sample.available(),
@@ -1794,8 +1793,6 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     """
     job = load_job_status(request, job_id, user)
     context = job_page_context(request, job_id, user, job) | {"auto_reload": auto == "1"}
-    # No `active` nav item: this page is not "My documents" itself (aria-current="page"
-    # would announce it as such).
     # A person the document was shared with to read gets their own page, not the owner's
     # (SW16); a reviewer gets the owner's page without the owner's blocks.
     template = "job_reader.html" if job.audience == "reader" else "job.html"
@@ -2315,7 +2312,6 @@ def _combine_page(request: Request, session: Session, job: Job) -> Response:
             "name": combine_rules.title_of(first[0].job if first else job),
             "view": view,
             "word_export": export_docx.available(),
-            "active": "app",
         },
     )
 

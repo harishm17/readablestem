@@ -313,7 +313,6 @@ def privacy_context(settings: Settings, *, tracer_on: bool = False) -> dict[str,
     """The variables /privacy renders with (besides the page-wide ones `deps.render` adds,
     which `notice_text` supplies for itself)."""
     return {
-        "active": "privacy",
         # The page names Langfuse only when traces are actually sent there, and usage events
         # only when they are recorded.
         "tracing": tracer_on,

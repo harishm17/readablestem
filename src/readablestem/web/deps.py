@@ -411,6 +411,50 @@ def pop_flash(request: Request) -> list[dict[str, Any]]:
     return items if isinstance(items, list) else []
 
 
+# --------------------------------------------------------------------------- section
+
+# Which part of the site a path belongs to, for the navigation's and the footer's current-page
+# mark (`aria-current="page"` in `base.html`). A path belongs to the longest prefix here that it
+# equals or continues after a "/"; a path in no section marks nothing. Pages inside a document
+# (its page, review, share, Listen, record, draft, an upload) are "My documents".
+SECTIONS: dict[str, str] = {
+    "/": "home",
+    "/app": "app",
+    "/jobs": "app",
+    "/uploads": "app",
+    "/courses": "courses",
+    "/account": "account",
+    "/admin": "admin",
+    "/demo": "demo",
+    "/help": "help",
+    "/help/review": "help-review",
+    "/help/latex": "help-latex",
+    "/help/posting": "posting",
+    "/status": "status",
+    "/privacy": "privacy",
+    "/terms": "terms",
+    "/limits": "limits",
+    "/pricing": "pricing",
+    "/security": "security",
+    "/for-accessibility-offices": "offices",
+    seo.GUIDES_INDEX: "guides",
+    seo.ADA_GUIDE: "guide-ada",
+    seo.COMPARE_GUIDE: "guide-compare",
+    "/style": "style",
+}
+
+
+def current_section(path: str) -> str:
+    """The section of the site `path` belongs to ("" when it belongs to none)."""
+    if path == "/":
+        return SECTIONS["/"]
+    best = ""
+    for prefix in SECTIONS:
+        if prefix != "/" and (path == prefix or path.startswith(prefix + "/")):
+            best = max(best, prefix, key=len)
+    return SECTIONS.get(best, "")
+
+
 # --------------------------------------------------------------------------- render
 
 
@@ -425,6 +469,7 @@ def render(
     ctx = get_ctx(request)
     base: dict[str, Any] = {
         "user": current_user(request),
+        "active": current_section(request.url.path),  # the nav's and footer's current page
         "csrf_token": LazyCsrfToken(request),
         "csrf_field": CSRF_FIELD,
         "flash": pop_flash(request),
