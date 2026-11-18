@@ -33,6 +33,7 @@ from readablestem.web.deps import (
     get_ctx,
     render,
     require_csrf,
+    say_new_time,
 )
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import rerender_job_html
@@ -113,7 +114,7 @@ def set_title(
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.title_override = chosen
         _remake_html(session, job, ctx.settings)
-        retention.restart_clock(job, ctx.settings)
+        say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
         now_title = chosen or page_rules.suggested_title(result, job.filename)
     log_event(logger, "title_set", job_id=job_id, own=chosen is not None)
     flash(
@@ -146,7 +147,7 @@ def set_contact(
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.contact_line = line or None
         _remake_html(session, job, ctx.settings)
-        retention.restart_clock(job, ctx.settings)
+        say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
     log_event(logger, "contact_set", job_id=job_id, has_contact=bool(line))
     message = (
         "The contact line was added to the student file. The HTML file was made again."
@@ -178,18 +179,14 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
                     "This document was not kept longer",
                     f"You are keeping {others + 1} documents, and the most allowed is "
                     f"{MAX_LIVE_JOBS_PER_USER}. Delete one you no longer need, then choose "
-                    "Keep for 7 days again. Nothing was changed.",
+                    f"{retention.keep_label()} again. Nothing was changed.",
                     context={"job_id": job_id},
                 )
         changed = retention.keep_seven_more_days(job)
+        until = job.retain_until
     if changed:
         log_event(logger, "kept_longer", job_id=job_id)
-        flash(
-            request,
-            "This document will be kept for 7 days from now. Only you and the people you share "
-            "it with can see it.",
-            undo=False,
-        )
+        flash(request, retention.keep_done(until), undo=False)
     else:
-        flash(request, "This document is already kept for longer than 7 days.", undo=False)
+        flash(request, retention.keep_already(), undo=False)
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

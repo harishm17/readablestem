@@ -60,6 +60,21 @@
 - WS10.9: the owner's job page, once the job is done, says "Converting this document has cost
   $x.xx in all." from `Job.cost_usd` (after a re-run, the total of both runs), in the admin
   page's money format. Nothing while it runs; no one it was shared with sees it.
+## Unreleased: retention a person can predict (branch feat/retention-predictable)
+
+- WS20.4 (F-051): the job page says, right under the status box, the day and time the document is
+  kept until and why ("24 hours after you last work on it", or the 7-day or 30-day form), with
+  "Keep for 7 days" beside it, on states that have something to keep; other states keep the line in
+  the Delete group. An action that restarts the clock and moves the time by an hour or more (a
+  decision, a language, title or contact change, Try again) says the new time in its notice, and
+  "Keep for 7 days" says the day it keeps the document until; a download has no notice and stays
+  silent. The documents list marks a document with 6 hours or less left (`retention.LAST_HOURS`).
+  Every one of these sentences is written in `web/retention.py` from Settings. No migration and no
+  version bump.
+- WS20.4 (F-050): the expired-document page never prints a negative or zero span, says the date the
+  document was deleted while the row still knows it, and after the purge says only when it was
+  uploaded.
+
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
 - WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per

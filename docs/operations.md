@@ -51,6 +51,12 @@ the crops, the result JSON, the HTML, the filename, the review edits and the ste
 ("Step facts and the step report"). It deletes the child rows itself and does not rely on
 the database cascade alone.
 
+Every sentence about retention is written in `web/retention.py` from the settings: the job page's
+"Kept until ..." line (under the status box, with "Keep for 7 days" beside it), the notice that
+names the new time after an action that moved it by an hour or more, the expired-document page and
+the list's mark on a document with `LAST_HOURS` (6) or less left. A download restarts the clock
+silently: it has no notice to put the time in.
+
 Every deletion goes through `ops.retention.delete_jobs(session, job_ids)`: the hourly
 purge, and the web app's "delete now" (`POST /jobs/{job_id}/delete` must call
 `delete_jobs(session, [job.id])` in its transaction rather than `session.delete(job)`).

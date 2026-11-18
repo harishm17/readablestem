@@ -1,15 +1,13 @@
 {% extends "base.html" %}
 {# What the owner of a deleted document finds at its old address (routes/jobs.py
-   `_missing`, UX review MF10). `kept`: how long it was kept ("24 hours", "30 days") when the
-   row still says so; empty once the purge has removed it. Retention slides with the owner's
-   work (web/retention.py), so it is never said to run "after upload"; the page gives the
-   times that apply now. #}
+   `_missing`, UX review MF10). `deleted_line`: what is known of when it went, from the row
+   while it still waits for the purge, else from the upload event, else empty. Retention
+   slides with the owner's work, so it is never said to run "after upload"; the rules are
+   web/retention.py's (`retention_rules`). #}
 {% block title %}Document deleted{% endblock %}
 {% block content %}
 <h1>This document has been deleted</h1>
-<p>{% if kept %}Deleted automatically after {{ kept }} in all. {% endif %}Documents go
-  {{ retention_hours }} hours after you last work on them (7 days if you keep them,
-  {{ opt_in_days }} days from upload if you let us look at the results). Files you downloaded are not affected.</p>
+<p>{% if deleted_line|default("") %}{{ deleted_line }} {% endif %}{{ retention_rules }}</p>
 <ul class="actions">
   <li><a class="button" href="/app#upload-heading">Upload the PDF again</a></li>
   <li><a href="/app">Go to my documents</a></li>

@@ -1,11 +1,11 @@
 """re-run after a new version: the version it was offered for and the spend before it
 
-Three columns on `jobs` and one on `pending_uploads`: `rerun_version` (the
-`PIPELINE_VERSION` a finished document was last converted again for, so a re-run is offered at most once per version) and `cap_base_usd` and
-`cap_base_calls` (what the job had spent when that run began, so the run's spend caps count
-from there). `pending_uploads.scans_json` holds the count of scanned and handwritten pages the
-upload probe made, so the page where a kept file waits can say them (WS7.8). Additive; existing
-rows get NULL and 0; the downgrade drops the columns.
+Three columns on `jobs` and one on `pending_uploads`: `rerun_version` (the `PIPELINE_VERSION` a
+finished document was last converted again for, so a re-run is offered at most once per version)
+and `cap_base_usd` and `cap_base_calls` (what the job had spent when that run began, so the
+run's spend caps count from there). `pending_uploads.scans_json` holds the count of scanned and
+handwritten pages the upload probe made, so the page where a kept file waits can say them
+(WS7.8). Additive; existing rows get NULL and 0; the downgrade drops the columns.
 
 Revision ID: c5d2a8e6f1b7
 Revises: a3c7e1f95b24

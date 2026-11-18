@@ -33,6 +33,7 @@ from readablestem.core.types import (
 from readablestem.ops.retention import purge_expired
 from readablestem.web import heading_groups, job_page
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_when
 from readablestem.web.db import Job, session_scope, utcnow
 
 
@@ -150,17 +151,36 @@ def test_activity_never_shortens_the_time_kept(ux):
 
 def test_keep_7_more_days_on_the_job_page(ux):
     html = page(ux)
-    assert "Keep for 7 days" in html and "Then it is deleted on" in html
+    until = format_when(stored_job(ux).retain_until)
+    line = html.split('id="retention-line"', 1)[1].split("</div>", 1)[0]
+    assert until in text_of(line) and f'action="/jobs/{ux.job_id}/keep"' in line
     assert html.count(f'action="/jobs/{ux.job_id}/keep"') == 1  # once, not repeated below
-    assert (
-        html.index('id="retention-line"') > html.index('id="next-actions"') or "Review" not in html
-    )
+    # under the status box, before the review and download group
+    assert html.index('id="retention-line"') < html.index('id="review-and-download"')
     set_retain_until(ux, utcnow() + timedelta(hours=1))
-    post(ux, "/keep")
+    response = post(ux, "/keep")
     job = stored_job(ux)
     assert (job.retention_mode, job.opt_in_retention) == ("week", False)
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
-    assert "7 days after you last work on it" in text_of(page(ux))
+    after = page(ux)
+    assert format_when(job.retain_until) in text_of(after)  # the notice and the line
+    assert response.headers["location"] == f"/jobs/{ux.job_id}"
+
+
+def test_an_action_that_restarts_the_clock_says_the_new_time(ux):
+    """F-051: the deletion time moved with every action and nothing said so. After a
+    decision that moved it by hours, the notice names the new time; a decision that moved it
+    by seconds is not worth a sentence."""
+    set_retain_until(ux, utcnow() + timedelta(hours=2))
+    response = decide(ux, "p1-e2", action="accept")
+    moved = stored_job(ux).retain_until
+    assert timedelta(hours=23) < retain_in(ux) <= timedelta(hours=24)
+    landing = ux.browser.get(response.headers["location"]).text
+    assert format_when(moved) in text_of(landing)
+    again = decide(ux, "p1-e5", action="accept")
+    assert format_when(stored_job(ux).retain_until) not in text_of(
+        ux.browser.get(again.headers["location"]).text
+    )
 
 
 def test_keeping_needs_the_csrf_token_and_the_owner(ux):

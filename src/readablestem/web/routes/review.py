@@ -1973,7 +1973,7 @@ def review_action(
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
-            restart_owner_clock(job, user, get_ctx(request).settings)
+            restart_owner_clock(job, user, get_ctx(request).settings, request)
             _decision_events(request, session, user, job, result, "single", change_made.every)
             session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
     except LookupError:
@@ -2109,7 +2109,7 @@ def _group_action(
                 job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
-                restart_owner_clock(job, user, get_ctx(request).settings)
+                restart_owner_clock(job, user, get_ctx(request).settings, request)
                 _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
@@ -2180,7 +2180,7 @@ def _page_group_action(
                 job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
-                restart_owner_clock(job, user, get_ctx(request).settings)
+                restart_owner_clock(job, user, get_ctx(request).settings, request)
                 _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
@@ -2401,7 +2401,7 @@ def undo(
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
-            restart_owner_clock(job, user, get_ctx(request).settings)
+            restart_owner_clock(job, user, get_ctx(request).settings, request)
             # What the undone write recorded, taken back (`web.outcomes`).
             outcomes.record_undo(
                 session,

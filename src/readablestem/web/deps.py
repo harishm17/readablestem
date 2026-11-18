@@ -29,6 +29,7 @@ from readablestem.web import (
     office_convert,
     recipients,
     report_item,
+    retention,
     seo,
     signin_words,
     uploads,
@@ -49,6 +50,7 @@ SESSION_VERSION = "sv"  # users.session_version when the session was signed in
 SESSION_VERIFIED = "ev"  # this sign-in proved the account's own address (shares need it)
 SESSION_CSRF = "csrf"
 SESSION_FLASH = "flash"
+RETENTION_NOTE = "retention_note"  # `request.state`: the new deletion time, said once
 
 logger = logging.getLogger(__name__)
 
@@ -361,11 +363,24 @@ def flash(
     `undo` False: the notice is not about a review write, so the review screen offers no
     Undo under it (Undo would take back the write before, which the notice is not about)."""
     items = list(request.session.get(SESSION_FLASH, []))
+    # An action that restarted the deletion clock says the new time in its first notice
+    # (`say_new_time`, web/retention.py).
+    note = getattr(request.state, RETENTION_NOTE, "")
+    if note:
+        message = f"{message} {note}"
+        setattr(request.state, RETENTION_NOTE, "")
     entry: dict[str, Any] = {"message": message, "element_id": element_id}
     if not undo:
         entry["undo"] = False
     items.append(entry)
     request.session[SESSION_FLASH] = items[-5:]
+
+
+def say_new_time(request: Request, note: str) -> None:
+    """Hand the sentence `retention.restart_clock_and_say` returned to the notice this
+    request flashes next. A download has no notice, so its sentence is never used."""
+    if note:
+        setattr(request.state, RETENTION_NOTE, note)
 
 
 def pop_flash(request: Request) -> list[dict[str, Any]]:
@@ -428,6 +443,7 @@ def render(
         "project_zip": uploads.zip_limits(),
         "chars_per_page": f"{source_intake.CHARS_PER_PAGE:,}",
         "retention_hours": ctx.settings.retention_hours,
+        "retention_rules": retention.rules_line(ctx.settings),
         "opt_in_days": ctx.settings.opt_in_retention_days,
         # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.
         "courses_enabled": ctx.settings.feature_notation_memory,

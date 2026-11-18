@@ -5,6 +5,10 @@
    the finished page replaces the waiting one without a reload (web/poll.py, SW8). #}
 {% set field_errors = field_errors|default({}) %}
 {% set typed = typed|default({}) %}
+{# When the document is kept until and why, with the way to keep it longer, right under the
+   status box on a state that has something to keep (web/retention.py, `_job_retention.html`);
+   a state with nothing to keep has the same line in the Delete group at the end. #}
+{% if state.keeps %}{% include "_job_retention.html" %}{% endif %}
 {% if not job.finished %}
 {# How long it has been, outside the live region (ux2-lane-a, `_wait_note.html`). #}
 {% if job.waiting_since %}
@@ -217,13 +221,13 @@
 </section>
 {% endif %}
 
-{# Last on the page (MF17): when it will be deleted, the one way to keep it longer, and
-   deleting now, which is confirmed on its own page (/jobs/{id}/delete). The deletion time is
-   explained once, here (`_job_retention.html`, web/retention.py). #}
+{# Last on the page (MF17): deleting now, which is confirmed on its own page
+   (/jobs/{id}/delete). The deletion time is explained once (`_job_retention.html`,
+   web/retention.py): under the status box, or here for a state with nothing to keep. #}
 {% if job.is_owner %}
 <section aria-labelledby="delete-heading" class="job-group">
   <h2 id="delete-heading">Delete this document</h2>
-  {% include "_job_retention.html" %}
+  {% if not state.keeps %}{% include "_job_retention.html" %}{% endif %}
   <p>Removes the PDF and everything made from it, after you confirm.</p>
   <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

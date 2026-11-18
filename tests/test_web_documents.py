@@ -5,6 +5,7 @@ review BW5, BW9, MF10, MF11, MF16, MF20, MF21, MF22, MF24)."""
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from pathlib import Path
 
 import pymupdf
@@ -22,8 +23,10 @@ from fixtures.web.support import (
 )
 from readablestem.core.content_budget import PAGE_CONTENT_BUDGET_BYTES
 from readablestem.core.types import Status
+from readablestem.ops.retention import purge_expired
 from readablestem.web import states
-from readablestem.web.db import Job, JobStatus, session_scope
+from readablestem.web.dates import format_when
+from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.pdf_probe import ProbeRejected, probe
 
 LAYOUT = Path(__file__).resolve().parent / "fixtures" / "layout"
@@ -83,6 +86,38 @@ def test_someone_elses_live_document_is_a_plain_not_found(web):
     flat = text(bob.get(f"/jobs/{job_id}").text)
     assert "There is no document at this address that this account can open." in flat
     assert "has been deleted" not in flat and "not yours to see" not in flat
+
+
+def test_an_expired_document_says_when_it_went_and_never_a_negative_span(web):
+    """F-050: a row whose deletion time is before its upload time printed "after -2 hours".
+    The page names the date, and a span is only printed when it is a real one. After the
+    purge the row is gone and only the upload date is known: it says that and stops."""
+    job_id = finish(web)
+    gone = utcnow() - timedelta(hours=2)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.created_at, job.retain_until = utcnow() - timedelta(hours=1), gone
+    flat = text(web.browser.get(f"/jobs/{job_id}").text)
+    assert format_when(gone) in flat
+    assert not re.search(r"-\d|after 0 hour", flat)
+
+    purge_expired(web.ctx.factory)
+    flat = text(web.browser.get(f"/jobs/{job_id}").text)
+    assert "has been deleted" in flat and format_when(gone) not in flat
+    assert re.search(r"\b20\d\d, \d\d:\d\d UTC", flat)  # the upload date
+
+
+def test_the_list_marks_a_document_in_its_last_hours_and_no_other(web):
+    soon, later = finish(web, filename="soon.pdf"), finish(web, filename="later.pdf")
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, soon)
+        assert job is not None
+        job.retain_until = utcnow() + timedelta(hours=3)
+    html = web.browser.get("/app/documents", headers={"HX-Request": "true"}).text
+    cell = r'id="doc-(\w+)".*?(<td[^>]*Deleted.*?</td>)'
+    rows = dict(re.findall(cell, html, re.S))
+    assert "<strong>" in rows[soon] and "<strong>" not in rows[later]
 
 
 # --------------------------------------------------------------------------- uploads
