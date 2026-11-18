@@ -44,7 +44,7 @@ from sqlalchemy.orm import Session
 from readablestem.core import triage
 from readablestem.core.types import Element, Fix
 from readablestem.pipeline import assemble, checked, output_chars
-from readablestem.web import states, titles
+from readablestem.web import retention, states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus
 
@@ -64,6 +64,8 @@ class DocumentRow:
     created_at: datetime | None
     retain_until: datetime | None
     open_decisions: int = 0
+    # "Deleted in under 5 hours" for a document in its last hours (`retention.LAST_HOURS`).
+    ending: str = ""
     # The job's state (`web.states`): its label, badge, group and next step.
     state: states.State | None = None
     # One part of a larger file converted in parts (T3-3): the pages it holds, "31-59".
@@ -357,6 +359,7 @@ def documents(
             status=str(job.status),
             created_at=as_utc(job.created_at),
             retain_until=as_utc(job.retain_until),
+            ending=retention.last_hours_note(job.retain_until, now),
             open_decisions=open_count,
             part_label=job.part_label or "",
             is_sample=bool(job.is_sample),

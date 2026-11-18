@@ -19,7 +19,7 @@ import time
 import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import partial
 from typing import Annotated, Any
 from urllib.parse import quote
@@ -92,6 +92,7 @@ from readablestem.web.deps import (
     limited,
     render,
     require_csrf,
+    say_new_time,
 )
 from readablestem.web.forms import submit_once
 from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are documented here)
@@ -503,12 +504,16 @@ def role_of(session: Session, job: Job, user: CurrentUser) -> str:
     return shares.role_of(session, job, user) or VIEW
 
 
-def restart_owner_clock(job: Job, user: CurrentUser, settings) -> None:
+def restart_owner_clock(
+    job: Job, user: CurrentUser, settings, request: Request | None = None
+) -> None:
     """Restart the deletion clock (`retention.restart_clock`) when the owner acted. What a
     person the document was shared with does never keeps it longer (G1): retention is the
-    owner's choice."""
+    owner's choice. With the request, the notice that follows the action says the new time."""
     if is_owner(job, user):
-        retention.restart_clock(job, settings)
+        note = retention.restart_clock_and_say(job, settings)
+        if request is not None:
+            say_new_time(request, note)
 
 
 def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) -> PageError:
@@ -516,19 +521,15 @@ def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) 
     why (an expired row still waiting for the purge, or the upload in their own usage
     events); anyone else learns nothing, not even that the id exists."""
     if job is not None and job.user_id == user.id:
-        kept = (as_utc(job.retain_until) or utcnow()) - (as_utc(job.created_at) or utcnow())
-        return PageError(404, *DELETED, template="job_deleted.html", context={"kept": _kept(kept)})
-    if job is None and events.uploaded_at(session, user.id, job_id) is not None:
-        return PageError(404, *DELETED, template="job_deleted.html", context={"kept": ""})
+        deleted_on, created = as_utc(job.retain_until), as_utc(job.created_at)
+        kept = retention.span_words(deleted_on - created) if deleted_on and created else ""
+        said = retention.deleted_line(deleted_on, created, kept)
+        return PageError(404, *DELETED, template="job_deleted.html", context={"deleted_line": said})
+    uploaded = events.uploaded_at(session, user.id, job_id) if job is None else None
+    if uploaded is not None:
+        said = retention.deleted_line(None, uploaded, "")
+        return PageError(404, *DELETED, template="job_deleted.html", context={"deleted_line": said})
     return PageError(404, *NOT_FOUND)
-
-
-def _kept(delta: timedelta) -> str:
-    """'24 hours', '30 days': how long a job was kept."""
-    hours = round(delta.total_seconds() / 3600)
-    if hours >= 48 and hours % 24 == 0:
-        return f"{hours // 24} days"
-    return f"{hours} {'hour' if hours == 1 else 'hours'}"
 
 
 def expired(job: Job, now: datetime | None = None) -> bool:
@@ -1698,9 +1699,12 @@ def job_page_context(
     # When "Keep for 7 days" would delete it (None: the button is not offered). Only a state
     # with something to keep offers it (F-316).
     keeps = job.state is not None and job.state.keeps
-    context["keep_until"] = (
-        retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
-    )
+    keep_until = retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
+    settings = get_ctx(request).settings
+    context["keep_until"] = keep_until
+    context["keep_hint"] = retention.keep_hint(keep_until) if keep_until else ""
+    context["keep_label"] = retention.keep_label()
+    context["retention_line"] = retention.kept_line(settings, job.retention_mode, job.retain_until)
     return context
 
 
@@ -1875,7 +1879,7 @@ def set_language(
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = False  # made from the stored result, review writes included
         bump_result_version(job)  # review forms open in other tabs are now stale
-        retention.restart_clock(job, get_ctx(request).settings)
+        say_new_time(request, retention.restart_clock_and_say(job, get_ctx(request).settings))
     log_event(logger, "language_set", job_id=job_id)
     flash(
         request,
@@ -1959,7 +1963,7 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
                 session.rollback()  # it stays canceled, and nothing was counted
                 refused = "over_quota"
             else:
-                retention.restart_clock(job, ctx.settings)
+                say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
             tries = job.retries or 0
     if refused == "no_tries_left":
         raise PageError(

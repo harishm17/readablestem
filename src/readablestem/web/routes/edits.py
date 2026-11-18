@@ -127,7 +127,7 @@ def write_structure(
         # Text the reviewer typed: NUL (which Postgres refuses in JSON) is taken out.
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
-        restart_owner_clock(job, user, ctx.settings)
+        restart_owner_clock(job, user, ctx.settings, request)
         outcomes.record_write(
             session,
             ctx.settings,
@@ -737,7 +737,7 @@ def write_review(
         job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
-        restart_owner_clock(job, user, ctx.settings)
+        restart_owner_clock(job, user, ctx.settings, request)
         outcomes.record_write(
             session,
             ctx.settings,

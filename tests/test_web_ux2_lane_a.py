@@ -21,6 +21,7 @@ from fixtures.web.support import (
 )
 from readablestem.config import Settings
 from readablestem.web import outcome, states
+from readablestem.web.dates import format_when
 from readablestem.web.db import Job, session_scope
 
 
@@ -111,11 +112,10 @@ def test_retention_is_explained_once_with_the_real_deletion_time_and_who_moves_i
     page = web.browser.get(f"/jobs/{job_id}").text
     assert page.count('id="retention-line"') == 1
     line = flat(page.split('id="retention-line"', 1)[1].split("</div>", 1)[0])
-    assert "Deleted automatically on" in line and "24 hours after you last work on it" in line
-    assert "Your decisions, edits and downloads restart that time" in line
-    assert "sharing does not" in line
-    # it sits in the Delete group, where the share page's "Keep it longer" link goes
-    assert page.index('id="delete-heading"') < page.index('id="retention-line"')
+    assert format_when(web.job(job_id).retain_until) in line and "24 hours" in line
+    assert "restart that time" in line and "sharing does not" in line
+    # it sits under the status box, before the review and download group
+    assert page.index('id="retention-line"') < page.index('id="review-and-download"')
     assert "after upload" not in line
 
 
