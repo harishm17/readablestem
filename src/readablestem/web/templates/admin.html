@@ -72,13 +72,13 @@
     Set with <code>SIGNUP_MODE</code>.</p>
   {% if signup.full %}
   <div class="notice notice-warning" role="status">
-    <p>Today's limit on new accounts is reached ({{ signup.today }} of {{ signup.limit }}). New
+    <p>Today's limit on new accounts is reached ({{ allowance(signup.today, signup.limit, "account") }}). New
       people are told to come back tomorrow. Raise <code>MAX_NEW_ACCOUNTS_PER_DAY</code> if that
       is not what you want.</p>
   </div>
   {% endif %}
   <dl class="summary-list">
-    <div><dt>New accounts today (UTC)</dt><dd>{{ signup.today }} of {{ signup.limit }}</dd></div>
+    <div><dt>New accounts today (UTC day)</dt><dd>{{ allowance(signup.today, signup.limit, "account") }}</dd></div>
     <div><dt>Invited accounts</dt><dd>{{ signup.invited }}</dd></div>
     <div><dt>Open-tier accounts</dt><dd>{{ signup.open_accounts }}</dd></div>
     <div><dt>Blocked accounts</dt><dd>{{ signup.blocked }}</dd></div>

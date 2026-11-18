@@ -60,6 +60,7 @@ from readablestem.web.deps import (
 from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.quota import PAGES_RULE, allowance_phrase
 from readablestem.web.return_to import decision_link, remember_return, signed_out_page
 from readablestem.web.routes import (
     account,
@@ -153,6 +154,13 @@ def _utc_text(value: datetime | None) -> str:
     return f"{value:%b} {value.day}, {value.year}, {value:%H:%M} UTC" if value else ""
 
 
+def _allowance(
+    used: int, total: int | None, unit: str, resets_at: datetime | None = None
+) -> Markup:
+    """`quota.allowance_phrase` for a template: the reset is written as a `<time>`."""
+    return Markup(allowance_phrase(used, total, unit, _utc(resets_at) if resets_at else None))
+
+
 def _speakable(text: str | None) -> str:
     """A spoken reading to show, or "" when the text is not one (LaTeX that stood in for a
     reading must never be presented as what a person hears). One rule, in `web.listen`,
@@ -196,6 +204,8 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.globals["allowance"] = _allowance
+    env.globals["PAGES_RULE"] = PAGES_RULE
     env.filters["utc_text"] = _utc_text
     env.filters["breakable"] = _breakable
     env.filters["usd"] = _usd

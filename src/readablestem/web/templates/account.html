@@ -47,12 +47,12 @@
 <section aria-labelledby="account-limits">
   <h2 id="account-limits">Daily limits</h2>
   <ul>
-    <li>Pages today: {% if page_quota is none %}no limit set{% else %}{{ pages_left }} of {{ page_quota }}{% endif %}.</li>
+    <li>Pages: {% if page_quota is none %}no limit set.{% else %}{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% endif %}</li>
     {% if reread_allowance is not none %}
-    <li>Model reads from the review screen: {{ rereads_left }} of {{ reread_allowance }}.</li>
+    <li>Model reads from the review screen: {{ allowance(reread_allowance - rereads_left, reread_allowance, "read", next_reset) }}</li>
     {% endif %}
   </ul>
-  <p class="hint">{% if tier_open %}New-account limits{% else %}Invited-account limits{% endif %}, reset {{ next_reset|utc }}. <a href="/limits">Known limits</a>.</p>
+  <p class="hint">{% if tier_open %}New-account limits{% else %}Invited-account limits{% endif %}. {{ PAGES_RULE }} <a href="/limits">Known limits</a>.</p>
 </section>
 
 <section aria-labelledby="account-export">
