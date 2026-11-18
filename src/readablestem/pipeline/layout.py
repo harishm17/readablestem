@@ -6747,6 +6747,7 @@ class _Figure:
     flat_scripts: bool = False  # its caption has raised or lowered text, written flat
     equation: bool = False  # a picture of an equation (`_equation_pictures`)
     number: str | None = None  # ... and the equation number printed beside it
+    fragments: bool = False  # a region of text fragments and short strokes (`_fragment_figures`)
 
     @property
     def reasons(self) -> list[str]:
@@ -6755,6 +6756,8 @@ class _Figure:
             reasons.append(f"{self.images} raster images")
         if self.paths:
             reasons.append(f"vector drawing ({self.paths} paths)")
+        if self.fragments:
+            reasons.append(REASON_DRAWING_FRAGMENTS)
         return reasons
 
 
@@ -7910,6 +7913,74 @@ def _spread_row(row: _Row) -> bool:
         and statistics.median(gaps) >= LABEL_SPREAD * row.size
         and min(gaps) >= LABEL_SPREAD_MIN * row.size
     )
+
+
+REASON_DRAWING_FRAGMENTS = "drawing_fragments"
+FRAGMENT_CHARS = 3  # a text row of this many characters or fewer is a fragment
+MIN_FRAGMENT_ROWS = 12  # fragments in a region that is a drawing
+FRAGMENT_REACH = 3.0  # body sizes between the fragments of one region
+FRAGMENT_STROKES = 0.5  # short strokes per fragment row in a drawing (bonds, leads, arrows)
+FRAGMENT_STROKE_MIN_EM = 0.5  # a dot (a contents leader) is no stroke: its longer side is longer
+FRAGMENT_STROKE_EM = 6.0  # a stroke is short when its longer side is at most this many body sizes
+
+
+def _fragment_figures(
+    rows: Sequence[_Row], strokes: Sequence[_Path], held: Sequence[BBox], ctx: _Context
+) -> list[_Figure]:
+    """Regions of the page that are a drawing made of text fragments, as figures.
+
+    The labels of a structure, a circuit or a diagram that no drawing cluster took (its
+    strokes are too short and plain to be a figure) were written as dozens of loose
+    paragraphs and one-symbol equations, each its own decision (WS2.9a). A region is a group
+    of at least `MIN_FRAGMENT_ROWS` rows of `FRAGMENT_CHARS` characters or fewer, within
+    `FRAGMENT_REACH` body sizes of each other, outside the figures and tables already found
+    (`held`), when the rows in its box (grown to the short strokes among them, at least
+    `FRAGMENT_STROKES` per fragment: a derivation has a fraction bar or two, a structure a
+    bond to each atom, and a contents page's leader dots are not strokes) have a median
+    length under four characters and none of them holds three words. Its rows become the figure's labels and are written as text no more."""
+    fragments = [
+        r
+        for r in rows
+        if not r.absorbed
+        and not r.vertical
+        and not r.code
+        and len(r.clean) <= FRAGMENT_CHARS
+        and not any(_centre_inside(r.bbox, box) for box in held)
+    ]
+    short = [
+        p
+        for p in strokes
+        if FRAGMENT_STROKE_MIN_EM * ctx.body
+        <= max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1])
+        <= FRAGMENT_STROKE_EM * ctx.body
+    ]
+    found: list[_Figure] = []
+    reach = FRAGMENT_REACH * ctx.body
+    for group in _cluster([r.bbox for r in fragments], reach):
+        if len(group) < MIN_FRAGMENT_ROWS:
+            continue
+        box = _union(fragments[i].bbox for i in group)
+        near = [p for p in short if _centre_inside(p.bbox, _pad(box, reach))]
+        if len(near) < FRAGMENT_STROKES * len(group):
+            continue
+        box = _union([box, *(p.bbox for p in near)])
+        inside = [
+            r
+            for r in rows
+            if not r.absorbed
+            and not r.vertical
+            and _centre_inside(r.bbox, box)
+            and not any(_centre_inside(r.bbox, other) for other in held)
+        ]
+        if statistics.median(len(r.clean) for r in inside) >= 4 or any(
+            _prose_words(r, _CharInfo.of(r)) >= 3 for r in inside
+        ):
+            continue
+        for row in inside:
+            row.absorbed = True
+        found.append(_Figure(box, paths=len(near), labels=inside, fragments=True))
+        held = [*held, box]
+    return found
 
 
 def _absorb_outer_labels(figure: _Figure, drawing: BBox, rows: list[_Row], ctx: _Context) -> None:
@@ -9547,6 +9618,9 @@ def _page_blocks(
     for figure in figures:
         if figure.paths and not figure.equation:
             _absorb_outer_labels(figure, drawings[id(figure)], rows, ctx)
+    figures += _fragment_figures(
+        rows, loose, [f.bbox for f in figures] + [t.bbox for t in page_tables], ctx
+    )
     text_rows = [r for r in rows if not r.absorbed]
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
     if page_math is not None:
