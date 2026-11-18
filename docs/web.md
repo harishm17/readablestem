@@ -891,8 +891,9 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   (`web/isolated_convert.py`). The child checks everything again, unpacks into a private temporary
   folder, runs LaTeXML in the sandbox (`core/sandbox.py`, `source/latexml.py`; docs/security.md,
   "Running uploaded TeX"), and `source/ltx_reader.py` turns its XHTML into elements: headings,
-  paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
-  and figures with the project's own picture through the ordinary figure step. A formula
+  paragraphs, lists (a list nested in an item, a contents entry's sub-entries included, is read
+  as items of its own one level down; the item keeps only its own words), tables, exact
+  equations (LaTeXML's MathML through the sanitiser, accepted), and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions. **Which picture
   a name means** (WS18.2) is decided as LaTeX does it, not by the suffix as written: the reader
   takes the first entry of LaTeXML's `candidates` for the graphic that is inside the project and

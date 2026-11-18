@@ -25,6 +25,30 @@
   disabled for a Firefox-shaped voice list) and pass on this branch; the Firefox-shaped voice
   test now has 14,805 voices. No Listen change, no model call, no migration. The change
   rides on the `RENDER_VERSION` raise already in this batch (not bumped here).
+## Unreleased: links across the parts of a long file, and a LaTeX contents list that says each entry once (branch fix/combined-links-and-contents)
+
+- WS17.2, F-515, F-516, as far as its triage line (no seven-input resolver). A book converted in
+  parts could not link a contents entry for a later chapter, or "Chapter 2" or "Figure 3", to a
+  target printed in another part, and the combined file left them plain words. `combine.join`
+  now runs the passes that made those links in the parts once more over the joined elements
+  (`_contents_links`, then `text_pass.source_links`: contents entries, typed addresses,
+  references by number); links a part made are kept and move with their targets' ids. Links
+  in the file on the three-part generated book of WF23: 7 whole, 3 in the parts, 3 combined
+  before and 7 combined after; on a generated book with numbered figures and equations referred
+  to across parts: 17 whole, 7 in the parts, 7 combined before and 17 after; no link in the
+  combined page goes nowhere. Not built: a link the PDF itself made to a page of another part
+  (the part does not keep it), the wrong link a contents entry gets inside a part from a
+  namesake heading (F-515's first half: the layout's `_contents_links`), and a paragraph cut at
+  a part boundary (SW50).
+- A LaTeX contents entry that has sub-entries repeated its children's words ("Alpha Beta Gamma"
+  for "Alpha") and carried a link on the first child's words, because an item with no paragraph
+  took the text of the list nested in it (`ltx_reader._list`). It now says its own words and the
+  sub-entries follow as items one level down. The Word reader's nested lists and an `itemize`
+  in an `enumerate` were checked and were already right. On 38 of the 53 tracked LaTeX main
+  files that convert (the others stop the same way before and after), 2 documents changed, 5
+  rows in all, each a contents entry. No migration; no model request changed;
+  `PIPELINE_VERSION` and `RENDER_VERSION` not bumped (the next bump covers it: stored combined
+  files and LaTeX documents read differently).
 
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 

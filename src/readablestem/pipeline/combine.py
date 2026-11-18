@@ -17,6 +17,9 @@ each part. What changes between a part and the whole is only addresses:
   fix, its container, links and cross-references, the equation markers inside text (their
   length changes, so the offsets of every span of the text (`core.inline`: links, colour,
   raised and lowered runs, struck text) and a term's end are moved with them) and the pictures.
+- **Links.** A part cannot link to what is in another part (a contents entry for a later
+  chapter, "Chapter 2", "Figure 3"). After the join the same passes that made links in the
+  parts run again over all the elements (`join`), so those resolve; links a part made are kept.
 - **Language.** The file's language is the one most parts have (`common_language`); a part
   in another language keeps it: its paragraphs, list items and headings are written with their
   own `lang`, so a screen reader switches voice at the part. A part whose language was assumed
@@ -48,7 +51,8 @@ from readablestem.core.types import (
     Kind,
     inline_marker,
 )
-from readablestem.pipeline import assemble, language
+from readablestem.pipeline import assemble, language, text_pass
+from readablestem.pipeline.layout.elements import _contents_links
 from readablestem.pipeline.notices import LANGUAGE_CODES
 
 _PAGE_ID = re.compile(r"p(\d+)-(.+)")
@@ -235,6 +239,10 @@ def join(parts: Sequence[Part]) -> Joined:
     ids = [e.id for e in elements]
     if len(ids) != len(set(ids)):
         raise CombineError("ids_clash")
+    # A part could not link to what is in another part: a contents entry for a later chapter,
+    # "Chapter 2" or "Figure 3" naming a thing printed elsewhere. The two passes that made
+    # those links in the parts run again over the whole; links the parts made are kept.
+    elements = text_pass.source_links(_contents_links(elements))
 
     held = set(seen)
     omitted |= set(range(min(held), max(held) + 1)) - held  # parts that are not here

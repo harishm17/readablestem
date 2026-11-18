@@ -146,6 +146,29 @@ def test_lists_keep_their_markers_order_and_nesting(tmp_path):
     assert items[2].list_marker == "1."
 
 
+def test_a_contents_entry_with_sub_entries_says_its_own_words_once(tmp_path):
+    def entry(target: str, words: str, *inner: str) -> str:
+        nested = f'<ol class="ltx_toclist">{"".join(inner)}</ol>' if inner else ""
+        return (
+            f'<li class="ltx_tocentry"><a href="#{target}" class="ltx_ref">'
+            f'<span class="ltx_text ltx_ref_title">{words}</span></a>{nested}</li>'
+        )
+
+    body = (
+        '<ol class="ltx_toclist">'
+        + entry("S1", "Alpha", entry("S1.SS1", "Beta"), entry("S1.SS2", "Gamma"))
+        + entry("S2", "Delta")
+        + "</ol>"
+    )
+    items = [e for e in read(body, tmp_path).elements if e.kind is Kind.LIST_ITEM]
+    assert [(e.text, e.list_level) for e in items] == [
+        ("Alpha", 1),
+        ("Beta", 2),
+        ("Gamma", 2),
+        ("Delta", 1),
+    ]
+
+
 def test_a_table_becomes_a_grid_with_spans_and_headers(tmp_path):
     body = (
         '<table class="ltx_tabular"><thead><tr><th class="ltx_th ltx_th_column">A</th>'
