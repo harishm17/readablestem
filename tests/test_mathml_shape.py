@@ -94,6 +94,8 @@ def test_a_function_name_is_one_token_and_is_spoken_as_the_function() -> None:
     assert "m a x" not in speech(r"{\rm max}_x f")
     assert "r" in [n.text for n in _nodes(convert(r"\mathrm{ran}"), "mi")]  # not a function: kept
     assert [n.text for n in _nodes(convert(r"Pr = 2"), "mi")] == ["P", "r"]  # the Prandtl number
+    assert [n.text for n in _nodes(convert(r"ln = 6"), "mi")] == ["l", "n"]  # may be a product
+    assert "natural log" in speech(r"\mathrm{ln} x")
 
 
 def test_mathml_stored_before_the_rules_is_written_in_the_normal_form_on_the_page() -> None:

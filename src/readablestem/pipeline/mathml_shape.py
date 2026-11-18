@@ -37,8 +37,8 @@ way. It is idempotent and changes no stored record.
 1. A function name is one identifier. A run of single letters that spells a name the speech
    knows (`sin`, `log`, `lim`, `max`) is the same token `\\sin` or `\\max` writes: `<mi>` for
    a function, `<mo>` for a name that takes limits. An upright run (`\\mathrm{sin}`) always;
-   an italic run (`sin x` typed in maths) only for a lower-case name, since `Pr` may be the
-   Prandtl number.
+   an italic run (`sin x` typed in maths) only for a lower-case name of three letters or
+   more, since `Pr` may be the Prandtl number and an italic `ln` a length times a count.
 2. A number is never styled: no bold (or other variant) on digits, written as plain digits,
    and no `mathvariant` on an `mn`. The double-struck one (the indicator) is a symbol and stays.
 3. A `mathvariant` on an operator says nothing and goes.
@@ -256,7 +256,7 @@ def _join_function_names(parent: ET.Element) -> None:
             out.append(kids[i])
             i += 1
             continue
-        if word in _FUNCTION_NAMES and (upright or word.islower()):
+        if word in _FUNCTION_NAMES and (upright or (word.islower() and len(word) >= 3)):
             first = kids[i]
             kind = "mo" if word in LIMIT_OPERATORS else "mi"
             name = ET.Element(first.tag[: len(first.tag) - len(_local(first))] + kind)
