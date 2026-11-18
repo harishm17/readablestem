@@ -1127,7 +1127,8 @@ def _guessed_links(element: Element, own: list[Link], targets: _Targets) -> list
 def source_links(
     elements: list[Element], printed: Mapping[str, str] | None = None
 ) -> list[Element]:
-    """The elements of a source document (Word, LaTeX: `source.convert`) with the same two
+    """The elements of a source document (Word, LaTeX: `source.convert`), or of parts of a PDF
+    joined into one file (`combine.join`), with the same two
     kinds of link the PDF pass adds: typed addresses and references by number. Links the
     reader made from the file (web and email links) are kept, never overlapped; a source has
     no pages, glyphs or link annotations, so nothing else of the pass runs. `printed` is

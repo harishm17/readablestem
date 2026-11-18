@@ -519,6 +519,15 @@ and each part's equations, figures and tables as in the part.
   id gets `s{part number}-` in front. The same rewrite is applied everywhere an id is named,
   including the equation markers inside text (their length changes, so the offsets of links,
   color runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
+- **Links.** A part cannot link to what is printed in another part: its contents entry for a
+  later chapter, or "Chapter 2" or "Figure 3" naming something in the next part, stay plain
+  words there. After the join `pipeline/combine.join` runs the passes that made those links in
+  the parts once more over all the elements (`layout.elements._contents_links`, then
+  `text_pass.source_links`: contents entries, typed addresses and references by number), so a
+  contents entry and a reference whose target is in the file link to it. A link a part already
+  has is kept and moves with its target's new id. A link the PDF itself made to a page of
+  another part is not restored (the part did not keep it). The combined file has no link to an
+  id that is not on the page.
 - **Title.** The title the instructor chose for the first part, else the source file's name
   without the part tag and extension; the contact line is the first part's that has one.
 - **Language.** The file's `<html lang>` is the language most parts have (by language

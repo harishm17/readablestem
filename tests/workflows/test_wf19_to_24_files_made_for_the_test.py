@@ -256,6 +256,14 @@ def test_wf23_no_link_of_the_combined_file_goes_nowhere_and_no_paragraph_is_cut(
 ) -> None:
     ids = set(combined.xpath("//@id"))
     assert [h for h in combined.xpath('//a/@href[starts-with(., "#")]') if h[1:] not in ids] == []
+    # F-515, F-516: a reference ("Chapter 2") and a contents entry whose target is printed in
+    # another part are links, and each lands on the heading it names.
+    for shown in ("Chapter 2", "Chapter 2 Sound", "Chapter 3 Light", "Appendix A Units"):
+        hrefs = combined.xpath(f'//a[normalize-space(.)="{shown}"]/@href[starts-with(., "#")]')
+        assert hrefs, shown
+        for href in hrefs:
+            (target,) = combined.xpath(f'//*[@id="{href[1:]}"]')
+            assert harness.words(target).startswith(shown), shown
     (crossing,) = combined.xpath('//p[contains(., "crosses to the next page")]')
     assert "Paragraph marker 6." in harness.words(crossing)
     text = harness.words(combined.xpath("//main")[0])
