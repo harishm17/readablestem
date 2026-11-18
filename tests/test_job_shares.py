@@ -27,11 +27,11 @@ from fixtures.web.support import (
     upload,
 )
 from readablestem.core.types import Status
-from readablestem.pipeline import export_docx
 from readablestem.ops import retention as purge
+from readablestem.pipeline import export_docx
 from readablestem.web import shares
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobShare, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.db import Job, JobShare, JobStatus, ReviewEdit, User, session_scope, utcnow
 from readablestem.web.views import audience_of
 from test_audit_authz import ROUTES
 
@@ -703,3 +703,23 @@ def test_a_share_needs_a_proved_address(site):
         assert shares.role_of(session, job, unproved) is None
         assert shares.shared_with(session, unproved, utcnow()) == []
         assert len(shares.shared_with(session, proved, utcnow())) == 1
+
+
+def test_the_settled_cost_is_the_owner_s_alone_and_is_the_total_after_a_rerun(ready_site):
+    """WS10.9: once the job is done, the owner's page says what the document has cost in all
+    (after a re-run, both runs), from the stored total; a person it was shared with is told
+    nothing of it, and nobody is told a figure while it is converting."""
+    job_id = ready_site.job_id
+    with session_scope(ready_site.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        job.cost_usd, job.cap_base_usd = 1.5, 1.0  # a re-run began when it had spent $1.00
+    asked = {
+        a: send(ready_site, a, "GET", f"/jobs/{job_id}").text for a in (OWNER, REVIEWER, VIEWER)
+    }
+    assert 'id="settled-cost"' in asked[OWNER] and "$1.50" in asked[OWNER]
+    for actor in (REVIEWER, VIEWER):
+        assert "settled-cost" not in asked[actor] and "$1.50" not in asked[actor], actor
+    with session_scope(ready_site.ctx.factory) as session:
+        session.get(Job, job_id).status = JobStatus.RUNNING
+    running = send(ready_site, OWNER, "GET", f"/jobs/{job_id}").text
+    assert "settled-cost" not in running and "$1.50" not in running

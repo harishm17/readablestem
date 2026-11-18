@@ -118,6 +118,10 @@
      on the review screen and in My documents. Items are not counted; a group of repeated
      headings is one decision. #}
   <p id="results-line">{{ pg.found }}</p>
+  {# The owner's, once the job is done: what the document has cost in all, from the stored
+     total (after a re-run, both runs). Nothing while it runs, and no one it was shared with
+     sees it (WS10.9). #}
+  {% if job.is_owner %}<p id="settled-cost">Converting this document has cost {{ job.cost_usd|usd }} in all.</p>{% endif %}
   <details class="more-detail" id="counts-detail">
   <summary>Counts in detail</summary>
   <dl class="summary-list">
