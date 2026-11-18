@@ -874,14 +874,11 @@ def _cmd_ledger(args: argparse.Namespace) -> int:
     figure with its counts, a bound and a label, held against its two bars (`eval.ledger`).
     Measures nothing and spends nothing. Exit code 0: no held-out figure is worse than its
     release bar; 1: one is, or `--for-release` and a row with a release bar has no held-out
-    figure of this release; 2: refused. `--record-release` adds the release to
-    `ops/releases.toml` when the exit code is 0."""
+    figure of this release; 2: refused."""
     from readablestem.config import Settings
     from readablestem.eval import corpus, ledger, run_record
-    from readablestem.ops import profile, releases
+    from readablestem.ops import profile
 
-    if args.record_release and not args.for_release:
-        return _error("--record-release is for a release: add --for-release")
     folder: Path = args.records or _default(Path("data/eval"))
     bars_path: Path = args.bars or folder / ledger.BARS_FILE
     try:
@@ -912,11 +909,6 @@ def _cmd_ledger(args: argparse.Namespace) -> int:
     failed = ledger.failures(made, for_release=args.for_release)
     _write_record(args.out, made)
     print(ledger.render(made, failed))
-    if args.record_release and not failed:
-        version, _, profile_hash = made["release"].partition("+")
-        row = releases.Release(made["release"], version, profile_hash, made["date"])
-        added = releases.record(row)
-        print(f"release record: {made['release']} " + ("added" if added else "was already there"))
     return 1 if failed else 0
 
 
@@ -2104,12 +2096,6 @@ def register(
         "--for-release",
         action="store_true",
         help="also fail when a row that has a release bar has no held-out figure of this release",
-    )
-    ledger.add_argument(
-        "--record-release",
-        action="store_true",
-        help="with --for-release, when no release fails: add this release to the release "
-        "record (src/readablestem/ops/releases.toml), the only way it is written",
     )
     ledger.add_argument(
         "--register-bars",

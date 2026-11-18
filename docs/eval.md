@@ -3537,7 +3537,6 @@ the figure, a bound and a label.
 uv run readablestem eval ledger --out data/eval/ledger.json
 uv run readablestem eval ledger --for-release          # the check a release runs
 uv run readablestem eval ledger --register-bars        # after the first held-out run
-uv run readablestem eval ledger --for-release --record-release   # and keep the release
 ```
 
 **The labels.**
@@ -3569,16 +3568,6 @@ Exit code 0: no held-out line is worse than its release bar. 1: one is, or, with
 `--for-release`, a row that has a release bar has no held-out figure of this release on the
 bar's set. 2: refused. A record that does not say its split, its set's hash, the profile's
 hash and the pipeline version is not read around: the run stops and names the file.
-
-**The release record** (`src/readablestem/ops/releases.toml`, read by `ops/releases.py`).
-`PIPELINE_VERSION` goes up for any change, so a stored job cannot say that a release has come
-since it was made. `--for-release --record-release` adds a row (release, pipeline version,
-profile, date) when no held-out figure is worse than its release bar, and does nothing when
-the release is already there. It is written by this command and never by hand;
-`--record-release` without `--for-release` is refused. A stored job says that an older
-pipeline made it with `web.retry.made_by_older_pipeline(result_json)`. Offering such a job a
-re-run with a fresh spending cap (the retry route, the same upload and the answers it
-already has, a new cap) is the next step; nothing offers it yet.
 
 **The whole-document record** (`whole-<set>.json`) is what the top rows are made of. Its
 `metrics` hold one row a document, with no name: `pages`, `silent_errors` (anything wrong in

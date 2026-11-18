@@ -11,7 +11,7 @@ import pytest
 
 from readablestem.cli.main import main
 from readablestem.eval import ledger
-from readablestem.ops import profile, releases
+from readablestem.ops import profile
 from readablestem.pipeline.run import PIPELINE_VERSION
 
 
@@ -111,26 +111,6 @@ def test_a_held_out_figure_worse_than_its_release_bar_fails_the_release(
     earlier = _record(_whole((0, 0, 0)), pipeline_version="0.0.1")
     code, made = _ledger(tmp_path, earlier, "--for-release")
     assert code == 1 and _line(made, "whole.silent_errors")["label"] == ledger.EARLIER
-
-
-def test_a_release_that_passes_is_added_to_the_release_record_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    kept = tmp_path / "releases.toml"
-    monkeypatch.setattr(releases, "PATH", kept)
-    # Only a release that passes is recorded, and only when it is a release.
-    assert _ledger(tmp_path, _record(_whole((1, 1, 0))), "--register-bars")[0] == 0
-    worse = _record(_whole((2, 1, 0)))
-    assert _ledger(tmp_path, worse, "--for-release", "--record-release")[0] == 1
-    assert _ledger(tmp_path, worse, "--record-release")[0] == 2
-    assert not kept.exists()
-
-    passing = _record(_whole((0, 0, 0)))
-    assert _ledger(tmp_path, passing, "--for-release", "--record-release")[0] == 0
-    assert _ledger(tmp_path, passing, "--for-release", "--record-release")[0] == 0
-    (row,) = releases.read()
-    assert row.release == f"{PIPELINE_VERSION}+{profile.load().sha256[:12]}"
-    assert row.pipeline_version == PIPELINE_VERSION
 
 
 def test_a_record_without_the_production_profile_hash_is_refused(

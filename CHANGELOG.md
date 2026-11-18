@@ -17,11 +17,7 @@
   (module constants and accept functions of the pipeline steps), found by what a module does
   and compared by parsed value; `eval-unchanged` still opts out. The README's version is
   checked against `PIPELINE_VERSION` (`tests/test_eval_docs.py`).
-- WS10.15 (reduced): `eval ledger --for-release --record-release` writes the release record
-  (`ops/releases.toml`: release, pipeline version, profile, date) when no release figure fails,
-  and `web.retry.made_by_older_pipeline` says that a stored job was made by another pipeline
-  version. Offering such a job a re-run with a fresh spending cap is the next step. No version
-  bump, no migration.
+  No version bump, no migration.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

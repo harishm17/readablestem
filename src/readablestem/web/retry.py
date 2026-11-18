@@ -20,10 +20,6 @@ decisions they made, or pay for the pages a second time.
 
 Which stops can be tried again is decided by the job's state (`web.states`), once, for the
 message, the page that shows the button and the route that does the work (`offer`).
-
-A finished job can also be older than the pipeline: `made_by_older_pipeline` says so from the
-version stored in its result. Offering a re-run for it, with a fresh spending cap, is the
-next step (WS10.15); nothing offers it yet.
 """
 
 from __future__ import annotations
@@ -31,7 +27,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from readablestem.pipeline import run as pipeline_run
 from readablestem.web import states
 from readablestem.web.db import Job, JobStatus
 
@@ -64,16 +59,6 @@ def offer(
     if step is None:
         return None
     return Offer(step.label, step.explain, states.tries_left(retries))
-
-
-def made_by_older_pipeline(result_json: dict[str, Any] | None) -> bool:
-    """Whether a stored job was made by a pipeline version before the one running now.
-
-    `PIPELINE_VERSION` goes up for any change, so any bump counts, and the release record
-    (`ops.releases`) is what says which of those were releases. A job with no stored version
-    (not finished) is not older: there is nothing to re-make."""
-    made = (result_json or {}).get("pipeline_version")
-    return bool(made) and made != pipeline_run.PIPELINE_VERSION
 
 
 class RetryRefused(Exception):
