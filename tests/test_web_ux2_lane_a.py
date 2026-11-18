@@ -19,6 +19,7 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.config import Settings
 from readablestem.web import outcome, states
 from readablestem.web.db import Job, session_scope
 
@@ -146,7 +147,7 @@ def test_a_stopped_scan_job_is_feature_aware_and_the_message_is_not_repeated():
     assert asked and "cannot convert" not in asked
     assert "such pages are read only when you ask" in asked and outcome.OPT_IN_ROUTE in asked
     # the job's state carries it, for the status box
-    offered = states.Context(image_pages_offered=True)
+    offered = states.Context(settings=Settings(_env_file=None, feature_image_pages=True))  # type: ignore[call-arg]
     scanned = states.Facts(id="j", status="failed", error_code="scanned")
     stopped = states.state_of(scanned, context=offered)
     assert stopped.key == "stopped_file" and "checked" in stopped.message
