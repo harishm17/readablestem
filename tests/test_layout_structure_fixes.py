@@ -298,6 +298,44 @@ def test_a_paragraph_cut_by_a_page_break_is_one_element():
     assert [e.page for e in paragraphs(layout)].count(1) == 1  # only the paragraph after it
 
 
+def column_break(tail_lines: int) -> bytes:
+    """Two two-column pages: the first ends in its right column with `tail_lines` lines of an
+    unfinished sentence, the second starts in its left column with the rest of it."""
+    line = "The cart rolls down the ramp and speeds"
+
+    def column(page, x, y, lines):
+        for text in lines:
+            page.insert_text((x, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        return y + 10
+
+    def fill(number, page):
+        if number == 0:
+            y = 72
+            for _ in range(3):
+                y = column(page, 72, y, [line] * 5)
+            y = column(page, 320, 72, [line] * 5)
+            y = column(page, 320, y, [line] * 5)
+            column(page, 320, 640, [line] * (tail_lines - 1) + ["the cart continues to"])
+        else:
+            page.insert_text((72, 72), "speed up while the ramp stays level.", fontsize=BODY)
+            y = column(page, 72, 86, [line] * 3)
+            column(page, 72, y + 10, [line] * 5)
+            column(page, 320, 72, [line] * 5)
+
+    return pdf_of(fill, pages=2)
+
+
+@pytest.mark.parametrize(("tail_lines", "joined"), [(2, True), (1, False)])
+def test_a_paragraph_that_ends_a_page_in_one_column_goes_on_in_the_next_pages_other_column(
+    tail_lines, joined
+):
+    layout = analyze(column_break(tail_lines))
+    spanning = [e for e in paragraphs(layout) if e.last_page is not None]
+    assert [(e.page, e.last_page) for e in spanning] == ([(0, 1)] if joined else [])
+    assert any("continues to speed up" in (e.text or "") for e in spanning) is joined
+
+
 def test_a_hyphen_at_a_page_break_is_repaired_like_one_at_a_line_break():
     layout = analyze(split_pages("ity while the", first_last="and the cart gains veloc-"))
     assert any("gains velocity while" in (e.text or "") for e in paragraphs(layout))

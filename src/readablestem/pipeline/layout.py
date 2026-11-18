@@ -10446,11 +10446,15 @@ def _last_body_block(blocks: Sequence[_Block], ctx: _Context) -> _Block | None:
     return next((b for b in reversed(blocks) if _body_sized(b, ctx)), None)
 
 
-def _goes_on(last: _Block, first: _Block, limits: tuple[float, float]) -> bool:
+def _goes_on(
+    last: _Block, first: _Block, limits: tuple[float, float], edges: Sequence[float] = ()
+) -> bool:
     """Is `first`, the top block of a page, the rest of the paragraph that `last` ends on the
     page before? The first part must not end a sentence, the second must start in the middle
     of one (a lower-case letter), and the two must look alike: the same size, typeface and
-    weight, the left edge of the second at the first's text edge with no first-line indent.
+    weight, the left edge of the second at the first's text edge, or at the left edge of
+    another body block of its page (`edges`: a two-column page ends in the right column and
+    the next starts in the left), with no first-line indent.
     Both must sit at the text area's edges (`limits`: its bottom and its top, with slack)."""
     if (
         last.kind != Kind.PARAGRAPH
@@ -10469,7 +10473,11 @@ def _goes_on(last: _Block, first: _Block, limits: tuple[float, float]) -> bool:
     ):
         return False
     tail, head = last.rows[-1], first.rows[0]
-    if abs(tail.x0 - head.x0) > 3.0 or head.x0 - first.bbox[0] > 3.0:
+    at_edge = abs(tail.x0 - head.x0) <= 3.0 or (
+        # across columns, a one-line tail is too often a license or copyright line
+        len(last.rows) >= 2 and any(abs(head.x0 - e) <= 3.0 for e in edges)
+    )
+    if not at_edge or head.x0 - first.bbox[0] > 3.0:
         return False
     if tail.family != head.family or tail.bold != head.bold:
         return False
@@ -10504,7 +10512,12 @@ def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
         if page.number != before.number + 1 or not page.blocks:
             continue
         last = _last_body_block(before.blocks, ctx)
-        if last is None or not _goes_on(last, page.blocks[0], limits):
+        edges = [
+            b.bbox[0]
+            for b in page.blocks[1:]
+            if b.kind in _TEXT_BLOCKS and _body_sized(b, ctx) and not b.code
+        ]
+        if last is None or not _goes_on(last, page.blocks[0], limits, edges):
             continue
         host, part = owner.get(id(last), last), page.blocks[0]
         host.parts.append((page.number, part))
