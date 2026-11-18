@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: page pictures and exports are made once (branch perf/render-once)
+
+- PF4 (F-284): the review screen's page and region pictures are kept in a small memory cache in
+  the web process (`web.page_images.RenderCache`, by job, upload and the exact render
+  arguments), bounded by bytes (`PAGE_IMAGE_CACHE_MB`, default 32, 0 keeps nothing). A repeat
+  loads no PDF and starts no MuPDF; the browser headers stay `no-store`; the routes' access
+  check still runs first; a job's pictures leave the cache when the job is deleted or expires
+  (`ops.retention.delete_jobs`).
+- PF7 (F-280, F-135, F-496): a Word, EPUB, Canvas or Cartridge file is built the first time it
+  is asked for and kept per job in `blobs` (kind `export`, `web.export_store`), keyed by result
+  version, `RENDER_VERSION`, file type and a digest of the title, options and page. Repeat
+  downloads, "Download all" and "Download everything" take it from there; a new decision or a
+  release that changes rendering builds once more and the older file is deleted. Kept exports
+  go with the job and are not counted against a person's stored bytes. No migration, no version
+  bump. Not built: the "preparing" state and building off the request, the image size cap.
+
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
 - WS11.18: `readablestem ops accuracy` prints false flags per true flag, silent misses found per

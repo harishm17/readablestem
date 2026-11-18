@@ -23,6 +23,7 @@ import pytest
 
 from fixtures.web.review_doc import PAGE, review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.ops import retention
 from readablestem.web import page_images, pdf_probe
 from readablestem.web.db import Job, session_scope, utcnow
 
@@ -190,6 +191,32 @@ def test_one_user_cannot_tie_up_the_renders_and_waits_hold_no_pdf(web, monkeypat
         web.run_worker()
         assert bob.get(f"/jobs/{own}/pages/1.png").status_code == 200
     assert web.browser.get(f"/jobs/{web.job_id}/pages/1.png").status_code == 200
+
+
+def test_a_picture_asked_for_again_is_not_drawn_again_and_goes_with_its_job(web, monkeypatch):
+    drawn = []
+    real = page_images._child
+    monkeypatch.setattr(page_images, "_child", lambda *a: (drawn.append(a[0]), real(*a))[1])
+    base = f"/jobs/{web.job_id}"
+    pictures = [f"{base}/pages/1.png", f"{base}/regions/p1-e2.png"]
+    first = [web.browser.get(url) for url in pictures]
+    again = [web.browser.get(url) for url in pictures]
+    assert len(drawn) == 2
+    for before, after in zip(first, again, strict=True):
+        assert after.content == before.content
+        assert after.headers["cache-control"] == "private, no-store"
+    assert page_images.CACHE.size()[0] == 2
+
+    bob = web.client()
+    login(bob, BOB)
+    assert [bob.get(url).status_code for url in pictures] == [
+        404,
+        404,
+    ]  # the cache is behind the access check
+
+    with session_scope(web.ctx.factory) as session:
+        retention.delete_jobs(session, [web.job_id])
+    assert page_images.CACHE.size() == (0, 0)
 
 
 # --------------------------------------------------------------------------- the child

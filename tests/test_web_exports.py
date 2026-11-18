@@ -15,13 +15,15 @@ from html import unescape
 
 import docx
 import pytest
+from sqlalchemy import func, select
 
 from fixtures.web.support import BOB, as_current, fetch, job_id_from, login, make_pdf, upload
 from readablestem.core.types import Kind
-from readablestem.pipeline import export_docx
-from readablestem.web import documents, events
+from readablestem.ops import retention
+from readablestem.pipeline import export_canvas, export_docx, export_epub
+from readablestem.web import documents, events, export_store
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, session_scope, utcnow
+from readablestem.web.db import Blob, Job, session_scope, utcnow
 from readablestem.web.routes import exports
 from readablestem.web.routes.jobs import download_filename
 from readablestem.web.security import VIEW_CSP
@@ -118,6 +120,72 @@ def test_a_head_request_gets_the_headers_of_the_get_and_takes_nothing(web, path)
     assert head.content == b""
     for name in ("content-type", "content-disposition", "content-security-policy"):
         assert head.headers[name] == get.headers[name], name
+
+
+# --------------------------------------------------------------------------- built once
+
+STORED = [
+    pytest.param("download.docx", export_docx, "export_docx", marks=needs_pandoc),
+    ("download.epub", export_epub, "export_epub"),
+    ("download/canvas", export_canvas, "export_canvas"),
+    ("download/cartridge", export_canvas, "export_canvas"),
+]
+
+
+@pytest.mark.parametrize(("path", "module", "builder"), STORED)
+def test_a_file_is_built_once_per_version_of_the_document(
+    web,  # noqa: F811
+    monkeypatch,
+    path,
+    module,
+    builder,
+):
+    job_id = ready_job(web)
+    url = f"/jobs/{job_id}/{path}"
+    built = []
+    real = getattr(module, builder)
+    monkeypatch.setattr(module, builder, lambda *a, **k: (built.append(1), real(*a, **k))[1])
+
+    first = fetch(web.browser, url)
+    again = fetch(web.browser, url)
+    assert first.status_code == again.status_code == 200
+    assert first.content == again.content and len(built) == 1
+    assert formats_of(web, job_id) == [path.removeprefix("download").lstrip("./")]  # still counted
+
+    set_job(web, job_id, result_version=7)  # a decision was made
+    fetch(web.browser, url)
+    fetch(web.browser, url)
+    assert len(built) == 2
+
+    monkeypatch.setattr(export_store, "RENDER_VERSION", export_store.RENDER_VERSION + 1)
+    fetch(web.browser, url)
+    fetch(web.browser, url)
+    assert len(built) == 3
+
+    bob = web.client()
+    login(bob, BOB)
+    refused = bob.get(url)
+    assert refused.status_code == 404 and refused.content != first.content  # not the stored file
+    with session_scope(web.ctx.factory) as session:
+        stored = session.scalars(select(Blob.element_id).where(Blob.kind == export_store.KIND))
+        assert len(stored.all()) == 1  # the older versions went when the newer one was kept
+        retention.delete_jobs(session, [job_id])
+    with session_scope(web.ctx.factory) as session:
+        assert session.scalar(select(func.count()).select_from(Blob)) == 0
+
+
+def test_the_canvas_course_number_is_part_of_what_is_kept(web, monkeypatch):  # noqa: F811
+    job_id = ready_job(web)
+    built = []
+    real = export_canvas.export_canvas
+    monkeypatch.setattr(
+        export_canvas, "export_canvas", lambda *a, **k: (built.append(1), real(*a, **k))[1]
+    )
+    for course in ("", "", "123", "123", "456"):
+        assert (
+            fetch(web.browser, f"/jobs/{job_id}/download/canvas?course={course}").status_code == 200
+        )
+    assert len(built) == 3
 
 
 # --------------------------------------------------------------------------- drafts
