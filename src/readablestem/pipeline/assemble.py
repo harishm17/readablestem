@@ -230,8 +230,8 @@ FIGURE_NOTE = "This figure has no text description yet."
 # each box used to repeat. What to do ("ask your instructor for a version you can read") is
 # in the statement of the same notice.
 NOT_CONVERTED_WHY = Words(
-    "A screen reader cannot read a picture, so it passes over each of these parts. Each one is "
-    "marked where it stands, with what it is."
+    "A screen reader cannot read what a picture shows, so it says only that each of these "
+    "parts is there. Each one is marked where it stands, with what it is."
 )
 NOT_CONVERTED_WHY_WRITTEN = Words(
     "A screen reader may not read these parts well. Each one is marked where it stands, with "
