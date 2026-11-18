@@ -8406,38 +8406,44 @@ def _starts_entry(prev: _Row, row: _Row, run: _Run, edges: _RightEdges) -> bool:
 def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
     """Mark the capital letters that head the sections of an index or a glossary (`_Row.letter`).
 
-    One capital letter alone on its line, bold or larger than the body text, in an
-    alphabetical sequence: at least `LETTER_SEQUENCE` such lines through the document, each
-    letter after the one before it (a letter with no entries is skipped), in one size,
-    typeface and column. A letter on its own line anywhere else is a label or a variable,
-    and is never marked."""
-    found: list[_Row] = []
-    for number in sorted(pages):
-        rows = sorted(pages[number], key=lambda r: (r.column == "R", r.y0))
-        found += [
-            r
-            for r in rows
-            if not r.vertical
-            and len(r.ink) == 1
-            and "A" <= r.ink[0].c <= "Z"
-            and not r.ink[0].math
-            and (r.bold or r.size >= HEADING_SIZE_RATIO * ctx.body)
-        ]
-    chain: list[_Row] = []
-    for row in [*found, None]:
-        if chain and (
-            row is None
-            or row.ink[0].c <= chain[-1].ink[0].c
-            or round(row.size * 2) != round(chain[-1].size * 2)
-            or row.family != chain[-1].family
-            or row.column != chain[-1].column
-        ):
-            if len(chain) >= LETTER_SEQUENCE:
-                for member in chain:
-                    member.letter = True
-            chain = []
-        if row is not None:
-            chain.append(row)
+    One capital letter alone on its line, bold or larger than the body text, with the line
+    right under it an entry that starts with that letter, and at least `LETTER_SEQUENCE`
+    different letters set that way in one size and typeface through the document. The test
+    reads the line under the letter, not the order of the page's columns, so the letters of
+    an index in three columns are found where they stand. A letter on its own line anywhere
+    else is the label of a figure's panel or a variable, and is never marked."""
+    found: dict[tuple[int, str], list[_Row]] = {}
+    for rows in pages.values():
+        lines = [r for r in rows if not r.vertical]
+        for row in lines:
+            if not (
+                len(row.ink) == 1
+                and "A" <= row.ink[0].c <= "Z"
+                and not row.ink[0].math
+                and (row.bold or row.size >= HEADING_SIZE_RATIO * ctx.body)
+            ):
+                continue
+            middle, centre = (row.y0 + row.y1) / 2, (row.x0 + row.x1) / 2
+            under = min(
+                (r for r in lines if r.y0 > middle and r.x0 <= centre <= r.x1),
+                key=lambda r: r.y0,
+                default=None,
+            )
+            if under is not None and _first_letter(under.clean) == row.ink[0].c:
+                found.setdefault((round(row.size * 2), row.family), []).append(row)
+    for members in found.values():
+        if len({row.ink[0].c for row in members}) >= LETTER_SEQUENCE:
+            for row in members:
+                row.letter = True
+
+
+def _first_letter(text: str) -> str:
+    """The first letter A to Z of the text, as a capital with any accent taken off ("" for
+    none): an index files "2-butene" and "(E)-alkene" under the first letter they have."""
+    for c in unicodedata.normalize("NFD", text):
+        if "A" <= c.upper() <= "Z":
+            return c.upper()
+    return ""
 
 
 def _hangs(group: Sequence[_Row]) -> list[tuple[int, int, float]]:
