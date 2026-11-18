@@ -63,13 +63,14 @@
 </ul>
 <p>A skip link, “Skip to the decision”, goes straight to the decision. After a decision, the
   screen shows what it did (for example “Accepted.”) with an <strong>Undo</strong> button, and
-  the next decision still waiting comes up. “More about this item” opens the details: the
-  tool's confidence, the checks that failed, and “Report this item”.</p>
+  the next decision still waiting comes up. “More about this item” (on a group of items, “More about this decision”) opens the
+  details: the tool's confidence, the checks that failed, and “Report this item”.</p>
 <p>If you have text typed into a box that you have not saved, it is kept in this browser tab
   and put back when that decision is shown again. It is not sent to the server until you
   save, and it is gone when you close the tab or sign out in it. If the same document is open
-  in two tabs and the other one changed it, a save from the older tab is refused and
-  nothing is saved; the page says so and offers “Reload this page”.</p>
+  in two tabs and the other one changed the item you are saving, that save is refused and
+  nothing is saved; the page says so and offers “Reload this page”. A change the other tab
+  made to a different item does not stop your save.</p>
 
 <h2 id="kinds">The kinds of decision</h2>
 <p>Each decision names its kind and a number, such as “Equation 3” or “Table 2”. The
@@ -218,7 +219,9 @@
 
 <h2 id="tools">Change a page</h2>
 <p>Under the optional checks, a disclosure named “Change page 4” (with the current page number)
-  has three tools.</p>
+  has three tools. On the document's page, the link <strong>Fix something on a page</strong>
+  opens the same tools for page 1 even when no decision is waiting. After a change here, the
+  screen offers <strong>Undo this change</strong>.</p>
 <ul>
   <li><strong>Change the words, or make a line a heading.</strong> Choose a paragraph, a list
     item or a heading on the page, change its words, and choose <strong>Save the words</strong>.

@@ -20,7 +20,7 @@
   {% set n = start + loop.index0 %}
   <li class="listen-item" id="item-{{ n }}" data-listen-item data-listen-id="{{ item.ref }}"{% if n == lesson_at %} data-listen-lesson{% endif %} data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
     <span class="listen-role">{{ item.role }}</span>{% if item.text %}<span class="visually-hidden">: </span> <span class="listen-text">{{ item.text }}</span>{% endif %}
-    {% if student %}<a class="listen-place" href="{{ student }}{% if item.anchor %}#{{ item.anchor|urlencode }}{% endif %}">Student page<span class="visually-hidden">: {{ item.role }}</span></a>{% endif %}
+    {% if student %} <a class="listen-place" href="{{ student }}{% if item.anchor %}#{{ item.anchor|urlencode }}{% endif %}">Student page<span class="visually-hidden">: {{ item.role }}</span></a>{% endif %}
     {% if item.thing %}<template data-listen-thing>{{ item.thing|safe }}</template>{% endif %}
   </li>
   {% endfor %}

@@ -396,8 +396,9 @@ document in another language marks it `lang="en"`).
   and jumps to the page's one `<h1>` (F-116), or to the "Before you read" notice above it
   when the page has one (`href="#checked-notice"`), so that following the link never passes
   over the statement that parts are pictures or that nobody reviewed the page. The target
-  carries `tabindex="-1"`: that makes it focusable by following the link, so Firefox and
-  VoiceOver move there (a link to an element that cannot take focus only scrolls), without
+  carries `tabindex="-1"`: that makes it focusable by following the link, so focus moves
+  there with the link (in some browsers a link to an element that cannot take focus only
+  scrolls; not tested with a named screen reader, see `docs/device-checks.md`), without
   making it a tab stop. A title the assembler
   adds has the id `main-content`; a heading that is the title keeps its own id, and the link
   points to it. Canvas removes `tabindex` from a pasted page, one more reason the paste
