@@ -29,7 +29,7 @@ from sqlalchemy import select
 
 from readablestem.pipeline import export_docx, export_epub
 from readablestem.web import bundle, documents, events, notation, output, retention
-from readablestem.web.database import as_utc
+from readablestem.web.dates import machine_date
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, get_ctx
 from readablestem.web.logsafe import log_event
@@ -235,7 +235,7 @@ def _account_json(request: Request, user) -> bytes:
         settings = {
             "email": user.email,
             "name": user.name,
-            "account_made": as_utc(row.created_at).isoformat() if row is not None else None,
+            "account_made": machine_date(row.created_at) or None if row is not None else None,
             "keep_new_documents_for_7_days": bool(row is not None and row.keep_week_default),
         }
     return json.dumps(settings, indent=2, ensure_ascii=False).encode("utf-8")
