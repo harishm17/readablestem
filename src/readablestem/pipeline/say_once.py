@@ -232,6 +232,10 @@ def _bag(element: Element) -> Counter[str]:
     if element.kind in TEXT_KINDS:
         said += fold(INLINE_MARKER_RE.sub(" ", element.text or ""))
         said += fold(element.list_marker or "")
+    elif element.kind is Kind.TABLE:
+        said += fold(
+            element.caption or ""
+        )  # ("Table N: ...": its row is set down apart from the grid)
     elif element.kind is Kind.FIGURE:
         # (`caption_marked` has a marker where each formula was; the plain caption says the
         # formula's words too, and the equation inside the caption owns them by place)
