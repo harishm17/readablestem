@@ -123,6 +123,11 @@ def test_showcase_pages_are_served_with_their_own_address(showcase):
         for hidden in ("/showcase/.nojekyll", "/showcase/404.html", "/showcase/../seo.py"):
             assert client.get(hidden).status_code == 404, hidden
         assert client.get("/showcase/%2e%2e/seo.py").status_code == 404
+        # Odd values never reach the file system: a null byte, an absolute path, a symlink out.
+        (seo.SHOWCASE_DIR.parent / "outside.html").write_text("outside")
+        (seo.SHOWCASE_DIR / "link.html").symlink_to(seo.SHOWCASE_DIR.parent / "outside.html")
+        for odd in ("/showcase/a%00b", "/showcase//etc/passwd", "/showcase/link.html"):
+            assert client.get(odd).status_code == 404, odd
         sitemap = client.get("/sitemap.xml").text
         landing = client.get("/").text
     assert home.status_code == method.status_code == css.status_code == 200
