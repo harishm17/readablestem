@@ -73,8 +73,11 @@ Design notes:
 - Finished steps can be kept and reused (`StepCache`, T3-1): with a cache, every model
   step's answer that is worth keeping (`reusable`: not a failure that a new try could
   change) is stored under a key made from the element, its crop, its nearby text, the
-  options and the models (`step_key`), and a later run of the same document finds it
-  there instead of calling the model again. The web app keeps them per job so that
+  options, the behaviour settings and the conversion code (`step_key`), and a later run of
+  the same document finds it there instead of calling the model again. The passes that ask
+  about a whole page (page math, the page witness, pages read from a picture) keep each
+  answer under the key of its question (`models.question.question_key`) and ask only for
+  what a previous run did not get (`_PageAnswers`). The web app keeps both per job so that
   "Try again" on a stopped conversion pays only for what was not finished.
 - After the steps, `pipeline.notices` derives the notices that follow from the fixes
   (a table kept as an image, a scanned page, a colour-only figure, a chart without a
@@ -87,6 +90,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import hashlib
+import json
 import logging
 import threading
 import time
@@ -96,7 +100,8 @@ from collections.abc import Callable, Generator, Iterable, Mapping
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cache, partial
+from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import Field
@@ -106,6 +111,7 @@ from readablestem.core import triage
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import (
     BBox,
+    CallFact,
     Check,
     ConversionOptions,
     ConversionOutput,
@@ -116,6 +122,7 @@ from readablestem.core.types import (
     ImagePagesSummary,
     Kind,
     ModelCall,
+    NotFinished,
     Notice,
     PageMathSummary,
     PageStats,
@@ -126,6 +133,7 @@ from readablestem.core.types import (
     Status,
     inline_marker,
 )
+from readablestem.models import question
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.math_readers.base import MathReader
 from readablestem.models.pricing import UnknownModelError
@@ -147,6 +155,8 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    shadow,
+    step_facts,
     table_math,
     table_step,
     tagged,
@@ -219,7 +229,11 @@ log = logging.getLogger(__name__)
 # TeX-made PDF, a unit past the box, a printed slash, a display's equation number, `\mathscr` for
 # an RSFS face, and `\boldsymbol` for a table cell's bold italic letter. Results from 0.5.8 load
 # unchanged.
-PIPELINE_VERSION = "0.5.9"
+# 0.5.10 (2026-11-11): a LaTeX source's result carries what LaTeXML reported
+# (`DocumentResult.source_report`, `source.report`), and a source that loses content outside a
+# formula stops with a code that names the cause. PDFs are unchanged. Results from 0.5.9 load
+# unchanged and are not judged again.
+PIPELINE_VERSION = "0.5.10"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -239,7 +253,12 @@ SCANNED_PAGE_REASON = page_type.SCANNED_PAGE
 # Fix reasons of what is kept as an image before any model work: a whole page, and a
 # region of handwriting on a typed page (module docstring).
 PAGE_REASONS = frozenset(
-    {page_type.SCANNED_PAGE, page_type.HANDWRITTEN_PAGE, page_type.UNREAD_PAGE}
+    {
+        page_type.SCANNED_PAGE,
+        page_type.HANDWRITTEN_PAGE,
+        page_type.UNREAD_PAGE,
+        page_type.PAGE_READ_FAILED,
+    }
 )
 KEPT_REASONS = PAGE_REASONS | {page_type.HANDWRITING_ON_PAGE}
 # `Fix.group_key` of the kept images with one reason: "pg-" + the first one's element id
@@ -360,12 +379,57 @@ class StepCache(Protocol):
     """Where finished steps are kept between runs of one document (module docstring).
 
     `lookup` returns the stored fix for this element when `key` is what it was stored
-    under, else None; `store` keeps one. Both are called on the calling thread, and a
-    cache must not raise: a failure to read or write is a miss, never a failed run."""
+    under, else None; `store` keeps one. Both are called on the calling thread.
+
+    `answer` returns what an earlier run kept for a page-level question (`{"payload": the
+    model's answer, "call": its `ModelCall`}`), else None; `keep` keeps one. Both may be
+    called from several threads at once. `answer` gives back only what was kept before this
+    run began: a request this run sends twice is asked twice, as without a cache.
+
+    A cache must not raise: a failure to read or write is a miss, never a failed run."""
 
     def lookup(self, element: Element, key: str) -> Fix | None: ...
 
     def store(self, element: Element, key: str, fix: Fix) -> None: ...
+
+    def answer(self, key: str) -> dict[str, Any] | None: ...
+
+    def keep(self, key: str, row: dict[str, Any]) -> None: ...
+
+
+class _PageAnswers:
+    """The client of a page-level pass when finished steps are kept (`StepCache`): a
+    question an earlier run of this document already has the answer to is not asked again,
+    and each new answer is kept. Only an answer the model gave and the step could read is
+    kept; a refusal, an outage or an unreadable reply is asked again next time."""
+
+    def __init__(self, inner: VisionClient, cache: StepCache, settings: Settings) -> None:
+        self._inner = inner
+        self._cache = cache
+        self._settings = settings
+
+    def run(
+        self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
+    ) -> tuple[T | None, ModelCall]:
+        key = question.question_key(self._settings, request, schema)
+        kept = self._cache.answer(key)
+        if kept is not None:
+            try:
+                return schema.model_validate(kept["payload"]), ModelCall.model_validate(
+                    kept["call"]
+                )
+            except (KeyError, TypeError, ValueError):
+                pass  # not readable by this release: ask
+        parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+        if parsed is not None and call.outcome == "ok":
+            self._cache.keep(
+                key,
+                {"payload": parsed.model_dump(mode="json"), "call": call.model_dump(mode="json")},
+            )
+        return parsed, call
+
+    def __getattr__(self, name: str) -> Any:  # anything else a pass may read
+        return getattr(self._inner, name)
 
 
 # `Fix.reason` codes of a failure that trying again could change: the model did not answer
@@ -383,6 +447,59 @@ def reusable(fix: Fix) -> bool:
     return reason not in _TRANSIENT_REASONS and not reason.startswith(_TRANSIENT_PREFIXES)
 
 
+# The settings a stored fix depends on whatever the profile lists (`_behaviour`).
+_KEY_SETTINGS = (
+    "model_provider",
+    "main_model",
+    "cheap_model",
+    "decisions_model",
+    "decisions_figure_verify",
+    "decisions_equation_shadow",
+    "claude_check_model",
+    "claude_check_scope",
+)
+# The packages whose code and prompts make a fix out of a model's answer.
+_CONVERSION_PACKAGES = ("core", "models", "pipeline", "source")
+
+
+@cache
+def code_identity() -> str:
+    """A digest of the conversion code this process runs: every file of the packages that
+    turn a model's answer into a fix, prompts and data files included. A stored fix is the
+    model's answer after this code has checked and shaped it, so it is good for this code
+    and no other; hashing the files asks nobody to remember a version bump. Where the
+    files cannot be read it is the pipeline version."""
+    root = Path(__file__).resolve().parent.parent
+    digest = hashlib.sha256()
+    count = 0
+    try:
+        for package in _CONVERSION_PACKAGES:
+            for path in sorted((root / package).rglob("*")):
+                if path.is_file() and "__pycache__" not in path.parts:
+                    digest.update(path.relative_to(root).as_posix().encode())
+                    digest.update(b"\x00")
+                    digest.update(path.read_bytes())
+                    count += 1
+    except OSError:
+        count = 0
+    return digest.hexdigest() if count else PIPELINE_VERSION
+
+
+def _behaviour(settings: Settings) -> str:
+    """The run's value of every setting that decides what a conversion gives: the ones the
+    production profile lists as behaviour (`ops.profile`), and the models and checks named
+    here in case the profile cannot be read."""
+    names: set[str] = set(_KEY_SETTINGS)
+    try:
+        from readablestem.ops import profile
+
+        names |= set(profile.load().settings)
+    except Exception as exc:  # the key is then built from the named settings alone
+        log.warning("step key: the profile was not read: %s", type(exc).__name__)
+    values = {name: str(getattr(settings, name, "")) for name in sorted(names)}
+    return json.dumps(values, separators=(",", ":"))
+
+
 def step_key(
     element: Element,
     png: bytes,
@@ -390,29 +507,19 @@ def step_key(
     options: ConversionOptions,
     settings: Settings,
 ) -> str:
-    """What a step's answer depends on, as a digest: the pipeline version, the element
-    (its text layer is checked against the answer), the picture, the nearby text sent with
-    it, the conversion options (notation, exam mode, feature flags) and the models and
-    checks in use. Equal keys mean the same question asked the same way."""
+    """What a step's stored fix depends on, as a digest: the element (its text layer is
+    checked against the answer), the picture, the nearby text sent with it, the conversion
+    options (notation, exam mode, feature flags), every behaviour setting (models, efforts,
+    switches) and the conversion code with its prompts (`code_identity`). Equal keys mean
+    the same question, asked and handled the same way. A recorded model answer is keyed by
+    its question alone (`models.question`); this key is for a finished fix."""
     parts = [
-        PIPELINE_VERSION,
+        code_identity(),
         element.model_dump_json(exclude={"id", "order"}),
         hashlib.sha256(png).hexdigest(),
         context_text or "",
         options.model_dump_json(),
-        "|".join(
-            str(getattr(settings, name, ""))
-            for name in (
-                "model_provider",
-                "main_model",
-                "cheap_model",
-                "decisions_model",
-                "decisions_figure_verify",
-                "decisions_equation_shadow",
-                "claude_check_model",
-                "claude_check_scope",
-            )
-        ),
+        _behaviour(settings),
     ]
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
@@ -1054,12 +1161,9 @@ class _Run:
         for future in list(self.futures):
             future.cancel()
         for future, element in list(self.futures.items()):
-            if future.cancelled():
-                continue
-            try:
-                done = future.result()
-            except BaseException:  # the failed step itself, or a worker that died
-                continue
+            if future.cancelled() or future.exception() is not None:
+                continue  # not run, or the failed step itself, or a worker that died
+            done = future.result()
             key = self.keys.get(element.id)
             if key and reusable(done.fix):
                 self.cache.store(element, key, done.fix)
@@ -1449,6 +1553,7 @@ def _page_math_pass(
     pages: list[int] | None,
     concurrency: int,
     tracer: Tracer,
+    measured: list[CallFact],
 ) -> tuple[Any, PageMathSummary]:
     """The page math pass (ADR 0006) and the second layout run that lays its verified plan
     over layout's rules. Fails open: a page the model could not answer, a cap that stopped
@@ -1464,6 +1569,8 @@ def _page_math_pass(
         result = page_math.run(client, settings, offered, concurrency=concurrency)
         plan = result.plan
         calls = result.calls
+        for number, asked in plan.pages.items():
+            measured.extend(step_facts.of_calls(asked.calls, number))
         applied = page_math_reconcile.PageMathHook(plan)
         answered = [n for n, p in plan.pages.items() if p.failed is None]
         if answered:
@@ -1522,6 +1629,7 @@ def _page_witness_pass(
     settings: Settings,
     concurrency: int,
     tracer: Tracer,
+    measured: list[CallFact],
 ) -> tuple[list[Element], PageWitnessSummary]:
     """The page witness (`pipeline/page_witness.py`) over the document's maths pages and its
     reconciliation with the elements layout found (`pipeline/witness_reconcile.py`): the
@@ -1544,6 +1652,8 @@ def _page_witness_pass(
         result = page_witness.run(client, settings, offered, concurrency=concurrency)
         plan = result.plan
         calls = result.calls
+        for number, asked in plan.pages.items():
+            measured.extend(step_facts.of_calls(asked.calls, number))
         reconciled = witness_reconcile.ReconcileStats()
         try:
             done = witness_reconcile.reconcile(elements, plan, collector.rows, collector.objects)
@@ -1600,6 +1710,8 @@ def _image_pages_pass(
     concurrency: int,
     tracer: Tracer,
     observer: Callable[[ModelCall], None] | None,
+    measured: list[CallFact],
+    step_cache: StepCache | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept scanned and handwritten pages from a picture of each (ADR 0007).
 
@@ -1611,7 +1723,10 @@ def _image_pages_pass(
     pages = image_page.kept_reads(kept)
     if not pages:
         return {}, None
-    recording = _RecordingClient(client, tracer, observer)
+    # (An answer kept by an earlier run is given back in front of the recording client: it
+    # is not a request, so it gets no span and the observer does not hear of it.)
+    sending = _RecordingClient(client, tracer, observer)
+    recording: Any = sending if step_cache is None else _PageAnswers(sending, step_cache, settings)
     renders = {
         number: partial(
             layout.render_page,
@@ -1656,6 +1771,8 @@ def _image_pages_pass(
             if page_built is not None:
                 built[number] = page_built
         summary = image_page.summarise(result.reads, built, settings, result.stopped)
+        for number, read in result.reads.items():
+            measured.extend(step_facts.of_calls(read.calls, number))
         _annotate(
             span,
             cost_usd=summary.cost_usd,
@@ -1687,10 +1804,26 @@ def _convert(
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    # What this conversion measures of itself (`pipeline.step_facts`): each stage's wall
+    # time, and every request to a model with its page.
+    watch = step_facts.Stopwatch()
+    measured: list[CallFact] = []
+    # The steps run in shadow (`pipeline.shadow`): a step that is given this runs beside
+    # the conversion and can change nothing of it.
+    shadowed = shadow.Shadow()
+    # Pages a layout run typed without their ink, and handwritten pages whose strokes were
+    # not read, because the time for the ink analysis ran out (`page_type.InkBudget`).
+    ink_late: set[int] = set()
+    strokes_late: list[NotFinished] = []
+    # The page-level passes ask through the job's kept answers when it has any.
+    page_client: VisionClient = (
+        client if step_cache is None else _PageAnswers(client, step_cache, settings)
+    )
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
         cached = _CachedDocument(pdf_bytes)
         try:
             _send(stage_progress, "layout")
+            watch.stage("layout")
             collector = (
                 page_math_reconcile.PageMathHook()
                 if options.page_math or options.page_witness
@@ -1706,30 +1839,38 @@ def _convert(
                 max_pages=settings.max_pages_per_job,
                 **extra,
             )
+            ink_late.update(page_type.out_of_time(getattr(doc, "page_types", None) or {}))
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
             if collector is not None and options.page_math:
+                watch.stage("page_math")
                 doc, page_math_summary = _page_math_pass(
                     pdf_bytes,
                     doc,
                     collector,
-                    client=client,
+                    client=page_client,
                     settings=settings,
                     pages=pages,
                     concurrency=concurrency,
                     tracer=tracer,
+                    measured=measured,
                 )
+                # (the pass lays the plan over a second layout run, which types the pages again)
+                ink_late.update(page_type.out_of_time(getattr(doc, "page_types", None) or {}))
             if collector is not None and options.page_witness:
+                watch.stage("page_witness")
                 witnessed, witness_summary = _page_witness_pass(
                     pdf_bytes,
                     doc,
                     collector,
-                    client=client,
+                    client=page_client,
                     settings=settings,
                     concurrency=concurrency,
                     tracer=tracer,
+                    measured=measured,
                 )
+            watch.stage("layout")
             elements = sorted(
                 doc.elements if witnessed is None else witnessed, key=lambda e: e.order
             )
@@ -1742,6 +1883,7 @@ def _convert(
             image_summary: ImagePagesSummary | None = None
             vector_pages: dict[int, image_page_vector.VectorPage] = {}
             if options.image_pages:
+                watch.stage("image_pages")
                 # (a picture under a text layer that does not cover it is kept as an
                 # unread page and read as a scan: `page_type.reads_image`)
                 to_read = {
@@ -1753,11 +1895,23 @@ def _convert(
                     for n, reason in kept.items()
                 }
                 if settings.image_pages_vector_crops or settings.image_pages_vector_checks:
+                    page_kinds = {
+                        n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()
+                    }
+                    ink_time = page_type.InkBudget()
                     vector_pages = image_page_vector.analyse(
-                        pdf_bytes,
-                        to_read,
-                        {n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()},
+                        pdf_bytes, to_read, page_kinds, budget=ink_time
                     )
+                    if ink_time.ran_out:
+                        written = [
+                            n for n in to_read if page_kinds.get(n) in page_type.HANDWRITTEN_KINDS
+                        ]
+                        strokes_late = step_facts.stopped(
+                            step_facts.INK_STROKES,
+                            "time_limit",
+                            done=len(vector_pages),
+                            of=len(written),
+                        )
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
                     to_read,
@@ -1768,7 +1922,10 @@ def _convert(
                     concurrency=concurrency,
                     tracer=tracer,
                     observer=call_observer,
+                    step_cache=step_cache,
+                    measured=measured,
                 )
+                watch.stage("layout")
                 for number in image_built:
                     kept.pop(number)  # read: no longer an image kept whole
                 # What layout read from a page the pass read (the watermark, header or page
@@ -1822,6 +1979,7 @@ def _convert(
                 for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 
+            watch.stage("steps")
             _process(run, elements, page_list, cached, text_and_headings)
             text = made[0]
             elements = text.elements
@@ -1832,7 +1990,9 @@ def _convert(
             image_page_vector.add_checks(elements, run.fixes, vector_pages)
         reading_cost = 0.0
         reading_notices: list[Notice] = []
+        stops: list[NotFinished] = []
         if image_built and settings.image_pages_second_reader != "off":
+            watch.stage("second_readings")
             with _span(tracer, "second_readings") as reading_span:
                 share = image_page_reconcile.share_s(
                     settings, time_limit_s, time.perf_counter() - started
@@ -1840,7 +2000,22 @@ def _convert(
                 reconciled = _second_readings(elements, run, settings, readers, share_s=share)
                 if reconciled is not None:
                     reading_cost = reconciled.cost_usd
+                    measured.extend(
+                        step_facts.of_reader_call(call, page) for page, call in reconciled.calls
+                    )
                     reading_notices = reconciled.notices()
+                    asked = reconciled.considered
+                    stops += step_facts.stopped(
+                        step_facts.SECOND_READER,
+                        "time_limit",
+                        done=asked - reconciled.out_of_time,
+                        of=asked,
+                    ) + step_facts.stopped(
+                        step_facts.SECOND_READER,
+                        "cap_reached",
+                        done=asked - reconciled.over_budget,
+                        of=asked,
+                    )
                     if image_summary is not None:
                         image_summary.second_reader = reconciled.record()
                     _annotate(
@@ -1850,10 +2025,14 @@ def _convert(
                         differed=reconciled.differed,
                         cost_usd=reconciled.cost_usd,
                     )
+        watch.stage("assemble")
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         elements, run.fixes = table_math.settle(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
+        page_of = {e.id: e.page for e in elements}
+        for fix in ordered:
+            measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
@@ -1872,7 +2051,19 @@ def _convert(
                 footnote_ids=footnotes,
             )
             _send(stage_progress, "checks")
+            watch.stage("checks")
             checks = html_checks.static_checks(html)
+        if image_summary is not None:
+            stops += step_facts.pages_capped(
+                "image_page",
+                [r.page for r in image_summary.per_page if r.outcome == "budget_exceeded"],
+            )
+        stops += strokes_late + step_facts.pages_capped(
+            step_facts.PAGE_TYPE, sorted(ink_late), "time_limit"
+        )
+        facts = step_facts.gathered(
+            measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
+        )
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
         if page_math_summary is not None:
@@ -1973,4 +2164,4 @@ def _convert(
         result.prompt_versions["image_page"] = image_page.PROMPT_VERSION
         if settings.image_pages_second_reading:
             result.prompt_versions["image_page_crops"] = image_page_check.PROMPT_VERSION
-    return PipelineOutput(result=result, crops=run.crops, checks=checks)
+    return PipelineOutput(result=result, crops=run.crops, checks=checks, facts=facts)

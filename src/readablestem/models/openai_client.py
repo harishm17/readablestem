@@ -37,7 +37,7 @@ Why it is built this way:
   router can fall back and the step can flag the element. Exception messages are never
   logged or stored: an API error can quote the request, and the request carries document
   content. Logs get the exception class, HTTP status and the provider's error code only.
-- Document text goes through `defang_context` before `base.fence_untrusted`. The fence alone
+- Document text goes through `base.defang_context` before `base.fence_untrusted`. The fence alone
   deletes the exact tags in one pass, so a nested, re-cased or spaced tag survives it and
   can close the fence early, putting the rest of the text outside it.
 - `store=False`: OpenAI does not keep the response for later retrieval.
@@ -59,7 +59,6 @@ import random
 import re
 import threading
 import time
-import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
@@ -75,7 +74,7 @@ from pydantic import ValidationError
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import ModelCall, Outcome
-from readablestem.models.base import T, VisionRequest, fence_untrusted, rate_gate
+from readablestem.models.base import T, VisionRequest, fenced_context, rate_gate
 from readablestem.models.pricing import cost_usd, estimate_max_cost_usd
 from readablestem.observability.logging import log_fields
 
@@ -113,12 +112,6 @@ RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({408, 409, 429})
 _NOT_SENT_ERRORS: Final[frozenset[str]] = frozenset(
     {"ConnectError", "ConnectTimeout", "PoolTimeout"}
 )
-
-# Our fence tag's name, in any case, with whitespace, "_" or "-" (or nothing) between words.
-_FENCE_NAME: Final = re.compile(r"document[\s_\-]*text", re.IGNORECASE)
-# `fence_untrusted` keeps 2,000 characters. Defanging a few times that much bounds the work on
-# a huge context while leaving enough text once tag names are removed.
-_CONTEXT_SCAN_CHARS: Final = 8000
 
 
 @dataclass(frozen=True)
@@ -364,36 +357,6 @@ def prompt_cache_key(request: VisionRequest) -> str:
 
 def png_data_url(png: bytes) -> str:
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-
-
-def defang_context(text: str) -> str:
-    """Document text with every spelling of the fence tag's name removed.
-
-    `base.fence_untrusted` deletes the exact tags once, so '</document_te</document_text>xt>'
-    rebuilds a closing tag, and '</DOCUMENT_TEXT>' or '</document_text >' pass untouched. A
-    model can read any of them as the end of the fence and the text after it as
-    instructions. Removing the tag *name* in any case and spacing, after dropping invisible
-    format characters (zero-width spaces, Unicode tag characters) that could hide inside it,
-    and repeating until nothing changes, leaves no way to spell either tag whatever brackets
-    or entities surround it. Only the start of a long text is scanned: the fence keeps 2,000
-    characters anyway.
-    """
-    text = text[:_CONTEXT_SCAN_CHARS]
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
-    while True:
-        cleaned = _FENCE_NAME.sub("", text)
-        if cleaned == text:
-            return cleaned
-        text = cleaned
-
-
-def fenced_context(text: str | None, limit: int | None = None) -> str | None:
-    """The exact text sent to the model for `text` (notice + fence), or None if empty.
-    `limit`: characters kept (default: the fence's own)."""
-    if not text:
-        return None
-    cleaned = defang_context(text)
-    return fence_untrusted(cleaned) if limit is None else fence_untrusted(cleaned, limit)
 
 
 def _input_content(request: VisionRequest, context: str | None) -> list[ResponseInputContentParam]:

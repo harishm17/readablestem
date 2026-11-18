@@ -1,5 +1,172 @@
 # Changelog
 
+## Unreleased: the measuring ground (branch feat/stage0-ground)
+
+Nothing here changes what a converted document contains. It is what later changes are
+measured and replayed against.
+
+- **Test corpus and recorded answers.** A manifest of files made for the tests or fetched by
+  hash, each converted through the app from recorded model answers, keyed by the question as
+  sent. A replay sends nothing and costs nothing. The workflow suite (`-m workflow`) runs the
+  audit's workflows on it, and a hostile-input set states for each of 36 files how its
+  conversion must end.
+- **Gold and evals.** Reading-order gold built from a document's source; a layout gold set
+  drawn by seeded rules, and a held-out set of 51 documents no page of which was opened.
+  Evals split by document, and only a held-out score can meet a bar.
+- **Step facts.** Every model request and every stage of a job is kept as a content-free
+  fact (`job_calls`, `job_stages`), with `readablestem ops step-report` and totals on the
+  admin page.
+- **Shadow steps** (`pipeline/shadow.py`). One way to run a new check or reader beside the
+  conversion: it returns nothing, any failure of it is counted and goes no further, and
+  what is kept is `same`, `differs` or `failed` by step and page (the `job_shadow` log
+  line). No step uses it yet.
+- **"Not finished" facts.** A step that stops before it has done all of its work says so:
+  `{step, page, reason, done, of}` in the table `job_not_finished`, a log line, and one
+  reader (`web.step_facts.not_finished`). Written by the steps the job's limit stops, the
+  image pages it keeps from being read, the second reader's time and dollar share, and the
+  ink analysis when its time runs out.
+- **The same file gives the same document on any machine** (tests/test_determinism.py).
+  Every read of a clock in `pipeline/` and `source/` is named in a table; the corpus is
+  replayed at full speed and held back to a quarter of the time, and an upload may differ
+  only if a step said it stopped. The first run found one: a handwritten upload lost a
+  page's handwriting when the ink analysis's 10 seconds ran out with nothing recorded. The
+  stop is now recorded. The clock itself is not yet replaced by a count of work.
+- **Cost and speed of a page** (`readablestem eval cost`, `eval speed`): dollars a page by
+  kind and by step and seconds a page by kind and stage, from a measured replay of the
+  corpus under the production profile. The Sonnet cache-read price was double the published
+  rate and is corrected.
+- **No unused code, no error without a trace.** 26 functions and classes nothing called,
+  an unused template and a limit nothing read are gone, and CI now fails for a new one
+  (`scripts/dead_code.py`). A broad handler that only passes or continues fails the linter
+  (ruff S110, S112); the five that did now count, log or return. When the conversion's
+  child cannot read what the worker sent it, it says so: the job fails as
+  `conversion_unavailable` (our side, "Try again" offered) with `conversion_child_link_failed`
+  in the log, where before it looked like a crash on the person's PDF.
+- **Every route has a test of what it does.** The test run notes each request that
+  reaches the app, and CI fails for a route no test requests or whose tests only get
+  refusals (`scripts/check_shards.py --routes`, `pytest --route-coverage`). The first run
+  found one: the region preview picture, now checked.
+- **"Download all" needs two.** The documents list and a course page offered "Download all
+  1 ready document"; the line now appears from two ready documents up.
+- **The quality ledger** (`readablestem eval ledger`): one table over the evals' kept
+  records, led by the whole-document rows (silent errors per 100 pages, documents with no
+  silent error, required decisions a page, false flags per true flag). Every figure is
+  printed with its counts, a one-sided 95% bound and a label (held-out, development score,
+  earlier release, or not measured with the proof owed). A goal is met only when the bound
+  is inside it, a held-out figure worse than its release bar fails the run, and a record
+  without its stamps is refused. No row has a held-out figure yet.
+- **Reading order** (`readablestem eval order`): the gold pages of the corpus are scored in
+  the page a student is given and in the element list, from the measured replay, with a bar
+  that no page that was right is made wrong. The scorer (version 5) counts what a right page
+  can still have wrong: furniture read aloud, a block cut, blocks run together, a caption on
+  the wrong picture. Baseline: 58 of 78 pages right in the student page and
+  33 faultless. `--set` scores a layout gold set with no model
+  (149 of 267 on `layout-dev-1`); a held-out set is scored
+  only with `--for-release` and its record names no page.
+- **What a page asks of a reviewer** (`readablestem eval burden`): required decisions a
+  page by page kind, by what is decided and by why it was asked, from the same measured
+  replay, with a bar against an earlier record (no page kind asks for more). The count is
+  the review screen's own (`core.triage.decisions`). Baseline on the corpus: 1.80 a page
+  over 315 pages, 10.5 on dense math pages, and 56% of pages ask nothing.
+- **A replay report names the steps that stopped early.** A step stopped by a clock gives
+  another result on a busier machine, and a report made from such a run did not say so. The
+  record of `eval cost`, `eval speed`, `eval burden` and `eval outputs` now lists every step
+  that did not finish, and the printed header names them. Fixed with it: `eval cost`, `eval
+  speed` and `eval burden` ended with a traceback when no upload could be measured; they now
+  say so and exit with 2.
+- **Every file a student is given, read back and counted** (`readablestem eval
+  outputs`, `pipeline/output_audit.py`): the student page, the Word file, the EPUB, the
+  two Canvas files, the Cartridge and the Listen transcript are built from a replay of
+  the corpus, read from their bytes and compared, the exports with the page and the
+  page with the stored result. 13 kinds of wrong place are counted, each with its page
+  and element and none of the document's words. It gates nothing yet. The first run
+  found three defects of the Word export that were in no list: every note's mark is a
+  footnote with no words, the words written for a voice beside a formula in a table
+  cell are shown next to it, and the title is said twice when the first heading differs
+  from it only in case.
+- **Fixed: two counters left out a page's paragraphs.** The command line's "decisions
+  needed" summary, the eval's review load and the weekly report's review-load table
+  counted only equations, figures, headings and tables. A page read from its picture asks
+  about its paragraphs too, and the review screen counted those. Every counter now counts
+  every kind of fix.
+- **The page audit, in shadow** (`pipeline/page_audit.py`, `readablestem eval page-audit`):
+  one request a page that sets the page's picture beside its converted text and answers
+  with fault codes, element ids and boxes, never text. A page is a pass, flagged, or not
+  audited with a reason; an answer that cannot be used is never a pass. It has a per-page
+  ceiling and runs under the run's spend cap. Nothing reads its verdicts yet, no job runs
+  it, and no live run has been recorded.
+- **Dependency record** (docs/dependencies.md): versions, licenses and rules, checked by the
+  suite.
+- The production profile lists the page audit's three behavior settings at their code
+  defaults, so its hash changes with no change to what production runs.
+
+## Unreleased: the content budget (branch fix/content-size-budget, WS26.9, F-559)
+
+- A PDF whose page's drawing instructions inflate past 32 MiB, or whose document's past
+  128 MiB, is refused at upload with `content_too_large` (422, "too large to read"), before
+  any quota is spent. The count runs through MuPDF's own decoders and stops at the budget:
+  content streams and arrays of them, the forms, tiling patterns, Type3 glyphs and annotation
+  appearances they draw, every filter and chain MuPDF applies, owner-password files; the
+  object streams are counted before the page tree is read. The hostile set's `stream-bomb.pdf`
+  (260 KB, one page of 256 MB) is refused in 0.36 s; it took 6.8 s of the upload request and
+  24 s of the worker.
+- `layout.analyze` makes the same check before any step reads a page, so a queued job,
+  `readablestem convert` and the evals stop with `content_too_large` too, and a PDF figure of
+  a LaTeX project over the budget is left without a picture. The budgets come from the
+  development corpus (largest page 3.0 MiB, largest document 9.9 MiB, 2026-11-11).
+- Workflow tests: `harness.ReplaySite.convert` uploads a corpus file before it skips one whose
+  recorded answers are kept out of the repository, so every file present passes the upload's
+  checks.
+
+## Unreleased: what a reviewer did (branch feat/reviewer-outcome-event)
+
+- Every review write records a content-free `decision_outcome` event beside `decision_made`:
+  the element kind, the reason code that flagged it (or `none`), one of six outcomes (kept,
+  edited, replaced, rejected, removed, added), origin, what raised it, single or group, the
+  write mode and the release. Undo writes the same rows negated, so the sums are the
+  decisions that stand. `events.outcome_cells(release)` reads them per lane with the
+  small-count rules. A migration adds the eight columns and an index to `events`.
+## Unreleased: the production profile (branch feat/production-profile)
+
+- `src/readablestem/ops/production.profile.toml` says what production runs: every behaviour setting
+  of `config.py` with its production value and the line of the repository it was taken from, the
+  other settings named as operations settings (never valued), and the image facts the build writes
+  (`readablestem ops image-facts --write` in the Dockerfile). Nobody has read the hosting dashboard
+  for it yet, so it says `confirmed = false`: a production start whose settings differ from it logs
+  `profile_mismatch` by setting name and starts; once confirmed, a difference refuses the start.
+- `/healthz/ops` returns the profile's hash; /admin shows its name, hash and the names of the
+  settings that differ; `readablestem ops profile-check` prints the same comparison.
+- Eval reports record the profile (`profile` in the JSON, one line in the header): "development
+  settings" unless the run's settings are the profile's (`--profile production`). A switch whose
+  program the image facts do not name (unknown counts as absent) is printed as counted off.
+- `.railway/railway.ts` names every behaviour setting on `web` (`preserve()`), and the docs and
+  comments that repeated production values now point at the profile.
+## Unreleased: copy leftovers and dev-only pages (branch fix/copy-leftovers)
+
+- Copy: the maintainer credit (both footers, the landing page, sign-in, privacy and terms) links
+  to "Support and continuity" on the offices page. The README, DESIGN.md and `docs/` use US
+  spelling and US date order, the attribution table head and the stemcheck summary line too, and
+  `tests/test_us_spelling.py` now reads those files and no longer lets two table cells run
+  together into one word. The README and the public site say the hosted service takes PDF and
+  LaTeX.
+- Dev-only addresses: `/style` is mounted only where `ENV` is `dev` or `test` (`web/dev_only.py`)
+  and answers 404 in production, as `/dev-login` already did. The stored demo moved from
+  `web/static/demo/` to `web/demo/`, so `/static/demo/*` no longer serves it unsandboxed;
+  `/demo` is its one address, and the landing page's PDF link is now `/demo/source.pdf`.
+  `docs/` and `scripts/` stay out of the Docker image.
+## Unreleased: stable element ids (branch feat/stable-ids, WS9.1)
+
+- Every element has a stable id (`core/uid.py`, `u1-` and 16 hex digits) made from its kind, a
+  content fingerprint, its page and its place among equal items on that page, so adding,
+  removing or editing one element renames no other. Computed from the result when needed:
+  stored results are not rewritten and keep every decision on its element; positional ids
+  stay the label and the key, and are an alias of the uid. The version is in the prefix, and
+  uids of earlier versions keep resolving.
+- The routes that take an element id in their address also take a uid; one that names nothing
+  is a 404.
+- Decision carry-over and the carry of edits use the same fingerprint. An edit to a paragraph
+  now carries when an item added above it renumbers its inline equations (it was dropped).
+
 ## Unreleased: copy slice (branch copy/vendor-spelling-continuity)
 
 - Upload: one visible line beside "Upload and convert" says who receives the pictures of equations

@@ -1,6 +1,6 @@
 # ReadableSTEM: information sheet for an accessibility or procurement office
 
-One page. It describes the beta as it is on 4 November 2026; it is not a contract or an audit.
+One page. It describes the beta as it is on November 4, 2026; it is not a contract or an audit.
 Where it differs from the live pages, those are right. The repository is `harishm17/readablestem`.
 
 ## What it does
@@ -33,13 +33,13 @@ decided and when, what was not converted, and what was not checked.
 ## Where it falls short
 
 - **Accuracy was measured on 26 documents** the tool had not seen (registered before the
-  run; version 0.5.9, 4 November 2026; 1,715 equations). 0.79 of equations came out exactly
+  run; version 0.5.9, November 4, 2026; 1,715 equations). 0.79 of equations came out exactly
   right end to end. Scored by how a screen reader reads them, 0.840 against 0.836 for a
   general chatbot: no difference the test can detect. It asked about 46% of its wrong
   equations (goal 60%). Earlier test (version 0.4.0): headings F1 0.96; a model judged 97% of figure descriptions acceptable.
   Chemistry is the weakest area. The tool accepts what its checks pass without a person
   looking; the review record lists those parts.
-- **Scanned and handwritten pages** convert only when the instructor ticks "Convert scanned or
+- **Scanned and handwritten pages** convert only when the instructor checks "Convert scanned or
   handwritten pages" (a server setting). A person decides on every converted equation and
   table, and the original page stays in the file. On nine real papers made into scans, about 2
   in 3 equations were exactly right. Handwriting: 0.57 on 24 held-out pages.

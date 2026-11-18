@@ -31,7 +31,7 @@ from readablestem.pipeline.export_canvas import (
 from test_content_e2e import FIXTURES, converted
 
 HERE = Path(__file__).parent
-DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "demo" / "index.html"
 GOLDEN = sorted((HERE / "fixtures" / "assemble" / "golden").glob("*.html"))
 COURSE = "12345"
 FOLDER = "doc-3f9a2b"

@@ -9,8 +9,14 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from readablestem.core.types import Element, Fix
-from readablestem.pipeline import html_checks
+from readablestem.core.types import Check, Element, Fix
+from readablestem.pipeline import (
+    export_canvas,
+    export_docx,
+    export_epub,
+    html_checks,
+    output_chars,
+)
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.html_checks import (
     AXE_SHA256,
@@ -109,6 +115,39 @@ def sample_html(notice: str | None = None) -> str:
 )  # fmt: skip
 def test_each_rule_reports_its_code(html, code):
     assert code in failed_codes(html)
+
+
+def test_a_character_that_is_not_text_never_reaches_any_output():
+    """A private-use glyph (a symbol font with no letter) and U+FFFD in the source: every
+    output holds the marked gap instead, and the job page's check says where to look."""
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    elements = [Element.model_validate(e) for e in data["elements"]]
+    paragraph = next(e for e in elements if e.kind == "paragraph")
+    paragraph.text = "Force \ue000 mass, and \ufffd here. " + (paragraph.text or "")
+    html = render_html(
+        title="Forces \uf0b7",
+        lang="en",
+        elements=elements,
+        fixes=[Fix.model_validate(f) for f in data["fixes"]],
+        crops={},
+        source_note="Sample written for tests.",
+    )
+    assert output_chars.count(html) == 0
+    body = html.split("<main", 1)[1]
+    assert body.count(output_chars.UNREADABLE) == 2
+    assert f"<title>Forces {output_chars.UNREADABLE}" in html
+
+    (check,) = [c for c in static_checks(html) if c.name == "html.characters"]
+    assert (check.passed, check.code) == (False, "unreadable_character")
+    assert check.added_on is not None
+    assert Check.model_validate({"name": "html.characters", "passed": True}).added_on is None
+
+    epub = export_epub.export_epub(html, title="Forces")
+    assert output_chars.count_in_zip(export_epub.build_epub(epub)) == 0
+    canvas = export_canvas.export_canvas(html, title="Forces", folder="forces")
+    assert output_chars.count_in_zip(export_canvas.build_zip(canvas)) == 0
+    if export_docx.available():
+        assert output_chars.count_in_zip(export_docx.export_docx(html, title="Forces").data) == 0
 
 
 # --------------------------------------------------------------------------- axe (no browser)

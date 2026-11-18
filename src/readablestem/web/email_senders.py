@@ -64,10 +64,6 @@ def register_sender(name: str, factory: SenderFactory, *, production_ok: bool = 
     _REGISTRY[name.strip().lower()] = _Registered(factory, production_ok)
 
 
-def unregister_sender(name: str) -> None:
-    _REGISTRY.pop(name.strip().lower(), None)
-
-
 def sender_names(*, production: bool = False) -> list[str]:
     return sorted(n for n, r in _REGISTRY.items() if r.production_ok or not production)
 

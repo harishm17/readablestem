@@ -1,0 +1,65 @@
+{
+ "id": "s10_slides_boxes",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "heading", "text": "Measurement and Error"},
+   {"role": "body", "text": "Lecture 4 · Introduction to Environmental Systems"},
+   {"role": "body", "text": "Dr. Anita Rao, Fall 2026"},
+   {"role": "dropped", "text": "ENVS 101 · Lecture 4: Measurement"},
+   {"role": "dropped", "text": "1"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "heading", "text": "Why measurement error matters"},
+   {"role": "list", "text": "Every measurement has an uncertainty"},
+   {"role": "list", "text": "Random error: scatters readings around the true value"},
+   {"role": "list", "text": "Reduced by repeating the measurement"},
+   {"role": "list", "text": "Systematic error shifts all readings the same way"},
+   {"role": "list", "text": "Example: a thermometer that reads 1 degree high"},
+   {"role": "list", "text": "Fixed by calibration"},
+   {"role": "list", "text": "Report results as value ± uncertainty"},
+   {"role": "dropped", "text": "ENVS 101 · Lecture 4: Measurement"},
+   {"role": "dropped", "text": "2"}
+  ]},
+  {"page": 3, "blocks": [
+   {"role": "heading", "text": "Field kit versus lab instrument"},
+   {"role": "heading", "text": "Field kit"},
+   {"role": "list", "text": "Easy to repeat"},
+   {"role": "list", "text": "Cheap equipment"},
+   {"role": "list", "text": "Results in minutes"},
+   {"role": "list", "text": "Good for teaching"},
+   {"role": "heading", "text": "Lab instrument"},
+   {"role": "list", "text": "Low precision"},
+   {"role": "list", "text": "Affected by wind"},
+   {"role": "list", "text": "Needs trained observer"},
+   {"role": "list", "text": "Hard to automate"},
+   {"role": "dropped", "text": "ENVS 101 · Lecture 4: Measurement"},
+   {"role": "dropped", "text": "3"}
+  ]},
+  {"page": 4, "blocks": [
+   {"role": "heading", "text": "Heat measured in four trials"},
+   {"role": "figure", "text": "Measured heat (kJ) by trial"},
+   {"role": "caption", "text": "Figure 1. Heat rose with each trial; the spread suggests a systematic drift."},
+   {"role": "dropped", "text": "ENVS 101 · Lecture 4: Measurement"},
+   {"role": "dropped", "text": "4"}
+  ]},
+  {"page": 5, "blocks": [
+   {"role": "heading", "text": "How a measurement becomes a result"},
+   {"role": "body", "text": "Collect samples"},
+   {"role": "body", "text": "Measure and record"},
+   {"role": "body", "text": "Analyze and report"},
+   {"role": "aside", "text": "Note: write down the instrument, the units and the time of every reading. These details cannot be recovered later."},
+   {"role": "dropped", "text": "ENVS 101 · Lecture 4: Measurement"},
+   {"role": "dropped", "text": "5"}
+  ]},
+  {"page": 6, "blocks": [
+   {"role": "heading", "text": "Summary"},
+   {"role": "list", "text": "Every measurement has an uncertainty."},
+   {"role": "list", "text": "Repeat measurements to reduce random error."},
+   {"role": "list", "text": "Calibrate instruments to catch systematic error."},
+   {"role": "list", "text": "Always report units and uncertainty."},
+   {"role": "dropped", "text": "ENVS 101 · Lecture 4: Measurement"},
+   {"role": "dropped", "text": "6"}
+  ]}
+ ]
+}

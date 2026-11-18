@@ -60,7 +60,7 @@ Console: create a workspace "ReadableSTEM prod", create an API key inside it, th
 **Settings > Limits** for that workspace: a monthly spend limit of **$100** (the app's own
 daily cap of $10 makes $300 the most a month could ever cost; a real month of 3-5
 instructors is under $15, see "Spend limits") and a usage alert at $25. Keep the key; you
-type it into the script's hidden prompt. If the key is an organisation-level key instead,
+type it into the script's hidden prompt. If the key is an organization-level key instead,
 note the workspace id (`wrkspc_...`).
 
 **4. HARISH: Google sign-in** (step 3). In the project's **Google Auth Platform**: Branding
@@ -193,11 +193,11 @@ processor for the app, so the privacy page changes with the setting and
 
 1. In the Anthropic Console, create a workspace for the app (for example "ReadableSTEM prod")
    and an API key inside it. **Use a workspace-scoped key.** A key that is not scoped to a
-   workspace (an organisation-level key) is refused with HTTP 400 "This API key is not
+   workspace (an organization-level key) is refused with HTTP 400 "This API key is not
    scoped to a workspace" unless every request carries the workspace id. The id is
    `ANTHROPIC_WORKSPACE_ID` (`wrkspc_...`; the client sends it as the `anthropic-workspace-id`
    header). Set it only for such a key; the settings cannot tell the two kinds of key apart
-   (the key text does not say), so a deployment with an organisation-level key and no id
+   (the key text does not say), so a deployment with an organization-level key and no id
    starts, and then fails each model call with that 400 (`call:<model>:outcome:api_error`
    in the aggregates, HTTP status 400 in the log lines). The proof's one-request API check
    (`readablestem proof --live --provider anthropic`) names the missing id.
@@ -233,10 +233,11 @@ Things that differ from OpenAI, all on by default and safe to leave:
   `ANTHROPIC_REFUSAL_FALLBACK=false` turns it off). `claude-haiku-5-5` has no such fallback;
   a decline there is a `refused` outcome, which the app then retries on the other model as
   usual. The fallback model is billed at its own rates; the reservation uses the dearer.
-- Prices (`models/pricing.py`, checked 2026-10-13): claude-opus-5-5 $4 / $20 per million
-  tokens (cache read $0.20, write $5), claude-sonnet-5-5 $2 / $10 (read $0.20, write $2.50),
+- Prices (`models/pricing.py`, checked 2026-11-11): claude-opus-5-5 $4 / $20 per million
+  tokens (cache read $0.20, write $5), claude-sonnet-5-5 $2 / $10 (read $0.10, write $2.50),
   claude-haiku-5-5 $0.10 / $0.50 for prompts up to 100K tokens, $0.50 / $2.50 above
-  (read 0.1x, write 1.25x).
+  (read 0.1x, write 1.25x). claude-fable-5-2 ($8 / $40, read $0.20, write $10) has a row so
+  that a ladder with it can be costed; no step uses it.
 - The instructions are cached (5 minutes), so from a job's second call on, the instruction
   tokens are billed at the cache-read rate.
 - A reservation (the worst case held before each call, then replaced by the real cost) is
@@ -268,6 +269,12 @@ Decisions second check off), measured with `readablestem convert` on 1 vCPU
 | The same with long descriptions on (the beta setting) | $0.209, 61 calls: $0.0070 a page |
 | 5 table pages, tables off / on | $0.036 / $0.083: $0.0067 more per rebuilt table |
 | Dense held-out pages (the held-out run) | about $0.014 a page |
+
+`readablestem eval cost` measures these from a replay of the test corpus, by page kind and
+by step, and `readablestem eval speed` the seconds and the memory (eval.md, "What a page
+costs and how long it takes"). The two figures the public pages are built from,
+`TYPICAL_PAGE_USD` ($0.0145) and `DENSE_PAGE_USD` ($0.034 to $0.092), are kept in
+`ops/limits.py` and are changed only from a replay of held-out documents.
 
 The planning rate is **$0.015 a dense page** (`ops/limits.py`, `PLANNING_USD_PER_PAGE`);
 a 100-page document (the most one job takes, `MAX_PAGES_PER_JOB`) at that rate is $1.50. Worst-case reservations on `claude-opus-5-5`:
@@ -356,7 +363,7 @@ at the next deploy: put it in the file. Choices for the beta, and why:
 | `FEATURE_NOTATION_MEMORY` | on | A course's second chapter reads its notation hints. It stores course names and notation; the privacy page says so (`launch-check` verifies) |
 | `FEATURE_TABLES` | **on** | The owner's decision of 2026-10-21 (docs/tables.md, "The decision"). Off, a table stays an image with a required decision and its formulas are lost. On: real `<table>` for $0.007 each, but the worst-case reservation rises to $0.53 a call, so the page cap must be at least $0.53 and the job cap at least $5.71 (the Claude defaults, $1.00 and $6.00, pass; `deploy/deploy.env.example` sets `MAX_USD_PER_PAGE=2.20`, which lets a one-page job hold four calls at once). Known: tables of unruled lists and of long wrapped text are missed (real-document recall 0.56), which stay as they were with the flag off |
 | `FEATURE_COLOUR` | off | No eval has turned it on |
-| Everything else | Railway only | `deploy.sh` passes only the switches in this table. The settings added later (`FEATURE_IMAGE_PAGES`, `FEATURE_PAGE_WITNESS`, `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP`) are not in the script's list, so a Cloud Run deployment runs with their code defaults (all off). Which are on in production today: deploy-railway.md, "Feature flags in production" |
+| Everything else | Railway only | `deploy.sh` passes only the switches in this table. The settings added later (`FEATURE_IMAGE_PAGES`, `FEATURE_PAGE_WITNESS`, `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP`) are not in the script's list, so a Cloud Run deployment runs with their code defaults (all off). Which are on in production: the production profile, `src/readablestem/ops/production.profile.toml` |
 | `DECISIONS_*` | off with Claude | The Decisions API is OpenAI's. With `MODEL_PROVIDER=anthropic` the script writes the three switches as `false`; the app ignores them for that provider either way |
 | `FEEDBACK_URL` | empty | The footer then links to an email to `CONTACT_EMAIL`. A form service is a new data processor; name it on the privacy page first |
 
@@ -492,8 +499,8 @@ from the Microsoft Entra admin center as documented on learn.microsoft.com (chec
    for local development `http://localhost:8000/auth/microsoft/callback` (Microsoft
    allows http only for localhost). The app sends `BASE_URL + /auth/microsoft/callback`;
    as for Google, sign-in only works on the `BASE_URL` host.
-5. **ID tokens: nothing to tick.** Leave both boxes under **Implicit grant and hybrid
-   flows** unticked. The app uses the authorisation code flow with PKCE, and the ID token
+5. **ID tokens: nothing to check.** Leave both boxes under **Implicit grant and hybrid
+   flows** unchecked. The app uses the authorisation code flow with PKCE, and the ID token
    comes back from the token request, not through the browser.
 6. **Certificates & secrets > Client secrets > New client secret.** Pick an expiry (at
    most 24 months; Microsoft recommends under 12) and write the date in your calendar:
@@ -505,14 +512,14 @@ from the Microsoft Entra admin center as documented on learn.microsoft.com (chec
    email address) and calls no Microsoft API. Under **Microsoft Graph (delegated)** keep
    `openid`, `profile` and `email`, and remove the `User.Read` permission added by
    default, so the approval page asks for as little as possible.
-8. **Token configuration > Add optional claim > ID**, tick `email` and `xms_edov`, and
+8. **Token configuration > Add optional claim > ID**, check `email` and `xms_edov`, and
    accept the offer to turn on the Graph `email` permission. `xms_edov` says whether the
    directory has verified the owner of the email's domain; the app ignores an email
    claim it marks false and uses the sign-in name instead.
 9. Find each university's **directory (tenant) id**: ask its IT team, or read it from
    `https://login.microsoftonline.com/UNIVERSITY_DOMAIN/v2.0/.well-known/openid-configuration`
    (the id in `issuer`). Someone from a university that is not listed sees "Your
-   organisation is not set up for this beta" with their directory id to send you. List
+   organization is not set up for this beta" with their directory id to send you. List
    the ids, comma-separated, in `MS_ALLOWED_TENANTS` (step 4). People still have to be
    on the allowlist (`readablestem users allow EMAIL`), with the address their university
    account has.
@@ -740,7 +747,7 @@ Railway (deploy-railway.md). It applies if you deploy on Cloud Run. In order:
 6. If you offer Microsoft sign-in: register the app (step 3b), get admin consent from
    each university's IT team, sign in once with a university account at the run.app
    URL, and add Microsoft sign-in to the privacy notice ("Your account": what Microsoft
-   sends, the directory id, and that the account's id is kept to recognise it).
+   sends, the directory id, and that the account's id is kept to recognize it).
    `readablestem ops launch-check` run with the production settings lists the privacy
    notice until it mentions Microsoft. The notice should also say that the Google
    account's id is now kept with the account.

@@ -21,7 +21,7 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+from fixtures.web.support import ALICE, WebEnv, fetch, job_id_from, login, token, upload, with_file
 from fixtures.web.table_doc import (
     MATHS_LATEX,
     TABLE_4,
@@ -567,7 +567,7 @@ def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
     assert queue.first_open(queue.decisions(stored(as_text))) is not None  # others wait
     assert "p2-e1" not in {d.key for d in queue.decisions(stored(as_text))}  # not a decision
     assert post(as_text, "p2-e1", action="accept").status_code == 303  # re-renders
-    html = as_text.browser.get(f"/jobs/{as_text.job_id}/download").text
+    html = fetch(as_text.browser, f"/jobs/{as_text.job_id}/download").text
     assert '<div id="p2-e1"><p>Table 4 Constants</p><dl><dt>Constant</dt>' in html
     response = post(as_text, "p2-e1", action="edit", change="cell", row="1", col="1", cell="9.8")
     assert response.status_code == 422

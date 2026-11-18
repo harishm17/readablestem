@@ -27,8 +27,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline import combine
-from readablestem.web import documents, ranges
+from readablestem.pipeline import combine, output_chars
+from readablestem.web import ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
@@ -45,9 +45,14 @@ class KeptPart:
 def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[KeptPart]:
     """The finished parts of `job`'s source that its owner still keeps, in page order.
     `job` must be a part; one that is not has none. A part with a decision still open is a
-    draft and is held back, as "Download all" holds it back (`web.routes.bundle`). When two
+    draft and is held back by the same rule as a download (`web.output.export_state`). When two
     parts name a page in common (the same pages converted twice) the newest is kept and the
     older one left out, so the file never holds a page twice."""
+    # Imported here: `output` imports the app's dependencies, which import the worker, and the
+    # worker imports this module. At the top it made `import readablestem.web.worker` fail on
+    # its own (the proof report's limits table, tests/test_ops_limits.py run alone).
+    from readablestem.web import output
+
     if not job.part_group:
         return []
     rows = session.scalars(
@@ -67,7 +72,7 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
         pages = ranges.pages_of_label(row.part_label)
         if pages is None or len(pages) != row.page_count or taken & set(pages):
             continue
-        if documents.open_decisions((row.result_json or {}).get("fixes")):
+        if output.export_state(row).key != output.READY:  # a draft is never joined (SW21)
             continue
         taken.update(pages)
         kept.append(KeptPart(row, pages))
@@ -76,11 +81,12 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
 
 def title_of(first: Job) -> str:
     """What the file is called: the title the instructor chose for the first part, else the
-    source's file name without the part tag and extension."""
+    source's file name without the part tag and extension. It names the Word and EPUB files
+    too, so a character that is not text in it is written as `output_chars.UNREADABLE`."""
     if first.title_override and first.title_override.strip():
-        return first.title_override.strip()
+        return output_chars.plain(first.title_override.strip())
     stem = _PART_SUFFIX.sub("", first.filename.rpartition(".")[0] or first.filename)
-    return " ".join(stem.split()) or DEFAULT_TITLE
+    return output_chars.plain(" ".join(stem.split())) or DEFAULT_TITLE
 
 
 def combined_html(

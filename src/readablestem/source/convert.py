@@ -8,13 +8,18 @@ PDF uses.
    (`source.intake`).
 2. LaTeXML runs on it inside the sandbox (`source.latexml`, `core.sandbox`): no network, a
    minimal root, the project read-only, time, memory and output caps.
-3. The XHTML it wrote is read into elements and the fixes that need no model
-   (`source.ltx_reader`): exact equations, tables, headings.
+3. What LaTeXML said is read from its messages before the temporary folder goes
+   (`source.report`), and the XHTML it wrote is read into elements and the fixes that need no
+   model (`source.ltx_reader`): exact equations, tables, headings. The report is kept on the
+   result (`DocumentResult.source_report`).
 4. Each figure goes through the ordinary figure step with the project's own picture.
 5. The ordinary assembler writes the HTML; the result says `origin="latex"`.
 
 A source that cannot be converted raises `SourceFailed` with a content-free code; the job then
-fails with a plain message and nothing partial is kept (`web.views.JOB_ERROR_MESSAGES`).
+fails with a plain message and nothing partial is kept (`web.views.JOB_ERROR_MESSAGES`). A
+source that would lose content outside a formula is one of them (`source.report.stop`): a
+missing file, a brace left open, commands that are not defined. Its `detail` names the files
+and commands for the job page only; it is stored with the job and never logged.
 """
 
 from __future__ import annotations
@@ -39,13 +44,15 @@ from readablestem.core.types import (
     Kind,
     ModelCall,
     Notice,
+    SourceReport,
 )
 from readablestem.models.base import VisionClient
-from readablestem.pipeline import assemble, html_checks
+from readablestem.pipeline import assemble, html_checks, step_facts
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline import run as pipeline
 from readablestem.source import intake, latexml, ltx_reader
+from readablestem.source import report as source_report
 from readablestem.web import archive_intake as arc
 from readablestem.web.isolated_convert import ConversionFailed
 
@@ -59,6 +66,7 @@ FAILURE_CODES = {
     "source_unreadable",  # it did, and it is not usable
     "source_refused",  # the source is not allowed (the child checks again)
     "timeout",
+    *source_report.STOP_CODES,  # it would lose content outside a formula
 }
 
 
@@ -69,11 +77,13 @@ GATE_WAIT_S = 600.0
 
 
 class SourceFailed(ConversionFailed):
-    """The source could not be converted; `code` becomes the job's error code."""
+    """The source could not be converted; `code` becomes the job's error code and `detail`
+    (names from the source: `source.report.stop`) the job's `error_detail`."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, detail: dict[str, object] | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.detail = detail
 
 
 @dataclass
@@ -126,10 +136,10 @@ class _SourceRun(pipeline._Run):
         self.pages.submitted(page)
 
 
-def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, bool]:
-    """Unpack the upload under `tmp/project` and return it, the main file's path and whether it
-    is a Beamer deck. The same checks as the web process made: the zip limits, the lint, the
-    main file."""
+def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, bool, set[str]]:
+    """Unpack the upload under `tmp/project` and return it, the main file's path, whether it
+    is a Beamer deck and the packages its files load. The same checks as the web process made:
+    the zip limits, the lint, the main file."""
     try:
         kind, hint, data = intake.unwrap(blob)
     except intake.EnvelopeError:
@@ -155,7 +165,7 @@ def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, boo
         raise SourceFailed("source_refused") from None
     except arc.ArchiveRefused:
         raise SourceFailed("source_refused") from None
-    return project, main, beamer
+    return project, main, beamer, source_report.loaded_packages(texts)
 
 
 def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) -> bytes:
@@ -181,6 +191,17 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
     if document.stat().st_size > ltx_reader.MAX_XHTML_BYTES:
         raise SourceFailed("source_failed")
     return document.read_bytes()
+
+
+def _stop_if_lost(report: SourceReport, *, beamer: bool) -> None:
+    """Stop the job when the source would lose content outside a formula
+    (`source.report.stop`). Logs the counts, never a name."""
+    found = source_report.stop(report, beamer=beamer)
+    log.info(
+        "source report: stop=%s %s", found[0] if found else None, source_report.summary(report)
+    )
+    if found is not None:
+        raise SourceFailed(*found)
 
 
 def convert_source(
@@ -240,21 +261,39 @@ def _convert(
 
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    watch = step_facts.Stopwatch()
+    watch.stage("source")  # LaTeXML in its sandbox, then reading what it wrote
     pipeline._send(stage_progress, "layout")
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
-        project, main, beamer = _project(blob, tmp, beamer_ok=settings.feature_beamer_source)
+        project, main, beamer, loaded = _project(
+            blob, tmp, beamer_ok=settings.feature_beamer_source
+        )
         out = tmp / "out"
-        xhtml = run_latexml(project, main, out, beamer=beamer)
+        try:
+            xhtml = run_latexml(project, main, out, beamer=beamer)
+        except SourceFailed as failed:  # what LaTeXML said names the cause, when it can
+            if failed.code == "source_failed":
+                _stop_if_lost(
+                    source_report.parse(out, project=project, loaded=loaded), beamer=beamer
+                )
+            raise
+        # LaTeXML's messages, read now: the folder holding them goes with this block.
+        report = source_report.parse(out, project=project, loaded=loaded)
         try:
             xml = out / latexml.XML_PATH
             graphics = ltx_reader.graphics_of(xml.read_bytes()) if xml.is_file() else {}
             reading = ltx_reader.read(xhtml, project, graphics, beamer=beamer)
         except ltx_reader.ReadError:
+            _stop_if_lost(report, beamer=beamer)
             raise SourceFailed("source_unreadable") from None
+    report = source_report.with_marks(report, reading.marks, reading.error_nodes)
+    report.figures = list(reading.figures)
+    _stop_if_lost(report, beamer=beamer)
     return _finish(
         reading,
         started=started,
+        watch=watch,
         settings=settings,
         client=client,
         progress=progress,
@@ -267,6 +306,7 @@ def _convert(
         step_cache=step_cache,
         call_observer=call_observer,
         origin="beamer" if beamer else "latex",
+        report=report,
     )
 
 
@@ -274,6 +314,7 @@ def _finish(
     reading: ltx_reader.Reading,
     *,
     started: float,
+    watch: step_facts.Stopwatch,
     settings: Settings,
     client: VisionClient,
     progress: pipeline.ProgressFn | None,
@@ -286,6 +327,7 @@ def _finish(
     step_cache: pipeline.StepCache | None,
     call_observer: Callable[[ModelCall], None] | None,
     origin: Literal["latex", "beamer"] = "latex",
+    report: SourceReport | None = None,
 ) -> ConversionOutput:
     """From a reading to a stored result: the figure steps, the assembler, the checks."""
     elements = sorted(reading.elements, key=lambda e: e.order)
@@ -313,12 +355,14 @@ def _finish(
         observer=call_observer,
         images=dict(reading.images),
     )
+    watch.stage("steps")
     try:
         run.start_stages(elements)
         run.process_page(0, elements)
         run.collect(block=True)
     finally:
         run.pool.shutdown(wait=True, cancel_futures=True)
+    watch.stage("assemble")
     ordered = pipeline._ordered_fixes(elements, run.fixes)
     pipeline._send(stage_progress, "assemble")
     html = assemble.render_html(
@@ -333,7 +377,14 @@ def _finish(
         origin=origin,
     )
     pipeline._send(stage_progress, "checks")
+    watch.stage("checks")
     checks = html_checks.static_checks(html)
+    # A source has no pages: every request is about the document.
+    facts = step_facts.gathered(
+        (fact for fix in ordered for fact in step_facts.of_fix(fix, None)),
+        watch,
+        step_facts.capped(ordered),
+    )
     wall_ms = round((time.perf_counter() - started) * 1000)
     stats = pipeline._stats(page_list, elements, ordered, run.page_ms, wall_ms)
     derived = notice_rules.from_fixes(
@@ -356,6 +407,7 @@ def _finish(
         notices=notices,
         lang_source="default",
         origin=origin,
+        source_report=report,
     )
     log.info(
         "convert_source done: elements=%d fixes=%d calls=%d cost_usd=%.4f",
@@ -364,4 +416,4 @@ def _finish(
         stats.model_calls,
         stats.cost_usd,
     )
-    return pipeline.PipelineOutput(result=result, crops=run.crops, checks=checks)
+    return pipeline.PipelineOutput(result=result, crops=run.crops, checks=checks, facts=facts)

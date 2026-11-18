@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from readablestem.core.types import Check, Notice
+from readablestem.core.types import Check, DocumentResult, Notice
 from readablestem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
@@ -342,6 +342,15 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "language code.",
     ("html.text_contrast", "low_contrast"): "Some colored text is too light to read easily "
     "on the white background.",
+    ("html.characters", "unreadable_character"): "Some characters in the document are not "
+    "text (a symbol the PDF gives no letter for, or a damaged character), so a screen reader "
+    'would say nothing or "question mark" there. Students see "[unreadable character]" in '
+    "each place instead; compare those places with the PDF.",
+    # A page kept as a picture for unread content (pipeline.html_checks, F-451)
+    ("html.sentence_holes", "sentence_hole"): "A sentence on a page that could not be read in "
+    "full has a gap where something is missing, often an equation drawn as lines, so a screen "
+    "reader reads the sentence with nothing in its place. Students are told so at the start "
+    "of that page's text; compare the text with the picture of the page.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
     ("axe", "axe_error"): "The automatic accessibility check (axe-core) could not run on the "
@@ -415,6 +424,8 @@ REASON_MESSAGES: dict[str, str] = {
     "checked).",
     "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
     "image, marked “Not converted”.",
+    "page_read_failed": "This page could not be read, so it is kept as an image, marked "
+    "“Not converted”. The rest of the document was read.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
     "convert handwriting on typed pages, so it is kept as an image after the typed text.",
 }
@@ -422,8 +433,7 @@ REASON_MESSAGES: dict[str, str] = {
 # DocumentResult.notices: one sentence per notice code for the job page's list ("Not
 # handled in this file" and "Worth checking"; core.types.Notice). Kept apart from the
 # check and fix-reason tables because a notice is not a review decision. Every code in
-# core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py). The wording
-# is a placeholder until the builder that emits each code writes its own sentence.
+# core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py).
 NOTICE_MESSAGES: dict[str, str] = {
     "table_not_rebuilt": "A table is kept as an image of the original, so screen readers "
     "cannot read its cells.",
@@ -433,6 +443,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "handwritten_page": "Handwritten, not converted: the page is kept as an image.",
     "unread_page": "Drawings or writing this tool could not read, not converted: the page is "
     "kept as an image, after any text read from it.",
+    "page_read_failed": "This page could not be read, so it is kept as an image. The rest of "
+    "the document was read.",
     "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "
@@ -470,8 +482,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
-    "source_error": "Part of the LaTeX source could not be read (an unknown command) and "
-    "is shown as it was written.",
+    "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
+    "is shown as it was written and is a decision for you.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
@@ -526,6 +538,35 @@ def explain_check(check: Check) -> Explained:
         part = TABLE_CHECK_PARTS.get(check.name, "contents")
         return Explained(UNKNOWN_TABLE_CHECK_MESSAGE.format(part=part), code, known=False)
     return Explained(UNKNOWN_CHECK_MESSAGE, code, known=False)
+
+
+def source_item_notes(result: DocumentResult) -> dict[str, str]:
+    """For a source job, a sentence per item that names what LaTeX reported about it (from
+    `DocumentResult.source_report`): the picture a figure asked for, the commands a formula
+    uses that are not defined. Element id -> sentence; empty for a PDF."""
+    report = result.source_report
+    if report is None:
+        return {}
+    notes: dict[str, str] = {}
+    for figure in report.figures:
+        notes[figure.element_id] = (
+            f"The picture “{figure.name}” named at this figure is not in the upload, or is a "
+            "kind this tool does not read (PNG, JPEG, GIF and PDF are read). Add it and upload "
+            "again, or describe the figure yourself."
+        )
+    commands: dict[str, list[str]] = {}
+    for mark in report.marks:
+        if mark.in_formula and mark.element_id and mark.name:
+            names = commands.setdefault(mark.element_id, [])
+            if mark.name not in names:
+                names.append(mark.name)
+    for element_id, names in commands.items():
+        listed = ", ".join(names[:5])
+        verb = "is" if len(names) == 1 else "are"
+        notes[element_id] = (
+            f"This formula uses {listed}, which {verb} not defined. It is shown as it was written."
+        )
+    return notes
 
 
 def explain_reason(reason: str) -> Explained:

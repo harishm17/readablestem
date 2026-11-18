@@ -20,7 +20,7 @@ from readablestem.web.recipients import recipients
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "src/readablestem/web/templates"
-STATIC = ROOT / "src/readablestem/web/static"
+WEB = ROOT / "src/readablestem/web"
 ALL_ON = {
     "feature_tables": True,
     "feature_image_pages": True,
@@ -166,7 +166,7 @@ def test_every_page_that_lists_inputs_says_the_same_about_latex_source(tmp_path)
 
 
 def test_the_demo_note_is_short_and_keeps_the_licence_and_the_teacher_support_note():
-    demo = (STATIC / "demo/index.html").read_text(encoding="utf-8")
+    demo = (WEB / "demo/index.html").read_text(encoding="utf-8")
     note = demo.split('<aside aria-label="About this demo"', 1)[1].split("</aside>", 1)[0]
     visible = note.split("<details>", 1)[0]
     assert len(text_of(visible).split()) < 75

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from fixtures.web.support import fetch
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline.assemble import CHECKED
 from readablestem.web.db import Job, session_scope
@@ -25,14 +26,14 @@ def decisions(site: Site) -> list[str]:
 def test_every_way_to_get_the_file_or_its_checks_refreshes_it(site, path):
     review(site, decisions(site)[0], action="reject")
     assert site.job(site.job_id).html_stale is True
-    response = site.browser.get(f"/jobs/{site.job_id}{path}")
+    response = fetch(site.browser, f"/jobs/{site.job_id}{path}")
     assert response.status_code == 200, path
     assert site.job(site.job_id).html_stale is False, path
 
 
 def test_undo_marks_the_file_out_of_date_like_any_other_write(site):
     review(site, decisions(site)[0], action="reject")
-    site.browser.get(f"/jobs/{site.job_id}/download")
+    fetch(site.browser, f"/jobs/{site.job_id}/download")
     version = site.job(site.job_id).result_version
     page = site.browser.get(f"/jobs/{site.job_id}/review").text
     token = csrf_from(page)
@@ -51,7 +52,7 @@ def test_the_student_note_is_dated_by_the_last_decision_not_by_the_render(site):
 
         for edit in session.query(ReviewEdit).filter_by(job_id=site.job_id):
             edit.created_at = edit.created_at.replace(year=2026, month=1, day=2)
-    served = site.browser.get(f"/jobs/{site.job_id}/download").text
+    served = fetch(site.browser, f"/jobs/{site.job_id}/download").text
     assert f"{CHECKED} on January 2, 2026." in served, served[-600:]
 
 
@@ -82,7 +83,7 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
         ]
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = True
-    assert 'alttext="' not in site.browser.get(f"/jobs/{site.job_id}/download").text
+    assert 'alttext="' not in fetch(site.browser, f"/jobs/{site.job_id}/download").text
 
     site.ctx.settings.mathml_alttext = True
     try:
@@ -90,7 +91,7 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
             job = session.get(Job, site.job_id)
             assert job is not None
             job.html_stale = True
-        served = site.browser.get(f"/jobs/{site.job_id}/download").text
+        served = fetch(site.browser, f"/jobs/{site.job_id}/download").text
         assert 'alttext="x equals 2"' in served
         token = csrf_from(site.browser.get(f"/jobs/{site.job_id}/review").text)
         contact = site.browser.post(
@@ -101,3 +102,63 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
         assert 'alttext="x equals 2"' in (site.job(site.job_id).html or "")
     finally:
         site.ctx.settings.mathml_alttext = False
+
+
+def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
+    """A stored page with no render version (made before pages carried one, or by an older
+    release) is made again from the stored result when it is next opened, once, and the
+    stored checks become those of the new page."""
+    import re
+
+    from readablestem.pipeline import assemble, html_checks
+    from readablestem.web import output
+
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None and not job.html_stale
+        job.html = re.sub(r'<meta name="readablestem-render"[^>]*>\n', "", job.html or "")
+        assert assemble.render_version(job.html) == 0
+        job.result_json = {**(job.result_json or {}), "html_checks": []}
+    first = site.browser.get(f"/jobs/{site.job_id}/view").text
+    assert assemble.render_version(first) == assemble.RENDER_VERSION
+    stored = site.job(site.job_id)
+    # The view of a draft carries the draft banner as it leaves; the stored page never does.
+    assert assemble.DRAFT_STATE_META not in (stored.html or "")
+    assert first == output.marked(stored.html or "", output.export_state(stored))
+    checks = DocumentResult.model_validate(stored.result_json).html_checks
+    assert checks == html_checks.static_checks(stored.html or "")
+
+    # A page at the current version is served as it is stored: no second render.
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None
+        job.html = (stored.html or "").replace("</main>", "<p>Stored as it was.</p></main>")
+    assert "Stored as it was." in site.browser.get(f"/jobs/{site.job_id}/view").text
+
+
+def test_an_older_page_that_cannot_be_made_again_is_served_as_it_is_stored(site, monkeypatch):
+    """A release must not turn a document that could be opened into an error: when the new
+    renderer fails on a stored result, the page the older renderer made is still served."""
+    import re
+
+    from readablestem.web import review
+
+    def fails(*args, **kwargs):
+        raise ValueError("the new renderer cannot read this stored result")
+
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None and not job.html_stale
+        job.html = re.sub(r'<meta name="readablestem-render"[^>]*>\n', "", job.html or "")
+        job.html = job.html.replace("</main>", "<p>Stored as it was.</p></main>")
+    monkeypatch.setattr(review, "rerender_job_html", fails)
+
+    answer = site.browser.get(f"/jobs/{site.job_id}/view")
+
+    assert answer.status_code == 200 and "Stored as it was." in answer.text
+    # A page a review write made out of date has no stored page to fall back to: it fails.
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None
+        job.html_stale = True
+    assert site.browser.get(f"/jobs/{site.job_id}/view").status_code == 500

@@ -21,7 +21,6 @@ Nothing from the crop or the LaTeX is logged.
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import threading
@@ -34,6 +33,7 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 
 from readablestem.config import ConfigError, Settings
+from readablestem.core.images import open_within_budget
 from readablestem.models.math_readers.base import (
     Candidate,
     ReaderCall,
@@ -100,9 +100,9 @@ def preprocess(png: bytes) -> np.ndarray:
     is at most 448 (bicubic), grayscale, normalised, padded to 448 x 448 on the right and
     bottom. Shape (1, 1, 448, 448), float32. Raises `ValueError` for an unreadable image."""
     try:
-        with Image.open(io.BytesIO(png)) as opened:
+        with open_within_budget(png) as opened:
             rgba = opened.convert("RGBA")
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
         raise ValueError("image could not be read") from exc
     # Transparent pixels become white, as on paper.
     white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))

@@ -59,6 +59,7 @@ def cmd_rows(args: argparse.Namespace) -> int:
     from readablestem.config import Settings
     from readablestem.core.types import Kind
     from readablestem.eval.answers import answer_key, load_rows
+    from readablestem.models.question import legacy_key
     from readablestem.pipeline import image_page, layout
 
     if args.prompt:  # the prompt an arm was recorded with, when it is not the packaged one
@@ -93,7 +94,10 @@ def cmd_rows(args: argparse.Namespace) -> int:
             png = layout.render_page(
                 pdf, page, dpi=settings.image_pages_dpi, max_side_px=image_page.MAX_SIDE_PX
             )
-            row = answers.get(answer_key(settings, image_page.build_request(settings, png)))
+            asked = image_page.build_request(settings, png)
+            row = answers.get(
+                answer_key(settings, asked, image_page.ImagePageOutput)
+            ) or answers.get(legacy_key(settings, asked))  # a file recorded before key 2
             if row is None or row["payload"] is None:
                 continue
             output = image_page.ImagePageOutput.model_validate(row["payload"])

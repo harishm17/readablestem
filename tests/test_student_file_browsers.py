@@ -26,7 +26,7 @@ from readablestem.pipeline.export_canvas import export_canvas
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")
 
-DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "demo" / "index.html"
 ENGINES = ["chromium", "firefox", "webkit"]
 WIDTHS = [1280, 375]
 

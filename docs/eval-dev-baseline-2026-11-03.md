@@ -49,10 +49,10 @@ that were not found, and 90 (3.8 per 100) are inline spans cut at the wrong edge
 - **Chatbots.** `chatbot-opus-purdue` (6 papers) and `chatbot-haiku-purdue` (25 papers), recorded
   2026-10-21 and re-scored from their recorded answers by today's converter (`--rescore-chat`), so every
   arm is scored by one converter. No chatbot was asked anything.
-- **Readings.** Reading B (`--reading cells`): the maths cells of a rebuilt table count as equations, as
+- **Readings.** Reading B (`--reading cells`): the math cells of a rebuilt table count as equations, as
   a chatbot's HTML is read; this is the primary here, as in docs/eval-equation-round5.md. Reading A is
   the registered table reading (the table is one element; ReadableSTEM does not get credit for cell
-  maths). Notation-neutral (`--neutral`, upright-word commands folded on both sides) and spoken-equal
+  math). Notation-neutral (`--neutral`, upright-word commands folded on both sides) and spoken-equal
   (`--spoken`, exploratory: an aligned equation is also right when ReadableSTEM's speech says prediction
   and gold alike; docs/eval-equation-round5.md) are applied to every arm.
 
@@ -81,7 +81,7 @@ All 25 papers (2,350 gold, 114 pages); Opus is 6 papers (546 gold, 27 pages).
 required decision; the chatbots ask nobody about anything, so every wrong aligned equation of theirs is
 unasked. Detection and the cost rows do not depend on the reading. Under reading A, ReadableSTEM's
 exact_lenient is 0.703 [0.636, 0.759] and detection recall 0.825 [0.751, 0.884], because a table's cell
-maths is not credited; the chatbots' numbers are the same under both readings.
+math is not credited; the chatbots' numbers are the same under both readings.
 
 ### On the 6 papers all three arms ran on (546 gold, 27 pages)
 
@@ -154,7 +154,7 @@ Display 197, 0.503; inline 2,153, 0.756; single symbol 608, 0.715; research pape
 
 - **Span.** ReadableSTEM's 102 span failures (90 in running text, 12 in tables and figures) are 65 cut too
   long and 37 cut too short. The chatbots' are almost all too long (Opus 18 of 19 on its 6 papers).
-- **Short inline maths.** ReadableSTEM does not find 70 single symbols and 55 two-or-three-symbol
+- **Short inline math.** ReadableSTEM does not find 70 single symbols and 55 two-or-three-symbol
   expressions in running text. The Haiku chatbot misses 81 and 40.
 - **Tables and figures.** 99 of the 223 table equations and 32 of the 177 figure equations are not found
   at all; 22 table equations are found and read wrong. Opus on its 6 papers misses 20 of 82 table
@@ -346,7 +346,7 @@ uv run python scripts/dev_miss_places.py --part dev --tag base-0503
 ## Pipeline 0.5.7
 
 Added 2026-11-04. ReadableSTEM re-run on the 25 development papers at commit `c0b5b69` (the deploy of
-2026-11-03; pipeline 0.5.7: glyph spans #116, table-cell maths #120, short inline maths #124, TeX
+2026-11-03; pipeline 0.5.7: glyph spans #116, table-cell math #120, short inline math #124, TeX
 producer detection #129), tag `base-0507`, against the `base-0503` run of pipeline 0.5.3 and the recorded
 Opus and Haiku chatbot answers (all 25 papers, 114 pages, 2,350 gold; development part only, no held-out
 or fresh paper touched, no chatbot asked). Same flags, models, tooling, scorer and reading B as the
@@ -361,7 +361,7 @@ The same holds under the notation-neutral reading (+0.037, -0.023 to +0.107) and
 reading (+0.056, -0.013 to +0.139). Against Haiku the difference is +0.062 (+0.005 to +0.122, p = 0.077),
 as before. The change from 0.5.3 to 0.5.7 is +0.001 (-0.009 to +0.010, p = 0.852): the four fixes did
 not move the end-to-end score on this set. They moved table equations (86 to 95 right of 223) and
-slightly raised detection recall; they did not move short inline maths (125 to 122 missed), span edges
+slightly raised detection recall; they did not move short inline math (125 to 122 missed), span edges
 got a little worse (90 to 96 in running text), and equations wrong without being asked went from 9.5 to
 10.2 per 100 gold (+0.68, -0.09 to +1.84, p = 0.297).
 
@@ -446,7 +446,7 @@ and just excludes it under exact (+0.005).
 | figure (caption or panel) | 177 | 132 (134) | 4 | 8 | 0 | 1 | 32 (32) |
 
 Table equations are the one place the four changes show: 9 more right, 14 fewer not found, and 4 more
-found and read wrong. Short inline maths barely moved (125 to 122), running-text spans got 6 worse (90 to
+found and read wrong. Short inline math barely moved (125 to 122), running-text spans got 6 worse (90 to
 96), and the running-text right count is 4 lower. These are single-run differences of a few equations in
 2,350; one run each, so run-to-run variation of the models is not measured here.
 
@@ -473,7 +473,7 @@ uv run python scripts/dev_miss_places.py --part dev --tag base-0507
 ## Pipeline 0.5.8
 
 Added 2026-11-04. ReadableSTEM re-run on the 25 development papers at commit `d4f0023` (origin/main at
-the deploy; pipeline 0.5.8: tex2pdf/VTeX producer recognised as TeX, symbol-only table cells, column-clipped
+the deploy; pipeline 0.5.8: tex2pdf/VTeX producer recognized as TeX, symbol-only table cells, column-clipped
 cell crops), tag `base-0508`, against the `base-0507` run of pipeline 0.5.7 and the recorded Opus and Haiku
 chatbot answers (all 25 papers, 114 pages, 2,350 gold; development part only, no held-out or fresh paper
 touched, no chatbot asked). Same flags, models, tooling, scorer and reading B as the 0.5.7 section; intervals

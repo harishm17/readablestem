@@ -8,7 +8,7 @@
 
 ## Context
 
-PyMuPDF (`pymupdf`) is licensed AGPL-3.0 (or a commercial licence from Artifex). The
+PyMuPDF (`pymupdf`) is licensed AGPL-3.0 (or a commercial license from Artifex). The
 hosted beta runs it on a network service. The alternative was `pypdfium2` + `pdfplumber`
 (permissive), with lower parsing quality and more code.
 
@@ -19,7 +19,7 @@ combines MIT code with an AGPL library:
 
 - the app links to its complete source (this public repository) in every page footer
   (`SOURCE_URL`), satisfying the AGPL network-use source offer;
-- `THIRD_PARTY_NOTICES.md` names PyMuPDF and its licence;
+- `THIRD_PARTY_NOTICES.md` names PyMuPDF and its license;
 - anyone redistributing or hosting a modified version must comply with AGPL-3.0 for the
   combined work.
 
@@ -34,10 +34,10 @@ Drafted from what the repository shows; the author confirms or edits.
 - **Harder.** The AGPL applies to the hosted combination, so the complete source has to
   be offered to its users: the repository must be public (or the source offered another
   way) before the first outside user, and `SOURCE_URL` must point at the deployed commit.
-  A closed-source deployment would need Artifex's commercial licence or a replacement
+  A closed-source deployment would need Artifex's commercial license or a replacement
   library.
 - **When to revisit.** If a closed-source deployment is ever needed, or if PyMuPDF's
-  licence terms change (see the amendment below for PyMuPDF 2.0).
+  license terms change (see the amendment below for PyMuPDF 2.0).
 
 ## Amendment (2026-10-09): table detection with PyMuPDF Layout
 
@@ -55,7 +55,7 @@ read as display equations and blank ruled tables as figures. PyMuPDF's own
 2026-10-08 benchmark. The evaluation (the author's private research notes, which are not
 in this repository, so these numbers cannot be reproduced from here; their method is in
 `docs/tables.md`) compared six detectors and four structure
-recognisers that fit Cloud Run (1 vCPU, 1 GiB; the service has since moved to Railway, see
+recognizers that fit Cloud Run (1 vCPU, 1 GiB; the service has since moved to Railway, see
 ADR 0004).
 
 ### Decision
@@ -64,15 +64,15 @@ ADR 0004).
 - Find tables with **PyMuPDF Layout** (`pymupdf-layout==1.28.2`,
   `page.find_tables(union=True, refine=True)`): the only accurate detector measured that
   fits 1 vCPU and 1 GiB. It carries the same terms as PyMuPDF (AGPL-3.0 or Artifex
-  commercial), so the licence position above does not change in kind. The 1.28.2 licence
+  commercial), so the license position above does not change in kind. The 1.28.2 license
   was read from three primary sources (PyPI `License` field, the wheel's `COPYING`, the
   GitHub `LICENSE`); the PyPI classifier still says "Other/Proprietary", and earlier
-  releases were under a commercial or noncommercial licence. Archive that evidence.
+  releases were under a commercial or noncommercial license. Archive that evidence.
 - Arbitrate every proposed box before it claims any text (the Challenge measured a
   precision of 0.68 on real lab manuals without it): a ruled-grid or aligned-text-grid
   check, a dot-leader rule for tables of contents, bullet columns, diagram labels and
   drawings, and box extension along the rules for blank worksheet tables.
-- Recognise rows, columns and spans with **SLANet-plus** (Apache-2.0 weights, RapidTable's
+- Recognize rows, columns and spans with **SLANet-plus** (Apache-2.0 weights, RapidTable's
   Apache-2.0 pre- and post-processing vendored), compared with the drawn grid and
   PyMuPDF's grid; fill cells with the PDF's own words.
 - Run it all on `onnxruntime` (MIT), pinned to 1.31.x, with its thread pools sized to the
@@ -128,7 +128,7 @@ Drafted from what the repository shows; the author confirms or edits.
   real-document check in `docs/eval.md`, "Tables").
 
 
-## Addendum (2026-11-03): where the licence sentence appears
+## Addendum (2026-11-03): where the license sentence appears
 
 | Field | Value |
 |---|---|
@@ -145,8 +145,8 @@ every screen, including the review screen.
 
 ### Decision
 
-The licence stays as decided above: the code is MIT, and the hosted service is offered under
-AGPL-3.0 terms because it links PyMuPDF (option A; a commercial licence from Artifex or a
+The license stays as decided above: the code is MIT, and the hosted service is offered under
+AGPL-3.0 terms because it links PyMuPDF (option A; a commercial license from Artifex or a
 replacement library were not chosen). Only where the words appear changes:
 
 - The sentence ("The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the
@@ -159,9 +159,9 @@ replacement library were not chosen). Only where the words appear changes:
 
 ### Consequences
 
-- **Easier.** One place to keep the licence wording true; the footer is short.
-- **Harder.** A visitor sees the licence only by following the "Open source" link. The source
+- **Easier.** One place to keep the license wording true; the footer is short.
+- **Harder.** A visitor sees the license only by following the "Open source" link. The source
   offer itself is unchanged and still on every page, which a test checks
   (`tests/test_web_pages.py`).
 - **When to revisit.** If the "Source code" link is ever removed from a footer, or if the
-  licence terms change.
+  license terms change.

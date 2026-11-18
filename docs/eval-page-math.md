@@ -283,10 +283,10 @@ pipeline's own `unsupported` column cannot be computed for them). Chemistry: the
 every formula as `\ce{...}` (mhchem), which the proof's converter, the one it uses for
 ReadableSTEM's own LaTeX, cannot read, so its chemistry sections score near 0 (0 of 36 and 5 of 57
 aligned); the held-out run had the same convention (all three systems near 0.04 on chemistry).
-Without the two chemistry sections the comparison on the maths sections of slice B (3 sections,
+Without the two chemistry sections the comparison on the math sections of slice B (3 sections,
 359 gold equations, 37 pages) is:
 
-| Slice B, maths sections only | off | on | Haiku | Opus |
+| Slice B, math sections only | off | on | Haiku | Opus |
 |---|---|---|---|---|
 | primary `exact_lenient` | 0.749 | 0.738 | 0.730 | 0.738 |
 | symbols, credited | 0.919 | 0.928 | 0.969 | 0.975 |
@@ -306,7 +306,7 @@ the primary score (Opus 0.586, flag off 0.597, flag on 0.589 on slice B; Haiku 0
 on both slices), where the held-out run at 0.4.0 had a 12-point gap. This is consistent with the
 0.5.0 layout rules having closed most of it, as the analysis projected, but dev is not held-out
 and these pages are rendered clean; it is evidence that the gap is much smaller, not a
-measurement of it. Where the chatbots lead is the symbols-correct score on the maths sections (+5
+measurement of it. Where the chatbots lead is the symbols-correct score on the math sections (+5
 points: they find and read the nested fractions and stacked nuclides the text layer cannot give)
 and detection recall; where the pipeline leads is chemistry under the mhchem convention, wrong
 equations nobody is asked about (Haiku 14 to 17 per 100 against 4 for the pipeline; Opus 2.4, below
@@ -376,7 +376,7 @@ and measured (not done here); the extra inline equations are the part to weigh.
 | not worth it | the 55 single-glyph gold equations (a lone `×`); the page pass with a bigger model | 0 | the pass at medium already reads as well as the layout cuts, and a bigger model does not anchor what the text layer lacks |
 
 **(c) A fresh held-out run.** Two different questions. (1) Has the 0.5.0 layout closed the
-held-out gap? The dev result says the pipeline is level with the chatbots on maths, so the
+held-out gap? The dev result says the pipeline is level with the chatbots on math, so the
 registered comparison (ReadableSTEM -0.118 against Opus) is probably out of date. Re-recording
 ReadableSTEM at this commit on the 15 registered sections costs about $1 to $2 per run (only the
 crops that changed need new answers; the rest replay), $3 for two runs; those sections are no longer
@@ -403,7 +403,7 @@ of the experiment). Two of the failures it could not repair were fixed in layout
 2. **Nuclides in running text.** The mass number raised and the atomic number lowered before an
    element's symbol (`14C`, `235U`, `4 2 He`) were raised text; they are one inline run now, so the
    equation step reads them and the speech says "carbon 14, atomic number 6"
-   (`layout._nuclide_runs`). Two tests that pinned the old raised-text behaviour were rewritten.
+   (`layout._nuclide_runs`). Two tests that pinned the old raised-text behavior were rewritten.
 
 Layout alone on all 28 dev-v2 documents (`--fake`, no model): matched gold equations 1,524 to 1,535
 of 1,809; equations whose span text is within 0.99 of the gold 978 to 1,002 (Elementary Algebra

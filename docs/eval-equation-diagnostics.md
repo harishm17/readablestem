@@ -1,6 +1,6 @@
 # Equations on real papers: three diagnostics on the recorded runs (2026-11-02)
 
-Four measurements on what is already recorded (the fourth, D2, is the last section): why maths typed in a table cell is missed, whether the equations
+Four measurements on what is already recorded (the fourth, D2, is the last section): why math typed in a table cell is missed, whether the equations
 the pipeline misses or cuts wrongly carry glyph evidence its rules do not use, and why wrong equations with other
 symbols were not flagged for review. They read the recorded items of the real-world runs
 ([eval-realworld.md](eval-realworld.md), [eval-equation-round3.md](eval-equation-round3.md)), the cached gold and the
@@ -10,7 +10,7 @@ of the product.
 | Script | Question |
 |---|---|
 | `scripts/eq_diag_tables.py` | A gold equation typed in a table was not aligned to a prediction: was the table not found, rotated, its cell kept as text, or the equation placed elsewhere in the order? |
-| `scripts/eq_diag_glyphs.py` | Do undetected and span-wrong equations carry maths-font, italic-text-font or raised/lowered glyphs, and how common is each in the rest of the page? |
+| `scripts/eq_diag_glyphs.py` | Do undetected and span-wrong equations carry math-font, italic-text-font or raised/lowered glyphs, and how common is each in the rest of the page? |
 | `scripts/eq_diag_unflagged.py` | A wrong equation with other symbols was not a required decision: no text layer, no Unicode, or symbols the bag check does not count? |
 | `scripts/eq_oracle_agreement.py` | Would a second, independent whole-page reading (the recorded Opus chatbot answers) fix, flag or find our errors? See [D2](#d2-an-independent-whole-page-reading-the-recorded-chatbot-answers). |
 
@@ -24,8 +24,8 @@ of the product.
 
 - **Splits and runs** (gold equations): dev 2,350 (`rs-allow`), dev2 2,350 (`main0`), held-out 1,826 (`rs`), fresh 1,836
   (`fresh-on`), fresh2 1,639, fresh3 1,779, fresh4 1,600 (`after`). dev and dev2 are the same 25 papers with the gold made
-  again, so sums leave dev out (11,030 gold in the sums). The table reading is reading B (the maths cells of a rebuilt
-  table are equations). dev, held-out and fresh were run before the table step read maths cells, so their "no maths cell
+  again, so sums leave dev out (11,030 gold in the sums). The table reading is reading B (the math cells of a rebuilt
+  table are equations). dev, held-out and fresh were run before the table step read math cells, so their "no math cell
   read" counts describe those runs, not the current code. `--run PART=NAME` picks another run.
 - **Where a gold equation sits.** A gold record has its page and no coordinates, so each equation is found in the page's
   characters (PyMuPDF `rawdict`) by its text, after making a text layer and the gold write the same thing (asterisk
@@ -33,9 +33,9 @@ of the product.
   diagnostics look at every place and say how many there were. A text found only in part (a floor bracket drawn as a rule,
   a missing star) is a partial match. 11,030 gold: 1,100 missed table-typed equations located in 972 cases, 914 exactly.
 - **Layout** for D1 is `layout.analyze` with the table step's detection on, as deployed, run again on the cached PDFs
-  with the code in this branch (no model). It found 39 of the 40 tables that had a maths cell in the recorded runs.
+  with the code in this branch (no model). It found 39 of the 40 tables that had a math cell in the recorded runs.
 
-## D1: table-cell maths (1,504 table-typed gold; 1,100 missed in the sums)
+## D1: table-cell math (1,504 table-typed gold; 1,100 missed in the sums)
 
 Pooled over dev2, held-out, fresh, fresh2, fresh3, fresh4: of 1,504 gold equations typed in a table, 404 were aligned (275
 exactly right) and 1,100 were not. Each missed one has the first cause that fits:
@@ -46,8 +46,8 @@ exactly right) and 1,100 were not. Each missed one has the first cause that fits
 | Not in the text layer | 7 | 6 | 0 |
 | Rotated (a rotated page, or text not running left to right) | 273 | 273 | 0 |
 | Table not detected (the text is in the page, no table region holds it) | 99 | 94 | 42 |
-| Table detected, no cell of it became a maths cell | 282 | 72 | 10 |
-| Table detected, other cells of it read as maths, this one stayed text | 318 | 318 | 222 |
+| Table detected, no cell of it became a math cell | 282 | 72 | 10 |
+| Table detected, other cells of it read as math, this one stayed text | 318 | 318 | 222 |
 
 What the 1,100 are:
 
@@ -66,7 +66,7 @@ What the 1,100 are:
 Located equations with at least one character carrying the kind of evidence. "Some" is the upper bound (at some place the
 text is found), "every" the lower bound (at every place).
 
-| Group | n located | Any evidence, some / every | Maths font, some / every | Italic text font, some / every | Raised, some / every | Lowered, some / every |
+| Group | n located | Any evidence, some / every | Math font, some / every | Italic text font, some / every | Raised, some / every | Lowered, some / every |
 |---|---|---|---|---|---|---|
 | Undetected, running text | 802 | 70% / 45% | 57% / 41% | 7.7% / 3.7% | 13% / 7.7% | 26% / 15% |
 | Undetected, table cell | 811 | 92% / 87% | 91% / 86% | 1.1% / 0.2% | 15% / 14% | 8.9% / 6.5% |
@@ -76,13 +76,13 @@ text is found), "every" the lower bound (at every place).
 | Detected and right (control) | 6,833 | 96% / 72% | 92% / 70% | 12% / 4.0% | 21% / 15% | 44% / 31% |
 
 By font family, undetected running text (some / every): CMMI 38% / 31%, CMSY 18% / 16%, CMEX 3.0% / 0.6%, MSBM 0.9% / 0.9%,
-another maths font 14% / 5.7%.
+another math font 14% / 5.7%.
 
-Background: of the 1,146,894 characters of the same pages outside every gold equation, 4.1% carry some evidence (maths
+Background: of the 1,146,894 characters of the same pages outside every gold equation, 4.1% carry some evidence (math
 font 1.5%, italic text font 2.3%, raised 0.3%, lowered 0.4%).
 
 Span-wrong equations, looking only at the characters of the wrong edge (equations whose edge was found): of 251 cut short,
-in 182 (73%) the characters the span lacks carry maths-font, italic or script evidence; of 207 that ran on, in 103 (50%)
+in 182 (73%) the characters the span lacks carry math-font, italic or script evidence; of 207 that ran on, in 103 (50%)
 the extra characters carry no evidence at all (plain upright text).
 
 Located counts: 802 of 863 undetected running-text, 811 of 818 table cell, 533 of 543 figure or algorithm, 281 of 313 cut
@@ -192,7 +192,7 @@ counts for the inline gold equations: detection recall by gold length, precision
 inline equations), and span edges. An **edge error** is an aligned pair whose text layer differs from the gold in letters
 or digits (after folding the code points a text layer and a gold spell differently): letters or digits only the span has
 are "ran on", only the gold has "cut short". The 390 aligned pairs of dev2 below text-layer fidelity 0.99 are mostly a
-different print of the same maths (an accent the text layer has no glyph for, scripts in another order): 289 of the 390 are
+different print of the same math (an accent the text layer has no glyph for, scripts in another order): 289 of the 390 are
 "inside" and are not counted as edge errors. The rules are in docs/layout.md ("Inline span edges from glyphs"); the dev2
 errors were read to find them, the other four parts were only measured.
 
@@ -217,16 +217,16 @@ Other layout, 148 PDFs of `scripts/layout_identity.py` (the fixtures, `data/`, t
 before and after, no model): 146 identical, 2 different, both TeX papers of the table sets. `real-tables/2407.13734`: 197
 to 193 elements, because `x_{1:T}` is one formula (its `T` was an equation element of its own, with two more fragments, a
 paragraph's marker numbers shift); `real-tables-heldout/2311.16525`: `\sim 28%` keeps its percent sign. The letters and
-digits of every page are the same before and after, inline maths included (0 lost, 0 gained).
+digits of every page are the same before and after, inline math included (0 lost, 0 gained).
 
 What this does not show: no model reads the changed spans here, so whether the crop reading improves is the next run's
 question; the gold's edges are the authors' `$`, and about a dozen of the 82 remaining dev2 errors are an author setting a relation as text
 (`G = $6.6 \times 10^{-11}$`), which glyphs cannot tell from one formula; the nuclide rule (`^{20}\mathrm{Mg}` against
 `20Mg`) is a gold convention left as it is (about a dozen dev2 pairs).
 
-## Table-cell maths (T10, 2026-11-03)
+## Table-cell math (T10, 2026-11-03)
 
-`scripts/eq_span_edges.py` also counts the equations layout now makes of table cells (docs/tables.md, "Maths cells from
+`scripts/eq_span_edges.py` also counts the equations layout now makes of table cells (docs/tables.md, "Math cells from
 glyphs"): how many it predicts and how many align to a gold equation. Layout alone, no model; the cell equations are
 inline equation elements of the tables, aligned to the gold with every other equation. Gold typed in a float (a table,
 a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a table".
@@ -243,13 +243,13 @@ a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a
 Only dev2 was read to build the rule. Overall precision of the predicted inline equations falls on one part, fresh4
 (0.933 to 0.905), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
 plus-or-minus sign (`68.8$\pm$0.7`), so each cell is a formula for a reader and none for the gold; they are 39 of the 49
-unaligned cell equations of that part (33 of 58 predictions here). The cells have real maths glyphs (the sign is in a maths font): the precision is
+unaligned cell equations of that part (33 of 58 predictions here). The cells have real math glyphs (the sign is in a math font): the precision is
 against the gold's typing, not against what a reader needs. The other unaligned cell equations are a few per paper (a
 number with a star or a bracket: `6.09e-03⋆`, `Ca∗[-]`). A glyph now belongs to one cell and a cell is an equation only when its glyphs spell its own text (before: 73 cells on dev2, one
-with a glyph of its neighbour's `p<0.05` in `65.1±0.4p`).
+with a glyph of its neighbor's `p<0.05` in `65.1±0.4p`).
 
 Layout identity, 148 PDFs of `scripts/layout_identity.py`, before and after, no model: two differ, both TeX-made and both
-because their tables gain cell equations (`beamer_columns_table.pdf`: 6 equation elements for 6 of the table's 8 maths cells;
+because their tables gain cell equations (`beamer_columns_table.pdf`: 6 equation elements for 6 of the table's 8 math cells;
 `real-tables/2407.13734.pdf`: 4 elements). The comparison was made against a snapshot of the previous change taken before
 its edge rules were gated on a TeX producer, so a third PDF (`real-tables-heldout/2311.16525.pdf`) showed up too: its producer
 is not one `page_type.producer_hint` calls TeX, so the gate returns it to the main-branch output. No element lost, the letters
@@ -259,9 +259,9 @@ Not measured here: whether the equation step reads these cells right (it needs a
 checks and review as any inline equation), the cost (one model call per cell equation, at most 60 a table: the 307 cells
 of the five parts are about 3.6 a paper) and the effect on exact and spoken-equal scores.
 
-## Simple inline maths (2026-11-03)
+## Simple inline math (2026-11-03)
 
-The question: which short inline formulas do authors set in maths mode that the layout does not find, and does the
+The question: which short inline formulas do authors set in math mode that the layout does not find, and does the
 page carry glyph evidence that tells them from plain text? `scripts/eq_short_missed.py PART` takes the inline gold
 equations of at most 3 symbols outside floats that the layout alone does not find (125 of dev2's 2,153 inline gold after
 this change; 131 before) and says where their text stands and what the glyphs there are. dev2 (the one part the layout was read on to
@@ -270,13 +270,13 @@ write the rule):
 | What the layout has at that place | dev2 | What it says |
 |---|---|---|
 | inside a longer run | 50 | a span edge (the author typed `$n$/2` or `$a$ = 5`), not a missed formula |
-| plain text glyphs | 30 | `A`, `-`, `_{ex}`: nothing on the page says it was typed in maths mode |
+| plain text glyphs | 30 | `A`, `-`, `_{ex}`: nothing on the page says it was typed in math mode |
 | a number | 16 | `1`, `9`, `0.3`: the same |
 | not in any paragraph row | 16 | a display, a caption or a cell, or text that is not in a paragraph |
 | a number with a percent sign | 6 | `95%`, `3%`: set in the text font |
-| a maths glyph and a script | 3 | `4^{N}`, `^{-2}`: a unit exponent |
+| a math glyph and a script | 3 | `4^{N}`, `^{-2}`: a unit exponent |
 | partly in a run | 2 | `\text{Growth}_i` |
-| a maths glyph (a relation before a number) | 4 before the rule, 1 after | `\approx 0.14`, `\ge 2`; the one left is a lone vertical bar |
+| a math glyph (a relation before a number) | 4 before the rule, 1 after | `\approx 0.14`, `\ge 2`; the one left is a lone vertical bar |
 
 The other four parts, replay only, split the same way: plain text glyphs and numbers are most of what is missed (held-out
 64 and 12, fresh2 12 and 54, fresh3 9 and 6, fresh4 17 and 17), and the percent signs are 6, 9, 2 and 16. So the headroom
@@ -284,11 +284,11 @@ for a rule from glyph evidence is the 4 relation cases of dev2 and 3 in fresh4; 
 
 What was tried, by evidence, on dev2 with the precision of the predictions that carry it (aligned to a gold equation over
 predicted): a **number with a percent sign** (`95%` standing clear of words) predicted 20 and aligned 4, precision 0.20, and
-was left out. A **relation in a maths font before a number** (`\approx 0.14`, `\geq 90\%`, `\geq 2`) is kept: 3 new
+was left out. A **relation in a math font before a number** (`\approx 0.14`, `\geq 90\%`, `\geq 2`) is kept: 3 new
 predictions on dev2, 3 aligned; 3 new on fresh4, 3 aligned; none on held-out, fresh2 and fresh3. Numbers with units, equation
 references, bare numbers and an upright letter were not tried as rules because the accounting above shows no glyph for
-them. The evidence already in the layout, on dev2 after this change (`scripts/eq_span_edges.py` prints it): maths font or
-symbol 1,734 predicted, 1,588 aligned (0.916); italic variable in prose 77, 72 (0.935); table cell maths 73, 67
+them. The evidence already in the layout, on dev2 after this change (`scripts/eq_span_edges.py` prints it): math font or
+symbol 1,734 predicted, 1,588 aligned (0.916); italic variable in prose 77, 72 (0.935); table cell math 73, 67
 (0.918); italic variable with an operator 42, 32 (0.762); stacked fraction 23, 22; nuclide 23, 12 (0.522); bold letter in
 prose 14, 11; letter with a script 9, 8; **relation between operands 9, 1 (0.111)** and power of ten 4, 1 (0.250), the two
 weakest classes, not changed here. (The relation-before-a-number reason shows 9 predicted, 5 aligned: six of the nine
@@ -309,7 +309,7 @@ new fixture, `short_maths.pdf`, holds the three formulas and the text that looks
 with a unit, a citation, a figure and a page number, a list marker), none of which is taken. Not computed: exact and
 spoken-equal scores (a model reads the new spans) and what a model would read for them.
 
-What this says: the short maths that is missed is mostly maths the author typed and the page prints in the text font. A
+What this says: the short math that is missed is mostly math the author typed and the page prints in the text font. A
 rule that takes percentages, numbers with units or equation references would take every one of them in the document
 (precision 0.20 for the percent sign), so a person or a model that sees the page has to decide, as the page witness does
 ([eval-equation-round5.md](eval-equation-round5.md)); the glyphs cannot. A Tectonic-made PDF (`xdvipdfmx` producer) is not

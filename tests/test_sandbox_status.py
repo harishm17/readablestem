@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import pytest
 from sqlalchemy import select
 
-from fixtures.web.support import ALICE, WebEnv, csrf_from, login, make_pdf
+from fixtures.web.support import ADMIN, ALICE, WebEnv, csrf_from, login, make_pdf
 from readablestem.core import sandbox
 from readablestem.observability.logging import FIELDS_ATTR
 from readablestem.source import latexml
@@ -89,10 +89,10 @@ def test_a_probe_that_takes_too_long_is_a_timeout_and_a_failure():
     assert status.state == "timeout" and not status.allows_source()  # a late answer changes nothing
 
 
-# --------------------------------------------------------------------- start-up and /healthz/ops
+# --------------------------------------------------------------------- start-up and /admin/health
 
 
-def test_the_web_process_runs_the_probe_in_the_background_and_healthz_ops_shows_it(
+def test_the_web_process_runs_the_probe_in_the_background_and_admin_health_shows_it(
     tmp_path, monkeypatch
 ):
     from readablestem.ops import sandbox_probe
@@ -102,12 +102,14 @@ def test_the_web_process_runs_the_probe_in_the_background_and_healthz_ops_shows_
     monkeypatch.setattr(sandbox_probe, "probe", lambda **kw: release.wait(10) and report())
     env = WebEnv(tmp_path, sandbox_probe_at_startup=True)
     with env.running() as client:
+        env.allow(ADMIN, admin=True)
+        login(client, ADMIN)
         # The probe is still running: start-up and the health routes did not wait for it.
         assert client.get("/healthz").status_code == 200
-        assert client.get("/healthz/ops").json()["sandbox"]["state"] == "running"
+        assert client.get("/admin/health").json()["sandbox"]["state"] == "running"
         release.set()
         for _ in range(100):
-            shown = client.get("/healthz/ops").json()["sandbox"]
+            shown = client.get("/admin/health").json()["sandbox"]
             if shown["state"] != "running":
                 break
             time.sleep(0.05)

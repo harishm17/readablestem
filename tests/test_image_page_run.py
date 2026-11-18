@@ -5,15 +5,18 @@ of the display equations, the fallback to a kept image, the cost, and the output
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import pymupdf
 
 from image_page_support import block, cell, math, scan_pdf, text
 from readablestem.config import Settings
+from readablestem.core import triage
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
+from readablestem.ops.report import render_report
 from readablestem.pipeline import image_page, run
 
 
@@ -21,6 +24,7 @@ def settings(**kw: Any) -> Settings:
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
 
 
+DAY = date(2026, 11, 11)
 PAGE = {
     "blocks": [
         block("heading", level=1, runs=[text("Motion in one dimension")], y0=40, y1=80),
@@ -119,6 +123,14 @@ def test_a_scanned_page_becomes_elements_and_fixes_with_a_tier_each():
     # What a person must decide: the equation, both paragraphs (one holds maths) and the table.
     assert result.stats.required_decisions == 4
     assert result.stats.by_review["required"] == 4
+    # Every counter says the same four. The command's summary, the eval's review load and
+    # the weekly report once left out a page's paragraphs, which the review screen counts.
+    load = triage.review_load(result.fixes)
+    assert load.required_decisions == triage.required_decisions(result.fixes) == 4
+    assert load.required_by_kind["paragraph"] == 2
+    counts = {(kind, "decisions:required"): n for kind, n in load.required_by_kind.items()}
+    weekly = render_report(counts | {("job", "pages"): 1}, since=DAY, until=DAY)
+    assert "4 (4.00 per page)" in weekly
 
 
 def test_the_output_page_has_the_notice_and_the_original_page_to_open():

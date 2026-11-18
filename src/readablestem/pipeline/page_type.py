@@ -57,7 +57,7 @@ import re
 import statistics
 import time
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -257,6 +257,9 @@ SCANNED_PAGE = "scanned_page"
 HANDWRITTEN_PAGE = "handwritten_page"
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 UNREAD_PAGE = "unread_page"  # painted, but nothing could be read from it
+# Layout raised while reading the page (a bug, not a property of the page): kept as its image,
+# the other pages are read. Set by `layout._analyze_document`, never by `kept_reason`.
+PAGE_READ_FAILED = "page_read_failed"
 # Element reason of a handwriting region layout cuts out of a typed page.
 HANDWRITING_REGION = "handwriting"
 
@@ -315,6 +318,7 @@ class TextStats:
 @dataclass
 class InkStats:
     analysed: bool = True  # False: over the time budget or the item cap
+    out_of_time: bool = False  # ... and it was the time budget (`InkBudget`)
     over_cap: bool = False  # too many drawings to read at all (`too_complex`)
     paths: int = 0  # visible drawings
     marks: int = 0  # ... that are not only straight lines (a paper template's rules)
@@ -381,13 +385,21 @@ class PageTypeResult:
 
 
 class InkBudget:
-    """How long the ink analysis may still run for one document (C1.6)."""
+    """How long the ink analysis may still run for one document (C1.6): `INK_BUDGET_S`
+    unless given. `ran_out` says it was asked after that time, so something was left
+    unread; whoever made the budget says so in the conversion's facts
+    (`core.types.NotFinished`), because a slower machine reaches this and a faster one
+    does not."""
 
-    def __init__(self, seconds: float = INK_BUDGET_S) -> None:
-        self.deadline = time.monotonic() + seconds
+    def __init__(self, seconds: float | None = None) -> None:
+        self.deadline = time.monotonic() + (INK_BUDGET_S if seconds is None else seconds)
+        self.ran_out = False
 
     def left(self) -> bool:
-        return time.monotonic() < self.deadline
+        if time.monotonic() < self.deadline:
+            return True
+        self.ran_out = True
+        return False
 
 
 # ---------------------------------------------------------------------------- geometry
@@ -1204,8 +1216,12 @@ def ink_stats(
             stats.marks += 1
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_INK]) or []:
         stats.annot_strokes += len(annot.vertices or [])
-    if stats.items > INK_MAX_ITEMS or (budget is not None and stats.paths and not budget.left()):
+    if stats.items > INK_MAX_ITEMS:
         stats.analysed = False
+        return stats
+    if budget is not None and stats.paths and not budget.left():
+        stats.analysed = False
+        stats.out_of_time = True
         return stats
     if not stats.paths:
         return stats
@@ -1693,6 +1709,12 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     ):
         return UNREAD_PAGE
     return None
+
+
+def out_of_time(pages: Mapping[int, PageTypeResult]) -> list[int]:
+    """The pages whose ink was not analysed because the document's time for it had run out
+    (`InkBudget`), in page order. Such a page is typed without its ink."""
+    return sorted(number for number, page in pages.items() if page.ink.out_of_time)
 
 
 def reads_image(page: PageTypeResult | PageType) -> bool:

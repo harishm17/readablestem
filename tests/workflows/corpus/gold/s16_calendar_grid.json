@@ -1,0 +1,13 @@
+{
+ "id": "s16_calendar_grid",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Course Calendar"},
+   {"role": "heading", "text": "Course Calendar"},
+   {"role": "table", "text": "October Calendar Mon Tue Wed Thu Fri 1 2 3 Lab 1 4 7 8 Quiz 9 10 Lab 2 11 14 15 16 Midterm 17 18 21 22 Field trip 23 24 25 No class 28 29 30 Project due"},
+   {"role": "body", "text": "Labs meet in room L012. The midterm is held in the regular classroom."},
+   {"role": "dropped", "text": "Page 1 of 1"}
+  ]}
+ ]
+}

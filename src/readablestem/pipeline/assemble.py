@@ -70,6 +70,7 @@ from readablestem.pipeline import (
     figure_images,
     inline_text,
     navigation,
+    output_chars,
     table_html,
     table_math,
 )
@@ -86,6 +87,26 @@ from readablestem.pipeline.safe_html import split_tag as _split_tag
 # Class on every element whose text this module wrote (notes, labels, the about section);
 # the table serialiser marks a maths header's reading with it too.
 AUTHORED_CLASS = table_html.AUTHORED_CLASS
+
+# The version of the student file's making: raise it with any change to the sheet, the
+# markup, the student words or the speech rules. The page carries it in its head
+# (`RENDER_META`), and the web app makes a stored page again from its stored result when
+# the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
+# documents converted before it, not only new ones and ones somebody edits again.
+RENDER_VERSION = 3
+RENDER_META = "readablestem-render"
+_RENDER_LINE = re.compile(
+    r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
+)
+
+
+def render_version(html: str) -> int:
+    """The render version written in a stored page's head; 0 for a page made before pages
+    carried one."""
+    head = html[: html.find("</head>")] if "</head>" in html else html[:4096]
+    match = _RENDER_LINE.search(head)
+    return int(match.group(1)) if match else 0
+
 
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
@@ -133,12 +154,27 @@ FLAGGED_NOTE = (
     "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
     "instructor for a version you can read."
 )
+# The same for a LaTeX source, whose parts are shown as written, never as pictures.
+FLAGGED_NOTE_SOURCE = (
+    "Some parts could not be converted. They are shown as they were written in LaTeX, "
+    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
+    "instructor for a version you can read."
+)
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
+# A draft (`mark_draft`): a file that left the tool with decisions still open says so before
+# anything else, and its head says so to a program (SW21). An honesty claim: one string.
+DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'
+DRAFT_CLASS = "draft-mark"
 # The flag notes speak to students, as the about section does (UX review MF7): what is
 # missing, and whom to ask. Never reviewer wording ("review", "publishing").
 EQUATION_NOTE = (
     "This equation is shown as an image of the original, so screen readers cannot read "
     "it. Ask your instructor for a version you can read."
+)
+# The same for a formula of a LaTeX source, shown as it was written (no picture).
+EQUATION_WRITTEN_NOTE = (
+    "This equation is shown as it was written in LaTeX, so screen readers may not read it "
+    "well. Ask your instructor for a version you can read."
 )
 FIGURE_NOTE = (
     "This figure has no text description yet. Ask your instructor for a description of it."
@@ -164,6 +200,11 @@ KEPT_IMAGE_WORDS = {
         "This page is shown as a picture, so a screen reader cannot read it. Ask your "
         "instructor for a text version.",
     ),
+    "page_read_failed": (
+        "Page {page}: this page could not be read.",
+        "This page could not be read, so it is shown as a picture and a screen reader cannot "
+        "read it. Ask your instructor for a text version.",
+    ),
     "handwriting_on_page": (
         "Handwriting on page {page}, not converted to text.",
         "This is a picture of handwriting on the page, so a screen reader cannot read it. "
@@ -177,6 +218,13 @@ KEPT_IMAGE_WORDS = {
         "instructor for a text version.",
     ),
 }
+# A page kept as a picture because something painted on it was read into nothing (an
+# equation drawn with lines, F-451), when text was read from it too: its text has holes
+# ("Newton's second law of motion is ."), so a note opens that text and links to the
+# picture after it, and no reader meets a sentence with a gap unwarned (`_Renderer.lead`).
+UNREAD_PARTS_CLASS = "unread-parts-note"
+UNREAD_PARTS_NOTE = "Parts of this page could not be read and are missing from the text below."
+UNREAD_PARTS_LINK = "The page is shown as a picture after it."
 # Writing on a page converted from an image that the reading left out (`image_page_omission`).
 OMITTED_NOTE = (
     "This part of the page was not converted to text, so a screen reader cannot read it. Ask "
@@ -201,7 +249,9 @@ IMAGE_PAGE_CSS = """\
 }
 """
 # The about section names the pages kept whole as images.
-KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"})
+KEPT_PAGE_REASONS = frozenset(
+    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed"}
+)
 
 # Fix statuses whose proposal is not used: the original stays, flagged.
 NOT_CONVERTED = KEPT_ORIGINAL_STATUSES
@@ -389,7 +439,8 @@ def equation_alt(element: Element) -> str:
     PDF and not checked, so a student hears what the PDF says and how much to trust it;
     without usable text, "Equation (2.4), not converted" (the equation's number) or
     "Equation not converted". The text is whitespace-normalised and nothing else: nothing
-    is written that the PDF does not hold. Text that is empty, has no letter or digit, or
+    is written that the PDF does not hold. Text that is empty, has no letter or digit, holds
+    a character that is not text (a symbol font's glyph with no letter, `output_chars`), or
     is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
     exponents or several lines in the region, the marker says the text may run them
     together (EQUATION_FLAT_ALT_SUFFIX).
@@ -397,7 +448,8 @@ def equation_alt(element: Element) -> str:
     number = equation_number(element.equation_label)
     named = f"Equation ({number})" if number else "Equation"
     text = " ".join(_ALT_CONTROL.sub(" ", element.text or "").split())
-    if text and len(text) <= EQUATION_ALT_MAX_CHARS and any(c.isalnum() for c in text):
+    usable = any(c.isalnum() for c in text) and not output_chars.count(text)
+    if text and len(text) <= EQUATION_ALT_MAX_CHARS and usable:
         lead = f"{named}: " if number else ""
         flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
         return f"{lead}{text}{EQUATION_FLAT_ALT_SUFFIX if flat else EQUATION_TEXT_ALT_SUFFIX}"
@@ -694,6 +746,12 @@ class _Renderer:
     last_page: int | None = None
     footnote_ids: Collection[str] = ()
     noterefs: dict[str, str] = field(default_factory=dict)
+    # "pdf", or "latex" / "beamer" for a source (`DocumentResult.origin`): a source's
+    # original is its own text, shown as written, never a missing picture.
+    origin: str = "pdf"
+    # Pages kept as a picture for unread content whose text is written too: page -> the
+    # picture's element id, until the note that opens the page's text is written.
+    unread_parts: dict[int, str] = field(default_factory=dict)
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -730,6 +788,25 @@ class _Renderer:
         if not self.mark_pages or element.page == self.last_page:
             return ""
         return self.mark_for(element.page)
+
+    def lead(self, element: Element) -> str:
+        """What goes before a block that starts `element`: its page marker, and the note
+        that opens the text of a page kept as a picture for unread content."""
+        mark = self.page_mark(element)
+        picture = self.unread_parts.get(element.page)
+        if picture is None or picture == element.id:
+            return mark
+        del self.unread_parts[element.page]
+        link = (
+            f' <a href="#{_escape(picture)}">{UNREAD_PARTS_LINK}</a>'
+            if not any(c.isspace() for c in picture)
+            else f" {UNREAD_PARTS_LINK}"
+        )
+        return (
+            f'{mark}<p class="notice flag-note {UNREAD_PARTS_CLASS} {AUTHORED_CLASS}" '
+            f'role="note"><span class="flag-label">{KEPT_IMAGE_LABEL}</span> '
+            f"{UNREAD_PARTS_NOTE}{link}</p>"
+        )
 
     def marks_after(self, element: Element) -> str:
         """The markers of the pages a paragraph goes on over (`Element.last_page`), to write
@@ -809,7 +886,7 @@ class _Renderer:
         i = 0
         while i < len(ordered):
             if is_entry(ordered[i]):
-                mark = self.page_mark(ordered[i])
+                mark = self.lead(ordered[i])
                 entries: list[Element] = []
                 while i < len(ordered):
                     if is_entry(ordered[i]):
@@ -820,7 +897,7 @@ class _Renderer:
                 chunks.extend([*([mark] if mark else []), self.definitions(entries)])
                 continue
             if ordered[i].kind is Kind.LIST_ITEM:
-                mark = self.page_mark(ordered[i])
+                mark = self.lead(ordered[i])
                 items: list[Element] = []
                 inside: dict[str, list[Element]] = {}
                 while i < len(ordered):
@@ -838,7 +915,7 @@ class _Renderer:
                 continue
             chunk = self.render(ordered[i])
             if chunk:
-                if mark := self.page_mark(ordered[i]):
+                if mark := self.lead(ordered[i]):
                     chunks.append(mark)
                 chunks.append(chunk)
                 if after := self.marks_after(ordered[i]):
@@ -1039,7 +1116,8 @@ class _Renderer:
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
         original = self.original(element, self.image_alt(element, equation_alt(element))) + label
-        return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
+        note = EQUATION_NOTE if self.has_picture(element) else EQUATION_WRITTEN_NOTE
+        return self.flag_block(element, reason, original, "Not converted.", note)
 
     def picture_size(self, element: Element, png: bytes | None) -> str:
         """The `width` and `height` of a crop's `<img>`: a figure or table at its printed
@@ -1181,13 +1259,20 @@ class _Renderer:
         described = (fix.described or "").strip() if fix is not None else ""
         return described or default
 
+    def has_picture(self, element: Element) -> bool:
+        """The element's original is a picture (a crop), not a source's own text."""
+        return self.origin == "pdf" or element.id in self.crops
+
     def original(self, element: Element, alt: str) -> str:
-        """The crop as an <img>, or the extracted text when there is no image."""
+        """The crop as an <img>, or the extracted text when there is no image. A source's
+        text is its own, shown as written: no picture was ever missing."""
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
             size = self.picture_size(element, self.crops.get(element.id))
             return f'<img src="{src}" alt="{_escape(alt)}"{size}>'
         text = (element.text or "").strip()
+        if text and not self.has_picture(element):
+            return f'<p class="original-text">{_escape(text)}</p>'
         unavailable = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
         if text:
             return f'<p class="original-text">{_escape(text)}</p>{unavailable}'
@@ -1315,7 +1400,8 @@ def _about_section(
         origin, ABOUT_WORDING
     )
     what = f"{opening} {MATHS_NOTE}" if maths else opening
-    flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
+    flagged_words = FLAGGED_NOTE if origin == "pdf" else FLAGGED_NOTE_SOURCE
+    flagged_note = f"<p>{flagged_words}</p>\n" if flagged else ""
     if pages_line := kept_pages_note(kept_pages or []):
         flagged_note += f"<p>{pages_line}</p>\n"
     if converted := image_pages_note(image_pages or []):
@@ -1330,6 +1416,36 @@ def _about_section(
         f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
         f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
     )
+
+
+def draft_banner(open_decisions: int) -> str:
+    """The first words of a draft file: how many decisions are still open, and that it is
+    not for students (SW21)."""
+    many = "1 decision is" if open_decisions == 1 else f"{open_decisions} decisions are"
+    return f"Draft: {many} still open. Not for students."
+
+
+_HEAD_TAG = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
+_BODY_TAG = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+
+
+def mark_draft(html: str, open_decisions: int) -> str:
+    """`html` marked as a draft: the state in its head for programs, and the banner as the
+    first thing in its body, so it comes first in reading order and is said in words, not
+    colour alone. The Word, EPUB, Canvas and Cartridge files are made from the marked HTML,
+    so the banner is inside each of them as well. Without a `<head>` or `<body>` (a fragment)
+    the banner goes first."""
+    word, colon, rest = draft_banner(open_decisions).partition(":")
+    banner = (
+        f'<p class="{DRAFT_CLASS}" role="note" lang="en" style="border: 3px solid; '
+        f'padding: 0.75em 1em; margin: 0.5rem; font-size: 1.25em">'
+        f"<strong>{word}{colon}</strong>{_escape(rest)}</p>"
+    )
+    if head := _HEAD_TAG.search(html):
+        html = html[: head.end()] + DRAFT_STATE_META + html[head.end() :]
+    if body := _BODY_TAG.search(html):
+        return html[: body.end()] + banner + html[body.end() :]
+    return banner + html
 
 
 def _contact_sentence(contact: str | None) -> str:
@@ -1490,6 +1606,24 @@ def _without_dead_links(ordered: list[Element]) -> list[Element]:
     return out
 
 
+def _unread_parts(
+    ordered: list[Element], fixes: dict[str, Fix], placed: Collection[str]
+) -> dict[int, str]:
+    """Pages kept as a picture for unread content (`unread_page`) whose text is written too:
+    page -> the picture's element id. A page with no text of its own needs no note: its
+    picture and the picture's own note are all there is."""
+    pictures = {
+        e.page: e.id
+        for e in ordered
+        if e.kind is Kind.FIGURE
+        and (fix := fixes.get(e.id)) is not None
+        and fix.reason == "unread_page"
+        and fix.status in NOT_CONVERTED
+    }
+    texts = {e.page for e in ordered if e.id not in placed and e.id not in pictures.values()}
+    return {page: picture for page, picture in pictures.items() if page in texts}
+
+
 def _kept_prose(ordered: list[Element], fixes: dict[str, Fix]) -> list[Element]:
     """Text read from an image of a page that the reviewer chose to keep as the picture: the
     element is written as a kept image of its region (a figure with the reason
@@ -1587,10 +1721,12 @@ def render_html(
         pdf_pages=pdf_pages or {},
         mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
+        origin=origin,
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
     )
+    renderer.unread_parts = _unread_parts(ordered, first_fix, renderer.placed)
     body = renderer.fill_backlinks(renderer.render_all(ordered))
     kept_pages = [
         e.page
@@ -1634,7 +1770,7 @@ def render_html(
         )
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
-    return "\n".join(
+    page = "\n".join(
         [
             "<!doctype html>",
             f'<html lang="{_escape(_clean_lang(lang))}">',
@@ -1642,6 +1778,7 @@ def render_html(
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
+            f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",
@@ -1659,3 +1796,9 @@ def render_html(
             "",
         ]
     )
+    # No character that is not text reaches the student (`output_chars`): a marked gap in
+    # its place, which every output made from the page carries and Listen speaks.
+    gap = _authored_in_english(
+        f'<span class="flagged-inline {AUTHORED_CLASS}">{output_chars.UNREADABLE}</span>', lang
+    )
+    return output_chars.mark_html(page, gap)

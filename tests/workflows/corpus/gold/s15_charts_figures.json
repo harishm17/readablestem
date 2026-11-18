@@ -1,0 +1,26 @@
+{
+ "id": "s15_charts_figures",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Lab 5: County Data"},
+   {"role": "heading", "text": "Reading County Data: Charts and Tables"},
+   {"role": "body", "text": "The two figures below summarize the county data used in Lab 5. Read each caption first, then look at the axes before you read the values."},
+   {"role": "figure", "text": "Land cover by type (percent of county area)"},
+   {"role": "caption", "text": "Figure 1. Land cover in the county. Forest covers 42 percent of the area; grassland and cropland together cover 45 percent."},
+   {"role": "body", "text": "Forest and grassland together account for more than two thirds of the county. Urban land is the smallest category at five percent."},
+   {"role": "figure", "text": "Carbon dioxide at the monitoring station (ppm)"},
+   {"role": "caption", "text": "Figure 2. Carbon dioxide concentration at the county monitoring station, 2000 to 2025, in parts per million."},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Lab 5: County Data"},
+   {"role": "heading", "text": "Data behind the figures"},
+   {"role": "table", "text": "Table 1. Land cover and area Type Percent Area (square km) Forest 42 1,050 Grassland 27 675 Cropland 18 450 Wetland 8 200 Urban 5 125"},
+   {"role": "caption", "text": "Table 1. Land cover and area"},
+   {"role": "body", "text": "Question 1. Using Figure 2, estimate the change in carbon dioxide between 2000 and 2025 and express it as a percentage of the 2000 value."},
+   {"role": "body", "text": "Question 2. Which land cover types could be converted into one another by human activity within a decade? Explain."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

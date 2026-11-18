@@ -19,7 +19,8 @@ Child to parent, part 0 is JSON and the rest are raw bytes (images, crops): the 
 the process that reads the hostile file, so the parent never unpickles anything it sends.
 
 Child to parent `op`s: "model" (a `VisionRequest`'s fields; the images are the blobs),
-"verify", "progress", "stage", "cache_lookup", "cache_store" (each answered, by `id`),
+"verify", "progress", "stage", "cache_lookup", "cache_store", "cache_answer", "cache_keep"
+(each answered, by `id`),
 "observe" (a finished model call; not answered), and the last frame: "done" (the result as
 JSON, the crops as blobs) or "error" (a category, never an exception message: MuPDF's
 messages quote the PDF).
@@ -176,7 +177,10 @@ def error_from_wire(wire: ErrorWire) -> Exception:
 
 class Link:
     """The child's end: sends requests, and a reader thread hands each answer to the thread
-    that asked. If the parent goes away the child exits at once."""
+    that asked. If the parent goes away the child exits at once. If the parent sends a frame
+    that cannot be read (too large, not a message), the child says so with an `error` frame
+    of kind `link` and exits with `EXIT_BROKEN`: that is a fault of the pair, and it must not
+    look like the parent going away."""
 
     def __init__(self, sock: socket.socket) -> None:
         self._sock = sock
@@ -205,8 +209,12 @@ class Link:
                 if waiter is not None:
                     waiter[1].append(message)
                     waiter[0].set()
-        except Exception:
-            pass
+        except OSError:
+            pass  # the socket went with the parent: the same as the end of the stream
+        except Exception as exc:  # a frame this process cannot read: its type, never its text
+            with contextlib.suppress(OSError):
+                self.send({"op": "error", "kind": "link", "type": type(exc).__name__})
+            os._exit(EXIT_BROKEN)
         os._exit(EXIT_PARENT_GONE)
 
     def wait_for_init(self) -> dict[str, Any]:
@@ -341,6 +349,16 @@ class ProxyStepCache:
                 }
             )
 
+    def answer(self, key: str) -> dict[str, Any] | None:
+        try:
+            return self._link.call({"op": "cache_answer", "key": key})
+        except Exception:  # a miss, as the cache's own contract says
+            return None
+
+    def keep(self, key: str, row: dict[str, Any]) -> None:
+        with contextlib.suppress(Exception):
+            self._link.call({"op": "cache_keep", "key": key, "row": row})
+
 
 # --------------------------------------------------------------------------- the child
 
@@ -396,8 +414,10 @@ def _classify(exc: BaseException) -> dict[str, Any]:
         return {"kind": "config", "message": str(exc)}
     from readablestem.source.convert import SourceFailed
 
-    if isinstance(exc, SourceFailed):  # a category code, never the source's own words
-        return {"kind": "source", "code": exc.code}
+    if isinstance(exc, SourceFailed):
+        # A category code; the names that stopped it (files, commands) go to the job's
+        # `error_detail` for its owner's page, never to a log (web.worker).
+        return {"kind": "source", "code": exc.code, "detail": exc.detail}
     if isinstance(exc, UnknownModelError):
         return {"kind": "unknown_model", "message": str(exc)}
     text = str(exc).lower()
@@ -469,6 +489,7 @@ def _main(args: list[str]) -> int:
             "op": "done",
             "result": output.result.model_dump(mode="json"),
             "checks": [c.model_dump(mode="json") for c in getattr(output, "checks", [])],
+            "facts": output.facts.model_dump(mode="json") if output.facts else None,
             "crop_ids": list(output.crops),
         }
         blobs = list(output.crops.values())

@@ -5,7 +5,7 @@ Run: uv run python scripts/hero_assets.py            (crop, text layer, MathML, 
                                                        (also the maths-font subset)
 
 The hero shows one real equation of the demo, OpenStax Physics 2.3 (CC BY 4.0), page 3 of
-`web/static/demo/source.pdf`: equation 2.4 as the PDF has it, beside the converted page's live
+`web/demo/source.pdf`: equation 2.4 as the PDF has it, beside the converted page's live
 MathML, with the readings of both:
 
 - `hero/before.png`: the equation and its number cut from the PDF page at 4x (PyMuPDF; the box is
@@ -35,7 +35,7 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "src" / "readablestem" / "web"
-DEMO = WEB / "static" / "demo"
+DEMO = WEB / "demo"
 OUT = WEB / "static" / "hero"
 FONT_DIR = WEB / "static" / "vendor" / "fonts"
 FONT_SOURCE = FONT_DIR / "latinmodern-math.otf"

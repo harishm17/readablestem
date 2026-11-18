@@ -15,7 +15,10 @@ What this module does around pandoc:
   names nothing outside itself and cannot fetch anything (it has no sandbox mode on the
   distribution build, which reads its default styles from disk). The page-break markers are
   taken out (a Word document has its own pages). A long description (`<details>`) becomes
-  its heading line in bold and its paragraphs, in place after the figure. A WebP picture
+  its heading line in bold and its paragraphs, in place after the figure. `<main>` is
+  unwrapped: when a page has one, pandoc reads only what is inside it, which would leave out
+  a draft's banner and the student note "About this version" (a `<footer>` after `<main>`).
+  The skip link goes. A WebP picture
   becomes a PNG (Word cannot show WebP). The language and the title are set explicitly.
 - **The child.** A separate process in its own session with a minimal environment
   (`core.childenv`: no keys, no database URL), a private temporary directory, CPU, file-size
@@ -55,9 +58,10 @@ from pathlib import Path
 from xml.etree import ElementTree as ET  # only serialises what defusedxml parsed
 
 from defusedxml import ElementTree as SafeET
-from PIL import Image
 
 from readablestem.core.childenv import child_env
+from readablestem.core.images import open_within_budget
+from readablestem.pipeline import output_chars
 from readablestem.pipeline.export_canvas import _DATA_URI, _find, _Node, _parse, _write
 from readablestem.pipeline.export_epub import _HEADING, _LANGUAGE, _sanitise, _text
 
@@ -87,9 +91,17 @@ for _prefix, _uri in _NAMESPACES.items():
     ET.register_namespace(_prefix, _uri)
 
 
+# Parts of the Word file that hold no document text, left out of the character rule: the
+# list styles draw their bullets with Symbol and Wingdings glyphs at private-use code points
+# (U+F0B7, U+F0A7), as Word itself does; Word shows them as list markers, not as text.
+_STYLE_PARTS = frozenset({"word/numbering.xml"})
+
+
 class DocxExportError(ValueError):
     """The document cannot be written as a Word file. `code` is a short category (no
-    document text): `unavailable`, `failed`, `timeout`, `equations`, `invalid`."""
+    document text): `unavailable`, `failed`, `timeout`, `equations`, `invalid`,
+    `unreadable_character` (the built file holds a character that is not text,
+    `output_chars`: the page never holds one, so it is the export's own)."""
 
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -200,7 +212,7 @@ def _webp_to_png(root: _Node) -> None:
             continue
         try:
             raw = base64.b64decode(re.sub(r"\s+", "", match.group("data")), validate=True)
-            with Image.open(io.BytesIO(raw)) as picture:
+            with open_within_budget(raw) as picture:
                 buffer = io.BytesIO()
                 picture.convert("RGBA").save(buffer, "PNG")
         except (ValueError, OSError):
@@ -220,12 +232,19 @@ def _replace(node: _Node, replacement: list[_Node | str]) -> None:
 
 
 def _prepare(root: _Node) -> None:
-    """Page markers out; a long description's `<details>` as a bold line and paragraphs."""
+    """Page markers out; a long description's `<details>` as a bold line and paragraphs;
+    `<main>` unwrapped, because pandoc's HTML reader reads only what is inside `<main>` when
+    there is one (3.7.0.2), and the draft banner before it and the student note "About this
+    version" after it must be in the file; the skip link, which only a web page needs, out."""
     for node in list(root.walk()):
         if node.parent is None:
             continue
         marker = node.tag == "hr" and "doc-pagebreak" in node.attrs.get("role", "").split()
         if marker or (node.tag == "div" and "pagebreak" in node.classes()):
+            _replace(node, [])
+        elif node.tag == "main":
+            _replace(node, list(node.children))
+        elif "skip-link" in node.classes():  # a web page's link past its contents
             _replace(node, [])
         elif node.tag == "summary":
             strong = _Node("strong", {}, list(node.children))
@@ -380,4 +399,6 @@ def export_docx(
     data, (equations, pictures, tables, headers) = _rebuild(data, title)
     if equations != n_math:
         raise DocxExportError("equations")
+    if output_chars.count_in_zip(data, skip=_STYLE_PARTS):
+        raise DocxExportError("unreadable_character")
     return DocxExport(title, lang, data, equations, n_headings, pictures, tables, headers)

@@ -412,11 +412,6 @@ def process_tree(root: int) -> tuple[set[int], int]:
     return tree, sum(pages.get(pid, 0) for pid in tree) * page
 
 
-def group_rss_bytes(root: int) -> int:
-    """Resident memory, in bytes, of `root` and every descendant of it."""
-    return process_tree(root)[1]
-
-
 def _tree_tasks(pids: set[int]) -> int:
     """Tasks (threads count) of these processes, from /proc."""
     total = 0

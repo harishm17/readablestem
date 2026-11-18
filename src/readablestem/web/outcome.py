@@ -96,7 +96,7 @@ KEPT = "The HTML keeps their original images, marked “Not converted”."
 MODEL_OUTAGE = "model_outage"
 # Figures kept as images before any model work: never sent to the service.
 KEPT_IMAGE_REASONS = frozenset(
-    {"scanned_page", "handwritten_page", "unread_page", "handwriting_on_page"}
+    {"scanned_page", "handwritten_page", "unread_page", "page_read_failed", "handwriting_on_page"}
 )
 OUTAGE_REASONS = frozenset({"model_api_error", "model_timeout"})
 
@@ -144,6 +144,12 @@ FAILED_MESSAGES = {
     "converted or sent anywhere. Tell the person who runs this site.",
     "access_removed": "Your access to this tool was removed, so this document was not converted.",
     "page_too_large": "The PDF has a page that is too large to convert.",
+    "image_too_large": "The PDF has a picture that is too large to read. Nothing was converted. "
+    "Export the PDF again with its pictures at a normal size (300 dpi is plenty) and upload that.",
+    "content_too_large": "The PDF is too large to read: a page of it, or the file as a whole, "
+    "holds far more drawing instructions than a course document does. Nothing was converted. "
+    "Save it as a PDF again (Print to PDF makes a simpler file), or split it into parts, and "
+    "upload that.",
     "too_complex": "A page of this PDF has so many separate shapes that reading it takes more "
     "time or memory than a conversion may use. Nothing was converted. Export a simpler or "
     "flattened PDF, or split the page off and upload the rest.",
@@ -249,6 +255,7 @@ PAGE_WORDS = {
         "has drawings or writing this tool could not read",
         "have drawings or writing this tool could not read",
     ),
+    "page_read_failed": ("could not be read", "could not be read"),
 }
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 HIDDEN_FEW = 3  # pipeline.page_type.HIDDEN_FEW: hidden characters that count as a layer

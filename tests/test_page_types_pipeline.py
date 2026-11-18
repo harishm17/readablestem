@@ -216,6 +216,43 @@ def test_kept_pages_are_one_decision_per_reason_and_typed_pages_convert():
     assert result_outcome(result) == ("done", "pages_not_converted")
 
 
+@pytest.mark.parametrize("drawn", [True, False])
+def test_the_text_of_a_page_kept_for_unread_content_says_so_and_a_hole_fails_a_check(drawn):
+    """F-451: an equation drawn with lines and no font is read into nothing, so its sentence
+    has a hole ("... is ."). The page keeps its picture (here for the line plotted behind its
+    text); its text opens with a note linked to that picture, and a hole in that text is a
+    failed check. The control has the same page with nothing drawn in the sentence."""
+    from readablestem.pipeline.assemble import UNREAD_PARTS_NOTE
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    shape = page.new_shape()
+    shape.draw_polyline(
+        [(20 + 5.72 * t, 396 + 360 * math.sin(t / 100 * 3 * math.pi)) for t in range(101)]
+    )
+    shape.finish(color=(0.2, 0.4, 0.9), width=1.5)
+    before = "Newton's second law of motion is"
+    page.insert_text((72, 100), before, fontsize=11)
+    x = 72 + pymupdf.get_text_length(before, fontsize=11) + 3
+    if drawn:  # "F =" as lines, where the sentence has no text
+        for p, q in (((x, 100), (x, 92)), ((x, 92), (x + 5, 92)), ((x, 96), (x + 4, 96)),
+                     ((x + 8, 97), (x + 14, 97)), ((x + 8, 95), (x + 14, 95))):  # fmt: skip
+            shape.draw_line(p, q)
+        shape.finish(color=(0, 0, 0), width=0.7)
+    shape.commit()
+    after = ". It holds for any body we push." if drawn else "true for any body we push."
+    page.insert_text((x + 18 if drawn else x, 100), after, fontsize=11)
+    client = FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS))
+    result = convert_pdf(doc.tobytes(), settings=Settings(_env_file=None), client=client).result  # type: ignore[call-arg]
+    (kept,) = [f for f in result.fixes if f.reason == "unread_page"]
+    html = result.html
+    note = html.index(UNREAD_PARTS_NOTE)
+    assert note < html.index("Newton") < html.index(f'id="{kept.element_id}"')
+    assert f'href="#{kept.element_id}"' in html[note : html.index("Newton")]
+    failed = {c.code for c in result.html_checks if not c.passed}
+    assert ("sentence_hole" in failed) is drawn
+
+
 def test_a_short_note_under_a_title_with_a_hidden_layer_is_kept_never_described():
     # The routing change for a few curves under a title (diagram slides) must not send a
     # note with a recognition layer over it to the figure model.

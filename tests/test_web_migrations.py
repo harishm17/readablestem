@@ -208,7 +208,7 @@ FACTS_COLUMNS = {"open_decisions", "result_title"}
 SAMPLE_REVISION = "b1d5f7a29c46"  # the last of the jobs migrations
 SIGN_IN_REVISION = "5e2b8d70a3c1"
 LOGIN_LINK_ADDRESS_REVISION = "ecb0b22515e0"  # (tests/test_job_shares.py)
-KEEP_WEEK_DEFAULT_REVISION = "5d8e1f2a7c39"  # the head (tests/test_web_keep_default.py)
+KEEP_WEEK_DEFAULT_REVISION = "5d8e1f2a7c39"  # (tests/test_web_keep_default.py)
 SIGN_IN_TABLES = {"linked_emails", "login_links"}
 
 

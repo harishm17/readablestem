@@ -87,9 +87,9 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/style` (the design tokens and components; `noindex`, no data), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
 | Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` (CSRF-checked; sets the caller's own "keep 7 days by default" only), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages, including the owner-only `GET /uploads/{id}/preview`), everything under `/courses/...` (including `/courses/{id}/download`, and the CSRF-checked `POST /courses/{id}/starter` and `POST /courses/{id}/documents`, which touch only the caller's own course and documents) |
-| Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
+| Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare; production refuses a `CRON_TOKEN` shorter than 32 characters; wrong tokens count against the cron limit below) |
 
@@ -227,7 +227,7 @@ script injected into an app page is refused by the policy.
 | Page size | 5000 pt a side | probe |
 | Uploads in progress | 3 per instance, 1 per person; each is held in memory about three times over, so at most about 900 MB at the largest size (`MAX_LARGE_UPLOAD_MB`) | `UploadGate` |
 | Stored bytes per person | `STORAGE_PER_USER_MB` (300, invited) or `STORAGE_OPEN_TIER_MB` (250, open tier): everything they have stored (source PDFs, crops, results, kept large files) that is not past its deletion time, counted in the same transaction as the job with the person's row locked, so two uploads cannot both pass; a new upload that would go over is refused (413) with how much is used and to delete documents. The old worst case was 2.2 GB a person | `web/storage.py`, `web/intake.py`, `web/pending.py` |
-| Stored upload bytes, whole service | `STORAGE_GLOBAL_MAX_MB` (2000): over it new uploads get a plain 503 before the body is read, and `/healthz/ops` goes 503 naming `storage`, until the hourly purge has deleted enough | `web/storage.py`, `routes/jobs.py`, `web/health.py` |
+| Stored upload bytes, whole service | `STORAGE_GLOBAL_MAX_MB` (2000): over it new uploads get a plain 503 before the body is read, and `/healthz/ops` goes 503 (`/admin/health` names `storage`), until the hourly purge has deleted enough | `web/storage.py`, `routes/jobs.py`, `web/health.py` |
 | Files in one upload | 30 for invited people and pilots, 10 for an account made by open sign-up (`access.files_per_upload`, also the cap on documents waiting or converting); the request, files together, at most `MAX_LARGE_UPLOAD_MB` (100); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `web/access.py`, `routes/jobs.py` |
 | Zip of documents (`FEATURE_BATCH_ZIP`) | The zip rules of LaTeX source (20 MB, 500 entries, no links, absolute or `..` paths, nested zips, EPS or SVG, an extension allowlist) with one unpacked budget per request (twice the upload limit, shared by all its zips), the documents read one at a time and a PDF over the upload limit refused unread (docs/web.md, "memory, per request"); a member that does not read, or a header that lies about its size, is a refusal; each document is then held to every control an upload has; the zip counts once for the upload rate limit | `web/batch_intake.py`, `web/archive_intake.py` |
 | Large files kept for choosing their pages | 2 per person, up to 100 MB and 500 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
@@ -272,7 +272,7 @@ cannot see the live header; the log line is the only live check.
 
 ### Running uploaded TeX (sandbox)
 
-A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`, on in production since 2026-11-04)
+A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`; production's value is in `src/readablestem/ops/production.profile.toml`)
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
 application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
 folder writable, a new network namespace (no network), a new pid namespace that dies with the
@@ -432,7 +432,7 @@ What the two layers cover:
   `can_landlock_restrict_self`, `can_no_new_privs`, `can_seccomp_syscall`, `can_seccomp_prctl`
   and `can_prlimit_self`, each `yes` or `no` with `can_<name>_errno=`. All are information: they
   change nothing about what the sandbox allows or what the probe requires, and they go to the
-  log line and to `/healthz/ops` with the other checks.
+  log line and to `/admin/health` with the other checks.
 - **Probe.** `backend=bwrap|landlock`, and from inside the sandbox that `/etc/passwd`,
   `/etc/shadow` and `/app` cannot be read, `/proc/1/environ` and the parent's are unreadable, a TCP
   connect fails, nothing beside the job's folder can be written, a denied call answers `EPERM`
@@ -550,6 +550,71 @@ exception or a hang. File names are reduced to a plain base name (control and bi
 characters dropped, 200 characters), are shown only to their owner, escaped, and never reach
 a header or a log.
 
+### Pixel budget
+
+A small file can hold a huge picture: a one-color canvas of 20,000 x 20,000 pixels is a few
+hundred bytes in a PDF and takes seconds and hundreds of megabytes to decode. Every place
+that decodes an image reads its width and height first (the PNG or image header with Pillow,
+the PDF object's `Width` and `Height` with MuPDF) and does not decode one over
+`core.images.MAX_IMAGE_PIXELS` (40 million): the layout step treats it as "not plain" and
+keeps the picture, the figure and image-page steps leave the image as it is, and the docx
+export and the proof replay skip it. The sites are `pipeline/layout.py`,
+`pipeline/image_page.py`, `pipeline/image_page_check.py`, `pipeline/figure_images.py`,
+`pipeline/export_docx.py`, `source/figures.py`, `models/images.py`,
+`models/math_readers/local_reader.py`, `proof/replay.py` and `eval/invented/figures.py`; new
+code opens images through `core.images.open_within_budget`. In the layout step a page's
+picture list is read once per document (a picture shown on every page is decoded or hashed
+once, not once per page), and the time spent decoding is summed against `DECODE_BUDGET_S`
+(30 s); over it the job fails with `image_too_large`. The upload probe refuses a PDF whose
+embedded picture is over `MAX_UPLOAD_IMAGE_PIXELS` (100 million, above a 600 dpi A3 scan)
+with the same code (422), before any quota is spent.
+
+### Content budget
+
+A page's drawing instructions are compressed in the file and inflated every time MuPDF
+reads the page, and every step that reads it (the upload probe's text pass, the layout,
+the crash probe, the tagged-structure and page-type reads) parses all of them again. A
+260 KB file can hold a page that inflates to 256 MB: before the budget it took 6.8 s of the
+upload request and 24 s of the worker, and the time grows with the inflated size.
+`core/content_budget.py` counts, before anything parses a page, how far each page's content
+inflates: its content streams (one or an array) and every stream they draw (form XObjects,
+tiling patterns, Type3 glyph procedures, annotation appearances, followed through their
+resources; a stream drawn twice on a page counts once, a stream shared by pages once for the
+document, and forms that draw each other in a loop are followed once). Each stream is read
+through MuPDF's own decoders, so every filter MuPDF applies counts (Flate, LZW, RunLength,
+ASCII85 and ASCIIHex, chains of them, and the decryption of a file with only an owner
+password), and its output is skipped in 1 MB steps and never kept: counting stops one byte
+past the budget. The object streams are counted the same way, from the cross-reference
+entries alone, before the page tree is read, since reading it loads them.
+
+The budgets are 32 MiB for a page and 128 MiB for a document, about ten times the largest
+measured in the development corpus on 2026-11-11 (3.0 MiB on a page, 9.9 MiB in a document;
+the reasoning is beside the constants). Over either, the upload probe refuses the file with
+`content_too_large` (422), before any quota is spent (the 256 MB page is refused in 0.36 s,
+most of it the child process starting). `layout.analyze` checks the pages it is given the
+same way before any step reads them, so a job, `readablestem convert` and the evals stop
+with the same code whatever the file passed before, and a PDF figure of a LaTeX project over
+the page budget is left without a picture (`source/figures.py`).
+
+Not bounded by it: how many times a page draws the same form. A form is counted once per
+page, but each `Do` runs it again: a 1.9 KB file whose page draws a 1 MB form 300 times is
+taken, and the upload probe spends 4.9 s on it (2026-11-11). Bounding it needs the drawing
+operators counted, which means scanning the page's content for them; until then the
+probe's 30 s limit and the job's time limit are what stop a larger one.
+
+### Hostile-input set
+
+`tests/workflows/hostile_set.py` lists 36 files made to hurt the app (oversized pages and
+pictures, page counts, broken and encrypted PDFs, scripts and markup planted in text,
+properties and links, text that instructs a model, zips that leave their folder or lie
+about their size, LaTeX that loops or reaches for a file of the host) with the one way each
+must end, and `tests/workflows/test_wf49_hostile_input.py` runs them through the app under
+production's size limits, the LaTeX ones under bubblewrap and under Landlock (docs/eval.md,
+"The hostile-input set").
+
+The set found one missing limit, on how far a page's content inflates (F-559): its file is
+now refused at upload by the content budget (above).
+
 ### Output escaping
 
 Jinja autoescape is on for every template. Everything a model or a PDF controls and that
@@ -582,7 +647,7 @@ a wrong alt text or equation, which the instructor reviews.
   download, failure and deletion and finds the markers in no log record, stdout line, cookie,
   response header, event, aggregate or quota row. `test_web_ops.py` does the same for logs
   alone.
-- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person ticks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
+- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person checks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
   answers 404 immediately, and the hourly purge (cron, with the worker as a backstop) deletes
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
@@ -615,7 +680,7 @@ a wrong alt text or equation, which the instructor reviews.
 | Recipient | What | How long |
 |---|---|---|
 | Railway (the web service, Railway Postgres and the `backup` volume) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups up to about a week more |
-| The model provider (`MODEL_PROVIDER`; production runs Anthropic) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
+| The model provider (`MODEL_PROVIDER`; production's is in `src/readablestem/ops/production.profile.toml`) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
 | A handwriting reader (`MATH_READER_CLAUDE_ENABLED`, `MATH_READER_OPENAI_ENABLED`; off; the pipeline calls one only when `IMAGE_PAGES_SECOND_READER` names it, and in the hosted conversion child only the local reader can run) | One tight crop of an expression, no text | Anthropic: deleted within 30 days (longer if flagged). OpenAI: sent with `store=False`. Turning one on can add a recipient to this table and to the privacy page (`docs/math-readers.md`). The local reader (`MATH_READER_LOCAL_ENABLED`) runs in the conversion child, sends nothing and adds no recipient |
 | Langfuse (only if tracing is on) | Timings, model names, token counts, costs, error categories, random ids; payloads are masked | Set in the Langfuse project |
 
@@ -652,7 +717,7 @@ have regression tests; 7 to 9 are wording.
 Checked and found sound (tests added as regression guards, no code change): headers on
 every response kind; CSRF on every state-changing route; owner checks and IDOR on all 29
 routes that take an id; admin routes; session fixation and cross-copy sign-out; dev login in
-production; Microsoft tenant and Google allowlist behaviour; size, page and probe limits
+production; Microsoft tenant and Google allowlist behavior; size, page and probe limits
 including a 1 GiB decompression bomb; hostile PDFs; file name handling; escaping of every
 model and PDF field; no document content in logs, events, aggregates, cookies or headers;
 the retention clock and erasure; no 500 for junk in any parameter of any route.
@@ -680,7 +745,7 @@ Triage of what the scanners reported:
 | B105 / S105 hardcoded password (13) | `pipeline/vendor/rapid_table.py`, `core/notation.py`, `web/compare.py`, others | False positives: variables named `token` that hold text tokens, and the OAuth `code_challenge_method` constant |
 | B311 / S311 `random` (6) | evaluation sampling, retry back-off in `models/openai_client.py` | False positives: no token, id or secret is made with `random` (ids use `uuid4`, tokens use `secrets`) |
 | B101 / S101 `assert` (5) | exception-handler type narrowing | False positives: not used for authorisation or validation |
-| semgrep `plaintext-http-link` (2) | `static/demo/index.html` | False positive: the Creative Commons licence link inside the OpenStax attribution the licence requires; a link, not a resource |
+| semgrep `plaintext-http-link` (2) | `web/demo/index.html` | False positive: the Creative Commons license link inside the OpenStax attribution the license requires; a link, not a resource |
 
 ## Residual risks, accepted for the beta
 
@@ -697,8 +762,7 @@ Triage of what the scanners reported:
   internet. The sandbox contains it; a flaw in bubblewrap or in the kernel's namespaces is not
   prevented by anything here. The lint is not a defence. The image has the distribution's LaTeXML, so
   a security update of it arrives with the next build (`apt`, not pinned).
-- `/healthz/ops` is public and has no rate limit: it reads two rows, a sum of stored sizes and the last sandbox probe result (`sandbox`: check names and one-word answers), and answers with at most the
-  words `backup`, `cron`, `storage` or `database`, and the stored and allowed megabytes (totals, no names). Scheduled-task failures are found by a GitHub Actions job
+- `/healthz/ops` is public and has no rate limit: it reads two rows and a sum of stored sizes, and answers with the status word `ok` or `stale` and nothing else (no task name, no count, no path, no version). Which task is late, the stored and allowed megabytes and the last sandbox probe result (`sandbox`: check names and one-word answers) are admin only (`/admin/health`, the admin page), so an outside reader learns neither which isolation layers exist nor when a backup stopped. Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.

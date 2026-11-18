@@ -74,6 +74,7 @@ from readablestem.web import (
     listen,
     notation,
     notice_places,
+    outcomes,
     page_edits,
     shares,
 )
@@ -100,6 +101,7 @@ from readablestem.web.messages import (
     explain_check,
     explain_reason,
     severity_label,
+    source_item_notes,
 )
 from readablestem.web.page_edits import StructureChange
 from readablestem.web.review import (
@@ -143,11 +145,18 @@ from readablestem.web.review import (
     kind_for_slug,
     needs_attention,
     next_to_review,
+    reject_keeps,
     restorable,
     review_anchor,
     undo_last,
 )
-from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done, restart_owner_clock
+from readablestem.web.routes.jobs import (
+    NOT_FOUND,
+    element_ref,
+    job_access,
+    require_done,
+    restart_owner_clock,
+)
 from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
@@ -251,6 +260,16 @@ OTHER_WORDS = RejectWords(
 )
 
 
+# A formula of a LaTeX source with no picture to keep (`web.review.reject_keeps`): its
+# LaTeX stays as it was written, marked for a later look.
+AS_WRITTEN_WORDS = RejectWords(
+    "Leave as written",
+    "Students see the LaTeX as it was written, marked “Not converted”.",
+    "Left as written, marked “Not converted”.",
+    "Left as written by you",
+)
+
+
 # A page (or handwriting) kept as an image before any model work (pipeline.page_type).
 KEPT_IMAGE_WORDS = RejectWords(
     "Keep as image",
@@ -260,27 +279,32 @@ KEPT_IMAGE_WORDS = RejectWords(
 )
 
 
-def reject_words(kind: Kind, element: Element | None, fix: Fix | None = None) -> RejectWords:
+def reject_words(
+    kind: Kind, element: Element | None, fix: Fix | None = None, origin: str = "pdf"
+) -> RejectWords:
     """What rejecting does here. A heading becomes a paragraph, bold when its line is
-    bold in the PDF (as `assemble` writes it); a page kept as an image stays one."""
+    bold in the PDF (as `assemble` writes it); a page kept as an image stays one; a source's
+    formula with no picture stays as written."""
     if fix is not None and is_kept_image(fix):
         return KEPT_IMAGE_WORDS
+    if fix is not None and reject_keeps(origin, fix, element) == "written":
+        return AS_WRITTEN_WORDS
     if kind is Kind.HEADING:
         return BOLD_TEXT_WORDS if element is not None and element.bold else PLAIN_TEXT_WORDS
     return REJECT_WORDS.get(kind, OTHER_WORDS)
 
 
-def status_words(fix: Fix, element: Element | None) -> str:
+def status_words(fix: Fix, element: Element | None, origin: str = "pdf") -> str:
     """The item's state in words, a reviewer's "Reject" named for what it did."""
     if fix.status is Status.REJECTED:
-        return reject_words(fix.kind, element, fix).state
+        return reject_words(fix.kind, element, fix, origin).state
     return fix_status_label(fix)
 
 
-def done_message(change: ReviewChange, element: Element | None) -> str:
+def done_message(change: ReviewChange, element: Element | None, origin: str = "pdf") -> str:
     """What the notice after one decision says (content-free: it lives in the session)."""
     if change.action == "reject":
-        return reject_words(change.fix.kind, element, change.fix).done
+        return reject_words(change.fix.kind, element, change.fix, origin).done
     if change.action == DESCRIBE and not change.fix.described:
         return DESCRIPTION_REMOVED
     if change.anyway:
@@ -386,7 +410,7 @@ def stale_notice(
             fix.element_id, f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
         )
         element = next((e for e in result.elements if e.id == target), None)
-        now = f"{label} is now: {status_words(fix, element).lower()}."
+        now = f"{label} is now: {status_words(fix, element, result.origin).lower()}."
     kept = any((value or "").strip() for value in (typed or {}).values())
     message = f"{STALE_MESSAGE} {STALE_KEPT}" if kept else STALE_MESSAGE
     return StaleNotice(STALE_TITLE, message, now, href, kept)
@@ -468,6 +492,11 @@ class ReviewItem:
     # A page (or handwriting) kept as an image (`web.review.is_kept_image`): its card says
     # what it is now and offers no figure form (its one decision is the page group's).
     kept_image: bool = False
+    # A source job: what LaTeX reported about this item, named (`messages.source_item_notes`):
+    # the picture a figure asked for, the undefined commands in a formula. Owner's pages only.
+    source_note: str = ""
+    # "Reject" keeps something (`web.review.reject_keeps`): not offered where it keeps nothing.
+    can_reject: bool = True
     kept_state: str = ""  # what students get, once decided
     # "Describe it in words" (T3-16): offered on an item kept as an image; what it replaces.
     can_describe: bool = False
@@ -623,6 +652,16 @@ PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
             "from it, so a student using a screen reader hears only that for the rest.",
             "In the HTML each page is an image marked “Not converted”, after any text read "
             "from it, so a student using a screen reader hears only that for the rest.",
+        ),
+    },
+    "page_read_failed": {
+        "title": ("Page that could not be read", "Pages that could not be read"),
+        "lead": ("{pages} could not be read.", "{pages} could not be read."),
+        "explain": (
+            "The rest of the document was read. In the HTML the page is an image marked "
+            "“Not converted”, so a student using a screen reader hears only that for it.",
+            "The rest of the document was read. In the HTML each page is an image marked "
+            "“Not converted”, so a student using a screen reader hears only that for it.",
         ),
     },
     "handwriting_on_page": {
@@ -811,8 +850,11 @@ def _item(
     crop_ids: set[str],
     place: HeadingPlace | None = None,
     label: str | None = None,
+    source_note: str = "",
+    origin: str = "pdf",
 ) -> ReviewItem:
-    """`label`: the item's name (`web.review.item_labels`), else kind and `number`."""
+    """`label`: the item's name (`web.review.item_labels`), else kind and `number`;
+    `source_note`: `messages.source_item_notes` for this item; `origin`: the result's."""
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
@@ -842,7 +884,7 @@ def _item(
         label=label or f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
         page=(element.page + 1) if element else 0,
         status=fix.status.value,
-        status_label=status_words(fix, element),
+        status_label=status_words(fix, element, origin),
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c, note=optional) for c in fix.failed_checks],
@@ -867,7 +909,8 @@ def _item(
         second_check=triage.second_check_note(fix),
         table=table,
         **details,
-        reject=reject_words(fix.kind, element, fix),
+        reject=reject_words(fix.kind, element, fix, origin),
+        can_reject=reject_keeps(origin, fix, element) != "nothing",
         by_you=fix.decided_by_reviewer,
         preview=_preview(fix, element),
         read_text=_read_text(fix, element),
@@ -888,6 +931,7 @@ def _item(
             mathml=fix.equation.mathml if fix.equation else None,
         ),
         kept_image=is_kept_image(fix),
+        source_note=source_note,
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
         can_describe=describable,
         describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "") if describable else "",
@@ -1260,6 +1304,7 @@ def _page(
     labels = item_labels(result)
     fix_groups = kept_images_apart(group_fixes(result))
     places = heading_places(result)
+    notes = source_item_notes(result)
     items = {
         f.element_id: _item(
             f,
@@ -1269,6 +1314,8 @@ def _page(
             crop_ids,
             places.get(f.element_id),
             labels.get(f.element_id),
+            source_note=notes.get(f.element_id, ""),
+            origin=result.origin,
         )
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)
@@ -1317,6 +1364,9 @@ def _page(
         "page_count": count,
         # T3-5, T3-16: the page tools are on the review screen; one link to each page's.
         "tool_pages": [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)],
+        # A LaTeX source has no page pictures, so no review screen and no page tools (the
+        # screen redirects here, `routes.split`): no link that leads back to this page.
+        "has_pages": result.origin == "pdf",
         "job": view,
         "groups": list(groups.values()),
         "deciding": filtered.groups,
@@ -1540,6 +1590,7 @@ def review_action(
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
+            element_id = element_ref(result, element_id)
             change_made = apply_review(
                 result,
                 element_id,
@@ -1553,8 +1604,8 @@ def review_action(
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             restart_owner_clock(job, user, get_ctx(request).settings)
+            _decision_events(request, session, user, job, result, "single", change_made.every)
             session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
-            _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
@@ -1577,7 +1628,7 @@ def review_action(
     )
     table = change_made.fix.kind is Kind.TABLE
     element = next((e for e in result.elements if e.id == element_id), None)
-    message = done_message(change_made, element)
+    message = done_message(change_made, element, result.origin)
     message += _moved_message(change_made.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
@@ -1671,8 +1722,8 @@ def _group_action(
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
                 restart_owner_clock(job, user, get_ctx(request).settings)
+                _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
-                _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
@@ -1742,8 +1793,8 @@ def _page_group_action(
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
                 restart_owner_clock(job, user, get_ctx(request).settings)
+                _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
-                _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale:
@@ -1812,17 +1863,22 @@ def _decision_events(
     job: Job,
     result: DocumentResult,
     kind: str,
-    changed: int,
+    changes: list[ReviewChange],
 ) -> None:
-    """Usage events of a review write (web/events.py), in its transaction:
+    """Usage events of a review write (web/events.py), in its transaction and before its
+    ReviewEdits are made: `decision_outcome` for what it did (`web.outcomes`),
     `decision_made`, and `review_completed` when no decision is left open."""
+    settings = get_ctx(request).settings
+    outcomes.record_write(
+        session, settings, user_id=user.id, job=job, result=result, changes=changes, write_mode=kind
+    )
     events.add_decision(
         session,
-        get_ctx(request).settings,
+        settings,
         user_id=user.id,
         job=job,
         kind=kind,
-        changed=changed,
+        changed=1 if kind == "single" else len(changes),
         open_after=triage.open_decisions(result.fixes),
     )
 
@@ -1956,6 +2012,15 @@ def undo(
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             restart_owner_clock(job, user, get_ctx(request).settings)
+            # What the undone write recorded, taken back (`web.outcomes`).
+            outcomes.record_undo(
+                session,
+                get_ctx(request).settings,
+                user_id=user.id,
+                job=job,
+                result=result,
+                reversed_edits=edits,
+            )
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)

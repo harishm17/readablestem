@@ -44,6 +44,24 @@
   {% endif %}
 </section>
 
+<section aria-labelledby="steps-heading">
+  <h2 id="steps-heading">Model work of recent documents</h2>
+  <p>From the newest {{ step_jobs }} documents finished in the last {{ step_days }} days. The
+    whole table, by step and by stage: <code>readablestem ops step-report</code>.</p>
+  {% if steps.jobs %}
+  <dl class="summary-list">
+    <div><dt>Documents and pages</dt><dd>{{ steps.jobs }} and {{ steps.pages }}</dd></div>
+    <div><dt>Input read from the prompt cache</dt><dd>{% if steps.cache_read is not none %}{{ "%.0f"|format(100 * steps.cache_read) }}%{% else %}No model input{% endif %}</dd></div>
+    <div><dt>Seconds a page, for half of the documents</dt><dd>{% if steps.s_per_page_p50 is not none %}{{ "%.1f"|format(steps.s_per_page_p50) }}{% else %}Not timed{% endif %}</dd></div>
+    <div><dt>Seconds a page, for 95 in 100</dt><dd>{% if steps.s_per_page_p95 is not none %}{{ "%.1f"|format(steps.s_per_page_p95) }}{% else %}Not timed{% endif %}</dd></div>
+    <div><dt>Model calls a page</dt><dd>{{ "%.1f"|format(steps.calls_per_page) }}</dd></div>
+    <div><dt>Dollars a page</dt><dd>{{ steps.usd_per_page|usd }}</dd></div>
+  </dl>
+  {% else %}
+  <p>No document measured yet.</p>
+  {% endif %}
+</section>
+
 <section aria-labelledby="signup-heading">
   <h2 id="signup-heading">Sign-up</h2>
   <p>{% if signup.open %}Open: anyone with a verified Google account (or an allowed Microsoft
@@ -65,6 +83,18 @@
     <div><dt>Open-tier accounts</dt><dd>{{ signup.open_accounts }}</dd></div>
     <div><dt>Blocked accounts</dt><dd>{{ signup.blocked }}</dd></div>
   </dl>
+</section>
+
+<section aria-labelledby="ops-heading">
+  <h2 id="ops-heading">Scheduled tasks, storage and sandbox</h2>
+  <dl class="summary-list">
+    <div><dt>Backup and cron</dt><dd>{% if ops.stale %}Late: {{ ops.stale|join(", ") }}{% else %}Both finished well lately{% endif %}</dd></div>
+    {% if ops.storage %}
+    <div><dt>Stored uploads</dt><dd>{{ ops.storage.stored_mb }} MB of {{ ops.storage.limit_mb }} MB{% if ops.storage.full %} (full: new uploads are refused){% endif %}</dd></div>
+    {% endif %}
+    <div><dt>Sandbox probe</dt><dd>{{ ops.sandbox.state }}</dd></div>
+  </dl>
+  <p>The same as JSON: <a href="/admin/health">/admin/health</a>.</p>
 </section>
 
 <section aria-labelledby="queue-heading">
@@ -274,6 +304,24 @@
   </div>
   {% else %}
   <p>No usage events yet.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="profile-heading">
+  <h2 id="profile-heading">Production profile</h2>
+  <p>The settings production should run, from <code>ops/production.profile.toml</code>:
+    profile <code>{{ profile.name }}</code>, hash <code>{{ profile.hash }}</code>.
+    {% if profile.confirmed %}Its values were confirmed against the hosting dashboard, so a
+    start whose settings differ is refused.{% else %}Its values are not yet confirmed against
+    the hosting dashboard, so a start whose settings differ is logged
+    (<code>profile_mismatch</code>) and goes ahead.{% endif %}</p>
+  {% if profile.differs %}
+  <p>Settings that differ from the profile now:</p>
+  <ul>
+    {% for name in profile.differs %}<li><code>{{ name }}</code></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>Every behavior setting matches the profile.</p>
   {% endif %}
 </section>
 {% endblock %}

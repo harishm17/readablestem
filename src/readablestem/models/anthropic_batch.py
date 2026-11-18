@@ -37,6 +37,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from pydantic import BaseModel
@@ -46,6 +47,7 @@ from readablestem.core.types import ModelCall
 from readablestem.models.anthropic_client import AnthropicVisionClient
 from readablestem.models.base import T, VisionRequest
 from readablestem.models.pricing import BATCH_DISCOUNT
+from readablestem.models.question import asked, key_of
 
 log = logging.getLogger(__name__)
 
@@ -136,8 +138,6 @@ class StagingClient:
     def run(
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
     ) -> tuple[T | None, ModelCall]:
-        from readablestem.eval.answers import answer_key
-
         placeholder = ModelCall(
             step=request.step,
             model=request.model,
@@ -146,11 +146,9 @@ class StagingClient:
             outcome="api_error",  # not kept by the answers file
         )
         settings = self._builder._settings
-        self._pool.add(
-            Pending(
-                answer_key(settings, request), request, schema, self._builder, self.owner.record
-            )
-        )
+        parts = asked(settings, request, schema)
+        keep = partial(self.owner.record, asked=parts)
+        self._pool.add(Pending(key_of(parts), request, schema, self._builder, keep))
         return None, placeholder
 
 

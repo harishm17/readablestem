@@ -11,14 +11,15 @@ person (the start of their random id), never next to an email.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import case, func, select
 
-from readablestem.web import access, events, linked_emails
+from readablestem.ops import profile, step_report
+from readablestem.web import access, events, linked_emails, step_facts
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import ErrorAggregate, Job, JobStatus, QuotaDay, User, session_scope
@@ -29,6 +30,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.health import ops_report
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import signups_today
 
@@ -43,6 +45,9 @@ USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 # any account, listed or not.
 PEOPLE_ROWS = 300
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
+# "Model work of recent documents": the newest documents finished in this many days.
+STEP_DAYS = 7
+STEP_JOBS = 50
 
 
 def admin_context(request: Request) -> dict[str, Any]:
@@ -133,7 +138,21 @@ def admin_context(request: Request) -> dict[str, Any]:
         ).all()
         # Usage events (web/events.py): counts per day and per pseudonymous person.
         usage = events.usage(session, days=USAGE_DAYS)
+        # What recent documents took of the models and the clock (`ops.step_report`).
+        steps = step_report.report(
+            step_facts.measured(
+                session, since=datetime.now(UTC) - timedelta(days=STEP_DAYS), last=STEP_JOBS
+            )
+        )
+    shipped = profile.load()
     return {
+        # The production profile (ops/profile.py): names only, never a value.
+        "profile": {
+            "name": shipped.name,
+            "hash": shipped.short_hash,
+            "confirmed": shipped.confirmed,
+            "differs": shipped.differences(ctx.settings),
+        },
         "usage": usage,
         "usage_columns": {"day": events.DAY_COLUMNS, "person": events.PERSON_COLUMNS},
         "events_on": ctx.settings.events_enabled,
@@ -145,9 +164,13 @@ def admin_context(request: Request) -> dict[str, Any]:
         "spend": ctx.guard.snapshot(),
         "spend_people": spend_people,
         "spend_people_rows": SPEND_PEOPLE_ROWS,
+        "steps": steps,
+        "step_days": STEP_DAYS,
+        "step_jobs": STEP_JOBS,
         "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,
+        "ops": ops_report(ctx)[1],
         "active": "admin",
         "errors": [],
         "email_error": "",
@@ -161,6 +184,17 @@ def admin_context(request: Request) -> dict[str, Any]:
 @router.get("/admin")
 def admin_page(request: Request, user: AdminDep) -> Response:
     return render(request, "admin.html", admin_context(request))
+
+
+@router.get("/admin/health")
+def admin_health(request: Request, user: AdminDep) -> Response:
+    """What `/healthz/ops` used to show everyone: which scheduled tasks are late, the stored
+    megabytes against the limit and the sandbox probe. Admin only; 503 while a task is late,
+    like the public route."""
+    ok, details = ops_report(get_ctx(request))
+    return JSONResponse(
+        details, status_code=200 if ok else 503, headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.post("/admin/allowlist", dependencies=[Depends(require_csrf)])

@@ -198,6 +198,7 @@ def mutate(path: Path) -> None:
                 try:
                     mathml = safe_latex_to_mathml(changed, "block")
                 except Exception:
+                    found[f"{name}|not converted"] += 1
                     continue
                 found[f"{name}|made"] += 1
                 diff = compare_species(text, mathml)
@@ -216,6 +217,8 @@ def mutate(path: Path) -> None:
             f"{name:32} {made:>5} {found[f'{name}|species']:>8} {found[f'{name}|other']:>9} "
             f"{found[f'{name}|species_only']:>13}"
         )
+    left_out = sum(found[f"{name}|not converted"] for name in MUTATIONS)
+    print(f"{left_out} changed formulas did not convert and are left out")
 
 
 def step_diff(path: Path) -> None:

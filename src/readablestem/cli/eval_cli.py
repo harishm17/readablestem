@@ -28,7 +28,7 @@ GOLD_DIR = Path("data/gold")
 EVAL_DIR = Path("data/eval")
 EVAL_CACHE = Path(".cache/eval")
 OPENSTAX_CACHE = Path(".cache/openstax")
-DEMO_DIR = Path("src/readablestem/web/static/demo")
+DEMO_DIR = Path("src/readablestem/web/demo")
 WEEKLY_DIR = Path(".local") / "eval" / "weekly"  # git-ignored; commit a report on purpose
 # Known-correct LaTeX for every sample equation (`make eval-latex-check`): an equation it
 # still fails is a scorer gap, left out of the "excluding scorer gaps" review flags.
@@ -127,6 +127,13 @@ def _add_spend_args(parser: argparse.ArgumentParser) -> None:
         metavar="ID",
         help="cheap model of the chosen provider (default: the setting, e.g. claude-haiku-5-5)",
     )
+    parser.add_argument(
+        "--profile",
+        choices=["production"],
+        help="run under the production profile (ops/production.profile.toml) instead of this "
+        "environment's settings; the report then names the profile and its hash, and without "
+        "it says 'development settings' unless the settings are the profile's",
+    )
 
 
 def _add_judge_args(parser: argparse.ArgumentParser) -> None:
@@ -178,42 +185,21 @@ def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
     path = getattr(args, "answers", None)
     if path is None:
         return client
-    from readablestem.eval.answers import CachedClient
+    from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
+    rekey = bool(getattr(args, "answers_rekey", False))
     if getattr(args, "batch", False):
         # A staged run: what the file cannot answer is collected, not sent (eval/staged.py).
         from readablestem.models.anthropic_batch import StagingClient
 
         staging = StagingClient(client, args.staged_pool)
-        cached = CachedClient(staging, path, settings)
+        cached = CachedClient(staging, path, settings, rekey=rekey)
         staging.owner = cached
         return cached
-    cached = CachedClient(
-        None if getattr(args, "answers_offline", False) else client, path, settings
-    )
-    _keep_second_check_answers(args, client, cached)
+    offline = bool(getattr(args, "answers_offline", False))
+    cached = CachedClient(None if offline else client, path, settings, rekey=rekey)
+    keep_second_check_answers(client, cached, offline=offline)
     return cached
-
-
-def _keep_second_check_answers(args: argparse.Namespace, client: Any, cached: Any) -> None:
-    """The Claude second check asks the model too: its answers go into the same file, so a
-    replay (and `--answers-offline`) spends nothing on it either. A staged `--batch` run
-    leaves it live (its few small requests are not staged)."""
-    from readablestem.eval.answers import CachedClient
-    from readablestem.models.claude_verifier import ClaudeVerifier
-
-    verifier = getattr(client, "verifier", None)
-    if not isinstance(verifier, ClaudeVerifier) or getattr(args, "batch", False):
-        return
-
-    def wrap(inner: Any) -> Any:
-        check = CachedClient(
-            None if getattr(args, "answers_offline", False) else inner, args.answers, inner.settings
-        )
-        cached.second_check = check
-        return check
-
-    verifier.wrap_client(wrap)
 
 
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
@@ -260,9 +246,12 @@ def _settings_for(args: argparse.Namespace) -> Any:
 
     from readablestem.config import with_provider
 
+    base = _settings()
+    if getattr(args, "profile", None) == "production":
+        base = base.production_profile()
     try:
         return with_provider(
-            _settings(),
+            base,
             getattr(args, "provider", None),
             main_model=getattr(args, "main_model", None),
             cheap_model=getattr(args, "cheap_model", None),
@@ -342,6 +331,8 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
         return _error("--answers is for development sets: not for the held-out or check parts")
     if args.answers_offline and not args.answers:
         return _error("--answers-offline needs --answers FILE")
+    if args.answers_rekey and not args.answers:
+        return _error("--answers-rekey needs --answers FILE")
     if args.scanned and args.task != "document":
         return _error("--scanned applies to the document task")
     if args.scanned and (
@@ -858,6 +849,438 @@ def _cmd_gate(args: argparse.Namespace) -> int:
         )
     except (ValueError, KeyError) as exc:  # malformed JSON or tolerance file
         return _error(f"cannot read reports or tolerances: {exc}")
+
+
+def _cmd_bar(args: argparse.Namespace) -> int:
+    """`eval bar REPORT --measure NAME --at-least X`: hold one number of a report against a
+    bar. Only a held-out score under the production profile can meet one (eval/split.py)."""
+    from readablestem.eval import split
+
+    if not args.report.is_file():
+        return _error(f"report not found: {args.report}")
+    try:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        return _error(f"cannot read {args.report}: {exc}")
+    verdict = split.judge(
+        report, args.measure, at_least=args.at_least, at_most=args.at_most, kind=args.kind
+    )
+    print(verdict.line)
+    return verdict.exit_code
+
+
+def _cmd_ledger(args: argparse.Namespace) -> int:
+    """`eval ledger`: every row of the quality ledger, from the records the evals keep, each
+    figure with its counts, a bound and a label, held against its two bars (`eval.ledger`).
+    Measures nothing and spends nothing. Exit code 0: no held-out figure is worse than its
+    release bar; 1: one is, or `--for-release` and a row with a release bar has no held-out
+    figure of this release; 2: refused."""
+    from readablestem.config import Settings
+    from readablestem.eval import corpus, ledger, run_record
+    from readablestem.ops import profile
+
+    folder: Path = args.records or _default(Path("data/eval"))
+    bars_path: Path = args.bars or folder / ledger.BARS_FILE
+    try:
+        production = profile.load()
+    except (OSError, ValueError) as exc:
+        return _error(f"refused: no production profile to name the release by ({exc})")
+    # The profile's own settings, so the stamp also names the switches this image counts off.
+    settings = production.apply(Settings(_env_file=None, env="test"))  # type: ignore[call-arg]
+    sha, dirty = run_record.source_state(corpus.REPO)
+    stamps = ledger.stamps(profile.stamp(settings, production), sha + ("+changes" if dirty else ""))
+    release = f"{stamps['pipeline_version']}+{production.sha256[:12]}"
+    try:
+        bars = ledger.read_bars(bars_path)
+        made = ledger.build(ledger.read_records(folder), bars, release=release, stamps=stamps)
+        if args.register_bars or args.replace_bar:
+            bars, written = ledger.register(made, bars, replace=args.replace_bar)
+            if written:
+                _write_record(bars_path, {"bars": bars})
+                made = ledger.build(
+                    ledger.read_records(folder), bars, release=release, stamps=stamps
+                )
+            print(
+                "release bars written: " + (", ".join(written) or "none"),
+                file=sys.stderr,
+            )
+    except ledger.Refused as exc:
+        return _error(f"refused: {exc}")
+    failed = ledger.failures(made, for_release=args.for_release)
+    _write_record(args.out, made)
+    print(ledger.render(made, failed))
+    return 1 if failed else 0
+
+
+def _measured(
+    args: argparse.Namespace, runs: int, *, outputs: bool = False
+) -> tuple[list[list[Any]], Any] | int:
+    """The measured replays `eval cost` and `eval speed` report on: read from `--from`, or
+    made now (`eval.measure`) and written to `--records`. `outputs`: each conversion also
+    builds and audits the files a student is given."""
+    from readablestem.eval import corpus, measure
+
+    settings = measure.replay_settings(corpus.ANSWERS)
+    if args.records_from is not None:
+        if not args.records_from.is_file():
+            return _error(f"records not found: {args.records_from}")
+        try:
+            kept = json.loads(args.records_from.read_text(encoding="utf-8"))
+            made = [[measure.Converted.from_dict(row) for row in run] for run in kept["runs"]]
+        except (ValueError, KeyError, TypeError) as exc:
+            return _error(f"cannot read {args.records_from}: {exc}")
+        known = {upload.name for upload in measure.every_upload()}
+        unknown = sorted({done.upload for run in made for done in run} - known)
+        if unknown:
+            return _error(f"{args.records_from}: not uploads of the corpus: {', '.join(unknown)}")
+        return made, settings
+    uploads = measure.every_upload()
+    if args.only:
+        unknown = sorted(set(args.only) - {upload.entry for upload in uploads})
+        if unknown:
+            return _error(f"not in the corpus: {', '.join(unknown)}")
+        uploads = [upload for upload in uploads if upload.entry in args.only]
+    cores = [part for part in (args.cores or "").split("/") if part]
+    made = []
+    for number in range(runs):
+
+        def said(done: Any, number: int = number) -> None:
+            ended = done.error or f"{done.pages} pages, {done.wall_s:.1f} s, ${done.usd:.4f}"
+            print(f"run {number + 1}: {done.upload}: {ended}", file=sys.stderr, flush=True)
+
+        made.append(
+            measure.run(
+                uploads,
+                at_once=args.at_once,
+                cores=cores[number % len(cores)] if cores else None,
+                said=said,
+                outputs=outputs,
+            )
+        )
+    if args.records is not None:
+        args.records.parent.mkdir(parents=True, exist_ok=True)
+        kept = {"runs": [[done.as_dict() for done in run] for run in made]}
+        args.records.write_text(json.dumps(kept), encoding="utf-8")
+    return made, settings
+
+
+def _add_measure_args(parser: argparse.ArgumentParser, *, at_once: int) -> None:
+    parser.add_argument(
+        "--only", action="append", metavar="ID", help="a corpus file to measure (repeatable)"
+    )
+    parser.add_argument(
+        "--at-once",
+        type=_positive_int,
+        default=at_once,
+        help=f"uploads converted at the same time (default {at_once})",
+    )
+    parser.add_argument(
+        "--cores", help="CPU list to pin a run to; a list per run, separated by / (0-3/4-7)"
+    )
+    parser.add_argument("--records", type=Path, help="write what was measured, to report again")
+    parser.add_argument(
+        "--from",
+        dest="records_from",
+        type=Path,
+        help="report on records written by --records and measure nothing",
+    )
+    parser.add_argument("--out", type=Path, help="write the report as JSON")
+
+
+def _write_record(path: Path | None, record: dict[str, Any]) -> None:
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+
+
+def _cmd_cost(args: argparse.Namespace) -> int:
+    """`eval cost`: dollars a page by page kind and by step, from a replay of the corpus
+    under the production profile (`eval.cost`). Spends nothing."""
+    from readablestem.eval import cost, measure
+
+    measured = _measured(args, runs=1)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = cost.report(run, open_pool_usd=settings.open_tier_daily_spend_cap_usd)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(cost.render(record))
+    return 0 if metrics["uploads"]["measured"] else _error("no upload could be measured")
+
+
+def _cmd_speed(args: argparse.Namespace) -> int:
+    """`eval speed`: seconds a page by page kind and by stage, from replays of the corpus
+    under the production profile, and the bar against an earlier record (`eval.speed`).
+    Exit code 0: the bar is met or none was asked; 1: a page kind is slower than allowed;
+    2: the two records cannot be compared."""
+    from readablestem.eval import measure, speed
+
+    before = None
+    if args.against is not None:
+        try:
+            before = json.loads(args.against.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return _error(f"cannot read {args.against}: {exc}")
+    measured = _measured(args, runs=args.runs)
+    if isinstance(measured, int):
+        return measured
+    runs, settings = measured
+    metrics = speed.report(runs, allowance=args.allowance)
+    record = measure.record(speed.fastest(runs), settings, metrics)
+    _write_record(args.out, record)
+    verdict = None if before is None else speed.judge(record, before, allowance=args.allowance)
+    print(speed.render(record, verdict))
+    if not metrics["uploads"]["measured"]:
+        return _error("no upload could be measured")
+    if verdict is None or verdict.met:
+        return 0
+    return 1 if verdict.judged else 2
+
+
+def _cmd_burden(args: argparse.Namespace) -> int:
+    """`eval burden`: decisions a page asks of a reviewer, by page kind, by what is decided
+    and by why it was asked, from a replay of the corpus under the production profile, and
+    the bar against an earlier record (`eval.burden`). Spends nothing. Exit code 0: the bar
+    is met or none was asked; 1: a page kind asks for more than before; 2: the two records
+    cannot be compared."""
+    from readablestem.eval import burden, measure
+
+    before = None
+    if args.against is not None:
+        try:
+            before = json.loads(args.against.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return _error(f"cannot read {args.against}: {exc}")
+    measured = _measured(args, runs=1)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = burden.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    verdict = None if before is None else burden.judge(record, before, allowance=args.allowance)
+    print(burden.render(record, verdict))
+    if not metrics["uploads"]["measured"]:
+        return _error("no upload could be measured")
+    if verdict is None or verdict.met:
+        return 0
+    return 1 if verdict.judged else 2
+
+
+def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | int:
+    """`eval order --set`: the documents of a layout gold set scored (or read from
+    `--from`), and the set's registry; an exit code when it cannot be done. The folder must
+    be the registered one, and a held-out set is scored only when the caller says the
+    score is for a release."""
+    from readablestem.cli import layout_gold as sets
+    from readablestem.eval import measure, order_report
+    from readablestem.gold import layout_gold
+
+    listed = sets.registry_path(args.set, args.registry)
+    root = sets.set_root(args.set, args.root)
+    if not listed.is_file():
+        return _error(f"no registry at {listed}")
+    registry = json.loads(listed.read_text(encoding="utf-8"))
+    if registry["side"] == "held-out":
+        if not args.for_release:
+            return _error(
+                f"{args.set} is a held-out set: it is scored for a release, once, and a score "
+                "read while the reader is being changed spends it (--for-release)"
+            )
+        if args.against is not None:
+            return _error("a held-out set is held to its release bar, not compared page by page")
+        if args.records is not None or args.records_from is not None:
+            return _error(
+                "a held-out set's pages are not kept: --records and --from are not for it"
+            )
+    known = {row["id"] for row in registry["documents"]}
+    if args.records_from is not None:
+        try:
+            kept = json.loads(args.records_from.read_text(encoding="utf-8"))
+            run = [measure.Converted.from_dict(row) for row in kept["runs"][0]]
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            return _error(f"cannot read {args.records_from}: {exc}")
+        unknown = sorted({done.upload for done in run} - known)
+        if unknown:
+            return _error(f"{args.records_from}: not documents of {args.set}: {', '.join(unknown)}")
+        return run, registry
+    if not (root / "gold").is_dir():
+        return _error(f"no set at {root} (a folder with files/ and gold/)")
+    problems = layout_gold.verify_set(root, registry)
+    if problems:
+        return _error(f"{root} is not the registered set: " + "; ".join(problems[:5]))
+    unknown = sorted(set(args.only or ()) - known)
+    if unknown:
+        return _error(f"not in {args.set}: {', '.join(unknown)}")
+
+    def said(done: Any) -> None:
+        print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
+
+    run = order_report.set_run(root, only=args.only or (), at_once=args.at_once, said=said)
+    if args.records is not None:
+        args.records.parent.mkdir(parents=True, exist_ok=True)
+        kept = {"runs": [[done.as_dict() for done in run]]}
+        args.records.write_text(json.dumps(kept), encoding="utf-8")
+    return run, registry
+
+
+def _cmd_order(args: argparse.Namespace) -> int:
+    """`eval order`: whether each gold page of the corpus is read in order, and what else
+    is wrong on a page that is, in the page a student is given and in what the pipeline
+    holds, from a replay under the production profile, and the bar against an earlier
+    record (`eval.order_report`). With `--set`, the pages of a layout gold set, each file
+    converted with no model. Spends nothing. Exit code 0: the bar is met or none was
+    asked; 1: a page that was right is not right now; 2: the two records cannot be
+    compared, or nothing could be measured."""
+    from readablestem.eval import corpus, measure, order_report
+
+    before = None
+    if args.against is not None:
+        try:
+            before = json.loads(args.against.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return _error(f"cannot read {args.against}: {exc}")
+    if args.set is not None:
+        scored = _scored_set(args)
+        if isinstance(scored, int):
+            return scored
+        run, registry = scored
+        settings = order_report.set_settings()
+        held_out = registry["side"] == "held-out"
+        metrics = order_report.report(run, order_report.set_groups(registry), listed=not held_out)
+        of_set = order_report.set_stamp(registry, [done.upload for done in run])
+        record = measure.record(run, settings, metrics, of_set=of_set | {"client": "none"})
+    else:
+        if not (args.only or args.records_from):
+            with_gold = (entry.id for entry in corpus.load_manifest().values() if entry.gold)
+            args.only = sorted(with_gold)
+        measured = _measured(args, runs=1)
+        if isinstance(measured, int):
+            return measured
+        (run,), settings = measured[0][:1], measured[1]
+        metrics = order_report.report(run)
+        record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    verdict = None if before is None else order_report.judge(record, before)
+    print(order_report.render(record, verdict))
+    if not metrics["uploads"]["measured"] and not metrics["uploads"]["answers_missing"]:
+        return _error("no upload could be measured")
+    if verdict is None or verdict.met:
+        return 0
+    return 1 if verdict.judged else 2
+
+
+def _cmd_outputs(args: argparse.Namespace) -> int:
+    """`eval outputs`: every file a student is given (the page, Word, EPUB, the two Canvas
+    files, the Cartridge and the Listen transcript), built from a replay of the corpus under
+    the production profile, read and counted (`eval.outputs`). Spends nothing and gates
+    nothing. Exit code 0: measured; 2: nothing could be measured."""
+    from readablestem.eval import measure, outputs
+
+    measured = _measured(args, runs=1, outputs=True)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = outputs.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(outputs.render(record))
+    if not metrics["whole"]["uploads"] and not metrics["answers_missing"]["uploads"]:
+        return _error("no upload could be measured")
+    return 0
+
+
+def _cmd_page_audit(args: argparse.Namespace) -> int:
+    """`eval page-audit`: the page audit in shadow on the corpus or on a layout gold set's
+    folder (`eval.page_audit_eval`). It writes verdicts and changes no output. Exit code 0:
+    every page has a verdict; 1: the spend cap ended the run early (the report says where);
+    2: the run could not start."""
+    import tempfile
+
+    from readablestem.eval import page_audit_eval as audit_eval
+    from readablestem.eval import pipeline_eval as pe
+    from readablestem.eval import run_record, staged
+    from readablestem.eval.render import ChromiumRenderer, RenderError
+
+    live = not (args.fake or args.answers_offline)
+    if args.answers_offline and not args.answers:
+        return _error("--answers-offline needs --answers FILE")
+    if args.batch and not live:
+        return _error("--batch needs real model calls: no --fake and no --answers-offline")
+    settings = _settings_for(args)
+    if isinstance(settings, str):
+        return _error(settings)
+    if live and settings.model_provider != "anthropic":
+        return _error("the page audit asks an Anthropic model: pass --provider anthropic")
+    root: Path | None = args.gold_dir
+    if root is not None and not (root / "files").is_dir():
+        return _error(f"{root} is not a layout gold set's folder (no files/ in it)")
+    name = "corpus" if root is None else root.name
+    keep = (run_record.set_root("corpus"), "corpus") if root is None else (root, name)
+    default_out = (
+        _default(Path("data/eval/latest-page-audit.json"))
+        if root is None
+        else root / "page-audit.json"  # a held-out set's rows stay with the set
+    )
+    out: Path = args.out or default_out
+    with _recording(args, keep) as rec:
+        if args.answers_offline:
+            from readablestem.eval.answers import CachedClient
+
+            client: Any = CachedClient(None, args.answers, settings)
+            label = "replay"
+        else:
+            made = _make_client(args, settings)
+            if isinstance(made, str):
+                return _error(made)
+            client, _budget, label = made
+        with tempfile.TemporaryDirectory() as scratch:
+            documents = list(
+                audit_eval.corpus_documents(Path(scratch), args.only)
+                if root is None
+                else audit_eval.gold_documents(root, settings, args.only)
+            )[: args.limit]
+        if not documents:
+            return _error("no document to audit: the set is empty, or --only names none of it")
+        renderer = ChromiumRenderer() if args.rendered else None
+
+        def one_pass() -> Any:
+            if hasattr(client, "reset"):
+                client.reset()
+            quiet = (lambda _line: None) if args.batch else print
+            return audit_eval.audit_documents(
+                documents, client, settings, renderer=renderer, say=quiet
+            )
+
+        try:
+            if args.batch:
+                run = staged.drive(one_pass, args.staged_pool, args.staged_runner)
+            else:
+                run = one_pass()
+        except RenderError as exc:
+            return _error(f"could not draw a page's output: {exc}")
+        except staged_error() as exc:
+            return _error(str(exc))
+        finally:
+            if renderer is not None:
+                renderer.close()
+        found = audit_eval.report(
+            run,
+            set_name=name,
+            settings=settings,
+            date=args.date,
+            client_label=label,
+            with_output_picture=args.rendered,
+        )
+        if hasattr(client, "summary"):
+            found["answers_file"] = dict(client.summary())
+        _finish_recording(rec, args, found)
+        pe.write_report(found, out)
+        print(audit_eval.format_markdown(found), end="")
+        print(f"wrote {_shown(out)}")
+        _copy_report(rec, found)
+    return 1 if run.stopped else 0
 
 
 def _cmd_promote(args: argparse.Namespace) -> int:
@@ -1511,6 +1934,13 @@ def register(
         help="with --answers: a request not in the file is refused, not sent (spends nothing)",
     )
     pipeline.add_argument(
+        "--answers-rekey",
+        action="store_true",
+        help="with --answers: a request the file holds only under the key used before the "
+        "answer format was part of it is answered from that row, and the row is written "
+        "again under the new key. One such run moves a recorded file to the new keys",
+    )
+    pipeline.add_argument(
         "--speech",
         action="store_true",
         help="equations and document tasks: add the share of equations whose speech equals the "
@@ -1580,6 +2010,177 @@ def register(
         help="refuse (exit 2) a current report made with other prompts or models than this code",
     )
     gate.set_defaults(func=_cmd_gate)
+
+    bar = group.add_parser(
+        "bar",
+        help="hold one number of a report against a bar: only a held-out score under the "
+        "production profile can meet one",
+    )
+    bar.add_argument("report", type=Path, help="a report that records its split and profile")
+    bar.add_argument("--measure", required=True, help="a number under metrics (dots go deeper)")
+    limit = bar.add_mutually_exclusive_group(required=True)
+    limit.add_argument("--at-least", type=float, metavar="X")
+    limit.add_argument("--at-most", type=float, metavar="X")
+    bar.add_argument("--kind", choices=["release", "goal"], default="release")
+    bar.set_defaults(func=_cmd_bar)
+
+    cost = group.add_parser(
+        "cost",
+        help="dollars a page by page kind and by step, from a replay of the corpus under "
+        "the production profile (spends nothing)",
+    )
+    _add_measure_args(cost, at_once=4)
+    cost.set_defaults(func=_cmd_cost)
+
+    speed = group.add_parser(
+        "speed",
+        help="seconds a page by page kind and by stage, from replays of the corpus under "
+        "the production profile, and the bar against an earlier record",
+    )
+    _add_measure_args(speed, at_once=1)
+    speed.add_argument(
+        "--runs", type=_positive_int, default=2, help="replays; an upload's fastest counts (2)"
+    )
+    speed.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    speed.add_argument(
+        "--allowance",
+        type=float,
+        default=0.10,
+        help="how much slower a page kind may be (0.10; 1.0 on a shared runner)",
+    )
+    speed.set_defaults(func=_cmd_speed)
+
+    burden = group.add_parser(
+        "burden",
+        help="decisions a page asks of a reviewer, by page kind and by why, from a replay of "
+        "the corpus under the production profile, and the bar against an earlier record "
+        "(spends nothing)",
+    )
+    _add_measure_args(burden, at_once=4)
+    burden.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    burden.add_argument(
+        "--allowance",
+        type=float,
+        default=0.0,
+        help="how many more decisions a page a page kind may ask for than before (0)",
+    )
+    burden.set_defaults(func=_cmd_burden)
+
+    ledger = group.add_parser(
+        "ledger",
+        help="the quality ledger: every row from the records the evals keep, with counts, a "
+        "bound and a label, held against its release bar and its goal bar (measures nothing)",
+    )
+    ledger.add_argument(
+        "--records", type=Path, metavar="DIR", help="the kept records (default: data/eval)"
+    )
+    ledger.add_argument(
+        "--bars", type=Path, metavar="FILE", help="default: ledger-bars.json beside the records"
+    )
+    ledger.add_argument("--out", type=Path, help="write the ledger here as JSON")
+    ledger.add_argument(
+        "--for-release",
+        action="store_true",
+        help="also fail when a row that has a release bar has no held-out figure of this release",
+    )
+    ledger.add_argument(
+        "--register-bars",
+        action="store_true",
+        help="write this run's held-out figures as the release bars of rows that have none",
+    )
+    ledger.add_argument(
+        "--replace-bar",
+        action="append",
+        default=[],
+        metavar="ROW",
+        help="replace this row's release bar with this run's held-out figure (repeat)",
+    )
+    ledger.set_defaults(func=_cmd_ledger)
+
+    order = group.add_parser(
+        "order",
+        help="whether each gold page is read in order and what else is wrong on it, in the "
+        "page a student is given, from a replay of the corpus, and the bar against an "
+        "earlier record (spends nothing)",
+    )
+    _add_measure_args(order, at_once=4)
+    order.add_argument("--against", type=Path, help="an earlier record to hold the bar against")
+    order.add_argument(
+        "--set",
+        metavar="NAME",
+        help="score a layout gold set (data/gold/layout/NAME.json) and not the corpus: each "
+        "file converted with no model",
+    )
+    order.add_argument("--root", type=Path, help="the set's folder (default: the cache's)")
+    order.add_argument("--registry", type=Path, help="default: data/gold/layout/<set>.json")
+    order.add_argument(
+        "--for-release",
+        action="store_true",
+        help="score a held-out set: once, for a release, never while the reader is changed",
+    )
+    order.set_defaults(func=_cmd_order)
+
+    outputs = group.add_parser(
+        "outputs",
+        help="the files a student is given, built from a replay of the corpus, read and "
+        "counted: what is wrong in each, by kind (spends nothing, gates nothing)",
+    )
+    _add_measure_args(outputs, at_once=4)
+    outputs.set_defaults(func=_cmd_outputs)
+
+    page_audit = group.add_parser(
+        "page-audit",
+        help="the page audit in shadow: one request a page that compares the page with its "
+        "output; writes verdicts, changes no output",
+    )
+    which = page_audit.add_mutually_exclusive_group(required=True)
+    which.add_argument(
+        "--corpus",
+        action="store_true",
+        help="the corpus, each upload converted from its recorded answers (as `eval cost`)",
+    )
+    which.add_argument(
+        "--gold-dir",
+        type=Path,
+        metavar="DIR",
+        help="a layout gold set's folder (files/<id>.pdf), each file converted with no model",
+    )
+    page_audit.add_argument(
+        "--only", action="append", default=[], metavar="ID", help="only this document (repeat)"
+    )
+    page_audit.add_argument("--limit", type=_positive_int, help="the first N documents")
+    page_audit.add_argument(
+        "--rendered",
+        action="store_true",
+        help="also send a picture of the page's output as a browser draws it (needs the "
+        "browser group: uv sync --group browser)",
+    )
+    _add_spend_args(page_audit)
+    page_audit.add_argument(
+        "--answers",
+        type=Path,
+        help="a file of recorded answers (eval/answers.py): a request in it costs nothing, "
+        "any other goes to the model and is appended (default: the run's own folder)",
+    )
+    page_audit.add_argument(
+        "--answers-offline",
+        action="store_true",
+        help="with --answers: replay only; a request not in the file is not audited",
+    )
+    page_audit.add_argument(
+        "--batch",
+        action="store_true",
+        help="send what the answers file cannot answer as Message Batches (half price); a "
+        "request that keeps failing is stored as not audited",
+    )
+    page_audit.add_argument("--date", type=_iso_date, default=today, help="run date to record")
+    page_audit.add_argument(
+        "--out",
+        type=Path,
+        help="report JSON (default: data/eval/latest-page-audit.json; with --gold-dir, "
+        "page-audit.json in that folder)",
+    )
+    page_audit.set_defaults(func=_cmd_page_audit)
 
     promote = group.add_parser(
         "promote", help="copy a reviewed report to data/eval as the baseline or latest"
@@ -1686,9 +2287,7 @@ def register(
     build.add_argument("--page", required=True, help="OpenStax page slug")
     build.add_argument("--book", default="physics")
     _add_spend_args(build)
-    build.add_argument(
-        "--out", type=Path, help="output dir (default: src/readablestem/web/static/demo/)"
-    )
+    build.add_argument("--out", type=Path, help="output dir (default: src/readablestem/web/demo/)")
     build.add_argument("--gold", type=Path, help="gold dir (gold pages render from cache)")
     build.add_argument("--date", type=_iso_date, default=today)
     build.add_argument("--paper", choices=["Letter", "A4"], default="Letter")

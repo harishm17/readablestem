@@ -14,7 +14,7 @@ decisions they made, or pay for the pages a second time.
 - the decisions made on a partly converted result are kept (`worker.Worker._carry_decisions`
   puts them on the new result, item by item, as for a revised upload);
 - every limit still holds: the daily budget (a queued job waits for it), the job's own
-  spend caps (they cover all tries together), at most `MAX_ACTIVE_JOBS_PER_USER` documents
+  spend caps (they cover all tries together), at most `access.files_per_upload` documents
   waiting or converting, at most `MAX_RETRIES_PER_JOB` tries, and the per-person and
   per-address rate limits on the route.
 
@@ -115,6 +115,7 @@ def start(job: Job, *, active_others: int, max_active: int) -> None:
         raise RetryRefused("too_many_active")
     job.status = JobStatus.QUEUED
     job.error_code = None
+    job.error_detail = None
     job.finished_at = None
     job.lease_until = None
     job.pages_done = 0

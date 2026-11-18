@@ -32,7 +32,7 @@ When a public page's text changes, update its date in `PUBLIC_PAGES` (or `SHOWCA
 
 | Page | What it holds |
 |---|---|
-| `index.html` | What ReadableSTEM is, who it is for, what it does not do, the headline numbers from `PROOF.md` with the set labelled, links to the README, `PROOF.md`, the method and the limits |
+| `index.html` | What ReadableSTEM is, who it is for, what it does not do, the headline numbers from `PROOF.md` with the set labeled, links to the README, `PROOF.md`, the method and the limits |
 | `examples/index.html` | The worked examples in one table |
 | `examples/<id>/index.html` | For one document: the PDF pages beside the HTML they became, what the checks found, the decisions a person would see (a static view of the review screen), how some equations are read aloud, the files and the credit |
 | `examples/<id>/converted.html` | The tool's full output page, as stored |
@@ -40,9 +40,9 @@ When a public page's text changes, update its date in `PUBLIC_PAGES` (or `SHOWCA
 | `before-after/index.html` | For the chosen equations: the PDF's text layer and its reading, beside the HTML's MathML and its reading |
 | `stemcheck/index.html`, `stemcheck/sample-report.html` | A short explanation of [stemcheck](https://github.com/harishm17/stemcheck) and one report it wrote |
 | `method/index.html` | How the numbers and the examples were made, and the limits (read from `PROOF.md` and `proof/sets/`) |
-| `attribution/index.html` | Title, authors, licence and link for every OpenStax page, and the credits for the other material |
+| `attribution/index.html` | Title, authors, license and link for every OpenStax page, and the credits for the other material |
 
-Every page carries a footer naming the author and the licences (MIT for the code and the site;
+Every page carries a footer naming the author and the licenses (MIT for the code and the site;
 CC BY 4.0 for the OpenStax material).
 
 ## Where the content comes from
@@ -54,7 +54,7 @@ Everything is committed. Nothing is fetched or generated at build time.
   the three files that `readablestem demo build` writes: `report.json` (the stored result),
   `converted.html` (the output) and `source.pdf` (the exact input). `meta.json` may point at
   the files elsewhere in the repository with `artefacts`, `html`, `pdf` and `report`: the
-  Physics 2.3 example uses the app's own demo under `src/readablestem/web/static/demo/`, and the
+  Physics 2.3 example uses the app's own demo under `src/readablestem/web/demo/`, and the
   lecture-notes fixture uses `tests/fixtures/layout/lecture_notes.pdf`.
 - **The review decisions.** The build loads the stored result with the app's own models and
   helpers (`web.review.group_fixes`, `web.messages`, `web.compare`, `web.speech_diff`) and
@@ -88,7 +88,7 @@ from the stored result, puts the demo note back (`--no-note` for a fixture), and
 stored result as it was written (only its `html_checks` are replaced, and only if they differ).
 No page is fetched, no model is asked, nothing is paid. The result still says which pipeline
 version converted it. The 2026-10-14 Tier 3 rebuild of the public demo and the four examples was
-made this way: one `h1`, the dark colour scheme and the labelled "About this version" region.
+made this way: one `h1`, the dark color scheme and the labeled "About this version" region.
 
 ## Adding an example
 
@@ -129,10 +129,10 @@ stemcheck report and the stored PDFs.
 ## Design system (the web app)
 
 `DESIGN.md` records the visual system and `PRODUCT.md` the product facts it serves. The tokens
-are `web/static/tokens.css` (fonts, colour in light and dark, type, space, radius, widths, layers
+are `web/static/tokens.css` (fonts, color in light and dark, type, space, radius, widths, layers
 and the paper palette); buttons are `web/static/controls.css`; the other components are in
-`web/static/app.css` under "Components", each with its responsive and forced-colour rules beside
-it (`DESIGN.md`, "Stylesheets"). `/style` shows every one in the
+`web/static/app.css` under "Components", each with its responsive and forced-color rules beside
+it (`DESIGN.md`, "Stylesheets"). `/style` (a builder page: dev and test only, 404 in production) shows every one in the
 visitor's theme (it is `noindex`, not in the sitemap, and nothing links to it). Pages people read
 (landing, guides, help, offices, privacy, terms, limits) set `{% block body_class %}mode-read{%
 endblock %}`: serif h1 and h2, 18px text in a 68ch column. App screens keep Source Sans 3
@@ -140,6 +140,6 @@ headings at 16px. Fonts are self-hosted (`web/static/vendor/README.md`); no page
 outside request. `tests/test_design_tokens.py` checks the contrast of every token pair, the
 14px floor and the font budget.
 
-The landing page's "Hear the difference" is built by `scripts/hero_assets.py` from `web/static/demo/` (an
+The landing page's "Hear the difference" is built by `scripts/hero_assets.py` from `web/demo/` (an
 equation-only crop of the PDF page, text layer, MathML, reading, font subset into `web/static/hero/` and `vendor/fonts/`); the app never runs it and
 `tests/test_hero_assets.py` regenerates and compares. The proof tiles on /limits and the comparison chart (compact on the landing page) come from `web/proof_facts.py` (PROOF.md, parsed once into `proof_facts.json`).

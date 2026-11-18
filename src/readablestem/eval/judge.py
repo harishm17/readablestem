@@ -266,10 +266,6 @@ def judge_long(
     return LongJudgement(verdict=verdict, call=call)
 
 
-def long_judge_prompt_version() -> str:
-    return load_prompt(LONG_JUDGE_PROMPT).version
-
-
 # ===================================================================== who judges
 
 

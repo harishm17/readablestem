@@ -1,6 +1,8 @@
 """Readiness (`/readyz`) and the SIGTERM hook.
 
-`/healthz/ops` says the scheduled tasks ran: the backup within 26 hours, the cron within 2.
+`/healthz/ops` says the scheduled tasks ran: the backup within 26 hours, the cron within 2. It
+answers with the status word alone; which task is late, the storage, the sandbox probe and the
+production profile's hash are the admin's (`ops_report`, `/admin/health`, `/admin`).
 `/healthz` says the process answers and the database does. `/readyz` says the service can
 do its job: the database answers, the worker thread is alive and not stuck, and the model
 provider is set up. Each check is one word; nothing in the answer comes from a setting's
@@ -23,7 +25,7 @@ from collections.abc import Callable
 from types import FrameType
 
 from readablestem.config import Settings
-from readablestem.ops import heartbeat
+from readablestem.ops import heartbeat, profile
 from readablestem.web import storage
 from readablestem.web.database import ping
 from readablestem.web.db import session_scope
@@ -59,6 +61,28 @@ def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
     if full:  # new uploads are being refused until the purge has caught up (`web.storage`)
         stale = sorted([*stale, "storage"])
     return not stale, stale
+
+
+def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
+    """`(fresh, details)` for the admin: the status word, the stale names, the storage
+    report, the sandbox probe and the production profile's hash. None of it is public
+    (`/healthz/ops` gives the word only)."""
+    ok, stale = ops_freshness(ctx)
+    try:
+        with session_scope(ctx.factory) as session:
+            stored: dict[str, int | bool] | None = storage.report(session, ctx.settings)
+    except Exception:
+        stored = None
+    details: dict[str, object] = {
+        "status": "ok" if ok else "stale",
+        "stale": stale,
+        "storage": stored,
+        "sandbox": ctx.sandbox.public(),
+        # The production profile's hash (ops/profile.py): it names no setting and no value,
+        # but it says which settings run, so it is the admin's, not the public route's.
+        "profile": profile.load().short_hash,
+    }
+    return ok, details
 
 
 def _worker_check(ctx: AppContext) -> str:

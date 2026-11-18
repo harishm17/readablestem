@@ -26,6 +26,7 @@ from fixtures.web.support import (
     BOB,
     WebEnv,
     fake_output,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -142,6 +143,22 @@ def huge_page_pdf() -> bytes:
     return data
 
 
+def huge_image_pdf() -> bytes:
+    """A small file whose picture states 20,000 x 20,000 pixels: decoding it would take
+    seconds and hundreds of megabytes, so the upload is refused before anything reads it."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Kinematics")
+    pixmap = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, 100, 50), False)
+    pixmap.set_rect(pixmap.irect, (200,))
+    xref = page.insert_image(pymupdf.Rect(72, 100, 272, 200), pixmap=pixmap)
+    doc.xref_set_key(xref, "Width", "20000")
+    doc.xref_set_key(xref, "Height", "20000")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
 # --------------------------------------------------------------------------- budget stops
 
 
@@ -166,7 +183,7 @@ def test_a_job_the_daily_cap_stops_part_way_is_not_shown_as_a_normal_success(env
     assert "The accessible HTML is ready" not in text
     assert "Stopped early" in page_text(env.browser.get("/app").text)
     # The partial result is still there to use.
-    assert env.browser.get(f"/jobs/{job_id}/download").status_code == 200
+    assert fetch(env.browser, f"/jobs/{job_id}/download").status_code == 200
 
 
 def test_a_per_job_cap_stop_says_to_split_the_document(env):
@@ -345,8 +362,9 @@ def test_stopping_the_worker_cancels_the_running_job_and_ends_its_lease(env):
         (scanned_pdf(2), "scanned", "is scanned, so this tool cannot convert it"),
         (blank_pdf(), "no_content", "Every page of notes.pdf is blank"),
         (huge_page_pdf(), "page_too_large", "too large to convert"),
+        (huge_image_pdf(), "image_too_large", "has a picture that is too large to read"),
     ],
-    ids=["scanned", "blank", "huge-page"],
+    ids=["scanned", "blank", "huge-page", "huge-image"],
 )
 def test_pdfs_with_nothing_to_convert_are_refused_at_upload(env, data, code, message):
     response = upload(env.browser, data)
@@ -514,6 +532,44 @@ def test_recorded_answers_wrap_the_real_client_and_offline_refuses_a_miss(tmp_pa
         Settings(_env_file=None, fake_models=True, model_answers_file=path), budget
     )
     assert isinstance(fake, FakeVisionClient)
+
+
+def test_offline_replay_answers_the_second_check_from_the_same_file(tmp_path):
+    from readablestem.core.types import ModelCall
+    from readablestem.eval.answers import answer_key
+    from readablestem.models.claude_verifier import FigureAudit, figure_request
+    from readablestem.models.openai_client import PNG_SIGNATURE
+
+    budget = JobBudget(guard=InMemorySpendGuard(1.0), max_usd=1, max_calls=10)
+    path = tmp_path / "answers.jsonl"
+    common = {
+        "model_provider": "anthropic",
+        "anthropic_api_key": "sk-ant-test",
+        "claude_second_check": "shadow",
+        "model_answers_file": path,
+    }
+    live_settings = Settings(_env_file=None, **common)
+    live = default_client_factory(live_settings, budget)
+    png = PNG_SIGNATURE + b"crop"
+    request = figure_request(live_settings.claude_check_model, png, alt="A ramp.", caption=None)
+    audit = FigureAudit(conveys_key_information=True, contradicts_image=False, problem="none")
+    call = ModelCall(step="check", model=request.model, prompt_version=request.prompt_version)
+    check = live.second_check  # the check keeps its own settings (its prompt notice differs)
+    check.record(answer_key(check._settings, request, FigureAudit), "check", audit, call)
+
+    offline = default_client_factory(
+        Settings(_env_file=None, model_answers_offline=True, **common), budget
+    )
+    assert offline.verifier is not None
+    recorded = offline.verifier.figure_alt(png, alt="A ramp.", caption=None)
+    assert recorded.reason_code == "ok" and recorded.probabilities == {
+        "ok": 1.0,
+        "factual_error": 0.0,
+    }
+    size = path.stat().st_size
+    missing = offline.verifier.figure_alt(png, alt="Another picture.", caption=None)
+    assert missing.reason_code != "ok" and not missing.probabilities
+    assert path.stat().st_size == size  # nothing was asked, nothing recorded
 
 
 def test_a_missing_model_key_fails_with_its_own_code_and_message(env, monkeypatch):

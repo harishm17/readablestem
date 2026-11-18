@@ -14,9 +14,9 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048, tag_dpi=False) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped; `tag_dpi` writes the resolution into the PNG header (equation crops for the student file, `pipeline/equation_scale.py`) |
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
-| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span colour, for the text pass |
+| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span color, for the text pass |
 | `heading_step.heading_fixes(elements) -> list[Fix]` | one `HeadingFix` per heading, outline repaired, with checks and confidence |
-| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour) -> TextPassResult` | the elements with links, colour runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
+| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour) -> TextPassResult` | the elements with links, color runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
 
 Element conventions:
 
@@ -26,7 +26,7 @@ Element conventions:
 - **`order`** is the position in the whole document (0, 1, 2, ... across pages).
 - **Inline equations** have `display="inline"` and `parent_id` = the paragraph (or list
   item) id; the parent's `text` contains `core.types.inline_marker(id)` (`⟦p1-e4⟧`) where
-  the maths was. Display equations have `display="block"` and no parent.
+  the math was. Display equations have `display="block"` and no parent.
 - **Equation numbers** ("2.4", "(2.4)", "[2.4]", "Eq. 2.4") of a display equation are in
   `equation_label`, as printed, and are not in its `text` or `bbox`, so they are not in
   the crop the model transcribes.
@@ -58,7 +58,7 @@ Element conventions:
 
 ## How a page is read
 
-0. **Tables first.** On every analysed page the data tables are found
+0. **Tables first.** On every analyzed page the data tables are found
    (`pipeline/tables.py`, [tables.md](tables.md)) before anything below: their lines,
    rules and `"Table N"` caption leave the page, and each comes back as one TABLE element
    placed in reading order like a figure. So a table's numbers are not a display
@@ -67,21 +67,21 @@ Element conventions:
    off the table step keeps the table as an image with a required decision. A grid of
    prose (one column, or a term and its long definition) is not claimed and is read as
    before. In a TeX-made PDF a cell that is one formula by its glyphs (the rules that
-   find inline maths in prose, applied to the cell alone) is also an inline equation
+   find inline math in prose, applied to the cell alone) is also an inline equation
    element of the table, `TableCell.equation_id` naming it (`_cell_maths`,
-   [tables.md](tables.md) "Maths cells from glyphs"); `run.py` drops these when the flag
+   [tables.md](tables.md) "Math cells from glyphs"); `run.py` drops these when the flag
    is off.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
    line and cannot be told apart. Ligatures are expanded.
-2. **Running headers, footers and other decoration.** A line whose centre is in the top or
+2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
    two), unless it stands out and changes: a line at least 1.15 x body size or bold whose
    exact text differs between pages (`Problem 3 (15 points)` at the top of each page) is
    content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size. The
-   reference pages are the analysed pages plus their neighbours, up to 24 pages, so
-   analysing one page of a long PDF still recognises its header. Bare page numbers (`7`,
+   reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
+   analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
    the output still carry them: `pipeline/page_labels.py` reads the PDF's page labels and the
    numbers printed in the margins separately, docs/output.md "Navigation"). Figures in the band
@@ -99,7 +99,7 @@ Element conventions:
    axis title `v` at the top of a full-page plot's y-axis, which the page-number rule
    reads as a roman numeral) and the same band of the other pages holds no changing
    number there (a page number beside a figure that reaches into the band stays a page
-   number; since 2026-10-12); other text only when it is beside a figure on every analysed page it was
+   number; since 2026-10-12); other text only when it is beside a figure on every analyzed page it was
    dropped from (`_label_keys`), so a running footer that also runs under pages of text
    stays dropped. The rows taken back are the figure's labels, in its text and its crop,
    however far from it within that reach (`_take_labels`; before, tick labels 6 pt under
@@ -107,14 +107,14 @@ Element conventions:
    chart on every page of a document is read as text (noise, not a loss).
 3. **Columns.** Narrow lines (at most 55 % of the text width) are projected onto the x-axis.
    A gap of at least 8 pt in the middle half that no narrow line touches (or at most two,
-   so a centred title does not hide the columns) is a gutter, if each side has at least
+   so a centerd title does not hide the columns) is a gutter, if each side has at least
    three lines sharing a left edge and the typical line on each side is at least 30 % of the
    text width (two table columns are not text columns). Lines for that test are boxes that
-   overlap vertically by half the smaller height: TeX splits a line with inline maths into
+   overlap vertically by half the smaller height: TeX splits a line with inline math into
    pieces whose bottom edges differ, and measured piece by piece a full LaTeX column
    looked like a column of short cells. Margin-band lines are ignored here.
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
-   changes in inline maths). Fragments on the same baseline are joined, never across the
+   changes in inline math). Fragments on the same baseline are joined, never across the
    gutter. Small sub/superscript fragments are folded into their line as one block, after
    the glyphs that start before their right edge (a sub/superscript lands after its base,
    a small fraction's denominator after its numerator). A fragment is a script only if
@@ -142,14 +142,14 @@ Element conventions:
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
    pitch is the last line of the sentence above (`... exactly one solution,` / `x =
-   A⁻¹b.`), not a display equation: its maths becomes inline equations of the paragraph. PyMuPDF's own blocks are not used: they glue a caption to the next
+   A⁻¹b.`), not a display equation: its math becomes inline equations of the paragraph. PyMuPDF's own blocks are not used: they glue a caption to the next
    paragraph and a fraction's denominator to the text under it.
 7. **Paragraph text.** Rows are joined with spaces. `veloc-` + `ity` becomes `velocity` (a
    letter, a hyphen at the line end and a lowercase start); `Newton-` + `Raphson` keeps the
    hyphen without a space; so does a compound whose pieces are words when the joined word
    is not (`well-` + `known`, `cross-` + `section`, `self-` + `consistent`), and a hyphen
    after a single letter (`x-` + `ray`). The list is `pipeline/data/words-en.txt.gz`
-   (63,849 lower-case English words from SCOWL; source, licence and SHA-256 in
+   (63,849 lower-case English words from SCOWL; source, license and SHA-256 in
    `pipeline/data/README.md`) and the rule is `pipeline/hyphens.py`: the joined word is a
    word, or neither piece is one (`eigen-` + `vector`, a technical word the list lacks):
    the hyphen goes. Soft hyphens disappear. Whitespace is collapsed and zero-width
@@ -161,7 +161,7 @@ Element conventions:
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
    counted, so a break never vouches for itself.
-   Inline maths that wraps from one line to the next is one equation (`_wrapped_inline`): a
+   Inline math that wraps from one line to the next is one equation (`_wrapped_inline`): a
    relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
    minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),
    two variables side by side and two formulas with a word between stay separate. The
@@ -173,10 +173,10 @@ Element conventions:
    filter dropped, are not in the way) does not end a sentence, the top block of the next
    page starts with a lower-case letter, and the two share size, typeface, weight and left
    edge with no first-line indent, both at the text area's edges. The element keeps the
-   first part's page and box, so a link or a colour in the second part is not placed on the
+   first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
    part keeps its own page for its crop. A hyphen at the page break is repaired like one at
-   a line break. A paragraph that starts with maths, a break between a column on one page
+   a line break. A paragraph that starts with math, a break between a column on one page
    and a column on the next, and a list item (a lowercase paragraph after a list item at a
    page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
    the last part (None when it ends on its own page). The assembler writes the page markers
@@ -194,7 +194,7 @@ Element conventions:
 
 ### Headings
 
-- **Body size** is the font size covering most characters in the analysed pages.
+- **Body size** is the font size covering most characters in the analyzed pages.
 - A run of at most 3 rows and 200 characters at **1.15 x body size or more** is a heading
   (`"larger font"`).
 - A **bold body-size** run of at most 2 rows and 120 characters that starts a block (after a
@@ -228,9 +228,9 @@ Element conventions:
   In a larger font any section number counts (`3 Forces` is a chapter title); at body size
   only the section shape above does.
 - Rotated and diagonal text is never a heading.
-- **A heading that is mostly maths is an equation** (`_mostly_maths`): a large or bold run
+- **A heading that is mostly math is an equation** (`_mostly_maths`): a large or bold run
   with a relation sign at full size, no plain word of more than three letters and at least
-  70 % maths characters (`KE = m v` set large on a slide, a bold `PE = mgh`; a letter
+  70 % math characters (`KE = m v` set large on a slide, a bold `PE = mgh`; a letter
   group of up to three letters counts as variables beside a relation sign) goes to the
   equation step, not to the outline. A line set bold as a whole keeps no bold in its text
   layer, since the weight is the heading's, not a vector's. `2.3 Units`, `Summary of
@@ -261,7 +261,7 @@ Element conventions:
   its level.
 - **The PDF's outline** (bookmarks, "The PDF's outline" below) does the same, when it
   matches the page text; a tag wins over a bookmark.
-- **Maths in a heading** stays text: math-italic and other mathematical alphanumerics
+- **Math in a heading** stays text: math-italic and other mathematical alphanumerics
   become the plain letters they style (`readable_math_letters`: `𝑔` is `g`, `ℎ` is `h`;
   only the bold, italic, sans and monospace variable ranges and Planck's h: `ℝ ℂ ℕ ℤ ℚ ℓ ℒ`,
   script, fraktur and double-struck letters stay),
@@ -333,7 +333,7 @@ development sets disagree about them, so four ways of handling a group were run 
 | | dev-v2 | 159 | 0.182 (29 of 159) | 0.236 (29 of 123) | 94 |
 
 Heading F1 is the same in every variant (0.9344 original dev, 0.9168 dev-v2). Before T2-7
-(no sentence rule) the group behaviour was (b) minus the 26 sentence decisions: 9 decisions
+(no sentence rule) the group behavior was (b) minus the 26 sentence decisions: 9 decisions
 on the original dev set and 34 on dev-v2 (flag precision 0.118, flag recall 0.114). (b) is
 the old "one decision per group, not per copy"; (b2) is the variant that asks for the group's
 first copy only.
@@ -403,7 +403,7 @@ Palatino, Garamond, Charter, Noto, Source, STIX, XITS, TeX Gyre, Libertine, ...)
 reading of such a letter is a scalar read as a vector, which the equation step treats as
 meaning-level. Fonts that cannot show a letter's style in the text layer are left out on
 purpose: MSBM (double-struck), EUSM and RSFS (script), EUFM (fraktur), CMSY
-(calligraphic), Symbol. A letter that is already a styled maths code point says its own
+(calligraphic), Symbol. A letter that is already a styled math code point says its own
 style and is not listed. On the two-column handout: `𝐯 ∈ Rn` gives `n` (R is MSBM), the
 bold omega gives nothing.
 
@@ -461,7 +461,7 @@ within 3 x font size:
   filled squares "▪";
 - a line-start dash or star (`-` `–` `—` `*` `∗`, LaTeX's second and third levels) or a
   middle dot (`·`, Word's Symbol bullet as extracted). A dash followed by a digit or a
-  decimal point (`- 40 m/s`, Word's `– 5 °C`), or set in a maths font, is the sign of a
+  decimal point (`- 40 m/s`, Word's `– 5 °C`), or set in a math font, is the sign of a
   value, not a bullet: the sign stays in the text;
 - an ordered marker: `1.` `2)` `(3)`, `a.` `b)` `(c)`, `A.`, `iv.` `(ii)` `IV)`. OpenStax's
   "3 ." (number and full stop in separate spans) is read as "3.".
@@ -488,36 +488,36 @@ matches. The indent is measured from the left edge of the item's column on its p
 leftmost x where at least three rows start), so a list that goes on in the next column or
 on a page with another margin keeps its levels. A display equation inside an item does
 not end the list; any other block does.
-A list item's row is never a display equation ("b. - 40 m/s" had become one): maths in
+A list item's row is never a display equation ("b. - 40 m/s" had become one): math in
 it becomes inline equations with the item as their parent.
 
 ### Equations
 
-Every character is classified: **maths** (a maths font such as CMMI, CMSY, MSBM, STIX,
+Every character is classified: **math** (a math font such as CMMI, CMSY, MSBM, STIX,
 Cambria Math, Latin Modern Math, Noto Sans Math, Symbol; a Unicode math-italic letter like
-`𝑣`; Greek; a symbol that only occurs in maths such as `∑ √ ≤ × →`), **digit**, **operator**
+`𝑣`; Greek; a symbol that only occurs in math such as `∑ √ ≤ × →`), **digit**, **operator**
 (`+ - * / = < > ^` and the minus/plus-minus signs), bracket, letter, code (monospaced) or
-other. A minus sign alone is not maths evidence: groff prints command-line options as `−d`.
+other. A minus sign alone is not math evidence: groff prints command-line options as `−d`.
 
 - **Display equation rows**: `parse.equation_score >= 0.5`, no prose word (3+ plain
   letters other than `sin`, `log`, units like `mol`; or English two-letter words like `is`,
-  `if`), at least half the characters maths-capable, and not mostly monospaced.
-- **Fragments**: short maths-only rows that do not score on their own (a lone `t`
+  `if`), at least half the characters math-capable, and not mostly monospaced.
+- **Fragments**: short math-only rows that do not score on their own (a lone `t`
   denominator, `2a`), and equation numbers (`(2.1)`, `[3]`, `Eq. 2.4`, a bare `2.4`).
-  They become maths when they touch a fraction bar or radical together with other maths
-  rows, or sit right next to a maths row. An equation number belongs to maths whose height
-  it shares: its vertical centre within half a font size of a maths row (OpenStax sets
+  They become math when they touch a fraction bar or radical together with other math
+  rows, or sit right next to a math row. An equation number belongs to math whose height
+  it shares: its vertical center within half a font size of a math row (OpenStax sets
   `2.4` level with the fraction bar, on neither the numerator's nor the denominator's
-  line); a bare `2.4` only counts to the right of the maths with a gap of at least one
+  line); a bare `2.4` only counts to the right of the math with a gap of at least one
   font size. Otherwise fragments stay text (`12 m/s.` at the end of a sentence, `2.4`
   alone on a line). Attachment spreads breadth-first through a vertical index, so a page
   of thousands of short numeric rows costs about n log n.
 - **Fraction bars and radicals** come from `page.get_drawings()`: horizontal rules at most
   1.6 pt thick (lines or thin filled rectangles; Chromium and TeX both draw them as
-  rectangles) and stroked square-root shapes. A rule counts when maths rows touch it and it
+  rectangles) and stroked square-root shapes. A rule counts when math rows touch it and it
   is not much wider than they are (a table rule beside a `>4` cell does not count). A bar
   that starts at the top-right corner of a `√` glyph is reported as `"radical sign"`.
-- **Display equations** are built from maths rows in two steps (`_equation_regions`):
+- **Display equations** are built from math rows in two steps (`_equation_regions`):
   1. *Lines.* Rows touching one fraction bar or radical (numerator, denominator,
      radicand), the main row at the bar's height (the `v =` before a fraction, within 4
      font sizes of it), rows on one baseline up to 6 font sizes apart (the columns of an
@@ -534,17 +534,17 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
      whose rows `1  x > 0` are whole equations of their own), or both are whole equations
      whose first relations are aligned within 0.3 x font size (an `align` system). Two
      whole equations stacked close but
-     centred on their own (`time = d / v` over `d = v × time`), two numbered equations
+     centerd on their own (`time = d / v` over `d = v × time`), two numbered equations
      (each row of a numbered `align`) and equations at paragraph spacing stay apart.
 
-  The box covers every row and the rules the equation uses (no rule of a neighbouring
-  equation). A single row of at most two characters without a maths character (`>4`,
+  The box covers every row and the rules the equation uses (no rule of a neighboring
+  equation). A single row of at most two characters without a math character (`>4`,
   `+8`) is not an equation.
 - **Exercise numbers.** A numbered exercise that is only an equation (`18. 0 = 5 t -
   4.9 t`) is one row, because the number and the equation sit on one baseline. The first
   token is cut off into a text row of its own (`_split_exercise_numbers`) when it is one
   to three digits and a full stop or bracket (`18.`, `4)`; also `18 .` in two spans),
-  drawn in a text font (no maths font, no maths character), with a gap before the rest,
+  drawn in a text font (no math font, no math character), with a gap before the rest,
   and the rest alone reads as a display equation. The number then stays a paragraph in
   front of the equation and is in neither its crop nor its text layer, which the
   text-layer checks compare the model's answer with. A row that already starts a list
@@ -555,15 +555,15 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   system) is marked the same way (`_lone_exercise_number`, `_Row.exercise_number`); read as
   a fragment it was drawn into the equation by `_math_neighbours`.
 - **Rows of a table, braced systems (T2-2).** Two whole equations also join when they are
-  set at most 0.7 x font size apart and share a left edge, a right edge or a centre
-  within 0.3 x font size (`_table_rows`: OpenStax centres each row of a system; a row may
+  set at most 0.7 x font size apart and share a left edge, a right edge or a center
+  within 0.3 x font size (`_table_rows`: OpenStax centers each row of a system; a row may
   line up with any earlier row of its equation, not only the last). A row with a fraction set
   at the size of its line (a glyph that size on both sides of a bar, with no relation among
   them) is never a table row: `time = d / v` over `d = v t` are two equations, where the
   small fractions of a system's rows are not. Two numbered rows still stay apart. A system's opening brace is part of the equation: a brace in the text font on
   the first row after prose ("Solve the system by substitution. { 2x + y = 7") is cut from
-  the sentence (`_split_braced_systems`: maths follows it, there is no closing brace, and
-  a maths row sits under that maths), and a brace that is a row of its own, level with the
+  the sentence (`_split_braced_systems`: math follows it, there is no closing brace, and
+  a math row sits under that math), and a brace that is a row of its own, level with the
   middle of the rows, joins them whatever its distance to the left (`_Line.opens_system`);
   alignment ignores it (`_Line.body_x0`).
 - **Inline stacked fractions (T2-1, T2-11).** A fraction set in a line of text has its
@@ -575,30 +575,30 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   digit, not a tall bracket). It applies only when the line of the bar has three plain
   letters (a display equation's fractions are read with their rows), the glyphs are
   smaller than the text and not wider than the bar, and no other bar lies among them (a
-  complex fraction is left as it was). `stacked` glyphs count as maths and are evidence of
+  complex fraction is left as it was). `stacked` glyphs count as math and are evidence of
   an inline equation (`"stacked fraction"`); they do not set a row's size or baseline.
   `_lift_stacked_pairs` does the same for a binomial or a column of two (`( 5 over 3 )`:
   brackets round one short token above and one below, nothing between them on the line of
   the brackets). A lone bracket that is a row of its own (TeX sets a tall bracket lowered)
   joins the line it stands in (`_attach_big_operators`), and a closing bracket followed by
-  a sub- or superscript is evidence of maths (`(x)ₙ`).
+  a sub- or superscript is evidence of math (`(x)ₙ`).
 - **Half a fraction (T2-11).** An equation whose box ends at a thin bar with glyphs on the
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
 - **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Three patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
-  clear keeps the old behaviour.
+  clear keeps the old behavior.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
      (`_CONNECTIVES`: and, or, for, for all/any/every/each, where, with, if, when, otherwise)
      alone in its row, between two formulas on its line. `_join_connectives` joins the formula
      before it (a whole equation) and the one after it (a whole equation, or after "for" a
      condition of three glyphs or fewer) when both reach it within `CONNECTIVE_GAP` (9 font
      sizes) and the word sits at the height of their middle (a fraction's bar); the word becomes
-     a maths row, so the crop, the text layer and the reading hold it, and the display's one
+     a math row, so the crop, the text layer and the reading hold it, and the display's one
      number (at the right margin) belongs to it. A row that is one line of text and holds only
      this (`_joined_formulas`: one connective, a relation with something on both sides of it,
-     the rest maths; "P(A) = 1 and P(B) = 2,") is a display row too. Any other word
+     the rest math; "P(A) = 1 and P(B) = 2,") is a display row too. Any other word
      ("where we assume", "Let x = 1 and y = 2") leaves the row as text; two numbered equations
      are never joined. Before, the word was a paragraph read after both equations and an
      inline "and" row was two inline equations.
@@ -620,38 +620,38 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   row); a display set with function names in a text font (`PMI`, `Unif` in Times) is still
   cut at the word, and an equation number set above the first row of a tall display is still
   an element of its own.
-- **Inline maths split or merged (T2-6).** A middle dot `·` or `∙` in the text font (Chromium
+- **Inline math split or merged (T2-6).** A middle dot `·` or `∙` in the text font (Chromium
   prints a product so) is an operator, so a run goes on through it. A blank in a text font
-  between maths-font glyphs ends the run (`_between_formulas`): Chromium puts the spaces
-  inside a formula in the maths font and the space between two formulas ("B = 0, C = 1")
+  between math-font glyphs ends the run (`_between_formulas`): Chromium puts the spaces
+  inside a formula in the math font and the space between two formulas ("B = 0, C = 1")
   in the text font.
 - **Equation numbers.** A row that reads as an equation number and touches no rule goes
-  to the line it sits beside (`_number_beside`, nearest vertical centre first), unless
+  to the line it sits beside (`_number_beside`, nearest vertical center first), unless
   that line ends with a relation or operator (`x =   2.4`: the number is its right-hand
   side). It becomes `equation_label` and stays out of the text and box. A number merged
-  into a maths row (`_merge_baselines` joins pieces up to 4 font sizes apart: `= 2000 m −
-  525 m ,   2.8`) is first cut off when it stands at least one font size clear of maths
+  into a math row (`_merge_baselines` joins pieces up to 4 font sizes apart: `= 2000 m −
+  525 m ,   2.8`) is first cut off when it stands at least one font size clear of math
   (or of the comma that ends it) that does not end in a relation; a prefixed number
   (`Eq. 2.4`, `Equation (2.4)`) is cut off whole, measured from before the prefix. A
-  number inside the maths that is not beside any line stays part of it.
-- **Inline equations** inside paragraph rows: a stretch of maths-capable characters
-  (maths characters, digits, operators, brackets, single letters, sub/superscripts, a decimal
+  number inside the math that is not beside any line stays part of it.
+- **Inline equations** inside paragraph rows: a stretch of math-capable characters
+  (math characters, digits, operators, brackets, single letters, sub/superscripts, a decimal
   point or a comma inside brackets), trimmed of spaces, trailing operators and punctuation,
   unbalanced brackets and a leading or trailing English `a`/`A`/`I`. It never starts with
   an operator that cannot start an expression (`/ * ^ = <` ...: `/h)] = 40` is the tail
   of a plain-text formula cut by a line break) or ends with one (including `−` and `×`).
   A bar `|` is kept at either end when the run has a pair of them (`|x| < 1`, `|r|ⁿ`);
   an unpaired bar at an edge is dropped.
-  It is kept only with evidence: a maths character; an italic single letter with an
+  It is kept only with evidence: a math character; an italic single letter with an
   operator (a leading sign does not count: `-49 m` with an italic unit is a quantity) or
   script or Greek letter; a single letter with a sub/superscript (`x²`); a signed number
   with a real minus sign (`−3`); or a relation with operands on both sides (`x = 5`, not
-  markup such as `<a><b/>`). Without a maths character the run's brackets must also
-  open and close in order. A lone italic word, `[3]`, `10-12` and `2019` are not maths.
-  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run; maths
+  markup such as `<a><b/>`). Without a math character the run's brackets must also
+  open and close in order. A lone italic word, `[3]`, `10-12` and `2019` are not math.
+  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run; math
   function names (`sin`, `lim`, `proj`, `rank`, `diag` ...) are not English words. List
   bullets (`•`, `▪`, Word's private-use Symbol bullet U+F0B7, and a `·` or `∙` that
-  starts a line) are never maths, even in the Symbol font Word draws them in.
+  starts a line) are never math, even in the Symbol font Word draws them in.
 - When `,` `.` `;` `:` or `?` follows an inline equation, its box's right edge moves left by
   up to `CROP_PAD` (crop's default padding, 2 pt) so the padded crop ends where the
   punctuation starts and still holds every glyph. The mark stays in the paragraph after
@@ -663,15 +663,15 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
 Checked on `tests/fixtures/layout/latex/` (Tectonic, Computer Modern and beamer's Latin
 Modern Sans):
 
-- CMMI, CMSY, CMEX and CMBSY are maths fonts; CMBX, CMB, CMMIB (`\bm`, `\boldsymbol`)
+- CMMI, CMSY, CMEX and CMBSY are math fonts; CMBX, CMB, CMMIB (`\bm`, `\boldsymbol`)
   and CMBSY are bold, so bold vectors keep their weight in the text layer (`𝐯`).
 - TeX's `\neq` is a zero-width negation slash (U+0338) over `=`; text cleaning joins it
   into `≠` (and `≮`, `∉`, ...). The text-font capital Delta (OT1 CMR) extracts as U+2206
-  and counts as a maths symbol.
+  and counts as a math symbol.
 - MuPDF's superscript flag is set on any span that starts above the previous one, which
   in TeX output is most of a line after an inline fraction, so a character is a script
   only if it is smaller, or flagged and raised by at least 0.2 x font size.
-- Beamer sets maths letters in Latin Modern Sans Oblique, a text font. Short italic runs
+- Beamer sets math letters in Latin Modern Sans Oblique, a text font. Short italic runs
   (at most three letters) are variables, not words, when the row also has upright
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
@@ -699,7 +699,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   of a longer row), the rows are in the same order and within 10 % of the page of where they were,
   and every picture and drawing is there too. Pictures are every raster image (a digest of its
   pixels, `get_image_info(hashes=True)`, empty ones skipped) and the vector drawings in the body
-  (kind, colour and box; the top fifth and bottom 12 % are the headline and footline), each within
+  (kind, color and box; the top fifth and bottom 12 % are the headline and footline), each within
   3 pt of where it was. So `\pause`, `\item<n->` and `\uncover`, which only add, collapse, and a
   step with a different picture, a changed row or a reordering stays. A dropped page is removed
   before margins, page types, tables and rows are read, so it costs no crop and no model call, and
@@ -728,7 +728,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   are enough, a side needs two rows whose left edges line up and a median row width of 15 % of
   the text width, and both sides must have a word of three letters (`_words_both_sides`), so the
   brace and the cases of a piecewise function are not two columns. Left column, then right.
-- **A bullet that wraps onto a line of maths** ("The energy is zero at" / "x = 0.") was a display
+- **A bullet that wraps onto a line of math** ("The energy is zero at" / "x = 0.") was a display
   equation: `_wrapped_maths` compared the line with the paragraph's left margin, and a list
   item's text starts after its marker. In a deck the marker's x counts; elsewhere the rule is
   unchanged.
@@ -744,7 +744,7 @@ small pictures, not drawn shapes, so a list in those themes is one paragraph (th
 triangles are glyphs and work); sidebar themes (Berkeley, Goettingen) put the outline in a column
 beside the frame, which is read as a column of text; a deck that is neither Beamer nor has
 repeated labels (a PowerPoint export) gets none of this, and its steps, if any, stay pages; `\only`
-steps are kept whole (one page each, labelled) rather than merged.
+steps are kept whole (one page each, labeled) rather than merged.
 
 ### Inline formulas in LaTeX papers (2026-10-21)
 
@@ -753,21 +753,21 @@ a paper page is mostly `$x$` in running text, in a font the OpenStax prints neve
 layout learned from it, all from the text layer and the glyph boxes, no model call. The rules that
 come from what a TeX author types (italic variables, bold letters with an index, the edges: parentheses, units,
 citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`: the producer or creator names pdfTeX, XeTeX or XeLaTeX (`xdvipdfmx`, what Overleaf offers), LuaTeX, LuaHBTeX, dvips, dvipdfm(x), Tectonic, arXiv's `tex2pdf` ("arXiv GenPDF (tex2pdf:...)", one word that `tex` does not match) or VTeX, or says LaTeX or TeX, as whole words in `page_type.TEX_PRODUCER`; a substring match took Quartz's "PDFContext" and iText for TeX): an
-OpenStax print from Chromium, where emphasis is italic and the unit is inside the maths, is read as before
+OpenStax print from Chromium, where emphasis is italic and the unit is inside the math, is read as before
 (`scripts/layout_identity.py` on 126 PDFs: 111 identical, the rest explained in
 [eval-equation-rootcause.md](eval-equation-rootcause.md) section 7). Captions, ellipsis lists and `:=` apply to every producer.
 
 - **Italic variables** (`_italic_variables`, evidence `italic variable in prose`). mathptmx, mathpazo,
   Charter and newtx set the Latin letters of a formula in the text family's italic, so a lone `S`,
-  `N_i` or `K(t)` has no glyph in a maths font. A run of italic letters (at most three letters in a
+  `N_i` or `K(t)` has no glyph in a math font. A run of italic letters (at most three letters in a
   group, a group that is not a short English word, so "not" and "for all" stay words) standing in
-  upright prose, whose neighbours are not italic letters, is a variable. Not variables: an italic
+  upright prose, whose neighbors are not italic letters, is a variable. Not variables: an italic
   phrase (a theorem set in italics, where `a` and `I` are words and a short word beside a longer
   italic one is text, `_word_lengths`), a label (`(a)`, `a)`), a reference to a part of a figure
   (`6(a)`, `5(d,e)`), a number and a space and an italic letter (`-49 m`, a quantity with its unit).
 - **A bold letter with an index** is a vector set in a text font (`v` in Times Bold with a lowered `2`);
   its script is an index, not the count of `H2O` (`_bold_variable`).
-- **Where a formula starts and ends** (`_trim_run`, `_inline_runs`). The author's maths stops at the dollar
+- **Where a formula starts and ends** (`_trim_run`, `_inline_runs`). The author's math stops at the dollar
   sign, so the parentheses of the sentence around a whole formula (`(x = 0.9)`; a tuple, which has a
   comma at its top level, keeps them), the upright unit after a number (`915 s`), a numbered
   citation after a space (`[8]`) and an opening bracket that the formula does not close are not part
@@ -776,13 +776,13 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   formulas). A list with an ellipsis (`i = 1, ..., S`) is one formula, a map `H : R -> S` is one (a colon
   between two runs, the second with an arrow or a membership sign: `_join_signatures`).
   On the 25 development papers 27 of 31 formulas cut inside a pair of parentheses had the pair
-  outside the author's maths, and of the formulas that ended in an upright unit 37 were span failures
+  outside the author's math, and of the formulas that ended in an upright unit 37 were span failures
   against 2 that were exact.
 - **Inline span edges from glyphs** (`pipeline/glyph_math.py`, 2026-11-03). Five more rules, all gated on a TeX-made PDF, read what the
-  page shows at an edge, and only move the edge of a run that was already maths (none makes text a formula,
+  page shows at an edge, and only move the edge of a run that was already math (none makes text a formula,
   so no text is lost: what leaves a run stays in the paragraph). (1) A comma, colon or semicolon that is
   raised or lowered between two raised or lowered glyphs is part of the index: `\rho_{m,q}` was read as
-  `q(x)`, `g_{1:T}` as `g_1`. (2) A blank whose two neighbours touch (gap under 0.1 em) is no space: the
+  `q(x)`, `g_{1:T}` as `g_1`. (2) A blank whose two neighbors touch (gap under 0.1 em) is no space: the
   text layer puts one between a radical and its radicand, and `O(\sqrt T)` was cut at the radical.
   (3) One of a short list of operator names that papers set upright (`glyph_math.OPERATOR_NAMES`: `Pr`, `Cov`,
   `supp`, `vech`, `Unif`, ...) that touches an opening parenthesis is a function name and the formula goes on through
@@ -800,11 +800,11 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   puts in another line (`\widetilde W`) still end a run, and a top-level comma between two variables
   (`S, M \to \infty`) still ends it.
 - **Short formulas the runs miss** (`glyph_math.relation_runs`, `layout._with_simple_maths`, 2026-11-03). A relation
-  glyph in a maths font (`\approx`, `\sim`, `\le`, `\ge`, `\ll`, `\gg`, `<`, `>`) and the number after it (`\approx 0.14`,
-  `\geq 2`, `\geq 90\%`) is one inline formula when the glyph before the relation is no maths and no digit: the run finder
+  glyph in a math font (`\approx`, `\sim`, `\le`, `\ge`, `\ll`, `\gg`, `<`, `>`) and the number after it (`\approx 0.14`,
+  `\geq 2`, `\geq 90\%`) is one inline formula when the glyph before the relation is no math and no digit: the run finder
   dropped such a relation as the tail of a formula that a line break cut, and the number had no evidence of its own. A
   run that is only the number is replaced by the whole; a longer run is left alone. Measured, with the evidence that was
-  tried and left out, in [eval-equation-diagnostics.md](eval-equation-diagnostics.md), "Simple inline maths": a number
+  tried and left out, in [eval-equation-diagnostics.md](eval-equation-diagnostics.md), "Simple inline math": a number
   with a percent sign, a number with a unit, an equation reference `(1)`, a bare number and an upright letter have no
   glyph that tells the author's `$...$` from text (a percent rule predicted 20 and aligned 4), so none is a formula
   here; a page number, a citation, a list marker, a year and a figure number are never taken
@@ -812,7 +812,7 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
 - **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the
-  maths into the `<figcaption>`; the equation step reads them as any inline equation. Table captions
+  math into the `<figcaption>`; the equation step reads them as any inline equation. Table captions
   are not cut this way (the table step owns them).
 - **Bold italic.** `CMMIB`, newtx's `bmi`, Nimbus `MediItal` and `BoldItalic` fonts give bold-italic code
   points in the equation's text layer (`_Char.styled`), so the equation step can tell `\boldsymbol{x}` from
@@ -822,8 +822,8 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
 
 OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of the
 sentence's row and the two equations in rows of their own to its right, level with the brace and
-not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a maths row
-starts within two font sizes to its right, another maths row sits under that one, and the brace's
+not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a math row
+starts within two font sizes to its right, another math row sits under that one, and the brace's
 middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
 crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
 layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
@@ -856,12 +856,12 @@ raised text (next section).
   species, the `+` and the coefficients taken as far as they go, and at least one formula in all;
   words that read as elements but carry no evidence (`HCl`, `NaOH`) count only inside a reaction.
   A trailing number belongs to the sentence. Several arrows in a row are one reaction.
-- **Where it applies**. `_inline_runs` adds the formulas and reactions of a row to its maths runs
+- **Where it applies**. `_inline_runs` adds the formulas and reactions of a row to its math runs
   (`_with_chemistry`; a run that overlaps one, such as the arrow that used to stand alone, is taken
   into it). `_classify_row` makes a row a display equation line when the whole row is one reaction
   (`_reaction_row`: the ink outside it is at most the punctuation that ends it), so the net ionic
   equations of a LaTeX page are display equations and not a paragraph with an arrow cut out of it.
-- **Spaces**. An inline equation that stands against its neighbours with a visible gap and no blank
+- **Spaces**. An inline equation that stands against its neighbors with a visible gap and no blank
   glyph between them (the text after `SO42-` in TeX output) gets a space on that side
   (`_gap_before`, `_gap_after`); `releases ⟦e1⟧ions` read as one word before.
 - Measured on the 121 PDFs of `scripts/layout_identity.py`: 96 are identical, and the 25 that differ
@@ -874,7 +874,7 @@ raised text (next section).
   an element symbol first) is one inline equation per item, and a row that is two or more
   reactions with a semicolon between them (`(a) A ⇌ B; (b) C ⇌ D`) is a prose row whose
   reactions are inline equations of their own, the list marker left out, not one display line.
-  This works on the letters whatever their font: chemistry set in a maths font has no
+  This works on the letters whatever their font: chemistry set in a math font has no
   upright-text evidence for `pipeline/chem.py`.
 - **Half-reactions** (`_half_reaction_label`). A label that names a half-reaction and ends in a
   colon (`anode (oxidation):`, `Overall:`) joins the reaction that follows it on the same baseline
@@ -912,7 +912,7 @@ this section describes.
   closing bracket only when the group it closes holds upright text (`(SO4)3`, `[Zn]2+`), or,
   for digits only, the capital letter right after it (`226Ra`, a mass number; before a word,
   never after one; since 2026-10-21 that case is no longer raised text, see "Nuclides" below).
-  A script of an italic letter or a letter in a maths font (`E` with a
+  A script of an italic letter or a letter in a math font (`E` with a
   subscript `k`, `x2`) is not given to this: it stays an inline equation, as before, and the
   model reads it.
 - **Nuclides** (`_nuclide_runs`, 2026-10-21): the mass number raised and the atomic number
@@ -927,10 +927,10 @@ this section describes.
   isotope tables of 2.3 are tables, not prose, and are untouched. The new inline equations in a
   Word lecture are real nuclides its gold does not list as equations.
 - **Evidence** (`_inline_evidence`): a script of upright text is no evidence that a run is
-  maths. `H2` was an inline equation, `SO4` was not, and half a formula reached the model
+  math. `H2` was an inline equation, `SO4` was not, and half a formula reached the model
   ("2O3", "34-"); now a run that only such scripts made is dropped. Inside a run that is
-  maths for another reason (an arrow, a relation, an italic variable with an operator: `2H2 + O2
-  -> 2H2O`, `E = mc2`) the scripts stay part of it. A formula or an ion is maths for its own
+  math for another reason (an arrow, a relation, an italic variable with an operator: `2H2 + O2
+  -> 2H2O`, `E = mc2`) the scripts stay part of it. A formula or an ion is math for its own
   reason, found by `pipeline/chem.py` (the section "Chemistry in running text" above), so `H2` and
   `SO4` are no longer dropped, they are inline equations.
 - **Stacked scripts** (`_merge_baselines`, `_insert_script`, `_stack_position`): a lowered and
@@ -940,7 +940,7 @@ this section describes.
   first after a base (`SO42-`) and raised first before one (`14 6 C`).
 - **Rows of mostly scripts** (`_Row.size`): a row's size is the size of most of its glyphs,
   and a nuclide's "92 U -> 234" has five script glyphs and three full-size ones, so its
-  scripts were taken for its text, never recognised as scripts, and the equation was cut
+  scripts were taken for its text, never recognized as scripts, and the equation was cut
   into pieces (the symbol of the nuclide lost, a heading made of "238"). A row whose small
   glyphs are 62-85 % of a larger size, each run of them off the larger glyphs' baseline by
   at least 4 % and at most 70 % and within 60 % of a larger glyph, is now set in the larger
@@ -974,7 +974,7 @@ nobody checked the formula. A picture of an equation has no text layer, so `layo
 decides before it makes a figure (`_equation_pictures`, `pipeline/equation_images.py`):
 
 - **The picture**: not larger than a few lines of text (at most 10 body sizes and 110 pt tall,
-  520 pt wide), black marks on white with almost no colour (`MAX_COLOUR`), 0.4 to 25 % of the
+  520 pt wide), black marks on white with almost no color (`MAX_COLOUR`), 0.4 to 25 % of the
   area inked, at least 60 % white, and no single piece of ink spanning 70 % of both sides
   (a plot's axes, a box). It is rendered at 144 dpi, shrunk to 400 px, and read as a bitmap;
   no model is asked. Neither a picture with labels nor one with a caption ("Figure 2.1" within
@@ -1005,8 +1005,8 @@ inline equation, and the equation step fixes it without a model call
 
 Two functions in `layout.py`, nothing else in the page flow changes:
 
-1. `_bold_letter_runs`, per paragraph row, beside the inline maths runs:
-   - a maths run that is one bold letter (a bold omega in CMMIB, a maths bold code point)
+1. `_bold_letter_runs`, per paragraph row, beside the inline math runs:
+   - a math run that is one bold letter (a bold omega in CMMIB, a math bold code point)
      is marked `bold letter in prose` with the evidence `maths font`;
    - any other bold Latin letter that stands alone (its token, split at spaces, is the
      letter and punctuation only) is a candidate, except: a bold word in the token on
@@ -1018,12 +1018,12 @@ Two functions in `layout.py`, nothing else in the page flow changes:
      unless the course lists it. A candidate the course lists (`NotationEntry.canonical`)
      keeps the evidence `course notation`.
 2. `_settle_bold_letters`, once for the whole document, keeps a waiting candidate only
-   with evidence: the same bold letter in the document's maths (a display or inline
+   with evidence: the same bold letter in the document's math (a display or inline
    equation: `bold in the document's maths`), or, for a small letter, another bold letter
-   that is maths in the same paragraph (`maths in the paragraph`). Any other candidate
+   that is math in the same paragraph (`maths in the paragraph`). Any other candidate
    goes back into the text as the plain letter it was.
 
-Running text is paragraphs and list items (the blocks that may hold inline maths), so a
+Running text is paragraphs and list items (the blocks that may hold inline math), so a
 bold letter in a heading or a caption is never touched; bold words and labels are left
 alone, not raised as notes. The evidence is the element's last reason (content-free,
 like every reason).
@@ -1042,13 +1042,13 @@ one-letter `<strong>` in the OpenStax XHTML outside headings and captions that i
 continued as a formula. The other five LaTeX fixtures (`vectors_relations`,
 `calculus_notes`, `kinematics_slides`, `problem_set`, `letter_styles`) have no bold letter
 in their prose and get none (`vectors_relations` writes its vectors with `\vec`). On the
-handout, 10 letters were kept by the same bold letter in its displayed maths and the omega
-by its maths font; on OpenStax, 7 by the document's maths and 2 by a bold letter nearby.
+handout, 10 letters were kept by the same bold letter in its displayed math and the omega
+by its math font; on OpenStax, 7 by the document's math and 2 by a bold letter nearby.
 With a course notation listing bold d, v, a, x and s, the same 9 are found, each by the
 course. Not covered: PDFs whose font does not mark bold (no candidate is seen at all
 there), and bold letters in captions. A bold answer letter in a document whose same bold
 letter is a vector elsewhere ("The correct answer to question 3 is **b**") is still made
-maths by the document's evidence; the equation step's own tiers then decide it.
+math by the document's evidence; the equation step's own tiers then decide it.
 
 
 
@@ -1060,8 +1060,8 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   is the safety net's, below). Decoration is decided by the size drawn, not the pixels: a
   21-pixel QR code drawn an inch wide is a figure. An image under 24 px on a side is
   decoration only when it is plain (`_plain_image`: looked at shrunk to 128 px, at most 2
-  pairs of neighbouring pixels differ by more than 16 levels, and what is seen, alpha
-  above 13, covers all of it or nothing: a transparent spacer, a one-colour block, a
+  pairs of neighboring pixels differ by more than 16 levels, and what is seen, alpha
+  above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
@@ -1069,7 +1069,7 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   double frame, a frame with corner ticks or curls; or a page-long rule within 15 % of an
   edge that is no plot's axis and no ruler, below), a background fill (85 % of the page's
   area or more, or a straight-edged panel round the page with a margin of up to 15 %) and
-  a band of colour along an edge (a slide template's title bar, at most 15 % of the page
+  a band of color along an edge (a slide template's title bar, at most 15 % of the page
   deep). A drawing's box holds every point of its path (`_drawing_bounds`: MuPDF's box
   leaves out the start of a subpath that begins away from where the last one ended, so
   a plot's axes drawn as one path, `80 75 m 640 75 l 80 335 m 80 75 l S`, read as the
@@ -1140,7 +1140,7 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   frames round paragraphs with a grid of cell borders drawn in pieces (an open chain)
   hold running text, so the chain is no sign. A rounded rectangle (at least 60 % of its
   outline straight horizontal and vertical lines) is a box, not a curve, so a rounded
-  callout around text is not a figure. One tick icon in a table cell does not make the
+  callout around text is not a figure. One check-mark icon in a table cell does not make the
   table a figure. A small mark just left of a text row at its height is a drawn list
   bullet, not a curve of a figure. Equation rules are taken out first.
   **Drawings that fill the page** (85 % both ways: a full-page plot, a slide's chart):
@@ -1173,21 +1173,21 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   left out, the figure's crop missed them.
 - **Small drawings on a typed page** (`_leftover_drawings`, 2026-10-12): the other
   drawings too small to be figures were dropped with nothing to say so (the silent-loss
-  sweep: a warning icon, a benzene ring, a number line, maths drawn as glyph outlines, a
-  hand tick). On a page with a line of text or more, they are grouped (within 24 pt) and
+  sweep: a warning icon, a benzene ring, a number line, math drawn as glyph outlines, a
+  hand check mark). On a page with a line of text or more, they are grouped (within 24 pt) and
   each group is kept when it is at least 6 pt on its longer side or has 3 marks in
   different places. Pen marks (most of their paths are the page type's pen strokes, or
   every path is an open stroked line or curve, or a hand mark over typed text, below: a
-  tick, a cross, a signature; never a ruler's straight lines) become a handwriting
+  check mark, a cross, a signature; never a ruler's straight lines) become a handwriting
   region (below, never sent to the figure model); any other drawing a figure for the
   figure model. On a `mixed_ink` page all of them are cut out with the handwriting; on a
-  page with ink the checks rejected or did not analyse, the safety net keeps the page
+  page with ink the checks rejected or did not analyze, the safety net keeps the page
   image instead. Not counted: a drawn list bullet, a mark repeated in the header or
   footer band (a logo), horizontal and vertical lines and boxes alone (an empty answer
   box, a black box over a line) unless they are a ruler (a timeline), bonds or boxes
   joined by lines (below), dots alone (4 pt or less: dot leaders, bullets the bullet
   test missed) unless they are round a letter (below), anything whose middle lies in an
-  element (an underline, a box round a word, maths drawn inside a line of text) unless
+  element (an underline, a box round a word, math drawn inside a line of text) unless
   it is a pen mark over the text, bonds, dots or an icon round a glyph (below), the
   ornaments of a page frame (marks at its edges, or a group that runs round the page)
   and a shape painted over hidden text. A page with less than a line of text keeps its
@@ -1209,35 +1209,35 @@ maths by the document's evidence; the equation step's own tiers then decide it.
 - **Pen marks over typed text** (`_pen_mark_over_text`, 2026-10-12): one or two strokes,
   each an open stroked diagonal line or curve that is no radical sign, whose middle lies
   in a paragraph, list item or heading and that reach out of the line under them (or the
-  nearest line they are beside) by a quarter of their height or more: a hand tick, a
+  nearest line they are beside) by a quarter of their height or more: a hand check mark, a
   cross or a slash drawn over a line, bigger than its text. They are cut out as
   handwriting with the rest; the text under them stays read. Before, they were taken as
   part of the line, like an underline, and lost with no decision. An underline is
   straight, a box round a word closes, and a cancel stroke across a term or an icon set
   in a line stays within it: those are still part of the text. Since 2026-10-13: one
-  curved outline, closed (an answer circled by an ellipse) or filled (a tick drawn as a
+  curved outline, closed (an answer circled by an ellipse) or filled (a check mark drawn as a
   note app's filled ribbon, covering at most half of its box: a highlight behind a line
-  covers nearly all of it), in another colour than the text under it (an sRGB component
-  0.3 or more apart: a circle round a step number in the text's colour is the text's),
+  covers nearly all of it), in another color than the text under it (an sRGB component
+  0.3 or more apart: a circle round a step number in the text's color is the text's),
   is a pen mark too; and a display equation holds no mark at least as tall as its text
-  (a tick over an equation: the transcription would leave it out). Measured on the
+  (a check mark over an equation: the transcription would leave it out). Measured on the
   private research corpus (not in this repository) and the repository's
   PDFs: of the 17 drawings too small to be figures whose middle lies in a text element
   on born-digital pages (the 586 real born-digital pages, fresh set 4, the 42 OpenStax
   renders, the three printed gold sections, the demo source and the fixtures), none is
   an open diagonal or curved stroke, so none is cut out at any overflow threshold; on
-  15 synthetic marks over text (ticks of 10 to 30 pt, crosses, a slash, a circle, a
+  15 synthetic marks over text (check marks of 10 to 30 pt, crosses, a slash, a circle, a
   question mark, a wavy underline, an arrow), 13 are cut out (3 were before, as pen
-  strokes or outside the text): a tick no bigger than the text (10 pt over 11 pt type)
+  strokes or outside the text): a check mark no bigger than the text (10 pt over 11 pt type)
   stays within its line, and an arrow whose head reads as a radical sign is not a pen
-  mark. The only machine-drawn marks of this shape seen are tick icons in table cells
+  mark. The only machine-drawn marks of this shape seen are check-mark icons in table cells
   (the sweep's `B_table_with_tick_icons`), which a table holds and this rule leaves
   alone. The 2026-10-13 rules change no element on those born-digital pages; the one
   page they first touched, a yellow highlight annotation over a line in the handwriting
   fixtures, is why a filled mark must be a thin ribbon.
 - Overlapping figures merge (a photo with arrows drawn on it). Text inside a figure, and
   short labels (at most 25 characters) within 0.6 x font size of its edge or across it (a
-  tick label half inside the box), belong to it and grow its box. A maths row is a label
+  tick label half inside the box), belong to it and grow its box. A math row is a label
   only when it is at most three glyphs (an axis variable `x` in CMMI). Running text does
   not: two prose lines (3+ English words each) that read as consecutive lines of one
   paragraph, and the short last line that continues them ("the three."), or a title-sized
@@ -1246,7 +1246,7 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   the reading flow. A picture with such text on it stays a figure and the text keeps its
   place in the outline (2026-10-12: a slide's photo under its title, a caption box over a
   photo and a report's screenshots under their captions were dropped as backgrounds,
-  with no decision). Only a plain picture (a coloured panel or a wash drawn as an image,
+  with no decision). Only a plain picture (a colored panel or a wash drawn as an image,
   `_plain_image`) under running text is a background and is dropped.
 - **Captions**: a run starting `Figure N` / `Fig. N` followed by punctuation or a capital
   letter ("Figure 2 shows ..." is prose) attaches to the nearest figure that overlaps it
@@ -1273,7 +1273,7 @@ edge of the block over that advance; spaces are the text layer's own, except tha
 space narrower than half an advance is one the layer made up for a gap and is not kept,
 and a gap of 1.8 advances or more between two characters with nothing between them is
 spaces. Blank lines are kept. The block is never joined with a paragraph above or below
-and its inline maths is not looked for. The assembler writes `<pre><code>` with the text
+and its inline math is not looked for. The assembler writes `<pre><code>` with the text
 escaped and the CSS added only when a document has code; a block with a line over 36
 characters is a tab stop named "Program code" (axe `scrollable-region-focusable`, as
 equations are). A box drawn round one line of code is its frame, not a figure
@@ -1330,7 +1330,7 @@ them once after the elements are made (`outline.apply`) and uses them before the
 rules would guess:
 
 - a heading layout found, or a paragraph that is only a plain title (no list marker, code,
-  glossary term or inline maths), whose letters and digits equal a bookmark's on that
+  glossary term or inline math), whose letters and digits equal a bookmark's on that
   bookmark's page (a section number the other lacks aside: `3 Forces` and `Forces`). A
   heading gets the reason `outline heading h2`: `tagged_level` reads it as it reads a tag
   (strong evidence, confidence 0.90, the bookmark's level as the raw level; the outline
@@ -1345,7 +1345,7 @@ rules would guess:
   of the document's paragraphs (and more than two) would be promoted, none is;
 - the heading's text becomes the bookmark's title when the two are the same letters (a
   math-italic letter, a ligature, spacing) and the heading has no raised or lowered runs;
-- consistency: at least 60 % of the bookmarks that point into the analysed pages must name
+- consistency: at least 60 % of the bookmarks that point into the analyzed pages must name
   such a line on their page, or the whole outline is ignored (an outline of another
   edition, or one a tool generated per page). An outline with one level only is ignored
   when the headings it names are set in two or more sizes, because the sizes then say more
@@ -1363,13 +1363,13 @@ that have one (Word and LaTeX exports) it is measured below ("Structure fixes, 2
 handwriting-recognition guesses over the ink (fill opacity 0, an Apple ".SF" font); an
 OCR program writes its guesses over a scan in render mode 3, or paints the page image
 over visible text. Read as content, a real 4-page set of iPad lecture notes became 26
-headings and 72 paragraphs of garbage, titled with a 35 pt scrawl, with no maths, no
+headings and 72 paragraphs of garbage, titled with a 35 pt scrawl, with no math, no
 model call and 0 decisions: "Finished. The accessible HTML is ready." OCR'd scans fell
 into the same hole, and the app's own advice for scans ("run OCR and upload again")
 produced exactly those files. There is **no handwriting or scan conversion by default**
 (decided 2026-10-09): such pages are kept as page images, marked "Not converted", with a
 decision. On request, per upload (the box "Convert scanned or handwritten pages", offered by
-`FEATURE_IMAGE_PAGES`, default off in code, on in production; [ADR 0007](decisions/0007-image-pages.md), measured in
+`FEATURE_IMAGE_PAGES`, default off in code, production's value in `src/readablestem/ops/production.profile.toml`; [ADR 0007](decisions/0007-image-pages.md), measured in
 [eval-image-pages.md](eval-image-pages.md)) a page the types below call
 `scan_no_text`, `scan_ocr`, `handwritten` or `handwritten_ocr` (kept reasons `scanned_page` and
 `handwritten_page`, and a picture under a text layer that does not cover it, `unread_page`
@@ -1396,7 +1396,7 @@ the pass cannot read stays a kept image exactly as described here.
   strikeout is not one; and the text counts as covered only when removing it (a
   text-only redaction on a one-page copy, its annotations made page content first, as a
   redaction deletes the ones it touches) does not change the rendered page there by more
-  than 1 % of its pixels. That render is the opacity check: soft masks, colour-key and
+  than 1 % of its pixels. That render is the opacity check: soft masks, color-key and
   stencil masks, constant alpha, blend modes and a yellow highlight all let the text
   show, and then it is kept. Up to 24 runs are tested per page, the rest follow them.
 
@@ -1412,23 +1412,23 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
-| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and ticked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple for the stroke test (a tick, a cross, a one-stroke signature) are cut out too ("Small drawings on a typed page") |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple for the stroke test (a tick, a cross, a one-stroke signature) are cut out too ("Small drawings on a typed page") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
-| `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analysed in time; its visible text is read, its drawings are not sent to the figure model |
+| `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analyzed in time; its visible text is read, its drawings are not sent to the figure model |
 | `blank` | nothing painted, or paper rules alone | nothing |
 
 The decisions in the rules, with the measured values next to each threshold in the code:
 
 - 40 visible characters make a page "have a text layer". Ink is "clean" when exact
   repeats are at most 35 % of the complex shapes, filled strokes share one pen width
-  (80 % within 0.75-1.33 x the median of their colour), and at most half the strokes have
+  (80 % within 0.75-1.33 x the median of their color), and at most half the strokes have
   a same-size twin. A page of writing has 40 or more clean strokes in 3 or more rows; a
   typed page with 12 strokes in a row has some handwriting. With no visible text at all,
   5 clean strokes in a row are already a short note; under a typed title (1 to 39
   visible characters) the page needs 12 strokes or a second row, as a row of five
   machine-drawn curves (five waves on a slide, five inductor coils) is not handwriting,
-  unless a hidden layer lies over them: that is a recogniser's guess at a note (machine
+  unless a hidden layer lies over them: that is a recognizer's guess at a note (machine
   drawings have none), so the page is `handwritten_ocr` whatever its title.
   A handwritten page refuses the upload whatever its typed title (as before
   page-type-v5.2): the few curves that may be machine-drawn are not called handwriting
@@ -1459,9 +1459,9 @@ The decisions in the rules, with the measured values next to each threshold in t
   `unread_page` (its text read, so the words of a title slide are not lost when the pass is off),
   but `page_type.reads_image` is true and the image page pass reads it as a scan. The render is
   made only for a page the rule might apply to. A picture that is the template's background
-  repeated on the pages or one plain colour is not content: layout asks (`_page_picture`) and
+  repeated on the pages or one plain color is not content: layout asks (`_page_picture`) and
   decides such a page again without the rule (`page_type.without_picture`).
-  Calibration: on the 846-page labelled corpus (the author's machine, not in the repository;
+  Calibration: on the 846-page labeled corpus (the author's machine, not in the repository;
   `scripts/page_type_corpus_compare.py`) the rules change no page's kind or action; a first version
   without the body-text gate changed 10 pages, all against their labels (designed covers and
   background-image pages with real text over a picture; typed slides and boxes with ink
@@ -1480,7 +1480,7 @@ The decisions in the rules, with the measured values next to each threshold in t
 - **A scan is a picture of a page** (C1.5): images cover 85 % of the page, or half of it
   with no visible text at all. A slide title over a photo is a typed page with a figure.
   Hidden text with no picture of a page over vector ink (clean, or rows of writing the
-  checks rejected, or ink not analysed) is handwriting (`invisible_without_image`). Over
+  checks rejected, or ink not analyzed) is handwriting (`invisible_without_image`). Over
   machine-drawn vector content (text turned into outlines, stamped shapes: what an OCR
   program writes over a vector page with no text layer) the page is `vector_no_text`: the
   hidden layer is dropped and the drawings are read as figures. Machine-drawn means
@@ -1492,19 +1492,19 @@ The decisions in the rules, with the measured values next to each threshold in t
   (page-type-v5.4): under a typed title, drawings with 3 or more pen strokes are
   `handwritten_ocr`, any other drawings `vector_no_text` (a slide's state diagram or a
   flowchart whose labels an OCR program read was refused at upload as `scanned_ocr`).
-- **Near-white paint** (every colour component 0.97 or more) is seen only on something
+- **Near-white paint** (every color component 0.97 or more) is seen only on something
   darker painted under it (page-type-v5.4, `page_type.paint_visibility`, used by layout
   too): the topmost fill of 100 pt² or more at 50 % opacity or more painted before it
-  that holds its middle is not near-white (a dark slide's background, a coloured panel),
+  that holds its middle is not near-white (a dark slide's background, a colored panel),
   or no fill holds it and a picture does. A dark slide's white diagram and its white
   chalk-style writing were dropped as invisible; a white box on the white page still is.
 - **Time budget** (C1.6): the ink analysis (pure Python) gets 10 s per document
-  (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analysed
+  (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analyzed
   (`INK_MAX_ITEMS`); such a page says `ink_not_analysed`. Measured on this machine,
   pinned to one core: the upload probe on a 19.6 MB file of 17 pages of dense synthetic
   ink (no text layer) took 13.8 s alone and 17.4 s with another busy process on the same
-  core, under the probe's 30 s limit; the file was accepted, because pages not analysed
-  in time never refuse an upload. Not measured on the host's CPU allowance. A page not analysed
+  core, under the probe's 30 s limit; the file was accepted, because pages not analyzed
+  in time never refuse an upload. Not measured on the host's CPU allowance. A page not analyzed
   with less than a line of typed text is kept as its image beside that text; with a line
   or more it is read as before (its drawings are figures for the figure model), unless a
   drawing fills the page, which keeps the page image (the safety net below). So writing
@@ -1521,9 +1521,9 @@ The decisions in the rules, with the measured values next to each threshold in t
   page with visible text keeps that text (as `text_kept` above), and a page with none
   has nothing but the image. Over the cap a page was before either read in full (a typed
   page with a huge vector figure: the figure went to the figure model; now the page image
-  keeps it) or analysed as ink (handwritten pages: the kept reason was
+  keeps it) or analyzed as ink (handwritten pages: the kept reason was
   `handwritten_page`, now `unread_page`; an upload of such a file is accepted, not refused,
-  as for every page whose ink was not analysed). The largest real page found has under
+  as for every page whose ink was not analyzed). The largest real page found has under
   30,000 paths; the dense synthetic pages in the research corpus have 30,000 to 86,000.
   The stored page record carries the reason code, so `kept_reason` gives the same answer
   from it.
@@ -1537,6 +1537,35 @@ The decisions in the rules, with the measured values next to each threshold in t
   groups are the same ones (`_cluster_scan` is the plain version it is tested against);
   on a page of 40,000 strokes it took 38 s and now takes under a second.
 
+**A page that raises** does not stop the document. If any step that works on one page at a
+time raises on a page (a bug), that page is kept as its image with the reason `page_read_failed`
+(a required decision, the words "This page could not be read"), and every other page is read.
+One rule, `layout._PageGuard`, covers them all: reading the page (`_read_page`), the slide-deck
+view of the page, the page's share of the margin statistic, the page-type adjustments, table
+claims (`_claim_tables`) and rows (`_prepare_rows`, the plot and answer-field marks), a page's
+list-marker candidates, its label keys, the page's blocks (`_page_blocks`), its elements
+(`_to_elements`) and the safety net's look at it. The log has the page number and the error's
+class and place, never its message or any text of the page. A spend cap, a cancel, a
+configuration error and a refusal of the file (`LayoutError`) are not taken for a page that
+raised. A document in which every page it was to read has raised still fails, counted over the
+document and not per step: a page that raised in one step and another page in a later one
+count together (`_PageGuard.settle`, after every step).
+
+What a page that failed leaves out: the steps after it do not read it (its rows, paths, tables,
+prepared rows and page type are dropped, and `page_types` has no entry for it, so the hidden-text
+notices do not mention it); the margin filter does not take it as a reference page, and its
+rows count for nothing in list markers or label keys. The document-wide steps work on the pages
+that are left. A table that goes on from the page before is not joined to a page that failed. A
+paragraph that goes on from the failed page onto the next is written there as a paragraph of its
+own, not lost to the join. The
+steps that look at several pages together stay unguarded, since one page cannot be blamed for
+them: the margin statistic's thresholds, the body size and line pitch, the document's
+spellings, the list-marker judgment, glossary entries, bold letters, numbered lines, run-in
+labels, joins over a page break, the outline, notices, footnote and contents links, and the
+slide-deck finish. The safety net is different: when its look at a page raises, the page keeps
+the elements read from it and gets its picture beside them, as when something painted was left
+unread.
+
 **The safety net** (C1.1, independent of the page types): after layout, a page keeps its
 page image, with a decision (`unread_page`), when something painted on it was read into
 nothing. The elements read from it stay; the image comes after them. It fires when:
@@ -1547,25 +1576,25 @@ nothing. The elements read from it stay; the image comes after them. It fires wh
   pen strokes under a typed title (too few to be called handwriting there, as they could
   be machine-drawn curves, and too small to be a figure), a drawing too small to be a
   figure. Rules (unless joined into a drawing, `_line_chain`, or a ruler's line and
-  ticks, `_mark_axes`), paper rules, a frame round the page, a background fill, a band of colour along an edge (a blank slide of a
+  ticks, `_mark_axes`), paper rules, a frame round the page, a background fill, a band of color along an edge (a blank slide of a
   template), a drawn list bullet beside its row, and a mark that repeats in the header
   or footer band on half of the reference pages (a logo,
   `_MarginFilter.drops_mark`) do not count (`layout._painted`). Anything else in the
   bands counts, since 2026-10-12: a note written in the top or bottom margin under a
   title, or a pen mark in the footer of an otherwise blank page, was lost;
 - on a typed page, a picture covering 85 % of the page or more that shows something
-  (`layout._page_picture`): not plain (`_plain_image`: one colour, a smooth gradient,
+  (`layout._page_picture`): not plain (`_plain_image`: one color, a smooth gradient,
   nothing seen) and not the template's background (the same image on half of the
   reference pages, `_MarginFilter.backgrounds`). Such a picture is never a figure, so it
   was dropped as a background: a scan with a stamp or a header of 40 or more visible
   characters and no hidden layer (the design review's "d1" case), a slide on a
   full-bleed photo with a title and a paragraph, a typed page under a transparent picture
   of hand-drawn circles. Its visible text is read, and the page keeps its image;
-- on a typed page with ink the checks rejected or did not analyse, a drawing too small to
+- on a typed page with ink the checks rejected or did not analyze, a drawing too small to
   be a figure lies outside every element (it may be writing: never a figure for the
   model);
 - a drawing filling the page was left out (`layout._vector_figures`) because the page
-  has ink the checks did not confirm (rejected or not analysed: a page of notes under a
+  has ink the checks did not confirm (rejected or not analyzed: a page of notes under a
   typed title, whatever the title's length), or because it is no plot and has running
   text inside or too few curves to be called a figure while holding a plotted line,
   curves or bars, and nothing was made of it once its border was off; or a drawing
@@ -1598,18 +1627,18 @@ is certain whatever its typed title; a scan needs no visible text or a hidden la
 (`page_type._certain`). A full-page picture with a few visible characters and no hidden
 layer (perhaps a slide), a page kept by the safety net (a short note under a typed title
 that may be a row of machine-drawn curves, see below) and a page whose ink was not
-analysed never refuse: the conversion keeps them as images with a decision. The worker
+analyzed never refuse: the conversion keeps them as images with a decision. The worker
 fails a result with the same rule (`worker.result_outcome`).
 
 ### Pages read from an image (on request, ADR 0007)
 
-For a conversion that has the option on (a job whose owner ticked the box; `ConversionOptions.image_pages`,
+For a conversion that has the option on (a job whose owner checked the box; `ConversionOptions.image_pages`,
 or the whole run for the CLI and the eval with `FEATURE_IMAGE_PAGES`), the kept pages with the reasons `scanned_page` and `handwritten_page` (not
 `unread_page`, not handwriting on a typed page) are read by `pipeline/image_page.py`: one vision
 call per page, the page at 200 dpi, long side at most 2,576 px (`IMAGE_PAGES_DPI`), the main model
 unless `IMAGE_PAGES_MODEL` says otherwise, effort `ANTHROPIC_EFFORT_IMAGE_PAGES` (default low), up
 to `IMAGE_PAGES_TIMEOUT_S` (180) per send. The answer is a list of blocks in reading order
-(heading with a level, paragraph or list item as text and inline-maths runs, display equation,
+(heading with a level, paragraph or list item as text and inline-math runs, display equation,
 figure with a short description, table as a grid), each with a box on a 0 to 1000 scale and a
 confidence, an unreadable word being the marker `[illegible]`. `image_page.build` makes elements
 of them (ids `p{page}-e{n}`, `Element.reasons` has "image page", `Element.image_confidence` the
@@ -1632,7 +1661,7 @@ with no fix (`IMAGE_PAGE_ORIGINAL_REASON`). A page the model cannot read (refuse
 invalid, no usable block, a spend cap) stays in `kept_pages` and is kept as its image. Each page
 has a record in `DocumentResult.image_pages` (outcome, model, calls, tokens, dollars, blocks by
 kind, markers, decisions and notes), its cost is in `DocumentStats` and its notice
-`image_page_converted` (optional) on the job page. When the box is ticked the upload probe lets a
+`image_page_converted` (optional) on the job page. When the box is checked the upload probe lets a
 PDF of scans through and counts its scanned and handwritten pages (`pdf_probe MAX_PAGES
 image_pages`, `page_type.image_page_count`), and `worker.result_outcome` does not fail the result for
 being only scans; the job's spend allowance is wider ([web.md](web.md), "Scanned and handwritten
@@ -1640,14 +1669,14 @@ pages on request").
 
 **What is not detected** (the text reaches the HTML, or the content is lost as before):
 
-- white text on a white page or a white cell (needs the colour under each glyph);
+- white text on a white page or a white cell (needs the color under each glyph);
 - text under a shape that covers less than the middle of its glyphs, or under strokes
   thinner than 3 pt (many passes of a thin pen over a line);
 - an annotation hidden from view (the Hidden or NoView flag) is not a cover, rightly:
   the text under it shows;
 - very small text (0.4 pt "microtext");
 - OCR text drawn visibly in place of the image (Acrobat ClearScan-like): it is trusted,
-  garbled maths included;
+  garbled math included;
 - white paint on a page whose dark background is a picture painted after it, or on a
   fill under 100 pt²: still taken as invisible;
 - a full-page picture under a line of typed text or more is kept as an image with a
@@ -1656,16 +1685,16 @@ pages on request").
   not;
 - hand marks too simple for the stroke test written over a line of typed text are cut
   out when they are one or two strokes that reach out of the line, or one closed or
-  filled curved outline in another colour than the text ("Pen marks over typed text");
-  a tick no bigger than the text, a mark whose shape reads as a radical sign, three or
-  more such strokes over the text, a circle drawn in the text's own colour, and a
+  filled curved outline in another color than the text ("Pen marks over typed text");
+  a check mark no bigger than the text, a mark whose shape reads as a radical sign, three or
+  more such strokes over the text, a circle drawn in the text's own color, and a
   straight-sided mark (a box drawn round an answer) are still taken as part of the line
   (as an underline and a box round a word are) and lost. Pen strokes the stroke test
   counts are cut out wherever they are. Strokes that cluster into a drawing of 24 pt or
   more on a side are a figure for the figure model, as before. Small machine drawings
   made of open strokes only (a curly arrow), one or two such strokes over a line that
-  reach out of it, and a coloured outline drawn round two or more characters of the text
-  by its author (a red ellipse round a term on a slide, a coloured badge round a step
+  reach out of it, and a colored outline drawn round two or more characters of the text
+  by its author (a red ellipse round a term on a slide, a colored badge round a step
   number) are cut out as handwriting: a needless decision, never a loss;
 - grids of small machine-drawn curves (sparklines, small multiples of loops) can look
   like handwriting: kept as an image with a needless decision (a PDF of only such pages
@@ -1689,7 +1718,7 @@ pages on request").
   looks the same): its page is kept as an image with a decision when it holds a plotted
   line, curves or bars that the border test does not make a figure of, a needless one
   for a decorated background; a frame round the page with a margin wider than 15 % is
-  not recognised, so a plot inside it is a figure the size of the frame;
+  not recognized, so a plot inside it is a figure the size of the frame;
 - an L of axes with no evidence of a plot (no ticks, no tick label or axis title just
   outside it, no curve or bars starting on it: a sketched plot with a curve that starts
   part way up the y-axis) is taken for a frame's two sides, as a title slide's accent
@@ -1708,7 +1737,7 @@ pages on request").
   drawings on a typed page"), with less text the safety net keeps the page; a ruler (a
   line with three or more ticks), bonds between atom groups and boxes joined by wires
   count there even when they are only straight lines. A drawing inside a line of text
-  (maths drawn as outlines mid-sentence, an icon in a sentence) is held by the paragraph
+  (math drawn as outlines mid-sentence, an icon in a sentence) is held by the paragraph
   and lost, and so are straight lines and boxes there that are no bonds or wires;
 - a ruler whose ticks stand on one side of it a letter cell apart with no labels is
   taken for an answer field's cells and dropped with the rules (a scale of that shape
@@ -1719,8 +1748,8 @@ pages on request").
   L: the curve is a figure, the axes are neither in it nor kept. Unfilled bars with no
   baseline joining them are one figure each (a decision each), their category labels
   paragraphs. None of these loses the chart's content (the drawings sweep, 2026-10-13);
-- with `FEATURE_TABLES` on, drawn marks inside a claimed table's cells (tick and cross
-  icons, a hand tick over a cell) exist only in the table's crop: a model that leaves
+- with `FEATURE_TABLES` on, drawn marks inside a claimed table's cells (check-mark and cross
+  icons, a hand check mark over a cell) exist only in the table's crop: a model that leaves
   those cells empty passes the check against the PDF's words, and the marks are lost.
   Not tested offline (the fake client's table is always a decision); with the flag off,
   the default, the table is kept as an image with a decision;
@@ -1746,7 +1775,7 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
   it (called drawings). The last two were then fixed (page-type-v5.1: a cover over part
   of a line is looked for; paper rules alone are blank), so v5.1 has no out-of-sample
   number of its own.
-- **The research corpus, 996 labelled pages** (not out of sample: every page was seen
+- **The research corpus, 996 labeled pages** (not out of sample: every page was seen
   while detect v1-v4 were tuned): 586 real born-digital pages, the 4 pages of one real
   set of handwritten notes and 23 derivatives of them, and synthetic handwriting, scans,
   OCR layers, mixed pages and hard negatives. page-type-v5.1 gets 984 page kinds right
@@ -1763,14 +1792,14 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
   the same errors; on the 45 synthetic handwriting pages of the corpus, each also with a
   short typed title added, the upload is refused for 45 of 45 without the title and 44
   of 45 with it (the 45th, eight strokes in one row, is kept as an image by the safety
-  net), and none is lost. One real page labelled
+  net), and none is lost. One real page labeled
   born-digital now has 8 characters under a grey box and a seal painted over them
   (checked by eye: they cannot be seen), so it is called `mixed_hidden_text` and counted
   as an error against its label. page-type-v5.4 (the silent-loss sweep's changes,
   2026-10-12: near-white paint on something darker is seen, a page with no picture is
   never a scan) gives every page of the three sets the same kind and action as v5.3:
   984 and 989 on the corpus, 29 and 29 on fresh set 4, 29 and 35 on the adversarial
-  pages; two born-digital corpus pages count more strokes (white paths on a coloured
+  pages; two born-digital corpus pages count more strokes (white paths on a colored
   panel), with no kind changed.
 
   | true \ predicted | born | mixed ink | mixed hidden | scan | scan OCR | hand | hand OCR | vector | blank |
@@ -1814,9 +1843,9 @@ rotation applied):
 
 | Drawn as | Stroke |
 |---|---|
-| stroked polylines and Bezier paths with a pen width, one per stroke, or one short segment per path object (as Xournal++ writes them) | `source="path"`: the path itself; consecutive two-point segments that continue each other, in one colour and width, are chained |
-| one small filled shape per pen sample (as GoodNotes writes them) | `source="samples"`: three or more touching shapes of one colour in a row of paint order are one stroke through the shape centres |
-| a filled outline of the whole stroke, several to a path object (as the committed `ios_notes.pdf` fixture imitates PencilKit) | `source="outline"`: the two edges are paired and averaged; the centre-line is the stroke, and the mean gap is the pen width |
+| stroked polylines and Bezier paths with a pen width, one per stroke, or one short segment per path object (as Xournal++ writes them) | `source="path"`: the path itself; consecutive two-point segments that continue each other, in one color and width, are chained |
+| one small filled shape per pen sample (as GoodNotes writes them) | `source="samples"`: three or more touching shapes of one color in a row of paint order are one stroke through the shape centers |
+| a filled outline of the whole stroke, several to a path object (as the committed `ios_notes.pdf` fixture imitates PencilKit) | `source="outline"`: the two edges are paired and averaged; the center-line is the stroke, and the mean gap is the pen width |
 
 A `Stroke` has `points` (page points, y down), `colour` (`#rrggbb`), `opacity`, `width` and
 `order` (paint order, which is the pen order). A short filled mark on its own is a one-point
@@ -1828,7 +1857,7 @@ transparent paint is not read.
 (`page_type._ink_candidates`) does not test small filled shapes on its own (a disc has no wiggle:
 it was a dot, so a page drawn as one disc per pen sample was `vector_no_text`). It asks this
 module: `dot_grid_members` takes the shapes on a lattice out (dot-grid paper), `sample_run_end`
-finds the run of touching short shapes of one colour in paint order, and `is_sample_stroke`
+finds the run of touching short shapes of one color in paint order, and `is_sample_stroke`
 (three or more) makes it one stroke, which replaces the shapes' own candidates. The page-level
 tests are unchanged (40 strokes in 3 rows, no exact repeats, one pen width), so scatter-plot
 markers (equal discs that repeat, rarely touch in paint order), stippled shading (rows of
@@ -1836,7 +1865,7 @@ identical dots, no writing rows) and dot-grid paper stay what they were. Measure
 846-page corpus: no page changes its kind; the added cost is about 55 microseconds per small
 filled shape (a 3,000-marker scatter page: 0.37 s to 0.54 s).
 
-**What is dropped as page furniture**, counted by reason in `PageInk.dropped`, never by colour
+**What is dropped as page furniture**, counted by reason in `PageInk.dropped`, never by color
 (pastel ink on a pastel template stays): `rule` (an exactly axis-aligned line at least half the
 page across), `grid` (four or more evenly spaced parallel axis-aligned lines, or four or more
 equal exact rectangles, whatever their length), `dashed` (a dashed straight line), `frame` (an
@@ -1851,12 +1880,12 @@ fraction, a matrix, a multi-line equation). Sizes are relative, so large and sma
 group alike. `InkRegion.strokes` is in pen order and `lines` indexes them row by row.
 `InkRegion.normalised(size)` gives each stroke's points with the region's top left at the origin,
 scaled evenly so the longer side is `size` (default 1000), and `to_inkml(size)` writes the same
-as InkML (one trace per stroke, one brush per colour and opacity, no time channel).
+as InkML (one trace per stroke, one brush per color and opacity, no time channel).
 
 **Limits.** Checked on synthetic ink in each style and on the two committed fixtures only; no real
 GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 
-- The direction of an outline's centre-line is a guess (the outline's first point is taken as the
+- The direction of an outline's center-line is a guess (the outline's first point is taken as the
   stroke's start). A closed loop such as a handwritten o can come out either way: on the seeded
   writer behind `ios_notes.pdf`, 139 of 150 strokes ran the right way and the 11 misses were
   closed loops.
@@ -1870,20 +1899,20 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 - Limits and time: the caps and the budget are `page_type`'s (`PAGE_MAX_PATHS`, `INK_MAX_ITEMS`,
   `InkBudget`, `INK_BUDGET_S`); `extract_ink` takes the document's `InkBudget`, checks it in
   every phase and inside the loops, and over a cap, more than 20,000 strokes (`MAX_STROKES`) or
-  the budget returns an empty result with `analysed` false. Grouping finds neighbours with a
+  the budget returns an empty result with `analysed` false. Grouping finds neighbors with a
   grid hash, so it is near linear: 50,000 strokes in a column, a row or at random group in
   1 to 3 s on this machine; strokes piled on one spot (over 1,000 in one grid cell) are an
   overrun, not a stall. Reading outlines costs about 3 ms a stroke (0.5 s for the 150 strokes
   of `ios_notes.pdf`; 0.03 s for the 270 polylines of `ink_no_layer.pdf`).
 - Strokes wholly off the page are dropped (`off_page`), and a region's box is clipped to the page.
-- On the seeded outline writer (150 strokes, 7 pt writing), the centre-line lies a median 0.4 pt
+- On the seeded outline writer (150 strokes, 7 pt writing), the center-line lies a median 0.4 pt
   (at most 1.4 pt) from the pen path; its ends can fall up to 2 pt short.
 
 ### Strokes in the image page pass (`pipeline/image_page_vector.py`)
 
 A handwritten page whose ink `ink_strokes` can read is read from its picture as before (one
 vision call, ADR 0007); the strokes are used beside it, never instead of it. A page qualifies
-when `page_type` calls it `handwritten` (or `handwritten_ocr`) and `extract_ink` analysed it
+when `page_type` calls it `handwritten` (or `handwritten_ocr`) and `extract_ink` analyzed it
 within the document's ink budget with at least 3 strokes (`image_page_vector.analyse`, through
 `layout.page_ink`). A scan, a photo, a typed page and a page over the caps go through the pass
 exactly as before. Measured on the vector dev set, a clean re-render of the ink does not make the
@@ -1892,9 +1921,9 @@ compares against and checks, not re-reading. Four uses, none calling a model:
 
 - **Sharp pictures** (`IMAGE_PAGES_VECTOR_CROPS`, default off). The picture of a display equation,
   of a prose block or list item that needs a decision, and of a stretch of ink the reading left
-  out is drawn from the strokes that sit in its box (centre within the box grown by a fifth of its
+  out is drawn from the strokes that sit in its box (center within the box grown by a fifth of its
   height and 4 pt): black on white at 300 dpi (long side at most 2,048 px), cut to the ink with
-  6 pt of paper round it, with no ruling, template or pen colour. The model's equation request, the
+  6 pt of paper round it, with no ruling, template or pen color. The model's equation request, the
   review screen and the student file get this picture; the student file's is drawn at the size its
   text is shown at and tagged with its resolution (`equation_scale.png_dpi`). A box with no stroke
   in it keeps the ordinary crop. The second reading's and the recovery's line pictures
@@ -1940,28 +1969,28 @@ MathWriting ink drawn as paths and no real GoodNotes ink has been tried.
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 
 After layout and before any step, `run` calls `text_pass.apply` once. It reads the PDF
-again for what layout does not keep (link annotations, `/Lang`, the colour of each
-glyph) and adds links, cross-references, colour runs and languages to the elements. It
+again for what layout does not keep (link annotations, `/Lang`, the color of each
+glyph) and adds links, cross-references, color runs and languages to the elements. It
 never changes an element's text and sends nothing to a model; URLs are never fetched. It
-never fails a conversion either: a PDF it cannot read again gives no links or colours
+never fails a conversion either: a PDF it cannot read again gives no links or colors
 (cross-references and the language still come from the text), and an error inside the
 pass leaves the elements as they were, logging only the exception type. What the output
 does with all this is in docs/output.md ("Links and cross-references", "Language",
-"Coloured text").
+"Colored text").
 
 ### From the page to offsets in `Element.text`
 
 Layout does not record where each character of an element's text was printed: the text
 is cleaned, joined across lines and dehyphenated. So the pass takes the glyphs of the
 page (`layout.page_glyphs`: the same raw extraction as layout's, in display space, with
-the span's sRGB colour, spaces left out), keeps those whose centre lies inside the
+the span's sRGB color, spaces left out), keeps those whose center lies inside the
 element's box (1.5 pt slack), and aligns the element's text with them
 (`text_pass.align`, `difflib.SequenceMatcher` over the characters; spaces and inline
 markers are left out of the text side). The alignment is monotonic, so a dehyphenated
 word, an extra glyph from another block inside a merged box or an inline equation's
 glyphs only leave characters unplaced; an unplaced character never starts or ends a link
-or a colour run on its own. Alignment runs only for elements a link rectangle touches,
-and (with colour on) for elements that have glyphs in a run colour; text over 20,000
+or a color run on its own. Alignment runs only for elements a link rectangle touches,
+and (with color on) for elements that have glyphs in a run color; text over 20,000
 characters is not aligned.
 
 A link covers the characters whose glyph box is at least half inside its rectangle
@@ -1978,8 +2007,8 @@ line) is one link again when only spaces separate the two pieces.
 |---|---|
 | URI with http, https or mailto (`core.types.is_safe_href`) | `Link(kind="uri", href=...)` |
 | URI with any other scheme (ftp, javascript, file), a launch action, a link to another PDF, an action PyMuPDF cannot read | no link; the text stays; notice `link_scheme_dropped` on the element (or the page, with a count, when it covers no text) |
-| GoTo, or a named destination, on an analysed page | `Link(kind="internal", target_id=...)`: the element at the destination |
-| GoTo to a page that was not analysed, a named action ("next page"), a link to its own element | nothing, and no notice |
+| GoTo, or a named destination, on an analyzed page | `Link(kind="internal", target_id=...)`: the element at the destination |
+| GoTo to a page that was not analyzed, a named action ("next page"), a link to its own element | nothing, and no notice |
 
 The destination is a point: an explicit GoTo gives it in display space, a named
 destination (hyperref's) in PDF space, which is turned into display space with the
@@ -2040,7 +2069,7 @@ Both notices are optional; the job page lets the instructor confirm or change th
 language (`text_pass.set_document_language`, source "user").
 
 Detection (`pipeline/language.py`) classifies words only: inline equations, numbers,
-single letters (mostly variables), symbols, styled maths letters and code-like tokens
+single letters (mostly variables), symbols, styled math letters and code-like tokens
 (anything with a digit, an underscore or a bracket in it) are left out. The document
 needs at least 100 letters of such prose and a probability of 0.90; a language other
 than English needs at least 250 letters and 0.99, and Latin and the constructed
@@ -2060,31 +2089,31 @@ another language is read in that language's voice, which is usually what a reade
 
 The detector is py3langid 0.4 (BSD-3-Clause), chosen 2026-10-09 over two others:
 
-| Detector | Licence | Installed size | Short academic sentences (24) |
+| Detector | License | Installed size | Short academic sentences (24) |
 |---|---|---|---|
 | py3langid 0.4 (langid.py fork, naive Bayes on byte n-grams, 97 languages) | BSD-3-Clause | 4.5 MB model, plus NumPy | 24 right |
 | lingua-py 2.2 (`lingua-language-detector`) | Apache-2.0 | about 290 MB of models | 23 right |
-| fastText lid.176 | model CC BY-SA 3.0 | 126 MB (0.9 MB compressed) | not tried: a share-alike licence on the model |
+| fastText lid.176 | model CC BY-SA 3.0 | 126 MB (0.9 MB compressed) | not tried: a share-alike license on the model |
 
-The test sentences were English with maths ("Let f be continuous on [a, b]", "Office
+The test sentences were English with math ("Let f be continuous on [a, b]", "Office
 hours: Tuesday and Thursday, 2 to 4 pm"), French, German, Spanish, Italian, Portuguese,
 Dutch and a Latin tag. py3langid loads in about 0.3 s (once per process) and takes well
 under a millisecond per paragraph. It unpacks its model through a temporary file; when
 that cannot be written (a full temporary directory) the model is unpacked in memory
 instead. If the detector still cannot run, the document gets the default language with
 `lang_assumed` and no passage is marked, and the rest of the pass (links,
-cross-references, colour runs) is kept: only the language depends on it.
+cross-references, color runs) is kept: only the language depends on it.
 
-### Colour (FEATURE_COLOUR)
+### Color (FEATURE_COLOUR)
 
 With the flag on, a paragraph or list item gets `Element.colour_runs`: maximal stretches
-of placed characters printed in one run colour, from the first to the last such
-character, across an inline equation when the text on both sides has the colour, minus
-any linked text (a link is written in the link colour), trimmed of spaces, and only with
-a letter, a digit or maths in them. A colour is a run colour unless:
+of placed characters printed in one run color, from the first to the last such
+character, across an inline equation when the text on both sides has the color, minus
+any linked text (a link is written in the link color), trimmed of spaces, and only with
+a letter, a digit or math in them. A color is a run color unless:
 
-- it is the body colour: the commonest glyph colour of the analysed pages, when it reaches
-  4.5:1 on white (a light body colour is not one, so light body text is kept and made
+- it is the body color: the commonest glyph color of the analyzed pages, when it reaches
+  4.5:1 on white (a light body color is not one, so light body text is kept and made
   darker);
 - it is near black (OKLCH lightness below 0.2, whatever its tint) or a readable grey
   (chroma below 0.035 and 4.5:1 or more on white): it reads as body text;
@@ -2092,16 +2121,16 @@ a letter, a digit or maths in them. A colour is a run colour unless:
   does not have, so it becomes body text.
 
 A light grey is a run (it is a contrast problem: the output darkens it); so is any real
-colour. Headings get no colour runs. Running text that names a colour ("in red", "shown
+color. Headings get no color runs. Running text that names a color ("in red", "shown
 in blue", "highlighted in yellow", "the green curve", "red arrows") on or within two
-paragraphs of coloured text on the same page gets the optional notice
+paragraphs of colored text on the same page gets the optional notice
 `colour_reference`. With the flag off there are no runs and no such notices.
 
 ### Source facts
 
 `text_pass.link_count(doc, pages)` counts the link annotations of any kind on the given
 pages of an open PyMuPDF document (hold layout's lock): `SourceFacts.links`. The pass
-also returns the same count for the analysed pages as `TextPassResult.annotations`.
+also returns the same count for the analyzed pages as `TextPassResult.annotations`.
 
 ## The page math hook (`pipeline/page_math_reconcile.py`, `FEATURE_PAGE_MATH`, off)
 
@@ -2117,7 +2146,7 @@ equations) and what the pass called a look-alike (`_Row.page_nonmath`, which dro
 inside it), and the rest of the page goes through the rules above unchanged. `Element.page_latex`
 and `Element.page_status` ("span": the pass placed it; "layout": only layout found it) carry the
 result to the equation step. A block span that would split a layout region or leave a piece layout
-reads as maths in a shared row is refused (`HookStats.refused`); a span whose LaTeX and quoted text
+reads as math in a shared row is refused (`HookStats.refused`); a span whose LaTeX and quoted text
 disagree is dropped (`inconsistent`); an exception in the hook leaves the page as layout has it.
 The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
 [eval-page-math.md](eval-page-math.md).
@@ -2133,6 +2162,9 @@ The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
 | `no_pages` | the file has no pages, or `pages=[]` |
 | `page_out_of_range` | a requested page index is negative or past the end |
 | `too_many_pages` | more pages requested (or in the file, with `pages=None`) than `max_pages` |
+| `content_too_large` | the object streams, a selected page or the selected pages together inflate past the content budget (`core.content_budget`; docs/security.md, "Content budget"), checked before any page is read |
+| `too_complex` | a page needs more time or memory to read than a conversion has |
+| `image_too_large` | decoding the pictures took longer than a job may spend (`core.images.DECODE_BUDGET_S`) |
 
 `crop` raises `ValueError` for bad arguments (`dpi <= 0`, `pad < 0`, `max_side_px < 16`) and
 for an element whose page or box is not in the PDF.
@@ -2196,7 +2228,7 @@ retention purge. `pipeline.run.convert_pdf` also calls `layout.release(pdf_bytes
 Crops render at `dpi` on a white background; when the long side would exceed `max_side_px`,
 the zoom drops so it fits (one pixel of headroom absorbs MuPDF's rounding).
 
-Speed (this machine, 2026-10-08): a 19-page DocBook spec analyses in 0.3 s plus the probe;
+Speed (this machine, 2026-10-08): a 19-page DocBook spec analyzes in 0.3 s plus the probe;
 a page with a 4,000-marker scatter plot takes about 1 s, almost all of it in MuPDF's path
 extraction (`get_cdrawings`, which returns plain tuples; `get_drawings` and per-point
 PyMuPDF objects were three times slower). A crop takes about 0.1 s.
@@ -2209,46 +2241,46 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   types" above.
 - **Synthetic italics.** When a PDF fakes italics by slanting an upright font (Chromium does
   this when the italic face is missing), the font name and flags say upright, so an italic
-  `x = 5` typed as text is not recognised as maths unless a maths font or symbol is involved.
-- **Plain-text maths in the body font** (`v = d/t` typed in Word without the equation
+  `x = 5` typed as text is not recognized as math unless a math font or symbol is involved.
+- **Plain-text math in the body font** (`v = d/t` typed in Word without the equation
   editor) is found inside paragraphs only through the relation rule; `d/t` alone is not.
 - **A display equation line with words** (`x = 1 if y > 0`) becomes a short paragraph with
-  inline maths, not one display equation.
-- **A CFF maths font in a Chromium print.** Chromium embeds a CFF (OpenType) maths font such
-  as Latin Modern Math as unnamed Type3 glyphs, so the font name gives no maths signal. A
-  display line such as `v(t) = −gt (time-dependent)` then reads as prose with inline maths
-  and is merged into the paragraphs around it. A TrueType maths font that names itself
+  inline math, not one display equation.
+- **A CFF math font in a Chromium print.** Chromium embeds a CFF (OpenType) math font such
+  as Latin Modern Math as unnamed Type3 glyphs, so the font name gives no math signal. A
+  display line such as `v(t) = −gt (time-dependent)` then reads as prose with inline math
+  and is merged into the paragraphs around it. A TrueType math font that names itself
   (Noto Sans Math) is read correctly. Pinned by the strict xfail
   `tests/test_sign_check.py::test_a_display_equation_in_a_type3_maths_font_stays_display`.
-- **A wrapped sentence whose last line is only maths** is read as a display equation when
+- **A wrapped sentence whose last line is only math** is read as a display equation when
   that line is indented or set off by extra space; at the paragraph's margin and line
   pitch it is inline.
 - **Very short documents** learn the "typical line pitch" from very few lines; with one
   two-line paragraph the paragraph gap itself becomes the typical pitch and separate
   paragraphs can merge.
-- **Maths inside headings and captions** is text: a heading's, and a caption's plain text,
+- **Math inside headings and captions** is text: a heading's, and a caption's plain text,
   has math-italic letters folded to plain letters (`readable_math_letters`), but only
-  paragraphs (and a figure's caption that holds maths) get inline equation elements, so a
+  paragraphs (and a figure's caption that holds math) get inline equation elements, so a
   fraction or a script in a heading is not typeset.
 - **Paragraphs split across pages** are joined into one element when they pass the tests
   in "Paragraph text" above; otherwise (a column break from one page to the next, a
-  paragraph that starts or ends in maths, a different size or indent) they stay two. The
+  paragraph that starts or ends in math, a different size or indent) they stay two. The
   joined element has the first part's page and box only.
-- **Inline maths that wraps across lines** is one equation when a relation sign, or a plus,
+- **Inline math that wraps across lines** is one equation when a relation sign, or a plus,
   minus or product after a longer expression, sits at the break; other wraps (a break
   inside a fraction, no operator at the break) still become two.
 - **A lone bold letter** in running text (`for some nonzero vector x`, `\mathbf{x}` in
-  CMBX) is not recognised as maths: one upright letter with nothing around it is too
+  CMBX) is not recognized as math: one upright letter with nothing around it is too
   ambiguous.
-- **Maths written as text** (OpenStax writes `d₀`, `t = 0 s`, `y = mx + b` in HTML, not
-  MathML) is found and converted like any inline maths; the gold set has no MathML for
+- **Math written as text** (OpenStax writes `d₀`, `t = 0 s`, `y = mx + b` in HTML, not
+  MathML) is found and converted like any inline math; the gold set has no MathML for
   it, so it counts against detection precision in the document eval (reported as
   `prose_math` when the prediction shows a formula: a relation with operands, a variable
   with an index or script, an italic variable with an operator; a bare quantity such as
   `-49 m` or a lone symbol is `other`).
 - **Lists:** a marker on a line of its own above its text (OpenStax prints exercise
   numbers that way) is not an item: the number stays at the start of a paragraph. Bullets
-  that are raster images are not recognised. A list that the PDF numbers with a gap, or
+  that are raster images are not recognized. A list that the PDF numbers with a gap, or
   in brackets, is reproduced with printed markers. A single item with a letter or roman
   marker and no sibling stays a paragraph.
 - **Equation numbers** to the left of an equation are found only in brackets (`(2.4)`);
@@ -2279,7 +2311,7 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - **Bold run-in labels**: the six words of the narrow rule, repeated, are bold text; any
   other label ("Example", "Strategy", a single "Solution") is still a weak heading; see
   "Run-in labels" above.
-- **Repeated margin logos drawn as vectors** are recognised only from drawings that lie
+- **Repeated margin logos drawn as vectors** are recognized only from drawings that lie
   inside the header/footer band; a logo that extends into the body is a figure on every
   page.
 - **A single prose line on a picture** (one subtitle on a slide backdrop) is absorbed as
@@ -2293,7 +2325,7 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 ## Tests and fixtures
 
 - `tests/test_layout_analyze.py` builds small PDFs with PyMuPDF for each rule (headings,
-  hyphenation, fraction bars, inline maths, figures, columns, headers, errors).
+  hyphenation, fraction bars, inline math, figures, columns, headers, errors).
 - `tests/test_layout_fixtures.py` checks three realistic PDFs printed by Chromium from HTML
   in `tests/fixtures/layout/` (lecture notes with MathML and a running header, a two-column
   handout, a worked example with a raster figure). The `browser`-marked test re-prints them
@@ -2311,7 +2343,7 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   in the test: bookmarks (levels, text, consistency, a tag winning), plain numbered lines
   in sequence, run-in labels, math-italic in a heading, paragraphs over a page break (a
   footnote and a running header between, a hyphen at the break, each reason not to join),
-  the document's spelling of compounds and inline maths that wraps.
+  the document's spelling of compounds and inline math that wraps.
 - `tests/test_layout_slides.py` (the slide rules on made-up pages, the four Beamer decks and
   `slides_steps.pdf`: steps dropped or kept, titles, headline and footline, columns, no line
   of the last step lost, non-slide files read exactly as before, ligatures, UTF-16 page
@@ -2323,7 +2355,7 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - `tests/test_layout_lists.py` (bullets, ordered markers, siblings, nesting, false lists),
   `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
   `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline
-  maths) pin the layout v2 fixes from the eval pages and the smoke test.
+  math) pin the layout v2 fixes from the eval pages and the smoke test.
 - `tests/test_page_types.py`, `tests/test_page_types_pipeline.py` and
   `tests/test_page_types_browser.py` (`browser` marker) cover hidden text and page types
   on synthetic PDFs from `tests/fixtures/handwriting/make_fixtures.py` (seeded ink in the
@@ -2341,8 +2373,8 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   short and a long title (and with the ink budget run out), a drawn page border, a
   full-page plot and a slide's chart, blank template pages, and a title slide on a photo.
 - `tests/test_layout_silent_loss.py` rebuilds the silent-loss sweep's cases (2026-10-12)
-  small: boxes joined by plain lines, a step plot of separate lines, maths drawn as
-  outlines, an icon, a benzene ring, a number line, hand ticks, crosses and one-stroke
+  small: boxes joined by plain lines, a step plot of separate lines, math drawn as
+  outlines, an icon, a benzene ring, a number line, hand check marks, crosses and one-stroke
   marks, strokes over an equation, notes in the header and footer bands, white drawings
   and writing on a dark slide, pictures with text on them, full-page pictures under a
   line of text, small-pixel pictures drawn large, chart labels in the bands, a hidden
@@ -2356,7 +2388,7 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   tick labels and axis title are the figure's), `open_axes.pdf` (axes drawn as one path
   of two separate lines), `timelines.pdf` (a timeline across the top of a page as one
   path and as separate lines, and a running header over a rule, which adds nothing) and
-  `marks_over_text.pdf` (a tick, a cross and a slash over typed lines, cut out; an
+  `marks_over_text.pdf` (a check mark, a cross and a slash over typed lines, cut out; an
   underline, a box round a word and a cancel stroke, still part of the text); with a
   frame of four lines and a header rule with end marks as controls.
 - `tests/test_layout_drawings.py` rebuilds the drawings sweep's cases (2026-10-13)
@@ -2365,12 +2397,12 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   with a legend, outlined bars on a baseline, a circuit with labels inside its loop,
   flowcharts of filled boxes with open arrows and of boxes drawn line by line, a timing
   diagram, a box plot, Fischer projections, bond lines, a one-line circuit of boxes and
-  wires, electron dots, an answer circled in red, ticks over an equation and drawn as a
+  wires, electron dots, an answer circled in red, check marks over an equation and drawn as a
   filled ribbon, comb fields on an exam cover, and icons round a glyph. Its controls:
   a worked example's frames with a grid of cell borders, a box of four lines whose
   corners do not quite meet, blanks to fill in, a fraction bar, dot leaders, a circle
-  round a step number in the text's colour, a red underline, a yellow highlight, and a
-  labelled scale.
+  round a step number in the text's color, a red underline, a yellow highlight, and a
+  labeled scale.
 - `tests/test_tables_detect.py` and `tests/test_tables_fixtures.py` cover table
   detection and how layout claims tables, on generated pages, the LaTeX
   `latex/tables.tex` (Tectonic) and a Word-style page exported by LibreOffice
@@ -2379,26 +2411,26 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   by Tectonic, in `tests/fixtures/layout/latex/`: article notes (numbered equations,
   `align`, limits, inline integrals, nested itemize/enumerate, a TikZ figure), a problem
   set ((a)/A./(i) lists, a three-row derivation, `2.1`-style numbers), beamer slides
-  (triangle bullets, sans-serif maths, a captioned figure) and a two-column handout
+  (triangle bullets, sans-serif math, a captioned figure) and a two-column handout
   (matrices, bold vectors, `\neq`, a numbered projection). The `.tex` files are the
   source; rebuild with `uv run python tests/fixtures/layout/latex/make_pdfs.py --tectonic
   PATH` (deterministic, byte-identical with the same Tectonic version; PDFs must stay
   under 300 KB).
 - `tests/test_layout_beamer_math.py` checks four small Beamer decks
-  (`latex/beamer_*.tex`: frame titles, itemize with inline maths, display equations and
-  `align`, `\pause` and `\item<n->` overlays, two columns, a table with maths, slide
+  (`latex/beamer_*.tex`: frame titles, itemize with inline math, display equations and
+  `align`, `\pause` and `\item<n->` overlays, two columns, a table with math, slide
   numbers, a theme with header and footer bars) against `beamer_*.gold.json`, the frames
   and equations read from the `.tex` (`latex/make_beamer_gold.py`, using
   `gold/arxiv_tex.py`). Slide numbers and footer bars are dropped and display equations
   are found; what still fails (repeated overlay pages, the overlay frame title dropped as
   a running header, a theme header bar kept as content, two columns read out of order,
-  table-cell maths without latex) is a strict xfail with its reason.
+  table-cell math without latex) is a strict xfail with its reason.
 - The text pass: `tests/test_text_pass.py` (alignment with inline markers, link
-  rectangles, unsafe schemes, destinations, cross-reference edge cases, colour rules,
+  rectangles, unsafe schemes, destinations, cross-reference edge cases, color rules,
   the language and its change, on glyphs built in the test), `tests/test_text_language.py`
-  (detection on short and maths-heavy text, tags), `tests/test_text_contrast.py`,
+  (detection on short and math-heavy text, tags), `tests/test_text_contrast.py`,
   `tests/test_text_inline.py` (the HTML), and `tests/test_text_latex.py` on
   `links_language_colour.tex` in the LaTeX fixtures folder (hyperref links, `\ref`
-  cross-references, a French quotation, coloured text) and on PDFs built in the test
+  cross-references, a French quotation, colored text) and on PDFs built in the test
   (rotated pages, a named destination, `/Lang`); its `browser` tests run axe-core on the
   converted file and check that a long link wraps at 320 px.

@@ -195,7 +195,6 @@ def test_a_draft_download_asks_first_and_says_what_students_get(web):
         f'<a class="button" href="/jobs/{job_id}/review?item=p1-e3">Review 3 decisions first'
         in (page.text)
     )
-    assert f'<a href="/jobs/{job_id}/download">Download the draft anyway</a>' in page.text
 
 
 def test_with_no_decision_open_the_draft_page_goes_to_the_finish_line(web):

@@ -255,10 +255,6 @@ class _Evidence:
         "1. Introduction" is an ordinary heading style."""
         return self.list_like and not (self.larger_font or self.tagged)
 
-    @property
-    def weak_flags(self) -> bool:
-        return self.all_caps or self.very_short or self.maybe_list_item
-
     def confidence(self, repaired: bool) -> float:
         if self.larger_font or self.tagged:
             value = 0.95 if self.numbered else 0.90

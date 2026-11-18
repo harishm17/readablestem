@@ -28,6 +28,56 @@ needs_latexml = pytest.mark.skipif(
 )
 
 
+# Sources that lose content (SW42): the text, the code the job stops with, a name the job
+# page must show, and a line the report must hold (level, category, name, file).
+LOSSES: dict[str, tuple[str, str, str, tuple[str, str, str, str]]] = {
+    "missing_input": (
+        "\\documentclass{article}\\begin{document}\nIntro.\n\\input{problems/set3}\n"
+        "\\end{document}\n",
+        "source_missing_file",
+        "problems/set3",
+        ("error", "missing_file", "problems/set3", "main.tex"),
+    ),
+    "unclosed_brace": (
+        "\\documentclass{article}\\usepackage{amsmath}\\begin{document}\n"
+        "\\begin{align}a &= \\frac{1}{2\n\\end{align}\n\\section{Harmonic series}Gone.\n"
+        "\\end{document}\n",
+        "source_syntax_error",
+        "main.tex, line",
+        ("error", "expected", "}", "main.tex"),
+    ),
+    "undefined_text": (
+        "\\documentclass{article}\\begin{document}\nA \\term{word} and \\hw.\n\\end{document}\n",
+        "source_undefined",
+        "\\term",
+        ("error", "undefined", "\\term", "main.tex"),
+    ),
+    "missing_package": (
+        "\\documentclass{article}\\usepackage{coursemacros}\\begin{document}\nHi \\course.\n"
+        "\\end{document}\n",
+        "source_unsupported_package",
+        "coursemacros",
+        ("missing", "missing_file", "coursemacros", "main.tex"),
+    ),
+    "unknown_class": (
+        "\\documentclass{exam}\\begin{document}\\begin{questions}\\question[5] Two?\n"
+        "\\begin{solution}Four.\\end{solution}\\end{questions}\\end{document}\n",
+        "source_unsupported_class",
+        "exam",
+        ("missing", "missing_file", "exam", "main.tex"),
+    ),
+    "tikz_figure": (
+        "\\documentclass{article}\\usepackage{tikz}\\usetikzlibrary{arrows.meta}\n"
+        "\\begin{document}\\section{Drawn}\n\\begin{figure}\\begin{tikzpicture}"
+        "\\draw (0,0) -- (1,1);\\end{tikzpicture}\\caption{A line}\\end{figure}\n"
+        "\\end{document}\n",
+        "source_unsupported_package",
+        "{tikzpicture}",
+        ("missing", "missing_file", "tikz", ""),
+    ),
+}
+
+
 def png_bytes(width: int = 40, height: int = 30, colour: tuple[int, int, int] = (200, 30, 30)):
     from PIL import Image
 

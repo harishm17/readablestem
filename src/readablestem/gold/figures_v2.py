@@ -208,10 +208,6 @@ def third_party_licence(caption: str | None) -> bool:
     return False
 
 
-def is_held_out(page_slug: str, held_out_slugs: Iterable[str]) -> bool:
-    return page_slug in set(held_out_slugs)
-
-
 def openstax_candidates(
     book: str,
     page_slug: str,
@@ -342,10 +338,6 @@ REQUIRED_FIELDS = (
 TABLE_SOURCES = {"source-data", "alt-text"}
 MAX_TABLE_ROWS = 40  # the figure prompt asks for at most 40 rows and 8 columns
 MAX_TABLE_COLS = 8
-
-
-class GoldFigureError(ValueError):
-    pass
 
 
 def validate_record(record: Mapping[str, Any]) -> list[str]:

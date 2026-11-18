@@ -89,6 +89,7 @@ from readablestem.eval.equations import (
 )
 from readablestem.eval.gold_scoring import iter_gold_records
 from readablestem.models.base import VisionClient
+from readablestem.ops import profile as run_profile
 from readablestem.pipeline import (
     equation_step,
     figure_details,
@@ -2301,6 +2302,8 @@ def build_report(
         "task": task,
         "date": cfg.date,
         "pipeline_version": run.PIPELINE_VERSION,
+        # The production profile, or "development settings" (ops/profile.py, WS0.9).
+        "profile": run_profile.stamp(cfg.settings),
         "prompt_versions": _prompt_versions(task, items),
         "models": models,
         "models_used": used,
@@ -2522,6 +2525,7 @@ def format_markdown(report: dict) -> str:
         f"n = {report['n']} of {report['n_planned']} {report['dataset']['unit']}s, {status}. "
         f"Pipeline {report['pipeline_version']}; gold manifest "
         f"{report['dataset']['manifest_sha256'][:12]}.",
+        run_profile.stamp_line(report.get("profile")),
         "",
     ]
     lines += _table(["metric", "value"], ((k, metrics.get(k)) for k in HEADLINE[report["task"]]))

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Iterator
+from datetime import date
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from urllib.parse import urlsplit
@@ -132,10 +133,23 @@ class Check(BaseModel):
     passed: bool
     severity: Literal["error", "warning"] = "error"
     code: str | None = None  # category when it fails, e.g. "unknown_command"
+    # The day the failed rule was added to the checks, for a rule that has one: a release's
+    # new rule can reopen a document that was ready, and the job page can say since when
+    # the rule exists. None for a check stored before rules carried a date, and for rules
+    # without one. A date, never content.
+    added_on: date | None = None
 
 
 Step = Literal[
-    "equation", "figure", "judge", "table", "check", "page_math", "page_witness", "image_page"
+    "equation",
+    "figure",
+    "judge",
+    "table",
+    "check",
+    "page_math",
+    "page_witness",
+    "image_page",
+    "page_audit",
 ]
 
 Outcome = Literal[
@@ -613,7 +627,9 @@ class GlyphContext(BaseModel):
 class Element(BaseModel):
     """Something on a page, in document reading order."""
 
-    id: str  # stable within a document: "p{page+1}-e{index}"
+    # "p{page+1}-e{index}": its place on its page, fixed within one result but not between
+    # two conversions (an element added above renames it). `core.uid` gives the stable one.
+    id: str
     kind: Kind
     page: int  # 0-based
     bbox: BBox
@@ -832,6 +848,7 @@ NOTICE_CODES = frozenset(
         "handwritten_page",  # a handwritten page, kept as an image (not converted)
         "handwriting_on_page",  # handwriting on a typed page, kept as an image of it
         "unread_page",  # drawings or images, nothing read from them: page kept as image
+        "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
         # Review edits (T3-16): a page the reviewer left out of the student file.
@@ -1062,6 +1079,73 @@ class ImagePagesSummary(BaseModel):
     second_reader: SecondReaderSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
+class SourceProblem(BaseModel):
+    """One line LaTeXML wrote about a source (`source.report`): an error, a fatal error, or a
+    file, package or class it could not find.
+
+    Unlike `Notice` and `Check`, this holds the instructor's own names (a command, a file
+    name, a package): it is kept with the document, removed with it, and never logged; logs
+    get the counts per category only. `name` and `file` are trimmed to printable characters
+    and 120 of them; `file` is relative to the project ("" when LaTeXML named no file of the
+    project). `what` says what a missing name is: a class or package with no binding
+    ("class", "package"), a package whose binding needs the package's own file
+    ("package_source"), or a file."""
+
+    level: Literal["error", "fatal", "missing"]
+    category: str
+    name: str = ""
+    file: str = ""
+    line: int | None = None
+    step: Literal["latexml", "post"] = "latexml"
+    what: Literal["class", "package", "package_source", "file"] | None = None
+
+
+class SourceMark(BaseModel):
+    """A place in the converted document where LaTeXML left an error node (`ltx_ERROR`): the
+    element that holds it (None when the reader did not place it) and whether it sits in a
+    formula. `name` is the node's text (a command, as written), trimmed like `SourceProblem`."""
+
+    name: str = ""
+    element_id: str | None = None
+    in_formula: bool = False
+
+
+class SourceFigure(BaseModel):
+    """A figure whose picture could not be read: the file name the source asked for."""
+
+    element_id: str
+    name: str
+
+
+class SourceReport(BaseModel):
+    """What LaTeXML said about a source, and where its error nodes ended up (`source.report`).
+
+    Three totals that should agree: `log_errors` (errors LaTeXML counted), `error_nodes`
+    (error nodes in its XHTML) and the marks the reader placed; `unplaced_errors` is the
+    number of error nodes the reader could not tie to an element. `counts` holds every error
+    by category, content-free; `problems` keeps at most 20 named lines per category and
+    `omitted` the number left out. Harmless warnings (a helper package LaTeXML's own
+    bindings ask for) are counted in `warnings` and never named."""
+
+    problems: list[SourceProblem] = Field(default_factory=list)
+    missing: list[SourceProblem] = Field(default_factory=list)
+    marks: list[SourceMark] = Field(default_factory=list)
+    figures: list[SourceFigure] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+    omitted: dict[str, int] = Field(default_factory=dict)
+    warnings: int = 0
+    log_errors: int = 0
+    error_nodes: int = 0
+    unplaced_errors: int = 0
+
+    @property
+    def empty(self) -> bool:
+        """Nothing to tell the instructor: no error, no missing file, no error node."""
+        return not (self.problems or self.missing or self.marks or self.figures) and not (
+            self.log_errors or self.error_nodes
+        )
+
+
 class DocumentResult(BaseModel):
     """Everything the pipeline produced for one PDF. Crop images are kept separately."""
 
@@ -1122,6 +1206,10 @@ class DocumentResult(BaseModel):
     origin: Literal["pdf", "latex", "beamer"] = Field(
         default="pdf", exclude_if=lambda v: v == "pdf"
     )
+    # A source only: what LaTeXML reported and where its error nodes are (`SourceReport`).
+    # It holds names from the source, so it lives and dies with the document. None for a PDF
+    # and for a source converted before it existed, and left out of the JSON then.
+    source_report: SourceReport | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @property
     def omitted_pages(self) -> list[int]:
@@ -1132,11 +1220,86 @@ class DocumentResult(BaseModel):
         return next((f for f in self.fixes if f.element_id == element_id), None)
 
 
+class CallFact(BaseModel):
+    """One request a conversion sent to a model, with the page it was about. Content-free:
+    codes, counts, seconds and dollars (`pipeline.step_facts`)."""
+
+    # A `ModelCall.step`, or "second_check" (a `Verification`) or "second_reader".
+    step: str
+    page: int | None = None  # 0-based; None for a request about the whole document
+    model: str = ""
+    # Whether it is in the job's call count. A second check or second reading is not: only
+    # its dollars count toward the job's limits.
+    counted: bool = True
+    input_tokens: int = 0  # the whole prompt, cached and cache-written tokens included
+    cached_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost_usd: float = 0.0
+    seconds: float = 0.0
+    attempt: int = 1
+    is_fallback: bool = False
+    outcome: str = "ok"
+
+
+class StageFact(BaseModel):
+    """The wall time of one stage of a job. The stages of a job do not overlap."""
+
+    stage: str
+    seconds: float
+
+
+# Why a step stopped before it had done all of its work (`NotFinished.reason`):
+# - "work_budget": it had done the count of work it is allowed (the same on every machine);
+# - "time_limit": a clock stopped it, so another machine may have got further;
+# - "memory_limit": it would have held more memory than it may;
+# - "cap_reached": the job's own limit on dollars or on model calls was reached.
+NotFinishedReason = Literal["work_budget", "time_limit", "memory_limit", "cap_reached"]
+
+
+class NotFinished(BaseModel):
+    """A step that stopped before it had done all of its work. Content-free: the step's name,
+    a page number, a code and two counts.
+
+    A limit may stop a step; it may not quietly change what a document contains. So every
+    step that stops early says so here, and a difference between two conversions of one file
+    is allowed only where the slower one holds such a fact (tests/test_determinism.py)."""
+
+    step: str
+    page: int | None = None  # 0-based; None for a step over the whole document
+    reason: NotFinishedReason
+    done: int = 0  # units of the step's work that were done (elements, pages, reads)
+    of: int = 0  # units there were to do
+
+
+class ShadowFact(BaseModel):
+    """What a step run in shadow said next to the answer the conversion kept
+    (`pipeline.shadow`). Content-free: it holds neither answer, only whether they were the
+    same, and the type of the exception when the step failed."""
+
+    step: str
+    page: int | None = None  # 0-based; None for a step over the whole document
+    outcome: Literal["same", "differs", "failed"]
+    error: str = ""  # the exception's class name when the outcome is "failed"
+
+
+class StepFacts(BaseModel):
+    """What a conversion measured of itself (`pipeline.step_facts`). Content-free."""
+
+    calls: list[CallFact] = Field(default_factory=list)
+    stages: list[StageFact] = Field(default_factory=list)
+    not_finished: list[NotFinished] = Field(default_factory=list)
+    shadow: list[ShadowFact] = Field(default_factory=list)
+
+
 class ConversionOutput(BaseModel):
-    """Return value of `pipeline.run.convert_pdf`: the result plus element crops (PNG)."""
+    """Return value of `pipeline.run.convert_pdf`: the result plus element crops (PNG), and
+    the conversion's own measurements when it made any."""
 
     result: DocumentResult
     crops: dict[str, bytes] = Field(default_factory=dict)  # element_id -> PNG bytes
+    facts: StepFacts | None = None
 
 
 # --------------------------------------------------------------------------- notation

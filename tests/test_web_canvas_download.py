@@ -13,12 +13,22 @@ import pytest
 
 import canvas_sanitizer as cs
 import readablestem
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from fixtures.web.support import (
+    ALICE,
+    BOB,
+    WebEnv,
+    as_current,
+    fetch,
+    job_id_from,
+    login,
+    make_pdf,
+    upload,
+)
 from readablestem.core.types import Status
 from readablestem.web.db import Job, session_scope
 from readablestem.web.security import VIEW_CSP
 
-DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "demo" / "index.html"
 
 
 @pytest.fixture
@@ -59,8 +69,8 @@ def folder_of(job_id: str) -> str:
 
 
 def test_a_finished_job_downloads_as_a_zip(web):
-    job_id = finished_job(web)
-    response = web.browser.get(f"/jobs/{job_id}/download/canvas")
+    job_id = ready_job(web)
+    response = fetch(web.browser, f"/jobs/{job_id}/download/canvas")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/zip"
     assert response.headers["content-disposition"].startswith(
@@ -77,7 +87,7 @@ def test_a_finished_job_downloads_as_a_zip(web):
 
 def test_with_a_course_number_the_zip_also_holds_the_page_to_paste(web):
     job_id = finished_job(web)
-    response = web.browser.get(f"/jobs/{job_id}/download/canvas?course=48213")
+    response = fetch(web.browser, f"/jobs/{job_id}/download/canvas?course=48213")
     assert response.status_code == 200
     archive = zip_of(response)
     assert archive.namelist() == ["index.html", "canvas-page.html", "README.txt"]
@@ -88,12 +98,12 @@ def test_with_a_course_number_the_zip_also_holds_the_page_to_paste(web):
 
 def test_the_pictures_of_a_real_document_are_files_in_the_zip(web):
     job_id = finished_job(web)
-    source = DEMO.read_text(encoding="utf-8")
+    source = as_current(DEMO.read_text(encoding="utf-8"))
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
         job.html = source
-    response = web.browser.get(f"/jobs/{job_id}/download/canvas?course=48213")
+    response = fetch(web.browser, f"/jobs/{job_id}/download/canvas?course=48213")
     archive = zip_of(response)
     pictures = [n for n in archive.namelist() if n.startswith("images/")]
     assert len(pictures) == 7
@@ -116,7 +126,7 @@ def test_the_pictures_of_a_real_document_are_files_in_the_zip(web):
 @pytest.mark.parametrize("course", ["12a", "-1", "1/2", "٣", "9" * 21, "1%0A2"])
 def test_a_course_number_that_is_not_digits_gets_a_plain_message(web, course):
     job_id = finished_job(web)
-    response = web.browser.get(f"/jobs/{job_id}/download/canvas?course={course}")
+    response = fetch(web.browser, f"/jobs/{job_id}/download/canvas?course={course}")
     assert response.status_code == 400
     assert "Check the course number" in response.text
     assert "digits only" in response.text
@@ -145,7 +155,7 @@ def test_other_users_and_signed_out_visitors_get_nothing(web):
 
 def test_a_job_that_is_not_done_gives_no_zip(web):
     waiting = job_id_from(upload(web.browser, make_pdf(1)))
-    response = web.browser.get(f"/jobs/{waiting}/download/canvas")
+    response = fetch(web.browser, f"/jobs/{waiting}/download/canvas")
     assert response.status_code == 409 and "Not ready yet" in response.text
 
 

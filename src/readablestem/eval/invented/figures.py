@@ -137,10 +137,12 @@ def bind(
 def to_png(image: bytes) -> bytes | None:
     """PNG bytes for the judge (it takes PNG only), the long side capped at 2,048 px;
     None when the bytes are not an image Pillow can read."""
-    from PIL import Image, UnidentifiedImageError
+    from PIL import UnidentifiedImageError
+
+    from readablestem.core.images import open_within_budget
 
     try:
-        with Image.open(io.BytesIO(image)) as opened:
+        with open_within_budget(image) as opened:
             picture = opened.convert("RGB") if opened.mode not in {"RGB", "L"} else opened.copy()
     except (UnidentifiedImageError, OSError, ValueError):
         return None

@@ -1,7 +1,7 @@
 # ReadableSTEM
 
 [![CI](https://github.com/harishm17/readablestem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/harishm17/readablestem/actions/workflows/ci.yml)
-[![Licence: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 
 ReadableSTEM (formerly a11y-stem) assists instructors who need to turn a STEM course PDF into an accessible web
 page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
@@ -35,7 +35,7 @@ are here. `uv run readablestem ops launch-check` lists the checks a deploy has t
 ## See it
 
 A converted page is committed so you can judge the output without running anything: open
-[`src/readablestem/web/static/demo/index.html`](src/readablestem/web/static/demo/index.html) in a
+[`src/readablestem/web/demo/index.html`](src/readablestem/web/demo/index.html) in a
 browser. It is OpenStax *Physics* section 2.3, converted with the real models; the PDF it
 came from sits beside it. The page shows the pipeline's output as it came, with the two required
 decisions the review screen asks about (the repeated headings "Solution" and "Discussion"). The
@@ -76,7 +76,7 @@ recall is below 0.60 (0.461). The unseen-loss and cost criteria are met. Stratum
 chemistry sections, 123 gold equations) is not a success (0.333 chemically right against 0.80),
 and its comparison with the chatbots is not measured. One run per arm; the speech is
 ReadableSTEM's own rules, not a particular screen reader's; nothing here covers scans,
-handwriting, Word files or maths inside figures. Recorded spend $21.98.
+handwriting, Word files or math inside figures. Recorded spend $21.98.
 
 ### First registered held-out result (2026-10-14)
 
@@ -140,7 +140,7 @@ development-sample checks that priced the run (Addendum 7).
   gold equations are wrong and not inside a decision the instructor is asked to make, as many
   as the chatbot, which asks nothing. The screen's equation flags have precision 0.79 and
   recall 0.34. Its heading flags have precision 0 and recall 0 (none of the wrong headings
-  is asked about), as the interim headings run had already shown. I have not yet labelled
+  is asked about), as the interim headings run had already shown. I have not yet labeled
   which wrong equations change the meaning, so the development-sample statement that no
   meaning-level error was accepted silently cannot be repeated for these sections.
 - **Review load: 1.76 required decisions per PDF page** (853 decisions over 484 page-runs), against
@@ -197,7 +197,7 @@ What was fixed before the run, and can be checked now:
 |---|---|
 | Sections | 15 sections of 5 OpenStax books (College Physics, Chemistry, Precalculus, Introductory Statistics, Intermediate Algebra), 242 Letter pages |
 | Answer key | 1,369 equations, 509 headings, 70 figures (69 with an OpenStax alt text) |
-| Licence | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
+| License | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
 | Choice | a seeded rule on input properties only, with every section used in development excluded; the rule's code, its inputs and its output are in [`proof/selection/`](proof/selection/), and `tests/test_proof_registered.py` re-runs the draw and compares it with the committed result |
 | Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec` (version 2), and the answer key's manifest `9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3`, checked before a run. This is version 2 of the registration: it differs from version 1 only in wording (the names of the people who asked for this evidence, an authorship line and paths on my machine were removed), and version 1's hashes are kept. Addendum 6, which moved the model-dependent parts to Claude, has SHA-256 `50fd995223017609e247bc9a2dc943f4fa9dd345d606cd075b851b32979e7c8a`, and Addendum 7, written after the run, `b38825ab165728273220e8685358328879db36437f1d1c3baafaaa6b817810d2`. The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
 | Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and a tool that writes LaTeX in its own style pays more (normalising markup alone moves MinerU from 0.174 to 0.197). I have not checked the 40 against the rendered gold yet |
@@ -243,10 +243,10 @@ again (the PDFs were printed again, so their bytes differ; text and gold are the
 By the registered method, ReadableSTEM minus the Opus chatbot on the primary score is -0.025 (99%
 interval -0.069 to +0.020, sign-flip p = 0.39): no difference this set can detect, where the
 registered run had -0.118 (-0.199 to -0.025). The change of ReadableSTEM itself on these sections is
-+0.093 (95% +0.039 to +0.144, sign-flip p = 0.023). What got worse: equations with no gold partner and no match in the PDF went from 0.027 to 0.234 by the registered rule (0.011 to 0.208 with the rows of a derivation checked one at a time). An audit of 30 of them (seeded, by section) found no wrong or invented reading: 25 were correct readings the check cannot support (22 are pictures of equations, which the 0.5.0 layout now reads and 0.4.0 left as figures, so the PDF holds no text for them; 3 are derivations whose rows are not one run of the text layer) and 5 were spans that swallowed neighbouring text. The comparable number is the equations that have a text layer: 0.035 (0.015 by rows) against 0.027 (0.011) registered. The check asks whether an equation without an answer-key partner can be found in the PDF's text; it cannot tell a right reading of a picture from a wrong one. The share of wrong equations a person is asked about fell (flag recall 0.34 to
++0.093 (95% +0.039 to +0.144, sign-flip p = 0.023). What got worse: equations with no gold partner and no match in the PDF went from 0.027 to 0.234 by the registered rule (0.011 to 0.208 with the rows of a derivation checked one at a time). An audit of 30 of them (seeded, by section) found no wrong or invented reading: 25 were correct readings the check cannot support (22 are pictures of equations, which the 0.5.0 layout now reads and 0.4.0 left as figures, so the PDF holds no text for them; 3 are derivations whose rows are not one run of the text layer) and 5 were spans that swallowed neighboring text. The comparable number is the equations that have a text layer: 0.035 (0.015 by rows) against 0.027 (0.011) registered. The check asks whether an equation without an answer-key partner can be found in the PDF's text; it cannot tell a right reading of a picture from a wrong one. The share of wrong equations a person is asked about fell (flag recall 0.34 to
 0.21, precision 0.79 to 0.89). Chemistry is as before (0.04). Recorded spend $9.23. The same recipe
 on the development sets (one run each, `docs/eval-page-math.md`): Haiku 0.514 against 0.486 on 114
-pages, Opus 0.586 and ReadableSTEM 0.597 on 49, a tie on maths sections; the symbols score is in
+pages, Opus 0.586 and ReadableSTEM 0.597 on 49, a tie on math sections; the symbols score is in
 `docs/eval-page-math.md`. A replay of this run reproduces every number but one axe-core count
 (`docs/remeasurement-2026-10-21.md`, deviation 1). The recording is not committed
 (`~/.cache/a11y-proof/heldout-remeasure-2026-10-21`).
@@ -275,8 +275,8 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
   PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
   asked about when it was measured (10 for the typed PDFs); since 2026-10-22 every converted block
-  with maths is a decision, and a replay of the same recorded answers left none unasked
-  (docs/eval-image-pages.md, "Update: maths always required"); $0.136 a page.
+  with math is a decision, and a replay of the same recorded answers left none unasked
+  (docs/eval-image-pages.md, "Update: math always required"); $0.136 a page.
 - It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
   model can misread handwriting and small symbols; the measurements are on synthetic scans, nine
   papers and 24 held-out handwritten pages, with no measurement of how long checking takes.
@@ -293,7 +293,7 @@ CI runs with them (`data/eval/baseline-*.json`).
 | Equations | 30 | `exact_lenient` 0.767 (95% CI 0.591 to 0.882); a perfect transcriber scores 0.833 here, because of known gaps in the scorer; mean TEDS 0.864 | $0.0017 per equation |
 | Headings | 121 | recall 0.793 (CI 0.713 to 0.856), level accuracy 0.740, precision 0.914 (105 predicted against 121 gold; the 8 least certain went to review; of the wrong headings, the share a decision asks about fell from 0.33 to 0.18 because the 8 repeated labels it used to ask about are no longer headings, 6 to 4 decisions). The gold counts the label and the title of an OpenStax box as two headings; the outline keeps one (docs/eval.md, "Doubled box headings") | no model call |
 | Figures | 13 | judge pass 1.000 (CI 0.772 to 1.000); the judge is a model and is not yet calibrated against human labels | $0.0039 per figure |
-| Whole pages | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 without prose maths); 0 static and 0 axe-core violations; 0.233 required decisions per PDF page, of which 6 of 10 pointed at a real error (recorded 2026-10-21, before the 2026-11-02 heading changes, which remove 2 of its heading decisions) | $0.0034 per PDF page; median 33 s per section (n = 3) |
+| Whole pages | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 without prose math); 0 static and 0 axe-core violations; 0.233 required decisions per PDF page, of which 6 of 10 pointed at a real error (recorded 2026-10-21, before the 2026-11-02 heading changes, which remove 2 of its heading decisions) | $0.0034 per PDF page; median 33 s per section (n = 3) |
 | Tables (local mode, no model; off by default) | 197 tables | recall 0.909 (CI 0.857 to 0.958), precision 0.984 (CI 0.953 to 0.994), TEDS 0.866 | no model call |
 
 The numbers leave several things out.
@@ -406,7 +406,7 @@ make reproduce
 Takes a few seconds and needs no API key, no network and no browser. It checks every gold
 file against its manifest, checks that each committed report was scored against exactly that
 gold data, runs the scorer on known-correct LaTeX to show its ceiling, and prints the
-committed numbers, labelled as read from file and not re-run.
+committed numbers, labeled as read from file and not re-run.
 
 The model numbers cost money to make and differ a little on every run, so `make reproduce`
 does not repeat them. It prints the commands, with their spend caps (about $0.30 for the
@@ -428,7 +428,7 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 ## Limits
 
 - **PDF in, web page out** (with Word, EPUB, Canvas zip and Common Cartridge downloads). Word and
-  PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF only).
+  PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF and LaTeX only).
   In production the limits are 150 pages a day and 250 MB stored for a new account and 300 pages
   a day and 300 MB for an invited one, 2000 MB stored in all, $6 of model spend for one
   document and $10 a day for the whole service.
@@ -484,13 +484,13 @@ hashes cited in `PROOF.md` and in the registration addenda are not the hashes yo
 [docs/history-commit-map.txt](docs/history-commit-map.txt) lists each original hash and its public one (original first), so the
 order of events can be checked.
 
-## Licence
+## License
 
 The code is MIT ([LICENSE](LICENSE)). The hosted service links PyMuPDF, which is AGPL-3.0, so
 the service is offered under AGPL-3.0 terms and links this repository's complete source from
-the "Source code" link in every page footer; the licence is also on the Terms page. OpenStax material used as answer keys, in the demo and in test fixtures is
+the "Source code" link in every page footer; the license is also on the Terms page. OpenStax material used as answer keys, in the demo and in test fixtures is
 CC BY 4.0 with attribution; documents under `data/authored/` are MIT. The full list of which
-files are under which licence, and the third-party packages, is in
+files are under which license, and the third-party packages, is in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). ReadableSTEM is not affiliated with or
 endorsed by OpenStax.
 

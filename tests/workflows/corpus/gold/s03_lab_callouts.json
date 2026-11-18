@@ -1,0 +1,42 @@
+{
+ "id": "s03_lab_callouts",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "CHEM 110L Lab 4"},
+   {"role": "heading", "text": "Lab 4: Heat of an Acid-Base Reaction"},
+   {"role": "body", "text": "CHEM 110L · Spring term · Work in pairs. Bring your lab notebook and your goggles."},
+   {"role": "heading", "text": "Objective"},
+   {"role": "body", "text": "You will measure the temperature change when baking soda reacts with vinegar and use it to estimate the heat released per mole of reactant."},
+   {"role": "aside", "text": "Safety: Acetic acid can irritate skin and eyes. Wear goggles and gloves at all times. If any liquid splashes into your eyes, use the eyewash station for fifteen minutes and tell your instructor."},
+   {"role": "heading", "text": "Materials"},
+   {"role": "list", "text": "250 mL Erlenmeyer flask"},
+   {"role": "list", "text": "Digital temperature probe"},
+   {"role": "list", "text": "Sodium bicarbonate, about 5 g"},
+   {"role": "list", "text": "Acetic acid, 1.0 M, 100 mL"},
+   {"role": "list", "text": "Weighing paper and balance"},
+   {"role": "list", "text": "Stopwatch"},
+   {"role": "heading", "text": "Procedure"},
+   {"role": "list", "text": "Put on goggles, gloves and a lab coat. Tie back long hair."},
+   {"role": "list", "text": "Weigh about 2.0 g of sodium bicarbonate on weighing paper and record the exact mass to 0.01 g."},
+   {"role": "list", "text": "Pour 50.0 mL of 1.0 M acetic acid into the 250 mL flask."},
+   {"role": "aside", "text": "Note: The mixture will foam. Keep the flask at arm's length from your face and add the powder slowly so that it does not overflow."},
+   {"role": "list", "text": "Add the sodium bicarbonate a little at a time, swirling the flask after each addition."},
+   {"role": "list", "text": "Record the temperature every 30 seconds for five minutes with the digital probe."},
+   {"role": "list", "text": "Pour the final solution into the labeled waste container and rinse the flask three times."},
+   {"role": "aside", "text": "Safety: Do not pour any solution down the sink. Used solutions go in the waste container marked ACID-BASE WASTE."},
+   {"role": "heading", "text": "Data Table"},
+   {"role": "table", "text": "Time (s) Temperature (°C) Observations 0 30 60 90 120 150"},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "CHEM 110L Lab 4"},
+   {"role": "aside", "text": "Note: Record the starting temperature before you add any powder. The change is the lowest temperature minus the starting temperature."},
+   {"role": "heading", "text": "Analysis Questions"},
+   {"role": "list", "text": "Calculate the temperature change and the heat absorbed by the solution, using 4.18 J per gram per degree and assuming the solution's density is 1.00 g per mL."},
+   {"role": "list", "text": "Is the reaction endothermic or exothermic? Give two pieces of evidence from your data."},
+   {"role": "list", "text": "List two sources of error and say whether each would make your result too high or too low."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

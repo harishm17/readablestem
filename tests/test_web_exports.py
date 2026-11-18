@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 import docx
 import pytest
 
-from fixtures.web.support import BOB, job_id_from, login, make_pdf, upload
+from fixtures.web.support import BOB, as_current, fetch, job_id_from, login, make_pdf, upload
 from readablestem.pipeline import export_docx
 from readablestem.web import events
 from readablestem.web.database import as_utc
@@ -56,8 +56,8 @@ def set_job(env, job_id: str, **fields) -> None:
 
 @needs_pandoc
 def test_a_finished_job_downloads_as_a_word_file(web):  # noqa: F811
-    job_id = finished_job(web)
-    response = web.browser.get(f"/jobs/{job_id}/download.docx")
+    job_id = ready_job(web)
+    response = fetch(web.browser, f"/jobs/{job_id}/download.docx")
     assert response.status_code == 200
     assert response.headers["content-type"] == DOCX
     assert response.headers["content-disposition"].startswith(
@@ -69,8 +69,8 @@ def test_a_finished_job_downloads_as_a_word_file(web):  # noqa: F811
 
 
 def test_a_finished_job_downloads_as_an_epub(web):  # noqa: F811
-    job_id = finished_job(web)
-    response = web.browser.get(f"/jobs/{job_id}/download.epub")
+    job_id = ready_job(web)
+    response = fetch(web.browser, f"/jobs/{job_id}/download.epub")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/epub+zip"
     assert response.headers["content-disposition"].startswith(
@@ -86,9 +86,70 @@ def test_a_finished_job_downloads_as_an_epub(web):  # noqa: F811
 def test_the_download_restarts_the_deletion_clock(web, kind, media):  # noqa: F811
     job_id = finished_job(web)
     set_job(web, job_id, retain_until=utcnow() + timedelta(hours=2))
-    assert web.browser.get(f"/jobs/{job_id}/download.{kind}").status_code == 200
+    assert fetch(web.browser, f"/jobs/{job_id}/download.{kind}").status_code == 200
     left = as_utc(web.job(job_id).retain_until) - utcnow()
     assert timedelta(hours=23, minutes=55) < left <= timedelta(hours=24)
+
+
+# --------------------------------------------------------------------------- drafts
+
+BANNER = re.compile(r"^Draft: \d+ decisions? (is|are) still open\. Not for students\.")
+DRAFT_PATHS = [
+    "download",
+    "download/canvas",
+    "download/cartridge",
+    pytest.param("download.docx", marks=needs_pandoc),
+    "download.epub",
+]
+
+
+def words(html: str) -> str:
+    body = re.split(r"<body\b[^>]*>", html, maxsplit=1)[-1]
+    return " ".join(re.sub(r"<[^>]+>", " ", body).split())
+
+
+def opening_words(path: str, data: bytes) -> str:
+    """The first words a reader meets in the downloaded file."""
+    if path == "download":
+        return words(data.decode())
+    if path == "download.docx":
+        return " ".join(p.text for p in docx.Document(io.BytesIO(data)).paragraphs if p.text)
+    archive = zipfile.ZipFile(io.BytesIO(data))
+    name = {"download/canvas": "index.html", "download.epub": "EPUB/content.xhtml"}.get(path)
+    if name is None:  # the cartridge: its one web page
+        name = next(n for n in archive.namelist() if n.endswith(".html"))
+    return words(archive.read(name).decode())
+
+
+@pytest.mark.parametrize("path", DRAFT_PATHS)
+def test_a_draft_leaves_only_through_its_page_and_says_so_inside(web, path):  # noqa: F811
+    """F-126: a document with decisions open cannot be fetched by its address alone, and the
+    file it gives after the draft page is named and marked as a draft."""
+    job_id = finished_job(web)
+    for query in ("", "?draft=", "?draft=99999999999.forged"):
+        asked = web.browser.get(f"/jobs/{job_id}/{path}{query}")
+        assert asked.status_code == 303, query
+        assert asked.headers["location"].startswith(f"/jobs/{job_id}/draft"), query
+    response = fetch(web.browser, f"/jobs/{job_id}/{path}")
+    assert response.status_code == 200
+    name = re.search(r'filename="([^"]+)"', response.headers["content-disposition"])
+    assert name is not None and name.group(1).rpartition(".")[0].endswith("-draft")
+    assert BANNER.match(opening_words(path, response.content))
+    if path == "download":
+        assert '<meta name="readablestem-state" content="draft">' in response.text
+
+
+def test_a_confirm_does_not_outlive_a_change_to_the_document(web):  # noqa: F811
+    job_id = finished_job(web)
+    confirmed = fetch(web.browser, f"/jobs/{job_id}/download")
+    assert confirmed.status_code == 200
+    token = confirmed.request.url.params["draft"]
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.result_version = (job.result_version or 0) + 1  # a review write
+    again = web.browser.get(f"/jobs/{job_id}/download?draft={token}")
+    assert again.status_code == 303 and "/draft" in again.headers["location"]
 
 
 # --------------------------------------------------------------------------- who may
@@ -104,14 +165,14 @@ def test_other_users_and_signed_out_visitors_get_nothing(web, kind, media):  # n
     assert response.status_code == 404 and "SECRET" not in response.text
     anonymous = web.client().get(path)
     assert anonymous.status_code in (303, 401) and anonymous.headers.get("content-type") != media
-    assert web.browser.get(f"/jobs/nonexistent/download.{kind}").status_code == 404
+    assert fetch(web.browser, f"/jobs/nonexistent/download.{kind}").status_code == 404
     assert formats_of(web, job_id) == []  # a refused request records nothing
 
 
 @pytest.mark.parametrize(("kind", "media"), PARAMS)
 def test_a_job_that_is_not_done_gives_no_file(web, kind, media):  # noqa: F811
     waiting = job_id_from(upload(web.browser, make_pdf(1)))
-    response = web.browser.get(f"/jobs/{waiting}/download.{kind}")
+    response = fetch(web.browser, f"/jobs/{waiting}/download.{kind}")
     assert response.status_code == 409 and "Not ready yet" in response.text
 
 
@@ -119,7 +180,7 @@ def test_a_job_that_is_not_done_gives_no_file(web, kind, media):  # noqa: F811
 def test_a_job_past_its_retention_time_gives_no_file(web, kind, media):  # noqa: F811
     job_id = finished_job(web)
     set_job(web, job_id, retain_until=datetime.now(UTC) - timedelta(minutes=1))
-    assert web.browser.get(f"/jobs/{job_id}/download.{kind}").status_code == 404
+    assert fetch(web.browser, f"/jobs/{job_id}/download.{kind}").status_code == 404
 
 
 # --------------------------------------------------------------------------- when it cannot
@@ -128,12 +189,12 @@ def test_a_job_past_its_retention_time_gives_no_file(web, kind, media):  # noqa:
 def test_without_pandoc_there_is_no_word_button(web, monkeypatch):  # noqa: F811
     job_id = ready_job(web)
     monkeypatch.setattr(export_docx, "available", lambda *a, **k: False)
-    response = web.browser.get(f"/jobs/{job_id}/download.docx")
+    response = fetch(web.browser, f"/jobs/{job_id}/download.docx")
     assert response.status_code == 503 and "not available here" in response.text
     assert formats_of(web, job_id) == []
     page = ready_section(web.browser.get(f"/jobs/{job_id}").text)
     assert "download.docx" not in page and f"/jobs/{job_id}/download.epub" in page
-    assert web.browser.get(f"/jobs/{job_id}/download.epub").status_code == 200
+    assert fetch(web.browser, f"/jobs/{job_id}/download.epub").status_code == 200
 
 
 def test_a_failed_word_export_is_a_plain_page_and_records_nothing(web, monkeypatch):  # noqa: F811
@@ -144,7 +205,7 @@ def test_a_failed_word_export_is_a_plain_page_and_records_nothing(web, monkeypat
         raise export_docx.DocxExportError("equations")
 
     monkeypatch.setattr(export_docx, "export_docx", refuse)
-    response = web.browser.get(f"/jobs/{job_id}/download.docx")
+    response = fetch(web.browser, f"/jobs/{job_id}/download.docx")
     assert response.status_code == 409
     assert "cannot be made as a Word file" in response.text
     assert "SECRET" not in response.text
@@ -157,7 +218,7 @@ def test_when_all_turns_are_taken_the_request_is_told_to_wait(web, monkeypatch):
     monkeypatch.setattr(exports, "_turns", threading.BoundedSemaphore(1))
     monkeypatch.setattr(exports, "WAIT_S", 0.05)
     assert exports._turns.acquire(timeout=1)
-    response = web.browser.get(f"/jobs/{job_id}/download.docx")
+    response = fetch(web.browser, f"/jobs/{job_id}/download.docx")
     assert response.status_code == 503 and response.headers["retry-after"] == "60"
     assert "Busy right now" in response.text
 
@@ -167,9 +228,11 @@ def test_a_failed_epub_export_is_a_plain_page(web):  # noqa: F811
     set_job(
         web,
         job_id,
-        html='<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>',
+        html=as_current(
+            '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
+        ),
     )
-    response = web.browser.get(f"/jobs/{job_id}/download.epub")
+    response = fetch(web.browser, f"/jobs/{job_id}/download.epub")
     assert response.status_code == 409 and "cannot be made as an EPUB" in response.text
     assert formats_of(web, job_id) == []
 
@@ -189,6 +252,8 @@ def test_a_document_with_decisions_open_offers_neither(web):  # noqa: F811
 
 def test_download_all_without_pandoc_has_no_word_zip(web, monkeypatch):  # noqa: F811
     ready_job(web)
+    assert "/app/download" not in web.browser.get("/app").text  # one document is not "all"
+    ready_job(web)
     monkeypatch.setattr(export_docx, "available", lambda *a, **k: False)
     response = web.browser.get("/app/download?format=docx")
     assert response.status_code == 503 and "not available here" in response.text
@@ -202,7 +267,9 @@ def test_a_document_that_cannot_be_made_is_left_out_and_said(web, monkeypatch): 
     set_job(
         web,
         job_id,
-        html='<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>',
+        html=as_current(
+            '<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>'
+        ),
     )
     response = web.browser.get("/app/download?format=epub")
     assert response.status_code == 409 and "cannot be made in that file type" in response.text
@@ -230,7 +297,7 @@ def record_words(env, job_id: str) -> str:
 
 def test_the_record_says_nothing_about_downloads_when_events_are_off(web):  # noqa: F811
     job_id = finished_job(web)
-    web.browser.get(f"/jobs/{job_id}/download.epub")
+    fetch(web.browser, f"/jobs/{job_id}/download.epub")
     object.__setattr__(web.ctx.settings, "events_enabled", False)
     try:
         assert "File types downloaded" not in record_words(web, job_id)

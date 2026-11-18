@@ -131,10 +131,10 @@ Rules that keep the plan honest:
 ## Variables
 
 Already set by hand on the web service: `ENV=prod`, `PORT=8080`, `BASE_URL=https://readablestem.com`,
-`DATABASE_URL`, `MODEL_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `CRON_TOKEN`,
+`DATABASE_URL`, `MODEL_PROVIDER`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `CRON_TOKEN`,
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CONTACT_EMAIL`, `ADMIN_EMAILS`,
 `DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=300`, `TRUSTED_PROXY_HOPS=1`, the `FEATURE_*`, `EQUATION_*`, `FLAG_POLICY` and
-the `DECISIONS_*` variables (which feature flags are on in production: "Feature flags in production" below). The `DECISIONS_*` ones (`DECISIONS_CANARY`, `DECISIONS_EQUATION_SHADOW`,
+the `DECISIONS_*` variables (their production values: "Feature flags in production" below). The `DECISIONS_*` ones (`DECISIONS_CANARY`, `DECISIONS_EQUATION_SHADOW`,
 `DECISIONS_FIGURE_VERIFY`) have no effect under `MODEL_PROVIDER=anthropic`: they only control OpenAI's
 Decisions API check, which is skipped with Claude (`models.verifier.any_check_enabled`). They stay in
 `.railway/railway.ts` so the plan stays empty. `SIGNUP_MODE` and the open-tier variables in the next
@@ -160,14 +160,14 @@ production if a required one is missing, and logs the reason):
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the GitHub uptime checks (below). |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours after the last activity, and 30 days for a document whose owner also lets the developer look at the results; "Keep for 7 days" is a per-upload choice with a fixed length (`web/retention.py`). Neither is named in `railway.ts`, so production uses the defaults. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
-| `CLAUDE_SECOND_CHECK` | The Claude second check: `shadow` (the code default) asks a second model about each equation and figure and only records its answer; `enforce` acts on it; `off` skips it. Declared on `web` in `railway.ts`. | **`off` in production since 2026-11-09.** On the first real-model walkthrough (4 OCW documents) the shadow check changed no output and cost about 16% of the spend. Turn it back on only for a measured run. |
+| `CLAUDE_SECOND_CHECK` | The Claude second check: `shadow` (the code default) asks a second model about each equation and figure and only records its answer; `enforce` acts on it; `off` skips it. Declared on `web` in `railway.ts`. | Production's value is in the production profile. It was set to `off` on 2026-11-09: on the first real-model walkthrough (4 OCW documents) the shadow check changed no output and cost about 16% of the spend. Turn it back on only for a measured run. |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
-| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | **On in production since 2026-11-04 13:53 UTC** (the start-up sandbox probe passes on Railway, see "LaTeXML" below). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
-| `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | **Off in production today**; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
-| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | **Off in production today**; keep it off until a few real decks have been converted and read. |
+| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | Production's value is in the production profile (it was turned on 2026-11-04 13:53 UTC, once the start-up sandbox probe passed on Railway, see "LaTeXML" below). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
+| `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
+| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until a few real decks have been converted and read. |
 | `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is: the probe passes on Railway with it. |
-| `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off. With it, allow 2 GB of memory. | Unset. |
+| `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off by default (production's values: the production profile). With it, allow 2 GB of memory. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
 
@@ -192,18 +192,24 @@ only flags `TRUSTED_PROXY_HOPS=0`.
 
 ## Feature flags in production
 
-As of 2026-11-04 (pipeline version 0.5.9). The values live in Railway, not in the repository
-(`railway.ts` only names them with `preserve()`); the defaults are in `src/readablestem/config.py`
-(all of these default to off in code).
+The production value of every behavior setting (the feature flags, the equation checks, the
+models and their effort, the thresholds) is in the production profile,
+`src/readablestem/ops/production.profile.toml`, with the place each value was taken from. This page
+does not repeat them; `railway.ts` names every one of them on `web` with `preserve()`, and the
+defaults are in `src/readablestem/config.py`. Settings that are not about behavior (secrets,
+addresses, accounts, spend and size limits) are named in the profile's `operations` list only.
 
-| State in production | Settings |
-|---|---|
-| On | `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `FEATURE_TABLES`, `FEATURE_IMAGE_PAGES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_NOTATION_MEMORY` |
-| Off | `LAYOUT_DISPLAY_GROUPING`; `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP` (until real decks and course sources have been tried, see "LaTeXML") |
-
-The other flags `railway.ts` names (`FEATURE_COLOUR`, `FEATURE_PAGE_WITNESS`, the `IMAGE_PAGES_*`
-settings) are not listed here because this page cannot tell their production values; read them with
-`railway variable list -s web`.
+The first profile was written from what the repository states, not from the dashboard, so it says
+`confirmed = false`. While it does, a deploy whose settings differ from it starts, logs
+`profile_mismatch` once per differing setting (the name, never the value) and lists the names on
+/admin. To confirm it, read the variables (`railway variable list -s web`), correct the file's
+values and their `source` lines, and set `confirmed = true`; from then on a difference refuses the
+start. `readablestem ops profile-check` prints the same comparison for the environment it runs in
+(`railway ssh -s web -- readablestem ops profile-check`). To change a setting in production, change
+the profile and the variable in Railway in the same change. `/admin/health` and `/admin` show the
+profile's hash to an admin (the public `/healthz/ops` gives the status word only); the image build
+writes the image facts (`readablestem ops image-facts --write`, Dockerfile), which changes that
+hash with what the image carries.
 
 Limits in production (each equals the code default in `config.py`, except the per-user page quota and the daily
 spend cap, which are set on `web`): 100 pages and 50 MB per upload (`MAX_PAGES_PER_JOB`, `MAX_UPLOAD_MB`); a file of up
@@ -230,7 +236,7 @@ university's.
   accounts. Copy the **Application (client) ID**.
 - Authentication, **Add Redirect URI**, platform **Web**: `https://readablestem.com/auth/microsoft/callback`
   (the app sends `BASE_URL` + `/auth/microsoft/callback`, and the match is exact), plus
-  `http://localhost:8000/auth/microsoft/callback` for local work. Leave both implicit-grant boxes unticked.
+  `http://localhost:8000/auth/microsoft/callback` for local work. Leave both implicit-grant boxes unchecked.
 - API permissions: keep `openid`, `profile` and `email` and remove `User.Read`.
 - Token configuration, **Add optional claim**, type **ID**: `email` and `xms_edov`.
 
@@ -241,7 +247,7 @@ secret, run the `MS_CLIENT_SECRET` command below with the new Value, redeploy, t
 
 **3. Allowed directories.** `MS_ALLOWED_TENANTS` lists the directory (tenant) ids that may sign in,
 comma-separated, lower-case GUIDs (the app refuses to start on anything else, such as a domain name or
-`common`). People from any other directory see "Your organisation is not set up for this beta" with their
+`common`). People from any other directory see "Your organization is not set up for this beta" with their
 directory id. The ids read on 2026-11-03 (re-check one with
 `https://login.microsoftonline.com/DOMAIN/v2.0/.well-known/openid-configuration`, the id in `issuer`):
 
@@ -327,7 +333,8 @@ Publisher verification (Branding & properties) is only needed if an IT team asks
    the worker thread and the model provider to be set up, so a provider problem would block a deploy
    that is otherwise fine and a worker starting late would be read as a failed deploy. `/readyz` is
    what the GitHub uptime check (every 5 minutes) and your own monitoring should read. `/healthz/ops`
-   says the backup and the cron ran lately (below). Railway's health check
+   says the backup and the cron ran lately, as a status word only (below); the admin page and
+   `/admin/health` say which one is late. Railway's health check
    sends its requests from the host name `healthcheck.railway.app`; the app does not restrict host
    names, so nothing needs adding.
 6. **Deploy,** watch the build and deploy logs. The first deploy creates the schema.
@@ -494,13 +501,13 @@ two `LaTeXML version 0.8.8` lines and the `1` printed by the policy check. Nothi
 LaTeXML until the LaTeX-source switch (`FEATURE_LATEX_SOURCE`) is on, and that switch stays off
 until `readablestem ops sandbox-probe --require-latexml` prints PASS on the deployed image
 (docs/operations.md, "Sandbox probe"); the web process also runs that probe at start-up, shows it
-on `/healthz/ops` under `sandbox`, and keeps the source features switched off in effect unless it
+on `/admin/health` under `sandbox` (admin only), and keeps the source features switched off in effect unless it
 passed, so a flag set by mistake does nothing under a FAIL.
 
-**Status today (2026-11-04).** `FEATURE_LATEX_SOURCE` is on in production since 13:53 UTC: the
-start-up sandbox probe passes on Railway with the Landlock backend (`init_process=tini` as pid 1; the
+**Status on 2026-11-04.** `FEATURE_LATEX_SOURCE` was turned on in production at 13:53 UTC (its value
+now: the production profile, "Feature flags in production" above): the start-up sandbox probe passes on Railway with the Landlock backend (`init_process=tini` as pid 1; the
 isolation, memory, task, task-growth and real-LaTeXML checks all ok). `FEATURE_BEAMER_SOURCE` and
-`FEATURE_BATCH_ZIP` exist in the code and stay off. How the probe got there:
+`FEATURE_BATCH_ZIP` exist in the code (their values: the profile). How the probe got there:
 
 - **Bubblewrap cannot start on Railway.** The platform gives no unprivileged user namespaces (the
   probe reported `bwrap=ok` but `sandbox_start=fail`), and the container already runs under seccomp
@@ -523,7 +530,7 @@ isolation, memory, task, task-growth and real-LaTeXML checks all ok). `FEATURE_B
   whether Railway keeps the ENTRYPOINT behind a custom start command is not something this
   repository has verified): it runs the image's CMD behind the ENTRYPOINT. `cron` and `backup` do
   have start commands; they run no sandbox. After a deploy, `init_process=tini` in the probe on
-  `/healthz/ops` (`sandbox.checks`) shows the ENTRYPOINT is in force; any other name means the
+  `/admin/health` (`sandbox.checks`, admin only) shows the ENTRYPOINT is in force; any other name means the
   app is pid 1 again. In the container reproduction below, the cleanup probe leaves one zombie
   with the app as pid 1 and none with an init (`podman run --init`).
 - **The task limit must be the kernel's count, not `/proc`'s** (found after #153 was deployed).
@@ -540,7 +547,7 @@ isolation, memory, task, task-growth and real-LaTeXML checks all ok). `FEATURE_B
   `latexml_timed_out=` and `latexml_log=` (the end of LaTeXML's own output for the probe's fixed
   document, paths removed), and `group_cap_forked=`, `group_cap_exit=`, `group_cap_timed_out=`.
 - **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only while the web
-  process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); it was switched on after
+  process's start-up probe reports PASS (`/admin/health`, `sandbox.result`); it was switched on after
   a deploy showed PASS there (2026-11-04), and a later FAIL switches it off in effect. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even
   then, until real Beamer decks and real course sources (zips of projects) have been tried through
   the Landlock sandbox on the deployed service.

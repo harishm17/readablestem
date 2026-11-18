@@ -1,0 +1,51 @@
+{
+ "id": "s07_glossary",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "dropped", "text": "Introduction to Environmental Systems"},
+   {"role": "heading", "text": "Glossary"},
+   {"role": "heading", "text": "A"},
+   {"role": "list", "text": "Abiotic factor. A non-living part of an ecosystem, such as sunlight, temperature or soil minerals."},
+   {"role": "heading", "text": "B"},
+   {"role": "list", "text": "Biodiversity. The variety of living things in a habitat, a region or on Earth."},
+   {"role": "list", "text": "Biome. A large region with a characteristic climate and community of plants and animals."},
+   {"role": "heading", "text": "C"},
+   {"role": "list", "text": "Carbon cycle. The movement of carbon among the air, water, soil and living things."},
+   {"role": "list", "text": "Carrying capacity. The largest population that an environment can support over a long time."},
+   {"role": "list", "text": "Community. All of the populations of different species that live in the same area."},
+   {"role": "heading", "text": "D"},
+   {"role": "list", "text": "Decomposer. An organism, such as a fungus or bacterium, that breaks down dead matter."},
+   {"role": "heading", "text": "E"},
+   {"role": "list", "text": "Ecosystem. A community of living things together with the non-living environment they interact with."},
+   {"role": "list", "text": "Eutrophication. Excess growth of algae caused by too many nutrients in water, often leading to low oxygen."},
+   {"role": "heading", "text": "F"},
+   {"role": "list", "text": "Food web. A network of overlapping food chains showing who eats whom in an ecosystem."},
+   {"role": "heading", "text": "H"},
+   {"role": "list", "text": "Habitat. The place where an organism normally lives, with the food, water and shelter it needs."},
+   {"role": "heading", "text": "K"},
+   {"role": "list", "text": "Keystone species. A species that has a much larger effect on its community than its numbers would suggest."},
+   {"role": "heading", "text": "L"},
+   {"role": "list", "text": "Limiting factor. A resource or condition that restricts the growth of a population."},
+   {"role": "heading", "text": "N"},
+   {"role": "list", "text": "Nitrogen fixation. The conversion of nitrogen gas into forms that plants can use, done by certain bacteria."},
+   {"role": "list", "text": "Niche. The role of a species in its community, including what it eats and where it lives."},
+   {"role": "heading", "text": "P"},
+   {"role": "list", "text": "Population. A group of individuals of the same species living in the same area."},
+   {"role": "list", "text": "Producer. An organism that makes its own food, usually by photosynthesis."},
+   {"role": "heading", "text": "S"},
+   {"role": "list", "text": "Succession. The gradual change in the species of a community over time after a"},
+   {"role": "dropped", "text": "Page 1 of 2"}
+  ]},
+  {"page": 2, "blocks": [
+   {"role": "dropped", "text": "Introduction to Environmental Systems"},
+   {"role": "list", "text": "disturbance."},
+   {"role": "heading", "text": "T"},
+   {"role": "list", "unit": "trophic-level", "text": "Trophic level. A feeding position in a food chain, such as producer or primary"},
+   {"role": "list", "unit": "trophic-level", "text": "consumer."},
+   {"role": "heading", "text": "W"},
+   {"role": "list", "text": "Watershed. The land area that drains into a particular river, lake or ocean."},
+   {"role": "dropped", "text": "Page 2 of 2"}
+  ]}
+ ]
+}

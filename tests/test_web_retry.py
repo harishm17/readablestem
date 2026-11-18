@@ -25,6 +25,7 @@ from fixtures.web.support import (
     make_settings,
     upload,
 )
+from image_page_support import block, scan_pdf, text
 from readablestem.config import ConfigError
 from readablestem.core.types import (
     DocumentResult,
@@ -82,13 +83,16 @@ class Flaky:
 class Site:
     def __init__(self, tmp_path: Path, **settings) -> None:
         self.state: dict = {"down": False, "down_for": set(), "fatal_after": None, "asked": []}
+        self.responders: dict = {}  # what the offline client answers for a step, when not its own
         values = {"max_pages_per_job": 30, "model_concurrency": 1} | settings
         self.settings = make_settings(tmp_path, **values)
         self.app = create_app(self.settings, client_factory=self.make_client)
         self.ctx = self.app.state.ctx
 
     def make_client(self, settings, budget):
-        return Flaky(make_vision_client(settings, budget, fake=True), self.state)
+        offline = make_vision_client(settings, budget, fake=True)
+        offline.responders.update(self.responders)
+        return Flaky(offline, self.state)
 
     def run_worker(self) -> str | None:
         worker = Worker(
@@ -128,8 +132,8 @@ class Site:
 
 
 @pytest.fixture
-def site(tmp_path):
-    site = Site(tmp_path)
+def site(tmp_path, request):
+    site = Site(tmp_path, **getattr(request, "param", {}))
     with TestClient(site.app, follow_redirects=False) as browser:
         with session_scope(site.ctx.factory) as session:
             set_allowed(session, ALICE, allowed=True)
@@ -260,6 +264,46 @@ def test_a_run_that_dies_half_way_keeps_its_finished_steps_and_pays_only_for_the
     assert again.cost_usd < cost_after_first_try + clean_cost  # not both runs in full
     assert again.model_calls > 0
     # A finished job that nothing can improve keeps no records.
+    assert site.records(job_id) == 0
+
+
+@pytest.mark.parametrize("site", [{"feature_image_pages": True}], indirect=True)
+def test_a_page_read_from_its_picture_is_not_read_again_on_try_again(site):
+    """A whole-page answer belongs to no element: it is kept under its question, and the
+    next try gets it back, pays nothing for it and counts its cost once."""
+    site.responders["image_page"] = lambda request: {
+        "blocks": [
+            block("heading", level=1, runs=[text("Motion")], y0=40, y1=80),
+            block("equation", latex="v = \\frac{d}{t}", y0=200, y1=260),
+            block("equation", latex="a = \\frac{v}{t}", y0=300, y1=360),
+        ]
+    }
+    pdf = scan_pdf()
+
+    site.state["asked"] = []
+    clean_id = job_id_from(upload(site.browser, pdf, filename="clean.pdf", image_pages=True))
+    assert site.run_worker() == clean_id
+    clean_asked = list(site.state["asked"])
+    assert clean_asked[0] == "image_page" and len(clean_asked) > 2
+    clean = site.job(clean_id)
+    assert clean.status == "done"
+
+    site.state.update(asked=[], fatal_after=2)  # the page is read; the run dies after it
+    job_id = job_id_from(upload(site.browser, pdf, filename="scan.pdf", image_pages=True))
+    assert site.run_worker() == job_id
+    stopped = site.job(job_id)
+    assert (stopped.status, stopped.error_code) == ("failed", "model_not_configured")
+
+    site.state.update(asked=[], fatal_after=None)
+    assert site.post_retry(site.browser, job_id).status_code == 303
+    assert site.run_worker() == job_id
+    again = site.job(job_id)
+    assert again.status == "done"
+    assert "image_page" not in site.state["asked"]
+    assert 0 < len(site.state["asked"]) < len(clean_asked)
+    assert fixes_json(site.result(job_id)) == fixes_json(site.result(clean_id))
+    # Every request of a clean run was paid for once across the two tries.
+    assert again.cost_usd == pytest.approx(clean.cost_usd)
     assert site.records(job_id) == 0
 
 

@@ -7,6 +7,7 @@ here the web routes are the subject."""
 
 from __future__ import annotations
 
+import html
 import io
 import stat
 import zipfile
@@ -16,11 +17,12 @@ from sqlalchemy import select
 
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login
 from readablestem.core import sandbox
+from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
 from readablestem.source.convert import SourceFailed
 from readablestem.web.db import Blob, Job, JobStatus, QuotaDay, session_scope
-from source_support import fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x^2$.\n\\end{document}\n"
 
@@ -300,6 +302,31 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
 
 
 @needs_latexml
+@pytest.mark.parametrize("name", list(LOSSES))
+def test_a_source_that_loses_content_never_ends_as_converted(name, tmp_path, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
+    text, code, shown, _ = LOSSES[name]
+    env = WebEnv(tmp_path, feature_latex_source=True)
+    env.converter = convert_pdf  # ty: ignore[invalid-assignment]
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        response = send(client, text.encode(), f"{name}.tex")
+        assert response.status_code == 303
+        job_id = job_id_from(response)
+        env.run_worker()
+        job = env.job(job_id)
+        assert job.status == JobStatus.FAILED and job.error_code == code
+        assert job.result_json is None  # nothing a student could be given
+        page = client.get(f"/jobs/{job_id}").text
+        assert "Everything was converted" not in page and "Try again" not in page
+        assert html.escape(shown, quote=False) in page  # the file or command is named
+    assert shown not in caplog.text  # names stay out of the logs
+
+
+@needs_latexml
 class TestRealConversion:
     @pytest.fixture
     def done(self, tmp_path, monkeypatch):
@@ -325,3 +352,24 @@ class TestRealConversion:
         review = env.browser.get(f"/jobs/{job_id}/review/list")
         assert review.status_code == 200 and "Figure" in review.text
         assert "of the PDF" not in review.text or "PDF" in review.text
+        # No choice that leads nowhere (SW18.5): no link back to this list, and a link to
+        # an item lands on it.
+        assert f'href="/jobs/{job_id}/review"' not in review.text
+        assert f"/jobs/{job_id}/review?page=" not in review.text
+        result = DocumentResult.model_validate(env.job(job_id).result_json)
+        formula = next(f for f in result.fixes if f.kind is Kind.EQUATION and f.pending)
+        table = next(f for f in result.fixes if f.kind is Kind.TABLE)
+        to_item = env.browser.get(f"/jobs/{job_id}/review?item={formula.element_id}")
+        assert to_item.headers["location"].endswith(f"/review/list#item-{formula.element_id}")
+        # "Reject" keeps a formula as written; a table with nothing to keep is refused.
+        token = csrf_from(review.text)
+        for fix in (table, formula):
+            env.browser.post(
+                f"/jobs/{job_id}/review/{fix.element_id}",
+                data={"csrf_token": token, "action": "reject", "view": "list"},
+            )
+        after = DocumentResult.model_validate(env.job(job_id).result_json)
+        assert after.fix_for(table.element_id).status is Status.ACCEPTED  # ty: ignore[possibly-missing-attribute]
+        assert after.fix_for(formula.element_id).status is Status.REJECTED  # ty: ignore[possibly-missing-attribute]
+        student = env.browser.get(f"/jobs/{job_id}/view").text
+        assert "not available" not in student and "\\badmacro" in student

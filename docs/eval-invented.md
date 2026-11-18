@@ -18,8 +18,8 @@ quotes folded, runs of `[a-z0-9]`. A unit of the output is *unsupported* when:
 
 | Type | Unit | Unsupported when | Deterministic |
 |---|---|---|---|
-| Prose sentence | a sentence of 7+ words in prose outside maths, headings, tables, figure descriptions | fewer than 25% of its word 4-grams are in R | yes |
-| Number | each number in prose and headings, outside maths | it is not among R's numbers (minus signs, thousands separators, 0.50 = 0.5) | yes |
+| Prose sentence | a sentence of 7+ words in prose outside math, headings, tables, figure descriptions | fewer than 25% of its word 4-grams are in R | yes |
+| Number | each number in prose and headings, outside math | it is not among R's numbers (minus signs, thousands separators, 0.50 = 0.5) | yes |
 | Heading | each output heading | no run of up to 3 consecutive lines of R matches it, difflib ratio 0.85 | yes |
 | Equation, aligned to a gold equation | | its letters, digits and Greek letters hold a symbol more often than the gold equation does | yes |
 | Equation, no gold partner, 3+ symbols | | no window of R's symbol stream of the same length matches, difflib ratio 0.8 | yes |
@@ -34,8 +34,8 @@ measures the judge against human labels.
 
 ### Readings where the table leaves room
 
-- **Maths is cut out of a sentence.** A sentence's 4-grams are taken inside the stretches
-  between maths spans, so no 4-gram spans a gap. A sentence with no 4-gram inside any
+- **Math is cut out of a sentence.** A sentence's 4-grams are taken inside the stretches
+  between math spans, so no 4-gram spans a gap. A sentence with no 4-gram inside any
   stretch falls back to the 4-grams of its words run together. (The earlier chatbot
   analysis read the flattened text of a MathML equation as a sentence: 134 of its 918 flagged
   "sentences" were equations. See the comparison below.)
@@ -116,7 +116,7 @@ of the PDF beside each unit. A person writes `invented`, `supported` or `unsure`
 labels: precision (invented among flagged), the miss rate (invented among unflagged), recall
 and the audited invented rate from both, with Wilson intervals for precision and miss rate
 and a bootstrap for recall and the audited rate. The raw rate and the audited numbers are
-published together. Nothing but the person's labels is used: there is no model labeller.
+published together. Nothing but the person's labels is used: there is no model labeler.
 The sheet and key commands ran on development outputs (611 units); no labels exist, so there
 is no precision or recall to report yet.
 

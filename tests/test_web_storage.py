@@ -13,7 +13,7 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from fixtures.web.support import ALICE, BOB, WebEnv, login, make_pdf, token
+from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, login, make_pdf, token
 from readablestem.ops import retention
 from readablestem.web import access, pending, storage
 from readablestem.web.db import Blob, Job, PendingUpload, User, session_scope, utcnow
@@ -240,20 +240,27 @@ def test_room_comes_back_when_the_purge_catches_up(web):
     assert stats.jobs_deleted == 2 and stats.blobs_deleted == 2
 
 
-def test_healthz_ops_shows_the_storage_and_goes_stale_while_full(web):
+def test_the_storage_shows_to_the_admin_and_goes_stale_while_full(web):
     with session_scope(web.ctx.factory) as session:
         from readablestem.ops import heartbeat
 
         for name in heartbeat.MAX_AGE:
             heartbeat.beat(session, name)
-    body = web.alice.get("/healthz/ops")
+    admin = web.client()
+    login(admin, ADMIN)
+    assert web.alice.get("/healthz/ops").json() == {"status": "ok"}
+    body = admin.get("/admin/health")
     assert body.status_code == 200
     assert body.json()["storage"] == {"stored_mb": 0, "limit_mb": 5, "full": False}
     fill_service(web)
-    body = web.alice.get("/healthz/ops")
-    assert body.status_code == 503
-    assert body.json()["stale"] == ["storage"]
-    assert body.json()["storage"]["full"] is True and body.json()["storage"]["stored_mb"] == 5
+    public = web.alice.get("/healthz/ops")
+    assert public.status_code == 503 and public.json() == {"status": "stale"}
+    response = admin.get("/admin/health")
+    assert response.status_code == 503
+    detail = response.json()
+    assert detail["stale"] == ["storage"]
+    assert detail["storage"]["full"] is True and detail["storage"]["stored_mb"] == 5
+    assert "storage" in admin.get("/admin").text
 
 
 # --------------------------------------------------------------------------- the parts page

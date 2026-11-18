@@ -25,9 +25,16 @@ is.
   the repository. A test that calls a real model is marked `live_model` and is opt-in; use
   your own key with a spend cap, and never commit a key. OpenAI requests are sent with
   `store=False`; do not change that.
-- **Test behaviour, not code.** CLAUDE.md, "What tests to write here", says which tests
+- **Test behavior, not code.** CLAUDE.md, "What tests to write here", says which tests
   earn a place. In short: a bug fix gets one regression test, and copy, markup, constants,
   private helpers and permutations of the same path do not get tests.
+- **Workflow tests** (`tests/workflows`, marked `workflow`) follow a person through the
+  app on a corpus file. One file per workflow, `test_wfNN_<name>.py`; one test per thing
+  the person gets, named for it (`test_the_student_file_has_one_top_heading`). A test reads
+  what the person gets through a parser (the student HTML, a page of the app), never by
+  searching raw HTML. It converts only files of the corpus manifest, from recorded
+  answers. A test that an open finding makes false is marked `@harness.finding("F-nnn")`,
+  which fails the run once the finding is fixed until the mark is removed.
 - **Only inputs that can be published.** Test and example documents must be your own work
   (contributed under MIT) or OpenStax material from books published under CC BY, with
   attribution.
@@ -48,18 +55,25 @@ is.
   `MODEL_CONCURRENCY` low for small runs, and record answers once with `--answers` so
   reruns replay for free.
 - **Style.** ruff with line length 100, type hints that pass `ty check src`, and docstrings
-  that say why. A new runtime dependency needs a note in the pull request, and its licence
+  that say why.
+- **No error without a trace.** A handler that catches broadly does something with the
+  failure: it returns the answer that stands for it, counts it, logs its type (never its
+  text, which may quote a document), or raises. `except: pass` and `except: continue` on a
+  broad handler fail the linter (ruff S110, S112).
+- **No code without a caller.** `scripts/dead_code.py` (in `make lint` and CI) fails for a
+  function, class, method or property of the package that nothing calls. Delete it; its
+  history is in git. A new runtime dependency needs a note in the pull request, and its license
   has to fit `THIRD_PARTY_NOTICES.md`.
 
 ## Commits and pull requests
 
 Small commits with plain messages that say what changed and why. Run `make check` first.
-Describe how you tested the change and, for behaviour that touches accessibility, what you
+Describe how you tested the change and, for behavior that touches accessibility, what you
 checked by hand.
 
-## Licence
+## License
 
-Contributions are under the MIT licence of the project. The hosted service also links
+Contributions are under the MIT license of the project. The hosted service also links
 PyMuPDF (AGPL-3.0); see `THIRD_PARTY_NOTICES.md` for what that means for redistribution.
 
 ## Security

@@ -31,6 +31,8 @@ Outcomes, mapped to `Job.error_code` by `web.worker.error_code_for`:
   the kernel's OOM killer sends): `ConversionOom`, "conversion_oom";
 - it runs past `limit_s` (the worker's own limit cancels it first; this is for other callers)
   or the CPU limit: `ConversionTimeout`, "timeout";
+- it cannot start, or cannot read a message this process sent it (it says which, by the
+  exception's type): `ConversionUnavailable`, "conversion_unavailable", the service's fault;
 - the worker cancels the attempt (deleted, taken over, shutting down): the child is killed
   within `POLL_S` and `BudgetExceeded("cancelled")` is raised.
 
@@ -77,6 +79,7 @@ from readablestem.core.types import (
     ModelCall,
     ProgressEvent,
     Step,
+    StepFacts,
 )
 from readablestem.web import conversion_child as protocol
 from readablestem.web.logsafe import log_event
@@ -133,9 +136,43 @@ _DETAILS = frozenset({"low", "high", "auto"})
 
 
 class ConversionFailed(Exception):
-    """The child could not finish. `code` becomes `Job.error_code`."""
+    """The child could not finish. `code` becomes `Job.error_code`; `detail`, for a source
+    that would lose content, the names that stopped it (`Job.error_detail`)."""
 
     code = "internal_error"
+    detail: dict[str, Any] | None = None
+
+
+def _source_detail(raw: object) -> dict[str, Any] | None:
+    """The child's `detail` for a stopped source, rebuilt from what is expected only: at most
+    20 items of name, file and line, a count of the rest, and a class or package name. Every
+    string printable and at most 120 characters (`source.report.clean`)."""
+    from readablestem.source.report import MAX_DETAIL_ITEMS, clean
+
+    if not isinstance(raw, dict):
+        return None
+    items = []
+    for item in raw.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        line = item.get("line")
+        items.append(
+            {
+                "name": clean(str(item.get("name") or "")),
+                "file": clean(str(item.get("file") or "")),
+                "line": line if isinstance(line, int) and not isinstance(line, bool) else None,
+            }
+        )
+    more = raw.get("more")
+    detail: dict[str, Any] = {
+        "items": items[:MAX_DETAIL_ITEMS],
+        "more": more if isinstance(more, int) and not isinstance(more, bool) and more > 0 else 0,
+    }
+    for key in ("class", "package"):
+        value = raw.get(key)
+        if isinstance(value, str):
+            detail[key] = clean(value)
+    return detail
 
 
 class ConversionCrashed(ConversionFailed):
@@ -157,8 +194,9 @@ class ConversionExternalKill(ConversionOom):
 
 
 class ConversionUnavailable(ConversionFailed):
-    """The child could not start (an import failed, a library or the model file is missing):
-    the service's fault, not the PDF's. Worth trying again once it is fixed."""
+    """The child could not start (an import failed, a library or the model file is missing),
+    or could not read what this process sent it: the service's fault, not the PDF's. Worth
+    trying again once it is fixed."""
 
     code = "conversion_unavailable"
 
@@ -217,6 +255,13 @@ def _valid[M: BaseModel](model: type[M], data: Any) -> M:
         return model.model_validate(data)
     except ValueError:  # pydantic's ValidationError
         raise _Protocol(model.__name__) from None
+
+
+def _question_key(value: Any) -> str:
+    """A page-level question's key as the child names it: a SHA-256 in hex, nothing else."""
+    if not isinstance(value, str) or len(value) != 64 or set(value) - set("0123456789abcdef"):
+        raise _Protocol("key")
+    return value
 
 
 def resolve_schema(name: str) -> type[BaseModel]:
@@ -409,8 +454,14 @@ class _Conversion:
                 self.frames.put((parts, sum(len(p) for p in parts)))
         except ValueError:  # a frame over the limit, or one that is not a frame
             self.refused = True
-        except OSError:
-            pass
+        except OSError as exc:  # the socket failed under the reader: the end, and why
+            log_event(
+                logger,
+                "conversion_child_read_failed",
+                logging.WARNING,
+                error_type=type(exc).__name__,
+                errno=exc.errno or 0,
+            )
         self.frames.put(_EOF)
 
     def _admit(self, size: int) -> bool:
@@ -592,6 +643,20 @@ class _Conversion:
             element, fix = _valid(Element, header["element"]), _valid(Fix, header["fix"])
             key, ident = str(header["key"]), header["id"]
             return lambda: self._store(element, key, fix, ident)
+        if op == "cache_answer":
+            key, ident = _question_key(header["key"]), header["id"]
+            return lambda: self._answer(key, ident)
+        if op == "cache_keep":
+            key, ident = _question_key(header["key"]), header["id"]
+            row = header["row"]
+            if not isinstance(row, dict) or not isinstance(row.get("payload"), dict):
+                raise _Protocol("cache_keep")
+            # (the answer itself is read back by the schema of the step that asks for it)
+            kept = {
+                "payload": row["payload"],
+                "call": _valid(ModelCall, row.get("call")).model_dump(mode="json"),
+            }
+            return lambda: self._keep(key, kept, ident)
         if op == "observe":
             call = _valid(ModelCall, header["call"])
             return lambda: self._observed(call)
@@ -644,6 +709,20 @@ class _Conversion:
         assert self.step_cache is not None
         with suppress(Exception):
             self.step_cache.store(element, key, fix)
+        self._reply(ident)
+
+    def _answer(self, key: str, ident: int) -> None:
+        assert self.step_cache is not None
+        try:
+            row = self.step_cache.answer(key)
+        except Exception:  # a cache never fails a run (`StepCache`)
+            row = None
+        self._reply(ident, value=row)
+
+    def _keep(self, key: str, row: dict[str, Any], ident: int) -> None:
+        assert self.step_cache is not None
+        with suppress(Exception):
+            self.step_cache.keep(key, row)
         self._reply(ident)
 
     def _observed(self, call: ModelCall) -> None:
@@ -745,6 +824,7 @@ class _Conversion:
                 result=DocumentResult.model_validate(header["result"]),
                 crops=dict(zip(ids, crops, strict=True)),
                 checks=[Check.model_validate(c) for c in header["checks"]],
+                facts=StepFacts.model_validate(facts) if (facts := header.get("facts")) else None,
             )
         except ValueError:  # pydantic's ValidationError
             raise _Protocol("result") from None
@@ -768,11 +848,15 @@ class _Conversion:
             code = "".join(c for c in str(header.get("code", "")) if c.isalnum() or c == "_")[:40]
             failure = ConversionFailed("the source could not be converted")
             failure.code = code or "source_failed"
+            failure.detail = _source_detail(header.get("detail"))
             return failure
         if kind == "oom":
             return ConversionOom("the child ran out of memory")
-        if kind == "startup":
+        if kind in ("startup", "link"):
             name = "".join(c for c in str(header.get("type", "")) if c.isalnum())[:60]
+            if kind == "link":  # it could not read a frame of ours: this pair, not the PDF
+                log_event(logger, "conversion_child_link_failed", logging.ERROR, error_type=name)
+                return ConversionUnavailable("the child could not read what it was sent")
             log_event(logger, "conversion_child_unavailable", logging.ERROR, error_type=name)
             return ConversionUnavailable("the child could not start")
         return RuntimeError(f"the conversion failed in its child ({header.get('type')})")

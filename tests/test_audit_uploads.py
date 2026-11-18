@@ -18,6 +18,7 @@ from fixtures.web.support import (
     ALICE,
     WebEnv,
     csrf_from,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -274,8 +275,9 @@ def flate_zeros(size: int) -> bytes:
 
 
 def test_a_decompression_bomb_costs_a_child_process_for_a_bounded_time():
-    """About 1 MB of PDF that inflates to 1 GiB of page content. The probe is killed at its
-    timeout and the answer is a category; the web process never holds the inflated bytes."""
+    """About 1 MB of PDF that inflates to 1 GiB of page content. The probe refuses it by the
+    content budget, before it parses the page, and the answer is a category; the web process
+    never holds the inflated bytes."""
     stream = flate_zeros(1 << 30)
     assert len(stream) < 2 * 1024 * 1024
     bomb = pdf_object_file(
@@ -287,7 +289,7 @@ def test_a_decompression_bomb_costs_a_child_process_for_a_bounded_time():
     started = time.monotonic()
     with pytest.raises(UploadRejected) as rejected:
         inspect_pdf_isolated(bomb, max_pages=5, timeout_s=1.5)
-    assert rejected.value.code in {"unreadable", "no_content"}
+    assert rejected.value.code == "content_too_large"
     assert time.monotonic() - started < 15
 
 
@@ -347,7 +349,7 @@ def test_hostile_names_are_shown_escaped_and_never_reach_headers(web):
         body = web.browser.get(path).text
         assert "<img src=x" not in body, path
         assert "onerror=alert" not in body.replace("&", "") or "&lt;img" in body, path
-    download = web.browser.get(f"/jobs/{job_id}/download")
+    download = fetch(web.browser, f"/jobs/{job_id}/download")
     assert "x-evil" not in {key.lower() for key in download.headers}
     assert "\r" not in download.headers["content-disposition"]
     assert "\n" not in download.headers["content-disposition"]

@@ -2,7 +2,7 @@
 
 How a data table in a PDF becomes an accessible HTML table (pipeline 0.4.0). Two parts:
 
-- **Detection** (`pipeline/tables.py`, below): finds tables on every analysed page,
+- **Detection** (`pipeline/tables.py`, below): finds tables on every analyzed page,
   builds the grid from the PDF's own words and lines (`Element.table`, source "local")
   and claims the rows and the "Table N" caption from the text flow. No model call.
 - **The table step** (`pipeline/table_step.py`, further below): a vision model reads the
@@ -16,7 +16,7 @@ author's private research notes, which are not in this repository.
 
 ## Detection (`pipeline/tables.py`)
 
-Layout calls `tables.find(page, lines, paths)` for every analysed page, before columns,
+Layout calls `tables.find(page, lines, paths)` for every analyzed page, before columns,
 rows, headings and equations are worked out ([layout.md](layout.md), "How a page is
 read", step 0). No model call; the same PDF always gives the same tables.
 
@@ -32,7 +32,7 @@ visual lines have a gap wider than half the font size, or a rule between two gly
 no ruled grid with a line of text in two columns. The thresholds are looser than the
 arbitration's (a gap counts from 0.5 of the font size, not 0.8), so a glyph the box leaves
 out cannot decide it; the test only ever over-passes. The result is the same either way:
-`tests/test_tables_prefilter.py` analyses every table fixture with and without it and
+`tests/test_tables_prefilter.py` analyzes every table fixture with and without it and
 compares the elements and notices (the rest of the repository's PDFs in a slow test), and a
 check over 553 PDFs (the repository's fixtures and the author's research PDFs, the first
 eight pages of each, 725 pages) found the detector's tables on 82 pages, none of them among
@@ -82,7 +82,7 @@ rules above.
    unruled lists, fragments of a table ruled only above and below whose cells are justified
    paragraphs, and every page with more than `MAX_DETECTOR_ITEMS` drawn items, where the model
    is not run. A page whose text reads sideways (a landscape table on a portrait page with no
-   `/Rotate`: `_page_turn`) is analysed turned upright and the results turned back
+   `/Rotate`: `_page_turn`) is analyzed turned upright and the results turned back
    (`TableGrid.turned` says how far the table's picture must be turned to read it; `layout.crop`
    does). See "Recall on real documents" at the end of this page for why each exists.
 2. **Arbitrate** (`judge`). On four real lab manuals the detector alone had a precision
@@ -94,7 +94,7 @@ rules above.
    another ruled table). Then it is kept only with a grid:
    - *ruled*: three or more row rules (or column rules), or two of each; or
    - *aligned text*: text in two or more columns on at least three lines, with at least
-     75 % of the cells lining up (left, right or centre) in their column.
+     75 % of the cells lining up (left, right or center) in their column.
 
    It is dropped as a table of contents (dot leaders, or titles each ending in an
    ascending page number), a list (most cells start with a bullet), diagram labels (no
@@ -116,7 +116,7 @@ rules above.
    addresses, a block of bare numbers (a matrix) or running text in a box (`_text_block_dropped`).
    A stack of three rules (top, under the header, bottom) whose header row names two or more
    columns and whose body keeps to them in two lines or more (every cell in one column, lined
-   up with a header cell by left edge, right edge or centre) is a table even with text in only
+   up with a header cell by left edge, right edge or center) is a table even with text in only
    one column (`_sparse_stack`); a note framed by the same rules, with a title and running
    text, is not. A kept unruled box of the detector that holds two tables is cut at a clear
    separator (`_split_boxes`): a "Table N" line in the middle of it, or a gap at least twice
@@ -131,11 +131,11 @@ rules above.
    refined grid** (not for an extended box: it stops where the detector did). The one
    that fits the glyphs best wins (`misfit`: text with no wide gap in it that a grid
    splits between cells, or puts side by side in one cell); on a tie, the drawn grid,
-   then SLANet-plus (the better recogniser in the benchmark), then PyMuPDF. A fourth, the
+   then SLANet-plus (the better recognizer in the benchmark), then PyMuPDF. A fourth, the
    **text cell grid** (`_text_slots`: columns between the gutters, a row for each line with text
    in the first column, the wrapped end of a cell stays in its row, header rows above the first
    rule between rows), is the structure of a box found from the text, where on a tie it beats a
-   model's reading (SLANet-plus joined neighbouring rows of a list), and of last resort for any
+   model's reading (SLANet-plus joined neighboring rows of a list), and of last resort for any
    box that no other structure fits, so a table the model file is missing for is no longer
    dropped when its box was grown past the detector's.
    Without the model file (a fallback for environments without SLANet-plus: the production image
@@ -153,9 +153,9 @@ rules above.
    is joined. A glyph smaller than the one before it with its baseline raised by a
    fifth of that glyph's size is a superscript, written in superscript characters
    (`10⁵`, `10⁻¹⁸`, `m/s²`; `^(...)` when a character has no superscript form), so a
-   flattened exponent never reads as other digits. Other maths in a cell is flattened
+   flattened exponent never reads as other digits. Other math in a cell is flattened
    to its characters (`K = ¹2mv²` for `K = ½mv²`); the table step's model gives LaTeX
-   for maths cells.
+   for math cells.
 5. **Headers.** The top rows are column headers when SLANet-plus or PyMuPDF marks them,
    except when a header cell starts with a number ("Mass | 2 kg" is a label and its
    value) or a header cell would span into the body. Empty cells are never headers.
@@ -199,7 +199,7 @@ rules above.
    the lines under them keep to the header's columns at the table's own leading and stop at
    a caption or a line of running text. A "Table N" line above the repeated header (not saying
    "continued") makes it a new table, and `continues` likewise does not mark a table whose own
-   caption is a new "Table N". The page is only analysed when a line of it holds the first header
+   caption is a new "Table N". The page is only analyzed when a line of it holds the first header
    cell, and the work counts against the document's detector budget. The one row left under a repeated header is too
    few lines for the aligned-text test, so before this the header, the split row and the
    next row were read as headings and paragraphs.
@@ -255,7 +255,7 @@ gets one content-free warning. The offline tests run without it (as CI does); th
 that need it skip.
 
 The code around the model (resize and normalisation, decoding the structure tokens and
-cell boxes) is RapidTable's, vendored with its Apache-2.0 licence and a notice in
+cell boxes) is RapidTable's, vendored with its Apache-2.0 license and a notice in
 `pipeline/vendor/` (`rapid_table.py` lists what changed: Pillow instead of OpenCV, cell
 boxes kept in order, bounded span parsing).
 
@@ -264,7 +264,7 @@ boxes kept in order, bounded span parsing).
 **Real lab manuals.** Four public instructor manuals (393 pages: Word through Quartz,
 Word through Distiller, pdfTeX, dvips; kept local for evaluation, never committed). The
 labels are the 2026-10-09 challenge's: every box either the detector or PP-DocLayoutV2
-proposed, labelled by eye from overlays; gold is the 87 real text tables found by either,
+proposed, labeled by eye from overlays; gold is the 87 real text tables found by either,
 so recall is an upper bound. A box counts at full extent when the challenge did not mark
 it cut short, or when the kept box now covers PP-DocLayoutV2's box for that table (90 %).
 
@@ -282,13 +282,13 @@ table and a plot). The 9 tables the detector never proposed (booktabs-style blan
 in the dvips manual) stay missed.
 
 What claiming changes: with detection switched off, layout put a display equation inside
-48 of these 76 tables, a figure inside 6 and a heading inside 21 (an element whose centre
+48 of these 76 tables, a figure inside 6 and a heading inside 21 (an element whose center
 falls in the table's box); now each is one TABLE element.
 
 **These numbers are optimistic.** The arbitration was developed on these same pages, so
 expect lower precision and recall on new documents. Before `FEATURE_TABLES` is turned on,
 check it on a private set of 3-5 real course PDFs kept out of git (the challenge's
-recommendation); that was the rule when this was written. `FEATURE_TABLES` has been on in production since the 2026-10-21 decision; the measurement of what turning
+recommendation); that was the rule when this was written. `FEATURE_TABLES` was turned on in production by the 2026-10-21 decision (its value now: `src/readablestem/ops/production.profile.toml`); the measurement of what turning
 it on does, and how the blockers were closed, is at the end of this page ("Tables on, on the development
 sets").
 
@@ -327,8 +327,8 @@ local` (docs/eval.md, "Tables").
   separated by a caption or a wide gap that the table's own structure confirms, each at
   least three lines long. Not split: two ruled tables in one box, a table and a plot, tables
   side by side, and a table of two lines or fewer.
-- **Maths in cells** is flattened to characters in the local grid (only superscripts are
-  kept, as superscript characters). Reading a cell's maths-font runs the way the body's
+- **Math in cells** is flattened to characters in the local grid (only superscripts are
+  kept, as superscript characters). Reading a cell's math-font runs the way the body's
   inline equations are read would not be a contained change: the body's path finds the run
   (`layout._inline_runs`) and then sends it to the equation step, a model call, for its
   LaTeX; the grid keeps no per-glyph font data, and a table cell is not an inline element.
@@ -385,7 +385,7 @@ exception's class name), never text. MuPDF's own messages are counted and droppe
   (`uv run python tests/fixtures/tables/make_word_pdf.py`), plus an end-to-end run where
   the detected tables are kept as images with a required decision.
 - `tests/test_tables_model.py`: the checked download, the command, the Docker step, the
-  licence files and the vendored pre- and post-processing.
+  license files and the vendored pre- and post-processing.
 - `tests/test_tables_structure.py`: the structure fixes of 2026-11 (generated pages): the split row of an
   unruled table joined across the page break and its negatives, a sparse booktabs table with its
   one filled column first, in the middle and last, two tables in one box split (other columns,
@@ -402,7 +402,7 @@ exception's class name), never text. MuPDF's own messages are counted and droppe
 
 `pipeline.run` sends every TABLE element to `table_step.rebuild` with its crop, like an
 equation or a figure. Rebuilding is behind `FEATURE_TABLES` (`ConversionOptions.tables`,
-off by default in code, on in production). Off, the table is kept as an image of the table with a required decision
+off by default in code; production's value is in `src/readablestem/ops/production.profile.toml`). Off, the table is kept as an image of the table with a required decision
 (FAILED, reason `table_not_rebuilt`) before any model work.
 
 ### What the model is asked
@@ -414,13 +414,13 @@ answer is strict structured output (`TableOutput`, `extra="forbid"`):
 |---|---|
 | `is_data_table` | true for values read against row or column labels; false for text in boxes, a list of terms, a form, a figure, a table of contents, an equation or a matrix |
 | `caption` | a caption printed inside the image, else empty (never used: see below) |
-| `rows[].cells[]` | each printed cell once, left to right, top to bottom: `text` exactly as printed, `latex` for a maths cell (words in `\text{}`), `header` (`col`, `row` or `none`), `row_span`, `col_span` |
+| `rows[].cells[]` | each printed cell once, left to right, top to bottom: `text` exactly as printed, `latex` for a math cell (words in `\text{}`), `header` (`col`, `row` or `none`), `row_span`, `col_span` |
 
 Rows of cells rather than (row, column) numbers: models list an HTML-like table far more
 reliably than they count positions, and that is the shape gpt-6-luna scored TEDS 0.97 and
-maths-cell F1 0.99 with on table-bench (59 crops, $0.0007 a table).
+math-cell F1 0.99 with on table-bench (59 crops, $0.0007 a table).
 
-The model sees the crop, the "Table N" caption and the neighbouring text, fenced as
+The model sees the crop, the "Table N" caption and the neighboring text, fenced as
 untrusted data by the client. It is **not** sent the PDF's own words for the table:
 those are what its answer is checked against, as the equation step keeps an equation's
 text layer from the model. A model that had copied them could pass the checks with a
@@ -435,7 +435,7 @@ flattened exponent (10⁵ is "105" in most text layers).
 The escalation is one main-model call with no fallback (its fallback would be the cheap
 model again). The main model's answer is kept unless it produced nothing, only the cheap
 one is usable, or only the cheap one is free of problems (for example the cheap answer
-escalated for a cosmetic maths style and the main model then misread a number). Every
+escalated for a cosmetic math style and the main model then misread a number). Every
 attempt is a `ModelCall` on the fix. The output budget is sized from the local grid
 (2,048 tokens plus 40 a slot, between 4,096 and 16,384), so a small table does not reserve
 a large one's worst case. Spend goes through the client's `JobBudget` reservations;
@@ -446,7 +446,7 @@ a large one's worst case. Spend goes through the client's `JobBudget` reservatio
 `grid_from_output` places the cells as HTML does: each row's cells from the left, skipping
 slots a cell above spans into; a span is cut at the last row; slots no cell covers become
 empty cells (models often leave empty cells out). Whitespace in a cell is collapsed.
-LaTeX is kept only for real maths: `5.2\ \text{m/s}` is plain text, `10^{-11}` is maths,
+LaTeX is kept only for real math: `5.2\ \text{m/s}` is plain text, `10^{-11}` is math,
 converted to inline MathML through `validate.check_latex`, `safe_latex_to_mathml` and
 `check_mathml`; a cell whose LaTeX fails keeps its text. An answer with no rows, more than
 60 columns, more than 300 rows or 5,000 cells is unusable.
@@ -469,8 +469,8 @@ mark an identifying first column as row headers. Both are valid; the rules are:
   two when a row-spanning group label such as "Metal" comes before "Aluminium",
   "Copper"). A label column after data cells is the second of two tables printed side
   by side ("Planet | Mass | Planet | Mass"): it is kept, and `table_html` then writes
-  headers/id, so 1898 is labelled Jupiter, not Mercury. A column marked so after data
-  cells whose cells are not labels would leave the row headers to its left labelling
+  headers/id, so 1898 is labeled Jupiter, not Mercury. A column marked so after data
+  cells whose cells are not labels would leave the row headers to its left labeling
   its half of each row (`scope="row"` covers the whole row), so those are dropped too,
   with the note `row_headers_dropped`. Partial row flags are dropped.
 - **Label/value tables** ("Mass | 2 kg") therefore get row headers and no `<thead>`.
@@ -495,11 +495,11 @@ All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
 | `table.cell_text` | `cell_mismatch` | every row's words are there, one is in another column of its row (an empty cell left out, two values swapped) | required |
 | `table.cell_text` | `whitespace_differs` | each cell equal to the PDF cell in its place once spacing is ignored ("12 345" and "12345", "tempera- ture") | optional note |
 | `table.cell_text` | `no_pdf_text` | no PDF words to compare (no local grid with text, no element text) | required |
-| `table.math` | `flattened_maths` | a grid read from the PDF (the local-grid fallback, or "Use the grid read from the PDF") has a cell whose maths its text gives flat: an arrow over a symbol, another accent (a combining mark or spacing accent) on a word of at most three letters (an accented word such as an OT1 font's "Mu¨ller" is text), a stacked fraction (a raised digit before a baseline one), a raised run written `^(...)` (`assemble_tables.flattened_cells`). Error severity: no Accept, and `rebuilt_grid` keeps the image until those cells are LaTeX | required |
+| `table.math` | `flattened_maths` | a grid read from the PDF (the local-grid fallback, or "Use the grid read from the PDF") has a cell whose math its text gives flat: an arrow over a symbol, another accent (a combining mark or spacing accent) on a word of at most three letters (an accented word such as an OT1 font's "Mu¨ller" is text), a stacked fraction (a raised digit before a baseline one), a raised run written `^(...)` (`assemble_tables.flattened_cells`). Error severity: no Accept, and `rebuilt_grid` keeps the image until those cells are LaTeX | required |
 | `table.edge_text` | `text_at_edge` | layout left a line of the table's own text size right under its box, starting where a column starts (`REASON_EDGE_TEXT`, `tables._edge_text`): probably the rest of a wrapped cell the box ended a line early. The grid and the crop both lack it, so no second reading can differ; never escalated | required |
-| `table.math` | `invalid_latex` | a maths cell's LaTeX fails a validator (error severity; the cell shows its text) | required |
-| `table.math_symbols` | `symbol_mismatch` | a maths cell's letters, digits or Greek letters differ from the PDF glyphs in its place; unlike an equation, with their case (5 mW is not 5 MW) and, unless the MathML stacks digits (a fraction, a root, scripts above and below), its numbers as written (6.67 is not 66.7, 10^-31 is not 10^-13; a text layer that runs a flattened exponent into its base, "1024" for 10^{24}, still agrees) | required |
-| `table.math_signs` | `sign_mismatch` | a sign or relation in a maths cell differs (the equation step's `compare_signs`; an en dash between digits in the PDF cell counts as a minus sign, the raise of 10^-18 lost) | required |
+| `table.math` | `invalid_latex` | a math cell's LaTeX fails a validator (error severity; the cell shows its text) | required |
+| `table.math_symbols` | `symbol_mismatch` | a math cell's letters, digits or Greek letters differ from the PDF glyphs in its place; unlike an equation, with their case (5 mW is not 5 MW) and, unless the MathML stacks digits (a fraction, a root, scripts above and below), its numbers as written (6.67 is not 66.7, 10^-31 is not 10^-13; a text layer that runs a flattened exponent into its base, "1024" for 10^{24}, still agrees) | required |
+| `table.math_signs` | `sign_mismatch` | a sign or relation in a math cell differs (the equation step's `compare_signs`; an en dash between digits in the PDF cell counts as a minus sign, the raise of 10^-18 lost) | required |
 | `table.math_style` | `style_mismatch` / `style_cosmetic` | a meaning-level letter style (a bold vector read as plain) / a cosmetic one | required / optional note |
 | `table.source` | `local_grid` | no model answer was usable: the proposal is the local grid | required |
 | `table.row_headers` | `row_headers_dropped` | the model marked a column after data cells as row headers that are not labels, so the row headers to its left were dropped too | optional note |
@@ -515,30 +515,30 @@ form (`10⁻¹⁸` is "10^-18", as the model types it), then the text is NFKC no
 (ligatures, full-width forms), invisible format characters dropped, dashes folded into
 one, pdfTeX's U+2206 into Δ; case is kept (mW is not MW); brackets, quotes, commas and
 full stops are not compared. The
-non-maths cells of the answer, as a multiset, must equal the PDF's words:
+non-math cells of the answer, as a multiset, must equal the PDF's words:
 
 - with a local grid of the same size, **cell by cell**: each answer cell against the
   local cell in its place (row by row when the merged cells differ, which is
-  `spans_differ` anyway), leaving out the local cells where the answer has maths (the
-  maths checks compare those). A failure whose row totals still match is
+  `spans_differ` anyway), leaving out the local cells where the answer has math (the
+  math checks compare those). A failure whose row totals still match is
   `cell_mismatch` (a value moved to another column: the blank cells the model left out
   of "Male | ___ | ___ | 14 | 55" put 14 under the wrong heading); one whose table totals
   match is `row_mismatch`; one where each cell holds once all spacing is removed is
   `whitespace_differs` (a cell boundary moved, "1.5 | 23" read as "1.52 | 3", is not);
 - otherwise (the grids disagree, or only `Element.text` is there) over the **whole
   table**: no word may be added, and the PDF words no text cell accounts for must be
-  exactly the maths cells' letters and digits (a maths cell's text layer is flattened,
+  exactly the math cells' letters and digits (a math cell's text layer is flattened,
   so it is compared as a bag of symbols, like an equation).
 
 This catches dropped, duplicated and invented numbers that a substring test cannot (a
 wrong "1" when a "1" appears elsewhere in the table).
 
-**Maths cells** are compared with the PDF glyphs of the local cell in the same place
+**Math cells** are compared with the PDF glyphs of the local cell in the same place
 (only when the grids are the same size): `equation_step.text_layer_symbols_differ`,
 `signs.compare_signs` when the letters mostly agree, and `text_layer_style`, the same
-rules and thresholds as an equation. Unlike an equation, a maths cell where the PDF has
+rules and thresholds as an equation. Unlike an equation, a math cell where the PDF has
 no letters or digits at all is a `symbol_mismatch`: the rest of the table has a text
-layer, so maths read into an empty cell was invented.
+layer, so math read into an empty cell was invented.
 
 ### Status and review tier
 
@@ -549,7 +549,7 @@ First matching rule wins:
 | 1 | rebuilding off | FAILED | `table_not_rebuilt` | required (image kept) |
 | 2a | the answer kept says it is not a data table, but the grid read from the PDF is a grid of numbers (`numeric_grid`: half its cells below the first row hold a digit) | NEEDS_REVIEW, the local grid with first-row headers | (check `table.kind` `numbers_not_a_table`) | required |
 | 2 | the answer kept says it is not a data table | ACCEPTED, the grid read from the PDF (`is_data` False) written as its text in reading order | (check `table.kind` `written_as_text`) | optional |
-| 2b | ... and there is no grid read from the PDF to write (none, no text, flattened maths) | ABSTAINED | `not_data_table` | required (image kept) |
+| 2b | ... and there is no grid read from the PDF to write (none, no text, flattened math) | ABSTAINED | `not_data_table` | required (image kept) |
 | 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with first-row headers | (check `local_grid`) | required |
 | 3b | no usable answer, no local grid | FAILED | `model_<outcome>` or `invalid_table` | required (image kept) |
 | 4 | every check passed | ACCEPTED | | none |
@@ -575,7 +575,7 @@ inside `<div class="table-scroll">`, which scrolls sideways on a narrow screen (
 screen is a tab stop, named by its caption (else "Table") with `role="group"`: a
 keyboard user can only scroll a box that takes focus, and a tab stop on every small
 table would make a long document tedious. The width estimate (`estimate_min_width_em`:
-per column the longest word at 0.6 em a character, or a maths cell's estimated width,
+per column the longest word at 0.6 em a character, or a math cell's estimated width,
 plus 1.4 em of padding and borders a cell; tab stop from 13 em of the 16 em available)
 errs wide: measured in Chromium on the 59 bench tables, none overflowed without being a
 tab stop (47 overflow; 7 more are tab stops without needing it). A proposal without a
@@ -601,7 +601,7 @@ position (a stand-in for tables-detect). Spend: $0.045 in all.
 
 - Eight of ten were ACCEPTED with nothing to note on gpt-6-luna alone ($0.0003 to
   $0.0006 each): booktabs with siunitx units, a fully ruled table, an unruled table of
-  signed numbers, maths in cells (`\bar{v} = \frac{\Delta x}{\Delta t}`,
+  signed numbers, math in cells (`\bar{v} = \frac{\Delta x}{\Delta t}`,
   `\vec{p} = m\vec{v}`, `W = \int \vec{F} \cdot d\vec{r}`), planets with row headers,
   and three OpenStax tables. The header rows matched the printed tables, and the first
   columns of names (planets, quantities) became row headers, as the policy allows.
@@ -633,8 +633,8 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 
 ### Known limits
 
-- A maths cell is compared as a bag of letters (with their case) and of numbers: two
-  whole numbers swapped inside one maths cell are missed, and so are digits in a
+- A math cell is compared as a bag of letters (with their case) and of numbers: two
+  whole numbers swapped inside one math cell are missed, and so are digits in a
   fraction or a root (only their bag is compared, as for an equation). Plain numbers
   are text cells (LaTeX without commands or scripts is treated as text), so the word
   check covers them.
@@ -644,51 +644,51 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
   NFKC does not fold) makes a correct answer a `text_mismatch`.
 - An em dash for "no value" folds into the dash that is not compared: an answer that
   leaves that cell empty passes.
-- No speech text for maths cells (the review screen reads the MathML).
+- No speech text for math cells (the review screen reads the MathML).
 
 ### Tests
 
 | File | What it covers |
 |---|---|
-| `tests/test_steps_table.py` | every route and tier with recorded JSON answers (`FakeVisionClient`), the bijection (misread, dropped, duplicated, invented, moved, signs, symbols, case, spacing), grid agreement, maths cells (MathML, symbols, signs, style, invalid LaTeX), the header policy, placement, the local-grid fallback, budget, the request (no table words, fenced context), model HTML and script in cells escaped, the recorded real answers and a misread in each, a conversion with the flag on, axe on every shape (`browser`) |
+| `tests/test_steps_table.py` | every route and tier with recorded JSON answers (`FakeVisionClient`), the bijection (misread, dropped, duplicated, invented, moved, signs, symbols, case, spacing), grid agreement, math cells (MathML, symbols, signs, style, invalid LaTeX), the header policy, placement, the local-grid fallback, budget, the request (no table words, fenced context), model HTML and script in cells escaped, the recorded real answers and a misread in each, a conversion with the flag on, axe on every shape (`browser`) |
 | `tests/test_assemble_tables.py` | the scroll box and tab stop, the width estimate, the caption kept, the HTML table rules, axe and 320 px reflow in Chromium (`browser`) |
 | `tests/test_table_html.py` | the serialiser (contracts work) |
 | `tests/test_tables_live.py` | the smoke test with the real models (`live_model`, opt-in; above) |
 
 
-## Review: clean tables, a grid that is not a table, a maths cell read (T3-11)
+## Review: clean tables, a grid that is not a table, a math cell read (T3-11)
 
 Three rough edges of the table card, built in `web/review.py` and `routes/edits.py` (the card
 itself is described in docs/web.md "The table card" and "Rough edges"):
 
 - **Accept all clean tables.** A table that waits although nothing was found wrong with it
-  (a data table with a proposal, no failed check of any kind, no structural problem, no maths the
+  (a data table with a proposal, no failed check of any kind, no structural problem, no math the
   PDF gives flat; `review.is_clean_table`) is accepted with every other such table in one write.
   A table with a finding, kept as an image or written as text is never swept in.
 - **This grid is not a table.** The reviewer's version of the table step's `written_as_text`: the
   grid read from the PDF's own words (else the proposal's) is written as text, one cell after
-  another (`assemble_tables.text_html`). Refused for a grid with no text or flattened maths.
-- **A maths cell read by the model.** The equation step reads the cell's crop (its box, or the
+  another (`assemble_tables.text_html`). Refused for a grid with no text or flattened math.
+- **A math cell read by the model.** The equation step reads the cell's crop (its box, or the
   box of the cell of the grid read from the PDF in its place) and the answer goes through the
   cell's edit checks (`web.edit_check.check_cell_edit`, against the PDF's text in that cell). It
   is a model call from the review, so it is spend capped like the conversion's (docs/web.md,
   "What the model costs here").
 
 
-## Maths cells from glyphs (T10, 2026-11-03)
+## Math cells from glyphs (T10, 2026-11-03)
 
-The table step's model reads a table once and writes a cell's maths as LaTeX when it sees it. Most of the maths of a table
+The table step's model reads a table once and writes a cell's math as LaTeX when it sees it. Most of the math of a table
 that the pipeline missed was cells it wrote as text ([eval-equation-diagnostics.md](eval-equation-diagnostics.md), D1). A
-table of a TeX paper now has a second reader for the cells whose glyphs say they are maths:
+table of a TeX paper now has a second reader for the cells whose glyphs say they are math:
 
 1. **Layout** (`layout._cell_maths`, TeX-made PDFs only, not a rotated table). The glyphs of a cell are read as a row of
-   their own by the rules that find inline maths in a line of prose (`_inline_runs`: a maths font, an italic variable with an
+   their own by the rules that find inline math in a line of prose (`_inline_runs`: a math font, an italic variable with an
    operator, a script, a relation with operands). A cell counts when one run covers everything in it (a cell with words and
    a formula, a bare number, a cell of several lines such as a stacked fraction, a table with more than 60 such cells are
-   left to the table step), a lone italic letter alone in a cell is a variable, and a cell of only maths-symbol glyphs (up to
+   left to the table step), a lone italic letter alone in a cell is a variable, and a cell of only math-symbol glyphs (up to
    four, in a font of `layout._MATH_SYMBOL_FONT`: a `\checkmark` or `\times`, which has no run because a symbol needs an
    operand beside it) is one formula (its marks must equal the cell's text; a bullet of the plain Symbol face and the Dingbats
-   fonts are not maths, and nothing outside a table is taken this way). The cell becomes an inline equation
+   fonts are not math, and nothing outside a table is taken this way). The cell becomes an inline equation
    element of the table (`parent_id` = the table, reason `table cell maths`) with its crop; `TableCell.equation_id` names
    it. Layout does not read the tables flag: `run.py` drops these elements (`table_math.without_cell_equations`) when
    tables are off, because the table stays a picture and nothing would write them.
@@ -714,8 +714,8 @@ table of a TeX paper now has a second reader for the cells whose glyphs say they
    files made from the page show the person's reading. The card marks such a cell "(also an equation)" and says so in its form.
 
 Measured offline with the layout alone (`scripts/eq_span_edges.py`, [eval-equation-diagnostics.md](eval-equation-diagnostics.md),
-"Table-cell maths"): gold equations typed in floats found 661 to 892 of 2,153 over the five development and replay parts.
-What the glyphs cannot see: a number set in maths mode in a text font (`0.50` in `0.50 kg`, `1.57 s`) has no glyph that says
+"Table-cell math"): gold equations typed in floats found 661 to 892 of 2,153 over the five development and replay parts.
+What the glyphs cannot see: a number set in math mode in a text font (`0.50` in `0.50 kg`, `1.57 s`) has no glyph that says
 so. Revised uploads carry the equation like any inline equation (by its element), which moves when the table's cells do.
 
 ## Tables on, on the development sets (2026-10-21): measured, and the decision
@@ -729,7 +729,7 @@ development sets, measured for this decision. Nothing on the held-out set was ru
 **Decision (2026-10-21, the owner's): `FEATURE_TABLES=true` in production**, with the settings in
 "The decision" below. The code default stays off. The blockers this section first listed were
 closed or measured: the gate floor (`wrong cells not flagged` 2 to 0), the real-document check
-(a public labelled set, "Real documents": precision 1.00, full-extent recall **0.56 against a
+(a public labeled set, "Real documents": precision 1.00, full-extent recall **0.56 against a
 floor of 0.85: missed**), the spend caps (the figures first given here were wrong; "The
 decision"). On every set measured it is a net gain for a reader and changes nothing else:
 equations 0 to 65 of 223 table equations on real papers (0 to 60 of 102 in the chemistry
@@ -853,17 +853,17 @@ gold of that set was made with the old converter. `on` and `off` below are this 
 Nothing else moves: the equations, their scores and their flags are identical, the headings and
 figures are the same elements. Tables of these papers are bigger and dearer to read than the
 OpenStax ones ($0.033 against $0.012). The limit is detection, not the table step: 17 tables are
-claimed, and the other 158 of the 223 table equations were not found (not analysed table by
+claimed, and the other 158 of the 223 table equations were not found (not analyzed table by
 table: a table the detector did not propose, or a cell the model wrote as text); no table of these
-papers was labelled, so how many real tables 17 is cannot be said.
+papers was labeled, so how many real tables 17 is cannot be said.
 
 ### The blockers (2026-10-21), and what closed them
 
 1. **The real-document check: measured, floor missed.** The first line of this page's rule was that
-   `FEATURE_TABLES` stays off until 3 to 5 real course documents are labelled and measured. The
+   `FEATURE_TABLES` stays off until 3 to 5 real course documents are labeled and measured. The
    private lab manuals of the research cannot be committed, so `data/real-tables/` holds five
    openly licensed ones (CC BY 4.0 arXiv lecture notes, a textbook, a physics-lab study, two
-   tutorials), 64 pages, 25 labelled tables, and the floors were written down before detection was
+   tutorials), 64 pages, 25 labeled tables, and the floors were written down before detection was
    run on any of them (its README; commit f545c73). No model: **precision 1.000 (14 of 14 predicted
    data tables are real; Wilson 95% 0.78 to 1.00), full-extent recall 0.560 (14 of 25; 0.37 to
    0.73) against floors of 0.95 and 0.85**. Every table found was found at its full extent.
@@ -1033,7 +1033,7 @@ system of equations, which is what the page guard (`_text_block_dropped`) exists
 papers no real-world split uses, up to 40 to 60 pages each, 233 boxes; the labels of a table are its
 source `tabular`, found in the PDF by `gold/tabulars.py`, and the 66 boxes with no matching
 `tabular` were looked at one by one): 222 are tables (167 matched a `tabular`; 55 were tables whose
-source the matcher could not place: tables made of maths, or of macros), 11 are not (5%): front
+source the matcher could not place: tables made of math, or of macros), 11 are not (5%): front
 matter (article info beside an abstract), an equation beside its explanation, code, a plot's
 tick labels and legend, a table of contents with a text column. None is a rule frame (77 boxes).
 
@@ -1041,7 +1041,7 @@ tick labels and legend, a table of contents with a text column. None is a rule f
 
 `data/real-tables-heldout/`: seven CC BY papers with tables (physics education studies, one
 deep-learning survey: the lecture notes and tutorials the rule asked for were few among what nothing
-had used), 58 pages, 39 labelled tables, registered with its floors (precision 0.95, recall 0.85)
+had used), 58 pages, 39 labeled tables, registered with its floors (precision 0.95, recall 0.85)
 and its selection rule before detection ran on it (commit `ce1f86e`). Run once with the code
 that followed that commit (`aee6915`), reported as it came out:
 
@@ -1099,7 +1099,7 @@ uv run readablestem eval gate --current dev.json --baseline data/eval/baseline-t
 ```
 
 `scripts/tables_label.py` and `scripts/tables_heldout.py` (with `gold/tabulars.py`) place a paper's
-LaTeX tables on its PDF pages and build a labelled set like the held-out one.
+LaTeX tables on its PDF pages and build a labeled set like the held-out one.
 
 
 ## Second held-out measurement and the residuals (2026-10-22, branch `fix/tables-round2`)
@@ -1119,7 +1119,7 @@ pin, which passes on both.
 | Residual | Cause | Fix | Dev effect |
 |---|---|---|---|
 | bar charts with fewer than 12 bars taken for tables | the bars of one series are one drawing of many `re` items, so they counted as one fill, and the count needed 12 | `layout._Path.rects` keeps the rectangles of a filled drawing; `tables._bars`: at least four filled rectangles on one line, side by side, of three or more different lengths, mostly with no text on them, is a chart (rules drawn as thin filled boxes are not bars) | the two bar charts of `data/real-tables-heldout` (false tables) gone: precision 0.951 to 1.000 |
-| lists of relations (`X ~ f(n)   if ...`) left as text | lines of symbols in aligned columns look like displayed equations | `tables._conditions`: three or more lines whose last cell opens with "if", "when", "where"..., not built from bracket glyph pieces (`cases` is maths), are a list of definitions | the two lists of `data/real-tables`: recall 0.920 to 1.000 (25 of 25) |
+| lists of relations (`X ~ f(n)   if ...`) left as text | lines of symbols in aligned columns look like displayed equations | `tables._conditions`: three or more lines whose last cell opens with "if", "when", "where"..., not built from bracket glyph pieces (`cases` is math), are a list of definitions | the two lists of `data/real-tables`: recall 0.920 to 1.000 (25 of 25) |
 | a ruled table split by far-apart rules (groups of rows) found as its first part | `_stack` only follows rules within three lines; the detector stops there | `_joined_frames`: the whole stack is the table when the detector's box in it is the stack's width and covers two spans, no paragraph runs across it, no caption is inside, and no other detector table is in it | partial find of 2302.07336 Table I found whole |
 | two rules and ragged number columns under a "Table N" line | the span between two rules is not "ruled" for the arbitration | the detector's box with a top and a bottom rule, three lines in aligned columns and a caption is a table | 1 table found (2503.16294) |
 | grids of single digits (codes, truth tables) called diagram labels | `labels_only` | not when a "Table N" line is over a grid that lines up | 6 tables found (2505.15032) |
@@ -1145,7 +1145,7 @@ These are development numbers: the first two rows are what the fixes were read o
 
 `data/real-tables-heldout2/` (README: the question, floors, rule, labels and comparison; hashes in
 `REGISTRATION.sha256`; committed at `5b1ea27`, before any detection ran on it): ten CC BY 4.0
-arXiv documents, 100 pages, 58 labelled tables, from computer science (4), engineering (3),
+arXiv documents, 100 pages, 58 labeled tables, from computer science (4), engineering (3),
 statistics (2) and economics (1), chosen by a seeded rule over the real-world pool and 20 further
 sets (21,615 records) minus the 330 papers earlier work used. The rule's "teaching" tier matched
 words in abstracts too, so the set is mostly surveys and research articles; two documents are a

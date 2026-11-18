@@ -8,7 +8,7 @@ page.
 
 Each converted equation already has a plain-English reading, made by
 `pipeline/speech.py` and stored on the fix (`EquationFix.speech`). The review screen shows
-it. The downloaded HTML keeps MathML only, so a screen reader voices the maths itself.
+it. The downloaded HTML keeps MathML only, so a screen reader voices the math itself.
 
 With `MATHML_ALTTEXT=true`, `assemble.render_html` also writes that stored reading as the
 `alttext` attribute of the equation's `<math>`:
@@ -27,7 +27,7 @@ downloaded file and a re-rendered one agree.
 ## Why it is off
 
 `alttext` is a fallback label, and screen readers disagree about when it wins over the
-maths structure:
+math structure:
 
 - Readers that voice the MathML (NVDA with MathCAT, JAWS with its math reader, VoiceOver
   in Safari) may ignore it, in which case it is harmless.
@@ -35,7 +35,7 @@ maths structure:
   of the equation. Then the reader hears our sentence and cannot step through the
   equation (exploration, navigation by fraction or root, braille math). That is a loss for
   the users who need the structure most.
-- Where the maths does not render at all (old browsers, some LMS viewers), `alttext` is the
+- Where the math does not render at all (old browsers, some LMS viewers), `alttext` is the
   only thing a reader gets. That is the gain.
 
 Which of these happens is a property of the reader and its settings, so it has to be
@@ -96,7 +96,7 @@ and Chrome. Test files are made with the two settings; the same PDF both times.
 Turn it on by default only if, in NVDA + MathCAT on both browsers:
 
 - the spoken reading with `alttext` is the same as without it (alttext ignored), or
-  clearly better where the maths does not render; and
+  clearly better where the math does not render; and
 - math navigation still works with it on; and
 - none of the equations reads worse than the baseline.
 

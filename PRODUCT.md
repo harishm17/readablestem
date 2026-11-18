@@ -24,7 +24,7 @@ The converted output and the review step are shown, not claimed: the site shows 
 
 ## Capabilities and Constraints
 - Input is a PDF (Word and PowerPoint are first turned into PDFs where the server has LibreOffice); output is one HTML file, plus a Canvas zip, Common Cartridge, Word and EPUB downloads.
-- Scanned and handwritten pages are read by a model only when the instructor ticks "Convert scanned or handwritten pages"; every block it writes is a review item.
+- Scanned and handwritten pages are read by a model only when the instructor checks "Convert scanned or handwritten pages"; every block it writes is a review item.
 - Not a compliance checker, not a general OCR engine, not a general PDF-to-Markdown converter. A LaTeX file or a zip of a LaTeX project is also taken on the hosted service since 2026-11-04, but the PDF is the main path; Beamer source and zips of several documents are built and switched off there (docs/deploy-railway.md, "Feature flags in production").
 - Wording rules (CONTRIBUTING.md): the tool assists; no claim of conformance, guaranteed accessibility or checked results; numbers carry their sample size and say what they do not show; no document content in logs.
 - Copy is the owner's. New labels are placeholders until reviewed.
@@ -35,14 +35,14 @@ The converted output and the review step are shown, not claimed: the site shows 
 
 ## Evidence on Hand
 - Held-out and development results in `PROOF.md` and `README.md`, with sample sizes; reports under `proof/`.
-- A stored real conversion with its source PDF: `src/readablestem/web/static/demo/` (OpenStax Physics 2.3, untagged PDF).
+- A stored real conversion with its source PDF: `src/readablestem/web/demo/` (OpenStax Physics 2.3, untagged PDF).
 - No testimonials, customer names or press exist; none may be invented.
 
 ## Product Principles
 1. Show the real output next to the real source rather than describing it.
 2. Every number names its set, sample size and date; the tool never claims to beat or certify.
-3. Accessibility is the first product feature: readable text, visible focus, no information by colour alone, works with forced colours and 200% zoom.
+3. Accessibility is the first product feature: readable text, visible focus, no information by color alone, works with forced colors and 200% zoom.
 4. The instructor decides; the interface makes the decisions easy to scan.
 
 ## Accessibility & Inclusion
-Text contrast of at least 7:1, a visible two-tone focus ring, forced-colours support, reduced-motion support, usable at 200% zoom and 320px width, keyboard-complete flows. The site's own pages should be a fair example for an accessibility office to read.
+Text contrast of at least 7:1, a visible two-tone focus ring, forced-colors support, reduced-motion support, usable at 200% zoom and 320px width, keyboard-complete flows. The site's own pages should be a fair example for an accessibility office to read.

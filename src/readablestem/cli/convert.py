@@ -226,7 +226,9 @@ def _fix_table(output: ConversionOutput) -> list[str]:
         return ["  (no headings, equations, figures or tables found)"]
     width = max(len(s.value) for s in statuses) + 2
     lines = ["  " + f"{'kind':<10}" + "".join(f"{s.value:>{width}}" for s in statuses)]
-    for kind in (Kind.HEADING, Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
+    first = (Kind.HEADING, Kind.EQUATION, Kind.FIGURE, Kind.TABLE)
+    others = sorted({f.kind for f in fixes} - set(first), key=lambda kind: kind.value)
+    for kind in (*first, *others):
         row = [sum(1 for f in fixes if f.kind is kind and f.status is s) for s in statuses]
         if any(row):
             lines.append("  " + f"{kind.value:<10}" + "".join(f"{n:>{width}}" for n in row))
@@ -337,6 +339,7 @@ def _cmd_convert(args: argparse.Namespace) -> int:
 
 def _convert(args: argparse.Namespace) -> int:
     from readablestem.observability.tracing import make_tracer
+    from readablestem.pipeline.assemble import draft_banner, mark_draft
     from readablestem.pipeline.html_checks import axe_checks, static_checks
     from readablestem.pipeline.layout import LayoutError
     from readablestem.pipeline.run import FATAL_ERRORS, PipelineOutput, convert_pdf
@@ -401,7 +404,11 @@ def _convert(args: argparse.Namespace) -> int:
     checks = output.checks if isinstance(output, PipelineOutput) else static_checks(html)
     axe = axe_checks(html) if args.axe else None
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(html, encoding="utf-8")
+    # There is no review step here, so a file with decisions open is a draft and says so
+    # first, as a draft downloaded from the web app does (SW21). The checks read the HTML
+    # as the pipeline wrote it.
+    still_open = triage.open_decisions(output.result.fixes)
+    args.out.write_text(mark_draft(html, still_open) if still_open else html, encoding="utf-8")
     if args.report:
         _write_report(args.report, output, checks, axe)
 
@@ -414,6 +421,8 @@ def _convert(args: argparse.Namespace) -> int:
         concurrency=concurrency,
     )
     print(f"wrote {args.out}")
+    if still_open:
+        print(f"Draft:       the file opens with “{draft_banner(still_open)}”")
     if args.report:
         print(f"wrote {args.report}")
     return 0

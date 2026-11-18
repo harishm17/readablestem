@@ -121,6 +121,30 @@ def test_max_usd_builds_the_openai_client_with_the_cap(gold, tmp_path, fake_inpu
     assert isinstance(verifier, DecisionsVerifier)
 
 
+def test_a_report_names_the_production_profile_only_when_run_under_it(
+    gold, tmp_path, fake_inputs, capsys
+):
+    from readablestem.ops import profile
+
+    shipped = profile.load()
+    assert main(pipeline_args(gold, tmp_path, "--fake")) == 0
+    out = capsys.readouterr().out
+    assert "Settings: development settings" in out and "production profile" in out
+    stamp = json.loads((tmp_path / "report.json").read_text())["profile"]
+    assert stamp["name"] == "development settings" and stamp["sha256"] == shipped.sha256
+    assert "FEATURE_TABLES" in stamp["differs"]
+
+    assert main(pipeline_args(gold, tmp_path, "--fake", "--profile", "production")) == 0
+    out = capsys.readouterr().out
+    assert f"Settings: production profile {shipped.short_hash}" in out
+    stamp = json.loads((tmp_path / "report.json").read_text())["profile"]
+    assert (stamp["name"], stamp["differs"]) == ("production", [])
+    # The image facts in the repository are unknown, so a switch that needs a program the
+    # image may lack is counted off whatever its setting says.
+    assert stamp["counted_off"] == ["FEATURE_LATEX_SOURCE", "OFFICE_INPUT_ENABLED"]
+    assert "Counted off, the image lacks their program: FEATURE_LATEX_SOURCE" in out
+
+
 # ---------------------------------------------------------------------- calibrate
 
 

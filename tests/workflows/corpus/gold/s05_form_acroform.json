@@ -1,0 +1,30 @@
+{
+ "id": "s05_form_acroform",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "heading", "text": "Student Accommodation Request Form"},
+   {"role": "body", "text": "Complete this form and return it to the Accessibility Office at least two weeks before the first class meeting. Fields marked with an asterisk are required."},
+   {"role": "heading", "text": "Section 1. About you"},
+   {"role": "form", "text": "Full name *"},
+   {"role": "form", "text": "Student ID *"},
+   {"role": "form", "text": "Campus email *"},
+   {"role": "form", "text": "Course *"},
+   {"role": "heading", "text": "Section 2. Accommodations requested"},
+   {"role": "body", "text": "Check every accommodation you are requesting."},
+   {"role": "form", "text": "Extended time on exams"},
+   {"role": "form", "text": "Note-taking support"},
+   {"role": "form", "text": "Course materials in an accessible format"},
+   {"role": "form", "text": "Other (describe below)"},
+   {"role": "form", "text": "Term *"},
+   {"role": "form", "text": "Fall"},
+   {"role": "form", "text": "Spring"},
+   {"role": "form", "text": "Summer"},
+   {"role": "heading", "text": "Section 3. Explanation"},
+   {"role": "body", "text": "Describe how your disability affects your coursework (optional)."},
+   {"role": "form", "text": "Signature *"},
+   {"role": "form", "text": "Date *"},
+   {"role": "body", "text": "Office use only: received"}
+  ]}
+ ]
+}

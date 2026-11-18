@@ -321,6 +321,11 @@ def test_budget_exhaustion_stops_the_rest_and_still_assembles(fake):
     html = output.result.html
     assert html.count('data-reason="budget_job_calls"') == 3
     assert all(c.passed for c in output.checks)
+    # each step the limit stopped says so, with how far it had got
+    assert [(n.step, n.reason, n.done, n.of) for n in output.facts.not_finished] == [
+        ("equation", "cap_reached", 2, 4),
+        ("figure", "cap_reached", 0, 1),
+    ]
 
 
 def test_calls_made_before_a_refusal_are_kept(monkeypatch):

@@ -35,7 +35,7 @@ pipeline changes. The version a result is measured under is the **pipeline versi
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
-report from an older version is not edited to look current: it stays labelled with the
+report from an older version is not edited to look current: it stays labeled with the
 version it was made under.
 
 The committed development-set reports (checked against the files by `tests/test_eval_docs.py`):
@@ -193,7 +193,7 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `exact_lenient_ci95` | Wilson 95% interval for `exact_lenient` |
 | `mean_teds` | mean of TEDS = 1 - TED / max(nodes), Zhang-Shasha tree edit distance on normalised trees; 0 with no proposal |
 | `proposal_rate` | share where the step proposed MathML at all |
-| `secondary_stream_v2` | the labelled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
+| `secondary_stream_v2` | the labeled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
 | `by_status` | per `Fix.status` (accepted, needs_review, abstained, failed): `n`, `share`, `exact_lenient`, `mean_teds`. Shows whether "accepted" really is more accurate than "needs review" |
 | `by_route` | same, per route: `cheap` (cheap model only), `main` (main model only), `escalated` (cheap first, then main), `fallback` (any call made as a fallback), `none` (no call) |
 | `by_display` | same, per gold `display` (block, inline) |
@@ -216,7 +216,7 @@ are packing gaps: the answer key writes `<mtext>time =</mtext>`, `<mn>-5</mn>` o
 code points for the same dash, mu, prime or degree sign. The held-out run could not score
 230 of 1,217 matched equations exact for this reason (A4). So the equations and document
 tasks, `eval equations` and the reproduce check also score every equation as a *stream of
-symbols* and report it beside the primary scorer, labelled `secondary`; it never replaces
+symbols* and report it beside the primary scorer, labeled `secondary`; it never replaces
 it and the primary numbers, the gate and the committed reports do not change. Rules, in
 order: the same lenient normalisation as the primary scorer; every token split into atoms
 (a number, a letter, one other character; a word is its letters); look-alike characters
@@ -312,7 +312,7 @@ line, cells separated by " | "), the OpenStax alt as a reference (not an answer 
 the caption, fenced and capped at 1000 / 400 / 250 / 150 characters. Output:
 `accurate`, `complete`, `invented_values` (bools), `score` (1-5), `table_values_ok`
 (null without a table; true when every value equals a printed one or, read off the
-chart, lies within half of the axis's smallest labelled step), `table_wrong_values`,
+chart, lies within half of the axis's smallest labeled step), `table_wrong_values`,
 `confidence`. **Long pass** = accurate and complete and no invented values. The report
 gains `metrics.long_descriptions` and a "Long descriptions" table:
 
@@ -326,7 +326,7 @@ gains `metrics.long_descriptions` and a "Long descriptions" table:
 | `unsure` | long descriptions the model marked unsure (an optional note each) |
 | `data_tables`, `table_values_ok_rate`, `table_wrong_values` | data tables proposed; the share whose values were all within tolerance; cells outside it |
 | `values_from_text` | tables whose every number is in the PDF text (always 0 here: the inputs are images) |
-| `colour_only` | figures flagged as telling things apart by colour alone |
+| `colour_only` | figures flagged as telling things apart by color alone |
 | `required_decisions`, `tables_offered` | figures needing a decision; data tables read from the image, offered as optional extras (not in the file until a reviewer adds them, never a decision; `required_for_values` in reports before 2026-10-09, when each was a decision) |
 
 The long judge is not calibrated against human labels yet. The 13 gold figures are too few for a
@@ -354,11 +354,11 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `matched_exact_lenient` | `exact_lenient` over matched pairs (no proposal = wrong) |
 | `matched_mean_teds` | mean TEDS over matched pairs |
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
-| `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (maths OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
+| `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (math OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
 | `detection_precision_excluding_prose_math` | matched / (predicted - `prose_math`): an estimate, since the gold cannot confirm those are formulas |
-| `unmatched_text_layer_supported`, `unmatched_text_layer_supported_by_reason`, `unmatched_not_supported` | the unmatched predictions the PDF's own text supports: not a fragment, and the transcription uses the same letters, digits and Greek letters as the region's text layer (`text_layer_symbols_differ` is False). That is real maths the gold wrote as text (A15: 176 of the 439 unmatched on the held-out run), kept apart from fragments, which agree with their own text trivially and never count as supported. Needs a model run: without proposals (`--fake`) nothing is supported. Per unmatched entry: `text_layer_supported` |
+| `unmatched_text_layer_supported`, `unmatched_text_layer_supported_by_reason`, `unmatched_not_supported` | the unmatched predictions the PDF's own text supports: not a fragment, and the transcription uses the same letters, digits and Greek letters as the region's text layer (`text_layer_symbols_differ` is False). That is real math the gold wrote as text (A15: 176 of the 439 unmatched on the held-out run), kept apart from fragments, which agree with their own text trivially and never count as supported. Needs a model run: without proposals (`--fake`) nothing is supported. Per unmatched entry: `text_layer_supported` |
 | `detection_precision_excluding_text_layer_supported` | matched / (predicted - supported extras): the detection precision with the artefact taken out, beside the unchanged `detection_precision` and the heuristic `..._excluding_prose_math` |
-| `secondary_stream_v2` | the labelled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
+| `secondary_stream_v2` | the labeled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
 | `prose_classes` | only with dev-v2 gold: the scripts, code, glossary and hyphen scorers (see "Extended development set") |
 | `split_gold_equations` | gold equations the pipeline found as several pieces |
 | `chemistry` | only when the gold has chemistry equations (ids with `chemistry`); report fields beside the scorers, never in their place. `chem_right_excl_times`: `n`, `right`, `rate` of chemically right (`exact_chem`) with the lone multiplication sign gold left out of both (the sentence around it says "times"), `lone_times` (how many were left out) and `chem_right_n`, `chem_right`, `chem_right_rate` with them kept. `silent_harm`: `n`, `n_gold` and `per_100_gold` (counts only: no item ids, so a held-out report names no items) of aligned equations that are wrong on `exact_chem`, not a required decision, and spoken differently from the gold (a reading that lacks only a prefix nuclide's atomic number the page does not show is not harm). Neither number is read by `eval gate`, a floor or a tolerance: they are for reading, not for passing or failing a change. Per pair: `silent_harm`; per page: `chem_lone_times_gold_ids` (`eval/equations_chem.py`) |
@@ -370,7 +370,7 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
 | `review_load` | see "Review load": every kind's decisions per section and per PDF page, optional notes per PDF page, `equation_flags` (matched equations, wrong = not `exact_lenient`; also `equation_flags_excluding_scorer_gaps`), `heading_flags` (the headings task's rule, on the same PDF), `flags` and `flags_excluding_scorer_gaps` (both together), and `wrong_not_required` |
 
-TODO(Harish): document precision is now limited mostly by prose maths (in
+TODO(Harish): document precision is now limited mostly by prose math (in
 document-run1, 25 inline formulas OpenStax wrote as HTML, with no gold MathML). Decide
 whether to add them to the gold set (hand-written MathML for those spans) or keep
 scoring them apart as `detection_precision_excluding_prose_math`; the report gives both
@@ -461,7 +461,7 @@ uv run readablestem eval pipeline --task document --set dev-v2 ... --speech
 ```
 
 Per equation (`--out`): the spoken strings under each engine for ours and the gold, whether
-MathCAT recognised chemistry (`data-chem-formula` or `data-chem-equation` in its canonical
+MathCAT recognized chemistry (`data-chem-formula` or `data-chem-equation` in its canonical
 MathML) on each side, a word diff, and a class (`chemistry`, `table or matrix`, `prescripts`,
 `limits, accents, arrows`, `fraction`, `root`, `scripts`, `text in math`, `plain`; or the
 `class` the input gave). Per set: the share of ours whose speech equals the gold's under each
@@ -567,6 +567,43 @@ or models than the code under test, so a prompt change cannot pass on an old com
 `latest-<task>.json`. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
+
+### Development and held-out, and the two bars (`eval/split.py`, `eval bar`)
+
+A bar set on the pages a fix was built on says nothing about the next document, and a score
+under settings production does not run is a score for another product. So, for every eval
+added from November 2026 on:
+
+1. The set is split into development and held-out by document, never by page:
+   `split.split(seed, {document id: sha256 of the file})`. A document's side depends only on
+   the seed and its id, so a new document moves no other.
+2. Thresholds, prompts, worked examples and rules are tuned on the development side only.
+   The held-out side is read only by the scorer, and `Split.verify` checks its hash (ids and
+   file hashes) against the registered one before a run.
+3. Each eval has two bars. The release bar is the first held-out measurement under the
+   production profile (`ops/production.profile.toml`): a release may not be worse. The goal
+   bar is the figure the fix is built toward.
+4. A held-out set that was used to choose between designs is spent. Its documents are passed
+   as `spent` and are development from then on; new ones are drawn.
+
+A report says four things about its run: `split.name` and `split.set_sha256`
+(`Split.stamp`), `profile.sha256` and `pipeline_version`.
+
+```bash
+uv run readablestem eval bar report.json --measure order.clean --at-least 0.9
+uv run readablestem eval bar report.json --measure errors_per_100 --at-most 3 --kind goal
+```
+
+| Output starts with | Exit | When |
+|---|---|---|
+| `bar met` | 0 | held-out documents, production profile, the number meets the bar |
+| `bar not met` | 1 | held-out documents, production profile, the number does not |
+| `development score` | 2 | scored on development documents, or not under the production profile |
+| `refused` | 2 | the report lacks one of the four, or has no number at `metrics.<measure>` |
+
+The older reports (`eval pipeline`, the 15 registered sections of `gold/heldout.py`) record
+their profile and pipeline version but no split, so `eval bar` refuses them: their bars are
+the ones `eval gate` checks.
 
 ## Report format
 
@@ -750,15 +787,28 @@ describe them, not the committed files. The OpenAI path has no committed baselin
 
 Recorded answers, replays and batches (`--answers`, `--batch`; development sets only). A live
 run is paid for once. `--answers FILE` keeps every model answer in a JSON-lines file keyed by
-everything the model is given (step, model, prompt version, instructions, the images by what
-they show, the text, the token limit, the thinking effort the client will send, and whether
-the untrusted-text notice rides in the system block). A request already in the file is
+the question as it is sent (`models/question.py`): step, model, prompt version, the
+instructions as sent, the images by what they show, the nearby text as sent (so the fence
+around it and the number of characters kept are part of it), the token limit, the image
+detail, the thinking effort the client will send, whether a refusal may go to the fallback
+model, and the format the answer is read in. Nothing about the release is in the key: a new
+pipeline version that sends the same question finds the same answer, and an edited prompt,
+answer format or context limit asks again. A request already in the file is
 answered from it, with the recorded tokens and cost, at no charge; any other goes to the model
 and is appended. So one baseline recording serves every experiment that asks the same
 thing, and an experiment pays only for requests that differ from the baseline's.
 `--answers-offline` turns a miss into a refusal instead of a call (a replay that cannot spend),
 and `--every N` takes every Nth equation or figure instead of the first few. `--answers` is
 refused for the held-out set and the sealed check part.
+Each row also holds the parts of its question (`"q"`), so a miss is reported with its reason:
+the report's `answers_file.answers_file_missed_because` counts misses by what differs from the nearest
+recorded question ("prompt equation-5 recorded, equation-6 asked", "nearby text changed",
+"no answer recorded for this picture"). A file recorded before 2026-11-11 is keyed by an
+older list (no answer format, no context limit). `--answers-rekey` moves it: a request found
+only under the older key is answered from that row, and the row is appended under the new key
+with its parts (`answers_file.answers_file_rekeyed` counts them). Run it once, with the code and settings
+the file was recorded with, then drop the flag; a request that changed since the recording is
+a miss either way.
 The Claude second check (shadow by default) asks the model as well; from 2026-10-14 its
 answers are kept in the same file (the report's `answers_file.second_check`), so a replay and
 `--answers-offline` spend nothing on it. The baselines of "Baselines and the gate" were
@@ -818,7 +868,7 @@ uv run readablestem demo build --page 2-2-speed-and-velocity --max-usd 1.00
 It prints the page to PDF, converts it, and writes `index.html` (the converted page with a
 short note saying it is a precomputed demo of an OpenStax CC BY page, with attribution
 and a link to the original), `report.json` (the `DocumentResult` without the HTML) and
-`source.pdf` (the exact input) to `src/readablestem/web/static/demo/`. Pages outside the
+`source.pdf` (the exact input) to `src/readablestem/web/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
 ### Runs keep their recordings
@@ -976,7 +1026,7 @@ figure prompt is not the production one): 9 required decisions (0.209 per PDF pa
 heading groups; the equation the flags-off run asked about was read right this time),
 27 optional notes (0.628 per PDF page: the 5 chart data tables read from the image are
 optional extras), matched exact_lenient 0.767, 64 predicted equations (bold letters in
-prose made maths), 0 static and 0 axe violations. These replace the estimate in "What
+prose made math), 0 static and 0 axe violations. These replace the estimate in "What
 this gives for the targets" below: flags off 0.233 (target 0.25), flags on 0.209 (target
 0.28).
 
@@ -985,7 +1035,7 @@ this gives for the targets" below: flags off 0.233 (target 0.25), flags on 0.209
 | equations | 30 | exact_lenient 0.767 (95% CI 0.591-0.882; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.864 | $0.0017 per equation |
 | headings | 121 | recall 1.000 (CI 0.969-1.000), level accuracy 0.992, precision 0.877 (every extra is NEEDS_REVIEW) | no model calls |
 | figures | 13 | image-aware judge pass 1.000 (CI 0.772-1.000), factual errors 0 (judge not yet calibrated) | $0.0039 per figure |
-| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations; 0.233 required decisions per PDF page | $0.0034 per PDF page |
+| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose math), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations; 0.233 required decisions per PDF page | $0.0034 per PDF page |
 | tables (local) | 197 gold data tables | recall 0.909, precision 0.984, TEDS 0.866 (0.954 on found), header exact 0.812 | no model calls |
 
 The 0.3.0 runs of 2026-10-09 for comparison: equations exact_lenient 0.733 (CI
@@ -1134,7 +1184,7 @@ dropped minus 45/45, minus to plus 45/45, `=` to `<`, `≤` or `≈` 146/146 eac
 products (the handout's `𝛚 × 𝐫`), never scientific notation (`1.1 × 10²`), as the policy
 says.
 
-A review of the check printed its own equations with Tectonic in 8 maths font setups,
+A review of the check printed its own equations with Tectonic in 8 math font setups,
 Chromium, KaTeX and LibreOffice (docs/steps.md "Review of the check"): on its 429 right
 answers the check flagged 57 before the fixes and 6 after, and caught 51 of 52 wrong
 answers (43 before); a dot product of arrow vectors read as a cross product is caught
@@ -1204,7 +1254,7 @@ cells; `eval/table_maths.py`), and the chemistry measurements are in [chemistry.
 
 ### Gold
 
-| Set | Where | Licence | Documents | Data tables | Layout tables |
+| Set | Where | License | Documents | Data tables | Layout tables |
 |---|---|---|---|---|---|
 | OpenStax | `data/gold/tables/` (13 pages of *Physics* and *Statistics*, table records only) | CC BY 4.0 | 13 pages x 3 print styles = 39 | 54 x 3 = 162 | 10 x 3 = 30 (the "Key Terms" grids) |
 | Authored | `data/authored/tables/` (`README.md` there) | MIT | 6 | 35 (32 source tables; 3 run over two pages) | 3 |
@@ -1230,7 +1280,7 @@ cells; `eval/table_maths.py`), and the chemistry measurements are in [chemistry.
   pages on the reference prints; a report gives `pages_differ_from_reference` (0 on this
   machine for all 192 prints).
 - **Authored documents** cover what the OpenStax prints lack: LaTeX (Tectonic) and Word
-  (exported by LibreOffice) toolchains, explicit row headers, two-level headers, maths in
+  (exported by LibreOffice) toolchains, explicit row headers, two-level headers, math in
   header cells, tables split across pages (one gold table per page, sharing a `cluster`),
   an unruled LaTeX table, PowerPoint's default table style, a form laid out as a table,
   and table-like traps (a matrix, `align*`, `cases`, multiple choice in two columns).
@@ -1250,17 +1300,17 @@ an image still counts as found. A step that raises becomes a FAILED fix
 
 | Metric | Definition |
 |---|---|
-| `detection_recall`, `detection_precision` | A predicted data table matches a gold table on the same page by content (gold has no boxes): word-token F1 >= 0.5, or F1 of the letters and digits >= 0.7 for maths-heavy tables (ranked on one scale as F1 - 0.2), pairs taken greedily, best first, one to one. A prediction matched to a layout table counts neither way. Predictions the pipeline itself called layout tables (`is_data` False) are not data tables and take no part |
-| `teds`, `teds_found` | TEDS (Zhong et al. 2020): 1 - TED / max(nodes) over table -> row -> cell trees. Unit cost to delete or insert a node; relabelling a cell costs 1 for another tag or span, else the normalised Levenshtein distance of its text (`eval/ted.py` relabel hook). Text is NFKC, one delta, one minus, no spaces. `teds` counts a missed table as 0; `teds_found` is over found tables only. Headers are ignored, as in table-bench, so its numbers reproduce |
+| `detection_recall`, `detection_precision` | A predicted data table matches a gold table on the same page by content (gold has no boxes): word-token F1 >= 0.5, or F1 of the letters and digits >= 0.7 for math-heavy tables (ranked on one scale as F1 - 0.2), pairs taken greedily, best first, one to one. A prediction matched to a layout table counts neither way. Predictions the pipeline itself called layout tables (`is_data` False) are not data tables and take no part |
+| `teds`, `teds_found` | TEDS (Zhong et al. 2020): 1 - TED / max(nodes) over table -> row -> cell trees. Unit cost to delete or insert a node; relabeling a cell costs 1 for another tag or span, else the normalised Levenshtein distance of its text (`eval/ted.py` relabel hook). Text is NFKC, one delta, one minus, no spaces. `teds` counts a missed table as 0; `teds_found` is over found tables only. Headers are ignored, as in table-bench, so its numbers reproduce |
 | `teds_structure` (`_found`) | the same with cell text ignored |
 | `teds_with_headers` (`_found`) | the same, with a header cell (and its direction) a different tag from a data cell |
 | `headers.column`, `headers.row` | precision, recall and F1 of header cells as (row, column, scope, text), micro-averaged over found tables; `exact`: share of gold tables with such headers whose header texts (a multiset) equal gold's; a missed table is not exact. Header texts are compared after `header_text` (2026-10-09): a raised mark the grid read from the PDF writes "^([1])" counts as "[1]", as gold's text drops the raise |
 | `column_header_exact` | `headers.column.exact`: the headline header number (OpenStax marks only column headers, so row headers proposed for an identifying first column are a convention gap, counted apart as `row_headers_where_gold_has_none`). `headers.share_found_without_headers`: found tables given no header cell at all |
 | `header_exact` | table-bench's: all header texts equal gold's |
 | `data_vs_layout` | `accuracy_on_negatives`: layout tables no data-table prediction matched; `data_called_layout`: missed data tables a layout-table prediction covers |
-| `maths` | per gold maths cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |
+| `maths` | per gold math cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |
 | `text_fidelity` | cells whose text is gold's (exact after `fidelity_text`, else the same letters and digits); `wrong_cells` per table = max(predicted cells left over, gold cells left over), so a misread number is one, two cells merged into one are two; `wrong_cells_not_flagged`: wrong cells in found tables whose fix is not a required decision. Must be 0. `fidelity_text` (2026-10-09) makes the ways gold and a reader write the same thing one: gold's text drops a superscript's raise ("10–18" for 10⁻¹⁸) while a cell writes 10^-18, 10^{-18} or 10⁻¹⁸; gold's stacked 1/3 reads "13" ("1/3" and ⅓ too); a "____" fill-in blank is an empty cell, however long; a raised mark the grid read from the PDF writes "^([1])" is "[1]"; and a gold footnote row (`<tfoot>`, printed under the table) counts only when the prediction has it. TEDS keeps table-bench's normalisation |
-| `by_style`, `by_feature` | recall, precision, TEDS and column headers per print style and authored, and for tables with spans, maths or row headers |
+| `by_style`, `by_feature` | recall, precision, TEDS and column headers per print style and authored, and for tables with spans, math or row headers |
 | `review_load` | the table fixes' tiers (`core.triage`): `required_decisions`, per table and per PDF page, `optional`, `needs_review_share`, `kept_as_image`, `required_by_reason`; `flags` (precision and recall over found tables, wrong = a wrong cell, another structure, column headers not exact, or kept as an image) and `wrong_not_required` |
 | `cost` | `per_table_usd`, `per_pdf_page_usd`, `seconds_per_table_p50`/`p95` (model time), model calls; `latency_ms` is per document, wall clock (layout, crops, the step; printing excluded) |
 
@@ -1305,24 +1355,24 @@ is one: `private-inputs/tables/` (git-ignored; or `--real-dir`) with the PDFs an
 ```
 
 Pages are 0-based; boxes are PDF points in PyMuPDF's page frame (`Element.bbox`'s);
-`pages` (optional) limits the check to the pages that were labelled. A predicted data
-table is a real table when it shares at least half of the smaller box with a labelled one;
-a labelled table is found at full extent when one prediction covers at least 90% of it and
+`pages` (optional) limits the check to the pages that were labeled. A predicted data
+table is a real table when it shares at least half of the smaller box with a labeled one;
+a labeled table is found at full extent when one prediction covers at least 90% of it and
 at least 75% of that prediction lies inside it (not cut short, not merged with a plot).
-`metrics.real_documents` holds counts only: documents, pages, labelled, predicted and true
+`metrics.real_documents` holds counts only: documents, pages, labeled, predicted and true
 tables, `precision`, `full_extent_recall` (Wilson intervals), `any_extent_recall`, error
 codes and the labels file's SHA-256. No file name, page or text leaves the private folder.
 The research's four public manuals are copyrighted: use them for local work only, never
 commit them or their labels.
 
 `data/real-tables/` is a committed set of the same shape: five openly licensed (CC BY 4.0)
-lecture notes, textbook and tutorial extracts, 64 pages, 25 labelled tables, with the floors and
-the licences in its README. Run it with `--real-dir data/real-tables`, free and without a model
+lecture notes, textbook and tutorial extracts, 64 pages, 25 labeled tables, with the floors and
+the licenses in its README. Run it with `--real-dir data/real-tables`, free and without a model
 (about four minutes). First measured 2026-10-21: precision 1.000 (14 of 14), full-extent recall
 0.560 (14 of 25): the recall floor was missed. It is a development set now (the detector was
 tuned on it, docs/tables.md "Recall on real documents"): after the fixes precision 1.000 (23 of 23)
 and recall 0.920 (23 of 25). `data/real-tables-heldout/` is a fresh set of seven CC BY papers, 58
-pages, 39 labelled tables, registered (documents, labels, floors, selection rule) before any
+pages, 39 labeled tables, registered (documents, labels, floors, selection rule) before any
 detection ran on it and run once: precision 0.914, full-extent recall 0.744, both under the floors
 (docs/tables.md has the table-by-table account). A second fresh set, `data/real-tables-heldout2/`
 (ten CC BY documents, 100 pages, 58 tables, registered before the run), gave precision 1.000 (55 of
@@ -1405,16 +1455,16 @@ option being off by default). Small: read the intervals.
 | alt factual errors | 0 | 0 |
 | long descriptions | 9 of 13: every chart and diagram (9), no photo or painting; mean 480 characters | |
 | long judge pass | 9 of 9 (CI 0.701-1.000): accurate 9, complete 9, invented values 0, mean score 5.0 | |
-| data tables | 3 (the position-time graphs with marked or labelled points), values within tolerance 3 of 3, 0 wrong cells | |
+| data tables | 3 (the position-time graphs with marked or labeled points), values within tolerance 3 of 3, 0 wrong cells | |
 | values from the PDF text | 0 of 3 (the inputs are images) | |
-| decisions added | 3 required (`values_from_image`; since 2026-10-09 a note, the table an optional extra: 0 required), 0 optional notes (no description marked unsure), 0 colour-only flags | 0 |
+| decisions added | 3 required (`values_from_image`; since 2026-10-09 a note, the table an optional extra: 0 required), 0 optional notes (no description marked unsure), 0 color-only flags | 0 |
 | cost | $0.0040 per figure for the step; $0.124 for the run with both judges | $0.0035 per figure |
 | step latency | p50 7.7 s, p95 15.9 s (sum of call latencies) | p50 5.8 s, p95 10.0 s |
 
 Reading it:
 
 - The long descriptions follow the W3C two-part pattern: axes with units and ranges,
-  the trend, the labelled points, and "about" for values read off an axis. The judge
+  the trend, the labeled points, and "about" for values read off an axis. The judge
   found every table value within tolerance, but every table asked for a decision because
   its values came from pixels (since 2026-10-09 such a table is not written and asks
   nothing: the review screen offers it, "Add the data table"); in a PDF whose chart
@@ -1502,7 +1552,7 @@ The document task on the same three OpenStax sections (43 PDF pages, `data/gold`
 | new: ruled key-term grids the model calls "not a data table" (`not_data_table`, kept as an image) | | 2 |
 | optional notes per PDF page | 0.535 | 0.535 |
 | equations exact (lenient), matched and end to end | 0.733 / 0.733 | 0.733 / 0.733 |
-| predicted equations (unmatched "other") | 55 (1) | 64 (10: bold letters in prose made maths, review none) |
+| predicted equations (unmatched "other") | 55 (1) | 64 (10: bold letters in prose made math, review none) |
 | static and axe violations | 0 / 0 | 0 / 0 |
 | cost | $0.141 | $0.142 |
 
@@ -1540,7 +1590,7 @@ tables, $0.034):
   writes `10^-18` as text), "13" for ⅓, "____" fill-in blanks the model leaves empty,
   and a footnote row gold keeps inside the table.
 
-So the floor of 0 needs either a scorer that knows these spellings or a few labelled
+So the floor of 0 needs either a scorer that knows these spellings or a few labeled
 exceptions before it can gate model runs (TODO(Harish) in gate.py stands). Superscript
 powers written as `^` in text cells are a prompt issue for the table step to take up.
 Both were done afterwards (below): the scorer knows these spellings (`fidelity_text`),
@@ -1552,7 +1602,7 @@ and the wrapped row is joined back; the model runs are not repeated yet.
 |---|---|---|---|---|
 | `tests/fixtures/layout/latex/tables.pdf` | 4 | 6 | equations only; all 5 detected tables rebuilt and ACCEPTED on gpt-6-luna, every check passed | $0.019 |
 | `tests/fixtures/layout/latex/problem_set.pdf` | 1 | 0 | | $0.007 |
-| `tests/fixtures/layout/latex/links_language_colour.pdf` | 1 | 0 | 4 web links, 4 cross-references and 2 internal links all resolve; the French passage is marked; 2 colour classes, the lowest at 4.53:1 | $0.003 |
+| `tests/fixtures/layout/latex/links_language_colour.pdf` | 1 | 0 | 4 web links, 4 cross-references and 2 internal links all resolve; the French passage is marked; 2 color classes, the lowest at 4.53:1 | $0.003 |
 | demo `source.pdf` (OpenStax Physics 2.3) | 13 | 9 (0.3.0 demo: 3) | the same 3 headings; 5 chart data tables read from the image; 1 equation whose bold v the model dropped (a right catch) | $0.066 |
 
 All four pass the static checks and axe. The committed demo was rebuilt afterwards with
@@ -1616,7 +1666,7 @@ those are not review load. Headings and tables do not depend on the model:
 | heading decisions (groups counted once) | 9 | 9 |
 | table decisions | 0 | 0 |
 | optional heading notes | 20 | 20 |
-| predicted equations | 55 | 64 (bold letters in prose made maths) |
+| predicted equations | 55 | 64 (bold letters in prose made math) |
 | static and axe violations | 0 / 0 | 0 / 0 |
 
 The 9 heading decisions are the 0.3.0 report's 9.
@@ -1690,9 +1740,9 @@ the matrix of what the app does with each page ("text", "text_and_ink_images",
 "page_image", "nothing"), every error with its counts, and the time per page. Kinds,
 counts and file names only: never page text. No model is called.
 
-The labelled sets are not in this repository: the research corpus holds derivatives of
+The labeled sets are not in this repository: the research corpus holds derivatives of
 a real lecturer's handwritten notes and PDFs from local research folders, and lives with
-the author's private research (996 labelled pages). The
+the author's private research (996 labeled pages). The
 results, and why only one of them is out of sample, are in docs/layout.md "Accuracy,
 honestly": page-type-v5 on fresh set 4 (31 pages built after it was frozen) 27 of 31
 kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 989
@@ -1721,14 +1771,14 @@ them and covering the page, chart labels in the bands, near-white paint on a dar
 ground) were checked the same way. The document task offline (`--fake`): identical
 per-page rows. Layout on the repository's PDFs: the same elements on the three printed
 gold sections, the 42 cached OpenStax renders, the LaTeX and layout fixtures and the
-demo source; the authored tables slides lose a figure made of their table's coloured
+demo source; the authored tables slides lose a figure made of their table's colored
 cells (the white lines between them are now seen, so the table's grid is drawn), with
 the tables eval (local) the same to the last digit; and one handwriting fixture,
 `overlays.pdf`, changes as intended (its page under a transparent picture of hand-drawn
 circles keeps its image; its half-page striped mask is a figure). The 110 sweep PDFs: 3 LOST verdicts left, all
 the generator's subtitle that was never written (41 before), 56 converted, 38 kept with
 a decision, 13 refused; only the three typed controls say "Everything was converted".
-On the research corpus (909 pages; labels as in "Page types"), no page labelled
+On the research corpus (909 pages; labels as in "Page types"), no page labeled
 born-digital keeps its image or changes kind. Twelve of them change: three keep the
 same elements (a figure gains its white lines), seven gain content that was dropped
 before (a report's two screenshots under their captions and a brochure's cover
@@ -1748,7 +1798,7 @@ the demo source, the layout, LaTeX, tables and handwriting fixtures): the same e
 and kept pages everywhere but one handwriting fixture, whose machine-drawn curve's box
 grows by the start of a subpath MuPDF left out. Page types: the same 984 kinds and 989
 actions on the 996-page corpus, 29 and 35 on the skeptic's 41 pages, 29 and 29 on fresh
-set 4. On the research corpus's 909 analysed pages, no page changes kind or kept image;
+set 4. On the research corpus's 909 analyzed pages, no page changes kind or kept image;
 three born-digital pages change only a figure's box or path count, and one `mixed_ink`
 page gains two handwriting regions (red pen marks over its typed lines). The 110 sweep
 PDFs end to end: the same verdicts (56 converted, 38 kept with a decision, 13 refused;
@@ -1756,13 +1806,13 @@ the three LOST items are the generator's subtitle that was never written), and t
 framed full-page plot has no painted pixel outside its elements (88 cells before). The
 86 evidence PDFs and the 90 handwriting pages: the same verdicts and decisions; two
 full-page charts read their tick labels as the figure's, not as one-digit paragraphs,
-and a 30-page file of notes has more of its pages analysed within the 10 s ink budget
-(called handwritten, not "not analysed"; kept as images either way): the machine's load,
+and a 30-page file of notes has more of its pages analyzed within the 10 s ink budget
+(called handwritten, not "not analyzed"; kept as images either way): the machine's load,
 not the change, as the base code run alone gives the same.
 
 The drawings sweep's fixes (2026-10-13, docs/layout.md "Figures": evidence of a plot,
 boxes round text and diagrams, bonds, boxes joined by wires, dots round a letter, hand
-marks circled or filled in another colour and over equations, answer fields, icons round
+marks circled or filled in another color and over equations, answer fields, icons round
 a glyph) were checked the same way, no model called, against the branch before them
 (`91697be`) and the merged base (`9071495`). The document task offline (`--fake`): the
 same report and per-document rows as the base, timing aside (the same 80 required
@@ -1770,12 +1820,12 @@ decisions of the offline client). Layout on the 96 born-digital PDFs (the 42 cac
 OpenStax renders, the three printed gold sections, the authored tables, the demo source,
 the layout, LaTeX, tables and handwriting fixtures): the same refusals, kept pages, kinds
 and elements as before the fixes; against the base, only the five handwriting fixtures
-the previous fix targeted differ. The research corpus's 909 analysed pages, the
+the previous fix targeted differ. The research corpus's 909 analyzed pages, the
 skeptic's 41, fresh set 4 and the evidence and sweep sets: no page changes kind, kept
 image or elements, except a slide whose title, 18 pt and its only text, is read as a
 heading instead of a figure's label, and one page of the 30-page file of notes that ran
-out of the 10 s ink budget (called not analysed instead of handwritten, and kept as an
-image either way: the base code run twice on its own analyses 26 and 27 of its pages).
+out of the 10 s ink budget (called not analyzed instead of handwritten, and kept as an
+image either way: the base code run twice on its own analyzes 26 and 27 of its pages).
 The checks found four opposite errors in the first versions of the fixes, each fixed and
 pinned by a control before the end: a worked example's frames round paragraphs with a
 grid of cell borders made one figure of the box (its open chain of rules was taken for a
@@ -1876,7 +1926,7 @@ It is a development set: numbers on it say nothing about documents in general, a
 tuned against it is not validated until it passes a set nobody tuned against.
 
 **What it holds.** Gold for OpenStax sections and authored documents, with every item
-labelled with the Tier 2 classes it belongs to. Items per class (the `summary.md` table;
+labeled with the Tier 2 classes it belongs to. Items per class (the `summary.md` table;
 `readablestem gold devset summary` prints it; Check counts are totals of the sealed part):
 
 | Class | Item | Backlog | Target | OpenStax | Authored | Dev | Check |
@@ -1910,11 +1960,11 @@ labelled with the Tier 2 classes it belongs to. Items per class (the `summary.md
 An item is an equation (record with `classes`), a sub- or superscript run in a paragraph
 (`script` records), a heading, a table, a code block, a glossary entry, or a word hyphenated
 at a line end (`hyphen_break` records, authored documents only). "Target" is the least wanted
-across the whole set (the maths classes 20 to 40).
+across the whole set (the math classes 20 to 40).
 
-**Sources and licences.**
+**Sources and licenses.**
 
-| Part | Source | Licence | Toolchain |
+| Part | Source | License | Toolchain |
 |---|---|---|---|
 | OpenStax sections | Algebra and Trigonometry, College Algebra, Elementary Algebra, Chemistry: Atoms First (retired first editions) | CC BY 4.0, attribution in `ATTRIBUTION.md` and in every record | Chromium print by `eval render` (the document, headings, equations and figures tasks print them as for any gold page) |
 | Authored documents | written for this project (`data/dev-v2/authored/build_authored.py`) | MIT | LaTeX built by Tectonic 0.17, Word files made with python-docx and exported by LibreOffice 26.2, HTML printed by Chromium |
@@ -2076,7 +2126,7 @@ tasks that run no model give a first look at how the layout step does here, on t
 headings precision 0.890, recall 0.917, level accuracy 0.898 over 683 gold headings (28 pages);
 tables, local mode, detection recall 0.774 and precision 0.911, TEDS 0.718 (31 documents,
 53 gold data tables; 52 of 67 layout tables kept out); document, detection precision
-0.647 and recall 0.825 (the unmatched predictions are mostly prose maths and fragments).
+0.647 and recall 0.825 (the unmatched predictions are mostly prose math and fragments).
 These are layout-only figures from one run, not a baseline anyone has agreed to; the gold
 manifest hashes are in the reports (`df760b3f59cd...` dev, `2cea9ea7f587...` check).
 
@@ -2143,7 +2193,7 @@ sealed check part. Code: a gold block is *exact* when some `<pre>` holds its lin
 their indentation (trailing spaces aside), *flat* when it does when each line's indentation
 is ignored. Glossary: *term found* when a `<dt>` holds the term, *entry right* when the
 `<dd>` after it also starts with the first 25 letters and digits of the definition (ASCII
-letters and digits only, so the maths in a term, a placeholder here, does not decide it).
+letters and digits only, so the math in a term, a placeholder here, does not decide it).
 
 | Dev part, 126 glossary entries, 40 code blocks | Before (6c8bbda) | After T2-16 |
 |---|---|---|
@@ -2157,10 +2207,10 @@ Before, code was one or two flowing paragraphs per block ("def bisect(f, lo, hi,
 were paragraphs or, with a bold term, headings. The 14 entries not found: the ten of the
 Word fixture's unruled two-column table (a glossary set as a table the table step does not
 claim) and four OpenStax entries: "half-life (t1/2)" and "positron (...)", whose gold
-terms have their maths written out as text while the output has it as an equation, and
+terms have their math written out as text while the output has it as an equation, and
 "nuclide" and "radioisotope", whose term is the last line of a page and definition the first
 of the next. The 3 "entry right" misses that remain among the found terms are gold
-definitions that begin with a parenthesis of maths the fake client cannot convert. The
+definitions that begin with a parenthesis of math the fake client cannot convert. The
 code is tuned on this set, which is all authored (the dev part has no OpenStax code), so
 it shows the shapes handled, not a rate on other documents.
 
@@ -2189,7 +2239,7 @@ docs/layout.md "Review tiers" has the table and the choice (one decision per gro
 ### Structure fixes (2026-11-02)
 
 Six layout fixes (docs/layout.md: "The PDF's outline", plain numbered lines, run-in labels,
-maths in headings, page and line joins, the document's spelling of compounds), measured with
+math in headings, page and line joins, the document's spelling of compounds), measured with
 the offline tasks only: `eval pipeline --task headings --fake`, `--task document --fake` (no
 model call; every call is refused, so its equation numbers are 0 and only layout, headings
 and the HTML checks mean anything) and `eval.structure_check`, before (3e2b7cd, a clean
@@ -2226,7 +2276,7 @@ held-out data was used.
   (inset against the page's edge, not the column's) 2 of them (recall 0.9136). Both were
   dropped for the inset against the column's edge, which loses none: docs/layout.md "Run-in
   labels".
-- Not measured by these tasks: page joins, wrapped inline maths and compounds (no gold of
+- Not measured by these tasks: page joins, wrapped inline math and compounds (no gold of
   their own). A survey of the 67 PDFs in the repository (authored dev-v2 documents and test
   fixtures, 1 to 8 pages) changed 8 of them: 2 paragraphs joined over a page break (both
   reading right: "... Aluminium" / "sulfate has the formula ..."), no wrapped inline
@@ -2284,7 +2334,7 @@ Prose runs are scored by the `prose_classes` scorer (`eval/prose_classes.py`, fr
 `<sub>`/`<sup>` or as a script inside inline MathML, flattened when its digits are glued on as
 text, lost when its context is not there (counts of runs):
 
-| Class | n | before: scripted (sub/sup + maths) | flattened | lost | after: scripted | flattened | lost |
+| Class | n | before: scripted (sub/sup + math) | flattened | lost | after: scripted | flattened | lost |
 |---|---|---|---|---|---|---|---|
 | Units with superscripts (`prose_unit_power`) | 146 | 77 (0 + 77) | 55 | 14 | 129 (120 + 9) | 4 | 13 |
 | Chemical scripts (`prose_chem_script`) | 263 | 76 (0 + 76) | 144 | 43 | 235 (214 + 21) | 13 | 15 |
@@ -2347,9 +2397,9 @@ writes `<mtext>`):
   these changes were built for are the scripts and the pictures.
 
 No gold file, golden output or held-out number changed. Three tests that encoded the old
-behaviour were rewritten (`test_layout_analyze`: an upright x with a raised 2 is raised text,
-not maths; `test_layout_fixtures`: "3 m/s2" in a text font is raised text; `test_layout_silent_loss`:
-a picture of maths is held as an equation, not as a figure).
+behavior were rewritten (`test_layout_analyze`: an upright x with a raised 2 is raised text,
+not math; `test_layout_fixtures`: "3 m/s2" in a text font is raised text; `test_layout_silent_loss`:
+a picture of math is held as an equation, not as a figure).
 
 ## Model cost (2026-10-14; T3-22, T3-23, T3-24, T3-29, T2-19, T3-21)
 
@@ -2517,6 +2567,1029 @@ without cost. The public demo and the site examples were written again from a ne
 conversions ($0.2744 in all) was discarded because the table-structure model was not found on
 the machine, which changed the layout of 2.1; it is not used.
 
+## The test corpus
+
+The workflow tests and the layout evals read one set of files, listed in
+`tests/workflows/corpus/corpus.json` and read through `src/readablestem/eval/corpus.py`.
+As of 2026-11-11 it has 72 entries; 47 of them have reading-order labels (91 pages).
+
+**Where a file may come from.** Every entry is one of three kinds.
+
+- `public` (27 entries): a file on MIT OpenCourseWare (25) or arXiv (2). The
+  manifest pins the URL, the SHA-256, the size, the license and who to credit. The file is
+  fetched into `.cache/corpus/` (not committed) and the tests use a page range cut from it.
+  A download whose hash differs is refused and never reaches the cache.
+- `committed` (34 entries): a file in the corpus folder. 29 were made for this repository
+  and sit next to the HTML, LaTeX, Markdown or Word source they were printed from; each is
+  at most 200,000 bytes. 2 are ten-page cuts of OpenStax textbooks, kept because the
+  publisher's download URLs stopped serving the bytes that were measured. 3 are files from
+  Wikimedia Commons (CC BY 4.0, CC0 and public domain), kept because Wikimedia answers a
+  CI runner's download with "too many requests". Someone else's file is committed only
+  under one of those three licenses, with its credit, and is at most 5,000,000 bytes.
+- `builder` (11 entries): a file made on demand by a builder in `tests/workflows/builders/`.
+  The builders make 71 files in all; 68 give the same bytes on every run, and their hashes
+  are in `builders/recorded.json`. The 3 encrypted ones cannot, and are checked by what
+  they contain.
+
+**Rules.**
+
+1. No file from an instructor's course, and nothing from the private audit corpus, is
+   committed, fetched or named. A manifest line that holds a path on one machine, or a URL
+   outside the allowed sites, fails to load.
+2. Someone else's file is committed only when its license is CC BY 4.0, CC0 or public
+   domain, with the attribution in the manifest and in the corpus README, and only up to
+   5,000,000 bytes. CC BY-NC-SA files (MIT OpenCourseWare) are fetched, never committed.
+   A model's recorded answer about such a file repeats what the file says (its equations,
+   its tables, a page read from a scan), so those answers are kept out of the repository
+   too ("Recording and replay" below).
+3. A URL is pinned to one version. arXiv entries name the version (`v1`, `v4`).
+4. Only files listed here, or files a builder makes, are sent to a model.
+
+**Gold labels.** A gold file gives, for each page, the blocks in reading order, each with a
+role (heading, body, list, table, caption, footnote, aside, form, figure, or dropped for
+text that must not be read, such as a running header). For files made here the block text is
+stored. For anyone else's file no text is stored: a block is a list of character ranges into
+the page's words (PyMuPDF's words in file order, NFKC-normalized, joined with nothing
+between), the lengths of its tokens, and the SHA-256 of its text. `load_gold` rebuilds the
+text from the file and checks every hash, so a different file, or a PyMuPDF that reads the
+page differently, fails loudly instead of scoring against the wrong text. Where the labeled
+text is not among the page's words (chart axis labels and some mathematical glyphs), the
+characters are stored as written: 390 characters over 682 blocks.
+
+The public-page labels were made on 2026-11-10 from candidate blocks produced by poppler's
+`pdftotext -bbox-layout`, which is independent of this project's layout step; order and
+roles were set by reading each rendered page, in one pass, with four blocks corrected in
+review. They were not labeled twice by independent readers. Labels for files made here
+come from the source each file was printed from. The manifest's `labels` table records the
+method and date for every gold file.
+
+**Commands.**
+
+```bash
+uv run python -m readablestem.eval.corpus check            # committed and built files, no network
+uv run python -m readablestem.eval.corpus check --fetch    # also fetch the 27 public files by hash
+uv run python tests/workflows/builders/record.py list      # the 71 built files and what each shows
+uv run pytest tests/workflows/test_corpus_manifest.py      # add -m "slow or network" for the rest
+```
+
+### Recording and replay
+
+The workflow tests (`tests/workflows`, `pytest -m workflow`) upload each corpus file to the
+real app, with production's behavior settings (`ops/production.profile.toml`), and convert
+it from recorded model answers. Nothing is sent to a model. A conversion that asks a
+question the recording does not hold fails its test with the step and what changed since
+the recording (a prompt, a model, a picture), so a change to what is sent to a model shows
+up as a named miss and never as a silent call.
+
+**Two files.** The recording is split by the license of the file an answer was read from:
+
+| File | Holds | As of 2026-11-11 |
+|---|---|---|
+| `tests/workflows/corpus/answers.jsonl.gz` (committed) | answers read from files made here, and from CC BY 4.0, CC0 and public-domain files | 270 answers |
+| `.cache/corpus/answers.jsonl.gz` (not committed; `$CORPUS_CACHE` moves the folder) | answers read from the 25 CC BY-NC-SA files | 1,303 answers |
+
+An answer a committable file and a kept-out file both read goes to the second file. Where
+the second file is absent, as in CI, a test that converts a CC BY-NC-SA file is skipped and
+says why; the five workflows built first (typed notes, dense solutions, slides, a chemistry
+exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only where
+that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
+replay pays nothing.
+
+**Answers still owed.** Ten files ask for 126 answers that were never recorded (pictures
+that changed since the first recording, and files added after it). `harness.OWED` lists
+them with the count for each, and the replay test fails if a file misses more or fewer than
+its count. Their conversions still finish: a part with no answer is left for the reviewer,
+as when a model is unavailable.
+
+**Refreshing.** `scripts/corpus_refresh.py` runs the same tests against a working copy of
+the recording and writes back what they read; an answer no test read is dropped.
+
+```bash
+uv run python scripts/corpus_refresh.py --check                # replay; write nothing
+uv run python scripts/corpus_refresh.py                        # replay; drop unread answers
+uv run python scripts/corpus_refresh.py --from OLD.jsonl       # move an older recording to today's keys
+uv run python scripts/corpus_refresh.py --live --max-usd 0.50  # pay for what is missing
+```
+
+Only `--live` can spend, and it needs `--max-usd`: the most the run may pay for answers the
+recording lacks, refused above $1.00. The limit is enforced where a real request is made
+(`MODEL_ANSWERS_LIVE_USD`, `eval/answers.py`), because the app's daily cap counts replayed
+costs as well. Past the limit a missing answer is refused and stays missing. The script
+prints what was read, what was missing and why, and what was paid.
+
+The answers were recorded with the table-structure model present (`make table-model`), as
+in the deployed image. Without it tables are read another way, the questions differ, and
+the tests say so instead of running.
+
+**Marking an open finding.** A workflow test that a known, unfixed finding makes false is
+marked `@harness.finding("F-nnn")`. The mark is a strict expected failure: when the fix
+lands the test passes, the run fails, and the same change removes the mark. A finding
+cannot be fixed by accident and stay marked open. The audit's register ends at F-558; a
+finding met while the plan is built takes the next number.
+
+### The hostile-input set (`tests/workflows/hostile_set.py`)
+
+Files made to hurt the app, each from a builder (`tests/workflows/builders/hostile.py` and
+`hostile_sources.py`), and for each the one way it must end: refused at upload with a named
+code, kept for choosing its pages, or queued and ended `done` or `failed` with a named code.
+`tests/workflows/test_wf49_hostile_input.py` uploads each file under production's size
+limits while a second person uploads a two-page syllabus behind it, and checks four things:
+
+| Check | What must hold |
+|---|---|
+| ends | the file ends as its case states |
+| bound | the upload request and the job together take no more than the case's time (30 s for a job, 10 s for a refusal), and no process holds more than 600 MB |
+| next | the second person's file is converted, from the recording alone, no later than the hostile job's bound plus 15 s |
+| planted | a string the builder planted where it could run (a script, a link that runs its target, an open action) is in no page or download and no log line; planted markup is only ever text; no page or download has a handler attribute or a link that runs its target |
+
+The queue is run by a worker in a process of its own, stopped after twice the bound, so a
+file that hangs the worker or ends it fails its case and not the run. A LaTeX source runs
+once under bubblewrap and once under Landlock, where the machine can start each.
+
+As of 2026-11-11 the set has 36 files: 6 on the size of pages and pictures, 3 on page
+count, 8 on the structure of the PDF, 5 on content that must stay data, 8 zips and 6 LaTeX
+sources. All 36 end as stated. The one that did not, a page whose content inflates to 256 MB
+from a 260 KB file (F-559), was taken and read for 7 s in the upload request and 24 s by the
+worker; the content budget (docs/security.md) now refuses it at upload in under a second.
+
+Owed:
+
+- **That a model was not steered.** Three files carry text that tells a model what to
+  write. The check reads the model's answers, and none is recorded for them (two a file).
+  One recording under a cap of $0.25 pays for them; until then the set shows only that
+  their output is safe.
+- **Cases for readers the app does not have yet.** A second PDF text extractor, readers
+  for Word, PowerPoint and notebook files, a structure checker and a TeX compile step each
+  add their cases in the change that adds the reader (docs/dependencies.md names the test
+  for each).
+- **One slice of waiting.** With one worker the second person waits for the whole hostile
+  job. When the queue has slots the `next` check becomes one page slice.
+
+## Reading order (`eval/order.py`)
+
+`src/readablestem/eval/order.py` scores what a listener hears on a page against the gold
+blocks of "The test corpus". It takes the output as a list of elements in reading order,
+made from a layout dump, from a conversion's element list or from the student HTML, and
+never looks at boxes, so the layout step, the finished HTML and any other reader are scored
+the same way. Its counts per page:
+
+| Count | Meaning |
+|---|---|
+| found | at least half of a gold block's words are on the page |
+| flow | the block's word 4-grams that appear unbroken in the page's word stream |
+| broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |
+| neighbors in order | consecutive gold blocks whose places in the stream are in gold order |
+| cross-join | an element holding text of two gold blocks that are not neighbors |
+| leaked | text that must not be read (a running header, a page number) that is in the output |
+| clean page | no broken block, every neighboring pair in order, no cross-join, half the blocks found |
+| right page | clean, and no margin stamp read inside text, no index entries joined, numbered blanks in order |
+| stray | a text element none of whose words any gold block accounts for |
+| furniture | a stray element that is the page's furniture: the words of a block that must not be read, or of a line printed in the page's margins (a running head, a page number, a stamp) |
+| cut | an unbroken block of 6 or more words heard in two or more elements |
+| merged | neighboring gold blocks heard in one element; `heading merged` is the part where one of the two is a heading |
+| caption wrong | a caption heard with, or nearest to, another picture or table than its own |
+| faultless page | a right page with none of the five |
+
+The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
+swapped pair fails the page. A right page can still read a running head aloud, cut a
+paragraph in two, run two list items together or put a caption on the wrong picture, which
+is what the last six rows count, so pages right is never reported alone. Two kinds of gold
+are judged differently where they must be. Gold built from a source does not hold every
+word of the page (a table's cells, a formula's line), so there a faultless page is one with
+no furniture read, in place of no stray text. Gold labeled by hand may hold two paragraphs
+in one block, so there only a cut inside a sentence is counted, and a block that ends inside
+a sentence is not merged with the one after it.
+
+None of the counts sees a formula missing from a sentence or from a line of its own. The
+gold marks the tokens of a block that are not source words, but such a token is also a
+drawing's label or another column's word on the same line, so it does not say where a
+formula stands. The equations eval and the page audit count that.
+
+**How the student page is heard.** `elements_from_html` reads the page as a screen reader
+does, cut at the page markers: a block element is one element, a formula's letters and
+digits stand side by side as the page prints them ("CH3", not "C H 3"), and the picture of
+an equation that was not converted is heard as the PDF's own text of it, which is its alt
+text. Text hidden from a voice is not heard. The writer's own words (a note that an equation
+was not converted, a label, the title it puts above a document that has no first-level
+heading) are not counted as text of any page. In a conversion's element list
+(`elements_from_result`) a table is heard as the grid that is written, row by row, and not
+as the words the file has in its region.
+
+The scorer is the research scorer (version 4) moved into the package. Before it was
+committed it was run next to the research script on every stored output of the layout
+studies: 26 runs, 2,133 page rows, every count and every listed fault identical. On the
+layout output of the main branch as stored on 2026-11-10, both give 59 clean pages of 78
+(30 of 41 on public files, 29 of 37 on files made here) and 6 of 13 on the edge files.
+Those numbers describe that stored output, read from a layout dump; they were not measured
+under the production profile and are not the registered baseline, which `eval order`
+records (below). Version 5 added the five further counts and `faultless`; for the same
+elements its other counts are those of version 4. The first scorer (version 2) was not
+moved: its element-level counts are still reported by this one (`pairs`, `stitched`,
+`split`, `lost`).
+
+### Gold built from sources (`gold/layout_gold.py`)
+
+Hand labeling cannot supply held-out pages in number: the 78 hand-labeled pages of the
+corpus have all been used to build readers. So reading-order gold is also built from a
+document's source, with no model. The source gives the units (headings, paragraphs, list
+items, captions, footnotes) in order: the HTML LaTeXML makes from a paper's LaTeX, the
+archive XHTML of an OpenStax section, or the unit list written next to a file made here.
+Every text line of a PDF page is matched to the unit that holds its words. A gold block is
+the run of lines of one unit in one column of one page, so a paragraph cut by a page or a
+column is two blocks, and a cut anywhere else is a reader's error. The caption of a float is
+marked `float` (whole and unjoined is scored, its place is not), a footnote goes to the end
+of its page, and a token that is not a word of the source (the glyphs of an inline formula)
+is masked for the scorer.
+
+Pages are chosen by rules that look only at the gold's own coverage, fixed before any
+reader was scored: a paper gives pages 1 to 3 and two from its middle; a textbook gives the
+first three well-covered pages of two section groups, four chapter-end pages and one index
+page; a page needs three blocks whose order is scored, and a paper's page needs the source to
+account for 0.75 of its prose lines.
+
+A set is a folder outside the repository (`files/<id>.pdf` and `gold/<id>.json`, by default
+under `~/.cache/readablestem/layout-gold/<set>/`). The repository keeps the set's registry,
+`data/gold/layout/<set>.json`: ids, sources, counts and SHA-256 hashes, and no text.
+
+```bash
+uv run readablestem gold layout verify --set layout-dev-1
+uv run readablestem gold layout sample --set layout-dev-1 --seed check-1 --out ~/layout-check
+uv run readablestem gold layout agreement ~/layout-check/sheet.jsonl
+```
+
+`sample` draws 1 page in 10 of each kind by a seeded hash and writes each page's picture
+with the gold blocks drawn and numbered, and `sheet.jsonl` with one row per block. A person
+sets `ok` on each row: true when the block is one whole unit of the page, has the right
+role and stands in its place. `agreement` reads the sheet: a kind whose checked blocks are
+right in fewer than 95 of 100, or whose sheet is not filled, is not used as gold until its
+matcher is fixed.
+
+| Set | Documents | Pages | Blocks | Use |
+|---|---|---|---|---|
+| `layout-dev-1` | 28 arXiv papers, 10 OpenStax books, 22 files made here | 267 | 4,460 | development |
+| `layout-heldout-1` | 28 arXiv papers, 8 OpenStax books, 15 course handouts | 256 | 3,811 | held-out |
+
+`layout-dev-1` was built in the second measuring round of November 2026 by research scripts,
+and `layout_gold.py` rebuilds all of it value for value from the kept sources. Half of it
+was scored once as a sealed half and its failing pages were then used as cases, so all of it
+is development now.
+
+`layout-heldout-1` was drawn on November 11, 2026 from documents that are in no other set,
+by three commands that fetch, build and choose with no model and no person in the loop:
+
+```bash
+uv run readablestem gold layout draw-papers --set layout-heldout-1 --seed SEED --pool pool.json
+uv run readablestem gold layout draw-books --set layout-heldout-1 --seed SEED
+uv run readablestem gold layout draw-course --set layout-heldout-1 --seed SEED
+uv run readablestem gold layout register --set layout-heldout-1 --side held-out --note "..."
+```
+
+- `draw-papers` walks a pool of openly licensed arXiv papers in an order the seed fixes,
+  takes four per class family (article, revtex, AMS, IEEE, conference, journal,
+  other), downloads the source, and runs LaTeXML and the PDF build in the repository's
+  sandbox (`gold/safe_tex.py`): a downloaded source is a stranger's program. 28 papers were
+  taken and 123 passed over, by rule: their family was full, the source did not build, or no
+  page met the coverage rule.
+- `draw-books` walks the CC BY OpenStax books that are in no other set (8 taken, 6 passed
+  over), and `draw-course` walks handouts and notes written in LaTeX in public repositories
+  under MIT or CC BY-SA licenses (15 taken, 49 passed over).
+- The seed is `layout-heldout-1-2026-11-11`. The registry lists every document taken, with
+  its source and license, and names every one passed over.
+
+The rebuilt fetch path was compared with the research set on the papers both can build: 91
+of 110 pages and 1,045 of 1,070 blocks are identical. The papers of `layout-dev-1` took
+their HTML from ar5iv, which runs another LaTeXML version; the differences are blocks that
+version cuts differently.
+
+No page of the held-out set was opened while it was built, and none is while the reader is
+worked on: `eval bar` reads its scores, and a failing page is not looked at. What it still
+lacks, and what a reading-order bar met on it therefore does not cover yet:
+
+- Word-made documents (at least 20 pages) and hand-labeled pages (at least 20): neither
+  source can be built by a rule, so both wait for a person.
+- The hand check: `sample` and `agreement` on 1 page in 10 of each kind, by someone other
+  than whoever changes the reader. Until it is done, a kind's gold is unchecked.
+- Three of the eight books are not science or mathematics (government, psychology,
+  economics): the walk takes books in seeded order and does not choose by subject. Their
+  pages count as textbook layout, not as mathematics.
+
+### `eval order`
+
+Whether each gold page is read in the order it was written, and what else is wrong on a page
+that is.
+
+```bash
+uv run readablestem eval order --out data/eval/order-corpus.json
+uv run readablestem eval order --out order.json --against data/eval/order-corpus.json
+uv run readablestem eval order --set layout-dev-1 --out data/eval/order-layout-dev-1.json
+```
+
+**On the corpus** the command is made from the measured replay of the next section: every
+corpus file with gold is converted as the worker converts a job, under the production
+profile, with the recorded answers in place of the provider. It spends nothing. Two things
+are scored against the same gold:
+
+- the **student page**: the HTML a student is given, read as a listener hears it. This is
+  the product, and the headline is of it;
+- the **element list**: what the pipeline holds before any file is written. Where the two
+  differ, writing the page changed what is heard.
+
+The groups are the manifest's (`labels.group`): `real` pages of published documents,
+labeled by hand; `self-made` pages built from a source that carries each block's role;
+`edge` pages generated to hold one hard case each. A figure "of 78" is of the real and the
+self-made pages together. A file whose recording does not hold every answer its conversion
+asks for is reported apart and left out of every total: an element whose answer is missing
+fails, which is the recording's doing and not the reader's.
+
+**The bar.** With `--against`, no page that was right in the earlier record is not right
+now; a page that became right is named too. Two records are compared only when they are of
+the same documents and were scored by the same version of the scorer, and every page scored
+then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a page was made
+wrong; 2: the two records cannot be compared, or nothing could be measured. The record
+keeps counts per page and no word of any document.
+
+**The baseline** (`data/eval/order-corpus.json`, 44 files measured
+whole, 88 gold pages, pipeline 0.5.10,
+production profile `62b4f1678d36`,
+no step stopped early). A count is given as its pages and, in brackets, its places.
+
+| | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|
+| real, student page | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
+| self-made, student page | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
+| real and self-made, student page | 78 | 58 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 43 | 17 |
+| edge, student page | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
+| real, element list | 41 | 30 | 12 | 8 (10) | 15 (32) | 10 (19) | 1 of 2 | 11 | 4 |
+| self-made, element list | 37 | 28 | 21 | 4 (4) | 1 (4) | 3 (27) | 0 of 2 | 32 | 13 |
+| real and self-made, element list | 78 | 58 | 33 | 12 (14) | 16 (36) | 13 (46) | 1 of 4 | 43 | 17 |
+| edge, element list | 10 | 6 | 4 | 3 (4) | 1 (1) | 0 (0) | 0 of 0 | 1 | 0 |
+
+Read with care:
+
+- 58 of 78 pages are right in the student page and in the element list, and 33 are
+  faultless. 12 of the 78 read a running head, a page number
+  or a stamp aloud, 16 cut a block and
+  13 run blocks together.
+- Two labels were corrected on November 11, and the figures above are scored with them. A
+  lab manual's first page had a block whose label read a Greek letter as the file's text
+  layer has it, a Latin one; with the printed letter the student page is right there (57
+  before, 58 now). On that page the answer written for an inline formula still ends with
+  the word that follows the formula in the sentence, so the page says that word twice: one
+  fault alone does not break the block, and the two together did. The glossary's second
+  page had a heading and two continued pieces on the wrong side of the page break in its
+  labels; with them in place, what is left wrong on that page is the reader's: a short
+  two-column page is read across the gutter.
+- The layout dumps of November 10 gave 59 of 78 for the same reader. The one page more was
+  a matching exercise that is written as a table and read row by row: a dump holds the words
+  of the table's region, in the order of the two lists, and the page a student gets does not.
+- 3 files (`ar3_sideways90`, `ar4_sideways270`, `e1_mc_columns`; 10
+  answers missing, 3 gold pages, none right) are
+  apart until they are recorded again, so the edge group is
+  10 pages and not 13.
+- This is a development set: every page of it has been read while the reader was built.
+  These figures guard against going backward and meet no release bar.
+
+**On a layout gold set** (`--set NAME`, the registry `data/gold/layout/NAME.json` and the
+set's folder) each file is converted as a job converts it, under production's behavior
+settings, with no model: an equation, a picture and a table keep what the file gives, which
+is what the reading order is made of. The folder must be the registered one
+(`gold layout verify`), and the groups are the registry's kinds of document. A held-out set
+is scored only with `--for-release`: once, for a release, and never while the reader is
+being changed. Its record keeps totals and names no page, `--records`, `--from` and
+`--against` are refused for it, and a failing page is not looked at.
+
+`layout-dev-1` (60 documents, 267 pages;
+`data/eval/order-layout-dev-1.json`), the student page:
+
+| | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|
+| paper | 119 | 73 | 34 | 38 (39) | 42 (52) | 46 (102) | 0 of 0 | 32 | 17 |
+| selfmade | 40 | 18 | 9 | 4 (8) | 6 (32) | 14 (39) | 0 of 5 | 17 | 12 |
+| textbook | 108 | 58 | 2 | 103 (143) | 44 (123) | 8 (31) | 0 of 0 | 49 | 6 |
+| all | 267 | 149 | 45 | 145 (190) | 92 (207) | 68 (172) | 0 of 5 | 98 | 35 |
+
+The element list reads 150 of 267 of these pages right.
+`layout-heldout-1` has not been scored.
+
+## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
+
+The four commands are made from one **measured replay** of the test corpus (`eval/measure.py`).
+Every upload of the corpus (`corpus.UPLOADS`: each file once, and again with the boxes a
+person would tick for it) is converted the way the worker converts a job: production's
+behavior settings (`ops/production.profile.toml`), the job's own caps, the conversion in a
+process of its own, and the recorded answers in front of the model client. Nothing is sent
+and nothing is spent. The database and the web app are not part of it.
+
+Each upload is measured in a fresh process, one at a time by default, so its highest memory
+use and its start-up are its own and no cache carries over. What is kept for an upload is
+content-free: its pages and the kind of each, its step facts (operations.md, "Step facts and
+the step report"), dollars, wall and CPU seconds, peak memory, and each decision it asks of
+a reviewer (page, kind and reason codes).
+
+**A page has one kind**, the first of these that fits, so that the kinds add up to the run:
+
+| Kind | A page that |
+|---|---|
+| `scan` | is scanned or handwritten: read from its picture when the upload asked for that, kept as a picture when it did not |
+| `source` | is a unit of a document read from its LaTeX source |
+| `slide` | has the shape of a slide |
+| `dense_math` | has 9 equations or more |
+| `table`, then `figure` | has one |
+| `typical` | is none of these |
+
+```bash
+uv run readablestem eval cost --out data/eval/cost-corpus.json
+uv run readablestem eval speed --runs 2 --cores 2/3 --out speed.json --against data/eval/speed-corpus.json
+uv run readablestem eval cost --only s15_charts_figures      # one file
+uv run readablestem eval speed --records kept.json           # keep what was measured
+uv run readablestem eval cost --from kept.json               # report on it again, measure nothing
+uv run readablestem eval burden --out burden.json --against data/eval/burden-corpus.json
+uv run readablestem eval outputs --out outputs.json         # builds and reads every file
+```
+
+The reports record the four things `eval bar` asks for, with the commit and the machine,
+and hold their figures under `metrics`, so `eval bar` can read one
+(`--measure kinds.dense_math.usd_page.p95`). The corpus is a development set: it was chosen
+to cover kinds of document, and the readers were built while looking at it. So no
+report can meet a bar or carry a public claim, and each says "Proof owed" in its header. A
+replay of held-out whole documents needs a recording that does not exist yet.
+
+A report also lists the steps that stopped before they were done (`not_finished` in the
+record: the upload, the step, the page and the reason, from the step facts) and names them
+in its header. A step stopped at a time limit gives another result on a busier machine: one
+corpus run made while four test suites ran lost a handwritten page to the 10-second clock
+of the page-type step, and its counts differed from the run before it. A baseline is a run
+in which no step stopped at a time limit. When nothing could be measured, each command says
+so and exits with 2.
+
+### `eval cost`
+
+A request to a model is a step fact with the page it was about. A page's dollars are the
+dollars of its requests, plus an even share of any request about the whole document, so the
+pages of a document add up to the document. The report prints:
+
+- a document's dollars a page (its cost divided by its pages), over the documents;
+- dollars of one page by page kind, at the median and the 95th percentile, with the mean;
+- dollars by step, over the pages the step ran on, and its mean over every page;
+- the mean of each step on each kind of page;
+- the steps of the accuracy round that are not built (page audit, text check, line-strip
+  check, table read, figure checker, structure read, cheap first read of a scan): what the
+  run spent on each, which is 0 until it runs, and the estimate for one unit with what it
+  rests on;
+- the two figures the public pages are built from (`TYPICAL_PAGE_USD` and `DENSE_PAGE_USD`
+  in `ops/limits.py`) beside what this run measured, and how many pages a day's open pool
+  pays for with and without the checks.
+
+An upload whose recording lacks an answer it asks for is left out and named: a refused
+request costs nothing, so its pages would look cheaper than they are.
+
+First run (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages, $4.85 in the recording; `data/eval/cost-corpus.json`). Ten uploads are left out for
+the 126 answers still owed ("Recording and replay").
+
+| Page kind | Pages | Documents | Median | p95 | Mean |
+|---|---|---|---|---|---|
+| `scan` | 25 | 10 | $0.0295 | $0.0569 | $0.0246 |
+| `slide` | 45 | 3 | $0.0000 | $0.0202 | $0.0053 |
+| `dense_math` | 30 | 10 | $0.0716 | $0.1365 | $0.0676 |
+| `table` | 24 | 17 | $0.0059 | $0.0486 | $0.0152 |
+| `figure` | 60 | 19 | $0.0174 | $0.0450 | $0.0220 |
+| `typical` | 131 | 43 | $0.0000 | $0.0091 | $0.0022 |
+
+| Step | Requests | Pages it ran on | Median of such a page | p95 | Mean over every page | Total |
+|---|---|---|---|---|---|---|
+| `equation` | 1,314 | 87 | $0.0065 | $0.1119 | $0.0070 | $2.21 |
+| `figure` | 260 | 92 | $0.0157 | $0.0510 | $0.0058 | $1.81 |
+| `image_page` | 14 | 13 | $0.0364 | $0.0707 | $0.0016 | $0.49 |
+| `table` | 44 | 28 | $0.0021 | $0.0486 | $0.0011 | $0.34 |
+
+What the first run shows:
+
+- **Most pages cost nothing.** A page of text alone sends nothing to a model, so the median
+  `typical` page is $0. The money is in the pages with equations (46% of it on 87 pages),
+  figures and tables. "What a typical page costs" has meant a document's cost divided by
+  its pages: $0.0055 at the median document here, $0.043 at the 95th percentile and $0.012
+  on average.
+- **The kept figures stay.** `TYPICAL_PAGE_USD` is $0.0145 and `DENSE_PAGE_USD` is $0.034
+  to $0.092, the audit's measurements. This run's dense pages are $0.072 at the median and
+  $0.137 at the 95th percentile, above the kept range's top; that is a development set
+  with one 14-page solution set in it, so the range is not changed from it, and the
+  held-out replay decides.
+- Every dollar of every job is on a step fact: the difference between a result's dollars
+  and its facts' dollars is 0 for all 73 uploads.
+
+### `eval speed`
+
+A replay waits on no model, so its seconds are the local work. The report prints:
+
+- seconds a page by page kind, at the median and the 95th percentile. The conversion does
+  not time each page yet, so a page is given its document's seconds divided by its pages:
+  exact for a document of one kind, blurred for a mixed one;
+- seconds a page by stage (`layout`, `image_pages`, `steps`, `assemble`, `checks`), over the
+  documents that have the stage, with the stage's mean over every page and its share;
+- start-up apart, as seconds of a job: starting the conversion process and loading its code
+  takes the same time for 1 page and for 40;
+- wall and CPU seconds apart, and the most memory held by the conversion process and by the
+  process that called it;
+- what the models took when the answers were recorded, per step, apart from all of the
+  above.
+
+`--runs N` replays the corpus N times and counts each upload's fastest run: a slow run is
+the machine, a fast one cannot be. `--cores A/B` pins run 1 to CPU list A and run 2 to B.
+Where two runs of the same code differ by more than the allowance at a kind's median, the
+report says the machine was too busy to judge.
+
+**The bar** (`--against RECORD`): no page kind is slower than in the earlier record by more
+than a tenth (`--allowance`, 1.0 for a shared runner) at the median or at the 95th
+percentile. Two records are compared only when they name the same CPU model and core count.
+
+| Exit | When |
+|---|---|
+| 0 | the bar is met, or no record was given |
+| 1 | a page kind is slower than allowed; the lines name each |
+| 2 | not judged: another machine class, or the machine was too busy |
+
+First measurement (2026-11-11, pipeline 0.5.10, production profile, all 73 uploads, 338
+pages, the faster of two runs on cores 2 and 3 of an AMD Ryzen 7 5800H). No speed record is
+kept from it: other work ran on the machine, the two runs differ by more than the allowance
+on `dense_math`, and the report says so ("the machine was too busy to judge"). The figures
+show the scale and where the time goes; the record `--against` compares with is made on a
+quiet machine and kept as `data/eval/speed-corpus.json`.
+
+| | Median | p95 |
+|---|---|---|
+| Wall seconds a page, start-up apart | 0.71 | 2.57 |
+| CPU seconds a page, start-up included | 1.63 | 3.73 |
+| Start-up of a job (seconds) | 2.00 | 2.04 |
+
+| Page kind | Pages | Documents | Median s | p95 s |
+|---|---|---|---|---|
+| `scan` | 25 | 10 | 0.77 | 4.06 |
+| `slide` | 45 | 3 | 0.20 | 0.55 |
+| `dense_math` | 34 | 13 | 0.84 | 1.70 |
+| `table` | 29 | 22 | 1.00 | 1.61 |
+| `figure` | 64 | 20 | 0.69 | 1.39 |
+| `typical` | 141 | 49 | 0.52 | 1.21 |
+
+Layout is 66% of the local time (0.48 s a page at the median), the steps' own work 24%,
+assembly 7% and the checks 1%. The models are not waited for in a replay; when the answers
+were recorded a request took 1.4 s at the median for an equation, 2.6 s for a figure, 3.2 s
+for a table and 8.9 s for a page read as a picture. The conversion process held at most
+515 MB and the process that called it 424 MB.
+
+### `eval burden`
+
+How many decisions a page asks of the person who reviews it, before anyone has reviewed.
+
+**One definition.** A decision is what the review screen counts: a fix the pipeline marked
+`required`, with a group of repeated headings (or of pages kept as pictures for one reason)
+as one decision. `core/triage.py` holds it (`units`, `required_decisions`, and `decisions`,
+which returns the same decisions as rows: page, kind, reason codes, members). The review
+screen, the documents list, the review record, the weekly report, the command line's
+summary and this report all count through it. Building the report found two counters that
+did not: `triage.review_load` and the weekly report's review-load table counted only
+equations, figures, headings and tables, so the paragraphs of a page read from its picture
+(6 decisions in this corpus) were on the review screen and in neither. Both now count every
+kind of fix.
+
+A decision is on the page of its first member. The report prints:
+
+- decisions a page over the whole set, and a document's decisions a page at the median and
+  the 95th percentile over documents (what one instructor meets);
+- decisions of one page by page kind, at the median and the 95th percentile, with the share
+  of pages that ask nothing;
+- decisions by what is decided (equation, figure, heading, table, paragraph);
+- decisions by why they were asked, each with its rate per 100 pages. The reason codes are
+  `triage.tier_reasons`: a failed check's code, the fix's own reason, a repeated heading,
+  or `below_accept` when only the confidence held it back. A decision with two reasons is
+  counted under both;
+- the documents that ask the most a page.
+
+An upload whose recording lacks an answer it asks for is left out and named: an unanswered
+request fails its element, and that decision would be the recording's, not the
+conversion's. A record kept before decisions were measured is "not measured", not a
+document that asks nothing.
+
+**The bar** (`--against RECORD`): the whole set and every page kind with at least 10 pages
+ask for no more decisions a page than in the earlier record (`--allowance`, 0 by default).
+Two records are compared only when they are of the same documents and measured the same
+number of uploads.
+
+| Exit | When |
+|---|---|
+| 0 | the bar is met, or no record was given |
+| 1 | the set or a page kind asks for more than before; the lines name each |
+| 2 | not judged: other documents, or a different number of uploads measured |
+
+**Fewer is not better by itself.** A change that stops asking about something wrong lowers
+this figure and raises the errors nobody is told about. The bar is read with the counts of
+silent errors (the lane evals and the page audit), never alone.
+
+Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
+report leaves out, for the same 126 answers.
+
+| | |
+|---|---|
+| Required decisions | 567 |
+| Decisions a page, whole set | 1.80 |
+| A document's decisions a page | 0.29 at the median, 7.44 at p95, 10.21 at the most |
+| A page's decisions | 0 at the median, 9 at p95, 25 at the most |
+| Pages that ask nothing | 56% |
+
+| Page kind | Pages | Documents | Decisions | A page | Median page | p95 | Most |
+|---|---|---|---|---|---|---|---|
+| `dense_math` | 30 | 10 | 314 | 10.47 | 9 | 25 | 25 |
+| `figure` | 60 | 19 | 105 | 1.75 | 1 | 7 | 13 |
+| `scan` | 25 | 10 | 28 | 1.12 | 1 | 4 | 9 |
+| `slide` | 45 | 3 | 13 | 0.29 | 0 | 2 | 5 |
+| `table` | 24 | 17 | 12 | 0.50 | 0 | 1 | 2 |
+| `typical` | 131 | 43 | 95 | 0.73 | 0 | 5 | 8 |
+
+| What is decided | Decisions |
+|---|---|
+| equation | 384 |
+| figure | 122 |
+| heading | 44 |
+| table | 11 |
+| paragraph (a page read from its picture) | 6 |
+
+| Why it was asked (the ten most frequent of 37 codes) | Decisions | Per 100 pages |
+|---|---|---|
+| `below_accept` | 154 | 48.9 |
+| `symbol_mismatch` | 143 | 45.4 |
+| `sign_mismatch` | 52 | 16.5 |
+| `glyph_style_mismatch` | 51 | 16.2 |
+| `low_confidence` | 41 | 13.0 |
+| `heading.weak_evidence` | 38 | 12.1 |
+| `heading.sentence_like` | 28 | 8.9 |
+| `style_cosmetic` | 26 | 8.2 |
+| `long_description_unsure` | 22 | 7.0 |
+| `text_layer_mismatch` | 19 | 6.0 |
+
+What the baseline shows:
+
+- **The load is equations.** 384 of the 567 decisions are equations, and the 30 dense
+  math pages (a tenth of the pages) ask for 314 of them: 10.5 a page, 25 on the worst. One
+  14-page solution set asks for 143. More than half of all pages ask nothing.
+- **Two reasons are half of it.** `below_accept` (the reading passed every check and its
+  confidence stayed under the accept bar) and `symbol_mismatch` (a symbol of the text
+  layer is not in the reading) are on 297 decisions. Whether those flags find errors is
+  what the equation measurements answer; this report only says where the questions are.
+- A document's 0.29 at the median against 1.80 for the set says the same thing from the
+  other side: most documents ask little and a few ask most of it.
+
+Two documents carry goals of their own, set before this report existed, and both are in the
+table of documents the report prints: the notes chapter `w_notes_6042_ch2` asks 3.36 a page
+today against a goal of 1.0 or fewer, and the solution set `w_solutions_1802` asks 10.21
+against 4.0 or fewer. Neither is met. They are development documents, so meeting them here
+proves nothing by itself; the release bar is judged on a held-out replay, which does not
+exist yet.
+
+### `eval outputs`
+
+Every other eval stops at the element list or at the markup of the student page. This one
+opens the files a student is given and counts what is wrong in them.
+
+**What is read.** From each converted upload the command builds the student page, the Word
+file, the EPUB, the two Canvas files (the page for a Canvas Page and the file for Canvas
+Files), the Common Cartridge and the Listen transcript, through the code the downloads use,
+and reads each one back from its bytes into one inventory (`pipeline/output_audit.py`):
+the blocks of words in reading order, the equations and whether each has a spoken form, the
+pictures and their alt text, the tables with their header cells, the links inside the file
+and whether each lands, the notes and the language. Words a reader hears and does not see
+(`alt`, `aria-label`, `alttext`, text for screen readers only) are read as what they are.
+
+**What is compared.** An export is right when it says what the page says, so each export is
+compared with the page it was made from. The page is compared with the stored result: every
+element has a place, in the stored order, and every open decision and kept picture is
+marked. Whether the words inside a place are the right words is the business of the lane
+evals and the page audit, and is not counted here.
+
+A count is one wrong place: a kind, the output, the page and the element id, and none of
+the document's words. Each place is counted once.
+
+| Kind | A place where |
+|---|---|
+| `out_char` | a character is not text (private use, a replacement character, a control) |
+| `out_text_lost` | words of the page are in no place of the output |
+| `out_text_twice` | words that are once on the page are twice in the output |
+| `out_order` | a block is in another order than on the page |
+| `out_math_fallback` | an equation is not an equation in the output, or has no spoken form |
+| `out_link_dead` | a link inside the file leads nowhere in it |
+| `out_alt_missing` | a picture that is not decoration has no alt text |
+| `out_table_header` | a table has no header cell where the page's has one |
+| `out_heading` | a heading is empty or skips a level, or the title is said twice |
+| `out_lang` | the file states no language, or another than the document's |
+| `out_note_lost` | a note of the page is not in the output |
+| `out_hole` | a sentence has a gap: a space before its full stop or comma, "the -x" |
+| `out_notice_missing` | an open decision or a kept picture has no note at its place |
+
+**What an output leaves out on purpose** is a written list (`output_audit.ABSENT_BY_DESIGN`),
+and nothing else may be missing: Word has no skip link and no visible page labels, the EPUB
+has neither and builds its own contents list, the Canvas page has no skip link, and the
+transcript says neither the page labels nor the title of the contents list.
+
+**What a format cannot hold is not asked of it.** Each limit is one rule:
+
+- A Word table can mark a row as a header and nothing else. A header column of the page is
+  not asked of the Word file.
+- Each format numbers a note's mark in its own way, so the mark's digits are not compared.
+  A Word footnote with no words is a mark that leads nowhere, and is a dead link.
+- A voice adds the word "link" before a link's name and reads a table row by row, so the
+  transcript's words are compared by their letters. The Listen page reads the first 8 rows
+  of a table and says how many more there are; the audit reads the transcript with every
+  row, so every row's words are checked.
+- The transcript closes the space before a full stop, and says a paragraph that is only a
+  formula in words. A gap is therefore judged where the page has it, and counted for the
+  transcript when the transcript says that sentence.
+- A formula in a table cell is written once for a voice and once for the eyes. It is one
+  thing: a file that shows both is counted as words twice.
+- A picture is decoration only where the page says so; an export is held to the page's
+  count of them.
+- MathML counts as a spoken form.
+
+**It measures the page before anyone has reviewed it.** The replay converts and nobody
+decides anything, so every proposal that waits for a required decision is open. A page that
+shows such a proposal with no mark at its place is counted under `out_notice_missing`. That
+is the largest figure below, and it is a count of the draft, which cannot leave as a
+finished file while a decision is open. It is counted because a draft can be downloaded
+after a confirm, and its reader has only the banner at the top to go by.
+
+**Known false positive.** `out_hole` also fires where the source itself writes a space
+before a colon or a full stop (a slide that sets "O(1) :"). Five of the places below are
+of that kind.
+
+```bash
+uv run readablestem eval outputs --out data/eval/outputs-corpus.json
+uv run readablestem eval outputs --only r18_arxiv_opt        # one file
+uv run readablestem eval outputs --from kept.json            # report on a kept replay
+```
+
+It spends nothing and gates nothing. Exit code 0: measured; 2: nothing could be measured.
+An upload whose recording lacks an answer is reported apart, as in the other reports.
+
+Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; `data/eval/outputs-corpus.json`). Every output of every upload could be built.
+
+| Kind | Page | Word | EPUB | Canvas file | Canvas page | Cartridge | Transcript | Documents |
+|---|---|---|---|---|---|---|---|---|
+| `out_char` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_text_lost` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_text_twice` | 0 | 9 | 0 | 0 | 0 | 0 | 0 | 4 |
+| `out_order` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_math_fallback` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_link_dead` | 0 | 74 | 0 | 0 | 0 | 0 | 0 | 8 |
+| `out_alt_missing` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_table_header` | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
+| `out_heading` | 13 | 14 | 13 | 13 | 13 | 13 | 13 | 14 |
+| `out_lang` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_note_lost` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `out_hole` | 43 | 43 | 43 | 43 | 43 | 43 | 43 | 6 |
+| `out_notice_missing` | 519 | 0 | 0 | 0 | 0 | 0 | 0 | 33 |
+
+What the figures are, checked place by place on 29 of the uploads:
+
+- **`out_notice_missing`, 519 on the page.** Proposals that wait for a required
+  decision and are shown with no mark (on the 29 uploads: 419 of 428; the other 9 are
+  formulas inside table cells, where a kept or open formula has no mark of its own and the
+  table has none). Every picture kept as the original with a place of its own is marked.
+  The exports copy the page, so the same places are unmarked in each; they are counted once,
+  on the page.
+- **`out_hole`, 43 in each written output.** Sentences that lost an inline formula
+  ("is denoted ."), stray punctuation left as a paragraph of its own, and a mis-decoded
+  ellipsis; five are the false positive above. The transcript says every one of these
+  sentences.
+- **`out_link_dead`, 74 in Word.** pandoc keeps an id on a heading and drops it on a
+  paragraph, so most links inside a Word file have no target. 13 of them are footnotes:
+  every note's mark becomes a Word footnote with no words, the note's text stays a
+  paragraph of the body, and its "Back to the text" link leads nowhere.
+- **`out_heading`, 13 in every output.** The page opens with the document title as
+  its `h1`, and the first heading of the document says the same words. In Word the title
+  paragraph is dropped when the two are equal; where they differ only in case it is not,
+  which is the one more in Word.
+- **`out_text_twice`, 9 in Word.** The words written for a voice beside a formula
+  in a table cell are ordinary text in Word, next to the formula.
+- **`out_table_header`, 1 on the page.** A table with no header cell and an open decision
+  on it.
+- Zero everywhere: a character that is not text, words lost, order, an equation with no
+  spoken form, a picture with no alt text, the language, a lost note.
+
+None of these is fixed here. The Word defects belong to the Word export's rebuild, the
+unmarked proposals to the page's notes, and the title to the one-`h1` rule; the counts are
+their baseline, and the release bar is 0 for `out_char`, `out_text_lost`, `out_link_dead`,
+`out_alt_missing` and `out_notice_missing`. They are development figures: the bar is judged
+on a held-out replay, which does not exist yet.
+
+What none of the reports has yet:
+
+- A replay of held-out whole documents (the recording is not made), and so a bar or a
+  public figure.
+- Seconds of one page. They come with the per-page trace of the conversion; until then a
+  kind's seconds are those of the documents its pages are in.
+- A long document. The longest corpus file has 39 pages; the 100-page math-heavy document
+  the audit timed is not in the corpus.
+- A LaTeX source, a Word or a PowerPoint file: the corpus has none whose answers are
+  recorded, so the `source` kind has no row.
+- How long a background (batch) check takes to come back: no batch answer is recorded.
+
+## The page audit in shadow (`eval page-audit`)
+
+The page audit (steps.md, "Page audit") compares one page of the output with the page it
+came from. This command runs it over a set and writes its verdicts. "In shadow" means that
+nothing reads them: no output, stored result or decision changes. It is how the audit's
+flags are measured before any of them is acted on.
+
+```bash
+uv run readablestem eval page-audit --corpus --fake            # no model: every page "not audited"
+uv run readablestem eval page-audit --corpus --provider anthropic --max-usd 3.00 --batch
+uv run readablestem eval page-audit --corpus --answers kept.jsonl --answers-offline   # replay, $0
+uv run readablestem eval page-audit --gold-dir <a layout gold set's folder> --provider anthropic --max-usd 1.00
+uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendered
+```
+
+- **`--corpus`**: each corpus upload converted under the production profile from its
+  recorded answers, as `eval cost` converts it. An upload this machine cannot replay is
+  listed under `skipped` with its reason.
+- **`--gold-dir DIR`**: the files of a layout gold set (`DIR/files/<id>.pdf`), each
+  converted with no model, so what is audited is the layout and the reading order. The
+  report goes in that folder (`DIR/page-audit.json`), so a held-out set's rows stay with
+  the set and outside the repository.
+- **`--rendered`** also sends the picture of the page's output (needs the browser group).
+- **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
+  nothing is sent and a page whose answer is not in the file is not audited. `--batch`
+  sends what the file cannot answer as Message Batches at half price.
+- A live run needs `--provider anthropic` and a `--max-usd` cap, and keeps its recording
+  like every other live run ("Runs keep their recordings").
+
+Exit code 0: every page has a verdict. 1: the spend cap ended the run, and the pages after
+it are `not_audited` with `cap_reached`. 2: the run could not start.
+
+The report (default `data/eval/latest-page-audit.json`) holds codes, ids, boxes, counts and
+dollars, and no text of any document: the model, effort and prompt version; `verdicts`
+(pass, flagged, not audited); `answered_by` (the model, or a test by code);
+`not_audited_by_reason`; `findings` by code and severity; `requests`, `cost_usd` and
+`usd_per_asked_page`; `stopped`; `skipped`; and one row a page with its verdict, findings,
+reason and the key of the question asked.
+
+One run's verdicts are not a measurement of the audit. Its bars (how many marked faults it
+flags, how many clean pages it flags, and the share of verdicts that differ between two
+runs of one input) are judged on pages whose faults a person marked. No live run is
+recorded yet: the first shadow recording of the corpus waits for the owner's approval of
+its cap.
+
+## The quality ledger (`eval ledger`)
+
+Each eval above reports its own lane on its own set. The ledger
+(`src/readablestem/eval/ledger.py`) is one list of rows over all of them, led by the rows
+that say what a student meets: how often a whole course document reaches them with an error
+nobody was asked about. It measures nothing and spends nothing. It reads the records the
+evals keep in `data/eval` (`order-*.json`, `burden-*.json`, `outputs-*.json` and
+`whole-*.json`), and for every row and every record that feeds the row it prints the counts,
+the figure, a bound and a label.
+
+```bash
+uv run readablestem eval ledger --out data/eval/ledger.json
+uv run readablestem eval ledger --for-release          # the check a release runs
+uv run readablestem eval ledger --register-bars        # after the first held-out run
+```
+
+**The labels.**
+
+| Label | What it says |
+|---|---|
+| held-out | scored on held-out documents, under the production profile, by this release |
+| development score | scored on documents the readers were built on, or under settings that are not the production profile; it guards against going backward and meets no bar |
+| earlier release | the record was made by another pipeline version, or under another profile, than the code that prints the ledger; it says nothing of this release, so the evals are run again for every release |
+| not measured: proof owed | no record feeds the row; the report says what proof is owed |
+
+**The bound.** A count from a sample allows more than it shows: no error in 237 formulas
+still allows about 1.3 in 100. Every figure is printed with a one-sided 95% bound on the
+side that matters (the upper one where lower is better): exact for a share
+(Clopper-Pearson) and for a rate of events (Poisson), an order statistic for a median. The
+bound treats pages as independent. Errors come in clusters by document, so the true bound
+is wider, and the rows that count documents are the ones to read for that.
+
+**The two bars.** The goal bar is the figure a lane is built toward, written with the row.
+It is met only when the bound is inside it, not when the figure is. A goal of none is met by
+a count of none, and the line still prints what that count allows. The release bar is the
+figure of the first held-out run, kept in `data/eval/ledger-bars.json` with the set it was
+measured on. `--register-bars` writes the bars that are missing; a bar is replaced only by
+naming its row (`--replace-bar ROW`), and a figure from a run in which a step stopped early
+is no baseline and is not written. A release may not be worse than its release bar, held as
+measured, with no bound. Only a held-out line is held against either bar.
+
+Exit code 0: no held-out line is worse than its release bar. 1: one is, or, with
+`--for-release`, a row that has a release bar has no held-out figure of this release on the
+bar's set. 2: refused. A record that does not say its split, its set's hash, the profile's
+hash and the pipeline version is not read around: the run stops and names the file.
+
+**The whole-document record** (`whole-<set>.json`) is what the top rows are made of. Its
+`metrics` hold one row a document, with no name: `pages`, `silent_errors` (anything wrong in
+the student file that carried no required decision), `doubt_false` and `doubt_true` (doubt
+flags: a check or a reader disagreed, and the flag turned out false or true) and
+`rule_required` (decisions a rule asks for whatever the readers say, by rule). Beside them,
+`rule_owners` (who shows on held-out pages what a rule catches) and `hand_sample` (the pages
+that passed every check and were read by hand, and how many had a fault). False flags per
+true flag is over doubt flags only. A rule-required decision is printed on its rule's line,
+with the rule's owner, and in no ratio. The record is written by the run that audits
+held-out whole documents and samples the pages it passed. That run needs a recording that
+does not exist yet, so no such record is kept and the top rows are not measured.
+
+**The file** (`--out`) holds, per release and row, the figures, their labels, the counts
+and both bars, and no word of any document. Its lanes are named as the outcome events name
+theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_outcome`
+event's, so the admin page can set production's numbers of the same release (false flags
+per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
+
+**Today** (`data/eval/ledger.json`, release `0.5.10+62b4f1678d36`). No row has a held-out
+figure and no release bar is registered: every line below is a development score.
+
+| Row | Set | Figure | Counts | 95% bound | Label | Goal bar |
+|---|---|---|---|---|---|---|
+| Required decisions a page, the median document | corpus | 0.29 | 63 documents | 0.60 | development score | at most 1.00 |
+| Pages not read right in the student page, by the scorer | corpus | 27.3 per 100 | 24 of 88 pages | 36.2 per 100 | development score | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 44.2 per 100 | 118 of 267 pages | 49.4 per 100 | development score | - |
+| Documents with every gold page right | corpus | 56.8% | 25 of 44 documents | 43.3% | development score | - |
+| Documents with every gold page right | layout-dev-1 | 13.3% | 8 of 60 documents | 6.8% | development score | - |
+| Pages that read a running head, a page number or a stamp aloud | corpus | 17.0 per 100 | 15 of 88 pages | 25.0 per 100 | development score | at most 2.0 per 100 |
+| Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 54.3 per 100 | 145 of 267 pages | 59.5 per 100 | development score | at most 2.0 per 100 |
+| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | development score | - |
+| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | development score | - |
+| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
+| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | development score | none |
+
+Read with care:
+
+- "Required decisions a page" is the median over documents of a document's decisions a
+  page, as production counts it. Its bound is an order statistic of
+  63 documents of a set chosen to cover kinds of
+  document, not sampled from what people upload.
+- The corpus line of the page rows counts every gold page measured whole
+  (88, the edge pages with the others); `eval order`'s
+  "of 78" leaves the edge pages out.
+- Every gold page is right in 25 of 44 corpus documents and in
+  8 of 60 documents of `layout-dev-1`. A document's gold pages are
+  the ones labeled, which in a layout set is a sample of its pages.
+- The output rows count places, and one fault can be many places: most of the HTML file's
+  are proposals still open that the page does not mark (`eval outputs`, above).
+
+Not measured, with the proof each is owed printed by the command: silent errors, documents with no silent error, false flags per true flag, doubt flags only, pages that passed every check and had a fault, read by hand, flags of the page check, and verdicts that change between two runs of one input, formulas whose meaning is wrong, with no flag, boxes that hold the whole formula, formulas inside tables read wrong, private-use or U+FFFD characters on a page with no flag, pages with a text error and no flag, words changed on a print page, wrong tables shown with no decision, wrong stated values on vector charts, drawn structures wrong with no question; and the rule-required decisions by rule.
+
+## The same file gives the same document on any machine
+
+A score or a replay means something only if a result does not depend on the machine that
+made it. The rule (`core.types.NotFinished`, tests/test_determinism.py):
+
+- A budget counts work: candidates tried, cells tested, pixels read. That is the same on
+  every machine.
+- A limit on time, memory or money may only stop a step. It never quietly changes what a
+  page contains.
+- A step that stops says so with a "not finished" fact: `{step, page, reason, done, of}`,
+  with no document text (operations.md, "Step facts and the step report"). Every report made
+  from a measured replay lists these facts in its record and names the steps in its header.
+
+Three tests hold the rule:
+
+1. **Every clock is named.** The test finds each read of a clock in `pipeline/` and
+   `source/` and compares the list with a table in the test file that says what each is for:
+   a timing field, a cache's expiry, a limit that ends the conversion with a code, a limit
+   whose step writes the fact. A new read fails the test until it is added to the table,
+   which is when to ask whether it can change a document.
+2. **A planted step.** A conversion with a step planted in it that leaves a page out once
+   its clock has passed a second is compared with the same conversion at full speed. The
+   comparison names the earliest part of the result that differs, and passes only when the
+   step wrote the fact.
+3. **The corpus, twice** (`-m workflow`). Every corpus upload is replayed as it is and
+   again held back to a quarter of the time (`eval.measure.run(..., share=0.25)`: the
+   conversion and everything it started are stopped and continued ten times a second, so
+   every clock they read runs four times as fast against their work). The two results are
+   hashed part by part with the fields of seconds left out (`measure.parts`: page types,
+   elements, the fixes of each kind, the HTML, the rest). An upload may differ only if a
+   step of the slower run wrote a "not finished" fact the quicker one lacks, or if it is
+   in the test's `KNOWN` list with the plan item that ends its difference.
+
+What the corpus run found (2026-11-11, 73 uploads). The first run failed on one upload, a
+handwritten lecture converted with its image pages read. The ink analysis has 10 seconds
+of wall-clock time for a document (`page_type.INK_BUDGET_S`) and takes 5.4 of them on that
+file at full speed. At a quarter of the speed the time ran out, one page was typed without
+its ink and so was not seen as handwriting, and its page type, elements, fixes and HTML all
+changed with nothing saying why. The stop now writes the fact (`page_type` with
+`time_limit` for each such page, and `ink_strokes` when the strokes were not read), and the
+test passes with an empty `KNOWN` list. The budget is still a clock: a slower machine can
+still give that file a different document, and now says so. Making it a count of work is
+the next step for it. The table search's time limit was not reached by any corpus upload at
+a quarter of the speed; it is listed in the clock table and gets its own fact with the
+table work.
+
+Not covered: a document long enough to reach the limits by its size. The corpus's longest
+upload is short of that, so a 100-page math-heavy document converted under several CPU
+limits is still owed.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -2568,6 +3641,16 @@ the machine, which changed the layout of 2.1; it is not used.
 | `src/readablestem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
 | `src/readablestem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
 | `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
+| `src/readablestem/eval/measure.py` | one measured replay of the corpus: each upload converted as a job is, in its own process, with page kinds, step facts, dollars, seconds and memory |
+| `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
+| `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
+| `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
+| `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
+| `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
+| `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |
+| `data/eval/ledger.json`, `data/eval/ledger-bars.json` | the last ledger, and the release bars once a held-out run has been registered (none yet) |
+| `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
+| `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |
 | `scripts/dev_chem_classes.py` | the outcome classes of a chemistry run, what harms a listener, `--speech` |
 | `src/readablestem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |
@@ -2589,7 +3672,7 @@ the machine, which changed the layout of 2.1; it is not used.
 | `src/readablestem/cli/devset.py`, `src/readablestem/eval/devset_media.py` | `gold devset ...`, `--set dev-v2`; authored PDFs as eval inputs |
 | `data/dev-v2/` | the extended development set (`README.md` there): dev gold, authored documents and their builder, sealed check archive, seal, selection |
 | `tests/test_devset*.py` | classes, selection, seal and the committed set (offline) |
-| `src/readablestem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
+| `src/readablestem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, math, fidelity, review load, real documents, report |
 | `src/readablestem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
 | `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
 | `data/authored/tables/` | authored table documents (MIT): sources, PDFs, gold, `make_authored.py` |

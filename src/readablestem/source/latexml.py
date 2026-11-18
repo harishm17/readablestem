@@ -57,6 +57,8 @@ XML_NAME = "doc.xml"
 # Where `convert` leaves them, relative to its `out` folder.
 XML_PATH = f"xml/{XML_NAME}"
 DOC_PATH = f"html/{DOC_NAME}"
+HTML5_NAME = "doc.html"
+HTML5_PATH = f"html/{HTML5_NAME}"
 
 
 def _dev_root() -> Path | None:
@@ -105,9 +107,12 @@ def convert(
     *,
     limits: sandbox.Limits | None = None,
     beamer: bool = False,
+    html5: bool = False,
 ) -> sandbox.Outcome:
     """Convert `src/main` (a path relative to `src`, no `..`): the XML at `out/XML_PATH`, then
-    the XHTML at `out/DOC_PATH`.
+    the XHTML at `out/DOC_PATH`. With `html5` the second step writes HTML5 instead
+    (`out/HTML5_PATH`, with `figure`, `figcaption`, `section` and `article` elements), which
+    is what the gold builders read; the site's conversions never ask for it.
 
     Each step writes into a folder of its own and the second reads the first's read-only, so
     what a hostile document writes in the first step cannot stand in for the second's answer.
@@ -148,9 +153,10 @@ def convert(
     xml_in = sandbox.where(xml_dir, "/xml")
     return sandbox.run(
         [
-            *prefix, "--format=xhtml", "--omitdoctype", "--pmml", "--nomathimages",
-            "--nographicimages", "--nopictureimages", "--nodefaultresources",
-            f"--sourcedirectory={work}", f"--destination={html_out}/{DOC_NAME}",
+            *prefix, f"--format={'html5' if html5 else 'xhtml'}", "--omitdoctype", "--pmml",
+            "--nomathimages", "--nographicimages", "--nopictureimages", "--nodefaultresources",
+            f"--sourcedirectory={work}",
+            f"--destination={html_out}/{HTML5_NAME if html5 else DOC_NAME}",
             f"--log={html_out}/post.log", f"{xml_in}/{XML_NAME}",
         ],
         ro=(*ro, (xml_dir, "/xml")), tools=tools, rw=((html_dir, "/out"),), env=_env(extra),

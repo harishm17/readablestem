@@ -3,15 +3,15 @@ The package itself is tested in test_export_cartridge.py."""
 
 from __future__ import annotations
 
-from fixtures.web.support import BOB, job_id_from, login, make_pdf, upload
+from fixtures.web.support import BOB, fetch, job_id_from, login, make_pdf, upload
 from readablestem.pipeline import export_cartridge
 from readablestem.web.security import VIEW_CSP
 from test_web_canvas_download import finished_job, folder_of, ready_job, web, zip_of  # noqa: F401
 
 
 def test_a_finished_job_downloads_as_a_common_cartridge(web):  # noqa: F811
-    job_id = finished_job(web)
-    response = web.browser.get(f"/jobs/{job_id}/download/cartridge")
+    job_id = ready_job(web)
+    response = fetch(web.browser, f"/jobs/{job_id}/download/cartridge")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/zip"
     assert response.headers["content-disposition"].startswith(
@@ -29,9 +29,9 @@ def test_the_cartridge_is_owner_only_and_a_get(web):  # noqa: F811
     job_id = finished_job(web)
     bob = web.client()
     login(bob, BOB)
-    assert bob.get(f"/jobs/{job_id}/download/cartridge").status_code == 404
+    assert fetch(bob, f"/jobs/{job_id}/download/cartridge").status_code == 404
     assert web.client().get(f"/jobs/{job_id}/download/cartridge").status_code in (303, 401)
     assert web.browser.get("/jobs/nonexistent/download/cartridge").status_code == 404
     assert web.browser.post(f"/jobs/{job_id}/download/cartridge").status_code == 405
     waiting = job_id_from(upload(web.browser, make_pdf(1)))
-    assert web.browser.get(f"/jobs/{waiting}/download/cartridge").status_code == 409
+    assert fetch(web.browser, f"/jobs/{waiting}/download/cartridge").status_code == 409

@@ -13,7 +13,7 @@ import re
 import pytest
 
 from fixtures.web.review_doc import review_output, review_pdf
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, upload
+from fixtures.web.support import ALICE, WebEnv, fetch, job_id_from, login, upload
 from readablestem.core.types import Check, ConversionOutput, FigureFix, ModelCall, Status
 from readablestem.pipeline import figure_details
 from readablestem.pipeline.figure_step import LONG_PROMPT_VERSION
@@ -91,7 +91,7 @@ def figure_card(env) -> str:
 
 
 def download(env) -> str:
-    return env.browser.get(f"/jobs/{env.job_id}/download").text
+    return fetch(env.browser, f"/jobs/{env.job_id}/download").text
 
 
 SHOWN = {"alt": ALT, "long_description": LONG}
@@ -165,10 +165,10 @@ def test_add_the_data_table_puts_it_in_the_file_and_keeps_the_decision_open(card
     assert fix is not None and fix.figure is not None and fix.figure.data_table_added
     # The alt text still waits for its decision: adding the table decides nothing else.
     assert fix.status is Status.NEEDS_REVIEW and not fix.reviewed
-    html = download(card)
-    assert "Data read from Figure 1; the values are approximate</caption>" in html
     page = screen(card, "?item=p1-e6")
     assert "The data table was added" in text_of(page)
+    html = download(card)
+    assert "Data read from Figure 1; the values are approximate</caption>" in html
     body = panel(page)
     assert "add_data_table" not in body and "Remove the data table" in body
     # Asking again changes nothing and says why.

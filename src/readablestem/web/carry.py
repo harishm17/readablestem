@@ -33,13 +33,11 @@ changes are returned as `web.review.ReviewChange`-like records so the caller can
 
 from __future__ import annotations
 
-import hashlib
-import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from readablestem.core import triage
+from readablestem.core import triage, uid
 from readablestem.core.types import (
     PENDING_STATUSES,
     DocumentResult,
@@ -60,8 +58,6 @@ SAME_PLACE = 0.5
 # (usage counts show "review:carried") and without a write number, so Undo never takes
 # back a whole carry at once.
 CARRIED_ACTION = "carried"
-
-_SPACES = re.compile(r"\s+")
 
 
 @dataclass
@@ -129,34 +125,23 @@ class CarriedChange:
 # --------------------------------------------------------------------------- fingerprints
 
 
-def _crop_hash(png: bytes) -> str:
-    return hashlib.sha256(png).hexdigest()
-
-
 def _words(text: str | None) -> str:
-    return _SPACES.sub(" ", (text or "").strip()).casefold()
+    return uid.words(text)
 
 
 def fingerprint(element: Element, crops: dict[str, bytes]) -> str | None:
     """The content of one item, or None when it has nothing to compare (no crop, no
-    words). Two items with the same fingerprint are the same item."""
+    words). Two items with the same fingerprint are the same item. It is the fingerprint
+    stable ids are made from (`core.uid.fingerprint`), with the crop as the content of an
+    equation, a figure or a table."""
     if element.kind is Kind.HEADING:
-        words = _words(element.text)
-        if not words:
+        if not _words(element.text):
             return None
-        parts = [words, f"{element.font_size or 0:.1f}", "b" if element.bold else "r"]
-    elif element.kind in (Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
+        return uid.fingerprint(element)
+    if element.kind in (Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
         png = crops.get(element.id)
-        if not png:
-            return None
-        parts = [_crop_hash(png)]
-        if element.kind is Kind.EQUATION:
-            parts.append(element.display or "")
-        elif element.kind is Kind.FIGURE:
-            parts.append(_words(element.caption))
-    else:
-        return None
-    return hashlib.sha256("\x1f".join([element.kind.value, *parts]).encode()).hexdigest()
+        return uid.fingerprint(element, png) if png else None
+    return None
 
 
 # --------------------------------------------------------------------------- position

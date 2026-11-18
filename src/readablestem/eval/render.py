@@ -285,6 +285,56 @@ class ChromiumRenderer:
         finally:
             context.close()
 
+    def part_png(
+        self, document_html: str, ids: Iterable[str], *, width_px: int = 800, pad_px: int = 8
+    ) -> bytes | None:
+        """A picture of the part of a document that holds the elements with these `id`s, as
+        a browser `width_px` wide draws it: the smallest box around them, the full width of
+        the page. None when none of them is drawn."""
+        with _chromium_errors("open a page"):
+            if self._browser is None:
+                self._start()
+            context = self._browser.new_context(
+                java_script_enabled=False,
+                offline=True,
+                viewport={"width": width_px, "height": 1000},
+            )
+        try:
+            with _chromium_errors("draw the part"):
+                page = context.new_page()
+                page.set_content(document_html, wait_until="load")
+                edges = page.locator("[id]").evaluate_all(
+                    """(all, ids) => {
+                        const wanted = new Set(ids);
+                        let top = Infinity, bottom = -Infinity;
+                        for (const one of all) {
+                            if (!wanted.has(one.id)) continue;
+                            const box = one.getBoundingClientRect();
+                            if (!box.width || !box.height) continue;
+                            top = Math.min(top, box.top + window.scrollY);
+                            bottom = Math.max(bottom, box.bottom + window.scrollY);
+                        }
+                        return bottom > top ? [top, bottom] : null;
+                    }""",
+                    sorted(ids),
+                )
+                if edges is None:
+                    return None
+                top = max(0.0, edges[0] - pad_px)
+                return page.screenshot(
+                    full_page=True,
+                    clip={
+                        "x": 0,
+                        "y": top,
+                        "width": width_px,
+                        "height": edges[1] + pad_px - top,
+                    },
+                    animations="disabled",
+                    caret="hide",
+                )
+        finally:
+            context.close()
+
     def equation_pdf(self, mathml: str, *, pad_px: int = 4) -> bytes:
         """The equation page printed to PDF: what a PDF's text layer holds for it."""
         return self.pdf(EQUATION_PAGE.format(pad=pad_px, math=clean_mathml(mathml)))

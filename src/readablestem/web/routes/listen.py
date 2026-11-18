@@ -19,7 +19,7 @@ from readablestem.web import documents, listen
 from readablestem.web.db import session_scope
 from readablestem.web.deps import UserDep, get_ctx, render
 from readablestem.web.routes.jobs import current_html, job_access, require_done
-from readablestem.web.routes.pages import DEMO_PAGE, STATIC_DIR
+from readablestem.web.routes.pages import DEMO_DIR, DEMO_PAGE
 from readablestem.web.shares import VIEW
 
 router = APIRouter()
@@ -58,7 +58,7 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
 def _demo_items() -> list[listen.Item]:
     """The demo's transcript, from the stored demo file and the readings in its report."""
     html = DEMO_PAGE.read_text(encoding="utf-8")
-    report = json.loads((STATIC_DIR / "demo" / "report.json").read_text(encoding="utf-8"))
+    report = json.loads((DEMO_DIR / "report.json").read_text(encoding="utf-8"))
     result = DocumentResult.model_validate(report["result"])
     return listen.build_transcript(html, listen.stored_speeches(result))
 

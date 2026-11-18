@@ -18,7 +18,8 @@
 {% endcall %}
 
 <h2>Who runs this</h2>
-<p>ReadableSTEM is a free, open-source beta built and maintained by Harish Manoharan.{% if contact_email %} Contact:
+<p>ReadableSTEM is a free, open-source beta built and maintained by Harish Manoharan.
+  <a href="/for-accessibility-offices#continuity">Support and continuity</a>.{% if contact_email %} Contact:
   <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
 
 <h2>What you may upload</h2>
@@ -31,7 +32,8 @@
 <summary>What is stored, and the exact clocks</summary>
 <p>For each upload we store: the PDF{% if office_on %} (for a Word or PowerPoint file, the PDF
   made from it; the Word or PowerPoint file itself is not kept){% endif %}{% if latex_source %}
-  (for LaTeX source, the .tex file or the zip that was uploaded){% endif %} and its file name, images cut from it (equations and
+  (for LaTeX source, the .tex file or the zip that was uploaded, and the names of the files,
+  packages and commands LaTeX reported a problem with){% endif %} and its file name, images cut from it (equations and
   figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
   converted HTML, and your review decisions.</p>
 <ul>

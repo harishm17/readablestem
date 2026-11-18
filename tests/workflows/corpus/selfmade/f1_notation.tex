@@ -1,0 +1,60 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1in]{geometry}
+\begin{document}
+\section*{Notation sampler}
+
+\subsection*{1. Matrices and systems}
+The rotation matrix is
+\[ R(\theta) = \begin{pmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{pmatrix}, \qquad
+A = \begin{bmatrix} 1 & 2 & 3 \\ 0 & 4 & 5 \\ 0 & 0 & 6 \end{bmatrix}. \]
+Solve the system
+\begin{align*}
+ 2x + 3y - z &= 5 \\
+ x - y + 4z &= -2 \\
+ 3x + 2z &= 7
+\end{align*}
+and the piecewise function $f(x) = \begin{cases} x^2 & x \ge 0 \\ -x & x < 0 \end{cases}$.
+
+\subsection*{2. Long division}
+Divide 1234 by 7:
+\[
+\begin{array}{r@{}l}
+ & \phantom{0}176 \\ \cline{2-2}
+ 7 \,\big) & 1234 \\
+ & \underline{\phantom{0}7}\phantom{00} \\
+ & \phantom{0}53\phantom{0} \\
+ & \underline{\phantom{0}49}\phantom{0} \\
+ & \phantom{00}44 \\
+ & \underline{\phantom{00}42} \\
+ & \phantom{000}2
+\end{array}
+\]
+so $1234 = 7 \cdot 176 + 2$.
+
+\subsection*{3. A proof tree}
+\[
+\dfrac{\dfrac{A \quad A \to B}{B}\;(\to E) \qquad \dfrac{B \to C}{B \to C}}{C}\;(\to E)
+\]
+
+\subsection*{4. A commutative square}
+\[
+\begin{array}{ccc}
+ A & \xrightarrow{\;f\;} & B \\
+ {\scriptstyle g}\big\downarrow & & \big\downarrow{\scriptstyle h} \\
+ C & \xrightarrow{\;k\;} & D
+\end{array}
+\qquad h \circ f = k \circ g
+\]
+
+\subsection*{5. Units, isotopes and reactions}
+The acceleration is $9.81\ \mathrm{m\,s^{-2}}$ and the density is 1.0 g/cm$^3$ at 25\,$^\circ$C.
+Uranium-235 is written ${}^{235}_{\phantom{0}92}\mathrm{U}$; it decays as
+${}^{235}_{\phantom{0}92}\mathrm{U} + {}^{1}_{0}\mathrm{n} \rightarrow {}^{141}_{\phantom{0}56}\mathrm{Ba} + {}^{92}_{36}\mathrm{Kr} + 3\,{}^{1}_{0}\mathrm{n}$.
+At equilibrium $\mathrm{N_2 + 3H_2 \rightleftharpoons 2NH_3}$, and heating gives
+$\mathrm{CaCO_3 \xrightarrow{\Delta} CaO + CO_2}$.
+
+\subsection*{6. Bra-ket notation}
+The expectation value is $\langle \psi | \hat{H} | \psi \rangle$ and the states are orthonormal:
+$\langle m | n \rangle = \delta_{mn}$, with $|\psi\rangle = \sum_n c_n |n\rangle$.
+\end{document}

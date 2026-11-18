@@ -32,6 +32,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/"): PUBLIC,
     ("GET", "/demo"): PUBLIC,
     ("GET", "/demo/listen"): PUBLIC,  # the stored demo's listening transcript; no user data
+    ("GET", "/demo/source.pdf"): PUBLIC,  # page 3 of the demo's OpenStax source, CC BY 4.0
     ("GET", "/style"): PUBLIC,
     ("GET", "/privacy"): PUBLIC,
     ("GET", "/terms"): PUBLIC,
@@ -45,7 +46,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/status"): PUBLIC,
     ("GET", "/healthz"): PUBLIC,
     ("GET", "/readyz"): PUBLIC,  # is the database reachable; no document data
-    ("GET", "/healthz/ops"): PUBLIC,  # names of stale scheduled tasks; no document data
+    ("GET", "/healthz/ops"): PUBLIC,  # the status word only
     # Crawler files and the static showcase (routes/discovery.py): no user data.
     ("GET", "/robots.txt"): PUBLIC,
     ("GET", "/sitemap.xml"): PUBLIC,
@@ -70,6 +71,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/logout"): PUBLIC,
     ("POST", "/internal/cron/aggregate-and-purge"): CRON,
     ("GET", "/admin"): ADMIN_ONLY,
+    ("GET", "/admin/health"): ADMIN_ONLY,  # stale task names, storage, sandbox probe
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
     ("POST", "/admin/users/block"): ADMIN_ONLY,  # open sign-up: stop an account
@@ -111,6 +113,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download.epub"): USER,  # W3: the same file as an EPUB
     ("GET", "/jobs/{job_id}/combine"): USER,  # T3-3: the finished parts of a source, joined
     ("GET", "/jobs/{job_id}/draft"): USER,
+    ("POST", "/jobs/{job_id}/draft"): USER,  # SW21: the draft page's confirm
     ("GET", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/contact"): USER,  # T1-17: CSRF, owner only, not rate limited
@@ -233,6 +236,10 @@ def site(tmp_path):
         )
         assert several.status_code == 303 and "/app/batch/" in several.headers["location"]
         result_id = several.headers["location"].rsplit("/", 1)[-1]
+        # The old address of that page still leads its owner to it.
+        assert alice.get(f"/app/upload/{result_id}").headers["location"] == (
+            f"/app/batch/{result_id}"
+        )
         env.ids = {
             "upload_id": upload_id,
             "result_id": result_id,

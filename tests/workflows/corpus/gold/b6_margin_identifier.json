@@ -1,0 +1,16 @@
+{
+ "id": "b6_margin_identifier",
+ "encoding": "text",
+ "pages": [
+  {"page": 1, "blocks": [
+   {"role": "heading", "text": "One page with a vertical margin identifier"},
+   {"role": "body", "text": "Paragraph 1 begins here. This sentence 1a explains one idea about cell biology in plain words. Sentence 1b continues the same idea with a second clause, so a reader can follow it. Sentence 1c ends paragraph 1."},
+   {"role": "body", "text": "Paragraph 2 begins here. This sentence 2a explains one idea about cell biology in plain words. Sentence 2b continues the same idea with a second clause, so a reader can follow it. Sentence 2c ends paragraph 2."},
+   {"role": "body", "text": "Paragraph 3 begins here. This sentence 3a explains one idea about cell biology in plain words. Sentence 3b continues the same idea with a second clause, so a reader can follow it. Sentence 3c ends paragraph 3."},
+   {"role": "body", "text": "Paragraph 4 begins here. This sentence 4a explains one idea about cell biology in plain words. Sentence 4b continues the same idea with a second clause, so a reader can follow it. Sentence 4c ends paragraph 4."},
+   {"role": "body", "text": "Paragraph 5 begins here. This sentence 5a explains one idea about cell biology in plain words. Sentence 5b continues the same idea with a second clause, so a reader can follow it. Sentence 5c ends paragraph 5."},
+   {"role": "body", "text": "Paragraph 6 begins here. This sentence 6a explains one idea about cell biology in plain words. Sentence 6b continues the same idea with a second clause, so a reader can follow it. Sentence 6c ends paragraph 6."},
+   {"role": "dropped", "text": "arXiv:2611.01234v2 [physics.ed-ph] 3 Nov 2026"}
+  ]}
+ ]
+}

@@ -21,6 +21,7 @@ from fixtures.web.support import (
     ALICE,
     PNG,
     WebEnv,
+    fetch,
     job_id_from,
     login,
     make_pdf,
@@ -28,6 +29,7 @@ from fixtures.web.support import (
     upload,
     with_file,
 )
+from readablestem.core import uid
 from readablestem.core.types import (
     Check,
     ConversionOutput,
@@ -382,6 +384,35 @@ def test_unknown_action_or_element(web):
     assert post(web, "bad id!", action="accept").status_code == 404
 
 
+def test_a_stored_result_keeps_its_decisions_and_answers_to_stable_ids(web):
+    """The stored result has today's shape (positional ids, no uid anywhere). Its decisions
+    stay on their elements, and a stable id in an address reaches the element it names:
+    p1-e3 and p1-e5 are identical (block equations with no text), told apart by order."""
+    post(web, "p1-e3", action="accept")
+    decided = result(web)
+    uids = uid.assign(decided)
+    first, second = uids.uid("p1-e3"), uids.uid("p1-e5")
+    assert first and second and first != second
+    assert uids.resolve(first) == "p1-e3" and uids.resolve("p1-e3") == "p1-e3"
+
+    assert post(web, second, action="reject").status_code == 303
+    after = result(web)
+    accepted, rejected = after.fix_for("p1-e3"), after.fix_for("p1-e5")
+    assert accepted is not None and accepted.status is Status.ACCEPTED and accepted.reviewed
+    assert rejected is not None and rejected.status is Status.REJECTED and rejected.reviewed
+    assert [e.element_id for e in edits(web)] == ["p1-e3", "p1-e5"]
+    assert uid.assign(after).by_id == uids.by_id  # a decision renames nothing
+
+    crop = web.browser.get(f"/jobs/{web.job_id}/crops/{second}.png")
+    assert crop.status_code == 200
+    assert crop.content == web.browser.get(f"/jobs/{web.job_id}/crops/p1-e5.png").content
+    # A stable id that names no element is not matched to the nearest one.
+    nothing = "u1-" + "0" * 16
+    assert post(web, nothing, action="accept").status_code == 404
+    assert web.browser.get(f"/jobs/{web.job_id}/crops/{nothing}.png").status_code == 404
+    assert result(web).fixes == after.fixes
+
+
 def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
     import logging
 
@@ -404,7 +435,7 @@ def test_a_failed_render_loses_no_decision_and_shows_no_content(web):
     with session_scope(web.ctx.factory) as session:
         assert session.scalar(select(func.count()).select_from(ReviewEdit)) == 1
     assert web.job(web.job_id).html_stale
-    failed = web.browser.get(f"/jobs/{web.job_id}/download")
+    failed = fetch(web.browser, f"/jobs/{web.job_id}/download")
     assert failed.status_code == 500 and "SECRET" not in failed.text
     assert web.job(web.job_id).html_stale  # nothing was half-written
     web.pipeline.render_raises = None
@@ -621,3 +652,80 @@ def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
     assert result(web).fix_for("p1-e4").reviewed  # type: ignore[union-attr]
     decided = card(review_page(web), "p1-e3")
     assert "Accepted by you" in decided
+
+
+# --------------------------------------------------------------------------- outcomes (WS8.23)
+
+
+def test_every_review_write_records_a_content_free_outcome(tmp_path):
+    """Each kind of review write records what the reviewer did (`decision_outcome`), in its
+    own transaction: kind, reason, outcome and write mode, summed net of Undo, with the
+    release of the job's output, and nothing typed or read from the document in any event."""
+    from fixtures.web.review_doc import review_output, review_pdf
+    from readablestem.web import events
+    from readablestem.web.db import Event, Job
+
+    env = WebEnv(tmp_path)
+    env.converter.output = review_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        job = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        env.browser, env.job_id = client, job
+
+        def send(path: str, **fields) -> None:
+            version = str(env.job(job).result_version or 0)
+            data = {"csrf_token": token(client, f"/jobs/{job}/review"), "version": version}
+            response = client.post(f"/jobs/{job}{path}", data=data | fields)
+            assert response.status_code == 303, (path, response.status_code)
+
+        typed = "SECRETTYPED"
+        writes = [
+            ("/review/p1-e2", {"action": "accept"}),  # one decision ...
+            ("/undo", {}),  # ... taken back ...
+            ("/review/p1-e2", {"action": "accept"}),  # ... and made again: counts once
+            ("/review/hg-p1-e3", {"action": "accept"}),  # a heading group, 3 headings
+            ("/accept/figures", {}),  # bulk accept
+            ("/review/p1-e2", {"action": "edit_anyway", "latex": typed}),  # decided, edited
+            ("/edit/p1-e4", {"action": "text", "text": f"{typed} words"}),  # page tools
+            ("/edit/p1-e4", {"action": "heading", "level": "2"}),
+            ("/pages/1/add", {"kind": "picture", "alt": f"{typed} drawn", "left": "10",
+                              "top": "55", "right": "50", "bottom": "70"}),
+            ("/pages/2/omit", {}),  # left out ...
+            ("/pages/2/restore", {}),  # ... and put back: nets to nothing
+        ]  # fmt: skip
+        for path, fields in writes:
+            send(path, **fields)
+        with session_scope(env.ctx.factory) as session:
+            sample = session.get(Job, job)
+            assert sample is not None
+            sample.is_sample = True
+        send("/review/hg-p1-e3", action="reject", scope="all")  # the sample: no row
+        with session_scope(env.ctx.factory) as session:
+            rows = list(session.scalars(select(Event)))
+            key = (Event.kind, Event.reason, Event.outcome, Event.write_mode)
+            sums = session.execute(
+                select(*key, func.sum(Event.value))
+                .where(Event.name == events.DECISION_OUTCOME)
+                .group_by(*key)
+            ).all()
+    standing = {(k, r, o, w): n for k, r, o, w, n in sums if n}
+    assert standing == {
+        ("equation", "style_mismatch", "kept", "single"): 1,
+        ("heading", "heading.repeated_label", "kept", "group"): 3,
+        ("figure", "below_accept", "kept", "group"): 1,
+        ("equation", "none", "edited", "single"): 1,  # accepted before: nobody asked
+        ("paragraph", "none", "edited", "structure"): 2,
+        ("figure", "none", "added", "structure"): 1,
+    }
+    outcomes = [e for e in rows if e.name == events.DECISION_OUTCOME]
+    assert {e.release for e in outcomes} == {"test"}  # the job output's pipeline_version
+    assert {(e.source, e.origin) for e in outcomes if e.reason == "none"} == {("browsing", "page")}
+    # Nothing typed and nothing from the document reaches any event, in any column.
+    words = [typed, "Teacher", "Vectors", "rigid", "omega", "car on a road", "Discuss"]
+    for event in rows:
+        for column in Event.__table__.columns:
+            held = getattr(event, column.name)
+            if isinstance(held, str):
+                assert not any(w.lower() in held.lower() for w in words), (column.name, held)

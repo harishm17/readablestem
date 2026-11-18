@@ -86,7 +86,7 @@ Reported for baseline and after, both scorers, as measured, including a fall.
   MathML, as in the development sections, where the primary was 0.13 and `exact_chem` 0.54 of
   the gold.
 - `exact_chem` is several times the primary score (at least 3 times).
-- After minus baseline is small: the fixes (labelled arrows set by TeX, two-part arrow labels,
+- After minus baseline is small: the fixes (labeled arrows set by TeX, two-part arrow labels,
   `\middle|` in cell notation) touch few equations; a difference of 0 to 4 equations on
   `exact_chem` is expected, and a fall of more than 2 equations would be a regression to explain.
 - Formulas in table cells (section 4-1 has 7 tables) stay undetected: tables are off.
@@ -131,18 +131,18 @@ Read by hand, the 12 "wrong reading" are not 12 wrong readings: 3 are glitches o
 (`Ca5(PO4)3OH` with the 3 after the bracket not lowered in the gold; `N` and `P` with an empty
 subscript in the gold's `NH4+` and `H2PO4-`), 1 is an excited-state star (`Co*`) the gold sets
 inline and the reading raises, 2 are the pairing taking another equation of the page (the cell
-notation paired with the "overall" line), 3 are spans that merged an equation with its neighbour
+notation paired with the "overall" line), 3 are spans that merged an equation with its neighbor
 and the equation numbers (4-2: the Fe/Cr half-reactions; 15-1: a line of the solubility
 calculation; the last also has a `14 H+` the gold lacks, not checked against the page), 2 are
 spans cut to `10^-5` (15-1: `x = ...` calculations) and 1 is `CrO4^2-` read as `PbCrO4` (a
-neighbouring word in the span). None is changed in the gold (the set is registered; the list is the evidence if the gold is ever
+neighboring word in the span). None is changed in the gold (the set is registered; the list is the evidence if the gold is ever
 corrected).
 
 What the held-out run adds to the development result: the same shape. The primary is a poor
 instrument for chemistry (13.5% against 56.0% chemically right); of the equations the system found
 83% are right; what is missing is detection: 121 of 377 (32%) are not found, 66 of them (17.5%) are
 a lone `×` the gold counts as an equation, 39 are formulas in table cells (tables off), 16 are
-neighbours merged into one prediction. The fixes of this branch matter little on these sections (3
+neighbors merged into one prediction. The fixes of this branch matter little on these sections (3
 equations); they are for the forms the sections do not have (TeX arrows with labels).
 
 Not done: the chatbot arms on these sections (the dev script refuses sections outside the

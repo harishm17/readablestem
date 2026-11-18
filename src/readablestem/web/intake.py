@@ -4,8 +4,8 @@ job row, in one transaction (shared by the upload route and the page chooser for
 The caps are the launch audit's (docs/security.md), and they live here so no route that
 makes jobs can skip them:
 
-- `MAX_ACTIVE_JOBS_PER_USER` (the open tier's; `access.files_per_upload`: 30 for invited
-  people): documents waiting or being converted. A person with a full
+- `access.files_per_upload` (10 for the open tier, 30 for invited people): documents
+  waiting or being converted. A person with a full
   queue would hold everyone else back.
 - `MAX_LIVE_JOBS_PER_USER`: documents kept (finished or not) until their deletion time. A
   person with hundreds of kept files would fill the database. The sample document
@@ -33,9 +33,8 @@ from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from readablestem.web.quota import pages_left, try_consume_pages
 
-# Per person, on top of the daily page count: documents waiting or being converted, and
-# documents kept (finished or not, until their deletion time).
-MAX_ACTIVE_JOBS_PER_USER = 10
+# Per person, on top of the daily page count: documents kept (finished or not, until their
+# deletion time). Documents waiting or being converted are capped by `access.files_per_upload`.
 MAX_LIVE_JOBS_PER_USER = 40
 
 
@@ -54,7 +53,7 @@ def live_job_count(session: Session, user_id: str, now: datetime, *, excluding: 
 
 
 def active_job_count(session: Session, user_id: str, *, excluding: str = "") -> int:
-    """The documents waiting or being converted (what `MAX_ACTIVE_JOBS_PER_USER` caps)."""
+    """The documents waiting or being converted (what `access.files_per_upload` caps)."""
     query = (
         select(func.count())
         .select_from(Job)

@@ -199,6 +199,43 @@ def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
     assert response.headers["content-security-policy"] == VIEW_CSP
 
 
+def test_a_production_server_does_not_answer_builder_pages_or_serve_stored_data(tmp_path):
+    """F-180, F-187: /style and the dev sign-in are 404 in production, and the demo's files
+    are reachable only through their routes, never under /static."""
+    from fastapi.testclient import TestClient
+
+    from fixtures.web.support import make_settings
+    from readablestem.web import dev_only
+    from readablestem.web.app import create_app
+
+    with WebEnv(tmp_path / "dev").running() as dev:
+        assert dev.get("/style").status_code == 200  # the screenshot and axe checks use it
+
+    settings = make_settings(
+        tmp_path,
+        env="prod",
+        dev_login_enabled=False,
+        database_url="postgresql+psycopg://u:p@127.0.0.1:1/never",
+        base_url="https://beta.example.org",
+        session_secret="s" * 40,
+        google_client_id="client-id",
+        google_client_secret="client-secret",
+        openai_api_key="sk-test",
+    )
+    stored = sorted(p.name for p in (WEB / "demo").iterdir())
+    assert stored, "the demo folder holds the stored demo"
+    # No lifespan: nothing here connects to the database.
+    client = TestClient(create_app(settings), follow_redirects=False)
+    for path in dev_only.DEV_PATHS:
+        assert client.get(path).status_code == 404, path
+    for name in stored:
+        for path in (f"/static/demo/{name}", f"/static/{name}"):
+            assert client.get(path).status_code == 404, path
+    demo = client.get("/demo")
+    assert demo.status_code == 200 and demo.headers["content-security-policy"] == VIEW_CSP
+    assert client.get("/demo/source.pdf").headers["content-type"] == "application/pdf"
+
+
 def test_job_page_works_without_javascript(pages):
     queued = pages["/jobs/{id} queued"]
     assert "http-equiv" not in queued  # reloading is opt-in (WCAG 2.2.1)

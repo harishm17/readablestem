@@ -62,7 +62,7 @@ from readablestem.pipeline import html_checks, run
 from readablestem.proof import goldinfo
 from readablestem.proof.bundle import Bundle, BundleWriter, run_stem
 from readablestem.proof.errors import BundleError, Incomplete, ProofError, ReplayMiss
-from readablestem.proof.registry import ProofSet, sha256_file
+from readablestem.proof.registry import ProofSet
 from readablestem.proof.replay import (
     AnswerSet,
     AnswerStore,
@@ -897,18 +897,4 @@ def compare_with_recorded(bundle: Bundle, results: ArmResults) -> list[str]:
         recorded = comparable(bundle.report(outcome.task, outcome.repeat))
         replayed = comparable(outcome.report)
         _walk(recorded, replayed, stem, problems)
-    return problems
-
-
-def pdf_hashes(bundle: Bundle) -> dict[str, str]:
-    return {e["section"]: e["sha256"] for e in bundle.pdfs}
-
-
-def verify_pdf_files(bundle: Bundle) -> list[str]:
-    """The PDFs against the hashes in the manifest (the files' own check is `verify`)."""
-    problems = []
-    for entry in bundle.pdfs:
-        path = bundle.path(entry["file"])
-        if not path.is_file() or sha256_file(path) != entry["sha256"]:
-            problems.append(f"{entry['section']}: PDF does not match its recorded hash")
     return problems

@@ -294,28 +294,6 @@ def coverage_counts(
 # ---------------------------------------------------------------------------- figures
 
 
-@dataclass
-class FigureOutcome:
-    figure_id: str
-    outcome: str  # "judged" | "no_description" | "judge_failed"
-    passed: bool | None = None
-    factual_error: bool | None = None
-    source: str | None = None
-    cost_usd: float = 0.0
-    prompt_version: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "figure_id": self.figure_id,
-            "outcome": self.outcome,
-            "passed": self.passed,
-            "factual_error": self.factual_error,
-            "source": self.source,
-            "cost_usd": self.cost_usd,
-            "prompt_version": self.prompt_version,
-        }
-
-
 def figure_outcomes(meta: dict[str, Any], gold: SectionGold) -> list[dict[str, Any]]:
     """One row per gold figure that has an OpenStax alt (the judge's reference), from the
     verdicts recorded with the output; a figure with no row is a figure with no

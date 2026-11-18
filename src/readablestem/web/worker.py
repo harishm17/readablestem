@@ -12,11 +12,11 @@ queue is safe with several workers or instances:
   ahead of everyone else's work after each restart. Jobs of someone removed from the
   allowlist are never claimed (removal also stops the ones already queued or running;
   see `web.auth.set_allowed`).
-- While less than one model call's worth (`spend.largest_reservation_usd`) is left under
-  the daily cap, nothing is claimed: queued jobs wait for the next UTC day instead of
-  running into a document with every element "not converted". The same for the open-tier
-  pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`, `web.spend`) and the jobs of open-tier accounts
-  (`web.access`): they wait for the next day while the pool is spent, and the jobs of
+- While less than one model call's worth (`spend.conversion_headroom_usd`; none in offline
+  replay) is left under the daily cap, nothing is claimed: queued jobs wait for the next UTC
+  day instead of running into a document with every element "not converted". The same for
+  the open-tier pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`, `web.spend`) and the jobs of open-tier
+  accounts (`web.access`): they wait for the next day while the pool is spent, and the jobs of
   invited people are claimed as before. A job of an open-tier account reserves in the
   pool as well as under the daily cap (`_start_attempt`).
 - The conversion runs on its own thread. The worker thread waits for it and extends the
@@ -97,9 +97,16 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
-from readablestem.core.types import ConversionOutput, DocumentResult, ProgressEvent
+from readablestem.core.types import (
+    ConversionOutput,
+    DocumentResult,
+    ProgressEvent,
+    StageFact,
+    StepFacts,
+)
 from readablestem.ops import limits
-from readablestem.web import access, carry_edits, events
+from readablestem.pipeline import step_facts as pipeline_step_facts
+from readablestem.web import access, carry_edits, events, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
@@ -108,7 +115,7 @@ from readablestem.web.fair_queue import claim_order_by
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
-from readablestem.web.spend import DbSpendGuard, largest_reservation_usd
+from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
 from readablestem.web.step_cache import DbStepCache
 from readablestem.web.step_cache import forget as forget_steps
 
@@ -159,7 +166,7 @@ SCANNED_PAGES = "scanned_pages"  # before page types: some pages were only scann
 PAGES_NOT_CONVERTED = "pages_not_converted"
 # Fix reasons of what the pipeline kept as an image before any model work.
 KEPT_IMAGE_REASONS = frozenset(
-    {"scanned_page", "handwritten_page", "unread_page", "handwriting_on_page"}
+    {"scanned_page", "handwritten_page", "unread_page", "page_read_failed", "handwriting_on_page"}
 )
 # Live progress is written to the job row at most this often (seconds), apart from a
 # stage seen for the first time or just finished (`Worker._stage_progress`). The job page
@@ -207,7 +214,8 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
 
     With MODEL_ANSWERS_FILE (dev and test only) the real client sits behind the file of
     recorded answers: a recorded request is answered from it at no cost, any other is asked
-    and appended (or, with MODEL_ANSWERS_OFFLINE, refused). Conversions and review-screen
+    and appended (or, with MODEL_ANSWERS_OFFLINE or past MODEL_ANSWERS_LIVE_USD, refused).
+    Conversions and review-screen
     re-reads both come through here, so both are recorded.
     """
     from readablestem import models
@@ -216,10 +224,18 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
     client = make_vision_client(settings, budget, fake=settings.fake_models)
     if settings.model_answers_file is None or settings.fake_models:
         return client
-    from readablestem.eval.answers import CachedClient
+    from readablestem.eval.answers import CachedClient, keep_second_check_answers
 
-    inner = None if settings.model_answers_offline else client
-    return CachedClient(inner, settings.model_answers_file, settings)
+    offline = settings.model_answers_offline
+    cached = CachedClient(
+        None if offline else client,
+        settings.model_answers_file,
+        settings,
+        rekey=settings.model_answers_rekey,
+        live_limit_usd=settings.model_answers_live_usd,
+    )
+    keep_second_check_answers(client, cached, offline=offline)
+    return cached
 
 
 def error_code_for(exc: BaseException) -> str:
@@ -399,6 +415,11 @@ class _Attempt:
     cancelled: threading.Event = field(default_factory=threading.Event)
     # The finished steps kept for this job (T3-1); None for a converter that takes none.
     step_cache: DbStepCache | None = None
+    # When the attempt began and when its conversion ended (`time.monotonic`), and the
+    # step facts stored with its result (`Worker._facts`).
+    began: float | None = None
+    converted: float | None = None
+    facts: StepFacts | None = None
 
 
 @dataclass
@@ -454,7 +475,7 @@ class Worker:
         self.timeout_grace_s = timeout_grace_s
         # Less than this left under the daily cap: claim nothing (see the module docstring).
         self.headroom_usd = (
-            largest_reservation_usd(settings) if headroom_usd is None else headroom_usd
+            conversion_headroom_usd(settings) if headroom_usd is None else headroom_usd
         )
         self.tracer = tracer  # None: the converter's own default (no tracing)
         # The dearest reservation any enabled step can hold (steps' own sizes, the optional
@@ -544,6 +565,7 @@ class Worker:
             "lease_until": self._lease_until(now),
             "attempts": Job.attempts + 1,
             "error_code": None,
+            "error_detail": None,
         }
         owners = [User.is_allowed.is_(True)]
         if self.open_pool_closed():  # open-tier jobs wait for the next day; others go on
@@ -597,10 +619,6 @@ class Worker:
             Job.status == JobStatus.RUNNING,
             Job.attempts == claim.attempt,
         )
-
-    def owns(self, claim: Claim) -> bool:
-        with session_scope(self.factory) as session:
-            return session.scalar(select(Job.id).where(*self._owned(claim))) is not None
 
     def extend_lease(self, claim: Claim, *, pages_done: int | None = None) -> bool:
         """Push the lease forward, recording progress. False once this worker no longer
@@ -997,6 +1015,7 @@ class Worker:
         limit_s = self.time_limit_s(page_count)
         thread, run = self._start_conversion(attempt, pdf, limit_s)
         finished = self._wait(attempt, thread, limit_s)
+        attempt.began, attempt.converted = started, time.monotonic()
         if not finished and not attempt.cancelled.is_set():
             return self._time_out(attempt, thread, limit_s)
         if attempt.cancelled.is_set():  # deleted, purged or requeued: nothing to record
@@ -1008,18 +1027,23 @@ class Worker:
             exc = run.error or RuntimeError("conversion ended without a result")
             code = error_code_for(exc)
             log_exception(logger, "job_failed", exc, job_id=claim.job_id, error_code=code)
-            return self._finish_failed(attempt, code)
+            detail = exc.detail if isinstance(exc, ConversionFailed) else None
+            return self._finish_failed(attempt, code, detail)
         status, code = result_outcome(run.output.result)
         if status == JobStatus.FAILED:
             log_event(logger, "job_failed", job_id=claim.job_id, error_code=code)
             return self._finish_failed(attempt, code or "internal_error")
         return self._store(attempt, run.output, time.monotonic() - started)
 
-    def _finish_failed(self, attempt: _Attempt, code: str) -> str:
-        """Mark the job FAILED if this worker still owns it; "discarded" if not."""
+    def _finish_failed(
+        self, attempt: _Attempt, code: str, detail: dict[str, Any] | None = None
+    ) -> str:
+        """Mark the job FAILED if this worker still owns it; "discarded" if not. `detail`:
+        the names that stopped a source (`Job.error_detail`)."""
         values: dict[str, object] = {
             "status": JobStatus.FAILED,
             "error_code": code,
+            "error_detail": detail,
             "finished_at": self.clock(),
             "lease_until": None,
         }
@@ -1062,6 +1086,8 @@ class Worker:
             cost_usd=round(result.stats.cost_usd, 6),
             seconds=round(seconds, 2),
         )
+        if attempt.facts is not None:
+            step_facts.log_job(job_id, result.stats.pages, attempt.facts)
         reading = result.image_pages.second_reader if result.image_pages is not None else None
         if reading is not None:
             # The conversion child's own logs do not reach the operator: its counts come back
@@ -1084,6 +1110,31 @@ class Worker:
                 cost_usd=reading.cost_usd,
             )
         return JobStatus.DONE
+
+    def _facts(self, attempt: _Attempt, job: Job, output: ConversionOutput) -> StepFacts | None:
+        """The conversion's step facts with the worker's own stages around them, or None
+        for a conversion that measured nothing (a stand-in converter).
+
+        `queue_wait` is the time from the upload to the first claim; a later try has none,
+        because the row does not say when it was asked for. `start_up` is what the
+        conversion call took outside the conversion's own stages: starting its process,
+        loading it, and passing the file in and the result back. `store` is from the end
+        of the conversion to this write."""
+        if output.facts is None:
+            return None
+        before: list[StageFact] = []
+        started, created = as_utc(job.started_at), as_utc(job.created_at)
+        if attempt.claim.attempt == 1 and started is not None and created is not None:
+            waited = (started - created).total_seconds()
+            before.append(StageFact(stage="queue_wait", seconds=round(max(0.0, waited), 4)))
+        after: list[StageFact] = []
+        if attempt.began is not None and attempt.converted is not None:
+            before.append(
+                pipeline_step_facts.start_up(output.facts, attempt.converted - attempt.began)
+            )
+            stored = time.monotonic() - attempt.converted
+            after.append(StageFact(stage="store", seconds=round(stored, 4)))
+        return output.facts.model_copy(update={"stages": [*before, *output.facts.stages, *after]})
 
     def _write_result_retrying(self, attempt: _Attempt, output: ConversionOutput) -> bool:
         try:
@@ -1143,6 +1194,9 @@ class Worker:
             job.pages_done = job.page_count
             job.status = JobStatus.DONE
             job.error_code = code
+            attempt.facts = self._facts(attempt, job, output)
+            if attempt.facts is not None:
+                step_facts.keep(session, job.id, attempt.facts)
             job.finished_at = self.clock()
             job.lease_until = None
             # Finished steps are only kept for a result that "Try again" can still improve.
@@ -1476,18 +1530,3 @@ class Worker:
         if self._thread is not None:
             self._thread.join(timeout=timeout)
         log_event(logger, "worker_stopped")
-
-
-def process_next_job(
-    settings: Settings,
-    factory: sessionmaker[Session],
-    *,
-    converter: Converter,
-    client_factory: ClientFactory,
-    guard: SpendGuard | None = None,
-) -> str | None:
-    """Process one queued job synchronously (tests, scripts). Returns its id or None."""
-    worker = Worker(
-        settings, factory, converter=converter, client_factory=client_factory, guard=guard
-    )
-    return worker.run_once()

@@ -15,7 +15,7 @@ cover.
 | Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
 | Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to a `.part` file, checked (gzip, completion line, restore into a scratch database, every table and the schema version present), then moved into the `/backups` volume; dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`, or `backup_failed reason=...` and exit 1. Records the `backup` heartbeat. See "Backups and restore" |
-| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes, and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
+| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes (which one is late is on the admin page, `/admin`), and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
 | Deploy health check of `/healthz` | On every deploy, Railway | A new deployment takes traffic only once `/healthz` answers (timeout 300 s) |
 | Outside-in check of `/readyz` | Every 5 minutes, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set; a failed run is emailed by GitHub. This is the only check of `/readyz` |
 | Outside-in check of `/healthz/ops` and `/demo` | Every 3 hours, GitHub Actions `uptime.yml` | Same variable and the same email. GitHub turns scheduled workflows off after 60 days with no commit to a public repository ("Health, readiness and shutdown") |
@@ -44,11 +44,12 @@ so `/healthz/ops` goes stale 150 minutes after the last good one.
 ## Retention
 
 Each job gets `retain_until` when it is uploaded: `RETENTION_HOURS` (24) later, 7 days later when
-the instructor ticked "Keep for 7 days" (or has it as their default on the Account page,
+the instructor checked "Keep for 7 days" (or has it as their default on the Account page,
 `users.keep_week_default`), or `OPT_IN_RETENTION_DAYS` (30) when they opted in. The hourly purge deletes every
 job past that time together with everything derived from the document: the uploaded PDF,
-the crops, the result JSON, the HTML, the filename and the review edits. It deletes the
-child rows itself and does not rely on the database cascade alone.
+the crops, the result JSON, the HTML, the filename, the review edits and the step facts
+("Step facts and the step report"). It deletes the child rows itself and does not rely on
+the database cascade alone.
 
 Every deletion goes through `ops.retention.delete_jobs(session, job_ids)`: the hourly
 purge, and the web app's "delete now" (`POST /jobs/{job_id}/delete` must call
@@ -86,8 +87,8 @@ person), which were 20 and 30 before 2026-11-03. The database is on a 5000 MB vo
   alone is not enough (100 x 250 MB is 25 GB): the global one is the bound.
 - **Whole service**: `STORAGE_GLOBAL_MAX_MB` (2000) of stored upload bytes. Over it new
   uploads get a 503 page ("Uploads are paused while storage catches up", logged as
-  `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 with `"stale": ["storage"]`
-  and `"storage": {"stored_mb", "limit_mb", "full"}`, which the GitHub uptime job reads. Why
+  `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 (`/admin/health` names `"stale": ["storage"]`
+  and gives `"storage": {"stored_mb", "limit_mb", "full"}`); the GitHub uptime job reads the status code. Why
   2000 and not 60% of the volume: the daily backup restores its dump into a second database on
   the same volume (`restore_check`), so the volume holds about twice the data for those minutes.
   Raise it only with the volume (`allowOnlineResize` is on), and set the three variables in the
@@ -132,7 +133,8 @@ hourly purge deletes it (`ops.retention.purge_upload_results`, logged as `result
 ### Usage events
 
 `events` (`web/events.py`, docs/web.md "Usage events") holds content-free, pseudonymous
-usage events: a user id, an event name, a job id, a category code and a number. They
+usage events: a user id, an event name, a job id, a category code and a number (a
+`decision_outcome` row has eight short codes from closed lists in place of the code). They
 outlive the jobs they mention on purpose (the beta's measures span weeks, and the
 deleted-document page uses them to tell an owner what happened), but not for ever:
 
@@ -150,6 +152,90 @@ deleted-document page uses them to tell an owner what happened), but not for eve
 The upload fingerprint in `uploaded` events is keyed with `SESSION_SECRET`: rotating the
 secret makes the next upload of a file look new (a missed `reuploaded`, nothing else).
 `/admin` shows the counts per day and per pseudonymous person.
+
+### Step facts and the step report
+
+When a job ends `done`, the worker keeps what it took of the models and of the clock
+(`web/step_facts.py`), in the transaction that stores the result:
+
+- `job_calls` has one row for each request the job sent to a model: the step, the page,
+  the model, the tokens (input, input read from the provider's prompt cache, input written
+  to it, output, reasoning), the dollars, the seconds the request took, which try it was,
+  whether the fallback model answered and how it ended. The second check of an answer and
+  the second reading of an image page are rows with `counted` false: they cost money and
+  are not in `jobs.model_calls`.
+- `job_stages` has the wall seconds of each stage of the job, in order: `queue_wait`,
+  `start_up`, the stages of the conversion (`layout`, `page_math`, `page_witness`,
+  `image_pages`, `steps`, `second_readings`, `assemble`, `checks`; a LaTeX source has
+  `source` in place of the first four) and `store`.
+- `job_not_finished` has one row for each step that stopped before it had done all of its
+  work: the step, the page (empty for a step over the whole document), a reason code and
+  how many units of its work were done out of how many there were. The reasons are
+  `work_budget` (it did the count of work it is allowed, the same on every machine),
+  `time_limit` (a clock stopped it, so another machine may have got further),
+  `memory_limit` and `cap_reached` (the job's limit on dollars or on model calls). Written
+  today: `equation`, `table` and `figure` when the job's limit stopped the steps (elements
+  done of elements); `image_page`, one row for each page the limit kept from being read;
+  `second_reader`, when its time ran out (`time_limit`) or its own dollar share was spent
+  (`cap_reached`), with the equations read of those it could have read; `page_type`, one
+  row for each page that was typed without its ink because the document's time for the ink
+  analysis had run out (`time_limit`; such a page may be handwriting that was not seen as
+  handwriting); `ink_strokes`, when the same time ran out while the strokes of handwritten
+  pages were read for their pictures (pages read of pages).
+  `web.step_facts.not_finished(session, job_id)` is the one place a page or a count reads
+  them, and each is also a `job_not_finished` log line.
+
+All three hold codes, counts, seconds and dollars only: no text of the document, no file
+name and no user id. They are replaced when the job is converted again and deleted with the
+job. A job that failed keeps none.
+
+There are two kinds of seconds, and they do not add up to each other:
+
+- **Stage seconds** divide the job's wall time, from the worker taking it to the result
+  being stored. They add up to that time. `queue_wait` is the wait before it and is outside
+  the sum. `start_up` is the part of the conversion call that is outside the conversion's
+  own stages: starting the conversion process, loading its code, and passing the file in
+  and the result out.
+- **Call seconds** are how long each request to a model took. The `steps` stage sends
+  several requests at once, so the call seconds of a job add up to more than its `steps`
+  stage. When answers come from a recording (the workflow tests), the call seconds are
+  the ones the recording was made with, and the stage seconds are those of the replay.
+
+The rows are the calls of the conversion that was stored. An answer reused from an earlier
+try of the same job (`step_records`) keeps the figures of the request that made it. Money
+spent by a try that did not finish and whose answers were not reused is on `jobs.cost_usd`
+only, so the settled dollars can be more than the steps' dollars, and the report prints
+the difference.
+
+`readablestem ops step-report` prints the report (`ops/step_report.py`) over the jobs
+finished in the last 7 days (`--days N`), the newest `--last N` of them, or the jobs named
+with `--job ID` (repeatable); `--json` gives the same figures as JSON. The sample document
+is never counted. It prints:
+
+- by step and model: calls, failed calls, calls a page, input, cached input and output
+  tokens a page, the share of input read from the prompt cache, the p50 and p95 seconds
+  of one call, the p99 dollars of one call and the dollars a page;
+- by stage: the p50 and p95 seconds of a job and of a page, and the stage's share of the
+  wall time of the jobs that have it;
+- in all: dollars and calls beside what the job rows settled, the cache share, and the p50
+  and p95 seconds a page.
+
+A percentile is the nearest rank, so with few jobs the p95 is the largest value. A page is
+a page of a job (`jobs.page_count`), whether or not the step ran on it. The admin page
+shows the totals for the newest 50 documents of the last 7 days under "Model work of
+recent documents".
+
+The same facts go to the log when the job is stored: one `job_steps` line for each step
+and model (`calls`, `failed`, `input_tokens`, `cached_input_tokens`, `output_tokens`,
+`cache_read`, `call_s_p50`, `call_s_p95`, `cost_usd`), one `job_stages` line with
+`pages` and a `<stage>_s` field for each stage, and one `job_not_finished` line for each
+step that stopped early (`step`, `page`, `reason`, `done`, `of`).
+
+A step that runs in shadow (docs/steps.md, "Running a new step in shadow") adds one
+`job_shadow` line a job: its `step`, and how often it said the `same` as the answer the
+conversion kept, how often it `differs`, and how often it `failed`. These counts are in
+the log only, not in a table: they are read over many jobs. A step with many `failed` is
+broken or out of money; it has changed no document.
 
 ## Error aggregates
 
@@ -179,7 +265,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
 | `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`, `error:handwritten`; on done jobs the outcome code (`error:budget_daily`, `error:pages_not_converted`; `error:scanned_pages` before page types) |
-| `page` | `page_type:<kind>` | analysed pages of a job by page type (`born_digital`, `handwritten_ocr`, `scan_ocr`, ...; `pipeline.page_type`, docs/layout.md "Hidden text and page types"): the signal for whether handwriting and scans are common enough to matter |
+| `page` | `page_type:<kind>` | analyzed pages of a job by page type (`born_digital`, `handwritten_ocr`, `scan_ocr`, ...; `pipeline.page_type`, docs/layout.md "Hidden text and page types"): the signal for whether handwriting and scans are common enough to matter |
 | `page` | `page_type_reason:<code>` | their content-free reason codes (`invisible_text`, `text_covered`, `ocr_font`, `ink_writing`, `hidden_ratio`, `text_not_covering_content`, `ink_not_analysed`, `drawings_over_cap`, ...) |
 | `job` | `pages` | pages of done jobs (a sum, not a count of jobs) |
 | `job` | `cost_microusd` | model spend of done jobs in millionths of a dollar (a sum): `sum(cost_microusd) / sum(pages) / 1e6` is the production cost per page |
@@ -270,6 +356,7 @@ Useful filters for the service's **Logs** panel or `railway logs --service web -
 | Anything wrong? | `@severity:WARNING OR @severity:ERROR` |
 | Server errors | `@message:request AND @status:>=500` |
 | Slow pages | `@message:request AND @latency_ms:>5000` |
+| What a job took of the models and the clock ("Step facts and the step report") | `@message:job_steps OR @message:job_stages OR @message:job_not_finished OR @message:job_shadow` (add `AND @job_id:...` for one job) |
 | Hourly cleanup (cron service) | `@message:aggregate_done OR @message:purge_done OR @message:aggregate_failed OR @message:aggregate_on_delete_failed` |
 | Tracing problems | `@message:tracing_disabled OR @message:trace_failed` |
 | Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `@message:upload_rejected AND (@code:handwritten OR @code:handwritten_no_text OR @code:scanned OR @code:scanned_ocr)` |
@@ -338,8 +425,8 @@ is the event name alone and the fields become top-level keys, so
 
 ## Decisions canary
 
-This applies to the OpenAI provider only (the Decisions API is OpenAI's); production runs
-Anthropic, so nothing here runs there. The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
+This applies to the OpenAI provider only (the Decisions API is OpenAI's); with production's
+provider (`MODEL_PROVIDER` in `src/readablestem/ops/production.profile.toml`) set to Anthropic, nothing here runs there. The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
 probabilities with fixed thresholds. Those thresholds mean nothing once the answers
 under them move, and the API is in beta: one model, no version pinning. Its answers are
 deterministic, so a fixed set of requests answered differently on one day is a change
@@ -375,7 +462,7 @@ of the model or the service, seen the day it happens.
   question wording, new canary cases) or a drift you have looked at and accept:
   `... ops decisions-canary --max-usd 0.02 --record`, review the diff of
   `canary_expected.json`, commit it with the change, and re-check the thresholds on
-  labelled data (docs/eval.md).
+  labeled data (docs/eval.md).
 
 No alert is wired to the drift line (the log-based alert policies in `deploy/deploy.sh` are
 the Cloud Run path only). To get one on Railway, run the canary somewhere that can mail
@@ -387,7 +474,8 @@ failures, for example the weekly GitHub workflow.
 |---|---|---|
 | `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Railway's deploy health check (`.railway/railway.ts`); the Dockerfile's HEALTHCHECK for local Docker |
 | `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | GitHub `uptime.yml` every 5 minutes; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
-| `GET /healthz/ops` | 200 `{"status":"ok","stale":[]}`, or 503 `{"status":"stale","stale":["backup"]}` naming only the tasks that are late (`database` if the table could not be read) | GitHub `uptime.yml` every 3 hours; you, with `curl` |
+| `GET /healthz/ops` | 200 `{"status":"ok"}`, or 503 `{"status":"stale"}`: the status word and nothing else, so it says no task, setting or number to someone who is not signed in | GitHub `uptime.yml` every 3 hours, which reads the status code; you, with `curl` |
+| `GET /admin/health` | Admin only. The same status code with the detail: `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}`; `stale` names only the tasks that are late (`database` if the table could not be read, `storage` while full). The admin page shows the same under "Scheduled tasks, storage and sandbox" | you, signed in as an admin |
 
 `/readyz` has three checks, each one word and never a setting's value (so no key, URL or
 model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
@@ -410,7 +498,7 @@ own (a read of two rows), and it is not in the access log (`logging._QUIET_ROUTE
 `uptime.yml` (not necessarily the repository owner; Settings > Notifications > Actions, for that
 account). Whoever should get the mail should be the one who commits any change to those lines. Every 5 minutes one job calls `/readyz` (with two retries), so an outage
 is mailed within about ten minutes, then once per failed run until it is fixed. Every 3 hours a
-second job calls `/healthz/ops` and `/demo` and prints the 503 body, which names the stale task;
+second job calls `/healthz/ops` and `/demo` and fails on a 503 (the admin page and `/admin/health` name the stale task);
 three hours keeps a late backup or cron to a few mails a day instead of one per five minutes, and
 finds a missed cron within five hours and a missed backup within 29. Two limits to know:
 
@@ -456,6 +544,8 @@ hangs instead of failing, and the job ends as `timeout`. What to look for:
 | `job_failed error_code=conversion_crashed`, preceded by `conversion_child_died signal=6` (abort), `11` (segfault) or `exit_code=N` | MuPDF or another native library killed the child. That file will do it again: nothing to retry (the job page does not offer "Try again"). Keep the document id; reproduce with `readablestem convert` on a copy only if the owner agrees |
 | `error_code=conversion_oom` (after `conversion_child_retry` when it was `signal=9`) | The child ran out of memory (its cap), or was SIGKILLed from outside twice. Raise `CONVERSION_MEMORY_MB` only if documents that should fit are failing; a single large file is better split |
 | `error_code=conversion_unavailable`, `conversion_child_unavailable` (ERROR, with `error_type` or `exit_code`), `conversion_child_check_failed` at start | The child itself cannot run (an import, a library, the table model file at `TABLE_MODEL_DIR`), not the PDF. Every job fails this way until it is fixed; the job page offers "Try again". Check the image and the volume, then redeploy |
+| `error_code=conversion_unavailable` with `conversion_child_link_failed` (ERROR, `error_type`) | The child could not read a message this process sent it (`error_type` is the exception's class, for example `UnpicklingError`): the two processes disagree, which is the deployment's fault and not the PDF's. The job page offers "Try again". If it repeats, the worker and the child are running different code: redeploy |
+| `conversion_child_read_failed` (WARNING, `error_type`, `errno`) | The socket to the child failed while this process was reading it. `errno=104` (connection reset) next to `conversion_child_died` is a child that ended before it had read its input; the line after it says how the job ended |
 | `conversion_child_retry` | The child was killed by a SIGKILL this process did not send; the conversion was run once more. `cgroup_oom_kills` on `conversion_child_died` says whether the kernel's OOM killer did it (cgroup v2). Frequent ones mean the service is short of memory: raise its allowance, not `CONVERSION_MEMORY_MB` |
 | `conversion_child_frame_refused` | The child's result was over 128 MB: the job fails `conversion_crashed` |
 | `conversion_child_timeout` | The converter's own backstop fired (the worker's limit normally does first: `job_timeout`, `error_code=timeout`). `conversion_child_died signal=24` is the CPU limit |
@@ -671,7 +761,7 @@ itself, in the background, when it starts and LaTeXML is in the image
 (`web/sandbox_status.py`; `SANDBOX_PROBE_AT_STARTUP`, default on, `SANDBOX_PROBE_TIMEOUT_S`, default
 240). It is the same probe with `--require-latexml`. It logs one line, `sandbox_probe result=PASS|FAIL
 <check>=<value> ...` (the probe's own check names and one-word answers, nothing else), and
-`/healthz/ops` shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
+`/admin/health` (admin only) shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
 `not_installed` or `not_run`), `result`, `checks`, `bound_mb`, `cgroup`, `seccomp`, `checked_at`.
 Neither start-up nor `/healthz` waits for it. In production (2026-11-04) the probe reports PASS on the Landlock backend, and
 `FEATURE_LATEX_SOURCE` is on; `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off by choice, until real
@@ -732,9 +822,9 @@ Nothing it prints is document content.
 
 | Job | What it checks |
 |---|---|
-| `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, and an import of every module |
+| `static` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `scripts/dead_code.py` (no function, class, method or property of the package without a caller), and an import of every module |
 | `pytest` (shards) | `pytest -n auto --shard i/4` (offline, parallel; Postgres tests use the embedded server on 3.12). 3.12 always; 3.14 in full on main, nightly and dependency or workflow changes, otherwise one smoke shard. Rules and sharding: [development.md](development.md), "CI" |
-| `shard-coverage` | Every collected test ran in exactly one shard |
+| `shard-coverage` | Every collected test ran in exactly one shard, and every route of the app gave some test its own answer (not only a refusal) |
 | `ci-passed` | Fails if any other job failed or was cancelled; the one check to require in branch protection |
 | `postgres` | `alembic upgrade head` and `alembic check` (models match migrations), then `pytest -m postgres`, against a Postgres 18 service container (the major the backup image uses). Zero collected tests fails the job |
 | `browser` | `pytest -m browser -n 3 --dist loadfile --shard i/2` (two jobs) with Playwright Chromium (axe-core checks); the browsers and axe-core are cached; zero collected tests fails the job |

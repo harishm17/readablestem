@@ -45,7 +45,9 @@ Untrusted input: MuPDF is C code parsing bytes from the internet, and some damag
 make it abort the whole process (a glibc double free while rendering). Before a page is
 extracted or rendered in this process, `analyze` and `crop` have a child process do the
 same once (`_probe_pages`); a child that dies or hangs makes the file
-`LayoutError("unreadable")`.
+`LayoutError("unreadable")`. Before that, `analyze` counts how far the selected pages'
+drawing instructions inflate and refuses them over the content budget
+(`core.content_budget`, `LayoutError("content_too_large")`), since every step parses them.
 MuPDF's own error and warning printing is switched off: it quotes content-stream tokens
 and resource names from the PDF, which must not reach the logs.
 
@@ -59,6 +61,7 @@ from __future__ import annotations
 
 import bisect
 import hashlib
+import logging
 import math
 import re
 import statistics
@@ -68,14 +71,19 @@ import threading
 import time
 import unicodedata
 from collections import Counter, OrderedDict, deque
-from collections.abc import Callable, Collection, Iterable, Sequence
+from collections.abc import Callable, Collection, Generator, Iterable, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import combinations, count, pairwise
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import pymupdf
 
+from readablestem.config import ConfigError
+from readablestem.core import content_budget
+from readablestem.core import images as pixel_budget
+from readablestem.core.budget import BudgetExceeded
 from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
@@ -89,6 +97,7 @@ from readablestem.core.types import (
     TableGrid,
     inline_marker,
 )
+from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import (
     chem,
     equation_images,
@@ -119,6 +128,8 @@ from readablestem.pipeline.parse import (
     equation_score,
     is_math_alphanumeric,
 )
+
+log = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------------------- thresholds
 # Sizes are PDF points unless the name says otherwise. docs/layout.md explains each one.
@@ -421,7 +432,64 @@ class LayoutError(ValueError):
         super().__init__(message)
         # "unreadable" | "encrypted" | "too_many_pages" | "no_pages" | "page_out_of_range"
         # | "too_complex" (a page needs more time or memory to read than a conversion has)
+        # | "image_too_large" (decoding its pictures took longer than a job may spend)
+        # | "content_too_large" (a page's drawing instructions inflate past the content
+        # budget, `core.content_budget`: the upload probe refuses these first)
         self.code = code
+
+
+# Errors that stop a job on purpose: a spend cap or a cancel (`JobCancelled` is a
+# `BudgetExceeded`), a configuration error (`run.FATAL_ERRORS`) and a refusal of the file.
+# The page guard (`_PageGuard`) lets them through; it keeps a page only for a bug.
+_STOPS: tuple[type[Exception], ...] = (
+    BudgetExceeded,
+    ConfigError,
+    UnknownModelError,
+    LayoutError,
+)
+
+
+class _PageGuard:
+    """The one rule for a page whose reading raises, for every step of `_analyze_document`
+    that works on one page at a time (docs/layout.md "A page that raises").
+
+    `with guard(n):` runs the step for page `n`. An error in `_STOPS` goes on up. Any other
+    error is a bug on that page: it is logged (the page, the error's class and where it was
+    raised, never the message, which can quote the page) and remembered in `failed`, and the
+    step goes on with the next page. Later steps read `live(...)`, so a page that failed
+    is not read again; `_analyze_document` forgets what the earlier steps stored for it and
+    keeps it as its picture (`page_type.PAGE_READ_FAILED`). `settle` is the one place that
+    says when the document fails with it: when every page that was to be read has failed,
+    counted over the whole document and not per step."""
+
+    def __init__(self) -> None:
+        self.failed: dict[int, Exception] = {}  # in the order they failed
+        self.pages: list[int] = []  # the pages the document is made of
+        self.on_purpose: set[int] = set()  # kept whole by their type: not read, nothing to fail
+
+    @contextmanager
+    def __call__(self, number: int) -> Generator[None]:
+        try:
+            yield
+        except _STOPS:
+            raise  # a stop on purpose (cancel, spend cap, configuration), not a page's fault
+        except Exception as exc:
+            if number not in self.failed:
+                _log_page_failure(number, exc)
+                self.failed[number] = exc
+
+    def ok(self, number: int) -> bool:
+        return number not in self.failed
+
+    def live(self, pages: Iterable[int]) -> list[int]:
+        """`pages` without those that failed, in their order."""
+        return [n for n in pages if n not in self.failed]
+
+    def settle(self) -> None:
+        """Fail the document, with the first error, when no page it was to read could be."""
+        tried = [n for n in self.pages if n not in self.on_purpose]
+        if tried and all(n in self.failed for n in tried):
+            raise self.failed[tried[0]]
 
 
 @dataclass
@@ -479,7 +547,9 @@ def analyze(
         try:
             doc = _open(pdf_bytes)
             try:
+                _check_content(lambda: content_budget.check_objects(doc))  # before the page tree
                 selected = _select_pages(doc.page_count, pages, max_pages)
+                _check_content(lambda: content_budget.check(doc, selected))
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
                 return _analyze_document(doc, selected, page_math, display_grouping)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
@@ -1160,6 +1230,18 @@ def _open(pdf_bytes: bytes) -> pymupdf.Document:
     return doc
 
 
+def _check_content(check: Callable[[], None]) -> None:
+    """Run a check of the content budget (`core.content_budget`) and refuse the document
+    when it is over: the object streams before the page tree is read, the selected pages
+    before any step parses them (each step parses all of their content again). Every PDF
+    converted comes here (the worker, `readablestem convert`, the evals), whether or not it
+    passed the upload probe."""
+    try:
+        check()
+    except content_budget.ContentTooLarge as exc:
+        raise LayoutError("content_too_large", str(exc)) from None
+
+
 def _select_pages(page_count: int, pages: list[int] | None, max_pages: int | None) -> list[int]:
     if page_count == 0:
         raise LayoutError("no_pages", "the PDF has no pages")
@@ -1452,6 +1534,8 @@ class _Row:
         letters. The numbers of a fraction (beside an operator, or in a sentence) are not
         scripts of anything."""
         counts = Counter(round(c.size * 2) / 2 for c in self.plain)
+        if not counts:  # a row with no characters has no size; the body default, as elsewhere
+            return 10.0
         size = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
         larger = [s for s in counts if s > 0 and SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
         if not larger:
@@ -1484,7 +1568,8 @@ class _Row:
     @cached_property
     def baseline(self) -> float:
         main = [c.baseline for c in self.plain if abs(c.size - self.size) <= 0.5]
-        return statistics.median(main or [c.baseline for c in self.plain])
+        every = main or [c.baseline for c in self.plain]
+        return statistics.median(every) if every else 0.0  # no characters: nothing to sit on
 
     @cached_property
     def text(self) -> str:
@@ -2557,37 +2642,43 @@ def _margin_filter(
     selected: list[int],
     frags: dict[int, list[_Row]],
     paths: dict[int, list[_Path]],
-    skip: Collection[int] = (),
+    skip: Collection[int],
+    guard: _PageGuard,
 ) -> _MarginFilter:
+    """What repeats on the pages. A page that raises (`guard`) is left out of the count, as
+    if it was not a reference page: the statistic is the others'."""
     reference = _reference_pages(doc.page_count, selected, skip)
     counts: Counter[tuple] = Counter()
     texts: dict[tuple[str, str], set[str]] = {}
     sizes: Counter[float] = Counter()
+    counted = 0
     for number in reference:
-        page = doc[number]
-        if number not in frags:
-            frags[number] = _page_rows(page)
-        if number not in paths:
-            paths[number] = _page_paths(page)
-        height = page.rect.height
-        seen: set[tuple] = set()
-        for row in frags[number]:
-            if row.vertical:
-                seen.add(("rotated", _rotated_key(row)))
-                continue
-            zone = _margin_zone(row, height)
-            if zone is None:
-                for c in row.ink:
-                    sizes[round(c.size * 2) / 2] += 1
-                continue
-            key = (zone, _norm_margin(row.clean))
-            seen.add(("text", key))
-            texts.setdefault(key, set()).add(row.clean)
-        seen.update(("figure", key) for key in _band_figures(page, paths[number]))
-        seen.update(("mark", key) for key in _band_marks(page, paths[number]))
-        seen.update(("picture", xref) for xref in _page_pictures(page) if xref)
-        counts.update(seen)
-    needed = max(2, -(-len(reference) // 2))  # at least half of the pages, and two
+        with guard(number):
+            page = doc[number]
+            if number not in frags:
+                frags[number] = _page_rows(page)
+            if number not in paths:
+                paths[number] = _page_paths(page)
+            height = page.rect.height
+            seen: set[tuple] = set()
+            for row in frags[number]:
+                if row.vertical:
+                    seen.add(("rotated", _rotated_key(row)))
+                    continue
+                zone = _margin_zone(row, height)
+                if zone is None:
+                    for c in row.ink:
+                        sizes[round(c.size * 2) / 2] += 1
+                    continue
+                key = (zone, _norm_margin(row.clean))
+                seen.add(("text", key))
+                texts.setdefault(key, set()).add(row.clean)
+            seen.update(("figure", key) for key in _band_figures(page, paths[number]))
+            seen.update(("mark", key) for key in _band_marks(page, paths[number]))
+            seen.update(("picture", xref) for xref in _page_pictures(page) if xref)
+            counts.update(seen)
+            counted += 1
+    needed = max(2, -(-counted // 2))  # at least half of the pages, and two
     repeated: dict[str, set] = {
         "text": set(),
         "rotated": set(),
@@ -4836,7 +4927,10 @@ class _DrawnBullets:
 
 
 def _list_markers(
-    rows_by_page: dict[int, list[_Row]], paths: dict[int, list[_Path]], ctx: _Context
+    rows_by_page: dict[int, list[_Row]],
+    paths: dict[int, list[_Path]],
+    ctx: _Context,
+    guard: _PageGuard,
 ) -> None:
     """Set `row.marker` on every row that starts a list item, in all analysed pages.
 
@@ -4849,20 +4943,24 @@ def _list_markers(
     pages). "A ball rolls", "2.3 Speed", "2.5 metres", a lone "B. Smith", "... is
     exactly" / "2. The heavier ball ...", a spaced minus ("- 40 m/s") or a sentence
     wrapped onto a new line after a dash do not start lists.
+
+    The candidates are found page by page (a page that raises, `guard`, has none) and judged
+    together; the rows of a page that failed get no marker.
     """
     candidates: list[_MarkerCandidate] = []
     for number, rows in rows_by_page.items():
-        bullets = _DrawnBullets(paths.get(number, []), ctx.body)
-        found = [c for row in rows if (c := _marker_candidate(row, bullets)) is not None]
-        if any(c.sure and c.readings for c in found):
-            columns = _ColumnRows(rows)
-            found = [
-                replace(c, sure=False)
-                if c.sure and c.readings and columns.wraps_into(c, ctx)
-                else c
-                for c in found
-            ]
-        candidates.extend(found)
+        with guard(number):
+            bullets = _DrawnBullets(paths.get(number, []), ctx.body)
+            found = [c for row in rows if (c := _marker_candidate(row, bullets)) is not None]
+            if any(c.sure and c.readings for c in found):
+                columns = _ColumnRows(rows)
+                found = [
+                    replace(c, sure=False)
+                    if c.sure and c.readings and columns.wraps_into(c, ctx)
+                    else c
+                    for c in found
+                ]
+            candidates.extend(found)
     index: dict[tuple, tuple[list[float], list[float]]] = {}
     for candidate in candidates:
         for reading in candidate.readings or (("bullet", 0),):
@@ -5651,11 +5749,21 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
                 or all(c.c in ",.;:" for c in before)  # the comma that ends the maths
             )
         ):
-            out.append(_Row(row.chars[:start], column=row.column, marker=row.marker))
+            out.append(
+                _Row(row.chars[:start], column=row.column, marker=_marker_left(row.marker, start))
+            )
             out.append(_Row(row.chars[start:], column=row.column))
         else:
             out.append(row)
     return out
+
+
+def _marker_left(marker: _Marker | None, cut: int) -> _Marker | None:
+    """The list marker a row keeps when its characters from `cut` on are cut off: the marker
+    only while some of the item's text stays after it. A row that is the marker and nothing
+    else ("1 ." with its equation number cut away) is a line of text, not an empty list item
+    (`_paragraph_pieces` would slice the marker off and be left with no characters)."""
+    return marker if marker is not None and marker.end < cut else None
 
 
 def _mark_case_rows(rows: list[_Row]) -> None:
@@ -5755,7 +5863,7 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
         if cut is None:
             out.append(row)
             continue
-        out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
+        out.append(_Row(row.chars[:cut], column=row.column, marker=_marker_left(row.marker, cut)))
         out.append(_Row(row.chars[cut:], column=row.column))
     return out
 
@@ -6475,10 +6583,67 @@ def _raster_figures(
     return figures
 
 
+def _images_in_budget(page: pymupdf.Page) -> bool:
+    """Whether every image the page lists is within the pixel budget (`core.images`), by
+    the sizes their PDF objects state: only then may anything hash or decode them."""
+    doc, number = _where(page)
+    try:
+        return all(
+            pixel_budget.within_budget(width, height)
+            for _, _, width, height, *_ in doc.get_page_images(number, full=True)
+        )
+    except (RuntimeError, ValueError):
+        return False
+
+
+def _image_infos(page: pymupdf.Page, *, hashes: bool = False) -> list[dict[str, Any]]:
+    """`page.get_image_info()`; with `hashes`, each image's `digest` too, but only on a page
+    whose images are all within the pixel budget: hashing decodes them (twice a page's
+    images, on every call, in PyMuPDF's own `xrefs=True`), so on a page with one over it the
+    infos come without digests."""
+    if not hashes or not _images_in_budget(page):
+        return page.get_image_info()
+    memo = _decode_memo(_where(page)[0])
+    started = time.perf_counter()
+    try:
+        return page.get_image_info(hashes=True)
+    finally:
+        _charge(memo, started)
+
+
 def _image_xrefs(page: pymupdf.Page, count: int) -> list[int]:
     """The xref of each of the page's images, in `get_image_info` order (0 for an inline
-    image, or when the lists disagree)."""
-    xrefs = [int(info.get("xref") or 0) for info in page.get_image_info(xrefs=True)]
+    image, or when the lists disagree). Images are told apart by a digest of their pixels
+    (kept per image for the document, not made again for every page) when the page's images
+    are all within the pixel budget; else by their stated size, an image whose size another
+    listed image shares being 0."""
+    doc, number = _where(page)
+    infos = page.get_image_info()
+    if len(infos) != count:
+        return [0] * count
+    listed = doc.get_page_images(number)
+    if _images_in_budget(page):
+        memo = _decode_memo(doc)
+        started = time.perf_counter()
+        try:
+            hashed = page.get_image_info(hashes=True)
+            by_digest: dict[bytes, int] = {}
+            for item in listed:
+                xref = item[0]
+                if xref not in memo.digests:
+                    memo.digests[xref] = pymupdf.Pixmap(doc, xref).digest
+                by_digest[memo.digests[xref]] = xref
+        finally:
+            _charge(memo, started)
+        xrefs = [by_digest.get(info.get("digest"), 0) for info in hashed]
+    else:
+        by_size: dict[tuple[int, int], list[int]] = {}
+        for item in listed:
+            by_size.setdefault((item[2], item[3]), []).append(item[0])
+        xrefs = []
+        for info in infos:
+            same = by_size.get((info.get("width"), info.get("height")), [])
+            xrefs.append(same[0] if len(same) == 1 else 0)
     return xrefs if len(xrefs) == count else [0] * count
 
 
@@ -6493,17 +6658,84 @@ ALPHA_SEEN = 13
 SEEN_WHOLE = 0.98
 
 
+class _DecodeMemo:
+    """What `_plain_image` has answered for one open document: the answer per image (a
+    picture a template repeats on every page is decoded once) and the seconds all its
+    decodes took, which `images.DECODE_BUDGET_S` bounds for the job."""
+
+    def __init__(self) -> None:
+        self.answers: dict[int, bool] = {}
+        self.digests: dict[int, bytes] = {}  # a digest of each image's pixels, by xref
+        self.spent_s = 0.0
+
+
+def _charge(memo: _DecodeMemo, started: float) -> None:
+    """Add the time since `started` to the document's decode time; past the job's budget
+    the layout stops (`image_too_large`)."""
+    memo.spent_s += time.perf_counter() - started
+    if memo.spent_s > pixel_budget.DECODE_BUDGET_S:
+        raise LayoutError("image_too_large", "the pictures took too long to read")
+
+
+def _decode_memo(doc: pymupdf.Document) -> _DecodeMemo:
+    memo = getattr(doc, "_rs_decode_memo", None)
+    if memo is None:
+        memo = doc._rs_decode_memo = _DecodeMemo()  # ty: ignore[unresolved-attribute]
+    return memo
+
+
+def _where(page: pymupdf.Page) -> tuple[pymupdf.Document, int]:
+    """The document `page` was read from and its number there. PyMuPDF types
+    `Page.parent` and `Page.number` as optional; a page of an open document has both."""
+    return cast(pymupdf.Document, page.parent), cast(int, page.number)
+
+
+def _image_size(doc: pymupdf.Document, xref: int) -> tuple[int, int]:
+    """Width and height in pixels as the image's PDF object states them, read without
+    decoding it ((0, 0) when it does not say)."""
+    try:
+        width, height = (doc.xref_get_key(xref, key)[1] for key in ("Width", "Height"))
+        return int(width), int(height)
+    except (RuntimeError, ValueError, IndexError, TypeError):
+        return 0, 0
+
+
 def _plain_image(doc: pymupdf.Document | None, xref: int) -> bool:
     """The image shows no picture: nothing in it is seen (a transparent spacer), or it is
     seen whole in one colour or a smooth gradient (a wash, a template's background). A
     picture with transparent parts (ink on a transparent overlay, a stencil mask's
-    shapes) is not plain, and neither is an image that cannot be read (an inline one)."""
+    shapes) is not plain, and neither is an image that cannot be read (an inline one) or
+    that is over the pixel budget (`core.images`): that one is not decoded at all, so a
+    small file holding a huge canvas costs nothing here. The answer is kept per image for
+    the document; the decodes of one job together may take `DECODE_BUDGET_S` seconds, then
+    the layout stops with `image_too_large`."""
     if doc is None or xref <= 0:
         return False
+    memo = _decode_memo(doc)
+    if xref not in memo.answers:
+        started = time.perf_counter()
+        try:
+            memo.answers[xref] = _decide_plain(doc, xref)
+        finally:
+            _charge(memo, started)
+    return memo.answers[xref]
+
+
+def _decide_plain(doc: pymupdf.Document, xref: int) -> bool:
+    """`_plain_image` for an image not seen before."""
+    mask_xref = 0
+    try:
+        key = doc.xref_get_key(xref, "SMask")
+        if key[0] == "xref":
+            mask_xref = int(key[1].split()[0])
+    except (RuntimeError, ValueError, IndexError):
+        return False
+    for wanted in (xref, mask_xref):
+        if wanted and not pixel_budget.within_budget(*_image_size(doc, wanted)):
+            return False  # not decoded: too many pixels, or a size the object does not give
     try:
         pix = pymupdf.Pixmap(doc, xref)
-        key = doc.xref_get_key(xref, "SMask")
-        mask = pymupdf.Pixmap(doc, int(key[1].split()[0])) if key[0] == "xref" else None
+        mask = pymupdf.Pixmap(doc, mask_xref) if mask_xref else None
         if pix.colorspace is None:  # a stencil mask: its alpha is what is painted
             mask, pix = pix, None
         if pix is not None and (pix.alpha or pix.colorspace.n not in (1, 3)):
@@ -6712,10 +6944,17 @@ def _vector_figures(
         # nor the round bullets of a list in a panel.
         curves = [p for p in members if p.curved and not _bullet_mark(p, index)]
         curved = len(curves) >= 3 or any(_area(p.bbox) >= 0.05 * width * height for p in curves)
+        # A filled shape that holds a line of text is shading behind it, and a filled strip
+        # along a whole side of the cluster is a side of its frame (a shaded contents box
+        # drawn as a frame of four strips and one rectangle per entry): neither is a bar.
         bars = [
             p
             for p in members
-            if p.filled and p.bbox[3] - p.bbox[1] >= 4 and p.bbox[2] - p.bbox[0] <= 0.5 * width
+            if p.filled
+            and p.bbox[3] - p.bbox[1] >= 4
+            and p.bbox[2] - p.bbox[0] <= 0.5 * width
+            and not any(_centre_inside(r.bbox, p.bbox) for r in inside)
+            and not _frame_side(p.bbox, box)
         ]
         if fills_page:
             if not page_sized:
@@ -7268,6 +7507,15 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
     if path.kind == "vrule":
         return y1 - y0 >= big * h and (x1 <= edge * w or x0 >= (1 - edge) * w)
     return False
+
+
+def _frame_side(bbox: BBox, box: BBox) -> bool:
+    """A strip along one whole side of `box`: as tall as it at its left or right edge, or
+    as wide as it at its top or bottom edge."""
+    x0, y0, x1, y1 = bbox
+    tall = y1 - y0 >= 0.8 * (box[3] - box[1]) and (x0 <= box[0] + 1 or x1 >= box[2] - 1)
+    wide = x1 - x0 >= 0.8 * (box[2] - box[0]) and (y0 <= box[1] + 1 or y1 >= box[3] - 1)
+    return tall or wide
 
 
 def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
@@ -9148,27 +9396,33 @@ def _label_keys(
     paths: dict[int, list[_Path]],
     ctx: _Context,
     margins: _MarginFilter,
+    guard: _PageGuard,
 ) -> set[tuple]:
     """Keys (`_label_key`) of the dropped repeated text that is beside a figure on every
     analysed page it was dropped from: an axis title repeated under each chart of a deck,
     not a running footer that also runs under pages of text. Only pages with such a
-    candidate pay for a first look at their figures (`_figure_boxes`)."""
+    candidate pay for a first look at their figures (`_figure_boxes`). A page that raises
+    (`guard`) says nothing: the keys are those of the other pages."""
     near: set[tuple] = set()
     far: set[tuple] = set()
     for n in numbers:
-        page = doc[n]
-        candidates = [
-            r
-            for r in _label_candidates(prepared[n][2], numbers=False)
-            if _label_key(r, page.rect.height) not in far
-        ]
-        if not candidates:
-            continue  # nothing, or only what a page of text already ruled out
-        rows = prepared[n][0]
-        extents = _figure_extents(_figure_boxes(page, rows, paths[n], ctx, margins), rows)
-        for row in candidates:
-            key = _label_key(row, page.rect.height)
-            (near if _beside_figure(row, extents) else far).add(key)
+        with guard(n):
+            page = doc[n]
+            candidates = [
+                r
+                for r in _label_candidates(prepared[n][2], numbers=False)
+                if _label_key(r, page.rect.height) not in far
+            ]
+            if not candidates:
+                continue  # nothing, or only what a page of text already ruled out
+            rows = prepared[n][0]
+            extents = _figure_extents(_figure_boxes(page, rows, paths[n], ctx, margins), rows)
+            here = [
+                (_label_key(row, page.rect.height), _beside_figure(row, extents))
+                for row in candidates
+            ]
+            near.update(key for key, beside in here if beside)
+            far.update(key for key, beside in here if not beside)
     return near - far
 
 
@@ -9899,15 +10153,38 @@ def _analyze_document(
     global _TEX_MADE, _GROUPING
     _TEX_MADE = producer == "tex"
     _GROUPING = display_grouping
+    guard = _PageGuard()
+    guard.pages = list(selected)
+
+    def forget() -> None:
+        # A page that failed in a step is not in the later ones: whatever the steps before
+        # stored for it goes (`prepared`, `found` and `types` are indexed by page, and the
+        # document-wide steps after this one read every page in them).
+        for number in guard.failed:
+            for stored in (frags, paths, types, found, prepared):
+                stored.pop(number, None)
+
+    def keep_failed() -> None:
+        for number in guard.failed:
+            if number in selected:  # a failed reference page of the margin filter is not one
+                kept[number] = page_type.PAGE_READ_FAILED
+
+    found: dict[int, list[tables.PageTable]] = {}
+    prepared: dict[int, tuple[list[_Row], tuple[float, float] | None, list[_Row]]] = {}
     for number in selected:
-        frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
-        if _kept_whole(types[number]):
-            # Nothing but the header and footer bands of its paths is read again (by the
-            # margin filter, before this page is dropped): a page of tens of thousands of
-            # strokes must not stay in memory as objects.
-            height = doc[number].rect.height
-            paths[number] = [p for p in paths[number] if _box_zone(p.bbox, height) is not None]
-    deck = _read_deck(doc, selected, frags, types, paths)
+        with guard(number):
+            rows, drawn, kind = _read_page(doc[number], budget, producer)
+            if _kept_whole(kind):
+                # Nothing but the header and footer bands of its paths is read again (by the
+                # margin filter, before this page is dropped): a page of tens of thousands of
+                # strokes must not stay in memory as objects.
+                height = doc[number].rect.height
+                drawn = [p for p in drawn if _box_zone(p.bbox, height) is not None]
+            frags[number], paths[number], types[number] = rows, drawn, kind
+    guard.settle()
+    deck = _read_deck(doc, guard.live(selected), frags, types, paths, guard)
+    forget()
+    guard.settle()
     global _SLIDE_DECK
     _SLIDE_DECK = deck is not None
     if deck is not None and deck.dropped:
@@ -9916,92 +10193,134 @@ def _analyze_document(
         for number in deck.dropped:
             frags.pop(number), paths.pop(number), types.pop(number)
         selected = [n for n in selected if n not in deck.dropped]
-    margins = _margin_filter(doc, selected, frags, paths, deck.dropped if deck else ())
-    for number in selected:
-        # A thin text layer over a page-sized picture makes the picture the page's content
-        # (`page_type.TEXT_NOT_COVERING`) unless the picture is the template's background
-        # or one plain colour: a title slide on a repeated background is typed.
-        result = types[number]
-        if (
-            page_type.TEXT_NOT_COVERING in result.reasons
-            and result.kind in ("scan_no_text", "scan_ocr")
-            and not _page_picture(doc[number], margins)
-        ):
-            types[number] = page_type.without_picture(result)
+        guard.pages = list(selected)
+    # Pages that failed are not neighbours either (`_reference_pages`): they would be read
+    # again as a reference page.
+    skip = {*(deck.dropped if deck else ()), *guard.failed}
+    margins = _margin_filter(doc, guard.live(selected), frags, paths, skip, guard)
+    forget()
+    guard.settle()
     # Handwritten and scanned pages are kept as their page image: nothing on them is read
     # (there is no handwriting or scan conversion). On a typed page with handwriting on
-    # it, the ink stays out of the figures; each region of it is cut out instead.
-    kept = {n: reason for n in selected if (reason := page_type.kept_reason(types[n]))}
-    # A page kept as an image that has some visible typed text and nothing hidden (a title
-    # slide on a photo, a page of notes not analysed in time under its typed title, a
-    # watermark over a photographed page) keeps that text; nothing drawn on it goes to the
-    # figure model. The image page pass, when it reads such a page, replaces that text.
-    text_kept = {n for n in kept if page_type.keeps_text(types[n])}
-    prepared = {}
-    found: dict[int, list[tables.PageTable]] = {}
+    # it, the ink stays out of the figures; each region of it is cut out instead. A page kept
+    # as an image that has some visible typed text and nothing hidden (a title slide on a
+    # photo, a page of notes not analysed in time under its typed title, a watermark over a
+    # photographed page) keeps that text; nothing drawn on it goes to the figure model. The
+    # image page pass, when it reads such a page, replaces that text.
+    kept: dict[int, str] = {}
+    text_kept: set[int] = set()
+    for number in guard.live(selected):
+        with guard(number):
+            # A thin text layer over a page-sized picture makes the picture the page's content
+            # (`page_type.TEXT_NOT_COVERING`) unless the picture is the template's background
+            # or one plain colour: a title slide on a repeated background is typed.
+            result = types[number]
+            if (
+                page_type.TEXT_NOT_COVERING in result.reasons
+                and result.kind in ("scan_no_text", "scan_ocr")
+                and not _page_picture(doc[number], margins)
+            ):
+                result = types[number] = page_type.without_picture(result)
+            if (reason := page_type.kept_reason(result)) is not None:
+                kept[number] = reason
+                if page_type.keeps_text(result):
+                    text_kept.add(number)
+    forget()
+    for number in guard.failed:  # (`keep_failed` sets the reason for these, later)
+        kept.pop(number, None)
+        text_kept.discard(number)
+    guard.on_purpose = {n for n in kept if n not in text_kept}
+    guard.settle()
     detector = tables.DetectorBudget()  # the slow detections of this document (tables.py)
-    for number in selected:
-        if number in kept and number not in text_kept:
-            frags[number], paths[number], found[number] = [], [], []
-            continue
-        if number in text_kept:
-            paths[number] = []
-        if types[number].kind == "mixed_ink":
-            ink = types[number].ink.ink_drawings
-            paths[number] = [p for p in paths[number] if p.source not in ink]
-        # A page kept as its image beside its text reads no drawings (no rules to judge a
-        # grid by), and the detector is the slowest step on the pen-stroke pages these are.
-        found[number] = (
-            []
-            if number in text_kept
-            else _claim_tables(doc[number], number, frags, paths, found.get(number - 1), detector)
-        )
-        prepared[number] = _prepare_rows(doc[number], frags[number], margins, paths[number])
-        # Axes with tick labels, an axis title or a curve from their corner are a plot's:
-        # the rows the header and footer rules dropped count (tick labels in the bands).
-        # Rulers with no labels whose ticks are an answer field's cells are not rulers.
-        page_rows = [*prepared[number][0], *prepared[number][2]]
-        _answer_fields(paths[number], page_rows)
-        _mark_plots(paths[number], page_rows)
+    for number in guard.live(selected):
+        with guard(number):
+            if number in kept and number not in text_kept:
+                frags[number], paths[number], found[number] = [], [], []
+                continue
+            if number in text_kept:
+                paths[number] = []
+            if types[number].kind == "mixed_ink":
+                ink = types[number].ink.ink_drawings
+                paths[number] = [p for p in paths[number] if p.source not in ink]
+            # A page kept as its image beside its text reads no drawings (no rules to judge a
+            # grid by), and the detector is the slowest step on the pen-stroke pages these are.
+            # `previous` is the page before's tables, unless that page failed: a page that is
+            # now a picture takes no row the break split.
+            found[number] = (
+                []
+                if number in text_kept
+                else _claim_tables(
+                    doc[number],
+                    number,
+                    frags,
+                    paths,
+                    found.get(number - 1) if guard.ok(number - 1) else None,
+                    detector,
+                )
+            )
+            prepared[number] = _prepare_rows(doc[number], frags[number], margins, paths[number])
+            # Axes with tick labels, an axis title or a curve from their corner are a plot's:
+            # the rows the header and footer rules dropped count (tick labels in the bands).
+            # Rulers with no labels whose ticks are an answer field's cells are not rulers.
+            page_rows = [*prepared[number][0], *prepared[number][2]]
+            _answer_fields(paths[number], page_rows)
+            _mark_plots(paths[number], page_rows)
+    forget()
+    guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     global _COMPOUNDS, _WHOLE_WORDS
     _COMPOUNDS, _WHOLE_WORDS = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
     )
-    _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
-    label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
-    pages = [
-        _kept_page(doc[n], n)
-        if n in kept and n not in text_kept
-        else _page_blocks(
-            doc[n],
-            n,
-            prepared[n][0],
-            prepared[n][1],
-            ctx,
-            paths[n],
-            margins,
-            found[n],
-            page_type.ink_regions(types[n]),
-            page_sized=not INK_REASONS & set(types[n].reasons),
-            little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
-            strokes=_light_ink(types[n]),
-            dropped=prepared[n][2],
-            ink_sources=types[n].ink.ink_drawings,
-            mixed_ink=types[n].kind == "mixed_ink",
-            label_keys=label_keys,
-            covers=_covered_points(doc[n], types[n]),
-            page_math=page_math,
-        )
-        for n in selected
-    ]
+    _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx, guard)
+    forget()
+    guard.settle()
+    label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins, guard)
+    forget()
+    guard.settle()
+    pages: list[_PageBlocks] = []
+    for n in selected:
+        read: _PageBlocks | None = None
+        if guard.ok(n) and (n not in kept or n in text_kept):
+            with guard(n):
+                read = _page_blocks(
+                    doc[n],
+                    n,
+                    prepared[n][0],
+                    prepared[n][1],
+                    ctx,
+                    paths[n],
+                    margins,
+                    found[n],
+                    page_type.ink_regions(types[n]),
+                    page_sized=not INK_REASONS & set(types[n].reasons),
+                    little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
+                    strokes=_light_ink(types[n]),
+                    dropped=prepared[n][2],
+                    ink_sources=types[n].ink.ink_drawings,
+                    mixed_ink=types[n].kind == "mixed_ink",
+                    label_keys=label_keys,
+                    covers=_covered_points(doc[n], types[n]),
+                    page_math=page_math,
+                )
+        pages.append(read if read is not None else _kept_page(doc[n], n))
+    forget()
+    keep_failed()
+    guard.settle()
     _glossary_entries(pages)
     _settle_bold_letters(pages)
     _promote_numbered_lines(pages, ctx)
     _mark_run_in_labels(pages, ctx)
     _join_page_splits(pages, ctx)
     block_ids: dict[int, str] = {}
-    elements = outline.apply(_to_elements(pages, ctx, block_ids), outline.read(doc), selected)
+    elements = outline.apply(
+        _to_elements(pages, ctx, block_ids, guard), outline.read(doc), selected
+    )
+    keep_failed()
+    guard.settle()
+    # A page whose blocks could not be written as elements is its picture, as the others
+    # that failed (the notices below read only the pages that stay).
+    pages = [p if guard.ok(p.number) else _kept_page(doc[p.number], p.number) for p in pages]
     footnote_marks: dict[str, _FootnoteMark] = {}
     notices = _layout_notices(pages, ctx, block_ids, footnote_marks)
     elements = _contents_links(_footnote_links(elements, footnote_marks))
@@ -10017,16 +10336,19 @@ def _analyze_document(
         n = page.number
         if n in kept:
             continue
-        if n not in boxes:
-            unread = _painted(doc[n], paths[n], margins=margins)
-        else:
-            left_out = bool(page.left_out) and types[n].kind != "mixed_ink"
-            unread = left_out or page.unread or _unread_ink(types[n], boxes[n], page.size)
-        # A picture covering the page under its typed text (a scan with a stamp, a slide
-        # on a full-bleed photo, ink drawn on a transparent overlay): never a figure, and
-        # not to be dropped as a background unless it is one.
-        if unread or _page_picture(doc[n], margins):
-            kept[n] = page_type.UNREAD_PAGE
+        with guard(n):
+            if n not in boxes:
+                unread = _painted(doc[n], paths[n], margins=margins)
+            else:
+                left_out = bool(page.left_out) and types[n].kind != "mixed_ink"
+                unread = left_out or page.unread or _unread_ink(types[n], boxes[n], page.size)
+            # A picture covering the page under its typed text (a scan with a stamp, a slide
+            # on a full-bleed photo, ink drawn on a transparent overlay): never a figure, and
+            # not to be dropped as a background unless it is one.
+            if unread or _page_picture(doc[n], margins):
+                kept[n] = page_type.UNREAD_PAGE
+    keep_failed()  # these keep the elements read from them, with the picture beside them
+    guard.settle()
     if deck is not None:
         elements = slides.finish(
             elements, deck, {p.number: p.size for p in pages}, (REASON_LARGER_FONT,)
@@ -10054,33 +10376,36 @@ def _read_deck(
     frags: dict[int, list[_Row]],
     types: dict[int, page_type.PageTypeResult],
     paths: dict[int, list[_Path]],
+    guard: _PageGuard,
 ) -> slides.Deck | None:
     """The slide deck the selected pages make up (`slides.detect`), or None. A page kept whole
-    as its image is shown to it with no text, so it is never taken for an earlier step."""
+    as its image is shown to it with no text, so it is never taken for an earlier step. A
+    page whose view raises (`guard`) is left out of the deck, as a page that was not selected."""
     views: list[slides.PageView] = []
     for number in selected:
-        page = doc[number]
-        whole = _kept_whole(types[number])
-        rows = (
-            []
-            if whole
-            else [
-                slides.RowView(r.clean, r.bbox, r.size, r.vertical)
-                for r in frags[number]
-                if r.clean.strip()
-            ]
-        )
-        rect = page.rect
-        views.append(
-            slides.PageView(
-                number,
-                rect.width,
-                rect.height,
-                page_labels.pdf_label(page),
-                rows,
-                _slide_marks(page, paths.get(number, []), rect.height),
+        with guard(number):
+            page = doc[number]
+            whole = _kept_whole(types[number])
+            rows = (
+                []
+                if whole
+                else [
+                    slides.RowView(r.clean, r.bbox, r.size, r.vertical)
+                    for r in frags[number]
+                    if r.clean.strip()
+                ]
             )
-        )
+            rect = page.rect
+            views.append(
+                slides.PageView(
+                    number,
+                    rect.width,
+                    rect.height,
+                    page_labels.pdf_label(page),
+                    rows,
+                    _slide_marks(page, paths.get(number, []), rect.height),
+                )
+            )
     creator = doc.metadata.get("creator") if doc.metadata else None
     return slides.detect(creator, views)
 
@@ -10093,7 +10418,7 @@ def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[
     grows on every page and would make every step differ."""
     marks: list[slides.Mark] = []
     display = _Display.of(page)
-    for info in page.get_image_info(hashes=True):
+    for info in _image_infos(page, hashes=True):
         if info["bbox"][2] - info["bbox"][0] <= 0 or info["bbox"][3] - info["bbox"][1] <= 0:
             continue  # an image with no area shows nothing (an overlay's hidden item)
         digest = info.get("digest")
@@ -10153,6 +10478,16 @@ def _kept_whole(kind: page_type.PageTypeResult) -> bool:
     """The page is kept as its page image and nothing on it is read (a kept page that has
     visible typed text keeps that text, `text_kept` in `_analyze_document`)."""
     return page_type.kept_reason(kind) is not None and not page_type.keeps_text(kind)
+
+
+def _log_page_failure(number: int, exc: Exception) -> None:
+    """Say that a page could not be read: the page, the error's class and where it was
+    raised. Never the message or any text of the page (rules: no content in logs)."""
+    tb = exc.__traceback__
+    while tb is not None and tb.tb_next is not None:
+        tb = tb.tb_next
+    where = f"{tb.tb_frame.f_code.co_name}:{tb.tb_lineno}" if tb is not None else "unknown"
+    log.warning("layout could not read page %d: %s at %s", number + 1, type(exc).__name__, where)
 
 
 def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:
@@ -10474,135 +10809,158 @@ def _whole_pieces(block: _Block) -> list[str | _Inline]:
 
 
 def _to_elements(
-    pages: list[_PageBlocks], ctx: _Context, block_ids: dict[int, str] | None = None
+    pages: list[_PageBlocks],
+    ctx: _Context,
+    block_ids: dict[int, str],
+    guard: _PageGuard,
 ) -> list[Element]:
     """Blocks -> Elements with ids "p{page+1}-e{index}" and a global reading order
-    (`block_ids` gets each block's element id)."""
+    (`block_ids` gets each block's element id).
+
+    A page whose blocks cannot be written (`guard`) gives no element: what it wrote so far
+    is taken back, and the later part of a paragraph it was to carry over from the next page
+    is written there instead (`_join_page_splits`)."""
     elements: list[Element] = []
     levels = _list_levels((b for page in pages for b in page.blocks), 0.6 * ctx.body)
     for page in pages:
-        ids = (f"p{page.number + 1}-e{index}" for index in count())
-        for block in page.blocks:
-            if block.joined:  # written with the paragraph it goes on from (`_join_page_splits`)
-                continue
-            element_id = next(ids)
-            if block_ids is not None:
-                block_ids[id(block)] = element_id
-                block_ids.update({id(part): element_id for _, part in block.parts})
-            if block.kind in _TEXT_BLOCKS:
-                children = []
-                parts = []
-                term_length = 0
-                for number, piece in enumerate(_whole_pieces(block), start=1):
-                    if isinstance(piece, _Inline):
-                        child_id = next(ids)
-                        children.append((child_id, piece))
-                        parts.append(inline_marker(child_id))
-                    else:
-                        parts.append(piece)
-                    if number == block.term_pieces:
-                        # offsets are into the text without the script marks
-                        term_length = len(script_marks.strip_marks("".join(parts)))
-                joined = "".join(parts)
-                plain = script_marks.strip_marks(joined)
-                if block.code:  # indentation is kept; code carries no raised or lowered runs
-                    text, script_runs = plain.strip("\n"), []
-                else:
-                    text, script_runs = script_marks.split(joined)
-                term_end = None
-                if block.term_pieces is not None:
-                    term_end = max(0, term_length - (len(plain) - len(plain.lstrip())))
-                marker = block.marker
-                elements.append(
-                    Element(
-                        id=element_id,
-                        kind=Kind(block.kind),
-                        page=page.number,
-                        bbox=_rounded(block.bbox),
-                        order=len(elements),
-                        text=text,
-                        font_size=block.font_size,
-                        bold=block.bold,
-                        preformatted=block.code,
-                        term_end=term_end,
-                        list_marker=marker.text if marker else None,
-                        list_ordered=marker.ordered if marker else None,
-                        list_level=block.contents_level
-                        or (levels.get(id(block)) if marker else None),
-                        reasons=[CONTENTS_ENTRY]
-                        if block.contents_level
-                        else ([REASON_JOINED_PAGES] if block.parts else []),
-                        script_runs=script_runs,
-                        last_page=block.parts[-1][0] if block.parts else None,
-                    )
-                )
-                for child_id, inline in children:
-                    where = page.number if inline.page is None else inline.page
-                    elements.append(_inline_element(child_id, inline, where, element_id, elements))
-                continue
-            kind = Kind(block.kind)
-            heading_text, heading_runs = (
-                script_marks.split(block.marked) if block.marked else (None, [])
-            )
-            caption_children: list[tuple[str, _Inline]] = []
-            caption_marked = None
-            if kind is Kind.FIGURE and block.caption_pieces:
-                parts = []
-                for piece in block.caption_pieces:
-                    if isinstance(piece, _Inline):
-                        child_id = next(ids)
-                        caption_children.append((child_id, piece))
-                        parts.append(inline_marker(child_id))
-                    else:
-                        parts.append(piece)
-                caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
-            table = block.table if kind is Kind.TABLE else None
-            if table is not None and block.cell_inlines:
-                # A cell that is one formula is an inline equation of the table: its id goes
-                # on the cell, and the equation step reads the cell's crop.
-                cell_ids: dict[tuple[int, int], str] = {}
-                for key, inline in sorted(block.cell_inlines.items()):
+        first = len(elements)
+        with guard(page.number):
+            _page_elements(page, ctx, levels, block_ids, elements)
+        if not guard.ok(page.number):
+            del elements[first:]
+            for block in page.blocks:
+                block_ids.pop(id(block), None)
+                for _, part in block.parts:
+                    block_ids.pop(id(part), None)
+                    part.joined = False
+    return elements
+
+
+def _page_elements(
+    page: _PageBlocks,
+    ctx: _Context,
+    levels: dict[int, int],
+    block_ids: dict[int, str],
+    elements: list[Element],
+) -> None:
+    """The elements of one page's blocks, appended to `elements`."""
+    ids = (f"p{page.number + 1}-e{index}" for index in count())
+    for block in page.blocks:
+        if block.joined:  # written with the paragraph it goes on from (`_join_page_splits`)
+            continue
+        element_id = next(ids)
+        block_ids[id(block)] = element_id
+        block_ids.update({id(part): element_id for _, part in block.parts})
+        if block.kind in _TEXT_BLOCKS:
+            children = []
+            parts = []
+            term_length = 0
+            for number, piece in enumerate(_whole_pieces(block), start=1):
+                if isinstance(piece, _Inline):
                     child_id = next(ids)
-                    caption_children.append((child_id, inline))
-                    cell_ids[key] = child_id
-                table = table.model_copy(
-                    update={
-                        "cells": [
-                            c.model_copy(update={"equation_id": cell_ids[(c.row, c.col)]})
-                            if (c.row, c.col) in cell_ids
-                            else c
-                            for c in table.cells
-                        ]
-                    }
-                )
+                    children.append((child_id, piece))
+                    parts.append(inline_marker(child_id))
+                else:
+                    parts.append(piece)
+                if number == block.term_pieces:
+                    # offsets are into the text without the script marks
+                    term_length = len(script_marks.strip_marks("".join(parts)))
+            joined = "".join(parts)
+            plain = script_marks.strip_marks(joined)
+            if block.code:  # indentation is kept; code carries no raised or lowered runs
+                text, script_runs = plain.strip("\n"), []
+            else:
+                text, script_runs = script_marks.split(joined)
+            term_end = None
+            if block.term_pieces is not None:
+                term_end = max(0, term_length - (len(plain) - len(plain.lstrip())))
+            marker = block.marker
             elements.append(
                 Element(
                     id=element_id,
-                    kind=kind,
+                    kind=Kind(block.kind),
                     page=page.number,
                     bbox=_rounded(block.bbox),
                     order=len(elements),
-                    script_runs=heading_runs if heading_text == block.text else [],
-                    text=block.text,
+                    text=text,
                     font_size=block.font_size,
                     bold=block.bold,
-                    score=block.score,
-                    reasons=block.reasons,
-                    display="block" if kind == Kind.EQUATION else None,
-                    equation_label=block.label if kind == Kind.EQUATION else None,
-                    caption=block.caption,
-                    caption_marked=caption_marked,
-                    regular_letters=block.regular if kind == Kind.EQUATION else None,
-                    page_latex=block.page_latex if kind == Kind.EQUATION else None,
-                    page_status=block.page_status if kind == Kind.EQUATION else None,
-                    table=table,
+                    preformatted=block.code,
+                    term_end=term_end,
+                    list_marker=marker.text if marker else None,
+                    list_ordered=marker.ordered if marker else None,
+                    list_level=block.contents_level or (levels.get(id(block)) if marker else None),
+                    reasons=[CONTENTS_ENTRY]
+                    if block.contents_level
+                    else ([REASON_JOINED_PAGES] if block.parts else []),
+                    script_runs=script_runs,
+                    last_page=block.parts[-1][0] if block.parts else None,
                 )
             )
-            for child_id, inline in caption_children:
-                elements.append(
-                    _inline_element(child_id, inline, page.number, element_id, elements)
-                )
-    return elements
+            for child_id, inline in children:
+                where = page.number if inline.page is None else inline.page
+                elements.append(_inline_element(child_id, inline, where, element_id, elements))
+            continue
+        kind = Kind(block.kind)
+        heading_text, heading_runs = (
+            script_marks.split(block.marked) if block.marked else (None, [])
+        )
+        caption_children: list[tuple[str, _Inline]] = []
+        caption_marked = None
+        if kind is Kind.FIGURE and block.caption_pieces:
+            parts = []
+            for piece in block.caption_pieces:
+                if isinstance(piece, _Inline):
+                    child_id = next(ids)
+                    caption_children.append((child_id, piece))
+                    parts.append(inline_marker(child_id))
+                else:
+                    parts.append(piece)
+            caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
+        table = block.table if kind is Kind.TABLE else None
+        if table is not None and block.cell_inlines:
+            # A cell that is one formula is an inline equation of the table: its id goes
+            # on the cell, and the equation step reads the cell's crop.
+            cell_ids: dict[tuple[int, int], str] = {}
+            for key, inline in sorted(block.cell_inlines.items()):
+                child_id = next(ids)
+                caption_children.append((child_id, inline))
+                cell_ids[key] = child_id
+            table = table.model_copy(
+                update={
+                    "cells": [
+                        c.model_copy(update={"equation_id": cell_ids[(c.row, c.col)]})
+                        if (c.row, c.col) in cell_ids
+                        else c
+                        for c in table.cells
+                    ]
+                }
+            )
+        elements.append(
+            Element(
+                id=element_id,
+                kind=kind,
+                page=page.number,
+                bbox=_rounded(block.bbox),
+                order=len(elements),
+                script_runs=heading_runs if heading_text == block.text else [],
+                text=block.text,
+                font_size=block.font_size,
+                bold=block.bold,
+                score=block.score,
+                reasons=block.reasons,
+                display="block" if kind == Kind.EQUATION else None,
+                equation_label=block.label if kind == Kind.EQUATION else None,
+                caption=block.caption,
+                caption_marked=caption_marked,
+                regular_letters=block.regular if kind == Kind.EQUATION else None,
+                page_latex=block.page_latex if kind == Kind.EQUATION else None,
+                page_status=block.page_status if kind == Kind.EQUATION else None,
+                table=table,
+            )
+        )
+        for child_id, inline in caption_children:
+            elements.append(_inline_element(child_id, inline, page.number, element_id, elements))
 
 
 def _inline_element(

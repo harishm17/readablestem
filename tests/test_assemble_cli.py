@@ -165,7 +165,7 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
         "Elements:    4 (1 headings, 1 paragraphs, 0 list items, 2 equations, 0 figures)",
         "Model calls: 2",
         "(fake client, nothing billed)",
-        "Checks:      static 15/15 passed",
+        "Checks:      static 16/16 passed",
         f"wrote {out}",
         f"wrote {report}",
     ):
@@ -198,6 +198,11 @@ def test_a_small_run_cap_suggests_fewer_steps_at_once(pdf, tmp_path, pipeline, m
     )
     assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "0.0001") == 0
     assert "try --concurrency" not in capsys.readouterr().out  # already one at a time
+    # Items the cap stopped wait for a decision, and nothing is reviewed here: the file is a
+    # draft and says so before anything else (SW21).
+    html = (tmp_path / "o.html").read_text(encoding="utf-8")
+    assert '<meta name="readablestem-state" content="draft">' in html
+    assert re.search(r"<body[^>]*><p class=\"draft-mark\"[^>]*><strong>Draft:</strong>", html)
     args = ("--max-usd", "0.0001", "--concurrency", "4")
     assert run(pdf, "--out", tmp_path / "q.html", *args) == 0
     assert "with a small --max-usd try --concurrency 1" in capsys.readouterr().out

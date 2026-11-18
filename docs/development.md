@@ -19,9 +19,10 @@ printed pages read differently.
 | EPUB validators | `tests/test_export_epub_validators.py` skips unless EPUBCheck and DAISY Ace are installed: set `EPUBCHECK_JAR` (needs Java; `JAVA` if not on PATH) and `ACE` (for example `npx -y @daisy/ace`). CI runs them in `epub.yml` |
 | `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
-| `make lint` | `ruff check` + `ruff format --check` |
+| Workflow suite | `uv run pytest -m workflow -n auto --dist loadfile -rs`: the corpus's files through the real app, from recorded model answers, at no cost (docs/eval.md, "Recording and replay"). Needs `make table-model` and `uv run python -m readablestem.eval.corpus check --fetch` once |
+| `make lint` | `ruff check` + `ruff format --check` + `scripts/dead_code.py` (a function, class, method or property of the package that nothing calls) |
 | `make fmt` | Format and auto-fix |
-| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
+| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, the unused-code check, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make table-model` | Download the SLANet-plus table-structure model (7.5 MB, SHA-256 checked) into `~/.cache/readablestem/models` (or `TABLE_MODEL_DIR`); without it tables use PyMuPDF's grid |
 | `make fuzz-tables` | Upgrade check before any PyMuPDF bump: byte mutants of the repository's fixtures through the probe and the table detector (`pytest -m slow`; a few minutes; docs/tables.md) |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
@@ -50,6 +51,10 @@ distribution (`apt install latexml bubblewrap`), or, without root, unpack the pa
 `READABLESTEM_LATEXML_ROOT` to it (it needs a `usr/` folder; the folder is mounted read-only in the sandbox and
 Perl is pointed at it; production never sets it). `uv run readablestem ops sandbox-probe` (`READABLESTEM_SANDBOX_BACKEND=landlock` to force the Landlock backend) says whether the sandbox
 works on the machine.
+
+Running the web app on recorded answers (`MODEL_ANSWERS_FILE` with `MODEL_ANSWERS_OFFLINE=true`, docs/web.md)
+needs no spend headroom: uploads and the worker ignore the room one live model call would need under
+`DAILY_SPEND_CAP_USD`, so a server with a $0.01 cap converts what the file can answer, and the Claude second check replays from the same file. Serve it on a fresh database; there is no need to copy a recorder's.
 
 CLI:
 
@@ -81,8 +86,9 @@ UTC) and by hand. Jobs, by check name:
 | `plan (what runs on Python 3.14)` | Builds the pytest matrix (below) |
 | `ruff + ty (Python 3.12)`, `(Python 3.14)` | ruff, ty and an import of every module; both Pythons on every run |
 | `pytest (Python 3.12, shard i/6)`, `(Python 3.14, ...)` | The offline suite, in six shards |
-| `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
+| `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two, or if a route of the app gave no test its own answer |
 | `pytest -m browser (Playwright Chromium, shard i/4)` | Browser tests, four shards of three xdist workers each |
+| `workflow suite (replay of the recorded answers)` | `pytest -m workflow`: corpus files converted by the real app from recorded answers. Tests that need answers kept out of the repository are skipped and listed |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
 
 The other jobs (`postgres`, `docker`, `latex source`, `make proof` (on main, the nightly run, and pull requests that touch `proof/`, `PROOF.md`, `data/`, the Makefile, `src/readablestem/proof` or `cli`, or the dependency and CI files), `make site`, `pip-audit`,
@@ -105,7 +111,16 @@ A file is never split, so module-scoped servers and browsers start once. A new f
 entry: it gets the default weight and lands in exactly one shard. Each shard writes a report
 with `--shard-report`, and `scripts/check_shards.py` (job `every test ran in exactly one
 shard`) fails if the shards collected different tests, or a collected test ran in none or in
-two. Refresh the durations now and then so the shards stay level (about 10 minutes with 16
+two.
+
+The same reports say which routes of the app the tests reached (`tests/_routes.py` notes
+every request that goes through the app while the tests run). The job fails for a route that
+no test requests, and for one whose tests only ever get a refusal (a redirect to sign-in, a
+403, a 404): such a route has no test of what it does. A new route therefore needs one test
+that gets its answer. `uv run pytest --route-coverage` judges a whole local run the same way
+(`make ci-local` passes it); it means nothing on part of the suite.
+
+Refresh the durations now and then so the shards stay level (about 10 minutes with 16
 cores):
 
 ```
@@ -172,6 +187,12 @@ snapshot before the change (from an old `src/` as above) and one after.
 |---|---|
 | `src/readablestem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
 | `src/readablestem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
+| `src/readablestem/gold/layout_gold.py` | reading-order gold from a document's source (LaTeXML HTML, OpenStax XHTML, a written unit list), the page rules, a set's registry and the sample a person checks (see docs/eval.md) |
+| `src/readablestem/gold/layout_sources.py` | fetches the sources of a reading-order gold set and picks its documents by seeded rules with no model: arXiv papers and course handouts through LaTeXML in the sandbox, CC BY OpenStax books by position (see docs/eval.md) |
+| `src/readablestem/eval/split.py` | development and held-out by document, and `eval bar`: only a held-out score under the production profile meets a bar |
+| `src/readablestem/eval/measure.py` | a measured replay of the test corpus under the production profile: each upload converted as a job is, in its own process (page kinds, step facts, dollars, seconds, memory) |
+| `src/readablestem/eval/cost.py` | `eval cost`: dollars a page by page kind and by step, the steps not built yet with their estimates, the open pool's reach |
+| `src/readablestem/eval/speed.py` | `eval speed`: seconds a page by page kind and by stage, start-up, memory, and the bar against an earlier record |
 | `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/readablestem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
@@ -253,6 +274,16 @@ step) needs to account for this.
   `--set heldout` command refuses a path inside the repository, `--fake`, and gold that
   is not the registered gold.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.
+- Every dependency has a row in docs/dependencies.md, which `scripts/dependency_record.py
+  --write` makes from `uv.lock`, the `Dockerfile`, each package's own metadata and
+  `data/dependency_facts.toml`. Run it after either file changes. The test suite fails for
+  a locked package with no row, a license that is neither permissive nor accepted in the
+  facts file with a reason, a package that reads a stranger's bytes and names no limits or no
+  hostile-input tests, and a system package with neither a version in the `Dockerfile` nor
+  a stated rule. A new dependency gets its facts before its first use.
+- The command line starts with the packages of the image alone: a development package
+  (lxml, python-docx, pytest) is imported inside the function that needs it, never at the top
+  of a module the command line loads.
 
 
 ## The student file in three browsers
@@ -260,7 +291,7 @@ step) needs to account for this.
 `tests/test_student_file_browsers.py` opens the committed demo document (as the pipeline
 writes it, and as the Canvas export's `index.html`) in Chromium, Firefox and WebKit at 1280
 and 375 CSS px and checks that the page loads without errors, the pictures load, and the
-MathML is drawn as maths (fractions stacked, scripts raised and lowered, nothing cut off).
+MathML is drawn as math (fractions stacked, scripts raised and lowered, nothing cut off).
 Install the engines you want (`uv run playwright install chromium firefox webkit`; WebKit
 also needs `uv run playwright install-deps webkit`) and run
 `uv run pytest -m browser tests/test_student_file_browsers.py -rs`. An engine that is not

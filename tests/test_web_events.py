@@ -88,6 +88,31 @@ def test_an_event_cannot_carry_text(kwargs, problem):
         events.make("u" * 32, **kwargs)
 
 
+OUTCOME = {
+    "kind": "equation",
+    "reason": "style_mismatch",
+    "outcome": "kept",
+    "origin": "page",
+    "source": "pipeline",
+    "mode": "single",
+    "write_mode": "single",
+    "release": "0.5.9",
+}
+
+
+@pytest.mark.parametrize("column", sorted(OUTCOME))
+def test_an_outcome_column_takes_only_a_code_from_its_closed_list(column):
+    """Each of a decision outcome's eight columns is checked on write: a value outside its
+    list (a file name, an element id) or of 65 characters is refused, and so is any outcome
+    column on another event."""
+    assert events.make("u" * 32, events.DECISION_OUTCOME, value=1, **OUTCOME).kind == "equation"
+    for bad in ("Week 3 notes.pdf", "p3-e12", "x" * 65):
+        with pytest.raises(ValueError, match="closed list"):
+            events.make("u" * 32, events.DECISION_OUTCOME, value=1, **(OUTCOME | {column: bad}))
+    with pytest.raises(ValueError, match="only a decision outcome"):
+        events.make("u" * 32, events.UPLOADED, **{column: OUTCOME[column]})
+
+
 def test_the_upload_fingerprint_is_keyed_salted_and_not_the_plain_hash(tmp_path):
     from fixtures.web.support import make_settings
 
@@ -122,6 +147,55 @@ def test_a_failing_event_never_breaks_what_the_person_was_doing(web, monkeypatch
 
 
 # --------------------------------------------------------------------------- admin
+
+
+def test_outcome_cells_count_one_release_per_lane_and_withhold_small_cells(web):
+    """`outcome_cells` (decision A15, rule 4 of WS11.18): equations from 5 accounts and 10
+    documents are shown with their three measures; tables from 4 accounts are withheld, and
+    with them the next smallest lane (figures), so "all" cannot give tables away. An admin's
+    rows and another release's rows count nowhere, and no cell holds a user or job id."""
+    ids: list[str] = []
+
+    def outcome(user: str, job: str, kind: str, reason: str, what: str, release="0.5.9"):
+        fields = OUTCOME | {"kind": kind, "reason": reason, "outcome": what, "release": release}
+        source = "browsing" if reason == "none" else "pipeline"
+        return events.make(user, events.DECISION_OUTCOME, job_ref=job, value=1,
+                           **(fields | {"source": source}))  # fmt: skip
+
+    with session_scope(web.ctx.factory) as session:
+        users = [User(email=f"r{n}@example.org", is_admin=n == 9) for n in range(10)]
+        session.add_all(users)
+        session.flush()
+        rows = []
+        for n in range(20):  # 10 documents for accounts 0-4, 10 for accounts 5-8
+            user = users[n // 2].id if n < 10 else users[5 + n % 4].id
+            job = f"{n:032x}"
+            ids += [user, job]
+            rows.append(events.make(user, events.UPLOADED, job_ref=job, value=10))
+            if n < 10:
+                rows.append(outcome(user, job, "equation", "style_mismatch", "kept"))
+                rows.append(outcome(user, job, "equation", "unknown_command", "edited"))
+                rows.append(outcome(user, job, "equation", "none", "edited"))
+                rows.append(outcome(user, job, "figure", "below_accept", "kept"))
+                rows.append(outcome(user, job, "equation", "none", "edited", release="0.5.8"))
+            else:
+                rows.append(outcome(user, job, "table", "table_not_rebuilt", "replaced"))
+        admin_job = "f" * 32
+        rows.append(outcome(users[9].id, admin_job, "equation", "none", "added"))
+        session.add_all(rows)
+    with session_scope(web.ctx.factory) as session:
+        cells = {c.lane: c for c in events.outcome_cells(session, "0.5.9")}
+    equations = cells["equations"]
+    assert equations.shown and (equations.accounts, equations.documents) == (5, 10)
+    assert (equations.false_flags, equations.true_flags, equations.unflagged) == (10, 10, 10)
+    assert equations.false_per_true == 1.0
+    assert equations.unflagged_per_100_pages == 10.0  # 10 edits nobody was asked for, 100 pages
+    assert equations.decisions_per_page_median == 0.3
+    assert not cells["tables"].shown and cells["tables"].needs_accounts == 1
+    assert cells["tables"].decisions == 0  # withheld: no number is kept
+    assert not cells["figures"].shown  # withheld with it
+    assert cells["all"].shown and cells["all"].decisions == 50 and cells["all"].accounts == 9
+    assert not any(i in repr(cells) for i in [*ids, users[9].id, admin_job])
 
 
 # --------------------------------------------------------------------------- retention

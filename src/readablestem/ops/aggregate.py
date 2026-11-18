@@ -62,7 +62,8 @@ asks for the file after a review decision (web/review.py `rerender_html`, web/ro
 `current_html`), and there is no snapshot of the pipeline's own, so a job reviewed before
 the hourly aggregation counts the checks of the last file made: its reviewed file once the
 instructor has downloaded, viewed or opened it, the file from before the decisions if not
-(`jobs.html_stale` says which).
+(`jobs.html_stale` says which). A file made by an older renderer is made again the same
+way, at the first request for it after a release (`assemble.RENDER_VERSION`).
 
 Every code part is checked against `CODE_PATTERN`; anything else (a sentence, LaTeX, an
 email) is recorded as "other", so a bug upstream cannot write text into this table.
