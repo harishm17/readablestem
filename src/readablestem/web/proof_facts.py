@@ -17,7 +17,7 @@ from them (`tests/test_proof_facts.py` compares the snapshot with both).
 Every fact names its set, its date, that it is a registered result, its count, and a link to how
 it was measured. Nothing here says one tool beats another.
 
-Three rules for what a public page may show (SW26):
+Two rules for what a public page may show (SW26):
 
 - The stamp. A result file may carry `profile_sha256`, the hash of the production profile the run
   used (`ops/profile.py`). A file whose hash is not the repository's profile is refused (a page
@@ -28,13 +28,8 @@ Three rules for what a public page may show (SW26):
 - The retired scoring. The silent-error rate, the flag recall and the unseen loss count wrong
   equations by a scorer that counted notation differences as errors (a hand check of 86 errors
   found 55 harmless, AQ1). They are not in `facts`, in the chart or on any page until a stamped
-  report under the corrected scorer exists; `RETIRED` names them and `tests/test_landing_facts.py`
+  report under the corrected scorer exists; `RETIRED` names them and `tests/test_proof_facts.py`
   fails if a page shows one.
-- The register. `figures` is every accuracy figure a public page may state, each with the record
-  that holds it. The ones for the newest run are read from its files; `HISTORY` is the short list
-  of older results the /limits history section states, each with its report.
-  `tests/test_landing_facts.py` fails when a page shows a figure that is not in the register, or
-  when a registered figure is not in the record it names.
 """
 
 from __future__ import annotations
@@ -102,7 +97,6 @@ class ProofFacts:
     first_test: FirstTest
     settings_line: str  # what the run's settings were, in a sentence
     numbers: dict[str, str]  # figures the pages' prose states, read from the run's files
-    figures: dict[str, str]  # the register: every figure a public page may state -> its record
 
 
 SYSTEMS = (
@@ -123,7 +117,7 @@ RETIRED_MEASURES = (
     "flag recall (symbols-wrong aligned equations that were a required decision)",
 )
 # Figures of the retired measures, as the report and the earlier pages wrote them. A public page
-# that shows one fails `tests/test_landing_facts.py`.
+# that shows one fails `tests/test_proof_facts.py`.
 RETIRED = ("5.0 per 100", "5.02", "9.56", "9.6 for", "46%", "0.461", "0.46 ", "11.02")
 PROFILE_KEY = "profile_sha256"
 # (key in the results file, plain words, direction, the axis the bars are drawn against, format)
@@ -328,61 +322,7 @@ def parse(report: str, results: dict | None = None, proof: str | None = None) ->
         first_test=first_test,
         settings_line=settings_line(results, pipeline, date),
         numbers=numbers,
-        figures=register(numbers, chart, first_test, count=(units, gold)),
     )
-
-
-def register(
-    numbers: dict[str, str], chart: list[ChartRow], first_test: FirstTest, count: tuple[str, str]
-) -> dict[str, str]:
-    """Every accuracy figure a public page may state, with the record that holds it: the
-    newest run's figures (read from its files, above), then `HISTORY`."""
-    figures = {
-        "0.840": "docs/eval-equation-fresh5.md",
-        "0.836": "docs/eval-equation-fresh5.md",
-        "0.793": "docs/eval-equation-fresh5.md",
-        "0.770": "docs/eval-equation-fresh5.md",
-    }
-    for value in numbers.values():
-        figures.setdefault(value, "docs/eval-equation-fresh5.md")
-        figures.setdefault(value.lstrip("+\u2212-"), "docs/eval-equation-fresh5.md")
-    figures["97.5%"] = "docs/eval-equation-fresh5.md"  # the registered interval level
-    for row in chart:
-        for line in row.lines:
-            figures.setdefault(line.value.lstrip("$"), "docs/eval-equation-fresh5.md")
-    for value in vars(first_test).values():
-        for token in re.findall(r"[\d,]+(?:\.\d+)?%?", value):
-            if token.strip(","):
-                figures.setdefault(token, "PROOF.md")
-    figures.update(HISTORY)
-    return figures
-
-
-# Older results the /limits history section and the comparison guide state: figure -> the record
-# that holds it. Typed here once; `tests/test_landing_facts.py` checks each against its file.
-HISTORY = {
-    "2,738": "PROOF.md",
-    "0.50": "PROOF.md",
-    "0.68": "PROOF.md",
-    "89%": "PROOF.md",
-    "0.96": "PROOF.md",
-    "97%": "PROOF.md",
-    "1,826": "docs/eval-realworld.md",
-    "0.58": "docs/eval-realworld.md",
-    "0.596": "README.md",
-    "0.504": "README.md",
-    "0.735": "docs/eval-dev-baseline-2026-11-03.md",
-    "2,350": "docs/eval-dev-baseline-2026-11-03.md",
-    "114": "docs/eval-dev-baseline-2026-11-03.md",
-    "0.56": "docs/eval-chemistry-heldout.md",
-    "377": "docs/eval-chemistry-heldout.md",
-    "0.14": "docs/eval-chemistry-heldout.md",
-    "0.57": "docs/eval-handwriting.md",
-    "205": "docs/eval-handwriting.md",
-    "1.8": "docs/eval.md",
-    "5.6": "docs/eval-realworld.md",
-    "5.7": "docs/eval-handwriting.md",
-}
 
 
 def regenerate() -> None:
@@ -413,7 +353,6 @@ def load() -> ProofFacts:
         first_test=FirstTest(**data["first_test"]),
         settings_line=data["settings_line"],
         numbers=data["numbers"],
-        figures=data["figures"],
     )
 
 

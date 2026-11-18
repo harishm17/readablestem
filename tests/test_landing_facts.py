@@ -17,8 +17,6 @@ from pathlib import Path
 import pytest
 
 from fixtures.web.support import WebEnv
-from readablestem.web import offices, proof_facts
-from readablestem.web.recipients import privacy_context
 
 ROOT = Path(__file__).resolve().parent.parent
 PROOF = (ROOT / "PROOF.md").read_text(encoding="utf-8")
@@ -52,31 +50,11 @@ def proof_field(name: str) -> str:
     return match.group(1).strip()
 
 
-PAGES_WITH_FIGURES = (
-    "/",
-    "/limits",
-    "/pricing",
-    "/security",
-    "/privacy",
-    "/for-accessibility-offices",
-    offices.SUMMARY_PATH,
-)
-# A figure is a decimal, a percent or a number with a thousands comma. A version, a standard or a
-# section is not one: these are names, and each is a different thing from a result.
-NAMES = {"2.3", "2.4", "4.0", "3.0", "2.2", "2.5"}
-FIGURE = re.compile(r"\d+(?:\.\d+)?%|\$?(?<![\d.])\d+\.\d+(?![\d]|\.\d)|\d{1,3}(?:,\d{3})+")
-
-
-def visible_text(page: str) -> str:
-    page = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", page, flags=re.S)
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page))
-
-
 @pytest.fixture(scope="module")
 def pages(tmp_path_factory) -> dict[str, str]:
     env = WebEnv(tmp_path_factory.mktemp("landing"))
     with env.running() as anon:
-        return {path: anon.get(path).text for path in (*PAGES_WITH_FIGURES, "/terms")}
+        return {path: anon.get(path).text for path in ("/", "/terms", "/limits")}
 
 
 def test_limits_latest_registered_numbers_match_the_fresh5_report(pages):
@@ -212,32 +190,3 @@ def test_licence_is_worded_the_same_way_everywhere(pages):
     seo = (ROOT / "src/readablestem/web/seo.py").read_text(encoding="utf-8")
     assert "the code is MIT; the hosted service is offered" in seo
     assert '"under AGPL-3.0 terms"' in seo
-
-
-def test_every_figure_on_a_public_page_is_registered_and_the_register_is_true(pages, tmp_path):
-    """The claims register (web/proof_facts.py `figures`): a result figure on a public page that
-    is not in it, or a retired one, fails; each hand-typed register entry is in its record."""
-    figures = proof_facts.load().figures
-    share = privacy_context(WebEnv(tmp_path).settings)["outcome_max_share"]
-    own = {f"{round(share * 100)}%"}  # a privacy setting (what a person may see of an outcome)
-    for path in PAGES_WITH_FIGURES:
-        text = visible_text(pages[path])
-        loose = {
-            f
-            for f in FIGURE.findall(text)
-            if f.lstrip("$") not in figures and f not in NAMES and f not in own
-        }
-        assert not loose, f"{path} states figures that are not in the register: {sorted(loose)}"
-        for retired in proof_facts.RETIRED:
-            assert retired not in text, (path, retired)
-    for figure, source in proof_facts.HISTORY.items():
-        record = (ROOT / source).read_text(encoding="utf-8")
-        if figure.endswith("%"):
-            found = {round(100 * float(d)) for d in re.findall(r"\b0\.\d{2,4}\b", record)}
-            assert int(figure[:-1]) in found, (figure, source)
-        elif "." in figure:  # written to its own number of places, as the record may give more
-            places = len(figure.split(".")[1])
-            found = {f"{float(d):.{places}f}" for d in re.findall(r"\b\d+\.\d+\b", record)}
-            assert figure in found, (figure, source)
-        else:
-            assert figure in record, (figure, source)

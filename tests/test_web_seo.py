@@ -164,7 +164,7 @@ def test_a_missing_showcase_answers_404_with_no_redirect(env):
 
 def test_no_public_page_changed_after_its_date():
     """`web/page_dates.json` says when each page's text last changed (scripts/page_dates.py).
-    Skipped where git has no history (a shallow clone or an unpacked archive)."""
+    Skipped where git has no full history (a shallow clone, as in CI, or an unpacked archive)."""
     root = Path(__file__).resolve().parent.parent
 
     def last_commit_day(name: str) -> str:
@@ -176,7 +176,11 @@ def test_no_public_page_changed_after_its_date():
         )
         return done.stdout.strip() if done.returncode == 0 else ""
 
-    if not last_commit_day("README.md"):
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"], cwd=root, capture_output=True, text=True
+    )
+    # A shallow clone (CI) dates every file by its one commit, so it cannot tell.
+    if shallow.stdout.strip() != "false" or not last_commit_day("README.md"):
         pytest.skip("no git history")
     for page in seo.PUBLIC_PAGES:
         for name in page.files:

@@ -11,18 +11,15 @@
   `docs/vendor-information.md`, and the pages say they are being scored again, with no figure.
   A result file is "the settings the live service uses" only when its `profile_sha256` equals the
   production profile's; fresh5 has no stamp and is labelled "did not record its settings".
-- Claims register: `proof_facts.json` `figures` maps each figure to its record. The existing
-  public-claims test (`tests/test_landing_facts.py`) fails when a decimal, a percentage or a
-  thousands figure on a public page is not in the register, when a retired figure returns, or when
-  a history figure is not found in its source file.
+- `tests/test_proof_facts.py` fails when a retired figure returns to a public page, the README
+  summary or `docs/vendor-information.md`.
 - WS12.7: the sitemap, `llms.txt` and the structured-data dates come from one list
   (`seo.PUBLIC_PAGES`) with a date per page from `git log` (`web/page_dates.json`,
   `scripts/page_dates.py`, checked by `tests/test_web_seo.py`). `/status` is listed. `/showcase`
   answers 404 where the folder is absent, not a redirect to a 404.
 - WS25.1: `/pricing` (free beta, the limits, no prices). WS25.3: `/security` (what is stored, who
   receives it, retention, access, file handling, what was and was not tested, no agreement
-  offered, how to report). The by-company table moved from the offices page to `/security`. A data
-  processing agreement is drafted, unpublished, in `docs/data-processing-agreement-draft.md`.
+  offered, how to report). The by-company table moved from the offices page to `/security`.
 - Plainer public copy: the landing page's two "screen reader says" labels say where each reading
   comes from; the terms summary keeps what the full text does not repeat; the privacy notice
   names what restarts the delete clock and the steps that write a temporary copy.

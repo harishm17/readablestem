@@ -30,7 +30,8 @@ every other page is `noindex`), and writes `/robots.txt`, `/llms.txt` and the In
 sitemap, `llms.txt` and the structured-data dates all read it. A page's date is in
 `web/page_dates.json`, written from `git log` by `scripts/page_dates.py` (the Docker image has no
 `.git`); run it after changing a page's text. `tests/test_web_seo.py` fails when a page's files
-changed after its date (skipped where git has no history).
+changed after its date. It needs the full history, so it runs on a full clone and is skipped in
+CI's shallow checkout: run the full suite locally before a release.
 
 ## Pages
 

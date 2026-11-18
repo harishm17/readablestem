@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from fixtures.web.support import WebEnv
-from readablestem.web import proof_facts
+from readablestem.web import offices, proof_facts
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -55,7 +55,8 @@ def test_a_result_file_is_called_the_live_settings_only_when_its_stamp_is_the_pr
 def pages(tmp_path_factory):
     env = WebEnv(tmp_path_factory.mktemp("proof-strip"))
     with env.running() as anon:
-        return {path: anon.get(path).text for path in ("/", "/limits", "/security")}
+        paths = ("/", "/limits", "/security", "/for-accessibility-offices", offices.SUMMARY_PATH)
+        return {path: anon.get(path).text for path in paths}
 
 
 def test_no_public_page_or_readme_summary_states_a_retired_figure(pages):
