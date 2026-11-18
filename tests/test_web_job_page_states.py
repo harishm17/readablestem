@@ -344,7 +344,7 @@ def statement_of(web, job_id: str) -> dict[str, object]:
         "state": title(job).split(":")[0],
         "job": page_text(job),
         "summary": re.search(r'accessibilitySummary">([^<]*)<', package).group(1),
-        "sufficient": "accessModeSufficient" in package,
+        "sufficient": 'accessModeSufficient">textual<' in package,
         "csv": {r[1]: r[7] for r in rows if r and r[0] == "summary"},
     }
 

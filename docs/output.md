@@ -1192,7 +1192,7 @@ from the stored result on first use. A combined document is titled by the file i
 from (`web.combine.title_of`), not by the first part's heading.
 
 My documents and the batch table lead with the title and put the file name on the line
-under it; when the title is the file name there is one line. The job page's title field
+under it; when the title is the file name as written there is one line. The job page's title field
 says where the suggestion comes from ("From the title in your PDF.", "From the first
 heading.", "From the file name.", or "No title found: students will hear “Converted
 document”. Type one.").

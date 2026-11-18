@@ -79,9 +79,10 @@ class DocumentRow:
     def file_note(self) -> str:
         """The file the person uploaded, shown under the title when it says something else:
         two files of a course can share a title, and the file name is what the person
-        recognises. One line when the title is the file name; the recorded sample has no
-        file of theirs."""
-        if self.is_sample or self.title in (self.filename, assemble.file_title(self.filename)):
+        recognises. One line only when the title is the file name as written; a title made from
+        its words ("a" for a.pdf) still shows the file, which says what kind it is. The
+        recorded sample has no file of theirs."""
+        if self.is_sample or self.title == self.filename:
             return ""
         return self.filename
 
