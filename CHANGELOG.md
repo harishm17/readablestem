@@ -51,6 +51,8 @@
   filter moves the note's words to the mark and writes neither the block nor the link. Word
   files are made on request, so a document converted earlier gets this at its next download; no
   `RENDER_VERSION` bump is owed.
+  The output audit no longer counts a note's "Back to the text" link as words of the note, which
+  a Word footnote leaves to Word (it had reported 11 notes lost in Word files).
 
 ## Unreleased: one equation cannot fail the Word file (branch feat/exports-links-epub-title)
 

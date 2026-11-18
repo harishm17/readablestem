@@ -54,7 +54,8 @@ id="pagebreak-2"><span aria-hidden="true">Page 2</span></div>
 alt="A hand sketch of the track." width="10" height="10">\
 <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span> \
 This sketch is shown as a picture of the original.</p></div>
-<div role="doc-footnote" id="p2-e5"><p>The slope is three metres long.</p></div>
+<div role="doc-footnote" id="p2-e5"><p>The slope is three metres long. \
+<a role="doc-backlink" href="#noteref-p2-e5">Back to the text</a></p></div>
 </main>
 <footer id="about-conversion" class="about readablestem">
 <p>This is a web version of a PDF from your course.</p>
@@ -103,7 +104,7 @@ EXPORT_DEFECTS = (
     ),
     ('<h2 id="p2-e0">Measured values</h2>', '<h4 id="p2-e0">Measured values</h4>'),  # out_heading
     ('<html lang="en">', "<html>"),  # out_lang
-    ("<p>The slope is three metres long.</p>", ""),  # out_note_lost
+    ("<p>The slope is three metres long.", ""),  # out_note_lost
     (f'<img src="{PNG}" alt="the red button" width="10" height="10">, then', " , then"),  # out_hole
     (  # out_notice_missing
         '<p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.'
@@ -133,7 +134,7 @@ PAGE_DEFECTS = (
     ),
     ('<h2 id="p2-e0">Measured values</h2>', '<h4 id="p2-e0">Measured values</h4>'),  # out_heading
     ('<html lang="en">', "<html>"),  # out_lang
-    ("three metres long.</p>", "three the -metres long.</p>"),  # out_hole
+    ("three metres long. ", "three the -metres long. "),  # out_hole
     (  # out_notice_missing: a kept picture with nothing to say so
         '<div class="flagged" id="p2-e4" data-status="failed">',
         '<div id="p2-e4">',
