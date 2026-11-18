@@ -59,8 +59,8 @@ def link_targets_exist(markup: str) -> None:
 
 def test_the_file_in_the_zip_keeps_all_of_it_and_adds_no_tab_stop(export):
     page = export.index_html
-    assert 'href="#main-content"' in page and 'id="main-content"' in page
-    # the one tabindex is the skip link's target, which is not a scroll box
+    assert re.search(r'class="skip-link[^>]*href="#p1-e0"', page)
+    assert re.findall(r'<h1 [^>]*tabindex="-1"', page) == ['<h1 id="p1-e0" tabindex="-1"']
     assert re.findall(r'tabindex="[^"]*"', page) == ['tabindex="-1"']
     assert export.notes.scroll_boxes == 0
     link_targets_exist(page)

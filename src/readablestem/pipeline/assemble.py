@@ -41,7 +41,7 @@ from __future__ import annotations
 import base64
 import math
 import re
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
@@ -219,63 +219,67 @@ CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'
 DRAFT_CLASS = "draft-mark"
 # The flag notes speak to students, as the about section does (UX review MF7): what is
-# missing, and whom to ask. Never reviewer wording ("review", "publishing").
-EQUATION_NOTE = (
-    "This equation is shown as an image of the original, so screen readers cannot read "
-    "it. Ask your instructor for a version you can read."
-)
+# missing, and whom to ask. Never reviewer wording ("review", "publishing"). A box says only
+# what this part is (F-114); why a screen reader cannot read a picture, and what to do about
+# it, is said once, in the notice at the top (`_checked_notice`, `NOT_CONVERTED_WHY`).
+EQUATION_NOTE = "Shown as an image of the original."
 # The same for a formula of a LaTeX source, shown as it was written (no picture).
-EQUATION_WRITTEN_NOTE = (
-    "This equation is shown as it was written in LaTeX, so screen readers may not read it "
-    "well. Ask your instructor for a version you can read."
+EQUATION_WRITTEN_NOTE = "Shown as it was written in LaTeX."
+FIGURE_NOTE = "This figure has no text description yet."
+# Said once, in the notice at the top, when any part is not converted: the explanation that
+# each box used to repeat. What to do ("ask your instructor for a version you can read") is
+# in the statement of the same notice.
+NOT_CONVERTED_WHY = Words(
+    "A screen reader cannot read a picture, so it passes over each of these parts. Each one is "
+    "marked where it stands, with what it is."
 )
-FIGURE_NOTE = (
-    "This figure has no text description yet. Ask your instructor for a description of it."
+NOT_CONVERTED_WHY_WRITTEN = Words(
+    "A screen reader may not read these parts well. Each one is marked where it stands, with "
+    "what it is."
 )
 # Pages and pictures kept as images (pipeline.page_type: there is no handwriting or scan
 # conversion): by the fix's reason, ONE table of the picture's alt text ("{page}" is the page
-# number), the label of its note and the note students see. Rendered from the stored reason,
-# so a stored result renders the same. A reason that names what the picture is (a handwritten
-# page, a scanned page) is a page-level finding; `handwriting_on_page` is also what a box of
-# vector lines got named before the reader had pen evidence (WS6.10, WS3.5), so it says only
-# that the part is a picture and never names handwriting (WS21.9). A drawing has no reason
-# of its own yet (P1 and P3 record it); it is added to this table then.
+# number), the label of its note and the short reason students see at the box. Rendered from the
+# stored reason, so a stored result renders the same. A reason that names what the picture is (a
+# handwritten page, a scanned page) is a page-level finding; `handwriting_on_page` is also what a
+# box of vector lines got named before the reader had pen evidence (WS6.10, WS3.5), so it says
+# only that the part is a picture and never names handwriting (WS21.9): its label says all, and
+# its reason is empty. A drawing has no reason of its own yet (P1 and P3 record it); it is
+# added to this table then.
 KEPT_IMAGE_LABEL = "Not converted."
 KEPT_PICTURE_LABEL = "Shown as a picture, not converted to text."
-_ASK = "Ask your instructor for a text version."
 KEPT_IMAGE_WORDS = {
     "handwritten_page": (
         "Page {page}: handwritten notes, not converted to text.",
         KEPT_IMAGE_LABEL,
-        f"This page is a picture of handwritten notes, so a screen reader cannot read it. {_ASK}",
+        "A page of handwritten notes.",
     ),
     "scanned_page": (
         "Page {page}: a scanned page, not converted to text.",
         KEPT_IMAGE_LABEL,
-        f"This page is a picture of a scanned page, so a screen reader cannot read it. {_ASK}",
+        "A scanned page.",
     ),
     "unread_page": (
         "Page {page}: not converted to text.",
         KEPT_IMAGE_LABEL,
-        f"This page is shown as a picture, so a screen reader cannot read it. {_ASK}",
+        "A page shown as a picture.",
     ),
     "page_read_failed": (
         "Page {page}: this page could not be read.",
         KEPT_IMAGE_LABEL,
-        "This page could not be read, so it is shown as a picture and a screen reader cannot "
-        f"read it. {_ASK}",
+        "This page could not be read.",
     ),
     "handwriting_on_page": (
         "Part of page {page}, shown as a picture, not converted to text.",
         KEPT_PICTURE_LABEL,
-        f"A screen reader cannot read this picture. {_ASK}",
+        "",
     ),
     # A block of a page converted from an image that the instructor chose to keep as the
     # picture (`_kept_prose`): not a page, and not a whole-page reason either.
     "image_page_text": (
         "Text on page {page}, not converted to text.",
         KEPT_IMAGE_LABEL,
-        f"This is a picture of text on the page, so a screen reader cannot read it. {_ASK}",
+        "Text on the page, shown as a picture.",
     ),
 }
 # A page kept as a picture because something painted on it was read into nothing (an
@@ -286,10 +290,7 @@ UNREAD_PARTS_CLASS = "unread-parts-note"
 UNREAD_PARTS_NOTE = "Parts of this page could not be read and are missing from the text below."
 UNREAD_PARTS_LINK = "The page is shown as a picture after it."
 # Writing on a page converted from an image that the reading left out (`image_page_omission`).
-OMITTED_NOTE = (
-    "This part of the page was not converted to text, so a screen reader cannot read it. Ask "
-    "your instructor for a text version."
-)
+OMITTED_NOTE = "Writing on the page that is not in the text."
 # A page converted from an image of it (ADR 0007): the note at its start and the toggle that
 # shows the original. The notice is the author's wording; it assists, it does not say the
 # conversion is right.
@@ -989,6 +990,7 @@ class _Renderer:
     # document has two pages or more), the page the last marker or block was on, and the
     # footnotes: their element ids, and the id of the mark that links to each.
     toc: list[navigation.TocEntry] = field(default_factory=list)
+    h1_id: str | None = None  # the id of the `<h1>` a heading is (the skip link's target)
     page_labels: Mapping[int, str] = field(default_factory=dict)
     # Page of the PDF each of the document's pages is, when it is not its own number (a part of
     # a longer file: 0-based local page to 0-based page of the source).
@@ -1364,6 +1366,9 @@ class _Renderer:
         # (`p3-e7`, the same on every render of a result), else the next free `heading-N`.
         anchor = self.claim_id(element.id) or self.fresh_id("heading")
         attrs = f' id="{_escape(anchor)}"' + inline_text.passage_attrs(element)
+        if level == 1:  # the skip link jumps here, and focus moves with it (not a tab stop)
+            attrs += ' tabindex="-1"'
+            self.h1_id = anchor
         plain = " ".join(INLINE_MARKER_RE.sub("[equation]", text).split())
         if plain:
             self.toc.append(navigation.TocEntry(level, anchor, plain))
@@ -1586,10 +1591,11 @@ class _Renderer:
         fix = self.fixes.get(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(fix, reason)
         link = self.instructor_link(element, reason)
+        said = "".join(f" {part}" for part in (note, link) if part)
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'
-            f'<span class="flag-label">{label}</span> {note}{" " + link if link else ""}</p></div>'
+            f'<span class="flag-label">{label}</span>{said}</p></div>'
         )
 
 
@@ -1610,6 +1616,17 @@ def _placed_equations(
             texts.append(element.caption_marked or element.caption or "")
     found = {m.group(1) for text in texts for m in INLINE_MARKER_RE.finditer(text)}
     return found & equation_ids
+
+
+def _after_title(parts: Iterable[str], contents: str) -> list[str]:
+    """The body's parts with the contents list right after the one that holds the `<h1>`
+    (first on the page when the title is not in a part): the title comes first, so on a phone
+    it is on the first screen and the skip link has its target before the list (F-116)."""
+    out = list(parts)
+    if contents:
+        at = next((i + 1 for i, part in enumerate(out) if "<h1" in part), 0)
+        out.insert(at, contents)
+    return out
 
 
 def _notice(text: str | None) -> str | None:
@@ -1693,7 +1710,9 @@ def _about_section(
     )
 
 
-def _checked_notice(summary: checked.CheckedSummary, places: Collection[str]) -> str:
+def _checked_notice(
+    summary: checked.CheckedSummary, places: Collection[str], audience: str = STUDENT
+) -> str:
     """The statement again, first in `<main>`, when nobody reviewed the page or a part is a
     picture or left out (SW7), so the note at the end is not the only notice. A region named
     by its own title (not the note's, so a list of landmarks tells the two apart), with no
@@ -1713,12 +1732,16 @@ def _checked_notice(summary: checked.CheckedSummary, places: Collection[str]) ->
         links.append(f"<li>{_escape(rest)}</li>")
     if summary.left_out:
         links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.NOTICE_LEFT_OUT_LINK}</a></li>')
+    why = ""
+    if summary.pictures:  # the explanation each not-converted box used to repeat (F-114)
+        said = NOT_CONVERTED_WHY if summary.origin == "pdf" else NOT_CONVERTED_WHY_WRITTEN
+        why = f"<p>{_escape(say(said, audience))}</p>\n"
     return (
         f'<section id="{NOTICE_ID}" class="notice checked-notice {AUTHORED_CLASS}" '
         f'aria-labelledby="{NOTICE_TITLE_ID}">\n'
         f'<p id="{NOTICE_TITLE_ID}" class="flag-label">{words.NOTICE_TITLE}</p>\n'
         f"<p>{_escape(' '.join(words.statement(summary)))}</p>\n"
-        f"<ul>{''.join(links)}</ul>\n</section>"
+        f"{why}<ul>{''.join(links)}</ul>\n</section>"
     )
 
 
@@ -2137,11 +2160,13 @@ def render_html(
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
         title=titles.text,
     )
-    top = _checked_notice(summary, renderer.used_ids)
+    top = _checked_notice(summary, renderer.used_ids, audience)
     # Exactly one H1 (SW6c): the title, added above the headings, or the heading that is it.
     page_title = titles.text
     if titles.heading_id is None:
-        body = [f"<h1>{_escape(page_title)}</h1>", *body]
+        title_h1 = f'<h1 id="{navigation.MAIN_ID}" tabindex="-1">{_escape(page_title)}</h1>'
+        body = [title_h1, *body]
+        renderer.h1_id = navigation.MAIN_ID
     # The PDF's own contents page is the contents list; a second one would be one too many.
     printed_contents = any(navigation.PRINTED_CONTENTS_REASON in e.reasons for e in ordered)
     contents = ""
@@ -2154,6 +2179,7 @@ def render_html(
             ),
             lang,
         )
+    skip_target = renderer.h1_id or navigation.MAIN_ID
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     page = "\n".join(
@@ -2170,13 +2196,11 @@ def render_html(
             f"<style>\n{style}</style>",
             "</head>",
             "<body>",
-            _authored_in_english(navigation.skip_link(AUTHORED_CLASS), lang),
-            *([contents] if contents else []),
-            f'<span id="{navigation.MAIN_ID}" tabindex="-1"></span>',
+            _authored_in_english(navigation.skip_link(AUTHORED_CLASS, skip_target), lang),
             "<main>",
             *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
             *([_authored_in_english(top, lang)] if top else []),
-            *(_authored_in_english(part, lang) for part in body),
+            *_after_title((_authored_in_english(part, lang) for part in body), contents),
             _authored_in_english(about, lang),
             "</main>",
             "</body>",

@@ -232,7 +232,7 @@ def test_a_not_converted_note_links_the_instructor_without_the_items_content():
         link == "mailto:prof.lee@example.edu?subject=Physics%20notes%3A%20Equation%20on%20page%202"
     )
     assert "SECRET" not in link and "body=" not in link  # kind and page only; an empty body
-    assert 'Ask your instructor for a version you can read. <a href="mailto:' in html
+    assert f'{assemble.EQUATION_NOTE} <a href="mailto:' in html
     assert instructor_links(unconverted("prof.lee@example.edu", assemble.CHECKER))  # the draft too
     assert all(c.passed for c in html_checks.static_checks(html))
 

@@ -4,17 +4,21 @@ What the output looks like and why is in docs/output.md ("Navigation"). The asse
 *where* each piece goes (it knows the headings, the pages and the notes); this module only
 writes the markup and holds the words, so both can be tested and changed on their own.
 
-- `skip_link`: the first thing in the file, hidden until it is focused, jumping over the
-  contents list to the empty `<span id="main-content" tabindex="-1">` just before `<main>`
-  (WCAG 2.4.1, Bypass Blocks). The id is on a span, not on `<main>` itself, because about 60
-  places (code, tests, the committed demo) read the file by the literal `<main>` tag. The
-  `tabindex="-1"` makes the span focusable by script and by following the link, so Firefox
-  and VoiceOver move there (a link to an element that cannot take focus only scrolls); it is
-  not a tab stop. Canvas removes `tabindex` from a pasted page, which also drops the skip link.
-- `contents_nav`: `<nav aria-label="Contents">` with nested links to the headings, made from
-  the outline as written (after the repair that never skips a level), when there are at
-  least `MIN_TOC_HEADINGS` of them and the PDF has no contents page of its own (two lists
-  of contents would be one too many).
+- `skip_link`: the first thing in the file, hidden until it is focused, jumping to the page's
+  one `<h1>` (WCAG 2.4.1, Bypass Blocks). The title is the start of the content, and the
+  Contents list stands after it, so the link needs nothing to jump over but the notices before
+  the title. The `<h1>` carries `tabindex="-1"`, which makes it focusable by following the link
+  (Firefox and VoiceOver move there; a link to an element that cannot take focus only scrolls)
+  without making it a tab stop. A title the assembler adds has the id `MAIN_ID`; a heading that
+  is the title keeps its own. Canvas removes `tabindex` from a pasted page, which also drops the
+  skip link.
+- `contents_nav`: `<nav aria-label="Contents">` after the `<h1>`, with nested links to the
+  headings, made from the outline as written (after the repair that never skips a level), when
+  there are at least `MIN_TOC_HEADINGS` of them and the PDF has no contents page of its own
+  (two lists of contents would be one too many). A heading repeated under the same parent is
+  one entry. The list is a `<details>`, closed in the markup so that every reader of the file
+  that draws no style (a phone's first screen, Canvas, Word, a transcript) gets a short line,
+  and open to the eye from `WIDE` up and on paper (`TOC_CSS`).
 - `pagebreak`: an `<hr role="doc-pagebreak" aria-label="Page N">` (axe accepts that role on
   `hr` only) and the same words as visible text beside it, so an LMS that drops the role or
   the label, or the CSS (Canvas keeps no pseudo-element rules), still shows the page.
@@ -28,9 +32,10 @@ so the wording check reads them and a document in another language marks them `l
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html import escape
 
+# The id of a title `<h1>` the assembler adds; the skip link's target when no heading is it.
 MAIN_ID = "main-content"
 SKIP_TEXT = "Skip to main content"
 CONTENTS_LABEL = "Contents"
@@ -41,6 +46,9 @@ MIN_TOC_HEADINGS = 3
 # `Element.reasons` of an entry of the PDF's own contents page (`layout.CONTENTS_ENTRY`; a
 # test keeps the two equal, since assembly does not import the PDF code).
 PRINTED_CONTENTS_REASON = "contents entry"
+# The width from which the contents list is shown open (and the same on paper). Under it the
+# list is one closed line, so a phone's first screen shows the title and the start of the text.
+WIDE = "40rem"
 
 
 @dataclass(frozen=True)
@@ -50,39 +58,82 @@ class TocEntry:
     text: str  # plain text of the heading
 
 
-def skip_link(authored_class: str) -> str:
-    return f'<a class="skip-link {authored_class}" href="#{MAIN_ID}">{SKIP_TEXT}</a>'
+@dataclass
+class _Entry:
+    """One line of the list: a heading, and the later headings under the same parent that
+    say the same words (`also`), with what is under all of them."""
+
+    first: TocEntry
+    also: list[TocEntry] = field(default_factory=list)
+    children: list[_Entry] = field(default_factory=list)
+
+
+def skip_link(authored_class: str, target_id: str = MAIN_ID) -> str:
+    target = escape(target_id, quote=True)
+    return f'<a class="skip-link {authored_class}" href="#{target}">{SKIP_TEXT}</a>'
+
+
+def _tree(entries: Sequence[TocEntry]) -> list[_Entry]:
+    """The entries as a tree by heading level. A heading more than one level below the one
+    before it nests one level only; one above the first heading is a sibling of it. A heading
+    with the words of an earlier one under the same parent is merged into it, so a heading
+    that repeats ("Teacher Support" in every section) is one line."""
+    roots: list[_Entry] = []
+    path: list[_Entry] = []
+    for entry in entries:
+        while path and path[-1].first.level >= entry.level:
+            path.pop()
+        siblings = path[-1].children if path else roots
+        words = " ".join(entry.text.casefold().split())
+        same = next(
+            (s for s in siblings if " ".join(s.first.text.casefold().split()) == words), None
+        )
+        if same is not None and same.first.level == entry.level:
+            same.also.append(entry)
+            path.append(same)
+        else:
+            line = _Entry(entry)
+            siblings.append(line)
+            path.append(line)
+    return roots
+
+
+def _list(lines: Sequence[_Entry]) -> str:
+    out = ["<ul>"]
+    for line in lines:
+        first = line.first
+        item = f'<li><a href="#{escape(first.id, quote=True)}">{escape(first.text)}</a>'
+        if line.also:
+            # The later places carry their number, so a link is never the same words twice.
+            more = ", ".join(
+                f'<a href="#{escape(e.id, quote=True)}" '
+                f'aria-label="{escape(e.text, quote=True)} {number}">{number}</a>'
+                for number, e in enumerate(line.also, 2)
+            )
+            item += f" ({more})"
+        if line.children:
+            item += _list(line.children)
+        out.append(item + "</li>")
+    out.append("</ul>")
+    return "".join(out)
 
 
 def contents_nav(
     entries: Sequence[TocEntry], authored_class: str, document_lang: str | None = None
 ) -> str:
-    """The contents list: nested `<ul>`s by heading level, one link per heading. A heading
-    more than one level below the one before it nests one level only; one above the first
-    heading is a sibling of it. `document_lang`: given when the document is not in English;
-    the label (an English `aria-label`) is then marked English and the entries the document's."""
-    out: list[str] = []
-    stack: list[int] = []
-    for entry in entries:
-        if not stack or entry.level > stack[-1]:
-            out.append("<ul>")
-            stack.append(entry.level)
-        else:
-            out.append("</li>")
-            while len(stack) > 1 and entry.level < stack[-1]:
-                out.append("</ul></li>")
-                stack.pop()
-        out.append(f'<li><a href="#{escape(entry.id, quote=True)}">{escape(entry.text)}</a>')
-    out.append("</li>" + "</ul></li>" * (len(stack) - 1) + "</ul>")
-    items = "".join(out)
+    """The contents list: nested `<ul>`s by heading level, one link per heading, in a
+    `<details>` whose summary is its label. `document_lang`: given when the document is not
+    in English; the label (an English `aria-label`) is then marked English and the entries the
+    document's."""
+    items = _list(_tree(entries))
     nav_lang = ""
     if document_lang:
         nav_lang = ' lang="en"'
         items = f'<div lang="{escape(document_lang, quote=True)}">{items}</div>'
     return (
         f'<nav class="toc"{nav_lang} aria-label="{CONTENTS_LABEL}">\n'
-        f'<p class="toc-title {authored_class}" aria-hidden="true">{CONTENTS_LABEL}</p>\n'
-        f"{items}\n</nav>"
+        f'<details class="toc-details"><summary class="toc-title {authored_class}">'
+        f"{CONTENTS_LABEL}</summary>\n{items}\n</details>\n</nav>"
     )
 
 
@@ -108,11 +159,34 @@ def backlink(ref_id: str, authored_class: str) -> str:
 # (`_Renderer.add_style`), so documents without them are written as before. `border-top`,
 # `margin`, `padding`, `font-size`, `color`, `text-align` and `display` are properties Canvas
 # keeps, so the Canvas export carries these rules into `style` attributes.
-TOC_CSS = """\
-.toc { margin: 1rem auto; max-width: 42rem; padding: 0 1rem; }
-.toc-title { font-weight: 700; margin: 0 0 0.25em; }
-.toc ul { margin: 0; padding-left: 1.25em; }
-.toc li { margin: 0.15em 0; }
+#
+# The list is a closed `<details>` under `WIDE`, so on a phone it is one line below the title.
+# From `WIDE` up, and on paper, where the browser can draw a closed `<details>`' content
+# (`::details-content`), the content is shown and the summary is hidden: with no control there
+# is no state to get wrong, and a screen reader meets the landmark named "Contents" and its
+# list, not a "collapsed" button above a list that is open. The words "Contents" are then
+# written by the sheet in the summary's place. Where it cannot (older browsers) nothing
+# changes: the closed line stays, a real control that works from the keyboard, and on paper
+# its summary says to open it first (as a figure description's does).
+TOC_CSS = f"""\
+.toc {{ margin: 1rem auto; max-width: 42rem; padding: 0 1rem; }}
+.toc-title {{ font-weight: 700; cursor: pointer; padding: 0.25em 0; }}
+.toc ul {{ margin: 0; padding-left: 1.25em; }}
+.toc li {{ margin: 0.15em 0; }}
+@media (min-width: {WIDE}), print {{
+  @supports selector(::details-content) {{
+    .toc-details::details-content {{ content-visibility: visible; display: block; }}
+    .toc-details > summary {{ display: none; }}
+    .toc-details::before {{ content: "{CONTENTS_LABEL}"; display: block; font-weight: 700;
+      margin: 0 0 0.25em; }}
+  }}
+}}
+@media print {{
+  @supports not selector(::details-content) {{
+    .toc-details:not([open]) > summary::after {{
+      content: " (open this list before printing)"; font-weight: 400; }}
+  }}
+}}
 """
 PAGEBREAK_CSS = """\
 .pagebreak { margin: 1.5em 0 0.5em; padding: 0.25em 0 0; border-top: 1px solid #767676;

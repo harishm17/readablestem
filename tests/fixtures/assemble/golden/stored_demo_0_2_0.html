@@ -79,9 +79,23 @@ figcaption { margin-top: 0.5em; }
   img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
 }
 .toc { margin: 1rem auto; max-width: 42rem; padding: 0 1rem; }
-.toc-title { font-weight: 700; margin: 0 0 0.25em; }
+.toc-title { font-weight: 700; cursor: pointer; padding: 0.25em 0; }
 .toc ul { margin: 0; padding-left: 1.25em; }
 .toc li { margin: 0.15em 0; }
+@media (min-width: 40rem), print {
+  @supports selector(::details-content) {
+    .toc-details::details-content { content-visibility: visible; display: block; }
+    .toc-details > summary { display: none; }
+    .toc-details::before { content: "Contents"; display: block; font-weight: 700;
+      margin: 0 0 0.25em; }
+  }
+}
+@media print {
+  @supports not selector(::details-content) {
+    .toc-details:not([open]) > summary::after {
+      content: " (open this list before printing)"; font-weight: 400; }
+  }
+}
 .pagebreak { margin: 1.5em 0 0.5em; padding: 0.25em 0 0; border-top: 1px solid #767676;
   font-size: 0.8rem; color: #595959; text-align: right; }
 .pagebreak hr { margin: 0; padding: 0; border: 0; height: 0; }
@@ -91,12 +105,7 @@ figcaption { margin-top: 0.5em; }
 </style>
 </head>
 <body>
-<a class="skip-link readablestem" href="#main-content">Skip to main content</a>
-<nav class="toc" aria-label="Contents">
-<p class="toc-title readablestem" aria-hidden="true">Contents</p>
-<ul><li><a href="#p1-e0">2.3 Position vs. Time Graphs</a><ul><li><a href="#p1-e1">Section Learning Objectives</a></li><li><a href="#p1-e5">Teacher Support</a><ul><li><a href="#p1-e6">Teacher Support</a></li></ul></li><li><a href="#p1-e10">Section Key Terms</a></li><li><a href="#p1-e12">Teacher Support</a><ul><li><a href="#p1-e13">Teacher Support</a></li></ul></li><li><a href="#p1-e16">Graphing Position as a Function of Time</a></li><li><a href="#p3-e7">Tips For Success</a></li><li><a href="#p5-e0">Teacher Support</a><ul><li><a href="#p5-e1">Teacher Support</a></li></ul></li><li><a href="#p5-e2">Teacher Demonstration</a></li><li><a href="#p6-e0">Snap Lab</a><ul><li><a href="#p6-e1">Graphing Motion</a></li><li><a href="#p6-e12">Procedure</a></li></ul></li><li><a href="#p7-e0">Teacher Support</a><ul><li><a href="#p7-e1">Teacher Support</a></li><li><a href="#p7-e6">Solving Problems Using Position vs. Time Graphs</a></li></ul></li><li><a href="#p8-e0">Worked Example</a><ul><li><a href="#p8-e1">Using Position–Time Graph to Calculate Average Velocity: Jet Car</a></li></ul></li><li><a href="#p8-e3">Strategy</a><ul><li><a href="#p8-e7">Solution</a></li><li><a href="#p8-e12">Discussion</a></li></ul></li><li><a href="#p8-e14">Teacher Support</a><ul><li><a href="#p8-e15">Teacher Support</a></li></ul></li><li><a href="#p10-e1">Worked Example</a><ul><li><a href="#p10-e2">Using Position–Time Graph to Calculate Average Velocity: Jet Car, Take Two</a></li></ul></li><li><a href="#p10-e4">Strategy</a><ul><li><a href="#p10-e6">Solution</a></li><li><a href="#p10-e12">Discussion</a></li></ul></li><li><a href="#p11-e0">Teacher Support</a><ul><li><a href="#p11-e1">Teacher Support</a></li></ul></li><li><a href="#p11-e4">Practice Problems</a></li><li><a href="#p12-e6">Check Your Understanding</a></li><li><a href="#p13-e3">Teacher Support</a><ul><li><a href="#p13-e4">Teacher Support</a></li></ul></li></ul></li></ul>
-</nav>
-<span id="main-content" tabindex="-1"></span>
+<a class="skip-link readablestem" href="#p1-e0">Skip to main content</a>
 <main>
 <section id="checked-notice" class="notice checked-notice readablestem" aria-labelledby="checked-notice-title">
 <p id="checked-notice-title" class="flag-label">Before you read</p>
@@ -104,7 +113,12 @@ figcaption { margin-top: 0.5em; }
 <ul><li><a href="#about-conversion">About this version</a></li></ul>
 </section>
 <div class="pagebreak readablestem"><hr role="doc-pagebreak" aria-label="Page 1" id="pagebreak-1"><span aria-hidden="true">Page 1</span></div>
-<h1 id="p1-e0">2.3 Position vs. Time Graphs</h1>
+<h1 id="p1-e0" tabindex="-1">2.3 Position vs. Time Graphs</h1>
+<nav class="toc" aria-label="Contents">
+<details class="toc-details"><summary class="toc-title readablestem">Contents</summary>
+<ul><li><a href="#p1-e0">2.3 Position vs. Time Graphs</a><ul><li><a href="#p1-e1">Section Learning Objectives</a></li><li><a href="#p1-e5">Teacher Support</a> (<a href="#p1-e12" aria-label="Teacher Support 2">2</a>, <a href="#p5-e0" aria-label="Teacher Support 3">3</a>, <a href="#p7-e0" aria-label="Teacher Support 4">4</a>, <a href="#p8-e14" aria-label="Teacher Support 5">5</a>, <a href="#p11-e0" aria-label="Teacher Support 6">6</a>, <a href="#p13-e3" aria-label="Teacher Support 7">7</a>)<ul><li><a href="#p1-e6">Teacher Support</a> (<a href="#p1-e13" aria-label="Teacher Support 2">2</a>, <a href="#p5-e1" aria-label="Teacher Support 3">3</a>, <a href="#p7-e1" aria-label="Teacher Support 4">4</a>, <a href="#p8-e15" aria-label="Teacher Support 5">5</a>, <a href="#p11-e1" aria-label="Teacher Support 6">6</a>, <a href="#p13-e4" aria-label="Teacher Support 7">7</a>)</li><li><a href="#p7-e6">Solving Problems Using Position vs. Time Graphs</a></li></ul></li><li><a href="#p1-e10">Section Key Terms</a></li><li><a href="#p1-e16">Graphing Position as a Function of Time</a></li><li><a href="#p3-e7">Tips For Success</a></li><li><a href="#p5-e2">Teacher Demonstration</a></li><li><a href="#p6-e0">Snap Lab</a><ul><li><a href="#p6-e1">Graphing Motion</a></li><li><a href="#p6-e12">Procedure</a></li></ul></li><li><a href="#p8-e0">Worked Example</a> (<a href="#p10-e1" aria-label="Worked Example 2">2</a>)<ul><li><a href="#p8-e1">Using Position–Time Graph to Calculate Average Velocity: Jet Car</a></li><li><a href="#p10-e2">Using Position–Time Graph to Calculate Average Velocity: Jet Car, Take Two</a></li></ul></li><li><a href="#p8-e3">Strategy</a> (<a href="#p10-e4" aria-label="Strategy 2">2</a>)<ul><li><a href="#p8-e7">Solution</a> (<a href="#p10-e6" aria-label="Solution 2">2</a>)</li><li><a href="#p8-e12">Discussion</a> (<a href="#p10-e12" aria-label="Discussion 2">2</a>)</li></ul></li><li><a href="#p11-e4">Practice Problems</a></li><li><a href="#p12-e6">Check Your Understanding</a></li></ul></li></ul>
+</details>
+</nav>
 <h2 id="p1-e1">Section Learning Objectives</h2>
 <p id="p1-e2">By the end of this section, you will be able to do the following:</p>
 <ul><li id="p1-e3">Explain the meaning of slope in position vs. time graphs</li><li id="p1-e4">Solve problems using position vs. time graphs</li></ul>
