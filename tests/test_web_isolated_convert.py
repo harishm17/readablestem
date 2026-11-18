@@ -785,3 +785,16 @@ def test_a_full_size_document_converts_inside_the_default_memory_cap_time_and_jo
     assert seen and seen[-1] == (100, 100)
     assert out.result.stats.model_calls > 0
     assert elapsed < job_time_limit_s(100, settings) / 10
+
+
+def test_the_conversion_child_loads_no_model_provider_library():
+    """The child sends model calls to the worker over a socket and never calls a provider's
+    library; importing one costs about 1.4 s of every job's start-up (F-492)."""
+    code = (
+        "import sys; import readablestem.pipeline.run;"
+        "print(sorted(m for m in sys.modules if m.split('.')[0] in ('anthropic', 'openai')))"
+    )
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=60, check=True
+    )
+    assert done.stdout.strip() == "[]"

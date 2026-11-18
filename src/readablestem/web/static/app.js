@@ -428,6 +428,18 @@
   });
 })();
 
+/* A tab nobody is looking at does not poll (web/poll.py). htmx's "every" trigger keeps asking
+ * in a background tab, and its trigger filter is an expression (`allowEval` is off here), so
+ * the request is cancelled instead. The timer keeps running: the first tick after the tab is
+ * shown asks again, within one interval, and nothing is lost meanwhile (the answer is the
+ * current state, not a queue of changes).
+ */
+document.addEventListener("htmx:beforeRequest", function (event) {
+  var elt = event.detail && event.detail.elt;
+  var trigger = elt && elt.getAttribute ? elt.getAttribute("hx-trigger") : "";
+  if (document.hidden && trigger && trigger.indexOf("every") === 0) event.preventDefault();
+});
+
 /* "Last checked" (job.html, web/poll.py). A page that polls says when it last asked, whether
  * or not the answer changed anything (a 204 changes nothing, on purpose: a screen reader is not
  * interrupted). The line sits outside the live region, so it is never read out. It goes when the
