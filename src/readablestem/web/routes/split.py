@@ -1462,13 +1462,14 @@ def review_screen(
     `tools` ("1"): the page tools are open; `change`: the text open in them; `add`, `left`,
     `top`, `right`, `bottom`: the region being described for something to add."""
     shown = accepted == "1"
-    _, loaded, _ = _load(request, job_id, user)
+    view, loaded, _ = _load(request, job_id, user)
     if loaded.origin != "pdf":
         # A LaTeX source has no page to show beside its decisions: its list, at the item a
         # link asked for ("Decide it" on the job page), so the link does not lose its place.
         known = item and loaded.fix_for(item) is not None
         anchor = f"#item-{quote(item, safe='')}" if known else ""
-        return RedirectResponse(f"/jobs/{job_id}/review/list{anchor}", status_code=303)
+        # Built from the row the check returned, not from the address asked for.
+        return RedirectResponse(f"/jobs/{view.id}/review/list{anchor}", status_code=303)
     response = split_page(
         request,
         job_id,

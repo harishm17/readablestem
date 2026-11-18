@@ -33,6 +33,7 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from collections.abc import Iterator
 
 # What students meet in place of a character that is not text (a student-facing string).
 UNREADABLE = "[unreadable character]"
@@ -94,8 +95,8 @@ def _replace(text: str, gap: str) -> str:
     return _REFERENCE.sub(lambda m: gap if _is_not_text_code(_code(m)) else m.group(0), text)
 
 
-# A tag, a comment or a declaration; everything between two of them is text.
-_TOKEN = re.compile(r"<!--.*?-->|<[^<>]*>", re.S)
+# A tag or a declaration; everything between two of them (and two comments) is text.
+_TAG = re.compile(r"<[^<>]*>")
 # Where a gap is written as words, not as a marked span: no element may go inside these.
 _PLAIN_INSIDE = ("math", "title", "style", "textarea")
 
@@ -110,9 +111,9 @@ def mark_html(html: str, gap: str) -> str:
     out: list[str] = []
     plain_depth = {name: 0 for name in _PLAIN_INSIDE}
     position = 0
-    for token in _TOKEN.finditer(html):
-        out.append(_text_part(html[position : token.start()], plain_depth, gap))
-        tag = token.group(0)
+    for start, end in _tokens(html):
+        out.append(_text_part(html[position:start], plain_depth, gap))
+        tag = html[start:end]
         if not tag.startswith("<!--"):
             name = re.match(r"</?\s*([A-Za-z][A-Za-z0-9:-]*)", tag)
             if name is not None and (key := name.group(1).lower()) in plain_depth:
@@ -122,9 +123,31 @@ def mark_html(html: str, gap: str) -> str:
                     plain_depth[key] += 1
             tag = _replace(tag, UNREADABLE)
         out.append(tag)
-        position = token.end()
+        position = end
     out.append(_text_part(html[position:], plain_depth, gap))
     return "".join(out)
+
+
+def _tokens(html: str) -> Iterator[tuple[int, int]]:
+    """Where each comment, tag and declaration starts and ends, in order. A comment's end
+    is searched for from where the comment opens, and never again once none is left, so a
+    page of unclosed comment openers costs one pass and not one pass for each."""
+    position = 0
+    closes_left = True
+    while (start := html.find("<", position)) != -1:
+        end = -1
+        if closes_left and html.startswith("<!--", start):
+            close = html.find("-->", start + 4)
+            closes_left = close != -1
+            end = close + 3 if closes_left else -1
+        if end == -1:
+            tag = _TAG.match(html, start)
+            end = tag.end() if tag is not None else -1
+        if end == -1:
+            position = start + 1
+        else:
+            yield start, end
+            position = end
 
 
 def _text_part(text: str, plain_depth: dict[str, int], gap: str) -> str:
