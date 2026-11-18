@@ -735,7 +735,7 @@
 
   <section class="page-area" id="page-view" aria-labelledby="page-title" tabindex="-1">
     <div class="page-head">
-      <h2 id="page-title">Page {{ page.number }} <span class="page-of">of {{ page.count }}</span></h2>
+      <h2 id="page-title" class="card-title">Page {{ page.number }} <span class="page-of">of {{ page.count }}</span></h2>
       <p class="back-to-decision"><a href="#decision-title">Back to the decision</a></p>
       <p class="page-step">
         {% if page.prev_href %}<a href="{{ page.prev_href }}">Previous page</a>{% endif %}
