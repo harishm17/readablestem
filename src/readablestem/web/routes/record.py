@@ -76,6 +76,7 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
             made_at=utcnow(),
             title_chosen=bool(job.title_override),
             contact_set=bool(job.contact_line),
+            exam_mode=bool(job.exam_mode),
             downloaded_formats=(
                 events.downloaded_formats(session, job.id) if ctx.settings.events_enabled else None
             ),

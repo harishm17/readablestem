@@ -351,6 +351,8 @@ class JobView:
     title_override: str | None = None
     contact_line: str | None = None
     retention_mode: str = "day"
+    # Converted as an exam or quiz (`Job.exam_mode`, the words are `web.exam`).
+    exam_mode: bool = False
     # What happened to the decisions of the earlier version this one revises (T3-2):
     # `carry.CarrySummary` and the earlier file's name; None for a job that revises nothing.
     carry: CarryView | None = None
@@ -730,6 +732,7 @@ def job_view(
         title_override=job.title_override,
         contact_line=job.contact_line,
         retention_mode=job.retention_mode,
+        exam_mode=bool(job.exam_mode),
         carry=carried,
         carried_ids=_carried_ids(job),
         part_label=job.part_label or "",

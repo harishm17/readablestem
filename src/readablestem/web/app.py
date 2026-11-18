@@ -43,6 +43,7 @@ from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
 from readablestem.pipeline import checked_words
 from readablestem.web import analytics, dev_only, forms, output, seo
+from readablestem.web.exam import EXAM_WORDS
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -197,6 +198,8 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     # Every sentence about what was converted, checked or reviewed (SW7): templates print
     # these, read from a `pipeline.checked.CheckedSummary`, and compose none of their own.
     env.globals["checked_words"] = checked_words  # ty: ignore[invalid-assignment]
+    # The exam choice's words (web/exam.py), the same on every page that says it.
+    env.globals["exam_words"] = EXAM_WORDS  # ty: ignore[invalid-assignment]
     # Structured data for the public pages (web.seo), with the same absolute address.
     env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
         seo.page_json_ld, site_url.rstrip("/")

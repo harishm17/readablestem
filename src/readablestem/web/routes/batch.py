@@ -191,6 +191,7 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
                 "name": item.filename if same else name,
                 "also": name if same else (item.filename if name != item.filename else ""),
                 "pages": item.pages,
+                "exam_mode": bool(row and row.exam_mode),
                 "label": row.label if row else state.label,
                 "badge": state.badge,
                 "state": _state(state),

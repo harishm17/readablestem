@@ -75,6 +75,7 @@ class DocumentRow:
     part_label: str = ""
     is_sample: bool = False  # the recorded sample document (T3-9)
     titled_by_you: bool = False  # the owner set the title students hear (T1-7): it leads
+    exam_mode: bool = False  # converted as an exam or quiz (`web.exam`); the row marks it
 
     @property
     def name(self) -> str:
@@ -297,6 +298,7 @@ def documents(
             Job.result_version,
             Job.part_label,
             Job.is_sample,
+            Job.exam_mode,
         )
         .where(*_live(user_id, now, course_id, job_ids))
         .order_by(Job.created_at.desc(), Job.id)
@@ -322,6 +324,7 @@ def documents(
             part_label=job.part_label or "",
             is_sample=bool(job.is_sample),
             titled_by_you=bool(own),
+            exam_mode=bool(job.exam_mode),
             state=found.get(job.id),
         )
         by_key[row.group].rows.append(row)

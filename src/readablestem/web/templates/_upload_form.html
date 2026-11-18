@@ -16,7 +16,7 @@
 {% set acc = accepted_revision if revising else accepted %}
 {% set course_error = field_errors.get("course") %}
 {# A group opens by itself when it holds a choice that is not its default, or an error. #}
-{% set open_convert = exam_on or pages_on or picked or course_error or open_convert|default(false) %}
+{% set open_convert = pages_on or picked or course_error or open_convert|default(false) %}
 {% set open_keep = share_on or (fv and keep_on) %}
 <section aria-labelledby="upload-heading" id="upload">
   {% if revising %}
@@ -120,28 +120,30 @@
     </details>
     {% endif %}
 
+    {# Exam mode (Job.exam_mode) is always in view: it changes what students get, so it is not
+       folded into a disclosure. The figure step then describes what is shown and never the
+       result. The words are `exam_words` (web/exam.py), the same on every page that says it. #}
+    <div class="field checkbox-field exam-choice">
+      <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}>
+      <label for="exam">{{ exam_words.choice }}</label>
+    </div>
+
     {# Two groups, in the order they are decided. Each says its setting in one line; the
        choices and their longer explanations open under it. #}
     <div class="option-groups">
+      {% if courses or course_error or image_pages_offered|default(false) %}
       <details class="option-group conversion-options" id="group-convert" data-summary="join"{% if open_convert %} open{% endif %}>
         <summary>
           <span class="group-name">How to convert it</span>
           <span class="group-change">Change</span>
           <span class="group-state" id="convert-state" data-group-state>
-            {%- if courses %}{{ course_name or "No course" }} · {% endif -%}
-            {{ "Exam or quiz: figures described without answers" if exam_on else "Figures described normally" }}
-            {%- if image_pages_offered|default(false) %} · {{ "Scanned and handwritten pages converted" if pages_on else "Scanned pages kept as pictures" }}{% endif %}
+            {%- if courses %}{{ course_name or "No course" }}{% endif -%}
+            {%- if courses and image_pages_offered|default(false) %} · {% endif -%}
+            {%- if image_pages_offered|default(false) %}{{ "Scanned and handwritten pages converted" if pages_on else "Scanned pages kept as pictures" }}{% endif %}
           </span>
         </summary>
         <div class="group-body">
           {% include "_course_choice.html" %}
-          {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
-             shown and never the result. #}
-          <div class="field checkbox-field exam-choice">
-            <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}
-                   data-on="Exam or quiz: figures described without answers" data-off="Figures described normally">
-            <label for="exam">Exam or quiz: describe figures without giving answers</label>
-          </div>
           {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
              owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
              server finds scanned or handwritten pages in. The first line is the rule: a PDF that
@@ -161,6 +163,7 @@
           {% endif %}
         </div>
       </details>
+      {% endif %}
 
       {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
          `retention_hours` after the last activity. The privacy page (privacy.html) says the

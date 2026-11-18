@@ -28,7 +28,6 @@ def test_the_box_is_described_by_its_hint_and_toggles_from_the_label(site, brows
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/app")
     box = page.get_by_label(LABEL)
-    page.locator("#group-convert > summary").click()
     page.locator("label[for=exam]").click()
     expect(box).to_be_checked()
     page.keyboard.press("Space")  # the box has focus after the label click

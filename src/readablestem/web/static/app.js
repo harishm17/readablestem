@@ -342,7 +342,7 @@
 })();
 
 /* Upload form option groups (_upload_form.html). Each group is a <details> whose summary
- * line says what is set ("No course · Figures described normally · ..."). The server writes
+ * line says what is set ("No course · Scanned pages kept as pictures"). The server writes
  * that line for the first view; this rewrites it as the boxes inside change, so a closed
  * group never states a choice that is no longer the one made. Without this file the line
  * stays as the page was sent, and the form still submits what is ticked.

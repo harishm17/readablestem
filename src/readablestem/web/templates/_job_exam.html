@@ -1,0 +1,8 @@
+{# The exam choice made at upload (`Job.exam_mode`, words in web/exam.py), said where the
+   document is handled. "Change" is the revised upload, which asks for the file again with
+   this choice ready to change and carries the decisions over; it is offered to the owner
+   of a finished document. The student's page and files never say it. #}
+{% if not job.is_sample %}
+<p id="job-exam">{{ exam_words.on if job.exam_mode else exam_words.off }}
+  {% if job.is_owner and job.status == "done" %}<a href="/app?revises={{ job.id }}#upload-heading">{{ exam_words.change }}</a>{% endif %}</p>
+{% endif %}

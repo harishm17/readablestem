@@ -40,7 +40,7 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline.checked import CheckedSummary
-from readablestem.web import job_page
+from readablestem.web import exam, job_page
 from readablestem.web.database import as_utc
 from readablestem.web.messages import explain_check, explain_reason, severity_label
 from readablestem.web.review import (
@@ -181,6 +181,7 @@ class Record:
     language: str
     title_chosen: bool
     contact_set: bool
+    exam_mode: bool
     counts: job_page.Breakdown
     checked: CheckedSummary  # what was converted, checked and reviewed (`pipeline.checked`)
     by_kind: dict[str, int]
@@ -370,6 +371,7 @@ def build(
     made_at: datetime,
     title_chosen: bool,
     contact_set: bool,
+    exam_mode: bool,
     downloaded_formats: list[str] | None = None,
     state: Any = None,
 ) -> Record:
@@ -447,6 +449,7 @@ def build(
         language=job_page.language_line(result),
         title_chosen=title_chosen,
         contact_set=contact_set,
+        exam_mode=exam_mode,
         counts=counts,
         checked=summary,
         by_kind=dict(Counter(job_page.word_kind(f) for f in result.fixes)),
@@ -510,6 +513,7 @@ def to_csv(record: Record) -> str:
     row("document", "Converted by", by=record.owner)
     row("document", "Tool", detail=record.tool)
     row("document", "Language", detail=record.language)
+    row("document", "Exam or quiz", detail=exam.words(record.exam_mode))
     row("document", "Record made on", when=iso_when(record.made_at))
     row("document", "Reference", detail=record.job_ref)
     if record.state:
