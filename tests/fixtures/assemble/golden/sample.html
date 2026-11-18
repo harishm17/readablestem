@@ -12,9 +12,15 @@
 body { margin: 0; background: #ffffff; color: #1b1b1b;
   font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
-h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
+h1 { font-size: 2em; }
+h2 { font-size: 1.5em; }
+h3 { font-size: 1.3em; }
+h4 { font-size: 1.15em; }
+h5 { font-size: 1em; }
+h6 { font-size: 1em; font-style: italic; }
 .equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
   overflow-x: auto; overflow-y: hidden; }
 .equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
@@ -35,7 +41,7 @@ li > ul, li > ol { margin: 0.25em 0 0; }
   clip-path: inset(50%); white-space: nowrap; }
 figure { margin: 1.5em 0; }
 figure img { display: block; }
-figcaption { margin-top: 0.5em; }
+figcaption { margin-top: 0.75em; font-size: 0.9em; }
 .flagged { border: 3px dashed #8a3c00; border-radius: 4px; padding: 0.75rem; margin: 1.5em 0; }
 .notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
 .flagged figure { margin: 0; }
@@ -43,7 +49,7 @@ figcaption { margin-top: 0.5em; }
 .flagged-inline { display: inline-block; max-width: 100%; vertical-align: middle;
   line-height: 1.25; border: 2px dashed #8a3c00; padding: 0.1em 0.2em; }
 .flagged-inline img { vertical-align: middle; }
-.flag-note { margin: 0.75em 0 0; }
+.flag-note { margin: 0.75em 0 0; font-size: 0.9em; }
 .flag-label { font-weight: 700; }
 .original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .about { margin: 2.5rem 0 0; padding: 0.5em 0 0; border-top: 2px solid #1b1b1b; }
@@ -79,7 +85,7 @@ figcaption { margin-top: 0.5em; }
   img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
 }
 .pagebreak { margin: 1.5em 0 0.5em; padding: 0.25em 0 0; border-top: 1px solid #767676;
-  font-size: 0.8rem; color: #595959; text-align: right; }
+  font-size: 0.9em; color: #595959; text-align: right; }
 .pagebreak hr { margin: 0; padding: 0; border: 0; height: 0; }
 @media screen and (prefers-color-scheme: dark) {
   .pagebreak { border-top-color: #8c8c8c; color: #c4c4c4; }

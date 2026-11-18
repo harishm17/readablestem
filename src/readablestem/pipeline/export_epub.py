@@ -17,9 +17,9 @@ What is kept and what changes:
   is marked `mathml`. Nothing is turned into an image.
 - Each `data:` image becomes a file in `images/` (one file per distinct picture); `alt` stays
   on the `<img>`.
-- The page's stylesheet is carried as the book's own sheet (`epub_sheet`): the page's colors,
-  font and column are left to the reading system. A document past `CHAPTER_LIMIT` is cut into
-  chapter files at top-level headings. Scripts are not carried.
+- The page's stylesheet is carried as the book's own sheet (`student_sheet.epub`): the page's
+  colors, font and column are left to the reading system. A document past `CHAPTER_LIMIT` is cut
+  into chapter files at top-level headings. Scripts are not carried.
 - ARIA roles stay; the DPUB ones (`doc-pagebreak`, `doc-noteref`, `doc-footnote`,
   `doc-backlink`) also get the matching `epub:type`.
 - `nav.xhtml`: a `toc` from the document's headings (nested by level), and a `page-list` from
@@ -49,7 +49,7 @@ from datetime import UTC, datetime
 from html import escape
 from io import BytesIO
 
-from readablestem.pipeline import checked_words, math_font, output_chars
+from readablestem.pipeline import checked_words, math_font, output_chars, student_sheet
 from readablestem.pipeline.assemble import (
     DECORATIVE_CLASS,
     DEFAULT_TITLE,
@@ -193,82 +193,6 @@ def _clean_css(css: str) -> str:
     """The stylesheet without `@import` and without any declaration that loads a file
     (`url(...)`): the book fetches nothing."""
     return _CSS_URL_DECLARATION.sub("", _CSS_IMPORT.sub("", css))
-
-
-# What the book leaves to the reading system (F-456, F-457): the page's colors, its font, base
-# size and column. A reader's own theme (dark, sepia, large text), margins and font choice
-# apply instead of being fought or doubled. The components keep their shape and their borders.
-_PAGE_ONLY = frozenset(["body", "html", ":root"])
-_COLOR_PROPERTIES = frozenset(["color", "background", "background-color", "color-scheme"])
-_COLUMN_PROPERTIES = frozenset(["max-width", "margin", "padding"])
-# The pictures, framed (the reading system's theme may be dark, and a picture is never
-# inverted): the frame is the text's own color, so it shows on any theme.
-EPUB_PICTURE_FRAME = "img { outline: 1px solid currentColor; outline-offset: -1px; }"
-
-
-def _css_rules(css: str) -> list[tuple[str, str]]:
-    """The top-level rules of a stylesheet as (prelude, body): `main { ... }` is ("main", " ..."),
-    `@media x { a { ... } }` is ("@media x", " a { ... } "). Comments are dropped."""
-    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
-    rules: list[tuple[str, str]] = []
-    depth = start = last = 0
-    prelude = ""
-    quote = ""
-    for at, char in enumerate(css):
-        if quote:
-            quote = "" if char == quote else quote
-        elif char in "\"'":
-            quote = char
-        elif char == "{":
-            if depth == 0:
-                prelude, start = css[last:at], at + 1
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                rules.append((prelude.strip(), css[start:at]))
-                last = at + 1
-    return rules
-
-
-def epub_sheet(css: str) -> str:
-    """The page's stylesheet as the book carries it: no page colors, font family, base size or
-    column (the rules of `body`, `html` and `:root` go; `main` keeps only its word breaking),
-    no color or background on a component (the reader's text color is on the reader's
-    background, whichever theme), and no `prefers-color-scheme` or print block. What is
-    left is the components' shape."""
-
-    def declarations(body: str, drop: frozenset[str]) -> str:
-        kept = [
-            d.strip()
-            for d in re.split(r";(?![^(]*\))", body)
-            if d.strip() and d.split(":", 1)[0].strip().lower() not in drop
-        ]
-        return " ".join(f"{d};" for d in kept)
-
-    def process(rules: list[tuple[str, str]]) -> list[str]:
-        out: list[str] = []
-        for prelude, body in rules:
-            if prelude.startswith("@"):
-                if "prefers-color-scheme" in prelude or re.search(r"\bprint\b", prelude):
-                    continue
-                if prelude.startswith(("@media", "@supports")):
-                    inner = " ".join(process(_css_rules(body)))
-                    if inner:
-                        out.append(f"{prelude} {{ {inner} }}")
-                else:
-                    out.append(f"{prelude} {{{body}}}")
-                continue
-            selectors = [s.strip() for s in prelude.split(",")]
-            if all(s in _PAGE_ONLY for s in selectors):
-                continue
-            drop = _COLOR_PROPERTIES | (_COLUMN_PROPERTIES if "main" in selectors else frozenset())
-            kept = declarations(body, drop)
-            if kept:
-                out.append(f"{prelude} {{ {kept} }}")
-        return out
-
-    return "\n".join(process(_css_rules(css)))
 
 
 def _remove(node: _Node, replacement: list[_Node | str] | None = None) -> None:
@@ -657,9 +581,9 @@ def export_epub(
 
     images = _extract_images(root, Notes(), lambda name: name)
     has_math, _ = _prepare(root, set(images))
-    stylesheets = [epub_sheet(_text(n)) for n in root.walk() if n.tag == "style"]
+    stylesheets = [student_sheet.epub(_text(n)) for n in root.walk() if n.tag == "style"]
     if images:
-        stylesheets.append(EPUB_PICTURE_FRAME)
+        stylesheets.append(student_sheet.EPUB_PICTURE_FRAME)
     stylesheets = [css for css in stylesheets if css.strip()]
 
     taken = {n.attrs["id"] for n in body.walk() if n.attrs.get("id")}

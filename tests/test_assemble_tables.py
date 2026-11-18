@@ -21,8 +21,9 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import html_checks
 from readablestem.pipeline.assemble import render_html
-from readablestem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
+from readablestem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
 from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.student_sheet import TABLE as TABLE_CSS
 
 
 def png() -> bytes:

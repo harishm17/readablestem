@@ -78,9 +78,9 @@ from readablestem.pipeline import (
     figure_details,
     figure_images,
     inline_text,
-    math_font,
     navigation,
     output_chars,
+    student_sheet,
     table_html,
     table_math,
 )
@@ -338,17 +338,6 @@ IMAGE_PAGE_ORIGINAL_ALT = Words(
 )
 # The label of a figure's note: to the student what is missing, to the checker what to do.
 FIGURE_LABEL = Words("No description.", "Needs a description.")
-IMAGE_PAGE_CSS = """\
-.image-page-note { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem;
-  margin: 1.5em 0; }
-.image-page-note p { margin: 0 0 0.5em; }
-.image-page-note details { margin: 0; }
-.image-page-note summary { cursor: pointer; font-weight: 700; padding: 0.25em 0; }
-.image-page-note img { display: block; margin: 0.5em auto 0; }
-@media screen and (prefers-color-scheme: dark) {
-  .image-page-note { border-color: #ffa066; }
-}
-"""
 # The about section names the pages kept whole as images.
 KEPT_PAGE_REASONS = frozenset(
     {"handwritten_page", "scanned_page", "unread_page", "page_read_failed"}
@@ -690,9 +679,8 @@ def _scroller_attrs(mathml: str, label: str | None) -> str:
 # An equation estimated at least this wide (em of the maths font) may not fit a sheet: at
 # Letter and 150% the text column is about 22 em of it. On paper it is scaled to fit the
 # column down to 70% of its size; wider than that it keeps 70% and the page prints a note
-# (`PRINT_CSS`, SW45 rule 6). The estimate is not calibrated (A23); it errs wide.
+# (`student_sheet.PRINT`, SW45 rule 6). The estimate is not calibrated (A23); it errs wide.
 PRINT_FIT_EM = 14.0
-_PRINT_FLOOR = 0.7  # of the size on screen, whose maths is set at 1.1 em
 
 
 def print_width_bucket(mathml: str) -> int | None:
@@ -703,18 +691,6 @@ def print_width_bucket(mathml: str) -> int | None:
         return None
     step = 4 if width <= 48 else 16
     return math.ceil(width / step) * step
-
-
-def print_fit_css(bucket: int) -> str:
-    """The rules of one width step: the width the sheet fits the equation to, and the note
-    that shows where even 70% is too wide (the column, in em of its 1.125 rem text, is
-    narrower than the equation at 70% of 1.1 em)."""
-    narrower = round(bucket * _PRINT_FLOOR * 1.1, 2)
-    return (
-        f"@media print {{ .pw-{bucket} {{ --pw: {bucket}; }}\n"
-        f"@container (inline-size < {narrower:g}em) "
-        f"{{ .pw-{bucket}::after {{ display: block; }} }} }}\n"
-    )
 
 
 def _fix_attrs(fix: Fix | None, reason: str | None) -> str:
@@ -1127,7 +1103,7 @@ class _Renderer:
         """The marker for `page`, which becomes the last page written."""
         self.last_page = page
         said, position = self.page_words(page)
-        self.add_style("pagebreak", navigation.PAGEBREAK_CSS)
+        self.add_style("pagebreak", student_sheet.PAGE_MARKER)
         return navigation.pagebreak(said, self.claim_id(f"pagebreak-{position}"), AUTHORED_CLASS)
 
     def instructor_link(self, element: Element, reason: str) -> str:
@@ -1277,7 +1253,7 @@ class _Renderer:
         document but is not known until it is written, so the link is a placeholder that
         `fill_backlinks` replaces once the whole body is written (and drops when no mark
         was written for this note)."""
-        self.add_style("footnote", navigation.FOOTNOTE_CSS)
+        self.add_style("footnote", student_sheet.FOOTNOTE)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
         return (
             f'<div role="doc-footnote"{attrs}><p>{self.rich(text, element)}'
@@ -1296,7 +1272,7 @@ class _Renderer:
         highlighting. A long line scrolls inside the block (WCAG 1.4.10), and a block with
         a line wider than a phone screen is a tab stop, so a keyboard user can scroll it
         (axe `scrollable-region-focusable`), named "Program code" for the focus."""
-        self.add_style("code", CODE_CSS)
+        self.add_style("code", student_sheet.CODE)
         wide = max((len(line) for line in text.split("\n")), default=0) > CODE_WIDE_CHARS
         stop = ' tabindex="0" role="group" aria-label="Program code"' if wide else ""
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
@@ -1305,7 +1281,7 @@ class _Renderer:
     def definitions(self, entries: list[Element]) -> str:
         """Glossary entries (`Element.term_end`) as one definition list: the term in a
         `<dt>`, its definition in the `<dd>` after it."""
-        self.add_style("definitions", DEFINITIONS_CSS)
+        self.add_style("definitions", student_sheet.DEFINITIONS)
         out = []
         for entry in entries:
             text = entry.text or ""
@@ -1433,7 +1409,7 @@ class _Renderer:
         bucket = print_width_bucket(mathml)
         if bucket is None:
             return ""
-        self.add_style(f"print-fit-{bucket:03d}", print_fit_css(bucket))
+        self.add_style(f"print-fit-{bucket:03d}", student_sheet.print_fit(bucket))
         return f" pw pw-{bucket}"
 
     def block_equation(self, element: Element) -> str:
@@ -1552,13 +1528,13 @@ class _Renderer:
                 return html
             # The long description and data table follow the figure, folded (W3C WAI
             # complex images: a short alt plus a long description next to the image).
-            self.add_style("figure_description", figure_details.DETAILS_CSS)
+            self.add_style("figure_description", student_sheet.FIGURE_DESCRIPTION)
             table_id = assemble_tables.id_prefix(element.id) + "-data"
             if figure_details.data_table_shown(proposal):
                 if self.claim_id(f"{table_id}-caption") is None:
                     table_id = None  # an id already used (a layout bug): no table
                 else:
-                    self.add_style("table", assemble_tables.TABLE_CSS)
+                    self.add_style("table", student_sheet.TABLE)
             details = figure_details.render_details(
                 proposal, element.caption, table_id=table_id, authored_class=AUTHORED_CLASS
             )
@@ -1571,7 +1547,7 @@ class _Renderer:
         """The start of a page converted from an image (ADR 0007): the notice, and the
         original page in a `<details>` the reader opens (no script; the summary is the
         control and says which page). Without the picture, the notice alone."""
-        self.add_style("image_page", IMAGE_PAGE_CSS)
+        self.add_style("image_page", student_sheet.IMAGE_PAGE)
         page = element.page + 1
         label = say(IMAGE_PAGE_LABEL, self.audience)
         body = say(IMAGE_PAGE_NOTE, self.audience)
@@ -1869,102 +1845,10 @@ def _contact_sentence(contact: str | None, title: str = "") -> str:
     return f"{CONTACT.removesuffix('.')}: {link} ({_escape((contact or '').strip())})."
 
 
-# Added to a document's stylesheet only when it has a code block / a definition list
-# (`_Renderer.add_style`), so documents without them are written as before.
 # A line longer than this is a tab stop. Measured in Chromium at 320 px: a block first scrolls
 # at 30 characters, and at 25 with WCAG 1.4.12 text spacing, so 24 leaves no scrolling block
 # without one (it was 36, F-448).
 CODE_WIDE_CHARS = 24
-CODE_CSS = """\
-pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px solid #c8c8c8;
-  border-radius: 4px; overflow-x: auto; }
-pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  white-space: pre; }
-@media screen and (prefers-color-scheme: dark) {
-  pre { background: #1f1f1f; border-color: #767676; }
-}
-@media print {
-  pre, pre code { overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
-}
-"""
-DEFINITIONS_CSS = """\
-dl { margin: 0 0 1em; }
-dt { margin-top: 0.75em; }
-dd { margin: 0.1em 0 0 1.5em; }
-"""
-
-STYLE = """\
-:root { color-scheme: light dark; }
-body { margin: 0; background: #ffffff; color: #1b1b1b;
-  font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
-h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
-p { margin: 0 0 1em; }
-img { max-width: 100%; height: auto; }
-.equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
-  overflow-x: auto; overflow-y: hidden; }
-.equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
-  overflow-x: auto; overflow-y: hidden; }
-.equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
-.equation-labelled > math { flex: 1 0 auto; }
-.equation-label { flex: none; margin-left: auto; }
-math { font-size: 1.1em; font-family: @MATH_FONT@; }
-math[display="block"] { margin: 0 auto; }
-math[intent] mi { text-transform: none; }
-ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
-li > ul, li > ol { margin: 0.25em 0 0; }
-.printed-markers { list-style: none; }
-.printed-markers > li { text-indent: -1.75em; padding-left: 1.75em; }
-.printed-markers > li > * { text-indent: 0; }
-.list-marker { display: inline-block; min-width: 1.5em; text-indent: 0; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip-path: inset(50%); white-space: nowrap; }
-figure { margin: 1.5em 0; }
-figure img { display: block; }
-figcaption { margin-top: 0.5em; }
-.flagged { border: 3px dashed #8a3c00; border-radius: 4px; padding: 0.75rem; margin: 1.5em 0; }
-.notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
-.flagged figure { margin: 0; }
-.flagged > img { display: block; margin: 0 auto; }
-.flagged-inline { display: inline-block; max-width: 100%; vertical-align: middle;
-  line-height: 1.25; border: 2px dashed #8a3c00; padding: 0.1em 0.2em; }
-.flagged-inline img { vertical-align: middle; }
-.flag-note { margin: 0.75em 0 0; }
-.flag-label { font-weight: 700; }
-.original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.about { margin: 2.5rem 0 0; padding: 0.5em 0 0; border-top: 2px solid #1b1b1b; }
-.about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
-:focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
-.skip-link { display: inline-block; margin: 0.5rem; padding: 0.5em 1em; background: #ffffff;
-  color: #0b57d0; }
-.skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-  overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* A kept picture holds what could not be read as text. When the column is narrow, as it is in
-   a zoomed window, it keeps its size and scrolls sideways instead of shrinking with the
-   column, so its writing stays as large as the text around it. */
-@media screen and (max-width: 40em) {
-  .flagged { overflow-x: auto; }
-  .flagged > img { max-width: none; }
-}
-@media print {
-  .flagged { break-inside: avoid; } .skip-link { display: none; }
-  /* Nothing is cut on paper without a mark (SW45 rule 6). The sheet is the container. An
-     equation too wide even at 70% stays in its box, which clips on paper (letting it out
-     would make the browser shrink the whole sheet), and prints a note. */
-  main { container: sheet / inline-size; }
-  .pw math { font-size: max(0.77em, min(1.1em, 100cqw / var(--pw))); }
-  .pw::after { display: none; font-size: 0.8em; font-style: italic;
-    content: "This equation is wider than the paper. It is complete on the web page."; }
-}
-@media screen and (prefers-color-scheme: dark) {
-  body { background: #121212; color: #ececec; }
-  .flagged, .notice, .flagged-inline { border-color: #ffa066; }
-  .about { border-top-color: #ececec; }
-  :focus-visible { outline-color: #8ab4f8; }
-  .skip-link { background: #121212; color: #8ab4f8; }
-  img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
-}
-""".replace("@MATH_FONT@", math_font.MATH_FONT_STACK)
 
 
 # The tool's own words (notes, labels, the student note) are English. In a document in
@@ -2210,7 +2094,7 @@ def render_html(
     printed_contents = any(navigation.PRINTED_CONTENTS_REASON in e.reasons for e in ordered)
     contents = ""
     if len(renderer.toc) >= navigation.MIN_TOC_HEADINGS and not printed_contents:
-        renderer.add_style("contents", navigation.TOC_CSS)
+        renderer.add_style("contents", student_sheet.CONTENTS)
         english = _clean_lang(lang).split("-", 1)[0].lower() == "en"
         contents = _authored_in_english(
             navigation.contents_nav(
@@ -2226,7 +2110,7 @@ def render_html(
     # link that jumped past that notice would hide it from the readers it is written for.
     skip_target = NOTICE_ID if top else (renderer.h1_id or navigation.MAIN_ID)
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
-    style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
+    style = student_sheet.screen(renderer.styles)
     page = "\n".join(
         [
             "<!doctype html>",

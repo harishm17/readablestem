@@ -20,7 +20,7 @@ import math
 RGB = tuple[int, int, int]
 
 WHITE: RGB = (255, 255, 255)
-# The output's backgrounds (`assemble.STYLE`: body background #ffffff, and #121212 for a
+# The output's backgrounds (`student_sheet.CORE`: body background #ffffff, and #121212 for a
 # reader whose browser asks for dark colours).
 OUTPUT_BACKGROUND: RGB = WHITE
 DARK_BACKGROUND: RGB = (18, 18, 18)

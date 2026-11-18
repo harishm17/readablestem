@@ -17,8 +17,8 @@ from readablestem.core.types import (
     ScriptRun,
     inline_marker,
 )
-from readablestem.pipeline import inline_text
-from readablestem.pipeline.inline_text import colour_css, passage_attrs, render_inline_text
+from readablestem.pipeline import inline_text, student_sheet
+from readablestem.pipeline.inline_text import colour_class, passage_attrs, render_inline_text
 
 MATHS = '<math display="inline"><mi>v</mi></math>'
 
@@ -109,13 +109,13 @@ def test_without_add_style_colour_is_not_written():
     assert render_inline_text("red text", element=element, equation=maths) == "red text"
 
 
-def test_colour_css_reaches_the_minimum_contrast():
-    assert colour_css((210, 210, 210)) == (
+def test_colour_reaches_the_minimum_contrast():
+    assert student_sheet.colour(colour_class((210, 210, 210)), (210, 210, 210)) == (
         ".tc-d2d2d2 { color: #767676; }\n"
         "@media screen and (prefers-color-scheme: dark) { .tc-d2d2d2 { color: #d2d2d2; } }\n"
     )
     # Blue is readable on white as printed; on the dark page it is lightened.
-    light, dark = colour_css((0, 0, 255)).split("\n@media", 1)
+    light, dark = student_sheet.colour(colour_class((0, 0, 255)), (0, 0, 255)).split("\n@media", 1)
     assert light == ".tc-0000ff { color: #0000ff; }"
     assert "prefers-color-scheme: dark) { .tc-0000ff { color: #" in dark and "#0000ff" not in dark
 
@@ -161,7 +161,7 @@ def test_a_lowered_run_beside_a_raised_one_is_one_stacked_pair():
     assert html(element, styles) == (
         'SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></span>'
     )
-    assert styles.added == {"script-stack": inline_text.STACK_CSS}
+    assert styles.added == {"script-stack": student_sheet.SCRIPT_STACK}
     # A nuclide: the mass number comes first, and is drawn on top.
     nuclide = paragraph("226Ra", script_runs=[script(0, 2, "sup"), script(2, 3, "sub")])
     assert html(nuclide).startswith('<span class="script-stack"><sup>22</sup><sub>6</sub>')
