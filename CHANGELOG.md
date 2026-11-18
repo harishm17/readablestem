@@ -116,7 +116,14 @@
   Word file with open tracked changes gets the required notice `office_tracked_changes` and is
   "Ready", not "Ready to share"; speaker notes, hidden slides and comments are optional notices
   with counts; the job page's "How this file was read" says how the file was read and how many
-  typed equations were read as pictures. The CLI adds the same notices.
+  typed equations were read as pictures. The CLI adds the same notices. Text moved with
+  tracking on (LibreOffice prints it where it was and where it went) and tracked table cells
+  count as tracked changes; a part that is not well formed refuses the file
+  (`office_failed`) and is never counted as far as it goes.
+- The notices that keep a finished job at "Ready" and never "Ready to share" are named in
+  `web/states.py`: `office_tracked_changes`, and `rtl_text` and `option_labels`, which are
+  required notices with no decision behind them until the text decision (WS16.6) exists. A
+  job with one of the two could say "Ready to share" before.
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 

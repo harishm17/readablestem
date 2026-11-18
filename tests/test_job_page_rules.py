@@ -101,6 +101,7 @@ def test_a_notice_no_decision_stands_behind_holds_back_ready_to_share():
     assert state("source_error", "required").key == "ready"
     held = state("office_tracked_changes", "required")
     assert held.key == "ready_remains" and "tracked changes" in held.message
+    assert state("rtl_text", "required").key == state("option_labels", "required").key == held.key
 
 
 # --------------------------------------------------------------------------- reading

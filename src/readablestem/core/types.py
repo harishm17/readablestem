@@ -919,8 +919,8 @@ class Notice(BaseModel):
     decision of its own: when something needs one (`review="required"`, e.g. a table
     kept as an image), the decision is the `Fix` with the same `element_id`, and only
     fixes count towards `DocumentStats.required_decisions`. A required notice no fix
-    stands behind (open tracked changes in a Word file) keeps the job at "Ready", never "Ready
-    to share": `web.states` lists those codes.
+    stands behind (open tracked changes in a Word file, right-to-left text, answer options run
+    together) keeps the job at "Ready", never "Ready to share": `web.states` lists those codes.
     """
 
     code: str

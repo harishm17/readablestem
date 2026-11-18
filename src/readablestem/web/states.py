@@ -534,6 +534,14 @@ _HOLDS = {
     "office_tracked_changes": (
         "The Word file still has tracked changes, so check the notices before you share it."
     ),
+    # `pipeline.notices.TEXT_CODES`: facts of the text that have no decision to carry them yet
+    "rtl_text": (
+        "The words of right-to-left text may be out of order, so check the notices before you "
+        "share it."
+    ),
+    "option_labels": (
+        "Answer options may be run together, so check the notices before you share it."
+    ),
 }
 
 
