@@ -242,7 +242,7 @@ def clean_text(text: str) -> str:
     for ligature, letters in _LIGATURES.items():
         text = text.replace(ligature, letters)
     text = text.replace("…", "...")
-    for pair in ("‘‘", "’’", "''"):
+    for pair in ("\u2018\u2018", "\u2019\u2019", "''"):
         text = text.replace(pair, '"')
     return re.sub(r"\s+", " ", text.translate(_INVISIBLE)).strip()
 
