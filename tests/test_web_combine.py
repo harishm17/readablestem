@@ -203,6 +203,7 @@ def test_the_language_is_asked_once_for_the_whole_file_and_each_part_keeps_its_o
     page = text_of(web.alice.get(page_url).text)
     assert page.count("confirm the language") == 1
     assert "The language of 2 parts was assumed" in page
+    assert "Open the parts for pages 1-4, pages 5-8, then confirm" in page  # named, not counted
     assert '<html lang="en">' in combine(web, jobs[0]).text
     # no part waits, and no language has most of the parts: said once, each part marked
     set_result(jobs[0], "de")

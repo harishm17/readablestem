@@ -34,6 +34,7 @@ from readablestem.web.db import Blob, Job, JobStatus, utcnow
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
 _PART_SUFFIX = re.compile(r"\s*\(pages [^)]*\)\s*$")
 DEFAULT_TITLE = "Combined document"
+NAMED_AT_MOST = 3  # parts a sentence names before "and N more" (as the review screen's notices)
 
 
 @dataclass(frozen=True)
@@ -102,18 +103,22 @@ def language_check(kept: list[KeptPart]) -> str:
         data = item.job.result_json or {}
         codes = [n.get("code") for n in data.get("notices") or [] if isinstance(n, dict)]
         parts.append((str(data.get("lang") or language.DEFAULT_LANG), combine.unconfirmed(codes)))
+    pages = [f"pages {item.job.part_label}" for item in kept]  # as the page's rows say them
     if len(parts) < 2:
         return ""
     tag, check = combine.common_language(parts)
     name = language.language_name(tag)
     if check == "unconfirmed":
-        waiting = sum(1 for _, unconfirmed in parts if unconfirmed)
+        named = [pages[n] for n, (_, unconfirmed) in enumerate(parts) if unconfirmed]
+        waiting = len(named)
+        more = waiting - NAMED_AT_MOST
+        listed = ", ".join(named[:NAMED_AT_MOST]) + (f" and {more} more" if more > 0 else "")
         return (
             f"The language of {checked_words.plural(waiting, 'part')} was assumed or could not be "
             f"settled, so the combined file reads {'it' if waiting == 1 else 'them'} in {name}. "
-            f"Open {'that part' if waiting == 1 else 'those parts'} and confirm the language "
-            "before you share the file: a screen reader reads each passage in the voice of its "
-            "language."
+            f"Open the {'part' if waiting == 1 else 'parts'} for {listed}, then confirm the "
+            "language before you share the file: a screen reader reads each passage in the "
+            "voice of its language."
         )
     if check == "split":
         return (
