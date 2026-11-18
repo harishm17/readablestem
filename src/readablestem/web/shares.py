@@ -92,6 +92,27 @@ def role_of(session: Session, job: Job, user: Any) -> str | None:
     )
 
 
+def names_of(
+    session: Session, job: Job, reader: Any, user_ids: set[str], *, you: str = "you"
+) -> dict[str, str]:
+    """How each person is named to `reader` where the document says who decided something,
+    on the record and on the review list, so the two cannot differ. The reader is `you`. The
+    owner of the document sees every other person by name, or by address when they have no
+    name (only the owner sees addresses). Everyone else sees names, and "the owner" or "a
+    reviewer" for a person without one. A person whose account is gone is not in the result."""
+    named: dict[str, str] = {}
+    for person in session.scalars(select(User).where(User.id.in_({job.user_id, *user_ids}))):
+        if person.id == reader.id:
+            named[person.id] = you
+        elif reader.id == job.user_id:
+            named[person.id] = person.name or person.email
+        else:
+            named[person.id] = person.name or (
+                "the owner" if person.id == job.user_id else "a reviewer"
+            )
+    return named
+
+
 def names_unproved(session: Session, job: Job, user: Any) -> bool:
     """A share on this document names this person's address, but their sign-in did not prove
     it (an older session, a Microsoft sign-in name, an email link sent elsewhere). True only

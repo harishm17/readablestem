@@ -1207,7 +1207,8 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   for everyone. The share is read on every request, so removing it works on the next click.
 - **Who did what.** A review edit is stored with the person who made it
   (`ReviewEdit.user_id`, as before), and the review record's "Decided by" column and its CSV
-  name them: name and address for the owner, names only for everyone else. Undo only takes
+  name them (`shares.names_of`): "you" for the reader, a name for anyone else, and the owner's
+  address once at the top of the record. The CSV has the "by" column in the owner's file only. Undo only takes
   back a write the person made themselves. A share applies only to a sign-in that proved the
   address (Google's verified email, Microsoft's `xms_edov`), see docs/security.md.
 - **Limits and cost stay the owner's.** A model re-read a reviewer asks for (marking an
@@ -1724,8 +1725,9 @@ It lists, in this order: the document (title, file name, pages, when and by whom
 converted, the tool and pipeline version, the language, when the record was made, a short
 reference); what the tool did (parts found by kind, accepted by the tool with no decision
 from a person, decided by a person, still open, shown as pictures); every review decision
-(`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom
-- the document's owner, the only person who can review it); the decisions still open; the
+(`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom:
+"you" for the reader, a name for another person, never an address beyond the one "Converted
+by" line the owner sees); the decisions still open; the
 parts shown as pictures and why; the structure checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
 lines for the office to sign. Every kind of change a person can make is a row with who and
@@ -1742,6 +1744,12 @@ axe test not run on the document, meaning is not checked, not tried in a course 
 itself is out of scope) plus counts from the result: the equations, figure descriptions,
 headings and tables the tool accepted without a person, the decisions still open, the parts
 that are pictures.
+
+Each item the record names (a decision, a part waiting, a part shown as a picture) is a link
+to that item on the review screen (`/jobs/{id}/review?item=...`, a page's own edit to that
+page's tools) for a reader with the Review right; a reader with only the View right gets the
+words without a link, since the screen refuses them. An item that is no longer in the
+document is named with "no longer in the document" and no link. The CSV keeps the words.
 
 It is a record and not a verdict: the page opens with a statement that it does not say the
 document meets any standard or law, and neither it nor the CSV uses the word "certification"

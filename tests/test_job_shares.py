@@ -639,7 +639,15 @@ def test_only_the_owner_sees_email_addresses_in_the_record(site):
             assert ALICE not in text, actor
             if actor == VIEWER:  # a reviewer sees their own address in the page header
                 assert DAVE not in text
-            assert "a reviewer" in text and "the owner" in text, actor
+        # the page names people as its reader may see them
+        assert ("a reviewer" if actor == VIEWER else "you") in page.text, actor
+        assert "the owner" in page.text, actor
+    # the review list says who decided with the record's words: "you" only to the one who did
+    listed = {
+        a: site.who[a].get(f"/jobs/{site.job_id}/review/list").text for a in (OWNER, REVIEWER)
+    }
+    assert f"by {DAVE}" in listed[OWNER] and "by you" not in listed[OWNER]
+    assert "by you" in listed[REVIEWER] and f"by {ALICE}" not in listed[REVIEWER]
     # the banner and the list name the owner without an address
     assert ALICE not in site.who[VIEWER].get(f"/jobs/{site.job_id}").text
     assert ALICE not in site.who[VIEWER].get("/app").text

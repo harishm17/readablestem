@@ -109,7 +109,7 @@ def test_the_record_lists_every_new_kind_of_decision_with_who_and_when(review):
     for decision, item in wanted.items():
         row = by_decision.get(decision)
         assert row is not None, (decision, sorted(by_decision))
-        assert row["by"] == ALICE and re.fullmatch(
+        assert row["by"] == "the owner" and re.fullmatch(
             r"20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ", row["when_utc"]
         )
         if item:
@@ -140,7 +140,7 @@ def test_clean_tables_accepted_together_and_a_cell_read_by_the_model_are_marked(
     bulk = "Accepted, together with the other clean tables, in one action"
     assert decisions.count(bulk) == 2
     assert "Table cell read by the AI service at the person's request, then saved" in decisions
-    assert all(r["by"] == ALICE for r in rows)
+    assert all(r["by"] == "the owner" for r in rows)
 
 
 # --------------------------------------------------------------------------- html_stale

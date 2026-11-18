@@ -16,7 +16,7 @@ from readablestem.core.types import DocumentResult
 from readablestem.pipeline import checked
 from readablestem.web import documents, events, record, shares, states
 from readablestem.web.database import as_utc
-from readablestem.web.db import ReviewEdit, User, session_scope, utcnow
+from readablestem.web.db import ReviewEdit, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, get_ctx, render
 from readablestem.web.routes.jobs import (
     content_disposition,
@@ -25,7 +25,7 @@ from readablestem.web.routes.jobs import (
     require_done,
     slug,
 )
-from readablestem.web.shares import VIEW
+from readablestem.web.shares import REVIEW, VIEW
 from readablestem.web.views import audience_of
 
 router = APIRouter()
@@ -44,20 +44,18 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
         result = DocumentResult.model_validate(job.result_json or {})
         edits = list(session.scalars(select(ReviewEdit).where(ReviewEdit.job_id == job.id)))
         is_owner = job.user_id == user.id
-        owner = user.email if is_owner else "the owner"
         # Who made each edit: the owner, and anyone the document was shared with for review.
         # A person whose account is gone has no edits left (they go with it), so every
-        # edit's author is found.
-        who: dict[str, str] = {}
-        for person in session.scalars(
-            select(User).where(User.id.in_({job.user_id, *(e.user_id for e in edits)}))
-        ):
-            if is_owner:  # only the owner sees addresses
-                who[person.id] = f"{person.name} ({person.email})" if person.name else person.email
-            else:  # everyone else sees names, and "the owner" or "a reviewer" for no name
-                fallback = "the owner" if person.id == job.user_id else "a reviewer"
-                who[person.id] = person.name or fallback
-        owner = who.get(job.user_id, owner)
+        # edit's author is found. The same words name them on the review list
+        # (`shares.names_of`); the CSV leaves the app, so it has no "you".
+        people = {e.user_id for e in edits}
+        who = shares.names_of(session, job, user, people)
+        file_who = shares.names_of(session, job, user, people, you="the owner")
+        # The one place an address is printed, and only to its owner.
+        if is_owner:
+            owner = f"{user.name} ({user.email})" if user.name else user.email
+        else:
+            owner = who.get(job.user_id, "the owner")
         title = documents.document_title(job).text
         role = shares.role_of(session, job, user) or VIEW
         viewer = audience_of(role)
@@ -70,7 +68,13 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
             result=result,
             edits=edits,
             who=who,
+            file_who=file_who,
             owner=owner,
+            csv_actors=is_owner,
+            # Only a person who may open the review screen is given links to it.
+            review_url=f"/jobs/{job.id}/review"
+            if shares.RANK[role] >= shares.RANK[REVIEW]
+            else None,
             filename=job.filename,
             title=title,
             job_ref=job.id[:6],

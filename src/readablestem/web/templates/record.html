@@ -3,6 +3,9 @@
    print, and the same facts as a CSV. It is a record of what was done, checked and decided,
    not a verdict: the words never say the document meets a standard or a law. #}
 {% block title %}Review record: {{ record.title }}{% endblock %}
+{# An item the record names: a link to its card on the review screen for a reader who may open
+   it, its words with a note when it is no longer in the document. #}
+{% macro item_ref(r) %}{% if r.href %}<a href="{{ r.href }}">{{ r.text }}</a>{% else %}{{ r.text }}{% if r.note %} ({{ r.note }}){% endif %}{% endif %}{% endmacro %}
 {% block content %}
 <h1>Review record</h1>
 <p class="doc-file">{{ record.title }}</p>
@@ -61,7 +64,7 @@
       {% for d in record.decisions %}
       <tr>
         <td>{{ long_when(d.when) }}</td>
-        <td>{{ d.item }}</td>
+        <td>{% for r in d.refs %}{{ item_ref(r) }}{{ ", " if not loop.last }}{% endfor %}{% if d.more %} and {{ d.more }} more{% endif %}</td>
         <td>{{ d.page or "" }}</td>
         <td>{{ d.tool_had }}</td>
         <td>{{ d.decision }}</td>
@@ -77,7 +80,7 @@
   {% if record.open_items %}
   <h3 id="record-open">Waiting for a decision</h3>
   <ul aria-labelledby="record-open">
-    {% for item in record.open_items %}<li>{{ item }}</li>{% endfor %}
+    {% for item in record.open_items %}<li>{{ item_ref(item) }}</li>{% endfor %}
   </ul>
   {% endif %}
 </section>
@@ -87,7 +90,7 @@
   {% if record.kept_as_images %}
   <p>These parts could not be converted to text. Screen readers cannot read them.</p>
   <ul>
-    {% for i in record.kept_as_images %}<li>{{ i.item }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
+    {% for i in record.kept_as_images %}<li>{{ item_ref(i.ref) }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
   </ul>
   {% else %}
   <p>{{ checked_words.record_pictures(record.checked) }}</p>
