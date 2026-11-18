@@ -242,7 +242,7 @@ def test_everything_works_without_javascript(site, browser):
     assert page.locator('meta[http-equiv="refresh"]').count() == 0
     page.get_by_role("link", name=re.compile(r"^Review \d+ decisions?$")).click()
     page.get_by_role("button", name="Keep as image (equation 2)").click()
-    assert "Kept as an image" in page.locator("#decision-notice").inner_text()
+    page.locator("#decision-notice", has_text="Kept as an image").wait_for()
     page.get_by_role("link", name="List view").click()
     page.locator("#fix-p1-e4").get_by_label(re.compile("^I understand")).check()
     page.locator("#fix-p1-e4").get_by_role("button", name="Keep without a description").click()
