@@ -76,9 +76,17 @@ GREEK = {
     "ρ": "rho", "ϱ": "rho", "σ": "sigma", "ς": "sigma", "τ": "tau", "υ": "upsilon",
     "φ": "phi", "ϕ": "phi", "χ": "chi", "ψ": "psi", "ω": "omega",
 }  # fmt: skip
-GREEK.update(
-    {ch.upper(): f"capital {name}" for ch, name in list(GREEK.items()) if ch.upper() != ch}
-)
+# A capital letter is "cap K": one syllable, so a formula with many capitals stays quick to hear.
+CAP = "cap"
+
+
+def in_full_words(said: str) -> str:
+    """A reading as the review screen's own sentences name a letter ("capital X", not the
+    "cap X" a voice says): for the words a person reads, not the ones a voice speaks."""
+    return f"capital {said[len(CAP) + 1 :]}" if said.startswith(f"{CAP} ") else said
+
+
+GREEK.update({ch.upper(): f"{CAP} {name}" for ch, name in list(GREEK.items()) if ch.upper() != ch})
 
 SYMBOLS = {
     # operators
@@ -277,15 +285,15 @@ def _char_words(ch: str) -> str:
     if negated is not None:
         return negated
     if ch.isascii() and ch.isalpha():
-        return f"capital {ch}" if ch.isupper() else ch
+        return f"{CAP} {ch}" if ch.isupper() else ch
     if ch.isascii():
         return ch
     name = unicodedata.name(ch, "")
     if not name:
         return ch
-    # Letterlike symbols (U+211D double-struck R): "double-struck capital R".
+    # Letterlike symbols (U+211D double-struck R): "double-struck cap R".
     base = unicodedata.normalize("NFKC", ch)
-    words = name.lower().split()
+    words = [CAP if w == "capital" else w for w in name.lower().split()]
     if len(base) == 1 and base.isascii() and base.isalpha() and words[-1] == base.lower():
         words[-1] = base
     return " ".join(words)
@@ -1174,6 +1182,27 @@ def _mark_row(kids: list[ET.Element]) -> None:
     _mark_tilde(kids)
 
 
+def _name_letter(node: ET.Element) -> bool:
+    """One upright Latin letter: a letter of a name (`\\mathrm{Var}` is three of them)."""
+    text = node.text or ""
+    return (
+        node.tag == "mi"
+        and not len(node)
+        and node.get("mathvariant") == "normal"
+        and len(text) == 1
+        and text.isascii()
+        and text.isalpha()
+    )
+
+
+def _in_name(kids: list[ET.Element], i: int) -> bool:
+    """Is kids[i] a letter in a run of two or more upright letters? Its case is part of how
+    the name is spelled ("Var"), not a capital variable, so it adds no "cap"."""
+    return _name_letter(kids[i]) and (
+        (i > 0 and _name_letter(kids[i - 1])) or (i + 1 < len(kids) and _name_letter(kids[i + 1]))
+    )
+
+
 def _speak_children(node: ET.Element) -> list[str]:
     words: list[str] = []
     kids = list(node)
@@ -1189,6 +1218,8 @@ def _speak_children(node: ET.Element) -> list[str]:
         if found is None and i > 0:
             count = _after_number(kids[i - 1])
             found = _unit_run(kids, i, count) if count is not None else None
+        if found is None and _in_name(kids, i):
+            found = [kids[i].text or ""], 1
         if found is None:
             words += _speak(kids[i])
             i += 1

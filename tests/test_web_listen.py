@@ -104,7 +104,7 @@ def test_chemistry_is_spoken_by_the_chemistry_rules():
     water = safe_latex_to_mathml(convert_ce_commands(r"\ce{2 H2 + O2 -> 2 H2O}"), "block")
     items = listen.build_transcript(doc(f"<main>{water}</main>"))
     eq = next(i for i in items if i.kind == "equation")
-    assert eq.say == "Equation: 2 H 2 plus O 2 reacts to form 2 H 2 O"
+    assert eq.say == "Equation: 2, H 2 plus O 2 reacts to form 2, H 2 O"
 
 
 def test_figure_alt_caption_and_long_description():
@@ -186,7 +186,7 @@ def test_table_cells_with_maths_are_spoken():
             "<math><mi>F</mi><mo>=</mo><mi>m</mi><mi>a</mi></math></td></tr></tbody></table></main>"
         )
     )
-    assert "Row 1 of 1: Law: capital F equals m a" in said(items)
+    assert "Row 1 of 1: Law: cap F equals m a" in said(items)
 
 
 def test_a_slide_deck_reads_frame_titles_as_headings_with_their_step():

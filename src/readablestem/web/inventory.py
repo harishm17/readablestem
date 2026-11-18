@@ -51,6 +51,7 @@ from readablestem.core.types import (
     Fix,
     Kind,
 )
+from readablestem.pipeline.speech import CAP, in_full_words
 from readablestem.web.review import (
     INVENTORY_KEY,
     RELABEL_ACTION,
@@ -246,7 +247,7 @@ def name_of(key: str) -> str:
     if key.isdigit():
         return f"the digit {key}"
     if key.isalpha():
-        return said if said.lower().startswith("capital") else f"small {key}"
+        return in_full_words(said) if said.startswith(f"{CAP} ") else f"small {key}"
     return said
 
 

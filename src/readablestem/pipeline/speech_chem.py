@@ -384,12 +384,14 @@ def _species_words(node: ET.Element) -> list[str]:
     text = _text(node)
     if _is_electron(node):
         count = text[:-1]
-        return [*([count] if count else []), "e"]
+        return [*([count + ","] if count else []), "e"]
     if node.tag == "mtext" and _formula_text(node) is not None:
-        return [
+        coefficient = _MTEXT_FORMULA.match(text).group(1)  # type: ignore[union-attr]
+        pieces = [
             _letters(piece) if piece[0].isalpha() else piece
-            for piece in re.findall(r"[A-Z][a-z]?|\d+", text)
+            for piece in re.findall(r"[A-Z][a-z]?|\d+", text[len(coefficient) :])
         ]
+        return [coefficient + ",", *pieces] if coefficient else pieces
     return [_letters(text)]
 
 
@@ -541,11 +543,36 @@ def _read_row(kids: list[ET.Element], speak: Speak) -> list[str]:
     return words
 
 
+def _pause_after_charge(kids: list[ET.Element], i: int) -> bool:
+    """After a charge, a sign between two species ("N a plus, plus C l minus") or the next
+    species itself ("N a plus, C l minus") is a new word: a pause keeps the charge from being
+    heard as a count of what follows."""
+    if i + 1 >= len(kids):
+        return False
+    following = kids[i + 1]
+    sign = following.tag == "mo" and _text(following) == "+"
+    return sign or starts_species(kids, i + 1)
+
+
+def _is_coefficient(kids: list[ET.Element], i: int) -> bool:
+    """A whole number in front of a species with nothing between ("2" then H, 2, O) when it
+    does not follow a species (then it would be a count): the number of molecules."""
+    node = kids[i]
+    return (
+        _is_count(node)
+        and (i == 0 or not _ends_species(kids[i - 1]))
+        and i + 1 < len(kids)
+        and starts_species(kids, i + 1)
+    )
+
+
 def read_at(kids: list[ET.Element], i: int, speak: Speak) -> tuple[list[str], int] | None:
     """The chemistry reading of what starts at kids[i] (a species, an ion, a state symbol, an
     arrow, a concentration) and the siblings it covers, or None. The caller has decided the
     row is chemistry (`is_chem_row`)."""
     node = kids[i]
+    if _is_coefficient(kids, i):
+        return [_text(node) + ","], 1  # "2, H 2 O": a pause keeps 2 H from reading as H 2
     state = _state_at(kids, i)
     if state is not None and i > 0 and _ends_species(kids[i - 1]):
         # A comma after it when more follows, so a plus after "aqueous" is the sign between
@@ -562,19 +589,12 @@ def read_at(kids: list[ET.Element], i: int, speak: Speak) -> tuple[list[str], in
             return ["the concentration of", *words], 2
     if i > 0 and _ends_species(kids[i - 1]) and _is_charge_script(node):
         charge = _charge_words(node[1]) or []
-        following = kids[i + 1] if i + 1 < len(kids) else None
-        if following is not None and following.tag == "mo" and _text(following) == "+":
+        if _pause_after_charge(kids, i):
             charge[-1] += ","
         return charge, 1
     scripted = scripted_words(node, speak)
     if scripted is not None:
-        following = kids[i + 1] if i + 1 < len(kids) else None
-        if (
-            node.tag in {"msup", "msubsup"}
-            and following is not None
-            and following.tag == "mo"
-            and _text(following) == "+"
-        ):
+        if node.tag in {"msup", "msubsup"} and _pause_after_charge(kids, i):
             scripted[-1] += ","  # "N a plus, plus C l minus": a charge, then the sign
         return scripted, 1
     split = _split_pair(kids, i)
