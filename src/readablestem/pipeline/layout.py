@@ -8119,8 +8119,39 @@ def _heading_sized(row: _Row, ctx: _Context) -> bool:
     return row.size >= HEADING_SIZE_RATIO * ctx.body
 
 
-def _continues(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
-    """Is `row` the next line of the paragraph `run`, whose last row is `prev`?"""
+class _RightEdges:
+    """Where the lines of a page's text columns end, for telling a line that runs full from
+    one that stops short: per column and type size, the right edge that a quarter of the
+    lines reach or pass (the last line of a paragraph, a heading or a label falls short of
+    it; a line in the middle of a paragraph does not)."""
+
+    def __init__(self, rows: Sequence[_Row]) -> None:
+        self._rows = [r for r in rows if r.kind == "text" and not r.vertical]
+        self._seen: dict[tuple[str, int], float] = {}
+
+    def of(self, row: _Row) -> float:
+        key = (row.column, round(row.size))
+        if key not in self._seen:
+            near = max(1.0, 0.12 * row.size)
+            ends = sorted(
+                r.x1 for r in self._rows if r.column == row.column and abs(r.size - row.size) <= near
+            )
+            self._seen[key] = ends[min(len(ends) - 1, 3 * len(ends) // 4)] if ends else row.x1
+        return self._seen[key]
+
+
+INDENT_REACH = 4  # em: how far left of an indented first line the paragraph's next line may start
+
+
+def _continues(
+    prev: _Row, row: _Row, run: _Run, ctx: _Context, edges: _RightEdges | None = None
+) -> bool:
+    """Is `row` the next line of the paragraph `run`, whose last row is `prev`?
+
+    With `edges` (the text lines of the page), a run of one line that is indented, runs to
+    the right edge and is no list item, caption or end of a sentence goes on with a line
+    that starts up to `INDENT_REACH` em to its left: the second line of a paragraph whose
+    first line is indented like a typewriter's tab. Without `edges` it is rejected."""
     size = prev.size
     if abs(row.size - size) > max(1.0, 0.12 * size):
         return False
@@ -8129,7 +8160,19 @@ def _continues(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
     if not 0.5 * size <= pitch <= limit:
         return False
     left, right = run.box[0], run.box[2]
-    if row.x0 > right or row.x1 < left or row.x0 < left - 2 * size:
+    if row.x0 > right or row.x1 < left:
+        return False
+    if row.x0 < left - 2 * size and not (
+        edges is not None
+        and len(run.rows) == 1
+        and row.x0 >= left - INDENT_REACH * size
+        and prev.x1 >= edges.of(prev) - 1.5 * size
+        and row.x1 >= prev.x1 - 3 * size
+        and row.marker is None
+        and prev.marker is None
+        and not CAPTION.match(prev.clean)
+        and prev.clean[-1:] not in ".:?!"
+    ):
         return False
     if run.rows[0].marker is not None and row.x0 < left - 0.5 * size:
         return False  # a list item goes on at its marker or its text, never further left
@@ -8333,6 +8376,7 @@ def _code_text(rows: Sequence[_Row]) -> str:
 def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
     runs: list[_Run] = []
     code = _code_groups(rows)
+    edges = _RightEdges(rows)
     for row in rows:
         if runs:
             run = runs[-1]
@@ -8370,7 +8414,7 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
                 row.kind, row.region = "text", None  # its maths becomes inline equations
                 run.add(row)
                 continue
-            geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx)
+            geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
             if geometric and _same_style(prev, row, ctx):
                 run.add(row)
                 continue

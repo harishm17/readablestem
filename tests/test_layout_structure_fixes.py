@@ -230,6 +230,29 @@ def test_a_single_label_or_another_bold_line_stays_a_heading():
 # ------------------------------------------------------------- 3. maths in headings
 
 
+# --------------------------------------------- 3b. paragraphs with an indented first line
+
+
+def indented_paragraphs(indent: float) -> bytes:
+    """Two justified paragraphs of 3 and 5 sentences whose first line starts `indent` pt in."""
+    style = f"text-align: justify; text-indent: {indent}pt; margin: 0; font-size: 11pt"
+
+    def fill(number, page):
+        for top, repeat in ((72, 3), (200, 5)):
+            body = " ".join([SENTENCE] * repeat)
+            page.insert_htmlbox(
+                pymupdf.Rect(72, top, 540, top + 150), f'<p style="{style}">{body}</p>'
+            )
+
+    return pdf_of(fill)
+
+
+@pytest.mark.parametrize("indent", [0.0, 33.0])
+def test_a_paragraph_is_not_cut_after_its_indented_first_line(indent):
+    layout = analyze(indented_paragraphs(indent))
+    assert [len((e.text or "").split()) for e in paragraphs(layout)] == [3 * len(SENTENCE.split()), 5 * len(SENTENCE.split())]
+
+
 # ---------------------------------------------- 4. paragraphs across a page break
 
 
