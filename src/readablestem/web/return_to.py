@@ -57,7 +57,9 @@ def build_pages(routers: Iterable[APIRouter]) -> list[re.Pattern[str]]:
         route.path_regex
         for router in routers
         for route in router.routes
-        if isinstance(route, APIRoute) and "GET" in route.methods and _takes_user(route.dependant)
+        if isinstance(route, APIRoute)
+        and "GET" in (route.methods or ())
+        and _takes_user(route.dependant)
     ]
 
 

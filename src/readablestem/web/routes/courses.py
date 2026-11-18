@@ -84,6 +84,15 @@ def _entry(course: Course, entry_id: str) -> CourseNotation:
     return row
 
 
+def _not_saved(reason: str) -> PageError:
+    """A form the review screen never builds (a hand-made post): which check it failed."""
+    return PageError(
+        400,
+        "That could not be saved",
+        f"Nothing was saved: {reason}. Go back to the review screen and choose again.",
+    )
+
+
 def _errors(exc: notation.NotationInvalid) -> dict[str, Any]:
     """The error summary and per-field messages for a template."""
     errors = [{"field_id": e.field_id, "message": e.message} for e in exc.errors]
@@ -522,19 +531,11 @@ def remember(
     canonical = canonical_symbol(symbol)
     shown = symbol[:20]
     if canonical is None:
-        reason = f"{shown!r} is not a letter or symbol a course can remember"
-    elif canonical != symbol:
-        reason = f"{shown!r} is not written in the standard form of that symbol"
-    elif meaning not in notation.MEANINGS:
-        reason = f"{meaning[:30]!r} is not one of the meanings a course can record"
-    else:
-        reason = ""
-    if reason:
-        raise PageError(
-            400,
-            "That could not be saved",
-            f"Nothing was saved: {reason}. Go back to the review screen and choose again.",
-        )
+        raise _not_saved(f"{shown!r} is not a letter or symbol a course can remember")
+    if canonical != symbol:
+        raise _not_saved(f"{shown!r} is not written in the standard form of that symbol")
+    if meaning not in notation.MEANINGS:
+        raise _not_saved(f"{meaning[:30]!r} is not one of the meanings a course can record")
     with session_scope(get_ctx(request).factory) as session:
         owned = job_access(session, job, user, OWNER)
         course = _course(session, course_id, user)

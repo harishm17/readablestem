@@ -712,14 +712,13 @@ class _Tally:
 
 def outcome_releases(session: Session) -> list[str]:
     """Every release that has outcome rows, the one written last first."""
-    return list(
-        session.scalars(
-            select(Event.release)
-            .where(Event.name == DECISION_OUTCOME, Event.release.is_not(None))
-            .group_by(Event.release)
-            .order_by(func.max(Event.created_at).desc(), Event.release)
-        )
+    rows = session.scalars(
+        select(Event.release)
+        .where(Event.name == DECISION_OUTCOME, Event.release.is_not(None))
+        .group_by(Event.release)
+        .order_by(func.max(Event.created_at).desc(), Event.release)
     )
+    return [release for release in rows if release]
 
 
 def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
