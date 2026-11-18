@@ -273,9 +273,7 @@ def test_one_function_decides_the_tier_and_the_review_walks_the_risk_bands():
         if fix.element_id in {"p3-e0", "p2-e0"}:
             fix.status, fix.reviewed, fix.checks = Status.EDITED, True, []
     assert [d.key for d in queue.decisions(result)] == walk
-    assert queue.stopping_words(result.fixes).endswith(
-        "The 2 are left, lower risk. You can share now or keep going."
-    )
+    assert "2 lower-risk decisions are left" in queue.stopping_words(result.fixes)
 
 
 def test_a_second_source_on_one_cause_adds_its_name_and_an_unknown_source_is_refused():

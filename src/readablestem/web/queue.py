@@ -150,12 +150,19 @@ def open_by_page(queue: list[Decision], elements: dict[str, Element]) -> dict[in
 
 def stopping_words(fixes: Iterable[Fix]) -> str:
     """The sentence at the stopping line (`core.triage.stopping_line`), or "" while a decision
-    of the first three bands is open or nothing lower is left."""
+    of the first three bands is open or nothing lower is left. It says what is left and that
+    the document is still a draft: a reading of the lower bands can be wrong too, and nothing
+    is shared while a decision is open."""
     line = triage.stopping_line(fixes)
     if not line.reached:
         return ""
-    left = f"{line.below_open} {'is' if line.below_open == 1 else 'are'}"
+    left = (
+        "1 lower-risk decision is"
+        if line.below_open == 1
+        else (f"{line.below_open} lower-risk decisions are")
+    )
     return (
-        "Everything that could change what a student reads is decided. "
-        f"The {left} left, lower risk. You can share now or keep going."
+        f"The higher-risk decisions are made. {left} left (a reading that passed every check "
+        "with lower confidence, or a heading that repeats). The document stays a draft until "
+        "every decision is made."
     )

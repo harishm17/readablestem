@@ -177,6 +177,10 @@
   There are no analytics, advertising or third-party tracking cookies. While you type a
   review decision, the text is kept in your browser tab until you save it, close the tab or
   sign out; it is never sent to the server before you save.</p>
+<p>The Listen page remembers where you stopped and your speed, voice and other player settings
+  in your browser's local storage, for the last 20 documents you listened to. It keeps a
+  document's id and the ids of places in it, never its text, and it is not sent to the server.
+  It stays until you clear this site's data in your browser.</p>
 {# web/analytics.py and static/analytics.js: PostHog through this site's /m/ path, a random
    visitor id in localStorage (no cookie), no autocapture or session replay, the visitor's
    address not forwarded. Only when ANALYTICS_ENABLED; the offices page says the same. #}

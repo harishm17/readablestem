@@ -192,7 +192,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/courses/{id}/documents` | owner of the course and of each document | Put finished documents that are in no course into this course (`notation.attach_documents`): listed under it, their review screen and edit checks use its notation; they are not converted again (to read the PDF with the notation, upload it again for the course) |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
-| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
+| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; anyone who may open the document (a person's address is shown to the owner only, and the CSV names who decided in the owner's file only), finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the checked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, the queue (how many stored documents are in each state, in the table's labels, F-213), aggregate counts, usage counts per day and per pseudonymous person |
@@ -2653,9 +2653,11 @@ decoration). 3: order or structure of a page (no source raises it yet). 4: confi
 bar with no failed check. 5: repeated headings and other weak structure. The one-at-a-time view
 (`web.queue`) walks the bands in this order and, inside a band, in page and reading order; the
 list view keeps its sections by kind and orders each section the same way. Once every decision of
-bands 1 to 3 is decided and some of bands 4 and 5 are left, both views say "Everything that could
-change what a student reads is decided. The N left, lower risk. You can share now or keep going."
-(`triage.stopping_line`, `queue.stopping_words`). `review_load` also counts required decisions by
+bands 1 to 3 is decided and some of bands 4 and 5 are left, both views say that the higher-risk
+decisions are made, how many lower-risk ones are left and what they are, and that the document
+stays a draft until every decision is made (`triage.stopping_line`, `queue.stopping_words`; it
+never says the document can be shared, because a band 4 reading can be wrong and a document
+with a decision open is a draft). `review_load` also counts required decisions by
 band, by opening source and by class (`required_by_band`, `required_by_source`,
 `required_by_class`).
 

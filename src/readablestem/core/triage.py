@@ -84,6 +84,8 @@ class Source:
     raised_by: str
 
 
+# A row is never removed or renamed while a stored result names it: `Fix.sources` is checked
+# against this table when a result is read, so a missing name would make an old result unreadable.
 SOURCE_ROWS = (
     Source(
         PIPELINE,
@@ -197,8 +199,7 @@ class StoppingLine:
 
     @property
     def reached(self) -> bool:
-        """Everything that could change what a student reads is decided, and some lower-risk
-        decisions are left."""
+        """The decisions of the bands above the line are made, and some below it are left."""
         return self.above_open == 0 and self.below_open > 0
 
 
