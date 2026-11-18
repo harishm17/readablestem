@@ -720,6 +720,12 @@ class Settings(BaseSettings):
         `max_pages_per_job`)."""
         return max(self.max_source_pages, self.max_pages_per_job)
 
+    def image_pages_estimate(self, pages: int) -> float:
+        """What reading `pages` scanned or handwritten pages may cost, in dollars: the per-page
+        setting times the pages, at most the per-job setting. The price the upload and the job
+        page say, and the cap a job that asked for them gets (`web.worker.job_caps`)."""
+        return min(self.image_pages_max_usd_per_job, pages * self.image_pages_usd_per_page)
+
     @property
     def signup_open(self) -> bool:
         """Anyone with a verified identity may sign in (`SIGNUP_MODE=open`)."""

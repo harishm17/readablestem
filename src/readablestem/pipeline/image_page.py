@@ -98,10 +98,12 @@ from readablestem.pipeline import (
     equation_step,
     image_page_vector,
     layout,
+    page_type,
     table_step,
 )
 from readablestem.pipeline import image_page_check as second
 from readablestem.pipeline import image_page_omission as omission
+from readablestem.pipeline.page_type import PageTypeResult
 from readablestem.pipeline.validate import check_alt, clean_alt, has_errors
 
 log = logging.getLogger(__name__)
@@ -115,9 +117,6 @@ IMAGE_PAGE_REASON = types.IMAGE_PAGE_REASON
 ORIGINAL_REASON = types.IMAGE_PAGE_ORIGINAL_REASON
 NO_BOX_REASON = types.IMAGE_PAGE_NO_BOX_REASON
 NO_CROP_REASON = types.IMAGE_PAGE_NO_CROP_REASON
-# Kept-page reasons (`page_type`) the pass reads. `unread_page` (a page with some typed text)
-# and handwriting on a typed page are not scans or notebooks and stay as they were.
-READ_REASONS = frozenset({"scanned_page", "handwritten_page"})
 ILLEGIBLE = "[illegible]"
 INLINE_MARKER = re.compile(r"⟦[^⟧]*⟧")  # where an inline formula stands in a block's text
 
@@ -1208,6 +1207,24 @@ def _add_omissions(
     builder.elements = [e.model_copy(update={"order": i}) for i, e in enumerate(builder.elements)]
 
 
+def _kept_typed(typed: Sequence[Element], blocks: Sequence[Block]) -> list[Element]:
+    """The typed text of the page (`build`'s `typed`) that the read does not hold: a title
+    the model passed over stays in the page, as the PDF has it. Letters and digits only are
+    compared, so spacing and marks do not make a title look missing."""
+
+    def plain(text: str) -> str:
+        return re.sub(r"[\W_]+", "", text.casefold())
+
+    read = plain(" ".join(r.value for b in blocks for r in b.runs if r.kind == "text"))
+    return [
+        e
+        for e in typed
+        if e.kind in {Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM}
+        and (own := plain(e.text or ""))
+        and own not in read
+    ]
+
+
 def build(
     page: int,
     output: ImagePageOutput,
@@ -1219,8 +1236,13 @@ def build(
     accept_agreed: bool = False,
     maths_required: bool = False,
     page_ink: image_page_vector.VectorPage | None = None,
+    typed: Sequence[Element] = (),
 ) -> Built | None:
     """The elements and decided fixes of one page, or None when nothing on it was usable.
+
+    `typed` is the visible typed text the page had before it was read (layout's elements: a
+    title over notes, a stamp over a scan). What the read leaves out of it is kept, first
+    after the page's own picture (`_keep_typed`).
 
     `page_ink` is the page's pen strokes when its ink is vector: the omission check then
     compares the strokes (not the picture) with the blocks' boxes.
@@ -1238,6 +1260,9 @@ def build(
     builder = _Builder(page, box, ink)
     original = _original_figure(builder)
     builder.elements.append(original.model_copy(update={"order": 0}))
+    kept_typed = _kept_typed(typed, output.blocks[:MAX_BLOCKS])
+    for element in kept_typed:
+        builder.add(element.model_copy(update={"id": builder.new_id()}))
     by_kind: dict[str, int] = {}
     for index, block in enumerate(output.blocks[:MAX_BLOCKS]):
         before = len(builder.elements)
@@ -1384,9 +1409,17 @@ def no_crop(element: Element, fixes: Mapping[str, Fix]) -> bool:
     return NO_CROP_REASON in element.reasons and element.id in fixes
 
 
-def kept_reads(kept: Mapping[int, str]) -> list[int]:
-    """The kept pages (page -> reason) this pass reads, in page order."""
-    return sorted(page for page, reason in kept.items() if reason in READ_REASONS)
+def kept_reads(kept: Mapping[int, str], types: Mapping[int, PageTypeResult]) -> list[int]:
+    """The kept pages (page -> reason) this pass reads, in page order: those whose type is one
+    the pass reads (`page_type.reads_image`) and that are kept for that reason (a page layout
+    failed on is kept for another)."""
+    return sorted(
+        page
+        for page, reason in kept.items()
+        if (kind := types.get(page)) is not None
+        and page_type.reads_image(kind)
+        and reason == page_type.kept_reason(kind)
+    )
 
 
 def record_of(read: PageRead, settings: Settings, built: Built | None) -> ImagePageRecord:

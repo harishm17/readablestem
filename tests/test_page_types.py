@@ -238,7 +238,7 @@ def test_a_page_is_the_same_whatever_the_clock_says(monkeypatch, speed):
     assert [_kinds(data) for _ in range(5)] == [quiet] * 5
 
 
-def test_a_page_the_guard_stops_is_named_in_the_checks_and_the_count_is_at_least(monkeypatch):
+def test_a_page_the_guard_stops_is_named_in_the_checks_and_still_counted(monkeypatch):
     from readablestem.config import Settings
     from readablestem.models.fake import FakeVisionClient
     from readablestem.pipeline import checked, run
@@ -266,13 +266,13 @@ def test_a_page_the_guard_stops_is_named_in_the_checks_and_the_count_is_at_least
     lines = [c for c in checks.worth_checking + checks.not_handled if "not analyzed" in c.text]
     assert [line.where for line in lines] == ["Page 1"]
     assert state.key != "ready" and "not analyzed" in state.message
-    # The upload's count: a scan is a scan whatever its drawings, but a page of drawings
-    # nobody analysed may be handwriting.
+    # The upload count: a scan is a scan whatever its drawings, and a page of drawings the
+    # guard stopped is still a page the pass reads, so the count stays exact.
     doc = pymupdf.open()
     for name in ("typed_with_ink.pdf", "scan_ocr.pdf", "ink_no_layer.pdf"):
         with pymupdf.open(HANDWRITING / name) as part:
             doc.insert_pdf(part)
-    assert page_type.image_page_count(doc, budget_s=0).words == "at least 1"
+    assert page_type.image_page_count(doc, budget_s=0).words == "2"
     assert page_type.image_page_count(doc).words == "2"
 
 

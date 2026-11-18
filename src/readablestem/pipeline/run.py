@@ -38,8 +38,8 @@ Design notes:
   "pg-..." and `group_size`), so a 20-page handwritten file asks once. The pages are
   listed on `DocumentResult.image_only_pages`, and every page's type on
   `DocumentResult.page_types` (content-free). The web app reports them to the user.
-- With `FEATURE_IMAGE_PAGES` (ADR 0007), the kept pages that are scanned or handwritten
-  (`image_page.READ_REASONS`) are read from a picture of the page first, one vision call each
+- With `FEATURE_IMAGE_PAGES` (ADR 0007), the kept pages whose content is a picture or ink
+  (`page_type.image_kind`) are read from a picture of the page first, one vision call each
   (`_image_pages_pass`). A page that is read leaves the kept pages: its blocks become
   elements, the fixes decided without a model are put in place before any step runs, the
   display equations are read from the crops of their boxes by the equation step (with the
@@ -1736,7 +1736,8 @@ def _witness_image(pdf_bytes: bytes, number: int) -> bytes:
 
 def _image_pages_pass(
     pdf_bytes: bytes,
-    kept: dict[int, str],
+    pages: list[int],
+    typed: Mapping[int, list[Element]],
     boxes: dict[int, BBox],
     vector: dict[int, image_page_vector.VectorPage],
     *,
@@ -1748,14 +1749,13 @@ def _image_pages_pass(
     measured: list[CallFact],
     step_cache: StepCache | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
-    """Read the kept scanned and handwritten pages from a picture of each (ADR 0007).
+    """Read the kept pages `pages` (`image_page.kept_reads`) from a picture of each (ADR 0007).
 
     Returns what was built for the pages that were read, and the summary (None when there
     was no page to read). A page not in the first result stays a kept page. Fails safe: a
     page whose answer cannot be used, a spend cap that stops the pass or an exception while
     building leaves that page as it was. `ConfigError` and `UnknownModelError` propagate like
     they do from every step."""
-    pages = image_page.kept_reads(kept)
     if not pages:
         return {}, None
     # (An answer kept by an earlier run is given back in front of the recording client: it
@@ -1799,6 +1799,7 @@ def _image_pages_pass(
                     accept_agreed=settings.image_pages_accept_agreed,
                     maths_required=settings.image_pages_maths_always_required,
                     page_ink=read.vector if settings.image_pages_vector_checks else None,
+                    typed=typed.get(number, ()),
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)
@@ -1921,26 +1922,26 @@ def _convert(
             vector_pages: dict[int, image_page_vector.VectorPage] = {}
             if options.image_pages:
                 watch.stage("image_pages")
-                # (a picture under a text layer that does not cover it is kept as an
-                # unread page and read as a scan: `page_type.reads_image`)
-                to_read = {
-                    n: page_type.SCANNED_PAGE
-                    if reason == page_type.UNREAD_PAGE
-                    and (kind := (getattr(doc, "page_types", None) or {}).get(n)) is not None
-                    and page_type.reads_image(kind)
-                    else reason
-                    for n, reason in kept.items()
-                }
+                # Every kept page whose content is a picture or ink (`page_type.image_kind`:
+                # a scan, handwriting, a picture under a text layer that does not cover it, an
+                # unread page of vector ink), asked to be read.
+                page_types = getattr(doc, "page_types", None) or {}
+                to_read = image_page.kept_reads(kept, page_types)
+                # What layout read from them, a title over notes: the read keeps what it
+                # leaves out (`image_page.build`).
+                typed: dict[int, list[Element]] = {}
+                for e in elements:
+                    if e.page in to_read:
+                        typed.setdefault(e.page, []).append(e)
                 if settings.image_pages_vector_crops or settings.image_pages_vector_checks:
-                    page_kinds = {
-                        n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()
-                    }
+                    page_kinds = {n: r.kind for n, r in page_types.items()}
                     vector_pages = image_page_vector.analyse(
                         pdf_bytes, to_read, page_kinds, stopped=strokes_late
                     )
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
                     to_read,
+                    typed,
                     boxes,
                     vector_pages,
                     client=client,
