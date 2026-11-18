@@ -374,6 +374,41 @@ def test_a_read_refused_by_the_allowance_sends_nothing_to_the_model(reviewing):
     assert len(sent) == 2
 
 
+def reread(env, element_id: str):
+    path = f"/jobs/{env.job_id}/review"
+    data = {"csrf_token": token(env.browser, path), "action": "reread", "view": "list"}
+    data["version"] = str(env.job(env.job_id).result_version or 0)
+    return env.browser.post(f"/jobs/{env.job_id}/review/{element_id}", data=data)
+
+
+def reads_today(env) -> int:
+    from readablestem.web.quota import rereads_used
+
+    user = user_row(env, ALICE)
+    assert user is not None
+    with session_scope(env.ctx.factory) as session:
+        return rereads_used(session, user.id, utc_today())
+
+
+def test_a_read_that_comes_back_empty_is_not_counted_and_a_read_with_something_is(reviewing):
+    """A read costs one only when it reads something ("Read again", or a region marked on
+    the page): an empty answer is given back, and the card says so."""
+    empty = {"is_equation": False, "latex": "", "confidence": 0.1}
+    reviewing.ctx.client_factory = lambda settings, budget: FakeVisionClient(
+        budget=budget, defaults={"equation": empty}
+    )
+    response = reread(reviewing, "p1-e2")
+    assert response.status_code == 422, response.text[:300]
+    assert "did not count against today" in " ".join(response.text.split())
+    assert reads_today(reviewing) == 0
+    mark_region(reviewing)  # the same for a region marked on the page
+    assert reads_today(reviewing) == 0
+
+    with_model(reviewing)  # now it reads x^2 + 1
+    assert reread(reviewing, "p1-e2").status_code == 303
+    assert reads_today(reviewing) == 1
+
+
 # --------------------------------------------------------------------------- admin
 
 
