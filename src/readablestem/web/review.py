@@ -1730,6 +1730,14 @@ def is_image_page_item(element: Element | None) -> bool:
     return element is not None and IMAGE_PAGE_REASON in element.reasons
 
 
+def asked_in_a_high_band(fix: Fix) -> bool:
+    """The decision was asked in band 1, 2 or 3 (`triage.risk_rank`: nothing usable was made,
+    what a student reads may be wrong, or the order of a page): a person decides it, whatever
+    its checks say now. The band is fixed when the decision is asked, so a reading made again
+    that passes every check still has the band of the failure that led to it."""
+    return triage.risk_rank(fix) <= triage.STOP_AFTER_BAND
+
+
 def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
     """A table that waits for a decision although nothing was found wrong with it (the model
     was not sure enough of it to accept it): a data table with a proposal, no failed check
@@ -1740,8 +1748,8 @@ def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
 
     if fix.kind is not Kind.TABLE or fix.status is not Status.NEEDS_REVIEW:
         return False
-    if is_image_page_item(element):
-        return False  # read from a picture of a page: every one is its own decision
+    if is_image_page_item(element) or asked_in_a_high_band(fix):
+        return False  # read from a picture of a page, or a decision of bands 1 to 3
     table = fix.table
     return (
         table is not None

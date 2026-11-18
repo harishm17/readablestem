@@ -1365,3 +1365,58 @@ document.addEventListener("htmx:beforeRequest", function (event) {
   window.addEventListener("resize", measure);
   measure();
 })();
+
+/* Pictures of the PDF (templates/_crop.html) are shown at their own size, so one can be wider
+ * than its column: it scrolls inside its box. The box is a tab stop only while there is
+ * something to scroll to (axe: scrollable-region-focusable; a page of 25 crops is not 25 tab
+ * stops), the line under it appears while the picture is wider than the box, and the box
+ * carries an edge shadow (data-more) until its right-hand end is in view. Without this file
+ * every box stays a tab stop and says nothing, and still scrolls. */
+(function () {
+  "use strict";
+  function update(box) {
+    var scroller = box.querySelector(".crop-scroll");
+    if (!scroller) return;
+    var wide = scroller.scrollWidth > scroller.clientWidth + 1;
+    var atEnd = scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1;
+    var more = box.querySelector(".crop-more");
+    if (more) more.hidden = !wide;
+    if (wide) scroller.setAttribute("tabindex", "0");
+    else scroller.removeAttribute("tabindex");
+    if (wide && !atEnd) box.setAttribute("data-more", "");
+    else box.removeAttribute("data-more");
+  }
+  var observer = window.ResizeObserver
+    ? new window.ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          update(entry.target.closest(".crop-box"));
+        });
+      })
+    : null;
+  function attach(box) {
+    var scroller = box.querySelector(".crop-scroll");
+    if (!scroller || box.hasAttribute("data-crop-ready")) return;
+    box.setAttribute("data-crop-ready", "");
+    scroller.addEventListener("scroll", function () {
+      update(box);
+    });
+    if (observer) observer.observe(scroller);
+    update(box);
+  }
+  function attachAll(root) {
+    root.querySelectorAll(".crop-box").forEach(attach);
+  }
+  attachAll(document);
+  window.addEventListener("resize", function () {
+    document.querySelectorAll(".crop-box").forEach(update);
+  });
+  if (window.MutationObserver) {
+    new window.MutationObserver(function (records) {
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1) attachAll(node);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+})();

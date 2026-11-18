@@ -63,6 +63,21 @@
   the count where it states an open-tier allowance. The beside-the-button line a person a
   document was shared with sees now says the owner's allowance is the one used.
 - A second "Read again" on one item returns the stored reading, not a new sample.
+## Unreleased: crops fit, and accept-many is paged (branch fix/crops-fit-and-accept-many)
+
+- WS8.13 (F-067, F-068): every crop on the review screens goes through one macro
+  (`_crop.html`) that shows it at the size its element has in the page, one scale for all
+  (1.5 px a PDF point), instead of shrinking it to the column, and keeps it whole: a crop wider
+  than the column scrolls in its own box, which the keyboard reaches, with a line and an edge
+  shadow while there is more to see. A tall figure was drawn 2.56 times too wide for its height
+  in the split view; it is no longer stretched. On the accept-many page the crops of 31
+  equations were shown at scales that differed 5.1 times and the confirming button came after
+  7,587 px (11,704 px at 430 px wide): the scales are now equal within rounding and the button
+  is at the top and the bottom of the list, which is paged 20 at a time with lazy crops. The
+  button accepts the page it is on and says how many: nothing unseen is accepted, and the
+  form carries the ids of the page. Nothing asked in band 1 to 3 is offered by accept-many or
+  "Accept the clean tables" (a reading made again kept its old band and could pass every check).
+  No model call, no stored-data change, no migration, no version bump.
 
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 

@@ -380,20 +380,27 @@ def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
     assert post(web, "p1-e4", action="edit", alt="A rising line").status_code == 303
 
 
-def test_a_stored_crop_is_drawn_at_the_size_its_file_says(web):
-    """Each crop's width and height come from its PNG header, so the page keeps room for it
-    before it loads."""
+def test_a_stored_crop_is_drawn_at_the_size_of_its_box_in_the_pdf(web):
+    """A crop is drawn from its element's box in the page, with one scale for every crop and
+    the proportions of its file, so the page keeps room for it before it loads."""
     header = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (37).to_bytes(4, "big") + (11).to_bytes(4, "big")
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (400).to_bytes(4, "big") + (100).to_bytes(4, "big")
     )
     with session_scope(web.ctx.factory) as session:
         blob = session.scalars(
             select(Blob).where(Blob.job_id == web.job_id, Blob.element_id == "p1-e3")
         ).one()
         blob.content = header + blob.content[len(header) :]
+        job = session.get(Job, web.job_id)
+        assert job is not None and job.result_json is not None
+        data = DocumentResult.model_validate(job.result_json)
+        for element in data.elements:
+            if element.id == "p1-e3":
+                element.bbox = (50.0, 100.0, 146.0, 124.0)  # 96 pt wide, with 2 pt padding a side
+        job.result_json = data.model_dump(mode="json", exclude={"html"})
     tag = re.search(r"<img[^>]*crops/p1-e3\.png[^>]*>", review_page(web))
     assert tag is not None
-    assert 'width="37"' in tag[0] and 'height="11"' in tag[0]
+    assert 'width="150"' in tag[0] and 'height="38"' in tag[0]  # (96 + 4) pt at 1.5 px; 4 to 1
 
 
 def test_unknown_action_or_element(web):

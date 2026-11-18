@@ -167,8 +167,8 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list?kind=&page=&part=&at=` | review | "All items as a list": every fix, grouped by kind, 25 cards a view; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below); `part` (1-based) picks the view and `at` (an item, heading group or section id) picks the view that holds it |
-| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
-| POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
+| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, one page of it (`?page=`, 20 items) and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
+| POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item of the page the list shows (`ids`; with none, every candidate), as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/symbols?view=` | review | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
 | POST `/jobs/{id}/symbols` | review | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form checked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
 | GET `/jobs/{id}/review/marks.css` | review | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
@@ -3306,9 +3306,31 @@ for the reviewer.
 *Where.* Links (with the count) at the top of "Needs your decision" in the list view and under
 "All items as a list" on the review screen, only while there is something to accept. A link
 opens `GET /jobs/{id}/accept/{equations|figures}`: the count, a sentence saying what is and is
-not included, the whole list (each item's label, page, the original crop beside the proposal as the card shows
-it, and a link to decide it on its own), the **Accept all N equations** button and **Cancel**. Nothing is
-written by looking.
+not included, the list (each item's label, page, the original crop beside the proposal as the card shows
+it, and a link to decide it on its own), the **Accept these N equations** button and **Cancel**. Nothing is
+written by looking. The button is at the top of the list and at the bottom, so it is on screen when the page
+opens (at 1,280 and at 430 px, measured: 372 and 457 px from the top where it was 7,587 and 11,704 px down
+with 31 equations). The list is paged, `bulk_accept.PAGE_SIZE` (20) items a page, with Previous page and Next
+page links under it (`?page=`); a page of 20 is about 5,600 px tall at 1,280 px and 7,600 at 430. The crops load
+lazily and carry their width and height, so the page does not jump.
+
+*What the button accepts.* Exactly the items listed on the page it is on, and the count in the button is the
+number listed: the form carries the review version and the element ids of the page (`ids`), and only those that
+are still candidates are accepted (`accept_all(..., only=ids)`). Nothing on another page is accepted: a person
+who has not seen an item has not been asked about it. After a page the person returns to the list (the first page
+of what is left, with the notice "Accepted 20 equations ... 41 more are listed below. Undo is on the review
+screen."); with nothing left the landing is as before. A form with no `ids` (a script) accepts every candidate,
+as the page did before it was paged; the version check still refuses a document that changed.
+
+*One scale for the crops (F-067).* Every crop on the review screens (the list card, the split card's figure, the
+kept-image card and this list) goes through one macro (`templates/_crop.html`, `crop_image`) that shows it at the
+size its element has in the page, from `element.bbox` and not from the file: 1.5 CSS px a PDF point
+(`routes/review.CROP_PX_PER_PT`, the box grown by the 2 pt the crop was cut with), with the file's proportions for the
+height, so crops of one page share one scale whatever resolution they were cut at, and none is shrunk to fit or
+stretched (a tall figure was drawn 2.56 times too wide for its height by a `max-height` rule). A crop wider than its
+column scrolls inside its own box (`.crop-scroll`): a named group that takes focus (`tabindex="0"`) only while it
+scrolls (`app.js`), a line under it ("Wider than the screen: scroll sideways to see all of it.") and a shadow on its
+right edge while more is out of view; the page never scrolls sideways. Without `app.js` every box is a tab stop.
 
 *The decision.* `POST /jobs/{id}/accept/{kind}` is CSRF-checked and owner-only like every review
 route, and goes through the same path as a clean-tables accept (`routes/edits.write_review`):
@@ -3327,6 +3349,14 @@ view, **Undo** on the review screen) puts every one back to undecided in one ste
 
 *At least two (F-068).* A kind is offered only when `MIN_OFFERED` (2) items qualify; one item
 is decided on its own card, so the page no longer says "Accept many figures (1)".
+
+*Bands.* Nothing asked in band 1 to 3 (`core.triage.risk_rank`) is accepted in bulk, equations, figures and
+"Accept the clean tables" alike (`review.asked_in_a_high_band`, read by `bulk_accept.is_bulk_candidate` and
+`review.is_clean_table`). A reading made again (`page_edits.read_again`) keeps the band of the failure it replaced
+and can pass every check, so the checks alone did not keep it out. Over the 51 corpus documents that replay at
+$0, the rule offered 19 items (12 equations, 7 figures), every one of band 4, none stamped lower, none in a group,
+and no clean table. A page-level card does not exist on this version (WS21.8): the page kept as an image is a
+group and a kept image, which the rule already leaves out.
 
 *Identical items (WS8.1) are not built.* The plan asked for one decision on open equations and
 figures of one document with a byte-equal crop and an equal proposal. The measure came first

@@ -6,6 +6,7 @@
 {% from "_report_item.html" import report_link with context %}
 {% from "_leave_out.html" import leave_out_forms with context %}
 {% from "_hear.html" import hear_button %}
+{% from "_crop.html" import crop_image %}
 {% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 
 {% macro notice_box(notice) %}
@@ -65,8 +66,7 @@
   {% if item.kind in ("equation", "figure", "table", "paragraph", "list_item") %}
   <figure class="crop">
     {% if item.crop_url %}
-    <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} loading="lazy"
-         alt="The original {{ name }} from page {{ item.page }} of the PDF, as an image.">
+    {{ crop_image(item, "The original " ~ name ~ " from page " ~ item.page ~ " of the PDF, as an image.") }}
     {% else %}
     <p>No image of the original is available.</p>
     {% endif %}
@@ -207,7 +207,7 @@
 <div class="fix-body">
   <figure class="crop">
     {% if item.crop_url %}
-    <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} loading="lazy" alt="{{ item.label }} of the PDF, as an image.">
+    {{ crop_image(item, item.label ~ " of the PDF, as an image.") }}
     {% else %}
     <p>No image of the original is available.</p>
     {% endif %}

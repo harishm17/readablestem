@@ -49,12 +49,12 @@ def output():
     return out
 
 
-@pytest.fixture(scope="module")
-def site(tmp_path_factory) -> Iterator[WebEnv]:
+def serve(folder, out) -> Iterator[WebEnv]:
+    """The app on a free port, converting every upload into `out`."""
     import uvicorn
 
-    env = WebEnv(tmp_path_factory.mktemp("scale-browser"), per_user_daily_page_quota=1000)
-    env.converter.output = output()
+    env = WebEnv(folder, per_user_daily_page_quota=1000)
+    env.converter.output = out
     port = free_port()
     server = uvicorn.Server(
         uvicorn.Config(env.app, host="127.0.0.1", port=port, log_level="warning", lifespan="on")
@@ -70,6 +70,11 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
     yield env
     server.should_exit = True
     thread.join(timeout=10)
+
+
+@pytest.fixture(scope="module")
+def site(tmp_path_factory) -> Iterator[WebEnv]:
+    yield from serve(tmp_path_factory.mktemp("scale-browser"), output())
 
 
 def upload(site, browser) -> str:
@@ -139,7 +144,7 @@ def test_accept_all_equations_from_the_keyboard_then_undo(site, browser, job):
         "Accept equations that passed every check"
     )
     assert page.locator(".bulk-preview > li").count() == 2
-    accept = page.get_by_role("button", name="Accept these 2 equations")
+    accept = page.get_by_role("button", name="Accept these 2 equations").first  # one at each end
     presses = tab_to(page, accept)
     assert presses <= 20
     page.keyboard.press("Enter")
@@ -347,4 +352,142 @@ def test_undo_is_a_44_px_target_and_the_marks_are_24_px_or_more(site, browser, j
     assert sizes, "marks on the page"
     assert all(w >= 23.9 and h >= 23.9 for w, h in sizes)
     assert any(w >= 43.9 and h >= 43.9 for w, h in sizes), "a mark with room is a 44 px target"
+    context.close()
+
+
+# --------------------------------------------------------------------------- crops fit
+
+BOXES = [(40, 14), (120, 30), (300, 60), (520, 40), (150, 200), (60, 12), (640, 300), (80, 24)]
+PHONE = {"width": 430, "height": 800}
+
+
+def _crop_png(width_pt: float, height_pt: float) -> bytes:
+    """A crop as the conversion cuts it: the box with 2 pt either side, at 200 dpi."""
+    import io
+
+    from PIL import Image
+
+    size = (round((width_pt + 4) * 200 / 72), round((height_pt + 4) * 200 / 72))
+    buffer = io.BytesIO()
+    Image.new("RGB", size, "white").save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+def sized_output():
+    """Thirty more equations, so the accept-many list has to be paged, and a tall figure; every
+    element that has a crop gets a box of its own size and a crop cut for it."""
+    from readablestem.core.types import Element, EquationFix, FigureFix, Fix, Kind, Status
+
+    out = output()
+    for n in range(30):
+        eid = f"p3-z{n}"
+        out.result.elements.append(
+            Element(
+                id=eid,
+                kind=Kind.EQUATION,
+                page=2,
+                bbox=(0, 0, 1, 1),
+                order=200 + n,
+                display="block",
+            )
+        )
+        out.result.fixes.append(
+            Fix(
+                element_id=eid,
+                kind=Kind.EQUATION,
+                status=Status.NEEDS_REVIEW,
+                confidence=0.8,
+                equation=EquationFix(latex="x", mathml="<math><mi>x</mi></math>", speech="x"),
+                review="required",
+            )
+        )
+        out.crops[eid] = b""
+    out.result.elements.append(
+        Element(id="p3-tall", kind=Kind.FIGURE, page=2, bbox=(0, 0, 1, 1), order=300)
+    )
+    out.result.fixes.append(
+        Fix(
+            element_id="p3-tall",
+            kind=Kind.FIGURE,
+            status=Status.NEEDS_REVIEW,
+            confidence=0.8,
+            figure=FigureFix(figure_type="chart", alt="A line that rises."),
+            review="required",
+        )
+    )
+    out.crops["p3-tall"] = b""
+    for n, element in enumerate(e for e in out.result.elements if e.id in out.crops):
+        width, height = (300, 520) if element.id == "p3-tall" else BOXES[n % len(BOXES)]
+        element.bbox = (50.0, 100.0, 50.0 + width, 100.0 + height)
+        out.crops[element.id] = _crop_png(width, height)
+    return out
+
+
+@pytest.fixture(scope="module")
+def sized(tmp_path_factory) -> Iterator[WebEnv]:
+    yield from serve(tmp_path_factory.mktemp("sized-browser"), sized_output())
+
+
+# What the browser lays out for each crop: its size in the file and on the screen, whether its
+# picture is stretched, and its scrolling box (its width against its content, and whether the
+# keyboard reaches it when it scrolls).
+MEASURE_CROPS = """async () => {
+  document.querySelectorAll('details').forEach((d) => { d.open = true; });
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  const images = [...document.querySelectorAll('img[src*="/crops/"]')];
+  images.forEach((i) => { i.loading = 'eager'; });
+  await Promise.all(images.map((i) => i.complete ? 0 : new Promise((done) => {
+    i.onload = done; i.onerror = done; setTimeout(done, 5000);
+  })));
+  const button = document.querySelector('.bulk-buttons button')?.getBoundingClientRect();
+  return {
+    sideways: document.documentElement.scrollWidth - innerWidth,
+    button: button && { top: button.top, bottom: button.bottom },
+    height: innerHeight,
+    crops: images.map((i) => {
+      const box = i.closest('.crop-scroll'), shown = {width: i.clientWidth, height: i.clientHeight};
+      const wide = box.scrollWidth > box.clientWidth + 1;
+      if (wide) box.focus();
+      return {
+        scale: shown.width / i.naturalWidth,
+        stretch: (shown.width / shown.height) / (i.naturalWidth / i.naturalHeight),
+        scrollsAll: getComputedStyle(box).overflowX === 'auto' && box.scrollWidth >= i.offsetWidth,
+        wide,
+        reachable: !wide || document.activeElement === box,
+        told: !wide || !box.parentElement.querySelector('.crop-more').hidden,
+      };
+    }),
+  };
+}"""
+
+
+@pytest.mark.parametrize("viewport", [WIDE, PHONE], ids=["desktop", "phone"])
+def test_every_crop_has_one_scale_none_is_cut_off_and_the_button_is_in_view(
+    sized, browser, viewport
+):
+    """A document with crops of very different sizes: on the accept-many page, the card and a
+    tall figure's card, each crop is drawn at one scale (the shown width over the file's width is
+    the same for all), unstretched, and whole: one wider than the column scrolls in a box the
+    keyboard reaches and says so. The page never scrolls sideways, and the confirming button
+    is on screen as the accept-many page opens."""
+    job_id = upload(sized, browser)
+    assert sized.run_worker() == job_id
+    context, page = open_page(browser, sized, viewport=viewport)
+    seen = []
+    for path in ("accept/equations", "review/list", "review?item=p3-tall"):
+        page.goto(f"{sized.base}/jobs/{job_id}/{path}")
+        measured = page.evaluate(MEASURE_CROPS)
+        assert measured["crops"], path
+        assert measured["sideways"] <= 0, path
+        for crop in measured["crops"]:
+            assert crop["scrollsAll"] and crop["reachable"] and crop["told"], path
+            assert 0.98 < crop["stretch"] < 1.02, path
+        scales = [crop["scale"] for crop in measured["crops"]]
+        assert max(scales) / min(scales) < 1.03, (path, min(scales), max(scales))
+        seen += [crop["wide"] for crop in measured["crops"]]
+        if path.startswith("accept"):
+            assert page.locator(".bulk-preview > li").count() == 20  # one page of the list
+            button = measured["button"]
+            assert button["top"] >= 0 and button["bottom"] <= measured["height"]
+    assert any(seen)  # some crop was wider than its column, and scrolled
     context.close()

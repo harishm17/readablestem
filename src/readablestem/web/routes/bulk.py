@@ -61,20 +61,28 @@ def _view(raw: str) -> str:
 
 @router.get("/jobs/{job_id}/accept/{slug}")
 def confirm_page(
-    request: Request, job_id: str, slug: str, user: UserDep, view: str = ""
+    request: Request, job_id: str, slug: str, user: UserDep, view: str = "", page: int = 1
 ) -> Response:
-    """The list of what the action would accept, and the button that does it."""
+    """The list of what the action would accept, one page of it at a time, and the button
+    that accepts the page (`web.bulk_accept.PAGE_SIZE`)."""
     spec = _spec(slug)
     job, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     labels = item_labels(result)
+    found = bulk_accept.candidates(result, slug)
+    listed, page, pages = bulk_accept.page_of(found, page)
     items = [
         _item(fix, elements.get(fix.element_id), numbers[fix.element_id], job.id, crop_ids, None,
               labels.get(fix.element_id), origin=result.origin)
-        for fix in bulk_accept.candidates(result, slug)
+        for fix in listed
     ]  # fmt: skip
     split = view == "split"
+    shown_view = _view(view)
+
+    def page_href(number: int) -> str:
+        return f"/jobs/{job.id}/accept/{slug}?view={shown_view}&page={number}"
+
     # With nothing to accept at once, the page names the next useful thing to do: the first
     # of this kind still waiting (a check failed, or it was flagged), else the next decision.
     waiting = reading_order(result, [f for f in result.fixes if f.kind is spec.kind and f.pending])
@@ -84,10 +92,16 @@ def confirm_page(
         "job": job,
         "spec": spec,
         "items": items,
-        "count": len(items),
-        "counted": f"{len(items)} {spec.one if len(items) == 1 else spec.many}",
+        "count": len(found),
+        "counted": f"{len(found)} {spec.one if len(found) == 1 else spec.many}",
+        "shown": len(items),
+        "page": page,
+        "pages": pages,
+        "first_shown": (page - 1) * bulk_accept.PAGE_SIZE + 1,
+        "prev_href": page_href(page - 1) if page > 1 else "",
+        "next_href": page_href(page + 1) if page < pages else "",
         "result_version": version,
-        "view": _view(view),
+        "view": shown_view,
         "back_href": (review_url(job.id) if split else list_url(job.id, "needs-decision")),
         "kind_waiting": len(waiting),
         "kind_href": (
@@ -111,8 +125,10 @@ def accept(
     user: UserDep,
     version: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
+    ids: Annotated[list[str] | None, Form()] = None,
 ) -> Response:
-    """Accept every item the page listed, in one write (one Undo takes all back)."""
+    """Accept the items the page listed (`ids`: the page the person was shown; without them,
+    every candidate), in one write (one Undo takes all back)."""
     spec = _spec(slug)
     view = _view(view)
     if not version.strip():  # a form without the version it was drawn at proves nothing
@@ -123,7 +139,7 @@ def accept(
             job_id,
             user,
             version,
-            lambda result: bulk_accept.accept_all(result, slug),
+            lambda result: bulk_accept.accept_all(result, slug, ids),
             kind="group",
         )
     except ReviewStale:
@@ -139,6 +155,12 @@ def accept(
     log_event(logger, "review_accept_bulk", job_id=job_id, group=slug, changed=n)
     what = spec.one if n == 1 else spec.many
     message = f"Accepted {n} {what} {spec.tail}. Undo takes them all back in one step."
+    left = len(bulk_accept.candidates(result, slug)) if ids is not None else 0
+    if left:  # a page of a longer list: the next page is where the person goes on
+        what_left = f"{left} more {spec.one if left == 1 else spec.many}"
+        rest = f"{what_left} {'is' if left == 1 else 'are'} listed below."
+        flash(request, f"{message} Undo is on the review screen. {rest}", undo=False)
+        return RedirectResponse(f"/jobs/{job_id}/accept/{slug}?view={view}", status_code=303)
     flash(request, message, element_id=GROUP_FLASH + slug)
     if view == LIST_VIEW:
         return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)

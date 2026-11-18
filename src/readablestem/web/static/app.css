@@ -355,6 +355,20 @@ progress { width: 16rem; height: 1.1rem; }
 .crop { margin: var(--space-2) 0; }
 .crop img { max-width: 100%; height: auto; border: 1px solid var(--border-subtle); background: var(--paper); }
 .crop figcaption { color: var(--ink-muted); font-size: var(--step--1); }
+/* The PDF's picture of an item (templates/_crop.html): shown at the size its element has in the
+   PDF, one scale for every crop, never shrunk or cut. One wider than its column scrolls inside
+   its own focusable box; app.js shows the line under it when there is more to see, and an edge
+   shadow while the right-hand end is out of view. */
+.crop-box { position: relative; max-width: 100%; }
+.crop-scroll { overflow-x: auto; max-width: 100%; }
+.crop-scroll:focus-visible { outline-offset: 0; }
+.crop-scroll .crop-image { display: block; max-width: none; max-height: none; flex: none; border: 1px solid var(--border-subtle); background: var(--paper); }
+.crop-more { margin: var(--space-1) 0 0; color: var(--ink-muted); font-size: var(--step--1); }
+.crop-box[data-more]::after {
+  content: ""; position: absolute; top: 0; right: 0; width: 1.5rem; height: 100%; pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--border-control)); opacity: 0.45;
+}
+@media (forced-colors: active) { .crop-box[data-more]::after { background: none; border-right: 4px solid CanvasText; opacity: 1; } }
 .mathml-preview { font-size: var(--step-2); padding: var(--space-3); background: var(--surface); border-radius: var(--radius-control); overflow-x: auto; }
 /* An equation that is all chemistry has no style on its element symbols (the MathML carries
    intent on <math>; Speech Rule Engine would read an explicit style aloud). Draw them upright

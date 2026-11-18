@@ -1,0 +1,18 @@
+{# The PDF's own picture of one item, as every review screen shows it (the card in both
+   views, the figure view, the accept-many page). `item.crop_size` is the size it is shown at,
+   worked out from the element's box in the page with one scale for every crop
+   (routes/review.py `crop_shown_size`), so two crops on a page can be compared by size and
+   none is shrunk to fit or cut off. A picture wider than the column scrolls inside its own
+   box, which can be focused and scrolled from the keyboard and says so (app.js shows the
+   line under it only when there is more to see, and takes the box out of the tab order when
+   there is not). Use:
+   {% from "_crop.html" import crop_image %}
+   {{ crop_image(item, "The original equation from page 2 of the PDF, as an image.") }} #}
+{% macro crop_image(item, alt) -%}
+<div class="crop-box">
+  <div class="crop-scroll" role="group" aria-label="PDF picture of {{ item.label|lower }}" tabindex="0">
+    <img class="crop-image" src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} loading="lazy" alt="{{ alt }}">
+  </div>
+  <p class="crop-more" hidden>Wider than the screen: scroll sideways to see all of it.</p>
+</div>
+{%- endmacro %}

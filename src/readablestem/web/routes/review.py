@@ -66,7 +66,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline import table_math
-from readablestem.pipeline.layout import REASON_LARGER_FONT
+from readablestem.pipeline.layout import CROP_PAD, REASON_LARGER_FONT
 from readablestem.pipeline.notices import TEXT_NOTICE_OF
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
@@ -466,8 +466,9 @@ class ReviewItem:
     heading_in_document: bool
     can_accept: bool
     values: dict[str, str]
-    # The stored crop's size in pixels (read from the file's header), so the page keeps room
-    # for it before it loads; None when there is no crop.
+    # The size in CSS pixels the stored crop is shown at (`crop_shown_size`: from its
+    # element's box, one scale for every crop), so the page keeps room for it before it loads;
+    # None when there is no crop.
     crop_size: tuple[int, int] | None = None
     optional: bool = False  # accepted automatically with optional notes (`checks`)
     second_check: bool = False  # ... one of them the second automated check's
@@ -873,6 +874,39 @@ class GroupView:
 
 # --------------------------------------------------------------------------- view model
 
+# One scale for every crop on the review screens: CSS pixels per PDF point. A 10 pt line of
+# the PDF is then 15 px high, as tall as the page's own text, whatever resolution the crop
+# was cut at (an equation's crop is cut sharper than a figure's) and however big its box is.
+CROP_PX_PER_PT = 1.5
+CROP_MAX_PX = 4000
+
+
+def crop_shown_size(
+    element: Element | None, natural: tuple[int, int] | None
+) -> tuple[int, int] | None:
+    """The (width, height) in CSS pixels a stored crop is shown at: its element's box in the
+    page (`element.bbox`, grown by the padding the crop was cut with) times `CROP_PX_PER_PT`,
+    so crops of one page share one scale. The height follows the file's own proportions
+    (`natural`, its size in pixels), so the picture is never stretched. A crop of a table set
+    sideways was cut turned: its box is turned too. Without a usable box the size is the
+    file's own."""
+    if element is None:
+        return natural
+    x0, y0, x1, y1 = element.bbox
+    width, height = x1 - x0, y1 - y0
+    if width <= 0 or height <= 0:
+        return natural
+    if element.table is not None and element.table.turned in (90, 270):
+        width, height = height, width
+    shown_w = round((width + 2 * CROP_PAD) * CROP_PX_PER_PT)
+    if natural is not None:
+        shown_h = round(shown_w * natural[1] / natural[0])
+    else:
+        shown_h = round((height + 2 * CROP_PAD) * CROP_PX_PER_PT)
+    if not 0 < shown_w <= CROP_MAX_PX or not 0 < shown_h <= CROP_MAX_PX:
+        return natural
+    return (shown_w, shown_h)
+
 
 def _item(
     fix: Fix,
@@ -927,7 +961,7 @@ def _item(
         crop_url=f"/jobs/{job_id}/crops/{fix.element_id}.png"
         if fix.element_id in crop_ids
         else None,
-        crop_size=crop_ids.get(fix.element_id),
+        crop_size=crop_shown_size(element, crop_ids.get(fix.element_id)),
         mathml=try_sanitize_mathml(fix.equation.mathml) if fix.equation else None,
         speech=fix.equation.speech if fix.equation else None,
         alt=fix.figure.alt if fix.figure else None,
