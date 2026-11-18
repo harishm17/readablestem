@@ -192,6 +192,7 @@ IMAGE_PAGES_VECTOR_CHECKS = { value = true, source = "not stated; code default" 
 IMAGE_PAGES_SECOND_READING = { value = false, source = "not stated; code default" }
 IMAGE_PAGES_ACCEPT_AGREED = { value = false, source = "not stated; code default" }
 MATHML_ALTTEXT = { value = false, source = "not stated; code default" }
+PAGE_IMAGE_CACHE_MB = { value = 32, source = "not stated; code default" }
 
 # What the production image carries, written by the image build (`readablestem ops image-facts
 # --write`, Dockerfile), never typed. In the repository every fact is "unknown", and every
