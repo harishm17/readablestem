@@ -11,8 +11,7 @@ or conditions.
 
 The table (`TABLE`) has one row per key. A row says when it applies (worked out from stored
 facts only, in `state_of`), its label, its tone and its next step. Rows that need facts not
-stored yet (a cancel request, checks that answer late, the daily reset of pages, the review's
-page cards) are not in it; they are added as rows when their facts exist, never as a surface.
+stored yet (the daily reset of pages, the review's page cards) are not in it; they are added as rows when their facts exist, never as a surface.
 
 Rules the function owns, so no template decides them:
 
@@ -94,6 +93,10 @@ TABLE: dict[str, Row] = {
     "waiting_reset": Row("Waiting until {time}", WAITING, False),
     "converting": Row("Converting", WORKING, False),
     "restarting": Row("Restarting", WORKING, False),
+    # The owner pressed "Cancel" on a conversion a worker has begun; it stops at its next step.
+    "stopping": Row("Stopping", WORKING, False),
+    # Stopped on request (`cancel_job`): the upload is kept, so it can be converted later.
+    "canceled": Row("Canceled", WAITING, True),
     "stopped_file": Row("Stopped: this file cannot be converted as it is", FAILED, True),
     "stopped_service": Row("Stopped: not caused by your file", FAILED, True),
     "stopped_no_tries": Row("Stopped", FAILED, True),
@@ -117,6 +120,9 @@ READY_KEYS = frozenset({"ready", "ready_remains"})
 FINAL_GAPS = frozenset({"pages_as_pictures", "source_unread"})
 
 # --------------------------------------------------------------------------- stop codes
+
+# The error code of a job its owner stopped (`routes.jobs.cancel_job`, `worker.Worker._beat`).
+CANCELED = "canceled"
 
 # Tries a person may ask for on one job (`web.retry`): each costs only what was not
 # finished before, but a job that fails the same way four times will not be helped by a fifth.
@@ -253,7 +259,7 @@ class State:
 
     @property
     def stopped(self) -> bool:
-        return self.tone == FAILED
+        return self.tone == FAILED or self.key == "canceled"
 
     @property
     def working(self) -> bool:
@@ -290,6 +296,7 @@ class Facts:
     deleted: bool = False
     deleted_on: datetime | None = None
     image_pages: bool = False  # the box "Convert scanned or handwritten pages" was checked
+    cancel_requested: bool = False  # the owner asked a running conversion to stop
 
     @classmethod
     def of(cls, job: Job) -> Facts:
@@ -308,6 +315,7 @@ class Facts:
             lease_until=job.lease_until,
             is_sample=bool(job.is_sample),
             image_pages=bool(job.image_pages),
+            cancel_requested=job.cancel_requested_at is not None,
         )
 
 
@@ -376,6 +384,8 @@ def state_of(
             return _make("waiting_reset", words.WAITING_BUDGET, time=f"{reset:%H:%M} UTC")
         return _make("waiting", ctx.waiting_line or "Waiting for its turn.")
     if job.status == JobStatus.RUNNING:
+        if job.cancel_requested:
+            return _make("stopping", "Stopping at the next step. What was not sent will not be.")
         lease = as_utc(job.lease_until)
         if lease is not None and lease < (ctx.now or utcnow()):
             return _make("restarting", _restart_message())
@@ -457,6 +467,8 @@ def _stopped(job: Facts, left: int, viewer: str, ctx: Context) -> State:
 
     code = job.error_code or ""
     owner = viewer == "owner"
+    if code == CANCELED:
+        return _canceled(job, owner)
     if code in RETRYABLE_FAILURES:
         cause = job_error_message(code, with_hint=False)
         if left:
@@ -485,6 +497,21 @@ def _stopped(job: Facts, left: int, viewer: str, ctx: Context) -> State:
         steps = (_retry_step(job, left), _upload()) if owner else ()
         return _make("stopped_unknown", " ".join(parts), steps, tries=left)
     return _make("stopped_unknown", " ".join(parts), (_upload(),) if owner else ())
+
+
+def _canceled(job: Facts, owner: bool) -> State:
+    """Stopped by its owner: the upload is kept, so it can be converted later (no try is used,
+    and a conversion that had not begun counted no pages: `retry.start`)."""
+    convert = Step(
+        "retry",
+        "Convert it",
+        f"/jobs/{job.id}/retry",
+        form=True,
+        explain="Converting puts your document back in the queue. It does not use one of the "
+        "tries for a document that stopped on its own.",
+    )
+    message = "You canceled this conversion. Your file is kept, so you can convert it later."
+    return _make("canceled", message, (convert, _upload()) if owner else (), group=NEEDS)
 
 
 def _no_tries(cause: str, retries: int) -> str:
@@ -647,6 +674,7 @@ _COLUMNS = (
     Job.lease_until,
     Job.is_sample,
     Job.open_decisions,
+    Job.cancel_requested_at,
 )
 
 
@@ -687,6 +715,7 @@ def load(
             attempts_at_retry=r.attempts_at_retry or 0,
             lease_until=r.lease_until,
             is_sample=bool(r.is_sample),
+            cancel_requested=r.cancel_requested_at is not None,
         )
         out[r.id] = state_of(facts, counts, context=context)
     return out

@@ -88,12 +88,15 @@ def start(job: Job, *, active_others: int, max_active: int) -> None:
         raise RetryRefused(refused)
     if active_others >= max_active:
         raise RetryRefused("too_many_active")
+    canceled = job.error_code == states.CANCELED
     job.status = JobStatus.QUEUED
     job.error_code = None
+    job.cancel_requested_at = None
     job.error_detail = None
     job.finished_at = None
     job.lease_until = None
     job.pages_done = 0
     job.progress_json = None
-    job.retries = (job.retries or 0) + 1
+    if not canceled:  # converting what its owner stopped is not a try after a failure
+        job.retries = (job.retries or 0) + 1
     job.attempts_at_retry = job.attempts or 0

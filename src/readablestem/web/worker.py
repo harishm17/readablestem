@@ -116,6 +116,7 @@ from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
+from readablestem.web.states import CANCELED
 from readablestem.web.step_cache import DbStepCache
 from readablestem.web.step_cache import forget as forget_steps
 
@@ -783,6 +784,22 @@ class Worker:
             return
         if not owned:
             self._cancel(attempt, "not_owned")
+        elif self._cancel_asked(attempt.claim):
+            # The owner pressed "Cancel" (`routes.jobs.cancel_job`): end the job as canceled and
+            # stop what has not been sent, as for a deleted job. The pages are not returned.
+            self._finish_failed(attempt, CANCELED)
+            self._cancel(attempt, "canceled")
+
+    def _cancel_asked(self, claim: Claim) -> bool:
+        try:
+            with session_scope(self.factory) as session:
+                return (
+                    session.scalar(select(Job.cancel_requested_at).where(*self._owned(claim)))
+                    is not None
+                )
+        except Exception as exc:  # a missed check is made again at the next beat
+            log_exception(logger, "cancel_check_failed", exc, job_id=claim.job_id)
+            return False
 
     def _progress(self, attempt: _Attempt) -> ProgressFn:
         """Progress callback. Raising from it aborts `convert_pdf` (queued steps cancelled)."""

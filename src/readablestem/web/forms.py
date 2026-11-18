@@ -100,6 +100,7 @@ BUSY_LABELS = {
     "removing": "Removing…",
     "saving": "Saving…",
     "starting": "Starting…",
+    "stopping": "Stopping…",
     "undoing": "Undoing…",
     "uploading": "Uploading…",
 }
@@ -203,6 +204,8 @@ FORMS: dict[str, FormRow] = {
                 "none: the sample opens the same document again"),
         FormRow("job.retry", "POST /jobs/{job_id}/retry", Kind.STATE, "starting",
                 "a second click said 'Nothing to try again'"),
+        FormRow("job.cancel", "POST /jobs/{job_id}/cancel", Kind.STATE, "stopping",
+                "a second click said 'Nothing to cancel'"),
         # The account deletion's repeat arrives signed out (see the module docstring).
         FormRow("account.delete", "POST /account/delete", Kind.DELETE, "deleting",
                 "a second click landed on the sign-in page"),

@@ -100,7 +100,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
 )
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.pending import MAX_PENDING_PER_USER
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import give_back_pages, next_day_start, pages_left, try_consume_pages
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
@@ -1746,6 +1746,12 @@ RETRY_REFUSED = {
         "You already have as many documents waiting or being converted as one person may. "
         "Wait for one to finish, then try again. Nothing was changed.",
     ),
+    "over_quota": (
+        429,
+        "Not enough pages left today",
+        "This document's pages no longer fit in what is left of today's pages. Try again after "
+        "the limit starts again. Nothing was changed.",
+    ),
 }
 
 
@@ -1775,6 +1781,9 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             )
             or 0
         )
+        # A document canceled before any worker began it had its pages given back: converting
+        # it counts them again (a canceled one that had begun kept them counted).
+        recount = job.error_code == states.CANCELED and not job.attempts
         try:
             retry_rules.start(
                 job, active_others=others, max_active=access.files_per_upload(user.access_tier)
@@ -1784,7 +1793,14 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             if refused == "not_stopped" and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
                 refused = "already_queued"
         else:
-            retention.restart_clock(job, ctx.settings)
+            quota = access.page_quota(ctx.settings, user.access_tier)
+            if recount and not try_consume_pages(
+                session, user.id, job.page_count, quota=quota, day=utc_today()
+            ):
+                session.rollback()  # it stays canceled, and nothing was counted
+                refused = "over_quota"
+            else:
+                retention.restart_clock(job, ctx.settings)
             tries = job.retries or 0
     if refused == "no_tries_left":
         raise PageError(
@@ -1809,6 +1825,45 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
         "was counted against your daily pages.",
         undo=False,
     )
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
+
+
+@router.post("/jobs/{job_id}/cancel", dependencies=[limited("retry"), Depends(require_csrf)])
+@submit_once("job.cancel")
+def cancel_job(request: Request, job_id: str, user: UserDep) -> Response:
+    """Cancel a document that is waiting or converting (WS11.3a). A document no worker has
+    begun stops at once and its pages come back (when they were counted today); one a worker
+    has begun is asked to stop, and the worker ends it at its next beat (`web.worker`) with
+    nothing returned. Either way the upload is kept: "Convert it" starts it again, or it can be
+    deleted."""
+    ctx = get_ctx(request)
+    enforce(request, "retry_user", user.id)
+    now = utcnow()
+    gave_back = False
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        owned_id = job.id
+        if job.status == JobStatus.QUEUED:
+            job.status = JobStatus.FAILED
+            job.error_code = states.CANCELED
+            job.finished_at = now
+            if not job.attempts and utc_today(as_utc(job.created_at)) == utc_today(now):
+                gave_back = give_back_pages(session, user.id, job.page_count, day=utc_today(now))
+            stopped = True
+        elif job.status == JobStatus.RUNNING:
+            job.cancel_requested_at = job.cancel_requested_at or now
+            stopped = True
+        else:
+            stopped = False
+    if not stopped:
+        raise PageError(
+            409,
+            "Nothing to cancel",
+            "This document is not waiting or converting. Nothing was changed.",
+            context={"job_id": job_id},
+        )
+    log_event(logger, "job_cancel_requested", job_id=owned_id, pages_given_back=gave_back)
+    flash(request, "Canceled. Your file is kept; you can convert it later or delete it.", undo=False)
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 

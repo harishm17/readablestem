@@ -12,6 +12,15 @@
 {% endwith %}
 {% endif %}
 {% include "_job_progress.html" %}
+{% if job.is_owner and state.key != "stopping" %}
+{# Stops a document that is waiting (at once, its pages back) or converting (at its next step).
+   The upload is kept either way (web/routes/jobs.py `cancel_job`). #}
+{% from "components/forms.html" import form with context %}
+{% call form("job.cancel", "/jobs/" ~ job.id ~ "/cancel", {"class": "inline-form", "id": "cancel-form"}) %}
+  <p id="cancel-explain" class="hint">Cancel stops it. Your file is kept, so you can convert it later or delete it.</p>
+  <button type="submit" class="button-secondary" aria-describedby="cancel-explain">Cancel</button>
+{% endcall %}
+{% endif %}
 {# Opt-in browser notice when the conversion finishes (static/app.js "When a job finishes").
    Hidden until the script finds the Notification API; nothing is asked until the button is
    used, and nothing leaves the device. #}

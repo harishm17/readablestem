@@ -5,7 +5,9 @@ UPDATE (`... WHERE pages + n <= quota`), so two uploads racing each other cannot
 squeeze under the limit: the database decides, not a read-then-write in Python.
 
 Pages are not refunded when a job fails or is deleted: the quota limits what a user can
-submit, and refunds would let a failing upload be retried without bound.
+submit, and refunds would let a failing upload be retried without bound. The one exception
+is a document canceled before a worker began it, on the day it was counted (`give_back_pages`);
+converting it again counts its pages again (`routes.jobs.retry_job`).
 
 The same row counts the model reads an open-tier account starts from the review screen
 (`try_consume_reread`: a region marked as an equation, a table cell read as maths), and one
@@ -50,6 +52,19 @@ def try_consume_pages(
     )
     if quota is not None:
         stmt = stmt.where(QuotaDay.pages + pages <= quota)
+    return rowcount(session.execute(stmt)) == 1
+
+
+def give_back_pages(session: Session, user_id: str, pages: int, *, day: date) -> bool:
+    """Take `pages` off the user's count for `day`: the document was canceled before any worker
+    began it (`routes.jobs.cancel_job`). The one case where pages come back; never below zero,
+    so a day that was already reset gives nothing back."""
+    stmt = (
+        update(QuotaDay)
+        .where(QuotaDay.user_id == user_id, QuotaDay.day == day, QuotaDay.pages >= pages)
+        .values(pages=QuotaDay.pages - pages)
+        .execution_options(synchronize_session=False)
+    )
     return rowcount(session.execute(stmt)) == 1
 
 

@@ -200,6 +200,10 @@ class Job(Base):
     # A Word or PowerPoint upload (T3-30): the census its preflight counted (what the PDF route
     # did with the file; `web.office_convert.Census.to_json`, counts only). NULL for a PDF.
     office_json: Mapped[dict | None] = mapped_column(JSON)
+    # When the owner asked for this document to stop (`POST /jobs/{id}/cancel`). A queued job is
+    # stopped by the request itself; a running one is stopped by the worker at its next beat,
+    # which ends it with the error code `canceled` (`web.worker.Worker._beat`).
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
