@@ -147,7 +147,7 @@ def test_every_page_that_lists_inputs_says_the_same_about_latex_source(tmp_path)
         seo.COMPARE_GUIDE: "a zip of a LaTeX project",
         seo.ADA_GUIDE: "You can upload a PDF or LaTeX file",
         offices.PAGE_PATH: "a zip of a LaTeX project",
-        "/privacy": "for LaTeX source, the .tex file",
+        "/privacy": "the LaTeX .tex file",
     }
     with on.running() as client_on, off.running() as client_off:
         for path, phrase in paths.items():

@@ -65,7 +65,7 @@ def test_accepted_fix_has_latex_mathml_speech_checks_and_calls():
     assert eq is not None
     assert eq.latex == r"\Delta t = t_\text{f} - t_0"
     assert eq.mathml.startswith("<math") and 'display="block"' in eq.mathml
-    assert eq.speech == "capital delta t equals t sub f minus t sub 0"
+    assert eq.speech == "cap delta t equals t sub f minus t sub 0"
     assert eq.display == "block"
     assert fix.checks and all(c.passed for c in fix.checks)
     names = {c.name for c in fix.checks}

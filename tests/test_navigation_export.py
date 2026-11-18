@@ -127,5 +127,6 @@ def test_the_zip_and_the_cartridge_carry_it(export):
     assert cc.check_cartridge(data) == []
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         page = archive.read(f"web_resources/{FOLDER}/index.html").decode()
-    assert page == export.index_html
+    # the same page, its note saying what this file is
+    assert page == cc.with_medium(export.index_html, "Common Cartridge")
     link_targets_exist(page)

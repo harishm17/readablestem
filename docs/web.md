@@ -2488,7 +2488,7 @@ From top to bottom:
    gone."), and "In the HTML:" the spoken reading. That text is document content: it is
    rendered for the owner only and never logged. On the committed demo PDF (13 pages,
    one real run) the card has 7 rows and its first example is Equation 2.4: "capital
-   delta d capital delta t period" against "capital delta bold d over capital delta t".
+   delta d capital delta t period" against "cap delta bold d over cap delta t".
 6. **Results**: what was found, and decisions as the one unit everywhere (MF6, T1-3,
    T1-11): "Decisions to make" and "Decisions made" ("Decisions still open" for a person who can only view it), counted as on the review
    screen and in My documents (a group of repeated headings is one decision). A heading
