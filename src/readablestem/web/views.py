@@ -24,7 +24,7 @@ from readablestem.pipeline import checked
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import documents, fair_queue, job_page, states, titles
+from readablestem.web import documents, fair_queue, job_page, office_census, states, titles
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
@@ -360,6 +360,9 @@ class JobView:
     # parts of the same file still kept (this one included), in page order.
     part_label: str = ""
     parts: list[PartLink] = field(default_factory=list)
+    # A Word or PowerPoint upload (T3-30): how the file was read, in sentences
+    # (`web.office_census.read_lines`); empty for a PDF.
+    office_lines: list[str] = field(default_factory=list)
     # How many parts "Combine parts" would join (`web.combine.kept_parts`: finished, kept,
     # no decision open, none overlapping); the link is offered from two.
     combinable: int = 0
@@ -729,6 +732,9 @@ def job_view(
         carry=carried,
         carried_ids=_carried_ids(job),
         part_label=job.part_label or "",
+        office_lines=office_census.read_lines(office_census.parse(job.office_json))
+        if with_page
+        else [],
         is_sample=bool(job.is_sample),
         sample=sample_view() if job.is_sample and with_page else None,
         parts=part_links(session, job, context) if with_page and job.part_group and owner else [],

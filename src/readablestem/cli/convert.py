@@ -34,7 +34,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from readablestem.config import ConfigError, Settings, get_settings
 from readablestem.core import triage
@@ -42,6 +42,9 @@ from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.core.types import Check, ConversionOutput, Fix, Kind, Status
 from readablestem.models.base import VisionClient
 from readablestem.models.pricing import UnknownModelError, price_for
+
+if TYPE_CHECKING:
+    from readablestem.web import office_convert
 
 # Shown at the top of the HTML from a --fake run: the offline client's answers are
 # placeholders (WP1's OFFLINE_DEFAULTS), and the CLI has no review step to catch them.
@@ -309,14 +312,15 @@ def _write_report(path: Path, output: ConversionOutput, checks: list[Check], axe
 # --------------------------------------------------------------------------- command
 
 
-def _pdf_bytes(path: Path, settings: Settings) -> bytes:
+def _pdf_bytes(path: Path, settings: Settings) -> tuple[bytes, office_convert.Census | None]:
     """The file's bytes; a Word or PowerPoint file is made into a tagged PDF first, in the
-    same limited child process the web app uses (T3-30)."""
+    same limited child process the web app uses (T3-30), and comes with the census of what
+    that route did with it (None for a PDF)."""
     from readablestem.web import office_convert, uploads
 
     data = path.read_bytes()
     if not uploads.is_office_upload(data):
-        return data
+        return data, None
     if not office_convert.input_kinds(settings):
         raise _CliError("LibreOffice is not installed (or OFFICE_INPUT_ENABLED is false)")
     try:
@@ -356,7 +360,7 @@ def _convert(args: argparse.Namespace) -> int:
             raise _CliError(f"{target} is the input PDF; choose another output path")
     if args.report is not None and args.report.resolve() == args.out.resolve():
         raise _CliError("--report and --out must be different files")
-    pdf_bytes = _pdf_bytes(args.pdf, settings)
+    pdf_bytes, census = _pdf_bytes(args.pdf, settings)
     pages = _parse_pages(args.pages, _page_count(pdf_bytes, args.pdf), args.pdf)
 
     cap_usd = settings.max_usd_per_job if args.fake else args.max_usd
@@ -400,6 +404,10 @@ def _convert(args: argparse.Namespace) -> int:
     finally:
         tracer.flush()  # spans are exported in batches; send them before the process exits
 
+    if census is not None:  # what the PDF route left out or kept open, as on the job page
+        from readablestem.web import office_census
+
+        output.result.notices = office_census.with_notices(output.result.notices, census)
     html = output.result.html
     checks = output.checks if isinstance(output, PipelineOutput) else static_checks(html)
     axe = axe_checks(html) if args.axe else None

@@ -97,6 +97,26 @@
 - No text decision exists yet (WS16.6), so options and right-to-left text raise a required
   notice and no fix: a paragraph fix would offer "keep as image" where only scanned-page text
   has an image to keep. The decision waits for WS16.6. `PIPELINE_VERSION` is not changed here.
+## Unreleased: pictures found as LaTeX finds them, one sandboxed TeX compile, the Office census (branch feat/source-pictures-tex-office-census)
+
+- SW18.2: a LaTeX source picture is found the way LaTeX does. `source.figures.find` takes the first
+  of LaTeXML's `candidates` that is inside the project and of a kind that is read (`.pdf .png
+  .jpg .jpeg .gif`), else the written name with those suffixes in that order, as written and in
+  capitals; `figure_png` decides PDF or image from the bytes and no longer from the suffix of the
+  name. `\includegraphics{fig1}` with `fig1.png` in the project was a figure with no picture (a
+  required decision) before. `.eps` and `.svg` stay unread. Changes the output of such a source,
+  so `PIPELINE_VERSION` needs a bump at merge.
+- WS18.22: `source/tex_compile.compile_tex(tex, project=None)`: one sandboxed `pdflatex` run
+  (LaTeXML's limits, no shell escape, TeX's own file rules refusing paths outside the work folder,
+  font generation off, no network) returning a PDF or a named failure. No caller yet. The profile
+  fact `tex_engine` is not added: nothing reads it yet.
+- WS18.13: a Word or PowerPoint upload says what the PDF route did with it. The preflight
+  returns a census of counts (`web.office_convert.Census`), stored on the job (`jobs.office_json`,
+  and `pending_uploads.office_json` for the parts of a large file; migration `4e8a1c7d9b35`). A
+  Word file with open tracked changes gets the required notice `office_tracked_changes` and is
+  "Ready", not "Ready to share"; speaker notes, hidden slides and comments are optional notices
+  with counts; the job page's "How this file was read" says how the file was read and how many
+  typed equations were read as pictures. The CLI adds the same notices.
 
 ## Unreleased: footnotes the file names, the equation scorer reads the output as stated, the second check off (branch fix/footnotes-the-file-names)
 

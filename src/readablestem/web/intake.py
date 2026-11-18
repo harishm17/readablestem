@@ -98,6 +98,7 @@ def store_job(
     part_label: str | None = None,
     now: datetime | None = None,
     media_type: str = "application/pdf",
+    office: dict | None = None,
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction.
 
@@ -135,6 +136,7 @@ def store_job(
             revises_job_id=revises,
             part_group=part_group,
             part_label=part_label,
+            office_json=office,
         )
         session.add(job)
         session.flush()

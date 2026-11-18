@@ -289,7 +289,7 @@ def _convert(
         report = source_report.parse(out, project=project, loaded=loaded)
         try:
             xml = out / latexml.XML_PATH
-            graphics = ltx_reader.graphics_of(xml.read_bytes()) if xml.is_file() else {}
+            graphics = ltx_reader.graphics_of(xml.read_bytes(), project) if xml.is_file() else {}
             reading = ltx_reader.read(xhtml, project, graphics, beamer=beamer)
         except ltx_reader.ReadError:
             _stop_if_lost(report, beamer=beamer)

@@ -274,6 +274,17 @@ cannot see the live header; the log line is the only live check.
 
 ### Running uploaded TeX (sandbox)
 
+`source/tex_compile.py` (WS18.22) is the one place the product runs `pdflatex`. It has no caller yet:
+a later feature (the line check) brings its own preamble. A TeX file, alone or with a project folder,
+goes in; a PDF or a named failure (`no_engine`, `no_sandbox`, `not_finished`, `failed`) comes out,
+never TeX's log. It runs in this sandbox under LaTeXML's limits, with the project (or the one file)
+mounted read-only, the PDF folder writable, no network, `-no-shell-escape`, `shell_escape=f`,
+`openin_any=p` and `openout_any=p` (TeX refuses absolute paths and `..` itself, behind the sandbox:
+`\input{/etc/hostname}` and `\input{|cat ...}` end the run), and the programs TeX starts to make a
+missing font off (`MKTEXPK`, `MKTEXTFM`, `MKTEXMF`, `MKTEXFMT` = 0). Tested with the real
+`pdflatex` (`tests/test_tex_compile.py`; skipped by name where pdfTeX is missing). `gold/safe_tex.py`
+is a separate, development-only compile of gold files and is not this function.
+
 A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`; production's value is in `src/readablestem/ops/production.profile.toml`)
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
 application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output

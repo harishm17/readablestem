@@ -374,10 +374,11 @@ def is_office_upload(data: bytes) -> bool:
 
 def convert_office_isolated(
     data: bytes, *, soffice: str | None, timeout_s: float = office_convert.DEFAULT_TIMEOUT_S
-) -> bytes:
+) -> tuple[bytes, office_convert.Census]:
     """A Word or PowerPoint file as a tagged PDF, made in a child process
-    (`web.office_convert`), or `UploadRejected` with a category. Call it from a worker
-    thread. The caller probes the PDF afterwards like any upload."""
+    (`web.office_convert`), with the census the child counted in the file (what the PDF route
+    does with it), or `UploadRejected` with a category. Call it from a worker thread. The
+    caller probes the PDF afterwards like any upload."""
     if soffice is None:
         raise UploadRejected("office_unavailable")
     if not _OFFICE_SLOT.acquire(timeout=OFFICE_WAIT_S):
@@ -388,7 +389,9 @@ def convert_office_isolated(
         _OFFICE_SLOT.release()
 
 
-def _run_office_child(data: bytes, soffice: str, timeout_s: float) -> bytes:
+def _run_office_child(
+    data: bytes, soffice: str, timeout_s: float
+) -> tuple[bytes, office_convert.Census]:
     try:
         child = subprocess.Popen(
             [sys.executable, "-m", "readablestem.web.office_convert", soffice, str(timeout_s)],
@@ -413,6 +416,9 @@ def _run_office_child(data: bytes, soffice: str, timeout_s: float) -> bytes:
     except ValueError:
         raise UploadRejected("office_failed") from None
     if isinstance(answer, dict) and answer.get("ok") is True and body.startswith(b"%PDF-"):
-        return body
+        try:
+            return body, office_convert.Census.from_json(answer.get("census"))
+        except ValueError:  # a child that sends no census is not the one that was started
+            raise UploadRejected("office_failed") from None
     code = answer.get("code") if isinstance(answer, dict) else None
     raise UploadRejected(code if code in REJECTION_STATUS else "office_failed")

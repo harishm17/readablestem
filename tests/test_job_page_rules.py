@@ -87,6 +87,22 @@ def test_an_ai_outage_is_not_finished():
     assert state(2, 4).key == "ready_remains" and state(0, 4).key == "ready_remains"
 
 
+def test_a_notice_no_decision_stands_behind_holds_back_ready_to_share():
+    from readablestem.pipeline import checked
+
+    whole = states.counts_of(checked.summarize(elements=[], fixes=[], html_checks=[]))
+
+    def state(code: str, review: str) -> states.State:
+        result = {"notices": [{"code": code, "review": review}]}
+        return states.state_of(states.Facts(id="j", status="done", result_json=result), whole)
+
+    assert state("office_comments", "optional").key == "ready"
+    # a formula LaTeX could not read has its own decision: the notice is not a second hold
+    assert state("source_error", "required").key == "ready"
+    held = state("office_tracked_changes", "required")
+    assert held.key == "ready_remains" and "tracked changes" in held.message
+
+
 # --------------------------------------------------------------------------- reading
 
 

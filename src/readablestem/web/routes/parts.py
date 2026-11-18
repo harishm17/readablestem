@@ -222,6 +222,7 @@ def _start_parts(
         done = {p for p in (row.done_pages or []) if isinstance(p, int)}
         course, exam, mode = row.course_id, bool(row.exam_mode), row.retention_mode
         asked_images = bool(row.image_pages) and s.feature_image_pages
+        office = dict(row.office_json) if row.office_json else None
     try:
         parts = ranges.parse_parts(text, total=total, limit=s.max_pages_per_job, taken=done)
     except ranges.PartsError as exc:
@@ -263,6 +264,7 @@ def _start_parts(
                 image_pages=asked_images and may_have,
                 part_group=upload_id,
                 part_label=part.label,
+                office=office,
             )
         except ExtractFailed:
             out.error = (

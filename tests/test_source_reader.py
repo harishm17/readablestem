@@ -345,8 +345,8 @@ def test_the_graphics_map_reads_the_xml_ids(tmp_path):
         b'<?xml version="1.0"?><document xmlns="http://dlmf.nist.gov/LaTeXML">'
         b'<graphics graphic="fig/a.png" xml:id="S1.F1.g1"/><graphics xml:id="x"/></document>'
     )
-    assert reader.graphics_of(xml) == {"S1.F1.g1": "fig/a.png"}
-    assert reader.graphics_of(b"<broken") == {}
+    assert reader.graphics_of(xml, tmp_path) == {"S1.F1.g1": "fig/a.png"}
+    assert reader.graphics_of(b"<broken", tmp_path) == {}
 
 
 def test_the_language_comes_from_the_page(tmp_path):
