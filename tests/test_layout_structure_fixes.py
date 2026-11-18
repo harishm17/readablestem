@@ -28,7 +28,7 @@ from readablestem.pipeline.layout import (
 from readablestem.pipeline.layout import (
     REASON_RTL_ORDER as RTL_TEXT,
 )
-from readablestem.pipeline.notices import from_reasons
+from readablestem.pipeline.notices import from_fixes, from_reasons, text_decisions
 
 BODY = 11.0
 SENTENCE = "The cart rolls down the ramp and speeds up as it goes, so the velocity grows."
@@ -518,6 +518,13 @@ def test_answer_options_inside_one_block_are_split_or_flagged_never_silent(lines
     assert [e.text for e in options] == texts
     assert [OPTION_LABELS in e.reasons for e in options] == [flagged] * len(options)
     assert [n.review for n in from_reasons(options)] == ["required"] * flagged
+    # the flagged block has a decision of its own, and its notice follows that decision
+    fixes = text_decisions(options, {})
+    assert [f.reason for f in fixes] == ["text.option_labels"] * flagged
+    assert [n.code for n in from_fixes(options, fixes, long_descriptions=False)] == [
+        "option_labels"
+    ] * flagged
+    assert from_reasons(options, fixes) == []
 
 
 def arabic_and_hebrew_page() -> bytes:
@@ -552,3 +559,8 @@ def test_right_to_left_text_is_flagged_and_a_lam_alef_ligature_keeps_its_letter_
     assert "لا" in (arabic.text or "") and "ال" not in (arabic.text or "")
     assert RTL_TEXT in arabic.reasons and RTL_TEXT in hebrew.reasons
     assert [n.code for n in from_reasons(layout.elements)] == [RTL_TEXT, RTL_TEXT]
+    fixes = {f.element_id: f for f in text_decisions(layout.elements, {})}
+    assert set(fixes) == {arabic.id, hebrew.id}
+    assert {f.reason for f in fixes.values()} == {"text.rtl_order"}
+    assert all(f.pending and f.review == "required" for f in fixes.values())
+    assert text_decisions(layout.elements, fixes) == []

@@ -727,7 +727,9 @@ class NoticeLine:
 # page or a region of handwriting kept as an image). Any other notice on an element with
 # a decision (a figure telling things apart by colour alone) is about something else: it
 # gets no "Decide it".
-DECISION_NOTICES = frozenset({"table_not_rebuilt"}) | notice_rules.KEPT_IMAGE_CODES
+DECISION_NOTICES = (
+    frozenset({"table_not_rebuilt", *notice_rules.TEXT_CODES}) | notice_rules.KEPT_IMAGE_CODES
+)
 
 
 @dataclass

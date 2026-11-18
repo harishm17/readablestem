@@ -132,6 +132,34 @@ def test_a_heading_level_the_outline_would_now_change_is_not_carried():
     assert changes == [] and report.suggestion_changed == ["p1-e1"]
 
 
+def text_decision(eid: str, text: str, kind: Kind = Kind.PARAGRAPH) -> tuple[Element, Fix]:
+    element = Element(
+        id=eid, kind=kind, page=0, bbox=(0, 0, 100, 20), order=0, text=text,
+        reasons=["rtl_text"],
+    )  # fmt: skip
+    fix = Fix(
+        element_id=eid,
+        kind=kind,
+        status=Status.NEEDS_REVIEW,
+        review="required",
+        reason="text.rtl_order",
+    )
+    return element, fix
+
+
+@pytest.mark.parametrize("kind", [Kind.PARAGRAPH, Kind.LIST_ITEM])
+def test_a_text_decision_is_carried_only_onto_the_same_words(kind):
+    before_e, before_f = text_decision("p1-e0", "שלום עולם", kind)
+    decide(before_f, Status.ACCEPTED)
+    old = result_of((before_e, before_f))
+    same_e, same_f = text_decision("p1-e0", "שלום  עולם", kind)
+    _report, changes = carry.carry_decisions(old, {}, result_of((same_e, same_f)), {})
+    assert [c.element_id for c in changes] == ["p1-e0"] and same_f.status is Status.ACCEPTED
+    other_e, other_f = text_decision("p1-e0", "שלום לכולם", kind)
+    _report, changes = carry.carry_decisions(old, {}, result_of((other_e, other_f)), {})
+    assert changes == [] and other_f.pending
+
+
 def test_the_report_round_trips_and_holds_no_text():
     report = carry.CarryReport(carried=["p1-e0"], changed=["p1-e1"], new=["p2-e0"], removed=2)
     again = carry.CarryReport.from_json(report.to_json())

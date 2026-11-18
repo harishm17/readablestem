@@ -409,6 +409,14 @@ REASON_MESSAGES: dict[str, str] = {
     "model_skipped": "No model was asked about this item.",
     # Heading step
     "heading.empty_text": "This heading has no text, so it cannot be used as a heading.",
+    # A paragraph or list item layout doubts (`pipeline.notices.text_decisions`): the proposal
+    # is its own text, as the PDF gives it.
+    "text.rtl_order": "This text is written right to left (Arabic or Hebrew). The PDF may store "
+    "its words in a different order from the one they are read in, so check them against the "
+    "original: if they read right, choose Looks right; if not, change the words.",
+    "text.option_labels": "Answer options (A, B, C and so on) run together in one paragraph or "
+    "list item, so a screen reader reads them as one block. If that is not what the original "
+    "shows, split them into separate items with the page tools; if it is, choose Looks right.",
     # Table step (pipeline.table_step)
     "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
     "cannot read its cells: keep it as an image or rebuild it as a table yourself.",

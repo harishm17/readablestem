@@ -485,6 +485,7 @@ DECISION_NOUNS = {
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
     Kind.PARAGRAPH: ("piece of text", "pieces of text"),
+    Kind.LIST_ITEM: ("list item", "list items"),
 }
 
 

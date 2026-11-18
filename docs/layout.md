@@ -1086,10 +1086,18 @@ classified like a raster picture, but they have not been measured; handwritten e
 ### Answer options and right-to-left text (WS2.4a, SW54a)
 
 Two things layout does not get right are never left silent: both set a reason on the
-paragraph or list item (`Element.reasons`), and `notices.from_reasons` turns it into a
-"required" notice, listed under "Not handled in this file" (no decision: the text decision
-of WS16.6 does not exist yet, and a paragraph fix would offer "keep as image" where only
-scanned-page text has an image to keep).
+paragraph or list item (`Element.reasons`). The run turns each into a decision on that
+element (`notices.text_decisions`, WS16.6 part 1): the element's own `Fix` with
+`status=NEEDS_REVIEW`, `review="required"` and the reason `text.rtl_order` or
+`text.option_labels`, the same fix shape a scanned page's paragraph has. Its proposal is the
+element's own words; the person says "Looks right", changes the words, or uses the page
+tools. A block with both flags has one decision, `text.rtl_order` (the words in the wrong
+order change what is read more than options run together do); the other flag keeps its bare
+required notice. The notice (`option_labels`, `rtl_text`, listed under "Not handled in this
+file") is derived from the pending decision (`notices.from_fixes`) and goes when it is made.
+A result stored before this has only the reason; `notices.from_reasons` still lists the
+notice, and `web.states` still holds that job at "Ready" (there is nothing to decide).
+Not built: the page record, the document card, and the per-source switch.
 
 - **Option labels** (`option_labels`, `_later_labels`, `_split_options`): a block that
   starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
