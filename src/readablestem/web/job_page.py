@@ -815,6 +815,20 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
         line = _line(notice, fixes, labels, elements)
         if notice.code == "source_error" and (names := _unknown_commands(result)):
             line = replace(line, names=names, lead="The commands LaTeX did not know", place="")
+        if notice.code == notice_rules.CUT_OFF and notice.page is not None:
+            pages = tuple(range(notice.page + 1, notice.page + notice.count + 1))
+            where = checked_words.page_range(pages)
+            line = replace(
+                line,
+                where=f"{where[0].upper()}{where[1:]}",
+                text=checked_words.cut_off_owner_pages(pages)
+                + (
+                    " Upload a fresh copy, or continue with the pages before them."
+                    if notice.review == "required"
+                    else " You chose to continue with the pages before them."
+                ),
+                count=1,
+            )
         if notice.code == "source_unread" and (report := result.source_report) is not None:
             # how much was left out, and its first words (document content: the owner's page)
             what = unread_phrase(report.unread_words, report.unread_pictures)
@@ -989,6 +1003,9 @@ class PageData:
     language: str  # "English (detected; your PDF did not say)"
     lang: str
     language_check: bool  # detected or assumed: worth confirming
+    # The empty last pages (1-based) of a PDF that looks cut off, while the owner has not
+    # answered (`pipeline.notices.continue_cut_off`).
+    cut_off_open: tuple[int, ...]
     language_choices: list[tuple[str, str]]
     first_open: str | None  # the review screen's first open decision (a key)
     finish: Finish
@@ -1051,6 +1068,9 @@ def page_data(result: DocumentResult, last_decision: date | None, filename: str 
         language=language_line(result),
         lang=result.lang,
         language_check=language_needs_check(result),
+        cut_off_open=tuple(
+            p + 1 for p in notice_rules.cut_off_pages(result.notices, open_only=True)
+        ),
         language_choices=language_choices(result.lang),
         first_open=first.key if first is not None else None,
         finish=Finish(summary, not_handled=len(notices.not_handled)),

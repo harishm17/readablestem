@@ -180,6 +180,27 @@ def left_out_sentence(s: CheckedSummary) -> str:
     return f"Pages {_pages_list(pages)}{of} of the original PDF were left out of this file."
 
 
+def page_range(pages: tuple[int, ...]) -> str:
+    """ "page 6", "pages 5 and 6", "pages 4 to 6" (1-based, consecutive)."""
+    if len(pages) == 1:
+        return f"page {pages[0]}"
+    joiner = "and" if len(pages) == 2 else "to"
+    return f"pages {pages[0]} {joiner} {pages[-1]}"
+
+
+def cut_off_sentence(s: CheckedSummary) -> str:
+    """What a student is told of a PDF that looks cut off ("" when it does not)."""
+    pages = s.converted.cut_off_pages
+    if not pages:
+        return ""
+    where = page_range(pages)
+    verb = "is" if len(pages) == 1 else "are"
+    return (
+        f"{where[0].upper()}{where[1:]} of the original PDF {verb} empty, because the file looks "
+        "cut off, so the rest is not in this file: ask your instructor for a complete version."
+    )
+
+
 def _unread_phrase(s: CheckedSummary) -> str:
     """ "14 words and 1 picture of the LaTeX source" ("" when it was read whole)."""
     c = s.converted
@@ -209,7 +230,13 @@ def unread_owner(s: CheckedSummary) -> str:
 def statement(s: CheckedSummary) -> list[str]:
     """The student statement: who reviewed it, what is a picture, what was left out or not
     read."""
-    parts = (review_sentence(s), pictures_sentence(s), left_out_sentence(s), unread_sentence(s))
+    parts = (
+        review_sentence(s),
+        pictures_sentence(s),
+        left_out_sentence(s),
+        cut_off_sentence(s),
+        unread_sentence(s),
+    )
     return [t for t in parts if t]
 
 
@@ -249,6 +276,34 @@ def left_out_owner(s: CheckedSummary) -> str:
     return f"{plural(n, 'page')} {'was' if n == 1 else 'were'} left out."
 
 
+def cut_off_owner(s: CheckedSummary) -> str:
+    """The owner's line for a PDF that looks cut off, once its question is answered ("" when
+    it does not)."""
+    pages = s.converted.cut_off_pages
+    return cut_off_owner_pages(pages) if pages else ""
+
+
+def cut_off_owner_pages(pages: tuple[int, ...]) -> str:
+    """The same for the empty `pages` (1-based, consecutive)."""
+    where = page_range(pages)
+    return (
+        f"{where[0].upper()}{where[1:]} of the PDF {'is' if len(pages) == 1 else 'are'} empty "
+        "(the file looks cut off), so the rest is not in this file."
+    )
+
+
+def cut_off_question(pages: tuple[int, ...]) -> str:
+    """The question the owner answers before a cut-off PDF is ready: `pages` are the empty
+    ones (1-based, consecutive, to the end of the file)."""
+    before = pages[0] - 1
+    kept = "page 1" if before == 1 else f"pages 1 to {before}"
+    verb = "is" if len(pages) == 1 else "are"
+    return (
+        f"This file looks cut off: {page_range(pages)} {verb} empty. Upload a fresh copy, or "
+        f"continue with {kept}."
+    )
+
+
 def checks_failed_sentence(s: CheckedSummary) -> str:
     if not s.checks_failed:
         return ""
@@ -259,7 +314,13 @@ def checks_failed_sentence(s: CheckedSummary) -> str:
 def remains(s: CheckedSummary) -> str:
     """What stands between a finished job with no open decision and "Ready to share" ("" when
     nothing does)."""
-    parts = [as_image_sentence(s), left_out_owner(s), unread_owner(s), checks_failed_sentence(s)]
+    parts = [
+        as_image_sentence(s),
+        left_out_owner(s),
+        cut_off_owner(s),
+        unread_owner(s),
+        checks_failed_sentence(s),
+    ]
     return " ".join(p for p in parts if p)
 
 
@@ -346,7 +407,7 @@ def record_pictures(s: CheckedSummary) -> str:
     """The record's line when no part is listed as a picture."""
     if s.all_found_converted:
         return READY_ALL
-    return " ".join(p for p in (left_out_owner(s), unread_owner(s)) if p)
+    return " ".join(p for p in (left_out_owner(s), cut_off_owner(s), unread_owner(s)) if p)
 
 
 def record_checks(s: CheckedSummary) -> str:

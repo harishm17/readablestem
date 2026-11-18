@@ -1993,6 +1993,7 @@ def render_html(
     origin: str = "pdf",
     pages: int | None = None,
     unread: tuple[int, int] = (0, 0),
+    cut_off_pages: list[int] | None = None,
     filename: str = "",
     audience: str = STUDENT,
     stamp: Stamp | None = None,
@@ -2032,7 +2033,9 @@ def render_html(
     (`DocumentResult.origin`): the student note's first sentence says so. `pages`: how many
     pages the document has, when known, so the note can say "7 of 8" pages were left out.
     `unread`: the words and pictures a LaTeX source's reader did not read
-    (`checked.unread_of`), which the student note says are not in the file.
+    (`checked.unread_of`), which the student note says are not in the file. `cut_off_pages`: the
+    0-based empty last pages of a PDF that looks cut off (`checked.cut_off_of`), which the note
+    says are not in the file either.
     `stamp`: which version of the document this file is (`Stamp`), written as the last line of
     the student note and in the head. The caller supplies it (no clock or database is read here);
     without one the file says nothing of a version.
@@ -2085,6 +2088,7 @@ def render_html(
         reviewed_on=checked_on,
         origin=origin,
         unread=unread,
+        cut_off_pages=cut_off_pages or (),
     )
     about = _about_section(
         summary,

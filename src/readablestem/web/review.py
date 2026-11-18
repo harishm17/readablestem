@@ -1901,6 +1901,7 @@ def rerender_html(
     html = assemble.render_html(
         origin=result.origin,
         unread=checked.unread_of(result),
+        cut_off_pages=checked.cut_off_of(result),
         title=title_override or result.title,
         filename=filename,
         audience=audience,

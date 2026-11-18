@@ -642,6 +642,12 @@ def to_csv(record: Record) -> str:
     row("summary", checked_words.READY_ALL, detail="Yes" if s.all_found_converted else "No")
     for name, n in record.by_hand.items():
         row("summary", name, detail=n)
+    if s.cut_off:
+        row(
+            "summary",
+            "Empty pages at the end of the PDF (it looks cut off)",
+            detail=" ".join(str(n) for n in s.converted.cut_off_pages),
+        )
     if record.left_out_pages:
         pages = " ".join(str(n) for n in record.left_out_pages)
         row("summary", "Pages left out of the student file", detail=pages)

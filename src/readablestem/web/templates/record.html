@@ -47,6 +47,7 @@
     {% elif record.checked.all_found_converted %}<li>{{ checked_words.READY_ALL }}</li>{% endif %}
     {% for name, n in record.by_hand.items() %}<li>{{ name }}: {{ n }}.</li>{% endfor %}
     {% for title, text in record.gaps %}<li>{{ title }}: {{ text }}</li>{% endfor %}
+    {% if record.checked.cut_off %}<li>{{ checked_words.cut_off_owner(record.checked) }}</li>{% endif %}
     {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
   </ul>
 </section>

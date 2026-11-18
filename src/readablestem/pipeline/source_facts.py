@@ -33,14 +33,22 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from xml.etree.ElementTree import Element as XmlElement
 
 import defusedxml.ElementTree as SafeET
 import pymupdf
 
-from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, SourceFacts
+from readablestem.core.types import (
+    KEPT_ORIGINAL_STATUSES,
+    Element,
+    Fix,
+    Kind,
+    Notice,
+    SourceFacts,
+)
 from readablestem.pipeline import layout, page_type, text_pass
+from readablestem.pipeline.notices import CUT_OFF, REPAIRED
 
 log = logging.getLogger(__name__)
 
@@ -354,3 +362,65 @@ def measure(
             return _from_pdf(pdf_bytes, sorted(set(pages)), equations, facts)
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
+
+
+# --------------------------------------------------------------------------- repaired files
+
+
+def _repair_state(pdf_bytes: bytes) -> tuple[bool, int] | None:
+    """Whether MuPDF had to repair the file when it opened it, and its page count; None when
+    it cannot be opened (layout opened it, so this is not expected). Holds layout's lock and
+    quiets MuPDF's messages, like `measure`."""
+    lock = getattr(layout, "_LOCK", None)
+    with lock if lock is not None else contextlib.nullcontext():
+        pymupdf.TOOLS.mupdf_display_errors(False)
+        pymupdf.TOOLS.mupdf_display_warnings(False)
+        try:
+            doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+            try:
+                pages = doc.page_count  # counting the pages is what repairs a lost page tree
+                return bool(doc.is_repaired), pages
+            finally:
+                doc.close()
+        except Exception as exc:
+            log.warning("repair check: the PDF could not be opened: %s", type(exc).__name__)
+            return None
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
+
+
+def repair_notices(
+    pdf_bytes: bytes, page_types: Mapping[int, page_type.PageTypeResult]
+) -> list[Notice]:
+    """What a person must be told of a PDF that was repaired when it was opened (a download
+    that did not finish, a damaged cross-reference table), from the pages `page_type` found
+    empty (blank, nothing painted at all). A file that was not repaired raises nothing: a
+    blank page in a healthy file is normal.
+
+    - The file's last pages are empty and an earlier page has content: it looks cut off. One
+      `file_cut_off` notice, required: `page` is the first empty page (0-based) and `count`
+      how many there are, to the end of the file. The owner continues with the pages before
+      them or uploads a fresh copy.
+    - Otherwise a repaired file gets one `file_repaired` line, optional. That includes a file
+      with empty pages in the middle: MuPDF reads the pages after them, so the file is not
+      cut short, and a blank page there is as likely meant to be blank as one that lost its
+      content, which nothing in the file can tell apart.
+
+    Never raises: a file it cannot judge says nothing."""
+    try:
+        state = _repair_state(pdf_bytes)
+        if state is None or not state[0] or not page_types:
+            return []
+        empty = {
+            n for n, kind in page_types.items() if kind.kind == "blank" and "empty" in kind.reasons
+        }
+        last = state[1] - 1
+        end = last
+        while end in empty:
+            end -= 1
+        if end < last and any(n <= end and n not in empty for n in page_types):
+            return [Notice(code=CUT_OFF, page=end + 1, count=last - end, review="required")]
+        return [Notice(code=REPAIRED, review="optional")]
+    except Exception as exc:  # a bug here must not cost the user a finished conversion
+        log.warning("repair check failed: %s", type(exc).__name__)
+        return []

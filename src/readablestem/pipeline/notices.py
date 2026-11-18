@@ -100,6 +100,35 @@ HANDLED_CODES = frozenset({"footnote", "code_block"})
 # file is "Ready to share" (`web.states`), whatever `review` an older stored notice has.
 LANGUAGE_CODES = frozenset({"lang_assumed", "lang_mixed"})
 
+# A PDF repaired when it was opened (`source_facts.repair_notices`). `file_cut_off`: its last
+# pages are empty. It is required until the owner continues with the pages before them
+# (`continue_cut_off`), which sets its `review` to "none" and nothing else: the notice stays,
+# because the pages are still not in the file, and the summary says so from it
+# (`checked.cut_off_of`). `file_repaired`: damaged and repaired, content on every page.
+CUT_OFF = "file_cut_off"
+REPAIRED = "file_repaired"
+
+
+def cut_off_pages(notices: Iterable[Notice], *, open_only: bool = False) -> list[int]:
+    """The 0-based empty last pages of a PDF that looks cut off; with `open_only`, only while
+    the owner has not answered."""
+    return [
+        page
+        for n in notices
+        if n.code == CUT_OFF and n.page is not None and (n.review == "required" or not open_only)
+        for page in range(n.page, n.page + n.count)
+    ]
+
+
+def continue_cut_off(result: DocumentResult) -> DocumentResult:
+    """The result with the owner's answer "continue with the pages before the empty ones":
+    the notice no longer holds the document back. It is kept, so every surface still says the
+    pages are not in the file."""
+    notices = [
+        n.model_copy(update={"review": "none"}) if n.code == CUT_OFF else n for n in result.notices
+    ]
+    return result.model_copy(update={"notices": notices})
+
 
 def section(notice: Notice) -> Section:
     """ "Handled in this file" for what was found and converted (`HANDLED_CODES`), "Not

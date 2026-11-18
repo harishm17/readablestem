@@ -2071,6 +2071,10 @@ def _convert(
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
+        # A PDF repaired when it was opened whose last pages are empty looks cut off: the
+        # student note says so, and so does the job page until the owner answers.
+        repaired = pdf_facts.repair_notices(pdf_bytes, getattr(doc, "page_types", None) or {})
+        cut_off = notice_rules.cut_off_pages(repaired)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
             _send(stage_progress, "assemble")
             html = assemble.render_html(
@@ -2084,6 +2088,7 @@ def _convert(
                 math_alttext=settings.mathml_alttext,
                 page_labels=labels,
                 footnote_ids=footnotes,
+                cut_off_pages=cut_off,
             )
             _send(stage_progress, "checks")
             watch.stage("checks")
@@ -2169,6 +2174,7 @@ def _convert(
     notices: list[Notice] = [
         *text.notices,
         *doc.notices,
+        *repaired,
         *image_page.notices(image_built),
         *reading_notices,
     ]
