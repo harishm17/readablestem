@@ -27,7 +27,7 @@ from pathlib import Path
 
 from starlette.background import BackgroundTask
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import FileResponse, HTMLResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
 
@@ -109,8 +109,27 @@ def cached_html(
     etag = '"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
     control = "public, no-cache" if revalidate else f"public, max-age={max_age}"
     sent = {**(headers or {}), "ETag": etag, "Cache-Control": control}
-    sent_tags = request.headers.get("if-none-match", "").split(",")
-    wanted = [tag.strip().removeprefix("W/") for tag in sent_tags]
-    if etag in wanted or "*" in wanted:
+    if _asked_for(request, etag):
         return Response(status_code=304, headers=sent, background=background)
     return HTMLResponse(body, headers=sent, background=background)
+
+
+def _asked_for(request: Request, etag: str) -> bool:
+    """Does the request's `If-None-Match` name this ETag? A weak tag counts: a compressed
+    copy of the same page carries `W/` (`web.security.CompressionMiddleware`)."""
+    sent = request.headers.get("if-none-match", "").split(",")
+    wanted = [tag.strip().removeprefix("W/") for tag in sent]
+    return etag in wanted or "*" in wanted
+
+
+def fixed_file(
+    request: Request, path: Path, *, cache_control: str, media_type: str | None = None
+) -> Response:
+    """A file that changes only with a deploy and is not under `/static/` (the favicon, the
+    demo's PDF): the `ETag` `FileResponse` makes from its size and time, and a 304 with no
+    body when the visitor already has that version."""
+    response = FileResponse(path, media_type=media_type, headers={"Cache-Control": cache_control})
+    etag = response.headers["etag"]
+    if _asked_for(request, etag):
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
+    return response

@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from readablestem.web import seo, signin_words
-from readablestem.web.assets import STATIC_DIR, cached_html, static_url
+from readablestem.web.assets import STATIC_DIR, cached_html, fixed_file, static_url
 from readablestem.web.deps import get_ctx
 from readablestem.web.security import VIEW_CSP
 
@@ -58,10 +58,8 @@ def indexnow_key() -> Response:
 
 
 @router.get("/favicon.ico")
-def favicon() -> Response:
-    return FileResponse(
-        STATIC_DIR / "favicon.ico", headers={"Cache-Control": "public, max-age=86400"}
-    )
+def favicon(request: Request) -> Response:
+    return fixed_file(request, STATIC_DIR / "favicon.ico", cache_control="public, max-age=86400")
 
 
 # --------------------------------------------------------------------------- showcase

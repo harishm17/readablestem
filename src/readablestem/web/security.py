@@ -13,13 +13,18 @@ Errors: Starlette's own error middleware re-raises after responding, so the serv
 log the exception message, which can contain document text. `SafeErrorMiddleware` sits
 inside it, logs only the exception type and code location, and answers with a plain 500
 page.
+
+Compression: `CompressionMiddleware` gzips text answers, and never a page that carries the
+CSRF token.
 """
 
 from __future__ import annotations
 
+import gzip
 import logging
 from collections.abc import Callable
 
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse, Response
@@ -184,4 +189,105 @@ def _plain_500() -> Response:
         "document's content. Please try again, or go back to <a href='/'>the home page</a>."
         "</p></main></body></html>",
         status_code=500,
+    )
+
+
+# --------------------------------------------------------------------------- compression
+
+# What is worth compressing: text. Pictures, fonts, zip, Word, EPUB and PDF files are
+# already compressed, and gzip makes them no smaller.
+COMPRESSED_TYPES = frozenset(
+    {
+        "text/html",
+        "text/css",
+        "text/plain",
+        "text/xml",
+        "text/javascript",
+        "application/javascript",
+        "application/json",
+        "application/xml",
+        "image/svg+xml",
+    }
+)
+COMPRESS_MIN_BYTES = 1024
+# Held in memory while it is compressed; a bigger answer (by its `Content-Length`) is sent as it is.
+COMPRESS_MAX_BYTES = 8 * 1024 * 1024
+# Set on a request's state when its page carries a secret (the CSRF token, `deps.csrf_token`).
+CARRIES_SECRET = "carries_secret"
+
+
+class CompressionMiddleware:
+    """gzip for text answers of 1 KB or more, when the browser asks for it.
+
+    Left alone: a download (`Content-Disposition: attachment`), a file type that is already
+    compressed, a streamed answer (no `Content-Length`), a partial answer and a 304.
+
+    Also left alone: a page that carries a secret. A page that holds the CSRF token next to
+    text an attacker can influence (a document's words, a query value) lets the attacker
+    guess the token from the size of the compressed answer (BREACH), so no page that prints
+    the token is compressed. What is compressed is the public pages, the static text files
+    and the converted document's own view."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") == "HEAD":
+            await self.app(scope, receive, send)
+            return
+        wants_gzip = "gzip" in Headers(scope=scope).get("accept-encoding", "").lower()
+        held: Message | None = None
+        body = bytearray()
+
+        async def compressing_send(message: Message) -> None:
+            nonlocal held
+            if message["type"] == "http.response.start":
+                if _compressible(message, scope):
+                    MutableHeaders(scope=message).add_vary_header("Accept-Encoding")
+                    if wants_gzip:
+                        held = message
+                        return
+                await send(message)
+                return
+            if held is None:
+                await send(message)
+                return
+            if message["type"] != "http.response.body":  # e.g. a file the server sends itself
+                start, held = held, None
+                await send(start)
+                await send(message)
+                return
+            body.extend(message.get("body", b""))
+            if message.get("more_body", False):  # a file comes in 64 KB pieces
+                return
+            start, held = held, None
+            packed = await run_in_threadpool(gzip.compress, bytes(body), 6, mtime=0)
+            if len(packed) < len(body):
+                headers = MutableHeaders(scope=start)
+                headers["Content-Encoding"] = "gzip"
+                headers["Content-Length"] = str(len(packed))
+                tag = headers.get("etag")
+                if tag and not tag.startswith("W/"):  # the bytes changed: no longer a strong tag
+                    headers["ETag"] = "W/" + tag
+                await send(start)
+                await send({"type": "http.response.body", "body": packed})
+                return
+            await send(start)
+            await send({"type": "http.response.body", "body": bytes(body)})
+
+        await self.app(scope, receive, compressing_send)
+
+
+def _compressible(start: Message, scope: Scope) -> bool:
+    """Is this answer one to compress (the class's list of what is left alone)?"""
+    if start["status"] != 200 or (scope.get("state") or {}).get(CARRIES_SECRET):
+        return False
+    headers = Headers(raw=start["headers"])
+    length = headers.get("content-length", "")
+    return (
+        "content-encoding" not in headers
+        and "attachment" not in headers.get("content-disposition", "").lower()
+        and headers.get("content-type", "").partition(";")[0].strip().lower() in COMPRESSED_TYPES
+        and length.isdigit()
+        and COMPRESS_MIN_BYTES <= int(length) <= COMPRESS_MAX_BYTES
     )

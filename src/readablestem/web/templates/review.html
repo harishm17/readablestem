@@ -65,7 +65,7 @@
   {% if item.kind in ("equation", "figure", "table", "paragraph", "list_item") %}
   <figure class="crop">
     {% if item.crop_url %}
-    <img src="{{ item.crop_url }}" loading="lazy"
+    <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} loading="lazy"
          alt="The original {{ name }} from page {{ item.page }} of the PDF, as an image.">
     {% else %}
     <p>No image of the original is available.</p>
@@ -205,7 +205,7 @@
 <div class="fix-body">
   <figure class="crop">
     {% if item.crop_url %}
-    <img src="{{ item.crop_url }}" loading="lazy" alt="{{ item.label }} of the PDF, as an image.">
+    <img src="{{ item.crop_url }}"{% if item.crop_size %} width="{{ item.crop_size[0] }}" height="{{ item.crop_size[1] }}"{% endif %} loading="lazy" alt="{{ item.label }} of the PDF, as an image.">
     {% else %}
     <p>No image of the original is available.</p>
     {% endif %}

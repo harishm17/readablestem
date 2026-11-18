@@ -12,22 +12,22 @@ from functools import cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
 from readablestem.pipeline import export_docx
 from readablestem.web import analytics, office_convert, offices, proof_facts, seo
-from readablestem.web.assets import cached_html, static_url
+from readablestem.web.assets import cached_html, fixed_file, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
-from readablestem.web.deps import get_ctx, render
+from readablestem.web.deps import SESSION_FLASH, current_user, get_ctx, render
 from readablestem.web.health import ops_freshness, readiness
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.recipients import privacy_context
 from readablestem.web.sample import DEMO_DIR
-from readablestem.web.security import VIEW_CSP
+from readablestem.web.security import CARRIES_SECRET, VIEW_CSP
 from readablestem.web.speech_diff import read_text_layer
 
 router = APIRouter()
@@ -74,9 +74,28 @@ def _features(request: Request) -> dict[str, object]:
     }
 
 
+def public_page(request: Request, template: str, context: dict[str, object]) -> Response:
+    """A public page that is the same for every signed-out visitor: an `ETag` and
+    `Cache-Control: no-cache`, so a repeat visit is a 304 with no body (`cached_html`).
+
+    Not cached, and `no-store` like every other page: a signed-in visitor's page (their
+    menu, the sign-out form), a page that shows a notice once (a flash or a queued usage
+    event are the visitor's own), and any page that carries the CSRF token."""
+    session = request.session
+    own = (
+        current_user(request) is not None
+        or session.get(SESSION_FLASH)
+        or session.get(analytics.SESSION_KEY)
+    )
+    page = render(request, template, context)
+    if own or getattr(request.state, CARRIES_SECRET, False):
+        return page
+    return cached_html(request, bytes(page.body).decode("utf-8"), max_age=0, revalidate=True)
+
+
 @router.get("/")
 def landing(request: Request) -> Response:
-    return render(
+    return public_page(
         request,
         "landing.html",
         {"active": "home", "hero": _hero(), "proof_facts": proof_facts.load()} | _features(request),
@@ -84,12 +103,12 @@ def landing(request: Request) -> Response:
 
 
 @router.get("/demo/source.pdf")
-def demo_source() -> Response:
+def demo_source(request: Request) -> Response:
     """Page 3 of the demo's source PDF, which the landing page links (OpenStax, CC BY 4.0)."""
     if not DEMO_PDF.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(
-        DEMO_PDF, media_type="application/pdf", headers={"Cache-Control": "public, max-age=3600"}
+    return fixed_file(
+        request, DEMO_PDF, cache_control="public, max-age=3600", media_type="application/pdf"
     )
 
 
@@ -185,7 +204,7 @@ def privacy(request: Request) -> Response:
     ctx = get_ctx(request)
     context = privacy_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
-    return render(request, "privacy.html", context)
+    return public_page(request, "privacy.html", context)
 
 
 @router.get("/terms")
@@ -229,7 +248,7 @@ def for_accessibility_offices_summary(request: Request) -> Response:
 
 @router.get("/limits")
 def limits(request: Request) -> Response:
-    return render(request, "limits.html", limits_context(request))
+    return public_page(request, "limits.html", limits_context(request))
 
 
 def limits_context(request: Request) -> dict[str, object]:
