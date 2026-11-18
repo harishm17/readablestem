@@ -464,7 +464,8 @@ def test_every_error_node_is_counted_and_placed():
 def links_of(result: DocumentResult, element_id: str) -> list[tuple[str, str, str | None]]:
     element = next(e for e in result.elements if e.id == element_id)
     return [
-        (k.kind, (element.text or "")[k.start : k.end], k.href or k.target_id) for k in element.links
+        (k.kind, (element.text or "")[k.start : k.end], k.href or k.target_id)
+        for k in element.links
     ]
 
 
