@@ -402,16 +402,83 @@ def strip_section_number(text: str) -> str:
     return stripped or text.strip()
 
 
+# Where a document's title came from, in the order they are tried (SW14).
+TITLE_YOURS, TITLE_PDF, TITLE_HEADING, TITLE_FILE, TITLE_STOCK = (
+    "yours",
+    "pdf",
+    "heading",
+    "file",
+    "stock",
+)
+# A file extension: a dot and up to five letters or digits at the end of the name.
+_EXTENSION = re.compile(r"\.[A-Za-z0-9]{1,5}\Z")
+_NAME_SEPARATORS = re.compile(r"[_\-\s]+")
+
+
+@dataclass(frozen=True)
+class DocumentTitle:
+    """The title of a document and where it came from (`TITLE_*`)."""
+
+    text: str
+    source: str
+
+
+def file_title(filename: str) -> str:
+    """A file name as a title: no extension, `_` and `-` read as spaces ("week_3-notes.pdf"
+    is "week 3 notes"). "" when nothing is left."""
+    return _NAME_SEPARATORS.sub(" ", _EXTENSION.sub("", filename.strip())).strip()
+
+
+def looks_like_file_name(text: str) -> bool:
+    """A "title" that is a file name written out: no spaces, and an underscore or a mix of
+    letters and digits ("MIT6_0001F16_Welcome", "lec03"). A single plain word is a title."""
+    return (
+        bool(text)
+        and not any(ch.isspace() for ch in text)
+        and ("_" in text or (any(ch.isdigit() for ch in text) and any(ch.isalpha() for ch in text)))
+    )
+
+
+def _usable_title(candidate: str | None) -> str:
+    """The candidate as a title, or "" when it is empty, the stock title or only names a part
+    of a document ("Contents")."""
+    if not candidate or not candidate.strip():
+        return ""
+    text = strip_section_number(_clean_title(candidate))
+    if text == DEFAULT_TITLE or text.casefold().rstrip(".:") in GENERIC_TITLES:
+        return ""
+    return text
+
+
+def document_title(
+    override: str | None,
+    raw: str | None,
+    headings: Sequence[str] = (),
+    filename: str = "",
+) -> DocumentTitle:
+    """The one title of a document and its source (SW14), the same everywhere the document
+    is named (the student `<title>`, the Word and EPUB title, the Canvas and Cartridge names,
+    the list, the download name): the title the instructor typed; the document's own title
+    (without its section number) when it is not generic and not a file name written out; the
+    first heading that is not generic; the file name without its extension and separators;
+    `DEFAULT_TITLE` only when there is nothing else."""
+    if override and override.strip():
+        return DocumentTitle(_clean_title(override), TITLE_YOURS)
+    own = _usable_title(raw)
+    if own and not looks_like_file_name(own):
+        return DocumentTitle(own, TITLE_PDF)
+    for heading in headings:
+        if text := _usable_title(heading):
+            return DocumentTitle(text, TITLE_HEADING)
+    if name := file_title(filename):
+        return DocumentTitle(name, TITLE_FILE)
+    return DocumentTitle(own or DEFAULT_TITLE, TITLE_PDF if own else TITLE_STOCK)
+
+
 def suggested_title(raw: str | None, headings: Sequence[str] = ()) -> str:
-    """The title students hear when the instructor has not chosen one: the PDF's title (or
-    the first top-level heading, as layout reads it) without its section number; when that
-    is missing or only names a part ("Contents"), the first heading that does not.
-    `DEFAULT_TITLE` when there is none."""
-    for candidate in (raw or "", *headings):
-        text = strip_section_number(_clean_title(candidate)) if candidate.strip() else ""
-        if text and text != DEFAULT_TITLE and text.casefold().rstrip(".:") not in GENERIC_TITLES:
-            return text
-    return DEFAULT_TITLE
+    """The title students hear when the instructor has not chosen one and the file has no
+    name to fall back on (`document_title`)."""
+    return document_title(None, raw, headings).text
 
 
 def _is_png(data: bytes | None) -> bool:
@@ -770,6 +837,7 @@ class TitlePlan:
     heading_id: str | None
     shift: int
     unshifted: frozenset[str] = frozenset()
+    source: str = TITLE_STOCK  # where `text` came from (`document_title`)
 
     def level(self, element_id: str, written: int) -> int:
         """The `<hN>` of a heading the outline repair writes at `written`."""
@@ -778,13 +846,19 @@ class TitlePlan:
 
 
 def title_plan(
-    elements: list[Element], fixes: list[Fix], *, title: str | None, title_set: bool = False
+    elements: list[Element],
+    fixes: list[Fix],
+    *,
+    title: str | None,
+    title_set: bool = False,
+    filename: str = "",
 ) -> TitlePlan:
     """The one-H1 rule (SW6c), read from the same headings, in the same order, as the
     renderer writes them (the first fix for an id wins).
 
-    The title is the instructor's (`title_set`, used as typed) or `suggested_title` of the
-    PDF's. When it is the same title (`same_title`) as the first top-level heading, that
+    The title is the instructor's (`title_set`, used as typed) or `document_title` of the
+    PDF's, the headings and the file name (`filename`). When it is the same title
+    (`same_title`) as the first top-level heading, that
     heading is the H1 and nothing is added. When it is not and the outline has exactly one
     top-level heading, that heading is the H1, unless the instructor chose the title: a
     chosen title is never replaced. Otherwise (no top-level heading, several, or a chosen
@@ -801,8 +875,12 @@ def title_plan(
             if level is not None:
                 written.append((element.id, outline.write(level), text))
     tops = [entry for entry in written if entry[1] == 1]
-    chosen = _clean_title(title) if title_set else suggested_title(title, [t for *_, t in written])
-    if tops and (same_title(chosen, tops[0][2]) or (len(tops) == 1 and not title_set)):
+    chosen = (
+        DocumentTitle(_clean_title(title), TITLE_YOURS)
+        if title_set
+        else document_title(None, title, [t for *_, t in written], filename)
+    )
+    if tops and (same_title(chosen.text, tops[0][2]) or (len(tops) == 1 and not title_set)):
         h1 = tops[0]
         section = {h1[0]}
         for element_id, level, _ in written[written.index(h1) + 1 :]:
@@ -814,6 +892,9 @@ def title_plan(
             heading_id=h1[0],
             shift=1 if len(tops) > 1 else 0,
             unshifted=frozenset(section),
+            source=(
+                chosen.source if same_title(chosen.text, h1[2]) or title_set else TITLE_HEADING
+            ),
         )
     shift = 2 - min((level for _, level, _ in written), default=2)
     return TitlePlan(text=chosen.text, heading_id=None, shift=shift, source=chosen.source)
@@ -892,9 +973,6 @@ class _Renderer:
     def page_mark(self, element: Element) -> str:
         """The page marker to write before `element` when it is on a page after the last one
         written; "" otherwise (and always in a one-page document). Never inside a block of
-            source=(
-                chosen.source if same_title(chosen.text, h1[2]) or title_set else TITLE_HEADING
-            ),
         text: callers ask only between blocks, or at the start of a list item."""
         if not self.mark_pages or element.page == self.last_page:
             return ""
@@ -1656,7 +1734,8 @@ figcaption { margin-top: 0.5em; }
 .notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
 .flagged figure { margin: 0; }
 .flagged > img { display: block; margin: 0 auto; }
-.flagged-inline { border: 2px dashed #8a3c00; padding: 0 0.2em; }
+.flagged-inline { display: inline-block; max-width: 100%; vertical-align: middle;
+  line-height: 1.25; border: 2px dashed #8a3c00; padding: 0.1em 0.2em; }
 .flagged-inline img { vertical-align: middle; }
 .flag-note { margin: 0.75em 0 0; }
 .flag-label { font-weight: 700; }
@@ -1668,6 +1747,13 @@ figcaption { margin-top: 0.5em; }
   color: #0b57d0; }
 .skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* A kept picture holds what could not be read as text. When the column is narrow, as it is in
+   a zoomed window, it keeps its size and scrolls sideways instead of shrinking with the
+   column, so its writing stays as large as the text around it. */
+@media screen and (max-width: 40em) {
+  .flagged { overflow-x: auto; }
+  .flagged > img { max-width: none; }
+}
 @media print {
   .flagged { break-inside: avoid; } .skip-link { display: none; }
   /* Nothing is cut on paper without a mark (SW45 rule 6). The sheet is the container. An
@@ -1819,6 +1905,7 @@ def render_html(
     origin: str = "pdf",
     pages: int | None = None,
     unread: tuple[int, int] = (0, 0),
+    filename: str = "",
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1833,7 +1920,8 @@ def render_html(
     review decision: the student note gives it once no decision is open (the review
     screen passes it when it re-renders the file; the pipeline never does).
     `title_set`: `title` is the one the instructor chose (T1-7), used as typed. Otherwise the
-    title is `suggested_title` of the PDF's. The page has exactly one `<h1>` and its
+    title is `document_title` of the PDF's, the headings and `filename` (SW14). The page has
+    exactly one `<h1>` and its
     `<title>` is the H1's text (`title_plan`, SW6c). `contact`: the instructor's contact
     line for the note at the end of `<main>` (T1-17). `math_alttext`: write each equation's
     stored speech as the `alttext` of its <math> (None: `Settings.mathml_alttext`, off by
@@ -1861,7 +1949,7 @@ def render_html(
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
 
-    titles = title_plan(ordered, fixes, title=title, title_set=title_set)
+    titles = title_plan(ordered, fixes, title=title, title_set=title_set, filename=filename)
     renderer = _Renderer(
         fixes=first_fix,
         crops=crops,

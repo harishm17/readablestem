@@ -41,7 +41,8 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - Links (`<a href>`, see "Links and cross-references") load nothing: following one is
   the reader's choice, and opening the file still sends no request.
 - `<title>` is the text of the page's one `<h1>` (see "One h1"): the first top-level
-  heading when it is the title, or the title itself, else "Converted document".
+  heading when it is the title, or the title itself, else the first heading, else the file
+  name, else "Converted document" (see "One title", `assemble.document_title`).
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
 - If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
@@ -1160,12 +1161,48 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
+### One title (SW14)
+
+A document has one title, said the same in every place and file: the student page's
+`<title>` and `<h1>`, the Word and EPUB title, the Canvas and Cartridge names, manifest and
+README, the download file name and the names in a zip of documents, the job page, My
+documents and the batch table, feedback, the record, Listen, the share page and the delete
+page. One function makes it, `assemble.document_title(override, raw, headings, filename)`,
+which returns the text and where it came from (`DocumentTitle.source`), in this order:
+
+1. `yours`: the title the instructor typed.
+2. `pdf`: the document's own title, without its section number, when it is not generic
+   ("Contents", "Overview") and not a file name written out (no spaces and an underscore or
+   letters mixed with digits, such as "MIT6_0001F16_Welcome").
+3. `heading`: the first heading that is not generic.
+4. `file`: the file name without its extension, `_` and `-` read as spaces.
+5. `stock`: "Converted document", only when there is nothing else.
+
+`assemble.title_plan` keeps the one-H1 rule (below), so a single top-level heading that
+is not the title still becomes the H1 and the page's `<title>`, and then the title is that
+heading (`heading`). The web layer reads it through `documents.document_title(job)`
+(`jobs.title_override`, the stored `jobs.result_title` and `jobs.filename`; no result is
+loaded) and `titles.effective_title` for a caller with only the columns. `jobs.result_title`
+is what the page writes without the instructor's choice (`documents.list_facts`, set
+whenever a result is stored); a row from before is the PDF's own title until its result is
+stored again, and shows the same words except where the page took a heading or the file name.
+A page is made with the file name (`render_html(filename=)`); the pipeline does not know it,
+so the worker marks a page whose title is the file name out of date and it is made again
+from the stored result on first use. A combined document is titled by the file its parts came
+from (`web.combine.title_of`), not by the first part's heading.
+
+My documents and the batch table lead with the title and put the file name on the line
+under it; when the title is the file name there is one line. The job page's title field
+says where the suggestion comes from ("From the title in your PDF.", "From the first
+heading.", "From the file name.", or "No title found: students will hear “Converted
+document”. Type one.").
+
 ### One h1 (T3-13, SW6c)
 
 A file has exactly one `<h1>`, and the title is said once (`assemble.title_plan`, one rule
 for the page, the contents list, the EPUB, the Word file and Listen, which all read the
 page). The title is the one the instructor typed on the job page, else the PDF's title as
-`suggested_title` gives it. Two titles are the same when they match with case folded,
+`document_title` gives it ("One title" below). Two titles are the same when they match with case folded,
 punctuation and spaces collapsed and the section number removed ("2.3 Kinematics" and
 "KINEMATICS." are one title, `assemble.same_title`).
 

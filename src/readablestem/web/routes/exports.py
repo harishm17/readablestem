@@ -72,13 +72,9 @@ def _source(
         job = job_access(session, job_id, user, VIEW)
         state = output.check(request, job, role_of(session, job, user), file_type)
         if is_head(request):  # the headers need the title only, not a re-render
-            title = documents.display_title(
-                documents.stored_title(job), job.filename, job.title_override
-            )
-            return "", title, state
+            return "", documents.document_title(job).text, state
         job = current_html(ctx, session, job)
-        result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename, job.title_override)
+        title = documents.document_title(job).text
         if job.user_id == user.id:  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
         return output.marked(job.html or "", state), title, state

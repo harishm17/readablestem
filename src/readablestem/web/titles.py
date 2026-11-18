@@ -10,7 +10,8 @@ never logged.
   invisible format characters. Empty means "use the title read from the PDF".
 - **Contact** (`clean_contact`): an email address or a web address (http or https), nothing
   else, at most `MAX_CONTACT` characters. Empty means no contact line.
-- `effective_title`: what the page, the list and the download name call the document.
+- `effective_title`: what the page, the list and the download name call the document
+  (one rule, `pipeline.assemble.document_title`).
 """
 
 from __future__ import annotations
@@ -72,15 +73,11 @@ def clean_contact(raw: str) -> str:
 
 
 def effective_title(override: str | None, result_title: object, filename: str) -> str:
-    """What a list or a heading calls the document: the instructor's title, else the PDF's
-    title without its section number, else the file name. It names the Word, EPUB, Canvas and
-    Cartridge files too, so a character that is not text in it (a PDF title in a symbol
-    font) is written as `output_chars.UNREADABLE`, as on the student page."""
-    if override and override.strip():
-        return output_chars.plain(override.strip())
-    if isinstance(result_title, str) and result_title.strip():
-        text = assemble.strip_section_number(" ".join(result_title.split()))
-        generic = text.casefold().rstrip(".:") in assemble.GENERIC_TITLES
-        if text and text != assemble.DEFAULT_TITLE and not generic:
-            return output_chars.plain(text)
-    return output_chars.plain(filename)
+    """What a list or a heading calls the document, for a caller that has only the job's
+    columns (`web.documents.document_title` is the one for a job): `assemble.document_title`
+    of the instructor's title, the stored title (the one the page writes, or the PDF's own on
+    a row from before) and the file name. It names the Word, EPUB, Canvas and Cartridge files
+    too, so a character that is not text in it (a PDF title in a symbol font) is written as
+    `output_chars.UNREADABLE`, as on the student page."""
+    stored = result_title if isinstance(result_title, str) else ""
+    return output_chars.plain(assemble.document_title(override, "", (stored,), filename).text)

@@ -50,7 +50,12 @@ from html import escape
 from io import BytesIO
 
 from readablestem.pipeline import checked_words, math_font, output_chars
-from readablestem.pipeline.assemble import DECORATIVE_CLASS, SUFFICIENT_META, SUMMARY_META
+from readablestem.pipeline.assemble import (
+    DECORATIVE_CLASS,
+    DEFAULT_TITLE,
+    SUFFICIENT_META,
+    SUMMARY_META,
+)
 from readablestem.pipeline.export_canvas import (
     _VOID,
     NOT_TEXT,
@@ -646,7 +651,7 @@ def export_epub(
     page_title = _find(root, "title")
     title = (
         " ".join((title or (_text(page_title) if page_title else "") or "").split())
-        or "Converted document"
+        or DEFAULT_TITLE
     )
 
     images = _extract_images(root, Notes(), lambda name: name)

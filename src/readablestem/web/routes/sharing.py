@@ -39,7 +39,7 @@ router = APIRouter()
 
 
 def _title(job: Job) -> str:
-    return documents.display_title(documents.stored_title(job), job.filename, job.title_override)
+    return documents.document_title(job).text
 
 
 def sign_in_words(*, google: bool, microsoft: bool, email_link: bool) -> str:

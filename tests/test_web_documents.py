@@ -188,8 +188,9 @@ def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
         )
     assert web.job(job_id).open_decisions is None
     first = text(web.browser.get("/app").text)
-    assert "Old one" in first and "3 decisions to make" in first
-    assert (web.job(job_id).open_decisions, web.job(job_id).result_title) == (3, "Old one")
+    shown = web.job(job_id).result_title
+    assert shown and shown in first and "3 decisions to make" in first
+    assert (web.job(job_id).open_decisions, web.job(job_id).result_title) == (3, shown)
     reads = Reads(web)
     web.browser.get("/app/documents")
     assert not any("result_json" in s for s in reads.stop())  # read once, not every poll

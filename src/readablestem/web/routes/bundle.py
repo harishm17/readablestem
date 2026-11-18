@@ -91,9 +91,7 @@ def _zip_response(
                 over_cap += 1
                 continue
             job = current_html(ctx, session, job)
-            title = documents.display_title(
-                (job.result_json or {}).get("title"), job.filename, job.title_override
-            )
+            title = documents.document_title(job).text
             name = download_filename(title, job.id).removesuffix(".html") + _ENDING[file_type]
             if file_type == "html":
                 content: str | bytes = job.html or ""

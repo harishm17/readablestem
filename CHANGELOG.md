@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: one title for a document (branch feat/exports-links-epub-title)
+
+- SW14 (F-044, F-052, F-056, F-124, F-125, F-321, F-322, F-368): three title chains and callers
+  that picked one or none gave a document one name in the list, another on the page, another in
+  the Word and EPUB files and a fourth in Canvas, where the instructor's title was dropped. One
+  function, `assemble.document_title`, now gives the title and its source (yours, the PDF's,
+  the first heading, the file name, the stock title last), and every place reads it: the page's
+  `<title>` (made with the file name), Word, EPUB, Canvas, Cartridge, the download and zip
+  names, feedback, the record, Listen, the share page, the delete page, My documents and the
+  batch table (which lead with the title and show the file name under it). A "title" that is a
+  file name written out ("MIT6_0001F16_Welcome") is skipped. The title field says where the
+  suggestion comes from. A page whose title is the file name is made again from its stored
+  result on first use. The stored title column is recomputed whenever a result is stored; rows
+  from before keep the PDF's own title until then. Stored pages made before this say "Converted
+  document" until they are made again, which a `RENDER_VERSION` bump does at the next
+  request: a bump is owed for this, with WS21.3.
+
 ## Unreleased: kept pictures hold their size when the window is narrow (branch feat/exports-links-epub-title)
 
 - WS21.3 (F-441, F-442, F-443), reduced: `img { max-width: 100% }` shrank a kept picture with

@@ -35,6 +35,7 @@ from urllib.parse import quote
 from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
 
+from readablestem.pipeline.assemble import DEFAULT_TITLE
 from readablestem.pipeline.export_canvas import ZIP_TIME, CanvasExport
 
 NS_CP = "http://www.imsglobal.org/xsd/imsccv1p3/imscp_v1p1"
@@ -68,7 +69,7 @@ def _language(lang: str) -> str:
 def manifest_xml(export: CanvasExport, files: list[str]) -> str:
     """`imsmanifest.xml` for the cartridge holding `files` (paths inside the zip, the page
     first)."""
-    title = escape(" ".join(export.title.split()) or "Document", quote=True)
+    title = escape(" ".join(export.title.split()) or DEFAULT_TITLE, quote=True)
     seed = export.folder
     page = files[0]
     lines = [

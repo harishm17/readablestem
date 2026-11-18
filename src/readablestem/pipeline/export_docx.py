@@ -544,7 +544,7 @@ def export_docx(
     lang = lang if _LANGUAGE.match(lang) else "en"
     page_title = _find(root, "title")
     title = (
-        _normal(title or (_text(page_title) if page_title else "") or "") or "Converted document"
+        _normal(title or (_text(page_title) if page_title else "") or "") or assemble.DEFAULT_TITLE
     )
 
     images = {n.attrs["src"] for n in root.walk() if n.tag == "img" and n.attrs.get("src")}

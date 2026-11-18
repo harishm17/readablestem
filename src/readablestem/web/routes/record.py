@@ -56,7 +56,7 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
                 fallback = "the owner" if person.id == job.user_id else "a reviewer"
                 who[person.id] = person.name or fallback
         owner = who.get(job.user_id, owner)
-        title = documents.display_title(result.title, job.filename, job.title_override)
+        title = documents.document_title(job).text
         role = shares.role_of(session, job, user) or VIEW
         viewer = "owner" if role == "owner" else ("review" if role == shares.REVIEW else "view")
         state = states.state_of(
