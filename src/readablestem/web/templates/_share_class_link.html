@@ -29,7 +29,8 @@
     {% if cl.published %}<dt>Published copy</dt><dd>Version {{ cl.published }}</dd>{% endif %}
   </dl>
   {% if cl.link.kept %}
-  <p class="hint">This document is kept until {{ retain_until|utc }} because of the link. After that it is {{ cl.after }}.</p>
+  {% if not cl.address %}<p class="hint">The address was shown once, when the link was made. If you lost it, make a new link.</p>{% endif %}
+  <p class="hint">This document is kept until {{ retain_until|utc }}, at least until the link's last day and then {{ cl.after }}.</p>
   {% if cl.out_of_date %}
   <p id="class-link-stale">The published copy is version {{ cl.published }}. Your document is now version {{ cl.current }}.{% if not cl.ready %} Finish checking it to publish the new version.{% endif %}</p>
   {% endif %}
@@ -58,9 +59,7 @@
   {% if cl.ready %}
   <h3 id="class-link-make-heading">{% if cl.link and cl.link.kept %}Make a new link{% else %}Make a link{% endif %}</h3>
   {% if cl.link and cl.link.kept %}<p class="hint">The link above stops working when you make a new one.</p>{% endif %}
-  {# Not a registry form: its answer holds the address, so a repeat cannot be answered with the first answer. #}
-  <form method="post" action="/jobs/{{ job_id }}/share/link" novalidate>
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("link.make", "/jobs/" ~ job_id ~ "/share/link", {"novalidate": true}) %}
     <div class="field">
       <label for="link-label">Label (only you see it)</label>
       <input type="text" id="link-label" name="label" maxlength="80" autocomplete="off" value="{{ cl.typed.label|default('') }}">
@@ -80,7 +79,7 @@
              aria-describedby="link-opens-hint{% if cl.errors.get('link-opens') %} link-opens-error{% endif %}"{% if cl.errors.get('link-opens') %} aria-invalid="true"{% endif %}>
     </div>
     <button type="submit" class="button">{% if cl.link and cl.link.kept %}Make a new link{% else %}Make the link{% endif %}</button>
-  </form>
+  {% endcall %}
   {% else %}
   <p class="hint" id="class-link-not-ready">A class link can be made once this document is ready, with nothing left to check.</p>
   {% endif %}

@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from readablestem.config import Settings
 from readablestem.core.types import DocumentResult
 from readablestem.web import job_page as page_rules
-from readablestem.web import output, retention, titles
+from readablestem.web import links, output, retention, titles
 from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.deps import (
     CurrentUser,
@@ -186,6 +186,8 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
                     context={"job_id": job_id},
                 )
         changed = retention.keep_seven_more_days(job)
+        if changed:
+            links.extend(session, job, get_ctx(request).settings)  # a link's window is now a week's
         until = job.retain_until
     if changed:
         log_event(logger, "kept_longer", job_id=job_id)

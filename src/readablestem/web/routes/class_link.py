@@ -101,7 +101,7 @@ def open_link(request: Request, token: str) -> Response:
             copy = links.published(session, found[1].id) if found is not None else None
             if found is not None and copy is not None:
                 html = copy.html
-                if not is_head(request):  # a HEAD or a preview fetch is not an open
+                if not is_head(request):  # a HEAD (served as a GET by `seo`) is not an open
                     links.record_open(session, found[0], now)
     if html is None:
         return _limited(request, "class_link_miss", address) or _plain(NOT_OPEN, 404)

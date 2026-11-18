@@ -1832,9 +1832,10 @@ def job_page_context(
     context["keep_hint"] = retention.keep_hint(keep_until) if keep_until else ""
     context["keep_label"] = retention.keep_label()
     link_until = None
-    if settings.feature_class_link and job.is_owner:  # the class link that is keeping it
+    if settings.feature_class_link and job.is_owner:  # the class link that decides the time
         with session_scope(get_ctx(request).factory) as session:
-            link_until = links.held_until(session, job_id)
+            row = session.get(Job, job_id)
+            link_until = links.keeping(session, row, settings) if row is not None else None
     context["retention_line"] = retention.kept_line(
         settings, job.retention_mode, job.retain_until, link_until
     )

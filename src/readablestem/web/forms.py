@@ -184,8 +184,11 @@ FORMS: dict[str, FormRow] = {
                 "a second click said 'Saved' again for access already given"),
         FormRow("share.revoke", "POST /jobs/{job_id}/share/{share_id}/revoke", Kind.STATE,
                 "removing", "a second click answered 'Page not found'"),
-        # The class link (`web.links`). Making one is not here: its answer holds the address,
-        # which is shown once, so a repeat cannot be answered with the first answer.
+        # The class link (`web.links`). The answer to making one holds its address, shown once,
+        # so a repeat (a reload of that answer) is not given that answer: it is the redirect
+        # to the share page, which says a link exists and never holds the address.
+        FormRow("link.make", "POST /jobs/{job_id}/share/link", Kind.CREATE, "saving",
+                "a reload of the page that showed the address made a second link"),
         FormRow("link.pause", "POST /jobs/{job_id}/share/link/pause", Kind.STATE, "saving",
                 "none: pausing a paused link changes nothing"),
         FormRow("link.resume", "POST /jobs/{job_id}/share/link/resume", Kind.STATE, "saving",

@@ -26,10 +26,10 @@ daily spend remain. A new table with a user id must be added there.
 Usage events (`web.events`) outlive the jobs they mention, by design, but not for ever:
 the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
 
-Class links (`web.links`) keep a document until their last day: `purge_expired` first lets a
-document whose last link has closed back to its earlier retention with the clock starting then
-(`links.release_closed`), so it is deleted on that clock and not at the closing; link rows go
-with their document and 30 days after they close or are removed (`links.purge_rows`).
+Class links (`web.links`) keep a document until their last day plus the window it goes back to,
+which is in its `retain_until`, so this purge needs no rule for them. It deletes the published
+copy of every document no link keeps (`links.purge_copies`), and link rows go with their
+document and 30 days after they close or are removed (`links.purge_rows`).
 
 Problem reports (`web.reports`) go with their sender's account (`erase_user`), `CLOSED_DAYS`
 (30) after they are closed, and `MAX_DAYS` (180) after they were made, whatever their state
@@ -49,7 +49,6 @@ from sqlalchemy import delete, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, sessionmaker
 
-from readablestem.config import Settings
 from readablestem.observability.logging import get_logger
 from readablestem.ops.aggregate import (
     FINISHED,
@@ -111,7 +110,6 @@ def purge_expired(
     now: datetime | None = None,
     *,
     source: str = "cron",
-    settings: Settings | None = None,
 ) -> PurgeStats:
     """Delete every job whose `retain_until` is before `now` (default: current UTC time).
 
@@ -119,13 +117,12 @@ def purge_expired(
     locked with SKIP LOCKED, so a job the worker is updating at that instant is left for
     the next run instead of blocking it. `source` (a code: "cron", "worker", "cli") is
     logged with `purge_done`, so the hourly scheduler run and the worker's backstop can
-    be told apart. `settings` gives the retention windows a document returns to when its class
-    link has closed (the process's own when not given).
+    be told apart.
     """
     now = _as_utc(now or datetime.now(UTC))
     stats = PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
     with session_scope(factory) as session:
-        links.release_closed(session, settings, now)
+        links.purge_copies(session, now)
     while True:
         with session_scope(factory) as session:
             batch = _purge_batch(session, now)
@@ -202,7 +199,6 @@ def purge_old_reports(session: Session, now: datetime) -> int:
 def aggregate_and_purge(
     factory: sessionmaker[Session],
     now: datetime | None = None,
-    settings: Settings | None = None,
 ) -> tuple[int | None, PurgeStats]:
     """The cron task: aggregate, then purge even if aggregation raised.
 
@@ -216,7 +212,7 @@ def aggregate_and_purge(
     except Exception as exc:
         get_logger(__name__).error("aggregate_failed", error_type=type(exc).__name__)
         aggregated = None
-    stats = purge_expired(factory, now, settings=settings)
+    stats = purge_expired(factory, now)
     vacuum_after_purge(factory, stats)
     return aggregated, stats
 

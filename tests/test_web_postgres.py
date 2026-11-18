@@ -517,11 +517,11 @@ def test_settlements_and_releases_racing_for_the_same_holds_release_each_once(fa
 
 
 def test_the_class_link_purge_and_cascade_on_postgres(factory):
-    """WS27.2: the purge's release step (`FOR UPDATE SKIP LOCKED`, an EXISTS over `job_links`)
-    and the job-to-link cascade run on Postgres, not only on SQLite."""
+    """WS27.2: the purge's published-copy step (an EXISTS over `job_links`), a document kept past
+    its link's last day on its own clock, and the job-to-link cascade run on Postgres, not only
+    on SQLite."""
     from datetime import UTC, datetime
 
-    from readablestem.config import Settings
     from readablestem.ops.retention import purge_expired
     from readablestem.web import links
 
@@ -534,7 +534,7 @@ def test_the_class_link_purge_and_cascade_on_postgres(factory):
             filename="a.pdf",
             page_count=1,
             status=db.JobStatus.DONE,
-            retain_until=closes,
+            retain_until=closes + timedelta(hours=24),  # the last day plus the document's window
             created_at=now - timedelta(days=3),
         )
         session.add(job)
@@ -552,11 +552,8 @@ def test_the_class_link_purge_and_cascade_on_postgres(factory):
                 content=b"<p>x</p>",
             )
         )
-    settings = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert purge_expired(factory, now, settings=settings).jobs_deleted == 0  # restored, not deleted
+    assert purge_expired(factory, now).jobs_deleted == 0  # still kept, its copy is freed
     with db.session_scope(factory) as session:
-        kept = session.get(db.Job, job_id)
-        assert kept.retain_until > now
         assert session.scalar(select(func.count()).select_from(db.Blob)) == 0
     with db.session_scope(factory) as session:
         session.delete(session.get(db.Job, job_id))  # the foreign key cascades the link row

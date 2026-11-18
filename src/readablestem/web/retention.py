@@ -79,16 +79,22 @@ def restart_clock(job: Job, settings: Settings, now: datetime | None = None) -> 
     return True
 
 
-def clock_after_link(job: Job, settings: Settings, now: datetime) -> None:
-    """The class link that was keeping the document has ended or been removed (`web.links`):
-    it goes back to the retention it had, with the clock starting now, so nobody is surprised
-    by a deletion in the same minute. `day` and `week` get a full window from now; `dev` its
-    30 days from upload, or a day from now when those have gone."""
-    target = now + window(settings, job.retention_mode)
+def after_link(job: Job, settings: Settings, closing: datetime) -> datetime:
+    """When a document that a class link keeps (`web.links`) is deleted, if the link closes
+    at `closing`: the retention it goes back to, with the clock starting at the closing. `day`
+    and `week` get a full window from then; `dev` its 30 days from upload, or a day from the
+    closing when those have gone."""
     if job.retention_mode == "dev":
-        uploaded = as_utc(job.created_at) or now
-        target = max(uploaded + window(settings, "dev"), now + window(settings, "day"))
-    job.retain_until = target
+        uploaded = as_utc(job.created_at) or closing
+        return max(uploaded + window(settings, "dev"), closing + window(settings, "day"))
+    return closing + window(settings, job.retention_mode)
+
+
+def clock_after_link(job: Job, settings: Settings, now: datetime) -> None:
+    """The class link that was keeping the document was removed (`web.links`): it goes back
+    to the retention it had, with the clock starting now, so nobody is surprised by a deletion
+    in the same minute."""
+    job.retain_until = after_link(job, settings, now)
 
 
 def can_keep_longer(job: Job) -> bool:
@@ -135,10 +141,16 @@ def window_words(settings: Settings, mode: str) -> str:
 
 
 def after_link_words(settings: Settings, mode: str) -> str:
-    """What happens to a document when its class link ends: "kept for 24 hours more"."""
+    """What the document gets after its class link's last day, as a clause that follows "then"
+    or "after that": "for 24 hours"; for `dev`, a day, or the rest of its 30 days from upload
+    if that is longer."""
+    day = span_words(window(settings, "day"))
     if mode == "dev":
-        return f"kept for the rest of its {window_words(settings, mode)}"
-    return f"kept for {window_words(settings, mode)} more"
+        return (
+            f"for {day}, or to the end of its {window_words(settings, mode)} from upload "
+            "if that is later"
+        )
+    return f"for {window_words(settings, mode)}"
 
 
 def kept_line(
@@ -148,14 +160,15 @@ def kept_line(
     link_until: datetime | None = None,
 ) -> str:
     """The job page's one line: the day and time the document is kept until, and why.
-    `link_until`: the end of the class link that is keeping it (`web.links.held_until`)."""
+    `link_until`: the last day of the class link that decides that time
+    (`web.links.keeping`)."""
     when = format_when(retain_until)
     if not when:
         return ""
-    if link_until is not None and as_utc(retain_until) == as_utc(link_until):
+    if link_until is not None:
         return (
-            f"Kept until {when}, while its class link is open. "
-            f"After that it is {after_link_words(settings, mode)}."
+            f"Kept until {when}: its class link works until {format_when(link_until)}, "
+            f"and the document is kept {after_link_words(settings, mode)} after that."
         )
     if mode == "dev":
         return (
