@@ -23,6 +23,7 @@ from readablestem.pipeline.layout import (
     crop,
     heading_levels,
 )
+from readablestem.pipeline.output_chars import GAP
 
 BODY = 11.0
 PITCH = 15.0  # baseline-to-baseline distance used for body text in these pages
@@ -648,3 +649,13 @@ def test_tex_extension_font_glyphs_are_read_by_the_names_the_font_gives_them():
     text = " ".join(e.text or "" for e in analyze(data).elements)
     assert "\u2211" in text and "\u222b" in text and "\u23a7 \u23a8" in text
     assert not [c for c in text if c == "\ufffd" or unicodedata.category(c) == "Co"]
+
+
+def test_a_stroke_the_font_draws_over_an_l_reads_as_the_l_with_a_stroke():
+    # 2505.03022.pdf (TeX, CMR10): an author's name is set with \l, which prints the glyph
+    # `suppress` over a plain l. The stroke has no character of its own, so the name came out
+    # with a gap mark in front of the l.
+    data = Path(__file__).parent.parent.joinpath("data/real-tables/2505.03022.pdf").read_bytes()
+    text = " ".join(e.text or "" for e in analyze(data, pages=[0]).elements)
+    assert "D\u0142otko" in text
+    assert GAP not in text

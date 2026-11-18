@@ -38,6 +38,11 @@ from readablestem.pipeline.output_chars import GAP
 
 _SUBSET_PREFIX = re.compile(r"^[A-Z]{6}\+")
 _UNI = re.compile(r"^uni([0-9A-F]{4})$")
+# TeX's \l and \L print the glyph `suppress` (a stroke) over a plain l or L at the same origin
+# and no advance of its own. The stroke reads with the letter it crosses, as one character;
+# over any other letter it says nothing and stays a gap.
+_STROKE = "suppress"
+_STROKED = {"l": "ł", "L": "Ł"}
 
 
 @cache
@@ -105,6 +110,21 @@ def _glyph_names(doc: pymupdf.Document, xref: int) -> Callable[[int], str] | Non
     return name
 
 
+def _stroked(span: dict[str, Any], stroke: dict[str, Any]) -> str | None:
+    """The letter with a stroke that `stroke` and the l or L beside it in the span make; the
+    letter is taken out of the span, the stroke's character becomes the pair. None when no
+    l or L is printed at the stroke's origin."""
+    chars = span["chars"]
+    at = next(i for i, char in enumerate(chars) if char is stroke)
+    x, y = stroke["origin"]
+    for near in (at + 1, at - 1):
+        if 0 <= near < len(chars) and chars[near]["c"] in _STROKED:
+            other_x, other_y = chars[near]["origin"]
+            if abs(other_y - y) < 0.1 * span["size"] and abs(other_x - x) < 0.1 * span["size"]:
+                return _STROKED[chars.pop(near)["c"]]
+    return None
+
+
 def recover(page: pymupdf.Page, blocks: list[dict[str, Any]]) -> None:
     """Step 2 of the ladder: give each undecoded glyph of `blocks` (the page's raw text, in
     place) the character its glyph name stands for."""
@@ -134,7 +154,8 @@ def recover(page: pymupdf.Page, blocks: list[dict[str, Any]]) -> None:
             if ucs == ord(char["c"])
             for lookup in lookups[font]
         }
-        text = character(found.pop()) if len(found) == 1 else None  # two names: not told apart
+        name = found.pop() if len(found) == 1 else None  # two names: not told apart
+        text = _stroked(span, char) if name == _STROKE else name and character(name)
         if text:
             char["c"], char["how"] = text, "name"
 
