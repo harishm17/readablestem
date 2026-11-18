@@ -701,18 +701,14 @@ class _Reader:
                         rest.append(sub)
                 for sub in _non_paragraph_nodes(child):
                     rest.append(sub)
-            if not taken:  # an item with no paragraph (a bibliography entry): its own text
+            if not taken:
+                # An item with no paragraph (a bibliography entry, a contents entry): its own
+                # text, without the list nested in it, which is read as items of its own.
                 holder = Node("span")
-                holder.extend(body)
+                holder.extend(c for c in body if not _is_list(c))
                 text, spans = self._inline_text(holder, owner=element, skip_tags=True)
                 texts.append(text)
-            if not taken:
-                rest = [
-                    r
-                    for r in rest
-                    if _local(r.tag) in ("ul", "ol")
-                    or _classes(r) & {"ltx_itemize", "ltx_enumerate"}
-                ]
+                rest = [r for r in rest if _is_list(r)]
             element.text = texts[0] if texts else ""
             self._apply_spans(element, spans)
             self._tie(item, element)
@@ -720,10 +716,7 @@ class _Reader:
             self._flush_pictures()  # a picture in the item follows it
             self._deferred_items(ordered, level)
             for sub in rest:
-                if _local(sub.tag) in ("ul", "ol") or _classes(sub) & {
-                    "ltx_itemize",
-                    "ltx_enumerate",
-                }:
+                if _is_list(sub):
                     self._list(sub, level + 1)
                 else:
                     self.walk(sub, 1)
@@ -1137,6 +1130,13 @@ def _children_blocks(node: Node) -> bool:
 def _blocks_below(node: Node) -> bool:
     """A block element under `node`, not counting `node` itself."""
     return any(_children_blocks(c) for c in _children(node))
+
+
+def _is_list(node: Node) -> bool:
+    """A list nested in a list item (itemize, enumerate, a contents list)."""
+    return _local(node.tag) in ("ul", "ol") or bool(
+        _classes(node) & {"ltx_itemize", "ltx_enumerate"}
+    )
 
 
 def _paragraph_nodes(node: Node) -> list[Node]:
