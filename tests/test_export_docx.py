@@ -411,3 +411,27 @@ def test_the_command_says_when_it_cannot(tmp_path, capsys):
     bad.write_text("words", encoding="utf-8")
     assert cli.main(["export", "docx", str(bad), str(tmp_path / "o.docx")]) == 2
     assert "cannot write a Word file: invalid" in capsys.readouterr().err
+
+
+# ------------------------------------------------------ pictures kept whole (F-114)
+
+
+def test_three_kept_pages_say_why_each_time_and_the_explanation_once_in_every_output():
+    from readablestem.core.types import Element, Fix, Kind, Status
+    from readablestem.pipeline.assemble import render_html
+
+    elements = [
+        Element(id=f"p{n}-e0", kind=Kind.FIGURE, page=n - 1, bbox=(0, 0, 500, 700), order=n)
+        for n in (1, 2, 3)
+    ]
+    fixes = [
+        Fix(element_id=e.id, kind=Kind.FIGURE, status=Status.FAILED, reason="scanned_page")
+        for e in elements
+    ]
+    html = render_html(title="Notes", lang="en", elements=elements, fixes=fixes, crops={})
+    word = ed.export_docx(html).data
+    xml = zipfile.ZipFile(io.BytesIO(word)).read("word/document.xml").decode()
+    said = [getattr(item, "say", "") for item in listen.build_transcript(html)]
+    for words in (plain(html), plain(xml), "\n".join(said)):
+        assert words.count("A scanned page.") == 3
+        assert words.count("A screen reader cannot read a picture") == 1

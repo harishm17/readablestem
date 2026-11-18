@@ -43,10 +43,7 @@ from readablestem.pipeline.table_html import render_table
 _NOT_ID = re.compile(r"[^A-Za-z0-9_.:\-]")
 
 TABLE_NOT_CONVERTED_ALT = "Table not converted"
-TABLE_NOTE = (
-    "This table is shown as an image of the original, so screen readers cannot read its "
-    "rows and columns. Ask your instructor for a version you can read."
-)
+TABLE_NOTE = "Shown as an image of the original."
 TABLE_FLAG_LABEL = "Not converted."
 # Added to the stylesheet of documents that contain a rebuilt table (and only those).
 TABLE_CSS = """\

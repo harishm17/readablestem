@@ -540,7 +540,7 @@ def export_canvas(
     notes.scroll_boxes = sum(
         1
         for n in standalone.walk()
-        if "tabindex" in n.attrs and n.attrs.get("id") != navigation.MAIN_ID
+        if "tabindex" in n.attrs and n.tag != "h1"  # the h1 is the skip link's target
     )
 
     # The paste version is its own copy of the tree: it differs in image addresses, in
@@ -562,11 +562,13 @@ def export_canvas(
         base = f"/courses/{course_number}/file_contents/course%20files/{folder}/"
         _extract_images(page_tree, Notes(), lambda name: base + name)
         for node in list(page_tree.walk()):
-            if "skip-link" in node.classes() or node.attrs.get("id") == navigation.MAIN_ID:
+            if "skip-link" in node.classes():
                 if node.parent is not None:
                     node.parent.children.remove(node)
                     notes.skip_link_left_out = True
                 continue
+            if node.attrs.get("id") == navigation.MAIN_ID:
+                del node.attrs["id"]  # what the skip link pointed to; nothing points to it now
             if HIDDEN_CLASS in node.classes():
                 node.attrs["class"] = f"{node.attrs['class']} {CANVAS_HIDDEN_CLASS}"
             node.attrs.pop("tabindex", None)

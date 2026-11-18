@@ -11,6 +11,24 @@
   finished job's page makes 0 requests, and importing `pipeline.run` loads 0 modules of
   `anthropic` or `openai` (now a test). No model call, no stored-data change, no migration, no
   version bump.
+## Unreleased: page structure and words (branch feat/page-structure-and-words)
+
+- WS11.5 (F-116): the Contents list comes after the title, inside `<main>`, and is a closed
+  `<details>` on a phone: at 390 px the title is on the first screen. From 40rem of width up,
+  and on paper, the list is shown open and its summary is hidden, with no script (older
+  browsers keep the closed line, which works from the keyboard). A heading that repeats under
+  the same parent is one entry; the later places follow it as numbered links. The skip link
+  jumps to the `<h1>`, which takes focus (`tabindex="-1"`); the empty `main-content` span is
+  gone. The Canvas export follows (its paste version drops the skip link and the id).
+- WS11.5 (F-114): a box for a part that is not converted says what it is ("A scanned page.",
+  "Shown as an image of the original.") and keeps the link to the instructor. The explanation
+  (a screen reader cannot read a picture) is said once, in the notice at the top, through
+  `say`, so Word, EPUB and Listen carry it once and each box's reason where it stands.
+- WS11.5 (F-118): a figure's description summary reads "Description of Figure 3.2" or
+  "Description of the figure"; the data table's caption the same. Neither quotes the alt text.
+  F-115 (page markers) and F-117 (link text) wait for printed page labels and the link
+  resolver. No model call, no stored-data change, no migration, no version bump:
+  `RENDER_VERSION` 8 already covers this unshipped batch.
 
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 

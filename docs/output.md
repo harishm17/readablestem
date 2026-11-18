@@ -17,11 +17,11 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
 <body>
-<a class="skip-link readablestem" href="#main-content">Skip to main content</a>
-<nav class="toc" aria-label="Contents">...</nav>       (3 or more headings, see "Navigation")
-<span id="main-content" tabindex="-1"></span>
+<a class="skip-link readablestem" href="#main-content">Skip to main content</a>   (to the h1)
 <main>
   <p class="notice readablestem" role="note">...</p>   (only when a notice is given)
+  <h1 id="main-content" tabindex="-1">...</h1>
+  <nav class="toc" aria-label="Contents"><details>...</details></nav>   (3 or more headings, see "Navigation")
   ... the document, in reading order ...
   <section id="about-conversion" ...>About this version (the note for students)</section>
 </main>
@@ -196,8 +196,9 @@ our own would be a second MathML reader to keep right.
   go, so pandoc is given only a document that names nothing outside itself. (Pandoc's own
   `--sandbox` cannot be used: the distribution build reads its default styles from disk.) A
   figure's long description (`<details class="figure-description">`) becomes its summary line
-  in bold and its paragraphs, after the figure. `<main>` is unwrapped, so the Contents and a
-  draft's banner, which stand before it, are in the file; the note "About this version" is
+  in bold and its paragraphs, after the figure; the Contents `<details>` the same way, so its
+  summary is a bold "Contents" line above the list. `<main>` is unwrapped, so a draft's banner,
+  which stands before it, is in the file; the Contents and the note "About this version" are
   inside `<main>`. A WebP picture is written as a PNG. The page's language and title are
   passed on. Every id an in-page link names is put where pandoc writes a Word bookmark:
   pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
@@ -357,7 +358,7 @@ no network, no model.
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |
-| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text."; for `handwriting_on_page`, "Part of page 3, shown as a picture, not converted to text.", the label "Shown as a picture, not converted to text." and the note "A screen reader cannot read this picture. Ask your instructor for a text version."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text."; for `handwriting_on_page`, "Part of page 3, shown as a picture, not converted to text.", the label "Shown as a picture, not converted to text."; its label alone says it, with no further reason), the label "Not converted." and a short reason: "A page of handwritten notes." (the explanation is once, in the notice at the top: see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
 | Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
 | Decorative figure (with evidence, see "Decoration") | `<div class="decorative"><img alt="">` (a `<figure class="decorative">` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
@@ -376,8 +377,7 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
 <div class="flagged" id="p1-e5" data-status="failed" data-reason="budget_job_usd">
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
   <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span>
-  This equation is shown as an image of the original, so screen readers cannot read it.
-  Ask your instructor for a version you can read.</p></div>
+  Shown as an image of the original.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
@@ -391,23 +391,35 @@ document in another language marks it `lang="en"`).
 
 - **Skip link.** The first thing in `<body>`: `<a class="skip-link" href="#main-content">`
   "Skip to main content" (WCAG 2.4.1). It is hidden until focused (`.skip-link:not(:focus)`)
-  and jumps over the contents list to the empty `<span id="main-content" tabindex="-1">` just
-  before `<main>`. The id is on a span, not on `<main>`, because about 60 places (code, tests,
-  the committed demo) read the file by the literal `<main>` tag. `tabindex="-1"` makes the span
+  and jumps to the page's one `<h1>` (F-116), which carries `tabindex="-1"`: that makes it
   focusable by following the link, so Firefox and VoiceOver move there (a link to an element
-  that cannot take focus only scrolls), without making it a tab stop. Canvas removes `tabindex`
-  from a pasted page, one more reason the paste version has no skip link. The skip link is the
-  first tab stop of the file, so a test that tabs through a file presses Tab once more.
-- **Contents list.** `<nav class="toc" aria-label="Contents">` after the skip link and before
-  `<main>`: nested `<ul>` of links to the headings, made from the outline as written (after
-  the repair above, and after the move down of "One h1": the title written as the `<h1>`
-  is not an entry), when there are at least 3 headings (`MIN_TOC_HEADINGS`). It is not
+  that cannot take focus only scrolls), without making it a tab stop. A title the assembler
+  adds has the id `main-content`; a heading that is the title keeps its own id, and the link
+  points to it. Canvas removes `tabindex` from a pasted page, one more reason the paste
+  version has no skip link (it drops the id `main-content` too). The skip link is the first
+  tab stop of the file, so a test that tabs through a file presses Tab once more.
+- **Contents list.** `<nav class="toc" aria-label="Contents">` right after the `<h1>`, inside
+  `<main>`: a `<details class="toc-details">` whose summary is "Contents" and whose body is a
+  nested `<ul>` of links to the headings, made from the outline as written (after the
+  repair above), when there are at least 3 headings (`MIN_TOC_HEADINGS`). The title comes
+  first, so on a 390 px screen it is on the first screen and a long list is one closed line
+  below it (it was above the title, 1,245 px of it for 30 entries). The `<details>` is closed
+  in the markup, so every reader that draws no style (Canvas, Word, a transcript) gets the
+  short form too. The page's style shows it open from 40rem of width up and on paper, without a
+  script: where the browser has `::details-content` the list is drawn and the summary is hidden
+  (a control that is not there cannot say "collapsed" over an open list), and the words
+  "Contents" are written by the style. Where it does not (older browsers) the closed line
+  stays, a control that works from the keyboard, and on paper its summary asks to open it
+  first, as a figure description's does. A heading that repeats under the same parent
+  ("Teacher Support" in every section) is one entry that links to the first; the later ones
+  follow it as links named by their number ("Teacher Support 2", visible "2"). The list is not
   written when the PDF has a contents page of its own (an element with the reason
   `contents entry`, `layout.CONTENTS_ENTRY`; a test keeps the two strings equal): a second list
   of contents would be one too many, and that page's entries already link to their headings.
   An equation in a heading is called "[equation]" in the list, as in a title. Every heading has
   an id, so every entry has a target: the heading's pipeline id (`p3-e7`, the same on every
-  render of a result), or `heading-N` for one whose id is missing or repeated.
+  render of a result), or `heading-N` for one whose id is missing or repeated. A heading that
+  is the title is the first entry, with the rest under it.
 - **Page markers.** Between the blocks, at each source page boundary:
   `<div class="pagebreak"><hr role="doc-pagebreak" aria-label="Page 12" id="pagebreak-N">
   <span aria-hidden="true">Page 12</span></div>`. The role is on an `<hr>` because axe accepts
@@ -553,11 +565,10 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
   be the figure's first or last child, and a long description inside the figcaption
   would become the figure's accessible name, read in full on entering it.
 - The summary names the figure from its caption ("Description of Figure 2.3", "Data for
-  Figure 2.3" when there is only a table); a figure without a number is named by the
-  first eight words of its alt text ("Description of the figure “Line graph of the
-  position of a car…”"), and only one without either is "the figure". So
-  several unnumbered figures' summaries still differ in a screen reader's list of
-  controls. The data table's caption names the figure the same way. It works without
+  Figure 2.3" when there is only a table); a figure without a number is "the figure" ("Description
+  of the figure"). The summary never quotes the alt text, which stands on the picture just above
+  (F-118), so several unnumbered figures share the same summary words; their order tells them
+  apart. The data table's caption names the figure the same way. It works without
   scripts.
 - Each line of the long description is a `<p>`; everything the model wrote is escaped.
 - The data table goes through `table_html.render_table` like a rebuilt table, in a box
@@ -782,10 +793,15 @@ and label are unchanged. In a document in another language the alt text is marke
 - If there is no crop, the extracted text (if any) is shown in monospace with "The
   original image is not available."
 - A page (or handwriting) kept as an image is never called a figure: its alt text names
-  the page and what it is, and its note says a screen reader cannot read it and to ask
-  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, one table of alt text,
-  label and note by the fix's reason, so a stored result renders the same; the design's
-  draft wording is the beta wording). `handwriting_on_page` is also what a box of vector
+  the page and what it is, and its note says what it is in a few words ("A scanned page.")
+  (`assemble.KEPT_IMAGE_WORDS`, one table of alt text, label and short reason by the fix's
+  reason, so a stored result renders the same). The explanation is not repeated at each box
+  (F-114): the notice at the top says once that a screen reader cannot read a picture, beside
+  the statement that says to ask the instructor for a version one can read
+  (`assemble.NOT_CONVERTED_WHY`, built through `say` so it has an audience). The same holds for
+  an equation, a table, writing left out of a page and a figure with no description: each
+  box has its label and its reason ("Shown as an image of the original."), and the link to
+  write to the instructor when the owner gave a contact line. `handwriting_on_page` is also what a box of vector
   lines was named before the reader had pen evidence, so it never says "handwriting": the
   part is "shown as a picture, not converted to text" in its alt text, label and note, and
   in its link in the statement ("Part 2 not converted: picture, page 1",

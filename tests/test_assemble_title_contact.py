@@ -52,7 +52,7 @@ def test_a_title_the_instructor_set_is_used_as_typed_and_becomes_the_top_heading
     html = render("1 Derivatives", title_set=True)
     assert title_of(html) == "1 Derivatives"
     content = re.sub(r'<section id="checked-notice".*?</section>\n', "", html, flags=re.S)
-    assert re.search(r"<main>\n<h1>1 Derivatives</h1>\n<h2", content)  # first, after the notice
+    assert re.search(r"<main>\n<h1 [^>]*>1 Derivatives</h1>\n<h2", content)  # after the notice
     assert html_checks.static_checks(html)
 
 
@@ -232,7 +232,7 @@ def test_a_not_converted_note_links_the_instructor_without_the_items_content():
         link == "mailto:prof.lee@example.edu?subject=Physics%20notes%3A%20Equation%20on%20page%202"
     )
     assert "SECRET" not in link and "body=" not in link  # kind and page only; an empty body
-    assert 'Ask your instructor for a version you can read. <a href="mailto:' in html
+    assert f'{assemble.EQUATION_NOTE} <a href="mailto:' in html
     assert instructor_links(unconverted("prof.lee@example.edu", assemble.CHECKER))  # the draft too
     assert all(c.passed for c in html_checks.static_checks(html))
 

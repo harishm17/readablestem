@@ -119,10 +119,10 @@ def test_an_image_type_the_export_does_not_write_is_refused():
 
 
 def without_skip_link(html: str) -> str:
-    """The source without its skip link and the anchor it jumps to: the paste version leaves
-    both out on purpose (`<main>`, where the link goes, is removed by Canvas)."""
+    """The source without its skip link and the id it jumps to: the paste version leaves both
+    out on purpose (`<main>`, where the link goes, is removed by Canvas)."""
     html = re.sub(r'<a class="skip-link[^>]*>[^<]*</a>\n?', "", html)
-    return re.sub(r'<span id="main-content"[^>]*></span>\n?', "", html)
+    return html.replace(' id="main-content"', "")
 
 
 def test_the_page_keeps_what_a_reader_needs(made):

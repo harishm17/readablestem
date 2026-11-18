@@ -76,18 +76,21 @@ def contents_nav(html: str) -> str:
 # ----------------------------------------------------------------------------- skip link
 
 
-def test_the_skip_link_comes_first_and_jumps_to_the_start_of_main():
+def test_the_skip_link_comes_first_and_jumps_to_the_h1_which_takes_focus():
     html = render([block(0, Kind.PARAGRAPH, "Hello.")])
     body = html.split("<body>", 1)[1]
     assert body.lstrip().startswith(
         '<a class="skip-link readablestem" href="#main-content">Skip to main content</a>'
     )
-    # the target is the empty anchor just before <main>, which keeps its plain tag
-    assert body.index('id="main-content"') < body.index("<main>")
+    # the target is the page's one h1: focusable by the link (Firefox, VoiceOver), but not a
+    # tab stop; the only tabindex
     assert html.count('id="main-content"') == 1
-    # focusable by the link (Firefox, VoiceOver), but not a tab stop; the only tabindex
+    assert '<h1 id="main-content" tabindex="-1">Doc</h1>' in html
     assert re.findall(r"tabindex=\"[^\"]*\"", html) == ['tabindex="-1"']
-    assert '<span id="main-content" tabindex="-1"></span>' in html
+    # a heading that is the title is the target under its own id
+    titled = render(three_headings())
+    assert 'href="#p1-e0">Skip' in titled
+    assert '<h1 id="p1-e0" tabindex="-1">Motion</h1>' in titled
 
 
 def test_the_contents_label_is_english_and_its_entries_the_documents_language():
@@ -113,8 +116,9 @@ def test_three_headings_make_a_nested_contents_list_of_links_to_their_ids():
         '<li><a href="#p1-e4">Velocity</a></li></ul></li></ul>'
     ) in nav
     assert html.count("<nav") == 1
-    # outside <main>, after the skip link, so the skip link jumps over it
-    assert html.index("skip-link") < html.index("<nav") < html.index("<main>")
+    # after the title, so the title is the first thing on a phone, and closed under 40rem
+    assert html.index("skip-link") < html.index("<h1") < html.index("<nav")
+    assert '<details class="toc-details"><summary' in nav and "<details open" not in nav
     for target in re.findall(r'href="#([^"]+)"', nav):
         assert f'id="{target}"' in html
     assert all(c.passed for c in static_checks(html) if c.severity == "error")
@@ -123,7 +127,7 @@ def test_three_headings_make_a_nested_contents_list_of_links_to_their_ids():
 def test_a_deck_with_one_heading_per_slide_lists_its_slides_under_the_title():
     pairs = numbered([heading(i, f"Slide {i}", 1, page=i) for i in range(3)])
     html = render(pairs)
-    assert "<h1>Doc</h1>" in html and '<h2 id="p1-e0">Slide 0</h2>' in html
+    assert ">Doc</h1>" in html and '<h2 id="p1-e0">Slide 0</h2>' in html
     nav = contents_nav(html)
     assert nav.count("<li>") == 3 and "Doc" not in nav  # the title is not an entry
 
@@ -134,9 +138,20 @@ def test_a_heading_whose_id_is_taken_gets_one_of_its_own():
     third, fix3 = heading(2, "Three", 2)
     html = render(numbered([(first, fix1), (clash, fix1), (third, fix3)]))
     assert '<h2 id="heading-1">One</h2>' in html  # (two top headings: all go one level down)
-    assert '<a href="#heading-1">One</a>' in contents_nav(html)
+    assert 'href="#heading-1"' in contents_nav(html)
     ids = re.findall(r'\bid="([^"]+)"', html)
     assert len(ids) == len(set(ids))
+
+
+def test_a_heading_that_repeats_under_one_parent_is_one_entry_that_still_reaches_each():
+    pairs = [heading(0, "Motion", 1)]
+    for n in range(3):
+        pairs += [heading(2 * n + 1, "Teacher Support", 2), heading(2 * n + 2, f"Part {n}", 2)]
+    nav = contents_nav(render(numbered(pairs)))
+    assert nav.count("Teacher Support") == 1 + 2  # the entry, and two named links to the others
+    for place in ("p1-e1", "p1-e3", "p1-e5"):
+        assert f'href="#{place}"' in nav
+    assert nav.count("Part ") == 3
 
 
 def test_an_equation_in_a_heading_is_called_equation_in_the_list():
@@ -287,3 +302,43 @@ def test_a_paragraph_over_two_pages_does_not_swallow_the_marker_of_its_last_page
     assert html.index("pagebreak-2") < html.index("Third page.")
     inside = re.search(r"<p[^>]*>Runs over the break and ends\.</p>", html)
     assert inside, "the paragraph is written whole"
+
+
+@pytest.mark.browser
+def test_on_a_phone_the_title_is_on_the_first_screen_and_the_skip_link_lands_on_it():
+    """F-116: a long Contents list no longer hides the title on a 390 px screen. It is a closed
+    line there, a control that works from the keyboard, and an open list from 40rem up."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    pairs = [heading(0, "Motion", 1)]
+    for n in range(20):
+        pairs += [heading(2 * n + 1, f"Section {n}", 2), block(2 * n + 2, Kind.PARAGRAPH, "Text.")]
+    html = render(numbered(pairs))
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch()
+        except sync_api.Error:
+            pytest.skip("Playwright's Chromium is not installed")
+        try:
+            page = browser.new_page(viewport={"width": 390, "height": 700})
+            page.set_content(html)
+            title_bottom = page.evaluate(
+                "document.querySelector('h1').getBoundingClientRect().bottom"
+            )
+            was_open = page.evaluate("document.querySelector('.toc-details').open")
+            page.keyboard.press("Tab")
+            page.keyboard.press("Enter")  # the skip link
+            focused = page.evaluate("document.activeElement.tagName")
+            page.keyboard.press("Tab")
+            page.keyboard.press("Enter")  # the contents line, from the keyboard
+            opened = page.evaluate("document.querySelector('.toc-details').open")
+            page.set_viewport_size({"width": 1000, "height": 700})
+            controls = page.evaluate(
+                "getComputedStyle(document.querySelector('.toc-details > summary')).display"
+            )
+            first_link = page.evaluate(
+                "document.querySelector('.toc a').getBoundingClientRect().height"
+            )
+        finally:
+            browser.close()
+    assert title_bottom < 700 and not was_open and focused == "H1" and opened
+    assert controls == "none" and first_link > 0  # from 40rem up the list is shown, with no control
