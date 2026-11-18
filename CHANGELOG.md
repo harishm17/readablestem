@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased: eight loose ends (branch fix/loose-ends-17)
+
+- A page limit said as a fact where it is an estimate. A Word file read from the file itself, a
+  LaTeX file and a project zip count as one page per 3,000 characters or picture. The daily
+  allowance refusal now says "notes.docx counts as 14 pages" (a PDF still "has" its pages), and
+  the documents list, the batch rows, the converting label and the job page's "Found ... on N
+  pages" say the same for those files.
+- A refused page edit (the document changed after the page was opened) now says what to do next.
+- The account deletion page lists its download choices one under the other (the second sat to
+  the right of the first at wide widths).
+- The stored demo page is written again by today's assembler from its stored result
+  (`readablestem demo rerender`, no model, $0); its note's summary says "license". The recorded
+  durations of 1,674 tests that no longer exist are dropped from `tests/shard_durations.json`; a
+  refresh with `--shard-record` is owed. `scripts/design_shots.py` finds the upload field again.
+- Looked at and left: the combine page's rows (a part whose language is assumed can be combined;
+  only sharing waits), the older question pages (same structure as the newer ones), the download
+  of a stored original (no kind has one).
+
 ## Unreleased: what is stored of an uploaded file is said for every kind (branch feat/source-file-at-the-door)
 
 - WS11.1e, as far as its triage line. Found by reading the upload, delete and purge code and by
