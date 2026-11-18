@@ -48,7 +48,7 @@ from readablestem.core.types import Element, Fix
 from readablestem.pipeline import assemble, checked, output_chars
 from readablestem.web import retention, states, titles
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobStatus
+from readablestem.web.db import SOURCE_MEDIA_PREFIX, Blob, Job, JobStatus
 
 
 def plural(n: int, one: str, many: str) -> str:
@@ -74,6 +74,15 @@ class DocumentRow:
     part_label: str = ""
     is_sample: bool = False  # the recorded sample document (T3-9)
     exam_mode: bool = False  # converted as an exam or quiz (`web.exam`); the row marks it
+    # The file is Word read from the file itself, LaTeX or a project zip: `pages` is the count
+    # it counts as (one per 3,000 characters or picture, `source.intake`), not a printed count.
+    estimated: bool = False
+
+    @property
+    def page_words(self) -> str:
+        """The file's pages in words: "14 pages", or "counts as 14 pages" when it is an estimate."""
+        words = plural(self.pages, "page", "pages")
+        return f"counts as {words}" if self.estimated else words
 
     @property
     def name(self) -> str:
@@ -105,7 +114,9 @@ class DocumentRow:
         assert self.state is not None
         label = self.state.label
         if self.state.key == "converting":
-            return f"{label}: {self.pages_done} of {plural(self.pages, 'page', 'pages')} done"
+            counted = "counted " if self.estimated else ""
+            of = f"{self.pages} {counted}{'page' if self.pages == 1 else 'pages'}"
+            return f"{label}: {self.pages_done} of {of} done"
         if self.decide and self.open_decisions:
             return f"{label}: {plural(self.open_decisions, 'decision', 'decisions')} to make"
         return label
@@ -344,6 +355,15 @@ def documents(
         .where(*_live(user_id, now, course_id, job_ids))
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
+    estimated = set(
+        session.scalars(
+            select(Blob.job_id).where(
+                Blob.job_id.in_([job.id for job in jobs]),
+                Blob.kind == "upload",
+                Blob.media_type.like(SOURCE_MEDIA_PREFIX + "%"),
+            )
+        )
+    )
     stored = _stored_facts(session, [job.id for job in jobs if job.status == JobStatus.DONE])
     found = states.load(
         session, [job.id for job in jobs], context=states.Context(budget_closed=budget_closed)
@@ -366,6 +386,7 @@ def documents(
             part_label=job.part_label or "",
             is_sample=bool(job.is_sample),
             exam_mode=bool(job.exam_mode),
+            estimated=job.id in estimated,
             state=found.get(job.id),
         )
         by_key[row.group].rows.append(row)

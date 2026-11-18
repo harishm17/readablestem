@@ -75,7 +75,15 @@ from readablestem.web import outcome as outcome_words
 from readablestem.web import retry as retry_rules
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
+from readablestem.web.db import (
+    SOURCE_MEDIA_PREFIX,
+    Blob,
+    Job,
+    JobStatus,
+    User,
+    session_scope,
+    utcnow,
+)
 from readablestem.web.deps import (
     CSRF_FIELD,
     ELEMENT_ID,
@@ -214,13 +222,15 @@ def upload_error_message(
     left: int | None = None,
     *,
     office: bool = False,
+    estimated: bool = False,
     tier: str = access.INVITED,
 ) -> str:
     """What went wrong with an upload, naming the file (and its pages) when known. The
     file name is shown to its owner only, never logged. `left`: pages left today, for
     "page_quota", which counts against `tier`'s daily pages (`web.access`). `office`: the file
     was a Word or PowerPoint file, made into a PDF first (T3-30), so the advice about pages
-    is about the document and not about a PDF."""
+    is about the document and not about a PDF. `estimated`: `pages` is what a Word file read
+    from the file itself, a LaTeX file or a project zip counts as, not a printed count."""
     s = ctx.settings
     name = filename or "This file"
     limit = s.source_page_limit
@@ -228,7 +238,12 @@ def upload_error_message(
     side = MAX_PAGE_SIDE_PT / 72 * 0.0254  # the longest side a page may have, in meters
     if code == "page_quota":
         return _quota_message(
-            name, pages, left, access.page_quota(s, tier), new_account=access.is_open(tier)
+            name,
+            pages,
+            left,
+            access.page_quota(s, tier),
+            new_account=access.is_open(tier),
+            estimated=estimated,
         )
     # One statement of what is taken, for the page and for this message (T3-30, D-009).
     accepted = ctx.accepted_types()
@@ -425,12 +440,15 @@ def _quota_message(
     quota: int | None,
     *,
     new_account: bool = False,
+    estimated: bool = False,
 ) -> str:
     """The daily page limit refused an upload (UX review MF20, MF21): the file, its
     pages, what is left, and when the count starts again (the page under it says when
     in the reader's own time). A new account (open tier) is told the number is the limit
     for new accounts, not a fault."""
-    has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
+    has = (
+        f"{name} {'counts as' if estimated else 'has'} {pages} {'page' if pages == 1 else 'pages'}"
+    )
     whose = "a new account can convert" if new_account else "you can convert"
     again = retry_after().words  # the same time the refusal's `Retry-After` counts down to
     if not left:
@@ -811,12 +829,13 @@ def _upload_error_page(
     course: str = "",
     revises: str = "",
     office: bool = False,
+    estimated: bool = False,
     fields: Mapping[str, str] | None = None,
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code, office=office)
     message = upload_error_message(
-        code, ctx, filename, pages, left, office=office, tier=user.access_tier
+        code, ctx, filename, pages, left, office=office, estimated=estimated, tier=user.access_tier
     )
     context = app_context(ctx, user)
     # The course chosen stays chosen (the form marks it only among the user's courses),
@@ -976,6 +995,7 @@ class Placed:
     left: int | None = None
     retry_after: str = ""
     office: bool = False  # the file was Word or PowerPoint, made into a PDF first (T3-30)
+    estimated: bool = False  # `pages` is what the file counts as (a source), not a page count
     # Scanned and handwritten pages the box was not checked for (`page_type.ImagePageCount`
     # as a dict): kept as pictures, with the price of reading them said beside the document.
     scans: dict[str, int] | None = None
@@ -1455,7 +1475,7 @@ def _place_source(
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
-            retry_after=retry_after().header,
+            retry_after=retry_after().header, estimated=True,
         )  # fmt: skip
     ctx.wake_worker()
     log_event(
@@ -1521,7 +1541,7 @@ def _place_word(
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
-            retry_after="3600",
+            retry_after="3600", estimated=True,
         )  # fmt: skip
     ctx.wake_worker()
     log_event(
@@ -1532,9 +1552,9 @@ def _place_word(
 
 
 SOURCE_MEDIA_TYPES = {
-    "tex": "application/x-readablestem-tex",
-    "zip": "application/x-readablestem-zip",
-    "docx": "application/x-readablestem-docx",
+    "tex": SOURCE_MEDIA_PREFIX + "tex",
+    "zip": SOURCE_MEDIA_PREFIX + "zip",
+    "docx": SOURCE_MEDIA_PREFIX + "docx",
 }
 
 
@@ -1625,6 +1645,7 @@ async def _answer_one(
             course=chosen,
             revises=revises,
             office=item.office,
+            estimated=item.estimated,
             fields=fields,
         )
     )

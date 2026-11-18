@@ -285,6 +285,11 @@ def _keep_html_version(target: Job, value: object, _old: object, _initiator: obj
     target.html_version = render_version(value) if isinstance(value, str) else None
 
 
+# The stored upload of a Word file read from the file itself, a LaTeX file or a project zip has a
+# media type that starts with this; its page count is an estimate (`source.intake`).
+SOURCE_MEDIA_PREFIX = "application/x-readablestem-"
+
+
 class Blob(Base):
     """Binary content tied to a job: the uploaded PDF and per-element crops (PNG)."""
 
