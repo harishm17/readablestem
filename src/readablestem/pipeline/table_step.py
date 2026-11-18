@@ -650,6 +650,18 @@ def _maths_symbols(cells: Iterable[TableCell]) -> Counter[str]:
     return bag
 
 
+def _text_cells(
+    grid: TableGrid, local: TableGrid, owner: dict[tuple[int, int], int], maths: set[int]
+) -> list[tuple[TableCell, list[TableCell]]]:
+    """Each text cell of the model's grid with the PDF cells in its place, leaving out the
+    ones that stand where the model put maths (those are compared by the maths checks)."""
+    return [
+        (cell, [local.cells[i] for i in _counterparts(cell, owner) if i not in maths])
+        for cell in grid.cells
+        if not cell.latex
+    ]
+
+
 def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
     """The bijection row by row, for grids of the same size: the PDF words of the local
     cells that stand where the model put maths are compared by the maths checks instead."""
@@ -671,11 +683,7 @@ def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
     if _spans(grid) == _spans(local):
         # Each text cell against the PDF cell in its place: a value in the wrong column
         # (a blank cell the model left out, two values swapped) keeps its row's words.
-        cells = [
-            ([cell], [local.cells[i] for i in _counterparts(cell, owner) if i not in maths])
-            for cell in grid.cells
-            if not cell.latex
-        ]
+        cells = [([cell], under) for cell, under in _text_cells(grid, local, owner, maths)]
     else:  # merged cells differ (spans_differ): rows are the finest pairing
         cells = pairs
     if all(bag(m) == bag(p) for m, p in cells):
@@ -687,6 +695,41 @@ def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
     if sum((bag(m) for m, _ in pairs), Counter()) == sum((bag(p) for _, p in pairs), Counter()):
         return "row_mismatch"
     return "text_mismatch"
+
+
+@dataclass(frozen=True)
+class CellDifference:
+    """A cell of the model's grid and the PDF's text where it stands. Not stored: the review
+    card works it out from the two grids when it is shown."""
+
+    cell: TableCell
+    pdf: str
+
+
+def text_differences(grid: TableGrid, element: Element) -> list[CellDifference]:
+    """The text cells whose words differ from the PDF's in their place: what
+    `cell_text_code` compares, so a difference in spacing, or in the spelling of a symbol
+    that it folds, or in nothing but spacing ("1 0" for "10": `whitespace_differs`), is not
+    one. Empty when the grids cannot be compared cell by cell: no PDF words, another number
+    of rows or columns, or merged cells that differ."""
+    local = _local(element)
+    if (
+        local is None
+        or not any(words(c.text) for c in local.cells)
+        or not _aligned(grid, local)
+        or _spans(grid) != _spans(local)
+    ):
+        return []
+    owner = _owners(local)
+    maths = {i for c in grid.cells if c.latex for i in _counterparts(c, owner)}
+    out = []
+    for cell, under in _text_cells(grid, local, owner, maths):
+        if Counter(words(cell.text)) != Counter(
+            w for c in under for w in words(c.text)
+        ) and _joined([cell]) != _joined(under):
+            pdf =" ".join(t for t in (c.text.strip() for c in under) if t)
+            out.append(CellDifference(cell, pdf))
+    return out
 
 
 def cell_text_code(grid: TableGrid, element: Element) -> str | None:
@@ -730,6 +773,11 @@ class _MathsVerdict:
     symbols: bool = False  # a letter, digit or Greek letter differs
     signs: bool = False  # a sign or relation differs
     style: str | None = None  # "meaning" or "cosmetic" (the worst seen)
+    # The cells behind each flag, by flag ("symbols", "signs", "style": a meaning-level one).
+    cells: dict[str, list[CellDifference]] = field(default_factory=dict)
+
+    def add(self, flag: str, cell: TableCell, layer: str) -> None:
+        self.cells.setdefault(flag, []).append(CellDifference(cell, layer))
 
 
 # MathML layouts whose digits a text layer may run together or reorder (a fraction's
@@ -821,18 +869,35 @@ def maths_verdict(grid: TableGrid, local: TableGrid) -> _MathsVerdict:
             if _mathml_symbols(cell.mathml):
                 verdict.compared += 1
                 verdict.symbols = True
+                verdict.add("symbols", cell, layer)
             continue
         verdict.compared += 1
         differ = differ or maths_numbers_or_case_differ(layer, cell.mathml)
         verdict.symbols = verdict.symbols or differ
+        if differ:
+            verdict.add("symbols", cell, layer)
         similarity = text_layer_similarity(layer, cell.mathml)
         if similarity is None or similarity >= TEXT_LAYER_MISMATCH_BELOW:
             signs = compare_signs(_DIGIT_DASH.sub("\N{MINUS SIGN}", layer), cell.mathml)
             verdict.signs = verdict.signs or (signs is not None and signs.mismatch)
+            if signs is not None and signs.mismatch:
+                verdict.add("signs", cell, layer)
         style = text_layer_style(layer, cell.mathml)
         if style == "meaning" or (style == "cosmetic" and verdict.style is None):
             verdict.style = style
+        if style == "meaning":
+            verdict.add("style", cell, layer)
     return verdict
+
+
+def maths_differences(grid: TableGrid, element: Element) -> dict[str, list[CellDifference]]:
+    """The maths cells behind each failed maths check, by check: "symbols"
+    (`table.math_symbols`), "signs" (`table.math_signs`) and "style" (`table.math_style`,
+    a style that changes the meaning). Empty when the grids cannot be compared cell by cell."""
+    local = _local(element)
+    if local is None or not _aligned(grid, local):
+        return {}
+    return maths_verdict(grid, local).cells
 
 
 def structure_checks(grid: TableGrid) -> list[Check]:

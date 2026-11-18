@@ -300,6 +300,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "check those letters.",
     ("table.math_style", "style_cosmetic"): "A letter's style in a math cell differs from "
     "the PDF only where it does not change the meaning, so this was accepted as it is.",
+    ("table.cell_reading", "differs_from_table_reading"): "This formula is also a cell of a "
+    "table, and the table's own reading of that cell is different, so compare both with the "
+    "image and keep the one that is right.",
     ("table.row_headers", "row_headers_dropped"): "A column of row labels comes after data "
     "cells and could not be used as one, so the table has no row headers: check that each "
     "value can still be found by its row.",

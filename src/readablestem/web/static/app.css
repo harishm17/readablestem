@@ -941,6 +941,16 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .finding { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .finding:first-child { border-top: 0; }
 .finding-text { flex: 1 1 18rem; min-width: 0; }
+/* The cells that differ: a list under the sentence of the check, the full width of the finding.
+   In the table, the same cells have a dashed frame and a ≠ sign, so no color carries it. */
+.cell-differences { flex: 1 0 100%; min-width: 0; }
+.cell-differences .part-label { margin: 0 0 var(--space-1); }
+.difference-list { margin: 0 0 var(--space-1); padding-left: var(--space-4); }
+.difference { margin: 0 0 var(--space-1); overflow-wrap: anywhere; }
+.difference-place { font-weight: 700; }
+.table-view .cell-differs { outline: 2px dashed var(--paper-accent); outline-offset: -4px; }
+.table-view .cell-differs::after { content: " \2260"; font-weight: 700; color: var(--paper-accent); }
+@media (forced-colors: active) { .table-view .cell-differs { outline-color: CanvasText; } .table-view .cell-differs::after { color: CanvasText; } }
 .finding-action { margin: 0; }
 a.finding-action { display: inline-flex; align-items: center; min-height: 2.25rem; font-weight: 700; }
 .table-source-grid { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
