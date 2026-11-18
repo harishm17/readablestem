@@ -13,7 +13,8 @@
   as every other page gets a "same". It is shown to nobody and counted in `job_shadow`. No
   notice, no card, no change to a counter a person sees. WS15.9's page-check writer is not built.
 - `readablestem eval say-once` gives the corpus figures again; the figures it was set on are in
-  docs/eval-say-once.md: over 551 pages of 40 words or more no page is over the line.
+  docs/eval-say-once.md: no page of the 551 corpus and public pages is over the line, and 1 of
+  3,380 wide-list pages is (a page of subscripted maths names, not a lost block).
 - Changes no element, no stored document, no recording and no hash, so `PIPELINE_VERSION` is
   not bumped and no migration is added.
 
