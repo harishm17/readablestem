@@ -74,7 +74,10 @@ def test_the_tools_words_in_the_student_file_speak_to_students():
     words = " ".join(re.sub(r"<[^>]+>", " ", n) for n in notes).casefold()
     for reviewer_word in ("review", "publish", "reject", "proposal", "decision"):
         assert reviewer_word not in words, reviewer_word
-    assert words.count("ask your instructor") == 4
+    # whom to ask is said once, in the notice at the top, not at every box (F-114)
+    notice = re.search(r'<section id="checked-notice".*?</section>', html, re.S)
+    assert notice and notice.group(0).casefold().count("ask your instructor") == 1
+    assert "ask your instructor" not in words
 
 
 PNG = bytes.fromhex(

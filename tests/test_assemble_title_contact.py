@@ -52,7 +52,7 @@ def test_a_title_the_instructor_set_is_used_as_typed_and_becomes_the_top_heading
     html = render("1 Derivatives", title_set=True)
     assert title_of(html) == "1 Derivatives"
     content = re.sub(r'<section id="checked-notice".*?</section>\n', "", html, flags=re.S)
-    assert re.search(r"<main>\n<h1>1 Derivatives</h1>\n<h2", content)  # first, after the notice
+    assert re.search(r"<main>\n<h1 [^>]*>1 Derivatives</h1>\n<h2", content)  # after the notice
     assert html_checks.static_checks(html)
 
 

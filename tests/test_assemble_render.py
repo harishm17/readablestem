@@ -191,7 +191,7 @@ def test_decorative_image_without_caption_is_not_an_empty_figure(sample_html):
 
 
 def test_headings_follow_fixes_and_rejected_ones_become_paragraphs(sample_html):
-    assert '<h1 id="p1-e0">2.2 Speed and Velocity</h1>' in sample_html
+    assert re.search(r'<h1 id="p1-e0"[^>]*>2.2 Speed and Velocity</h1>', sample_html)
     assert '<h2 id="p2-e0">Instantaneous velocity</h2>' in sample_html  # needs_review: kept
     # A rejected bold heading is bold text, as in the PDF ("Make them bold text").
     assert '<p id="p2-e3"><strong>NOTE TO STUDENTS</strong></p>' in sample_html
