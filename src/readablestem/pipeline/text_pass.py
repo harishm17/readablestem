@@ -9,11 +9,18 @@ keep, and adds to the elements without changing their text or anything a model s
   a link to a place in this document points at the element there (`target_id`); any
   other link (ftp, a file, a program to launch) is dropped and its text stays, with the
   notice `link_scheme_dropped`. URLs are never fetched.
+- `Element.links`, "typed": a web address ("https://...", "http://...", "www....") or an
+  email address typed in the text with no link in the file, checked by `is_safe_href`, the
+  punctuation that ends a sentence left out of it.
 - `Element.links`, "crossref": "Figure 2.3", "Fig. 2", "Table 1", "Equation (3)",
   "Eq. 3", "Eqs. (3) and (4)", and a bare "(3)" only when a display equation has exactly
   that number printed beside it (and not at the start of a paragraph, where it numbers
   the paragraph). Each links to the one figure, table or equation with that number; a
-  number that two targets share, or none has, gets no link.
+  number that two targets share, or none has, gets no link. The same for "Section 3.2"
+  (a heading that starts with that number), "Chapter 4" (a heading "Chapter 4"), and
+  "Theorem 2.1", "Lemma", "Proposition", "Corollary", "Definition" and "Example" (a
+  paragraph or heading that starts with that label and number). A reference inside its own
+  target is not linked.
 - `DocumentResult.lang` and `lang_source`: the PDF's /Lang ("pdf"), else detected from
   the body text ("detected", notice `lang_detected`), else "en" ("default", notice
   `lang_assumed`); and `Element.lang` on a paragraph or list item confidently in
@@ -57,7 +64,8 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Literal
+from typing import Literal, get_args
+from urllib.parse import urlsplit
 
 import pymupdf
 
@@ -523,14 +531,84 @@ def unclear_link_text(text: str, context: int = 0) -> bool:
     return " ".join(words.split()) in UNCLEAR_LINK_TEXT
 
 
+# ============================================================================ typed addresses
+
+# An email address typed in the text. Not after a letter, digit or sign of an address (the
+# whole address is found from its start), and it ends at its last letter, so the full stop
+# of a sentence is not in it.
+_EMAIL_TEXT = re.compile(
+    r"(?<![A-Za-z0-9_%+\-])[A-Za-z0-9][A-Za-z0-9._%+\-]*@(?:[A-Za-z0-9\-]+\.)+[A-Za-z]{2,}"
+    r"(?![A-Za-z0-9\-])"
+)
+# A web address needs a name with a dot and letters at its end ("www.", "http://x" and
+# "http://localhost" are not worth a link).
+_HOST_NAME = re.compile(r"(?:[\w\-]+\.)+[^\W\d_]{2,}")
+# Punctuation that ends a sentence or a quotation, never an address; a closing bracket ends
+# one only when its opening bracket is not in the address ("(see https://x.org/a)").
+_ADDRESS_END = ".,;:!?'\"\u2019\u201d\u00bb\u2026>"
+_OPENER = {")": "(", "]": "[", "}": "{"}
+
+
+def _address_end(text: str, start: int, end: int) -> int:
+    """Where the address that `_URL_TEXT` found at [start, end) really ends: before an
+    inline equation and before the punctuation that follows it."""
+    if marker := INLINE_MARKER_RE.search(text, start, end):
+        end = marker.start()
+    while end > start:
+        last = text[end - 1]
+        if last in _ADDRESS_END or (
+            last in _OPENER and text.count(last, start, end) > text.count(_OPENER[last], start, end)
+        ):
+            end -= 1
+        else:
+            break
+    return end
+
+
+def typed_addresses(text: str, taken: Sequence[Link] = ()) -> list[Link]:
+    """Links for the web and email addresses typed in one element's text that the file
+    gives no link: "https://...", "http://...", "www...." and "name@host.tld". The text is
+    as layout joined it, so an address broken across a line end is whole only where layout
+    joined it. Each passes `is_safe_href`; none overlaps a `taken` link or an inline marker."""
+    candidates: list[tuple[int, int, str]] = []
+    for match in _URL_TEXT.finditer(text):
+        start = match.start()
+        if start and text[start - 1].isalnum():
+            continue  # the end of a longer word, not an address
+        end = _address_end(text, start, match.end())
+        shown = text[start:end]
+        href = shown if shown.lower().startswith("http") else f"https://{shown}"
+        if is_safe_href(href) and _HOST_NAME.fullmatch(urlsplit(href).hostname or ""):
+            candidates.append((start, end, href))
+    for match in _EMAIL_TEXT.finditer(text):
+        href = f"mailto:{match.group()}"
+        if is_safe_href(href):
+            candidates.append((match.start(), match.end(), href))
+    spans = [*((k.start, k.end) for k in taken), *_marker_ranges(text)]
+    found: list[Link] = []
+    for start, end, href in sorted(candidates, key=lambda c: (c[0], -c[1])):
+        if any(s < end and start < e for s, e in spans):
+            continue  # on a link of the file, or on maths; or inside the address before it
+        found.append(Link(start=start, end=end, kind="typed", href=href))
+        spans.append((start, end))
+    return found
+
+
 # ============================================================================ cross-references
 
 # A reference word, then a number, then more numbers joined by "," "and" "or" "&" "to" or a
 # dash ("Eqs. (3) and (4)", "Figures 2, 3 and 5"). Equation numbers may be bracketed.
 _NUMBER = r"\(\s*\d+(?:[.\-]\d+)*[a-z]?\s*\)|\d+(?:[.\-]\d+)*[a-z]?"
 _JOIN = r"\s*(?:,|and|or|&|to|\u2013|-)\s*"
+# "Example" only with a capital: "for example 3 of them" is not a reference.
+_REF_WORDS = (
+    r"figures?|figs?\.|tables?|equations?|eqns?\.?|eqs?\.?"
+    r"|sections?|secs?\.|\u00a7\u00a7?|chapters?|ch\."
+    r"|theorems?|thm\.?|lemmas?|propositions?|prop\.|corollar(?:y|ies)|cor\."
+    r"|definitions?|defs?\.|(?-i:Examples?)"
+)
 CROSSREF = re.compile(
-    r"\b(?P<word>figures?|figs?\.|tables?|equations?|eqns?\.?|eqs?\.?)\s*"
+    rf"(?<!\w)(?P<word>{_REF_WORDS})\s*"
     rf"(?P<first>{_NUMBER})(?P<rest>(?:{_JOIN}(?:{_NUMBER}))*)(?![\w.]?\w)",
     re.IGNORECASE,
 )
@@ -561,7 +639,35 @@ _LABEL_NUMBER = re.compile(r"(\()?\s*(\d+(?:[.\-]\d+)*[a-z]?)\s*(\))?")
 _CAPTION_START = re.compile(r"\s*[.:|\u2013\u2014]")
 
 
-TargetKind = Literal["figure", "table", "equation"]
+TargetKind = Literal[
+    "figure",
+    "table",
+    "equation",
+    "section",
+    "chapter",
+    "theorem",
+    "lemma",
+    "proposition",
+    "corollary",
+    "definition",
+    "example",
+]
+_TARGET_KINDS: tuple[TargetKind, ...] = get_args(TargetKind)
+# The first letters of a reference word -> its kind ("Fig.", "Figures" -> figure); a word
+# that matches none of these is an equation ("Eq.", "Eqns").
+_KIND_OF_PREFIX: tuple[tuple[str, TargetKind], ...] = (
+    ("fig", "figure"),
+    ("tab", "table"),
+    ("sec", "section"),
+    ("\u00a7", "section"),
+    ("ch", "chapter"),
+    ("th", "theorem"),
+    ("lem", "lemma"),
+    ("prop", "proposition"),
+    ("cor", "corollary"),
+    ("def", "definition"),
+    ("ex", "example"),
+)
 
 
 def _key(number: str) -> str:
@@ -571,11 +677,28 @@ def _key(number: str) -> str:
 
 def _word_kind(word: str) -> TargetKind:
     lowered = word.lower()
-    if lowered.startswith("fig"):
-        return "figure"
-    if lowered.startswith("tab"):
-        return "table"
+    for prefix, kind in _KIND_OF_PREFIX:
+        if lowered.startswith(prefix):
+            return kind
     return "equation"
+
+
+# What a numbered thing in running text is called where it is defined: a paragraph or
+# heading that starts "Theorem 2.1." / "Definition 3 (Group)" / "Example 4:". The number must
+# be followed by the label's own punctuation (or end the line): "Theorem 2.1 shows that" is a
+# reference, not the theorem.
+_LABELLED = re.compile(
+    r"\s*(?P<word>theorem|lemma|proposition|corollary|definition|example)\s+"
+    r"(?P<num>\d+(?:[.\-]\d+)*[a-z]?)\s*(?=[.:(\u2013\u2014]|$)",
+    re.IGNORECASE,
+)
+# A heading that numbers a section ("3.2 Title", "3.2. Title", "Section 3.2: Title") or a
+# chapter ("Chapter 4", "Chapter 4: Title").
+_SECTION_HEADING = re.compile(
+    r"\s*(?:(?:section|sec\.|\u00a7)\s*)?(?P<num>\d+(?:\.\d+)*)\.?(?=\s|$|[:\u2013\u2014])",
+    re.IGNORECASE,
+)
+_CHAPTER_HEADING = re.compile(r"\s*chapter\s+(?P<num>\d+)(?=\s|$|[.:\u2013\u2014])", re.IGNORECASE)
 
 
 @dataclass
@@ -584,7 +707,7 @@ class _Targets:
     in brackets (only those make a bare "(3)" a reference)."""
 
     ids: dict[str, defaultdict[str, set[str]]] = field(
-        default_factory=lambda: {k: defaultdict(set) for k in ("figure", "table", "equation")}
+        default_factory=lambda: {k: defaultdict(set) for k in _TARGET_KINDS}
     )
     bracketed: set[str] = field(default_factory=set)
 
@@ -606,7 +729,23 @@ def crossref_targets(elements: Iterable[Element]) -> _Targets:
                 targets.ids["equation"][key].add(element.id)
                 if match.group(1) and match.group(3):
                     targets.bracketed.add(key)
+        elif element.kind in LINK_KINDS and element.text:
+            _label_targets(element, targets)
     return targets
+
+
+def _label_targets(element: Element, targets: _Targets) -> None:
+    """The section, chapter, theorem, ... that this heading or paragraph is, by the number
+    it starts with."""
+    text = element.text or ""
+    if element.kind is Kind.HEADING:
+        if match := _SECTION_HEADING.match(text):
+            targets.ids["section"][_key(match.group("num"))].add(element.id)
+        if match := _CHAPTER_HEADING.match(text):
+            targets.ids["chapter"][_key(match.group("num"))].add(element.id)
+    if match := _LABELLED.match(text):
+        kind = _word_kind(match.group("word"))
+        targets.ids[kind][_key(match.group("num"))].add(element.id)
 
 
 @dataclass(frozen=True)
@@ -668,9 +807,13 @@ def widen_internal(text: str, links: list[Link]) -> list[Link]:
     return out
 
 
-def crossrefs(text: str, targets: _Targets, taken: Sequence[Link] = ()) -> list[Link]:
+def crossrefs(
+    text: str, targets: _Targets, taken: Sequence[Link] = (), element_id: str | None = None
+) -> list[Link]:
     """Cross-reference links in one element's text, never overlapping `taken` links or
-    inline markers, and none where the number names no target or more than one."""
+    inline markers, and none where the number names no target or more than one, or where the
+    target is the element itself (`element_id`: "Theorem 2.1 (Rolle)." at the start of
+    theorem 2.1)."""
     markers = _marker_ranges(text)
     found: list[Link] = []
     for ref in references(text):
@@ -678,7 +821,9 @@ def crossrefs(text: str, targets: _Targets, taken: Sequence[Link] = ()) -> list[
             continue
         target = targets.unique(ref.kind, ref.number)
         spans = [*((k.start, k.end) for k in (*taken, *found)), *markers]
-        if target is None or any(s < ref.end and ref.start < e for s, e in spans):
+        if target is None or target == element_id:
+            continue
+        if any(s < ref.end and ref.start < e for s, e in spans):
             continue
         found.append(Link(start=ref.start, end=ref.end, kind="crossref", target_id=target))
     return found
@@ -910,7 +1055,8 @@ class TextPassResult:
         """Content-free numbers for the trace."""
         links = [k for e in self.elements for k in e.links]
         return {
-            "links": sum(1 for k in links if k.kind != "crossref"),
+            "links": sum(1 for k in links if k.kind in ("uri", "internal")),
+            "typed_links": sum(1 for k in links if k.kind == "typed"),
             "crossrefs": sum(1 for k in links if k.kind == "crossref"),
             "colour_runs": sum(len(e.colour_runs) for e in self.elements),
             "deleted_runs": self.deleted_runs,
@@ -949,8 +1095,13 @@ def annotate(
             shown = visible_text(element.text, link.start, link.end)
             if unclear_link_text(shown, context_words(element.text, link.start, link.end)):
                 unclear[(element.page, element.id)] += 1
+        # Addresses typed with no link in the file, then references by number. Neither is a
+        # link of the file, so neither is judged for its text above.
+        own = sorted([*own, *typed_addresses(element.text, own)], key=lambda k: k.start)
         if element.kind in RUNNING_KINDS:
-            own = sorted([*own, *crossrefs(element.text, targets, own)], key=lambda k: k.start)
+            own = sorted(
+                [*own, *crossrefs(element.text, targets, own, element.id)], key=lambda k: k.start
+            )
         if own:
             links[element.id] = own
     coloured: dict[str, list[ColourRun]] = {}

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: typed addresses and numbered references are links (branch feat/links-typed-and-references)
+
+- SW52 (F-517, F-518), as far as its triage line: a web address (`https://`, `http://`, `www.`)
+  or an email address typed in the text with no link in the PDF is now a link (kind "typed",
+  checked by `is_safe_href`, the full stop or comma at the end of a sentence left out). "Section
+  3.2", "Chapter 4", "Theorem 2.1" and the same for Lemma, Proposition, Corollary, Definition and
+  Example join the references to figures, tables and equations: each links to the one heading
+  or paragraph that starts with that number, and to nothing when there are none or two. A
+  reference inside its own target is not linked. The model's requests are unchanged; the job
+  page's count of links in the PDF leaves typed links out. A text edit keeps a computed link on
+  the words that did not change, as it does for the others, and does not compute a new one.
+  `PIPELINE_VERSION` is not bumped here.
+
 ## Unreleased: the stale check compares the item (branch fix/stale-check-per-item)
 
 - SW47 (F-080, F-407, F-481), as far as its triage line: a review write is refused as stale only

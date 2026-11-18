@@ -467,21 +467,23 @@ class Link(_Span):
     - "uri": a PDF link to the web or an email address; `href` is http, https or mailto
       (enforced: anything else is a validation error, so it can never reach the output);
     - "internal": a PDF link to a place in this document; `target_id` is the element there;
-    - "crossref": text such as "Figure 2.3", "Equation (3)" or "Table 1"; `target_id` is
-      the figure, equation or table it names.
+    - "crossref": text such as "Figure 2.3", "Equation (3)", "Table 1", "Section 3.2" or
+      "Theorem 2.1"; `target_id` is the element it names;
+    - "typed": a web or email address typed in the text with no link in the file; `href` is
+      as for "uri" (it is not one of the file's links, so the card's link count leaves it out).
     """
 
-    kind: Literal["uri", "internal", "crossref"]
+    kind: Literal["uri", "internal", "crossref", "typed"]
     href: str | None = None
     target_id: str | None = None
 
     @model_validator(mode="after")
     def _target(self) -> Link:
-        if self.kind == "uri":
+        if self.kind in ("uri", "typed"):
             if self.href is None or not is_safe_href(self.href):
-                raise ValueError("a uri link needs an http, https or mailto href")
+                raise ValueError(f"a {self.kind} link needs an http, https or mailto href")
             if self.target_id is not None:
-                raise ValueError("a uri link has no target_id")
+                raise ValueError(f"a {self.kind} link has no target_id")
         else:
             if not self.target_id:
                 raise ValueError(f"an {self.kind} link needs a target_id")
