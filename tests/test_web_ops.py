@@ -53,7 +53,7 @@ def ops(monkeypatch):
             raise state["aggregate_raises"]
         return 4
 
-    def purge_expired(factory, now=None) -> PurgeStats:
+    def purge_expired(factory, now=None, **_) -> PurgeStats:
         calls.append("purge")
         return PurgeStats(jobs_deleted=3, blobs_deleted=9, unaggregated_deleted=0)
 
