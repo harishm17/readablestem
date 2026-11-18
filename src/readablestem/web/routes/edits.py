@@ -53,6 +53,7 @@ from readablestem.web.review import (
     cell_region,
     field_id,
     is_stale,
+    review_anchor,
 )
 from readablestem.web.review import accept_clean_tables as accept_clean_tables_rule
 from readablestem.web.routes.jobs import (
@@ -91,10 +92,13 @@ def write_structure(
     user: CurrentUser,
     version: str,
     make: Callable[[DocumentResult, Job, Session], StructureChange],
+    *,
+    decision: bool = True,
 ) -> tuple[StructureChange, DocumentResult, str]:
     """One structural edit as one transaction: `make` applies it to the stored result and
     returns what to record, with the id of the owned job row (what a redirect is built
-    from, never the request's). Raises ReviewStale, ReviewInvalid (nothing saved; both
+    from, never the request's). `decision`: it counts as a decision made (usage events);
+    reading an item again is not one. Raises ReviewStale, ReviewInvalid (nothing saved; both
     carry that id as `job_id`) or a PageError (404)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
@@ -134,17 +138,18 @@ def write_structure(
             write_mode="structure",
         )
         session.add(_review_edit(job.id, user, change, written))
-        events.add_decision(
-            session,
-            ctx.settings,
-            user_id=user.id,
-            job=job,
-            kind="structure",
-            changed=1,
-            # "Review completed" only when this edit closed the last decision: an edit to
-            # a document that asked for none is not a finished review.
-            open_after=_open_decisions(result) if open_before else 1,
-        )
+        if decision:
+            events.add_decision(
+                session,
+                ctx.settings,
+                user_id=user.id,
+                job=job,
+                kind="structure",
+                changed=1,
+                # "Review completed" only when this edit closed the last decision: an edit to
+                # a document that asked for none is not a finished review.
+                open_after=_open_decisions(result) if open_before else 1,
+            )
         owned_id = job.id
     return change, result, owned_id
 
@@ -541,6 +546,160 @@ def _read_new_equation(
     placed = sorted(probe.elements, key=lambda e: e.order)
     context = pipeline_run.context_texts(placed).get(element_id)
     return read_equation(request, job, user.id, element, png, context)
+
+
+# --------------------------------------------------------------------------- an equation's card
+
+EMPTY_READ = "The read returned nothing."
+GIVEN_BACK = " It did not count against today's reads."
+NO_CROP = "There is no picture of this equation to read again."
+NOT_WAITING = "This equation is not waiting for a decision."
+
+
+def _item_refusal(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    view: str,
+    element_id: str,
+    message: str,
+) -> Response:
+    from readablestem.web.routes.review import _invalid_page
+
+    exc = ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    return _invalid_page(request, job_id, user, view, element_id, exc)
+
+
+def _after_item(
+    owned_id: str, result: DocumentResult, element_id: str, view: str, flt: str
+) -> Response:
+    """Where the reviewer lands after a new reading on an item's card: the item, to check
+    what was read."""
+    from readablestem.web.routes.review import keep_filter, list_url
+    from readablestem.web.routes.split import review_url
+
+    if view == "list":
+        where = list_url(owned_id, review_anchor(result, element_id))
+        return keep_filter(RedirectResponse(where, status_code=303), flt)
+    where = review_url(owned_id, item=element_id, anchor="decision-title")
+    return RedirectResponse(where, status_code=303)
+
+
+def read_again(
+    request: Request,
+    job_id: str,
+    element_id: str,
+    user: CurrentUser,
+    version: str,
+    view: str,
+    flt: str,
+) -> Response:
+    """ "Read again" on an equation card: the equation step reads the item's own picture again
+    and the new reading replaces the proposal on the same item, still waiting for a decision
+    (`page_edits.read_again`). An empty answer changes nothing and is given back against the
+    day's count. Reached from the decision route (`routes.review.review_action`), so the
+    form's submit rule is that route's. One read at a time, the same spend controls as marking
+    an equation, and one call made with no lock held."""
+    from sqlalchemy import select
+
+    from readablestem.pipeline import run as pipeline_run
+    from readablestem.web.reread import ReadRefused, counts_reads, is_empty, read_equation
+
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        # One budget per document's owner, so sharing never raises how fast it can spend.
+        enforce(request, "reread", job.user_id)
+        require_done(job)
+        stale = is_stale(job.result_version, version)
+        result = DocumentResult.model_validate(job.result_json or {})
+        element_id = element_ref(result, element_id)
+        png = session.scalar(
+            select(Blob.content).where(
+                Blob.job_id == job.id, Blob.kind == "crop", Blob.element_id == element_id
+            )
+        )
+    fix = result.fix_for(element_id)
+    element = next((e for e in result.elements if e.id == element_id), None)
+    if fix is None or element is None or fix.kind is not Kind.EQUATION:
+        raise PageError(404, *NOT_FOUND)
+    if stale:
+        return _stale_page(request, job_id, user, view, element_id)
+    if not fix.pending:
+        return _item_refusal(request, job_id, user, view, element_id, NOT_WAITING)
+    if png is None:
+        return _item_refusal(request, job_id, user, view, element_id, NO_CROP)
+    reading = element.model_copy(deep=True)
+    placed = sorted(result.elements, key=lambda e: e.order)
+    context = pipeline_run.context_texts(placed).get(element_id)
+    try:
+        read = read_equation(request, job, user.id, reading, bytes(png), context, escalate=True)
+    except ReadRefused as exc:
+        return _item_refusal(request, job_id, user, view, element_id, exc.message)
+    if is_empty(read):
+        said = EMPTY_READ + (GIVEN_BACK if counts_reads(request, job.user_id) else "")
+        return _item_refusal(request, job_id, user, view, element_id, said)
+    try:
+        change, result, owned_id = write_structure(
+            request,
+            job_id,
+            user,
+            version,
+            lambda stored, job, session: page_edits.read_again(stored, reading, read),
+            decision=False,
+        )
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, element_id)
+    except LookupError:
+        raise PageError(404, *NOT_FOUND) from None
+    log_event(logger, "read_again", job_id=job_id, element_id=element_id)
+    flash(request, change.message, element_id=element_id)
+    return _after_item(owned_id, result, element_id, view, flt)
+
+
+def not_an_equation(
+    request: Request,
+    job_id: str,
+    element_id: str,
+    user: CurrentUser,
+    version: str,
+    view: str,
+    flt: str,
+) -> Response:
+    """ "Not an equation" on an equation card: its glyphs go back to the text
+    (`page_edits.not_an_equation`), recorded as a structural edit the reviewer can undo, and
+    the reviewer goes on to the next decision. No model is asked."""
+    from readablestem.web import queue
+    from readablestem.web.routes.review import _invalid_page
+
+    try:
+        decided: list[str | None] = []
+
+        def make(result: DocumentResult, job: Job, session: Session) -> StructureChange:
+            real = element_ref(result, element_id)
+            decisions = queue.decisions(result)
+            nxt = queue.next_open(decisions, queue.find(decisions, real))
+            decided[:] = [real, nxt.key if nxt is not None else None]
+            return page_edits.not_an_equation(result, real)
+
+        change, _, owned_id = write_structure(request, job_id, user, version, make)
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, element_id)
+    except ReviewInvalid as exc:
+        log_event(logger, "review_invalid", job_id=job_id, action="not_equation")
+        return _invalid_page(request, job_id, user, view, element_id, exc)
+    except LookupError:
+        raise PageError(404, *NOT_FOUND) from None
+    from readablestem.web.routes.review import keep_filter, list_url
+    from readablestem.web.routes.split import review_url
+
+    real, after = decided
+    log_event(logger, "not_equation", job_id=job_id, element_id=real)
+    flash(request, change.message, element_id=after)
+    if view == "list":
+        anchor = f"item-{after}" if after else "review-progress"
+        return keep_filter(RedirectResponse(list_url(owned_id, anchor), status_code=303), flt)
+    return RedirectResponse(review_url(owned_id, item=after), status_code=303)
 
 
 # --------------------------------------------------------------------------- tables (T3-11)

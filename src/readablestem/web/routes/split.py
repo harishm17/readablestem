@@ -45,6 +45,7 @@ from sqlalchemy import select
 
 from readablestem.core import triage, uid
 from readablestem.core.types import DocumentResult, Element, Fix, Kind, Status
+from readablestem.pipeline import table_math
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
     bulk_accept,
@@ -562,6 +563,10 @@ class SplitBuilder:
         self.page_count = _page_count(self.view, self.result)
         self.omitted = set(self.result.omitted_pages)
         self.items: dict[str, ReviewItem] = {}
+        # A source's items are not read again from a picture (`review._own_equation`).
+        self.tied = (
+            table_math.tied_ids(self.result.elements) if self.result.origin == "pdf" else None
+        )
         self.first_fix: dict[str, Fix] = {}
         for fix in self.result.fixes:
             self.first_fix.setdefault(fix.element_id, fix)
@@ -584,6 +589,7 @@ class SplitBuilder:
                 self.crop_ids,
                 self.places.get(fix.element_id),
                 self.labels.get(fix.element_id),
+                tied=self.tied,
             )
         return self.items[fix.element_id]
 

@@ -752,3 +752,141 @@ def add_equation(
         crops={element_id: png},
         shows=element_id,
     )
+
+
+# --------------------------------------------------------------------------- an equation's card
+
+NOT_AN_EQUATION_NO_TEXT = (
+    "The PDF has no text for this, so there is nothing to give back to the text. Keep it as "
+    "a picture with your description, or type the LaTeX."
+)
+NOT_AN_EQUATION_IN_TABLE = (
+    "This equation is a cell of a table. Change the cell in the table, or keep the table "
+    "as an image."
+)
+NOT_AN_EQUATION_WHERE = "The text this belongs to is not there any more."
+
+
+def read_again(result: DocumentResult, element: Element, read: Fix) -> StructureChange:
+    """Replace the proposal of an equation that waits with `read`, a new reading of the same
+    picture (`web.reread`, made with no lock held), on the same item. The item keeps its id,
+    its place and its crop; whatever the step made, the reviewer decides it (as for an
+    equation added by hand: the tool read it a second time because a person asked, so
+    its answer is checked), and Undo puts the earlier reading back, as a whole.
+    `element` is the element as the read left it (a number printed beside the formula, read
+    out of its LaTeX, is kept). Raises LookupError for an item that is not a waiting equation."""
+    fix = result.fix_for(element.id)
+    if fix is None or fix.kind is not Kind.EQUATION or not fix.pending:
+        raise LookupError(element.id)
+    before = capture(result, elements=[element.id], fixes=[element.id], page=element.page)
+    asked = read.model_copy(update={"element_id": element.id})
+    if asked.status not in PENDING_STATUSES:
+        asked.status = Status.NEEDS_REVIEW
+    asked.review = "required"
+    asked.reviewed = False
+    asked.group_key = fix.group_key
+    result.fixes[next(n for n, f in enumerate(result.fixes) if f is fix)] = asked
+    for index, current in enumerate(result.elements):
+        if current.id == element.id and element.equation_label != current.equation_label:
+            result.elements[index] = current.model_copy(
+                update={"equation_label": element.equation_label}
+            )
+    _recount(result)
+    return StructureChange(
+        element_id=element.id,
+        action="read_again",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=[element.id], fixes=[element.id])},
+        message="The tool read it again. Check what it read.",
+        shows=element.id,
+        page=element.page,
+    )
+
+
+# What an element keeps when it stops being an equation: where it is, how it is drawn and its
+# words. Everything the equation step and the equation checks put on it goes.
+_EQUATION_ONLY = {
+    "score": None,
+    "reasons": [],
+    "display": None,
+    "parent_id": None,
+    "equation_label": None,
+    "regular_letters": None,
+    "glyphs": None,
+    "page_latex": None,
+    "page_status": None,
+    "witness_latex": None,
+    "witness_status": None,
+    "alternatives": None,
+}
+
+
+def not_an_equation(result: DocumentResult, element_id: str) -> StructureChange:
+    """ "Not an equation": the glyphs the PDF has under the box go back to the text as words. A
+    display equation becomes a paragraph where it stands (its printed number, if it has one, is
+    written after it); one inside a line is put back into the paragraph it was cut from, in
+    the place of its mark. The equation's fix goes (nobody has to decide it), the item keeps its
+    id and its crop, and Undo puts back the element, the paragraph and the fix as they were.
+    Refused, with nothing changed, for an item that does not wait, one with no text from the
+    PDF, a table's cell or text that is not there any more. Raises ReviewInvalid and
+    LookupError."""
+    element = text_element(result, element_id)
+    fix = result.fix_for(element_id)
+    fid = field_id("actions", element_id)
+    if fix is None or fix.kind is not Kind.EQUATION or not fix.pending:
+        raise LookupError(element_id)
+    glyphs = clean_text(element.text or "", preformatted=False)
+    if not glyphs:
+        raise ReviewInvalid([FieldError(fid, NOT_AN_EQUATION_NO_TEXT)])
+    from readablestem.pipeline import table_math
+
+    if table_math.tie_of(result.elements, element_id) is not None:
+        raise ReviewInvalid([FieldError(fid, NOT_AN_EQUATION_IN_TABLE)])
+    parent = (
+        next((e for e in result.elements if e.id == element.parent_id), None)
+        if element.display == "inline"
+        else None
+    )
+    inline = element.display == "inline"
+    marker = inline_marker(element_id)
+    if inline and (
+        parent is None
+        or parent.kind not in {Kind.PARAGRAPH, Kind.LIST_ITEM}
+        or (parent.text or "").count(marker) != 1
+    ):
+        raise ReviewInvalid([FieldError(fid, NOT_AN_EQUATION_WHERE)])
+    touched = [element_id, parent.id] if parent is not None else [element_id]
+    before = capture(
+        result,
+        elements=touched,
+        fixes=[element_id],
+        orders=inline,
+        pages=True,
+        page=element.page,
+    )
+    if inline and parent is not None:
+        old = parent.text or ""
+        new = old.replace(marker, glyphs)
+        update, _ = remap_spans(old, new, parent)
+        for index, current in enumerate(result.elements):
+            if current.id == parent.id:
+                result.elements[index] = current.model_copy(update={"text": new, **update})
+        result.elements = [e for e in result.elements if e.id != element_id]
+    else:
+        words = f"{glyphs} {clean_text(element.equation_label or '', preformatted=False)}".strip()
+        for index, current in enumerate(result.elements):
+            if current.id == element_id:
+                result.elements[index] = current.model_copy(
+                    update={"kind": Kind.PARAGRAPH, "text": words, **_EQUATION_ONLY}
+                )
+    result.fixes = [f for f in result.fixes if f.element_id != element_id]
+    result.notices = [n for n in result.notices if n.element_id != element_id]
+    _recount(result)
+    return StructureChange(
+        element_id=element_id,
+        action="not_equation",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=touched, fixes=[element_id])},
+        message="It is now text, as the PDF has it.",
+        page=element.page,
+    )

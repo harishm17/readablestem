@@ -204,6 +204,26 @@
   table grids that 3.1 keeps, and a later element number differs by one).
 - Hostile-input cases for the Word gate in `tests/workflows` (inflating part, member leaving the
   package, macro part, linked picture, external entity, deep nesting, embedded object).
+## Unreleased: Read again and Not an equation on a card with no proposal (branch feat/read-again-and-card-choices)
+
+- WS8.5 stage 1 (F-061): a waiting equation's card has "Read again": the item's own picture is
+  read once more (`reread.read_equation` on the existing decision route, `action=reread`) and the
+  result replaces the proposal on the same item. It is one structural write, so Undo puts the
+  whole fix back. A read that comes back empty escalates once by itself to the main model when
+  the first read was not by it (`equation_step.transcribe(first_model=...)`), and a read that
+  still reads nothing says so and costs nothing: the day's read count is given back
+  (`quota.give_back_reread`), also for a refused read and for the same case in a region marked on
+  the page and a table cell (siblings; the limit sentence in `reread.py` and the docs said "not
+  given back"). The adjustable region and the line strip are not in this change.
+- WS4.5 (F-061): an abstained equation's card offers three choices on the same route: Read
+  again, Keep as a picture with my description (the existing description box, open, checked by
+  the alt-text advice) and Not an equation (`action=not_equation`: the glyphs go back to the
+  paragraph; recorded as `removed`; carried onto a revised file for the same picture and words).
+  The LaTeX box is closed until typing is the way forward and Save edit waits until something is
+  typed (script only; without it the button works as before).
+- No change to the stored result shape, a model request or a prompt. `PIPELINE_VERSION` and
+  `RENDER_VERSION` are not bumped: nothing here changes what a conversion or a render writes, and
+  no migration was added.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

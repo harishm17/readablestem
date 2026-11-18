@@ -18,8 +18,9 @@ Spending is controlled exactly as in the worker, because the money is the same m
 - a read for an open-tier account (`web.access`) also draws on the open spend pool
   (`web.spend`) and counts against their daily allowance of reads
   (`OPEN_TIER_DAILY_REREADS`, `web.quota.try_consume_reread`). The count is made before
-  the call and not given back, like the page quota: it limits what is asked for. Invited
-  accounts have neither.
+  the call, so two clicks cannot start more than the allowance, and given back when nothing
+  was read (`give_back`): a read that returned no equation, a cap that stopped it, a model
+  that was not there. Invited accounts have neither.
 
 The call is made with no database transaction open and no row locked (it takes seconds);
 the route locks the job afterwards, to check that nothing changed meanwhile, and applies
@@ -43,7 +44,7 @@ from readablestem.web.database import rowcount, utc_today
 from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.deps import get_ctx
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.quota import allowance_phrase, try_consume_reread
+from readablestem.web.quota import allowance_phrase, give_back_reread, try_consume_reread
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +183,9 @@ def reread_allowance_message(allowance: int) -> str:
     used_up = allowance_phrase(allowance, allowance, "read", "at midnight UTC")
     return (
         f"Model reads from the review screen: {used_up} "
-        "That is the most a new account can start, and a read counts when it starts, whether "
-        "or not it worked. So this could not be read. Type it yourself, or try again then."
+        "That is the most a new account can start. A read counts when it starts and is given "
+        "back when nothing was read. So this could not be read. Type it yourself, or try "
+        "again then."
     )
 
 
@@ -207,18 +209,44 @@ def read_budget(request: Request, job: Job) -> ReadBudget:
     )
 
 
-def _count_against_allowance(request: Request, user_id: str) -> None:
+def _count_against_allowance(request: Request, user_id: str) -> bool:
     """One more read started today for an open-tier account; `ReadRefused` when they have
-    used the day's allowance. Nothing for an invited account."""
+    used the day's allowance. True when a read was counted, False for an invited account
+    (nothing counted)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         allowance = access.reread_allowance(ctx.settings, access.tier_of(session, user_id))
         if allowance is None:
-            return
+            return False
         counted = try_consume_reread(session, user_id, allowance=allowance, day=utc_today())
     if not counted:
         log_event(logger, "reread_refused", scope="allowance")
         raise ReadRefused(reread_allowance_message(allowance))
+    return True
+
+
+def counts_reads(request: Request, user_id: str) -> bool:
+    """Does a read for this person's document count against a daily allowance (an open-tier
+    account's), so that the card may say an empty one was given back?"""
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        return access.reread_allowance(ctx.settings, access.tier_of(session, user_id)) is not None
+
+
+def give_back(request: Request, user_id: str) -> None:
+    """Take the read counted for this start off today's count (`quota.give_back_reread`).
+    A failure here leaves it counted: it errs on the side of fewer reads."""
+    ctx = get_ctx(request)
+    try:
+        with session_scope(ctx.factory) as session:
+            give_back_reread(session, user_id, day=utc_today())
+    except Exception as exc:
+        log_exception(logger, "reread_give_back_failed", exc)
+
+
+def is_empty(fix: Fix) -> bool:
+    """A read that proposes no equation (the model said it is none, or could not be read)."""
+    return fix.equation is None or not fix.equation.latex.strip()
 
 
 def read_equation(
@@ -228,21 +256,31 @@ def read_equation(
     element: Element,
     png: bytes,
     context_text: str | None = None,
+    *,
+    escalate: bool = False,
 ) -> Fix:
     """Read the crop `png` of `element` (an equation) with the equation step. Returns its
     fix (possibly FAILED or ABSTAINED: the reviewer decides). The read counts against the job's
     owner (the day's allowance, spend pool and caps), whoever asked; `user_id` is who is
-    waiting for it, so one person has one read going at a time. Raises ReadRefused when a cap
-    or the model's availability stopped it. The caller holds no database lock."""
+    waiting for it, so one person has one read going at a time. A read that returns no
+    equation, or is stopped by a cap or the model's availability, is given back against the
+    day's allowance. Raises ReadRefused when a cap or the model's availability stopped it.
+    The caller holds no database lock.
+
+    `escalate`: a read that came back empty from a cheaper model than the main one is asked
+    once more of the main model (a re-read from the review card). It is the same step with
+    the request the main model gets in the pipeline, drawn from the same caps and the same
+    count, and the person sees the answer of the last one only."""
     from readablestem.pipeline import equation_step
 
     ctx = get_ctx(request)
     job_id = job.id
     GATE.enter(user_id)
+    counted = False
+    kept = False
     try:
-        _count_against_allowance(
-            request, job.user_id
-        )  # the owner's allowance, not the reviewer's (G1)
+        # The owner's allowance, not the reviewer's (G1).
+        counted = _count_against_allowance(request, job.user_id)
         budget = read_budget(request, job)
         client = ctx.client_factory(ctx.settings, budget)
         try:
@@ -250,6 +288,17 @@ def read_equation(
                 fix = equation_step.transcribe(
                     element, png, client=client, settings=ctx.settings, context_text=context_text
                 )
+                if escalate and is_empty(fix) and _asked_cheaper(fix, ctx.settings.main_model):
+                    first = fix
+                    fix = equation_step.transcribe(
+                        element,
+                        png,
+                        client=client,
+                        settings=ctx.settings,
+                        context_text=context_text,
+                        first_model=ctx.settings.main_model,
+                    )
+                    fix = fix.model_copy(update={"calls": [*first.calls, *fix.calls]})
         except BudgetExceeded as exc:
             log_event(logger, "reread_refused", job_id=job_id, scope=exc.scope)
             if getattr(exc, "pool", None) == access.POOL_OPEN:
@@ -260,7 +309,15 @@ def read_equation(
         except Exception as exc:  # a model or configuration problem: never an error page
             log_exception(logger, "reread_failed", exc, job_id=job_id)
             raise ReadRefused(FAILED) from None
+        kept = not is_empty(fix)
     finally:
+        if counted and not kept:
+            give_back(request, job.user_id)
         GATE.leave(user_id)
     log_event(logger, "reread", job_id=job_id, status=fix.status.value, cost=round(fix.cost_usd, 4))
     return fix
+
+
+def _asked_cheaper(fix: Fix, main_model: str) -> bool:
+    """The read was made, and not by the main model: there is a stronger one to ask."""
+    return bool(fix.calls) and all(c.model != main_model for c in fix.calls)

@@ -6,6 +6,7 @@
    `alt_guideline`. Every control is a form field or a button, so it all works without
    JavaScript. #}
 {% from "_hear.html" import hear_button %}
+{% from "components/forms.html" import submit_button with context %}
 
 {# Every decision form (the `form` macro writes the CSRF and request tokens): the view to
    come back to, and the review version the page was drawn at (a form from an out-of-date tab is refused, not applied). `flt` is the
@@ -57,6 +58,26 @@
   <div class="live-check" id="live-check-{{ eid }}"></div>
   {% endif %}
 </div>
+{% endmacro %}
+
+{# The two choices of an equation that waits and has its own picture and text (WS8.5, WS4.5):
+   read the picture again, or give its glyphs back to the text. Each posts the decision form
+   as its own action (`form_id`: the form they belong to when they sit outside it); the line
+   under them (`own_notes`) says what each does. #}
+{% macro own_choices(item, form_id="") %}
+{% set eid = item.element_id %}
+{% if item.can_read_again %}
+{{ submit_button("Read again", "reading", "action", "reread", "button-secondary", {"form": form_id or none, "data-role": "reread", "aria-describedby": "reread-note-" ~ eid}) }}
+{% endif %}
+{% if item.can_not_equation %}
+{{ submit_button("Not an equation", "saving", "action", "not_equation", "button-secondary", {"form": form_id or none, "data-role": "not-equation", "data-tone": "quiet", "aria-describedby": "not-equation-note-" ~ eid}) }}
+{% endif %}
+{% endmacro %}
+
+{% macro own_notes(item) %}
+{% set eid = item.element_id %}
+{% if item.can_read_again %}<p class="hint decide-note" id="reread-note-{{ eid }}">Read again reads the picture once more and replaces the proposal.</p>{% endif %}
+{% if item.can_not_equation %}<p class="hint decide-note" id="not-equation-note-{{ eid }}">Not an equation gives it back to the page as text, as the PDF has it.</p>{% endif %}
 {% endmacro %}
 
 {# Keep the original of an equation (or any kind that only has the plain fallback): its own

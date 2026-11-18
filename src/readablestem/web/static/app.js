@@ -535,7 +535,17 @@
     document.querySelectorAll(".decide-form").forEach(function (form) {
       // The choices that sit above the form (`data-decide-form` names it) follow it.
       var bars = form.id ? document.querySelectorAll('[data-decide-form="' + form.id + '"]') : [];
+      // A card with no proposal: Save edit waits for something typed (data-needs-edit).
+      var needs = form.querySelectorAll("[data-needs-edit]");
+      needs.forEach(function (button) { button.disabled = true; });
+      function typed() {
+        return Array.prototype.some.call(
+          form.querySelectorAll("textarea[data-edit-field]"),
+          function (field) { return field.value.trim() !== ""; }
+        );
+      }
       function edited() {
+        needs.forEach(function (button) { button.disabled = !typed(); });
         form.classList.add("is-edited");
         bars.forEach(function (bar) { bar.classList.add("is-edited"); });
       }

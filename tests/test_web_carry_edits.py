@@ -206,3 +206,19 @@ def test_edits_by_hand_survive_trying_a_document_again(web):
     assert described.described == "v equals d over t"
     # A try-again keeps its own review edits and adds none (carried rows are for revisions).
     assert carried_rows(web, web.first) == {}
+
+
+def test_not_an_equation_comes_back_on_a_revised_pdf_for_the_same_picture(web):
+    """The equation given back to its paragraph stays text in a revised file: found by the
+    same picture and the same words under it."""
+    inline = "p1-e2"
+    assert stored(web, web.first).fix_for(inline) is not None
+    decide(web, web.first, inline, action="not_equation")
+    assert stored(web, web.first).fix_for(inline) is None
+
+    second = revise(web, web.first, pdf_with(lambda doc: None))
+    result = stored(web, second)
+    assert result.fix_for(inline) is None and element(result, inline) is None
+    assert "𝛚" in (element(result, "p1-e1").text or "")
+    report = carry.CarryReport.from_json(env_job(web, second).carried_json)
+    assert report.edits == [inline] and report.edits_dropped == 0
