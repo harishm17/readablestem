@@ -668,9 +668,16 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "has_proposal": proposal is not None,
         "exact_strict": score.exact_strict,
         "exact_lenient": score.exact_lenient,
-        # Beside it for one release: the canonical-form score (eval.equations_printed).
-        "exact_printed": exact_printed(
-            proposal.latex if proposal is not None else None, record.get("latex")
+        # Beside it for one release: the canonical-form score (eval.equations_printed). Only for
+        # gold that has LaTeX (the real-world sets do; the OpenStax sample is MathML only).
+        **(
+            {
+                "exact_printed": exact_printed(
+                    proposal.latex if proposal is not None else None, record["latex"]
+                )
+            }
+            if record.get("latex")
+            else {}
         ),
         "teds": score.teds,
         # The labelled secondary scorer (eval.equations_v2); `wrong` below stays primary.
@@ -735,7 +742,7 @@ def _group_rates(items: Sequence[dict], key: str, order: Sequence[str] | None = 
             "n": len(groups[name]),
             "share": len(groups[name]) / n if n else None,
             "exact_lenient": rate(i["exact_lenient"] for i in groups[name]),
-            "exact_printed": rate(i["exact_printed"] for i in groups[name] if "exact_printed" in i),
+            **_printed_rate("exact_printed", groups[name]),
             "mean_teds": mean(i["teds"] for i in groups[name]),
         }
         for name in names

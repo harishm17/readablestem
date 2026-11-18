@@ -144,7 +144,7 @@ _TAKES_ARGUMENT = frozenset(
         "textcolor",
     )
 )
-_TAKES_TWO = frozenset(("frac", "dfrac", "tfrac", "binom", "overset", "underset"))
+_TAKES_TWO = frozenset(("frac", "dfrac", "tfrac", "binom", "overset", "underset", "sqrtroot"))
 
 
 def _group_open(s: str, close: int) -> int:
@@ -207,6 +207,61 @@ def _drop_free_groups(s: str) -> str:
     return "".join(char for i, char in enumerate(s) if i not in drop)
 
 
+def _group_end(s: str, start: int) -> int:
+    """The index after the `}` that closes the `{` at `start`; -1 when it never closes."""
+    depth = 0
+    for i in range(start, len(s)):
+        if s[i] == "\\":
+            continue
+        if s[i] == "{" and s[i - 1] != "\\":
+            depth += 1
+        elif s[i] == "}" and s[i - 1] != "\\":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return -1
+
+
+def _brace_arguments(s: str) -> str:
+    """Every argument of `\\frac` and `\\sqrt` in braces: `\\frac{a}2`, `\\frac12` and
+    `\\frac a{b}` are `\\frac{a}{2}`, `\\frac{1}{2}` and `\\frac{a}{b}`. The arguments are kept
+    (not folded into the command), so `\\frac{a}{b}c` stays apart from `\\frac{a}{bc}`."""
+    out: list[str] = []
+    i = 0
+    while True:
+        match = re.compile(r"\\(frac|sqrt)(?![A-Za-z])").search(s, i)
+        if match is None:
+            out.append(s[i:])
+            return "".join(out)
+        out.append(s[i : match.start()])
+        command = match.group()
+        i = match.end()
+        if match.group(1) == "sqrt" and s[i : i + 1] == "[":
+            # A root's order is a first argument: `\\sqrt[3]{a}b` is not `\\sqrt[3]{ab}`.
+            close = s.find("]", i)
+            if close >= 0:
+                command = "\\sqrtroot{" + s[i + 1 : close] + "}"
+                i = close + 1
+        out.append(command)
+        for _ in range(2 if match.group(1) == "frac" else 1):
+            while i < len(s) and s[i].isspace():
+                i += 1
+            if s[i : i + 1] == "{":
+                end = _group_end(s, i)
+                if end < 0:
+                    break
+                out.append("{" + _brace_arguments(s[i + 1 : end - 1]) + "}")
+                i = end
+            elif s[i : i + 1].isalnum():
+                out.append("{" + s[i] + "}")
+                i += 1
+            elif command := re.compile(r"\\[A-Za-z]+").match(s, i):
+                out.append("{" + command.group() + "}")
+                i = command.end()
+            else:
+                break
+
+
 def canon(latex: str, keep_styles: bool = True) -> str:
     """One spelling for every notation that prints alike. `keep_styles=False` also drops the
     letter-style commands (`\\mathbf`, `\\mathcal`, ...), for the second test of `exact_printed`."""
@@ -267,10 +322,8 @@ def canon(latex: str, keep_styles: bool = True) -> str:
     # A ket and a bra are bars and an angle bracket.
     s = re.sub(r"\\ket\{([^{}]*)\}", r"|\1\\rangle", s)
     s = re.sub(r"\\bra\{([^{}]*)\}", r"\\langle\1|", s)
+    s = _brace_arguments(s)
     s = re.sub(r"\s+", "", s)
-    # `\frac{a}2` and `\frac12` are `\frac{a}{2}` and `\frac1{2}`.
-    s = re.sub(r"(\\frac\{(?:[^{}]|\{[^{}]*\})*\})([A-Za-z0-9])", r"\1{\2}", s)
-    s = re.sub(r"\\frac([A-Za-z0-9])([A-Za-z0-9])", r"\\frac\1{\2}", s)
     s = s.replace("{}", "")  # an empty group prints nothing: `{}_d`, `\operatorname{E}{}[`
     # Upright round a styled letter is that style: `\operatorname{\mathbb E}` is `\mathbb{E}`.
     s = re.sub(r"\\mathrm\{(\\math(?:bb|bf|cal|frak)\{[^{}]*\})\}", r"\1", s)
@@ -282,7 +335,6 @@ def canon(latex: str, keep_styles: bool = True) -> str:
         t = re.sub(r"([_^])\{([A-Za-z0-9'*+\-])\}", r"\1\2", t)
         t = re.sub(r"(?<![A-Za-z0-9}_^\\])\{([A-Za-z0-9]+)\}", r"\1", t)
         t = re.sub(r"\{\{([^{}]*)\}\}", r"{\1}", t)
-        t = re.sub(r"(\\frac|\\sqrt)\{([A-Za-z0-9])\}", r"\1\2", t)
         # A group that nothing refers to is a grouping that prints nothing: `m-{m_L}`, `{x(i)}`.
         t = _drop_free_groups(t)
         t = re.sub(r"\\(mathrm|mathbf|mathcal|mathbb)\{([^{}]*)\}(,?)\\\1\{", r"\\\1{\2\3", t)
