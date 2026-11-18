@@ -12,6 +12,7 @@ import pymupdf
 import pytest
 
 from readablestem.pipeline import layout, table_model, tables
+from readablestem.pipeline.layout import tables as table_claims
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -32,11 +33,11 @@ def no_model(tmp_path, monkeypatch):
     yield
     tables.reset_models()
     layout.release()
-    layout.TABLE_PREFILTER = True
+    table_claims.TABLE_PREFILTER = True
 
 
 def read(pdf: Path, *, prefilter: bool) -> str:
-    layout.TABLE_PREFILTER = prefilter
+    table_claims.TABLE_PREFILTER = prefilter
     try:
         result = layout.analyze(pdf.read_bytes(), max_pages=40)
     except layout.LayoutError as exc:
@@ -78,7 +79,7 @@ def decisions(build) -> list[bool]:
         return []
 
     tables.find = record  # ty: ignore[invalid-assignment]
-    layout.TABLE_PREFILTER = False  # the gate is asked for, whatever it says
+    table_claims.TABLE_PREFILTER = False  # the gate is asked for, whatever it says
     try:
         layout.analyze(data)
     finally:

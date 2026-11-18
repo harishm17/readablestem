@@ -22,6 +22,8 @@ from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import layout, page_type
+from readablestem.pipeline.layout import document, elements, furniture, lists
+from readablestem.pipeline.layout import page as page_steps
 from readablestem.pipeline.run import convert_pdf
 
 SENTENCE = "Ordinary running text of the paragraph that sits above the equation."
@@ -90,17 +92,17 @@ def _on_third_look():
 # it is made to raise on. The label keys step skips a page whose header the first page already
 # ruled out, so it is the first page it fails on.
 STAGES = {
-    "read": (layout, "_read_page", _on_page, 1),
-    "slide_deck": (layout, "_slide_marks", _on_page, 1),
-    "margins": (layout, "_band_figures", _on_page, 1),
+    "read": (document, "_read_page", _on_page, 1),
+    "slide_deck": (document, "_slide_marks", _on_page, 1),
+    "margins": (furniture, "_band_figures", _on_page, 1),
     "page_kind": (page_type, "kept_reason", "third_look", 1),
-    "tables": (layout, "_claim_tables", _on_page, 1),
-    "rows": (layout, "_prepare_rows", _on_page, 1),
-    "list_markers": (layout, "_marker_candidate", _on_row, 1),
-    "label_keys": (layout, "_rough_figures", _on_page, 0),
-    "blocks": (layout, "_page_blocks", _on_page, 1),
-    "elements": (layout, "_whole_pieces", _on_block, 1),
-    "safety_net": (layout, "_page_picture", _on_page, 1),
+    "tables": (document, "_claim_tables", _on_page, 1),
+    "rows": (document, "_prepare_rows", _on_page, 1),
+    "list_markers": (lists, "_marker_candidate", _on_row, 1),
+    "label_keys": (page_steps, "_rough_figures", _on_page, 0),
+    "blocks": (document, "_page_blocks", _on_page, 1),
+    "elements": (elements, "_whole_pieces", _on_block, 1),
+    "safety_net": (document, "_page_picture", _on_page, 1),
 }
 
 
