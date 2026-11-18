@@ -184,6 +184,10 @@ class Reading:
     error_nodes: int = 0
     marks: list[SourceMark] = field(default_factory=list)
     figures: list[SourceFigure] = field(default_factory=list)
+    # Element id -> the number LaTeX printed before its heading or caption ("1.2 ", "Figure 3: "),
+    # which the element's own text leaves out: what a reference "Section 1.2" names
+    # (`text_pass.source_links`).
+    printed: dict[str, str] = field(default_factory=dict)
     # Figures (and tables, headings) that show a formula LaTeX could not read as its TeX: their
     # fix is a required decision (`needs_decision`, also applied to a figure step's fix).
     unread_formulas: set[str] = field(default_factory=set)
@@ -462,6 +466,8 @@ class _Reader:
         if not text:
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
+        if number := _printed_tag(node):
+            self.out.printed[element.id] = number
         self._heading_fix(element, level, text)
         self.chars += len(text)
         if titled and self.out.title is None:
@@ -882,6 +888,8 @@ class _Reader:
             if id(picture) not in inside:
                 holders.append(self._picture_element(picture, None if holders else caption))
         previous = self.out.elements[-1] if self.out.elements else None
+        if holders and captions and (number := _printed_tag(captions[-1])):
+            self.out.printed[holders[0].id] = number  # the caption went to the first
         if (
             not holders
             and not nested
@@ -1166,6 +1174,15 @@ def _lines(node: Node, drop: frozenset[str] = frozenset()) -> list[str]:
 
     visit(node)
     return [line for line in (_squash(x) for x in lines) if line]
+
+
+def _printed_tag(node: Node) -> str:
+    """The number LaTeX printed in front of a heading or caption ("1.2 ", "Figure 3: "), with
+    one space after it, "" when there is none."""
+    for child in _children(node):
+        if "ltx_tag" in _classes(child):
+            return _squash(_itertext(child)).rstrip(":.") + " "
+    return ""
 
 
 def _text_without_tag(node: Node, *, maths: bool = True) -> str:
