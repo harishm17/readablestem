@@ -53,8 +53,10 @@
   and never when a picture on it is over the pixel budget; the box is judged with one pixel of
   margin (a hairline minus sign is thinner than a pixel), and a space paints nothing and is not
   counted. The notice's tier is unchanged: this branch has no tier between "optional" and
-  "required". A page whose hidden text is longer than its visible text is a scan under a text
-  layer (`hidden_ratio`), so the hostile file `injection-white.pdf` now ends as `scanned_ocr`.
+  "required". Text that is painted and cannot be seen is counted apart from text in render mode 3
+  (`TextStats.unseen_chars`): it is not the mark of an OCR layer, so a typed page whose white
+  text is longer than its visible text stays a typed page (F-573), and the hostile file
+  `injection-white.pdf` converts with the white text left out and never sent.
 - WS14.3: a page saved sideways with no /Rotate is turned before it is read
   (`page_type.turn_page`): when 80 % or more of its 60 or more visible characters run up the
   page it is turned 90 degrees, down the page 270, so its rows are horizontal and its headings,

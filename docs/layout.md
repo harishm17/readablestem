@@ -1553,7 +1553,10 @@ the pass cannot read stays a kept image exactly as described here.
   text on the bare page is seen), and never on a page with a picture over the pixel budget.
   The earlier test that compared fill colors gave false positives and is not used. Their
   characters are counted with the other hidden ones (`hidden_text_ignored`) and leave
-  `Element.text`, Listen, Word, EPUB and the other outputs at the row. The glyph reads for
+  `Element.text`, Listen, Word, EPUB and the other outputs at the row. They, and the spans
+  under 2 pt, are painted text and not the mark of an OCR layer, so they do not count toward
+  calling the page a scan under a text layer: a typed page with a long white sentence stays
+  a typed page. The glyph reads for
   an equation's line (`line_glyphs`) and the text pass (`page_glyphs`) do not look at the
   render: they skip only the spans of the first three kinds above, as they skip covered
   ones.

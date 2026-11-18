@@ -11182,7 +11182,7 @@ def _hidden_text_notices(
     them, the instructor adds them)."""
     notices = []
     for number, kind in sorted(types.items()):
-        hidden = kind.text.untrusted
+        hidden = kind.text.left_out
         if hidden < page_type.HIDDEN_FEW:
             continue
         if number in kept:

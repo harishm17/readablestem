@@ -302,10 +302,15 @@ def span_hidden(span: dict[str, Any]) -> bool:
     """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), a size under
     TINY_PT points, or an alpha of 5 % or less, unless it is text used as a clip (C1.4).
     Text in the colour of what is behind it needs the rendered page (`_flat_spans`)."""
+    return _unpainted(span) or float(span.get("size", TINY_PT)) < TINY_PT
+
+
+def _unpainted(span: dict[str, Any]) -> bool:
+    """Render mode 3 or an alpha near 0: how an OCR program or a tablet writes its guess at
+    a page's words. Text that is painted and cannot be seen (tiny, or in the colour of what
+    is behind it) is hidden too, and says nothing about the page being a scan."""
     flags = int(span.get("char_flags", CHAR_FILLED))
     if not flags & (CHAR_FILLED | CHAR_STROKED):
-        return True
-    if float(span.get("size", TINY_PT)) < TINY_PT:
         return True
     return int(span.get("alpha", 255)) <= INVISIBLE_ALPHA and not flags & CHAR_CLIPPED
 
@@ -376,6 +381,10 @@ class TextStats:
     visible_chars: int = 0
     invisible_chars: int = 0  # render mode 3 or alpha ~0
     covered_chars: int = 0  # painted, then covered by an image or a fill painted later
+    # Painted where nobody can see it: under TINY_PT, or flat on the rendered page. Left out
+    # and counted in the notice like the two above, and not evidence of an OCR layer: a typed
+    # page with a long white sentence is still a typed page (`untrusted` leaves it out).
+    unseen_chars: int = 0
     ocr_font_chars: int = 0  # GlyphLessFont (Tesseract), Apple ".SF..." (iOS)
     clipped_chars: int = 0  # text used as a clip: kept, recorded only
     # Origins (`origin_key`) of the characters layout must leave out although their span
@@ -395,6 +404,11 @@ class TextStats:
     @property
     def untrusted(self) -> int:
         return self.invisible_chars + self.covered_chars
+
+    @property
+    def left_out(self) -> int:
+        """Every character of the page's text layer that the reader leaves out."""
+        return self.untrusted + self.unseen_chars
 
 
 @dataclass
@@ -662,7 +676,10 @@ def text_stats(
                 if flags & CHAR_CLIPPED:
                     stats.clipped_chars += n
                 if span_hidden(span):
-                    stats.invisible_chars += n
+                    if _unpainted(span):
+                        stats.invisible_chars += n
+                    else:
+                        stats.unseen_chars += n
                     continue
                 stats.visible_chars += n
                 b = span["bbox"]
@@ -708,17 +725,23 @@ def text_stats(
     if maybe_flat:
         for (_, origins, _), gone in zip(maybe_flat, _flat_spans(page, maybe_flat), strict=True):
             if gone:
-                _hide(stats, origins)
+                _hide(stats, origins, seen_by_nobody=True)
     return stats
 
 
-def _hide(stats: TextStats, origins: Iterable[tuple[int, int]]) -> None:
-    """Characters nobody sees although their span looks visible: counted as invisible, and
-    their origins are what layout leaves out (`TextStats.covered`)."""
+def _hide(
+    stats: TextStats, origins: Iterable[tuple[int, int]], *, seen_by_nobody: bool = False
+) -> None:
+    """Characters nobody sees although their span looks visible: their origins are what
+    layout leaves out (`TextStats.covered`). A clip nothing was painted through is counted
+    as invisible; text that is flat on the render (`seen_by_nobody`) as unseen."""
     new = {o for o in origins if o not in stats.covered}
     stats.covered |= new
     n = min(len(new), stats.visible_chars)
-    stats.invisible_chars += n
+    if seen_by_nobody:
+        stats.unseen_chars += n
+    else:
+        stats.invisible_chars += n
     stats.visible_chars -= n
 
 
