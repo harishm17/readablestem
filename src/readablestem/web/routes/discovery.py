@@ -3,6 +3,7 @@ key, the favicon) and the showcase: the static reviewer demo under /showcase/ (w
 
 from __future__ import annotations
 
+import functools
 import html
 import re
 from pathlib import Path
@@ -80,10 +81,9 @@ def showcase_root() -> Response:
 
 @router.get("/showcase/{rel:path}")
 def showcase(request: Request, rel: str) -> Response:
-    path = _showcase_file(seo.SHOWCASE_DIR, rel)
+    path, name = _showcase_file(seo.SHOWCASE_DIR, rel)
     if path.suffix != ".html":
         return FileResponse(path, headers={"Cache-Control": CRAWL_CACHE})
-    name = path.relative_to(seo.SHOWCASE_DIR.resolve()).as_posix()
     page = _with_head_tags(path.read_text(encoding="utf-8"), _site(request), name)
     headers = {}
     if path.name in seo.SHOWCASE_NOINDEX:
@@ -92,22 +92,40 @@ def showcase(request: Request, rel: str) -> Response:
     return cached_html(request, page, max_age=CRAWL_MAX_AGE, headers=headers)
 
 
-def _showcase_file(root: Path, rel: str) -> Path:
-    """The built file for a showcase address; a folder means its index.html. 404 for
-    anything outside the build, hidden files, or when there is no build."""
+@functools.cache
+def _showcase_files(root: Path) -> dict[str, tuple[Path, str]]:
+    """Every file of the build that may be served, by the address it answers to under
+    `/showcase/` (a folder's address, with or without its slash, is its index.html):
+    (the file, its name inside the build). Listed from the build itself, once: a request
+    only picks one of these, it never builds a path. Left out: hidden files, 404.html and
+    anything that resolves outside the build (a symlink)."""
     root = root.resolve()
-    path = (root / rel).resolve()
-    if path.is_dir():
-        path = path / "index.html"
-    parts = Path(rel).parts
-    if (
-        not path.is_relative_to(root)
-        or not path.is_file()
-        or any(part.startswith(".") for part in parts)
-        or path.name == "404.html"
-    ):
+    served: dict[str, tuple[Path, str]] = {}
+    for found in sorted(root.rglob("*")) if root.is_dir() else []:
+        path = found.resolve()
+        relative = found.relative_to(root)
+        if (
+            not path.is_file()
+            or not path.is_relative_to(root)
+            or any(part.startswith(".") for part in relative.parts)
+            or found.name == "404.html"
+        ):
+            continue
+        entry = (path, relative.as_posix())
+        served[relative.as_posix()] = entry
+        if found.name == "index.html":
+            folder = relative.parent.as_posix().removeprefix(".")
+            served[folder] = served[folder + "/" if folder else ""] = entry
+    return served
+
+
+def _showcase_file(root: Path, rel: str) -> tuple[Path, str]:
+    """The built file for a showcase address, and its name in the build. 404 for anything
+    that is not one of the build's files (`_showcase_files`), or when there is no build."""
+    entry = _showcase_files(root).get(rel)
+    if entry is None:
         raise HTTPException(status_code=404)
-    return path
+    return entry
 
 
 def _with_head_tags(page: str, site: str, name: str) -> str:

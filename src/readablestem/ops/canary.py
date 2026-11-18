@@ -329,6 +329,31 @@ def count_status(factory: sessionmaker[Session], day: date, label: str) -> None:
         upsert_counts(session, day, Counter({(CANARY_STEP, f"{code(prefix)}:{code(status)}"): 1}))
 
 
+def run_daily(
+    factory: sessionmaker[Session],
+    settings: Settings,
+    guard: SpendGuard,
+    now: datetime | None = None,
+    *,
+    decider_factory: Callable[[Settings, JobBudget], Decider] | None = None,
+    verifier_factory: Callable[[Settings, JobBudget], Any] | None = None,
+) -> dict[str, str]:
+    """Both daily canaries, each at most once per UTC day (the Decisions API drift canary and
+    the Claude second-check canary): the status of each, `decisions` and `claude`. The HTTP
+    cron route and `readablestem ops cron` both call this, so the hourly cron service in
+    production runs them too. Fail-open: neither can raise."""
+    from readablestem.ops import claude_canary
+
+    return {
+        "decisions": maybe_run_daily(
+            factory, settings, guard, now, decider_factory=decider_factory
+        ),
+        "claude": claude_canary.maybe_run_daily(
+            factory, settings, guard, now, verifier_factory=verifier_factory
+        ),
+    }
+
+
 def due(settings: Settings) -> str | None:
     """Why the cron should not run the canary, or None when it should."""
     if not settings.decisions_canary:

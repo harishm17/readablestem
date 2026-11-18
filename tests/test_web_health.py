@@ -36,9 +36,37 @@ def test_readyz_is_ready_with_a_key_and_shows_no_secret(tmp_path):
     assert response.status_code == 200
     assert response.json() == {
         "status": "ready",
-        "checks": {"database": "ok", "worker": "disabled", "model_provider": "ok"},
+        "checks": {
+            "database": "ok",
+            "database_write": "ok",
+            "worker": "disabled",
+            "model_provider": "ok",
+        },
     }
     assert SECRET_KEY not in response.text and "gpt" not in response.text
+
+
+def test_readyz_is_not_ready_while_the_database_refuses_writes(tmp_path):
+    """Pages that only read keep working while another connection holds the write lock, and
+    every POST waits: /readyz must say not ready, within about a second (F-343)."""
+    import sqlite3
+
+    _env, client = running(tmp_path, openai_api_key=SECRET_KEY)
+    with client as web:
+        assert web.get("/readyz").status_code == 200
+        holder = sqlite3.connect(tmp_path / "web.db", isolation_level=None)
+        holder.execute("BEGIN IMMEDIATE")
+        try:
+            started = time.monotonic()
+            locked = web.get("/readyz")
+            took = time.monotonic() - started
+        finally:
+            holder.execute("ROLLBACK")
+            holder.close()
+        assert locked.status_code == 503 and took < 3
+        assert locked.json()["checks"]["database_write"] == "failed"
+        assert web.get("/healthz").status_code == 200  # the process and a read still answer
+        assert web.get("/readyz").status_code == 200
 
 
 def test_readyz_without_any_key_is_not_ready_unless_the_models_are_fake(tmp_path):

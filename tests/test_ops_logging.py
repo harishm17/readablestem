@@ -235,7 +235,7 @@ def test_middleware_logs_route_template_not_path_or_query(capsys):
     client.get(
         f"/jobs/{SENTINEL}-notes.pdf",
         params={"email": f"{SENTINEL}@example.org"},
-        headers={"X-Filename": SENTINEL},
+        headers={"X-Filename": SENTINEL, "X-Forwarded-For": "198.51.100.1, 203.0.113.5"},
     )
     client.get("/no/such/page")
     client.get("/boom")
@@ -249,7 +249,8 @@ def test_middleware_logs_route_template_not_path_or_query(capsys):
         ("GET", "/boom", 500),
     ]
     assert all(isinstance(r["latency_ms"], int) and r["latency_ms"] >= 0 for r in records)
-    assert SENTINEL not in out
+    assert [r["forwarded_parts"] for r in records] == [2, 0, 0]  # a count, never an address
+    assert SENTINEL not in out and "198.51.100" not in out and "203.0.113" not in out
 
 
 # --------------------------------------------------------------------------- structured events

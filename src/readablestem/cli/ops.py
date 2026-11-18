@@ -225,16 +225,25 @@ def _cmd_cron(args: argparse.Namespace) -> int:
     print(f"aggregated_jobs={shown} {_purge_line(stats)}")
     if aggregated is None:
         return 1
-    # Both halves worked: tell /healthz/ops. A failure to write it is a failed run.
-    from readablestem.ops import heartbeat
+    # Both halves worked: the two daily canaries (once per UTC day each, fail-open), then tell
+    # /healthz/ops. A failure to write it is a failed run.
+    from readablestem.config import get_settings
+    from readablestem.ops import canary, heartbeat
     from readablestem.web.db import session_scope
+    from readablestem.web.spend import DbSpendGuard
 
+    settings = get_settings()
+    guard = DbSpendGuard(
+        factory, settings.daily_spend_cap_usd, open_cap_usd=settings.open_tier_daily_spend_cap_usd
+    )
+    canaries = canary.run_daily(factory, settings, guard)
+    note = f"decisions_canary={canaries['decisions']} claude_canary={canaries['claude']}"
     try:
         with session_scope(factory) as session:
             heartbeat.beat(
                 session,
                 heartbeat.CRON,
-                f"aggregated={aggregated} jobs_deleted={stats.jobs_deleted}",
+                f"aggregated={aggregated} jobs_deleted={stats.jobs_deleted} {note}",
             )
     except SQLAlchemyError as exc:
         return _db_error(exc)

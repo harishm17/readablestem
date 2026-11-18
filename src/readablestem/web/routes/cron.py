@@ -7,7 +7,8 @@ runs, even when aggregation fails (privacy beats statistics). A failed aggregati
 answers 500 so the scheduler and monitoring see it.
 
 Then, at most once per UTC day, the Decisions API drift canary (`ops.canary`) and the
-Claude second-check canary (`ops.claude_canary`). Each is fail-open: whatever happens to
+Claude second-check canary (`ops.claude_canary`), through `canary.run_daily`, which `readablestem
+ops cron` calls too. Each is fail-open: whatever happens to
 it, the response is the aggregate-and-purge result. Its status goes in the `cron_done`
 line; drift logs its own ERROR line.
 """
@@ -54,10 +55,7 @@ def aggregate_and_purge(
     purged = retention.purge_expired(ctx.factory, now)
     from readablestem.ops import canary
 
-    canary_status = canary.maybe_run_daily(ctx.factory, ctx.settings, ctx.guard, now)
-    from readablestem.ops import claude_canary
-
-    claude_status = claude_canary.maybe_run_daily(ctx.factory, ctx.settings, ctx.guard, now)
+    canaries = canary.run_daily(ctx.factory, ctx.settings, ctx.guard, now)
     body = {
         "status": "ok" if aggregated is not None else "aggregate_failed",
         "jobs_aggregated": aggregated,
@@ -72,7 +70,7 @@ def aggregate_and_purge(
         jobs_deleted=purged.jobs_deleted,
         blobs_deleted=purged.blobs_deleted,
         unaggregated_deleted=purged.unaggregated_deleted,
-        decisions_canary=canary_status,
-        claude_canary=claude_status,
+        decisions_canary=canaries["decisions"],
+        claude_canary=canaries["claude"],
     )
     return JSONResponse(body, status_code=200 if aggregated is not None else 500)

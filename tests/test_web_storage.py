@@ -261,6 +261,16 @@ def test_the_storage_shows_to_the_admin_and_goes_stale_while_full(web):
     assert detail["stale"] == ["storage"]
     assert detail["storage"]["full"] is True and detail["storage"]["stored_mb"] == 5
     assert "storage" in admin.get("/admin").text
+    # The daily canaries' results are on the admin page too, and only there.
+    from readablestem.ops import canary
+
+    canary.count_status(web.ctx.factory, utcnow().date(), "claude:drift")
+    assert admin.get("/admin/health").json()["canaries"] == {
+        "decisions": None,
+        "claude": {"day": utcnow().date().isoformat(), "status": "drift"},
+    }
+    assert "Claude second check: drift on" in admin.get("/admin").text
+    assert "canar" not in web.alice.get("/healthz/ops").text
 
 
 # --------------------------------------------------------------------------- the parts page

@@ -85,6 +85,7 @@ from readablestem.web.deps import (
     enforce,
     flash,
     get_ctx,
+    give_back,
     limited,
     render,
     require_csrf,
@@ -784,7 +785,6 @@ def form_values(fields: Mapping[str, str]) -> dict[str, Any]:
 @submit_once("upload.create", from_form=False)
 async def create_job(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
-    enforce(request, "upload_user", user.id)  # before anything is read or any process starts
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
         raise PageError(*conversions_paused(closed, kept=False), headers={"Retry-After": "3600"})
@@ -800,9 +800,15 @@ async def create_job(request: Request, user: UserDep) -> Response:
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
         raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
     try:
+        enforce(request, "upload_user", user.id)  # before anything is read or any process starts
+        request.state.upload_counted, request.state.upload_accepted = 1, 0
         return await _take_upload(request, ctx, user)
     finally:
         ctx.uploads.leave(user.id)
+        # The per-person rule counts accepted files only: a refusal gives its count back.
+        counted = getattr(request.state, "upload_counted", 0)
+        accepted = getattr(request.state, "upload_accepted", 0)
+        give_back(request, "upload_user", user.id, counted - accepted)
 
 
 def _storage_full(ctx: AppContext) -> bool:
@@ -926,6 +932,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         return await run_in_threadpool(_course_error_page, request, user, form.fields)
     for _ in form.files[1:]:  # every file after the first is an upload for the rate limits
         enforce(request, "upload_user", user.id)
+        request.state.upload_counted += 1
     mode = retention.mode_for_upload(
         keep=form.fields.get("keep") == "on", share=form.fields.get("share") == "on"
     )
@@ -938,6 +945,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     placed = await run_in_threadpool(
         _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages, main_file
     )
+    request.state.upload_accepted = sum(1 for item in placed if item.job_id or item.pending_id)
     for item in placed:  # product analytics (web.analytics): counts only, never a file name
         if item.job_id or item.pending_id:
             analytics.queue_event(

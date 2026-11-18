@@ -44,7 +44,10 @@ _seen: dict[str, tuple[tuple[int, int], str]] = {}
 def content_hash(name: str, root: Path = STATIC_DIR) -> str | None:
     """The first `HASH_LENGTH` hex digits of the SHA-256 of `root/name`; None when there
     is no such file (or the name leaves `root`)."""
-    path = (root / name).resolve()
+    try:
+        path = (root / name).resolve()
+    except ValueError:  # a name with a null byte is no file
+        return None
     if not path.is_relative_to(root.resolve()) or not path.is_file():
         return None
     stat = path.stat()

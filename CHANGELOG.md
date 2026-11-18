@@ -12,6 +12,43 @@
   the prose, and the equation was read without it; a bold letter under such an accent was
   written from the file as the bare letter. A run now starts at the accent. Stored documents
   change for those equations, so this goes out with the next pipeline version.
+## Unreleased: platform guards, second batch (branch fix/platform-guards-2)
+
+- Code-scanning alerts 9 to 13 (`py/path-injection`, `routes/discovery.py`): not a way out of the
+  showcase folder (the `is_relative_to` check already refused `..`, an absolute path and a symlink
+  out), but a request with a null byte in the address reached `Path.resolve()` and answered 500.
+  The showcase now answers from a listing of the build's own files (`_showcase_files`): the
+  request value only picks a key, and no path is built from it. Hidden files, `404.html` and
+  anything resolving outside the build are left out of the listing.
+- Sibling: `/static/<name>.<12 hex>.<ext>` with a null byte in the name reached
+  `assets.content_hash` and answered 500; it is now a 404. The other places that build a path
+  from a request value are bounded (`archive_intake` zip member names are cleaned and checked
+  under the folder, `office_convert` names its file from a fixed pair of kinds, a source's
+  `main_file` must name a file the archive holds).
+- WS12.5 (F-215, F-342, F-343), parts (a), (b) and (f). (a) was already built (WS26.2): `/admin`
+  shows the late backup, cron and the full storage from `ops_freshness`, the function
+  `/healthz/ops` uses; it now also shows the latest result of each daily canary ("Daily checks",
+  and `canaries` in `/admin/health`). (b) `readablestem ops cron` runs both canaries once per UTC
+  day through `canary.run_daily`, which the HTTP route calls too, and notes their status in the
+  cron heartbeat. Both stay off in production while `CLAUDE_SECOND_CHECK` is `off` and the
+  provider is not OpenAI, so no spend starts. (f) `/readyz` gains `database_write`: a write that
+  changes nothing, with a 1 second limit, and not ready when it fails (with a second connection
+  holding the write lock, `/readyz` answered ready while every POST waited 5 to 7 seconds). The
+  public `/healthz/ops` is unchanged: the status word only.
+
+- WS26.3 (ZS-3, F-159, F-366): the per-person upload rule (`upload_user`) counts accepted files
+  only. A refused upload, or a part that is not started, gives its count back
+  (`RateLimiter.give_back`, from `create_job` and `convert_parts`). The per-address `upload` rule
+  stays on requests. Before, 3 refused files followed by good files from one account stopped at
+  the 13th good file (12 taken); now all 15 are taken. No request, prompt or stored document
+  changes, so no version bump.
+- WS26.6, the log part: the content-free request log line carries `forwarded_parts`, the number of
+  `X-Forwarded-For` entries (a count, never an address), so one public GET with a two-entry header
+  can show how Railway treats the header (3 appends, 1 replaces, 2 passes it through;
+  `docs/deploy-railway.md`). The GET and the Landlock checks in the production image and in
+  production are not part of this change. The probe's bound for thread tasks is not built: no
+  caller needs it yet (the Word reader on `feat/word-reader` bounds pandoc by the group's resident
+  memory, not by the probe's total).
 
 ## Unreleased: exam mode is in view at upload and said wherever the document is handled (branch feat/exam-mode-visible-and-used)
 

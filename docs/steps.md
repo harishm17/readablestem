@@ -1368,7 +1368,7 @@ API with recorded answers; Claude is not deterministic, so this one asks the che
 fixed synthetic cases (the figure and equation cases of `canary_requests.json`) whose
 answer is known by construction (`SHOULD_FLAG`) and counts the cases it gets wrong. More
 than `CLAUDE_CANARY_MAX_MISSES` (1) is drift: one ERROR line `claude_canary_drift`. At most
-once a day, only in the HTTP cron route (production's `ops cron` does not run it; claim row
+once a day, in `ops cron` and in the HTTP cron route (`ops.canary.run_daily`; claim row
 `canary/claude:run`, counts `claude:<status>`), fail-open, off with `CLAUDE_CANARY=false`, never with `ENV=test`, `FAKE_MODELS`, another
 provider or `CLAUDE_SECOND_CHECK=off`. By hand: `readablestem ops claude-canary --max-usd 0.25`
 (exit 0, 1 drift, 2 could not run). First live run: 12 of 12 right, $0.0166.

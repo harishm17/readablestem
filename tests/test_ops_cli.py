@@ -57,6 +57,30 @@ def test_cron_prints_counts_only(database, capsys):
     assert SENTINEL not in out
 
 
+def test_cron_runs_both_canaries_and_records_their_status_in_the_heartbeat(
+    database, capsys, monkeypatch
+):
+    """`ops cron` is what runs in production: it asks for both daily canaries (each claims its
+    own UTC day, `maybe_run_daily`) and notes their status in the cron heartbeat. The canaries
+    are faked here: no model call is made."""
+    from sqlalchemy import select
+
+    from readablestem.ops import canary, claude_canary
+
+    asked: list[str] = []
+    monkeypatch.setattr(
+        canary, "maybe_run_daily", lambda *a, **k: asked.append("decisions") or "ok"
+    )
+    monkeypatch.setattr(
+        claude_canary, "maybe_run_daily", lambda *a, **k: asked.append("claude") or "drift"
+    )
+    assert main(["ops", "cron"]) == 0
+    assert asked == ["decisions", "claude"]
+    with db.session_scope(database) as s:
+        beat = s.scalars(select(db.OpsHeartbeat).where(db.OpsHeartbeat.name == "cron")).one()
+        assert "decisions_canary=ok claude_canary=drift" in (beat.detail or "")
+
+
 def test_export_writes_opted_in_jobs_only_and_prune_honours_their_deadline(
     database, capsys, tmp_path
 ):

@@ -78,6 +78,8 @@ def test_the_address_is_the_one_the_trusted_proxy_wrote_not_one_the_client_wrote
     behind_balancer = request_with({"x-forwarded-for": "6.6.6.6, 203.0.113.7, 130.211.0.1"})
     assert client_ip(behind_balancer, trusted_hops=2) == "203.0.113.7"
     assert client_ip(spoofed, trusted_hops=0) == "10.0.0.9"  # no proxy: the header is ignored
+    replaced = request_with({"x-forwarded-for": "203.0.113.7"})  # a host that replaces the header
+    assert client_ip(replaced, trusted_hops=1) == "203.0.113.7"
 
 
 def test_a_header_that_is_not_an_address_falls_back_to_the_peer():
@@ -149,19 +151,33 @@ def test_google_and_microsoft_callbacks_are_limited(web):
     assert codes[-1] == 429 and 429 not in codes[: rule.limit]
 
 
-def test_uploads_are_limited_per_person_and_a_rejected_upload_counts(web):
+def test_refused_uploads_do_not_use_the_per_person_allowance(web):
+    """A refused file gives its count back (the per-person rule counts accepted files), so a
+    person fixing a refused file is not stopped early; the per-address rule stays on requests,
+    so a script sending refused files in a loop is still stopped."""
     login(web.browser, ALICE)
-    rule = web.ctx.limiter.rules["upload_user"]
+    person = web.ctx.limiter.rules["upload_user"]
     csrf = token(web.browser)
-    statuses = [
-        upload(web.browser, b"not a pdf", csrf=csrf).status_code for _ in range(rule.limit + 2)
-    ]
-    assert statuses[: rule.limit] == [415] * rule.limit
-    assert statuses[rule.limit :] == [429, 429]
+    refused = [upload(web.browser, b"not a pdf", csrf=csrf).status_code for _ in range(3)]
+    assert refused == [415] * 3
+    good = [upload(web.browser, make_pdf(1), csrf=csrf).status_code for _ in range(person.limit)]
+    assert good == [303] * person.limit  # today the 3 refusals take 3 of the 15
+    assert upload(web.browser, make_pdf(1), csrf=csrf).status_code == 429
     bob = web.client()
     login(bob, BOB)
-    assert upload(bob, b"not a pdf").status_code == 415  # Bob has his own allowance
+    assert upload(bob, b"not a pdf").status_code == 415
     bob.close()
+
+
+def test_refused_requests_in_a_loop_are_still_stopped_per_address(web):
+    login(web.browser, ALICE)
+    address = web.ctx.limiter.rules["upload"]
+    csrf = token(web.browser)
+    statuses = [
+        upload(web.browser, b"not a pdf", csrf=csrf).status_code for _ in range(address.limit + 2)
+    ]
+    assert statuses[: address.limit] == [415] * address.limit
+    assert statuses[address.limit :] == [429, 429]
 
 
 def test_a_normal_afternoon_is_never_limited(web):

@@ -300,6 +300,14 @@ def enforce(request: Request, rule_name: str, key: str | None = None) -> None:
     )
 
 
+def give_back(request: Request, rule_name: str, key: str, count: int = 1) -> None:
+    """Take `count` attempts back from `rule_name` for `key`: a request that was refused
+    used none of the allowance of a rule that counts accepted work only."""
+    ctx = get_ctx(request)
+    if ctx.settings.rate_limits_enabled and count > 0:
+        ctx.limiter.give_back(rule_name, key, count)
+
+
 # What each limited action says when its allowance is used up, so a person knows which one
 # they hit and when it clears. The sign-in rules link back to /login.
 _SIGN_IN_BACK = {"back_href": "/login", "back_label": "Back to sign-in"}

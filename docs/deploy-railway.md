@@ -118,11 +118,11 @@ Rules that keep the plan honest:
    second place deleted documents live, so it would need a short lifetime (an R2 lifecycle rule
    of 3 days) and a sentence on the privacy page.
 3. **Cron: the Railway cron service (option A).** The HTTP route (`POST
-   /internal/cron/aggregate-and-purge`) also runs the daily canaries (the Claude canary, about
-   $0.04 a run; the OpenAI Decisions canary, which is off under Anthropic); `ops cron` does not,
-   so **no canary runs in production**. To get the Claude canary, run `readablestem ops
-   claude-canary --max-usd 0.25` on a schedule you control (option B below, or a GitHub workflow
-   with a repository secret).
+   /internal/cron/aggregate-and-purge`) and `ops cron` both run the two daily canaries, each at most
+   once per UTC day (the Claude canary, about $0.04 a run; the OpenAI Decisions canary, which is
+   off under Anthropic). In production the Claude canary does nothing until
+   `CLAUDE_SECOND_CHECK` is turned on (it is `off` in code), so no canary spends anything by
+   default. Their status goes in the cron heartbeat's note and on `/admin` ("Daily checks").
 4. **LibreOffice in the image (Word and PowerPoint uploads).** Off by default. To turn it on:
    variable `INSTALL_LIBREOFFICE=true` on the web service and a memory allowance of 2 GB (below).
    Check `readablestem ops launch-check` first.
@@ -161,7 +161,7 @@ production if a required one is missing, and logs the reason):
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the GitHub uptime checks (below). |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours after the last activity, and 30 days for a document whose owner also lets the developer look at the results; "Keep for 7 days" is a per-upload choice with a fixed length (`web/retention.py`). Neither is named in `railway.ts`, so production uses the defaults. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_SECOND_CHECK` | The Claude second check: `off` (the code default since WS10.5) skips it; `shadow` asks a second model about each equation and figure and only records its answer; `enforce` acts on it. Declared on `web` in `railway.ts`. | Production's value is in the production profile. It was set to `off` on 2026-11-09: on the first real-model walkthrough (4 OCW documents) the shadow check changed no output and cost about 16% of the spend. Turn it back on only for a measured run. |
-| `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
+| `CLAUDE_CANARY` | Daily drift check of the Claude second check. The cron service (`ops cron`) and the HTTP cron route run it, at most once per UTC day, and only while `CLAUDE_SECOND_CHECK` is not `off`. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
 | `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | Production's value is in the production profile (it was turned on 2026-11-04 13:53 UTC, once the start-up sandbox probe passed on Railway, see "LaTeXML" below). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
 | `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
@@ -185,6 +185,15 @@ it is logged once per process when `X-Forwarded-For` has more than `TRUSTED_PROX
 entries, which means a proxy is missing from the setting (or a client forged the header). It
 carries counts, no addresses. `readablestem ops launch-check` cannot see the live header; it
 only flags `TRUSTED_PROXY_HOPS=0`.
+
+Every request line in the log also carries `forwarded_parts`, the number of entries the
+`X-Forwarded-For` header held when it reached the app (a count, never an address; 0 with no
+header). To settle how Railway treats the header, send one public GET to a page that is not a
+health route (those log at debug level) with a made-up two-entry header and read the count on its
+line: 3 means Railway appends the address it saw, so the limiter keys on the real address
+(`TRUSTED_PROXY_HOPS=1` is right); 1 means it replaces the header; 2 means it passes the header
+through, and `TRUSTED_PROXY_HOPS` must change before anything else. **Not yet read in production**:
+write the date and the count here when it is.
 
 `CRON_TOKEN` must be at least 32 characters (production refuses to start otherwise). To rotate
 `SESSION_SECRET` without signing people out, use `SESSION_SECRET_PREVIOUS`

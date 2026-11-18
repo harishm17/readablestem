@@ -462,7 +462,9 @@ def route_template(scope: Mapping[str, Any]) -> str:
 async def request_logging_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """One log line per request: method, route template, status, latency_ms.
+    """One log line per request: method, route template, status, latency_ms and
+    `forwarded_parts`, how many entries `X-Forwarded-For` held (a count, never an address: one
+    public GET with a two-entry header shows how the host treats it, `docs/deploy-railway.md`).
 
     Add with `app.middleware("http")(request_logging_middleware)`. No query string, no
     headers, no path parameters: a URL can carry a filename or an email address.
@@ -479,4 +481,13 @@ async def request_logging_middleware(
         latency_ms = round((time.perf_counter() - start) * 1000)
         log = get_logger("readablestem.http")
         emit = log.debug if route in _QUIET_ROUTES else log.info
-        emit("request", method=method, route=route, status=status, latency_ms=latency_ms)
+        header = request.headers.get("x-forwarded-for", "")
+        parts = sum(1 for part in header.split(",") if part.strip())
+        emit(
+            "request",
+            method=method,
+            route=route,
+            status=status,
+            latency_ms=latency_ms,
+            forwarded_parts=parts,
+        )
