@@ -264,6 +264,18 @@ def test_without_footnotes_a_link_between_blocks_is_an_ordinary_link():
     assert '<a href="#p1-e1">1</a>' in html
 
 
+def test_a_typed_address_and_a_section_reference_reach_the_html_with_working_ids():
+    from readablestem.pipeline.text_pass import PdfText, annotate
+
+    text = "See Section 3.2 or write to a.b@example.edu."
+    head, fix = heading(0, "3.2 Rates of change", 2)
+    elements = annotate([head, block(1, Kind.PARAGRAPH, text)], PdfText()).elements
+    html = render([(elements[0], fix), elements[1]])
+    assert '<a href="#p1-e0">Section 3.2</a>' in html and 'id="p1-e0"' in html
+    assert '<a href="mailto:a.b@example.edu">a.b@example.edu</a>.' in html
+    assert all(c.passed for c in static_checks(html) if c.severity == "error")
+
+
 # ----------------------------------------------------------------------------- unit
 
 

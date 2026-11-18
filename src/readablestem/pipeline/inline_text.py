@@ -128,7 +128,7 @@ def colour_css(rgb: tuple[int, int, int]) -> str:
 
 
 def _href(link: Link) -> str | None:
-    if link.kind == "uri":
+    if link.kind in ("uri", "typed"):
         return link.href if link.href and is_safe_href(link.href) else None
     if link.target_id and LINK_TARGET.fullmatch(link.target_id):
         return f"#{link.target_id}"

@@ -284,6 +284,8 @@ def test_links_carry_exactly_one_kind_of_target():
     with pytest.raises(ValidationError):
         Link(start=0, end=4, kind="uri")
     with pytest.raises(ValidationError):
+        Link(start=0, end=4, kind="typed", href="ftp://example.org/a")
+    with pytest.raises(ValidationError):
         Link(start=0, end=4, kind="crossref")
     with pytest.raises(ValidationError):
         Link(start=0, end=4, kind="internal", target_id="p1-e1", href="https://example.org")

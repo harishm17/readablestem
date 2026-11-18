@@ -225,6 +225,12 @@ FIGURES = [
     el("e4", Kind.EQUATION, display="block", equation_label="(4) (5)"),
     el("e6", Kind.EQUATION, display="block", equation_label="2.4"),
     el("i1", Kind.EQUATION, display="inline", equation_label="(9)"),
+    el("s32", Kind.HEADING, text="3.2 Rates of change"),
+    el("c4", Kind.HEADING, text="Chapter 4: Waves"),
+    el("th21", Kind.PARAGRAPH, text="Theorem 2.1 (Rolle). Let f be continuous."),
+    el("d3", Kind.PARAGRAPH, text="Definition 3. A group is a set."),
+    el("s5a", Kind.HEADING, text="5 Methods"),
+    el("s5b", Kind.HEADING, text="5. Results"),
 ]
 
 
@@ -251,6 +257,9 @@ def refs(text: str, *, taken=(), elements=FIGURES) -> list[tuple[str, str | None
         ("Substituting (3) into (4), we get", [("(3)", "e3"), ("(4)", "e4")]),
         ("From (3), the speed is", [("(3)", "e3")]),
         ("using (3) and (4)", [("(3)", "e3"), ("(4)", "e4")]),
+        ("as Section 3.2 shows", [("Section 3.2", "s32")]),
+        ("see Chapter 4 and § 3.2", [("Chapter 4", "c4"), ("\u00a7 3.2", "s32")]),
+        ("By Theorem 2.1 and Definition 3, the", [("Theorem 2.1", "th21"), ("Definition 3", "d3")]),
     ],
 )
 def test_references_link_to_the_one_target_with_that_number(text, expected):
@@ -275,6 +284,10 @@ def test_references_link_to_the_one_target_with_that_number(text, expected):
         "This agrees with earlier measurements (3) and with the textbook value (4).",
         "Answer question (3) on the data sheet before you leave.",
         "When the cart stops, Repeat (3)",  # the one link the real lab manuals made
+        "Section 7 is not in this document.",  # no heading starts with 7
+        "Section 5 covers both.",  # two headings start with 5: nothing is guessed
+        "Chapter 9 and Lemma 2 are not here.",
+        "For example 3 of them fail.",  # "example" in lower case is not a reference
     ],
 )
 def test_no_link_without_one_target(text):
@@ -289,9 +302,52 @@ def test_an_ambiguous_number_gets_no_link():
     assert refs("See Figure 2.", elements=twice) == []
 
 
+def test_a_reference_inside_its_own_target_is_not_linked():
+    own = FIGURES[-4]
+    assert own.id == "th21"
+    links = crossrefs(own.text or "", targets_for(*FIGURES), element_id=own.id)
+    assert links == []
+
+
 def test_an_unattached_caption_does_not_link_to_itself():
     assert refs("Figure 2.3: Velocity against time.") == []
     assert refs("Figure 2.3 shows the velocity.") == [("Figure 2.3", "f1")]
+
+
+# --------------------------------------------------------------------------- typed addresses
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "See https://example.org/notes.pdf. It is long.",
+            [("https://example.org/notes.pdf", "https://example.org/notes.pdf")],
+        ),
+        (
+            "(see www.example.org/a_(b)), then",
+            [("www.example.org/a_(b)", "https://www.example.org/a_(b)")],
+        ),
+        (
+            "Write to jo.smith@example.edu, or call.",
+            [("jo.smith@example.edu", "mailto:jo.smith@example.edu")],
+        ),
+        ("Visit http://localhost:8000 or www. now", []),  # no host worth a link
+        ("The result a@b is not an address.", []),
+        # Broken at a line end the text keeps: only what the text holds together is linked.
+        ("Use https://example.org/a\nbc", [("https://example.org/a", "https://example.org/a")]),
+    ],
+)
+def test_an_address_typed_in_the_text_becomes_a_link(text, expected):
+    result = annotate([el("p1-e0", text=text)], pdf_with(line(text)))
+    assert links_of(result, "p1-e0") == [("typed", shown, href) for shown, href in expected]
+
+
+def test_an_address_the_file_already_links_gets_no_second_link():
+    text = "Syllabus at https://example.org/s here."
+    link = PdfLink(0, rect_of(text, "https://example.org/s"), "uri", uri="https://example.org/s")
+    result = annotate([el("p1-e0", text=text)], pdf_with(line(text), link))
+    assert links_of(result, "p1-e0") == [("uri", "https://example.org/s", "https://example.org/s")]
 
 
 # --------------------------------------------------------------------------- colour

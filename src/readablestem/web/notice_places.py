@@ -91,8 +91,8 @@ def unclear_links(element: Element) -> list[str]:
     text = element.text or ""
     found = []
     for link in element.links:
-        if link.kind == "crossref":
-            continue
+        if link.kind in ("crossref", "typed"):
+            continue  # not links of the file: the pass never judged their text
         shown = visible_text(text, link.start, link.end)
         if shown and unclear_link_text(shown, context_words(text, link.start, link.end)):
             found.append(_shorten(shown, NAME_CHARS))
