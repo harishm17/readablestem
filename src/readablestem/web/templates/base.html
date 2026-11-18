@@ -28,8 +28,9 @@
   <meta name="twitter:image" content="{{ site_url }}{{ static_url('social-card.png') }}">
   <meta name="twitter:image:alt" content="ReadableSTEM: accessible HTML from STEM course PDFs. An equation from a PDF beside the note that the web page has it as real maths (MathML) a screen reader can read.">
   <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true, "selfRequestsOnly": true}'>
+  {# The icons are drawn from static/icon.svg by scripts/brand_icons.py; the .ico is the fallback. #}
+  <link rel="icon" href="{{ static_url('icon.svg') }}" type="image/svg+xml" sizes="any">
   <link rel="icon" href="/favicon.ico" sizes="48x48">
-  <link rel="icon" href="{{ static_url('icon-192.png') }}" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="{{ static_url('apple-touch-icon.png') }}">
   <link rel="manifest" href="/site.webmanifest">
   {# The page background (--bg in tokens.css), for the browser's own bar. #}

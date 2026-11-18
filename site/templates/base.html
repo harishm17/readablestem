@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% if current != "home" and title %}{{ title }} | ReadableSTEM demo{% else %}{{ title }}{% endif %}</title>
 <meta name="description" content="{% block description %}{{ description }}{% endblock %}">
+<link rel="icon" href="{{ root }}assets/icon.svg" type="image/svg+xml" sizes="any">
+<link rel="icon" href="{{ root }}assets/favicon.ico" sizes="48x48">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
 {% block head %}{% endblock %}
 <link rel="stylesheet" href="{{ root }}assets/tokens.css">
 <link rel="stylesheet" href="{{ root }}assets/controls.css">
