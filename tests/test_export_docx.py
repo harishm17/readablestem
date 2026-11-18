@@ -434,4 +434,4 @@ def test_three_kept_pages_say_why_each_time_and_the_explanation_once_in_every_ou
     said = [getattr(item, "say", "") for item in listen.build_transcript(html)]
     for words in (plain(html), plain(xml), "\n".join(said)):
         assert words.count("A scanned page.") == 3
-        assert words.count("A screen reader cannot read a picture") == 1
+        assert words.count("A screen reader cannot read what a picture shows") == 1

@@ -1738,7 +1738,7 @@ def _checked_notice(
         why = f"<p>{_escape(say(said, audience))}</p>\n"
     return (
         f'<section id="{NOTICE_ID}" class="notice checked-notice {AUTHORED_CLASS}" '
-        f'aria-labelledby="{NOTICE_TITLE_ID}">\n'
+        f'aria-labelledby="{NOTICE_TITLE_ID}" tabindex="-1">\n'
         f'<p id="{NOTICE_TITLE_ID}" class="flag-label">{words.NOTICE_TITLE}</p>\n'
         f"<p>{_escape(' '.join(words.statement(summary)))}</p>\n"
         f"{why}<ul>{''.join(links)}</ul>\n</section>"
@@ -2175,11 +2175,17 @@ def render_html(
         english = _clean_lang(lang).split("-", 1)[0].lower() == "en"
         contents = _authored_in_english(
             navigation.contents_nav(
-                renderer.toc, AUTHORED_CLASS, None if english else _clean_lang(lang)
+                # The title stands right above the list: it is not an entry of it.
+                [entry for entry in renderer.toc if entry.id != renderer.h1_id],
+                AUTHORED_CLASS,
+                None if english else _clean_lang(lang),
             ),
             lang,
         )
-    skip_target = renderer.h1_id or navigation.MAIN_ID
+    # The skip link lands on the first thing a reader must not miss: the notice that says
+    # parts are pictures or nobody reviewed the page, when there is one, else the title. A
+    # link that jumped past that notice would hide it from the readers it is written for.
+    skip_target = NOTICE_ID if top else (renderer.h1_id or navigation.MAIN_ID)
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     page = "\n".join(

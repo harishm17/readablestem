@@ -540,7 +540,7 @@ def export_canvas(
     notes.scroll_boxes = sum(
         1
         for n in standalone.walk()
-        if "tabindex" in n.attrs and n.tag != "h1"  # the h1 is the skip link's target
+        if n.attrs.get("tabindex") == "0"  # "-1" is the skip link's target, not a scroll box
     )
 
     # The paste version is its own copy of the tree: it differs in image addresses, in

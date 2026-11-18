@@ -5,18 +5,19 @@ What the output looks like and why is in docs/output.md ("Navigation"). The asse
 writes the markup and holds the words, so both can be tested and changed on their own.
 
 - `skip_link`: the first thing in the file, hidden until it is focused, jumping to the page's
-  one `<h1>` (WCAG 2.4.1, Bypass Blocks). The title is the start of the content, and the
-  Contents list stands after it, so the link needs nothing to jump over but the notices before
-  the title. The `<h1>` carries `tabindex="-1"`, which makes it focusable by following the link
-  (Firefox and VoiceOver move there; a link to an element that cannot take focus only scrolls)
-  without making it a tab stop. A title the assembler adds has the id `MAIN_ID`; a heading that
-  is the title keeps its own. Canvas removes `tabindex` from a pasted page, which also drops the
-  skip link.
+  one `<h1>` (WCAG 2.4.1, Bypass Blocks), or to the notice above it when the page has one (parts
+  shown as pictures, or nobody reviewed the page): a link that jumped past that notice would
+  hide it from the readers it is written for. The title is the start of the content, and the
+  Contents list stands after it. The target carries `tabindex="-1"`, which makes it focusable
+  by following the link (Firefox and VoiceOver move there; a link to an element that cannot
+  take focus only scrolls) without making it a tab stop. A title the assembler adds has the id
+  `MAIN_ID`; a heading that is the title keeps its own. Canvas removes `tabindex` from a pasted
+  page, which also drops the skip link.
 - `contents_nav`: `<nav aria-label="Contents">` after the `<h1>`, with nested links to the
   headings, made from the outline as written (after the repair that never skips a level), when
   there are at least `MIN_TOC_HEADINGS` of them and the PDF has no contents page of its own
-  (two lists of contents would be one too many). A heading repeated under the same parent is
-  one entry. The list is a `<details>`, closed in the markup so that every reader of the file
+  (two lists of contents would be one too many). The title is not an entry: it stands right
+  above the list. A heading repeated under the same parent is one entry. The list is a `<details>`, closed in the markup so that every reader of the file
   that draws no style (a phone's first screen, Canvas, Word, a transcript) gets a short line,
   and open to the eye from `WIDE` up and on paper (`TOC_CSS`).
 - `pagebreak`: an `<hr role="doc-pagebreak" aria-label="Page N">` (axe accepts that role on

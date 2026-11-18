@@ -391,9 +391,12 @@ document in another language marks it `lang="en"`).
 
 - **Skip link.** The first thing in `<body>`: `<a class="skip-link" href="#main-content">`
   "Skip to main content" (WCAG 2.4.1). It is hidden until focused (`.skip-link:not(:focus)`)
-  and jumps to the page's one `<h1>` (F-116), which carries `tabindex="-1"`: that makes it
-  focusable by following the link, so Firefox and VoiceOver move there (a link to an element
-  that cannot take focus only scrolls), without making it a tab stop. A title the assembler
+  and jumps to the page's one `<h1>` (F-116), or to the "Before you read" notice above it
+  when the page has one (`href="#checked-notice"`), so that following the link never passes
+  over the statement that parts are pictures or that nobody reviewed the page. The target
+  carries `tabindex="-1"`: that makes it focusable by following the link, so Firefox and
+  VoiceOver move there (a link to an element that cannot take focus only scrolls), without
+  making it a tab stop. A title the assembler
   adds has the id `main-content`; a heading that is the title keeps its own id, and the link
   points to it. Canvas removes `tabindex` from a pasted page, one more reason the paste
   version has no skip link (it drops the id `main-content` too). The skip link is the first
@@ -401,7 +404,8 @@ document in another language marks it `lang="en"`).
 - **Contents list.** `<nav class="toc" aria-label="Contents">` right after the `<h1>`, inside
   `<main>`: a `<details class="toc-details">` whose summary is "Contents" and whose body is a
   nested `<ul>` of links to the headings, made from the outline as written (after the
-  repair above), when there are at least 3 headings (`MIN_TOC_HEADINGS`). The title comes
+  repair above), when there are at least 3 headings (`MIN_TOC_HEADINGS`). The title itself is
+  not an entry (it stands right above the list). The title comes
   first, so on a 390 px screen it is on the first screen and a long list is one closed line
   below it (it was above the title, 1,245 px of it for 30 entries). The `<details>` is closed
   in the markup, so every reader that draws no style (Canvas, Word, a transcript) gets the
