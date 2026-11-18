@@ -36,6 +36,7 @@ from html.parser import HTMLParser
 from threading import Lock
 
 from readablestem.core.types import Kind
+from readablestem.web.mathml import try_sanitize_mathml
 from readablestem.web.messages import KIND_LABELS, LISTEN_LABELS
 
 logger = logging.getLogger(__name__)
@@ -801,9 +802,12 @@ _THING_ATTRS = frozenset({"scope", "colspan", "rowspan"})
 
 
 def _thing_math(math: Node) -> str:
-    """The equation as MathML the browser draws, for the side panel. Built from the parsed
-    tree with every attribute but the ones MathML needs dropped (`_xml`)."""
-    return _xml(math) if math.tag == "math" else ""
+    """The equation as MathML the browser draws, for the side panel. It is placed in an app
+    page, so it goes through the app's allowlist (`web.mathml`), like every equation the
+    review screens show; one the allowlist refuses is not drawn."""
+    if math.tag != "math":
+        return ""
+    return str(try_sanitize_mathml(_xml(math)) or "")
 
 
 def _thing_picture(node: Node) -> str:
@@ -823,7 +827,7 @@ def _thing_html(node: Node | str, budget: list[int]) -> str:
     if node.tag in SKIPPED or "hidden" in node.attrs:
         return ""
     if node.tag == "math":
-        return _xml(node)
+        return _thing_math(node)
     if node.tag == "tr":
         if budget[0] <= 0:
             return ""
