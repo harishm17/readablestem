@@ -209,6 +209,9 @@ class Facts:
     equations: int = 0  # `m:oMath` in the body, notes included (a Fallback copy once)
     tables: int = 0
     marked_tables: int = 0  # tables with at least one row marked "repeat as header row"
+    # for each table of the body, in document order, how many leading rows are so marked: the
+    # reading of a pandoc that does not hand the style id back (3.1) goes by this list
+    header_marks: list[int] = field(default_factory=list)
     language_chars: Counter[str] = field(default_factory=Counter)  # BCP 47 tag -> letters
     default_language: str = ""
     words: Counter[str] = field(default_factory=Counter)
@@ -530,6 +533,7 @@ def _mark_tables(root: ET.Element, facts: Facts) -> None:
             else:
                 break
         facts.marked_tables += bool(marked)
+        facts.header_marks.append(marked)
         props = table.find(_TBLPR)
         if props is None:
             props = ET.Element(_TBLPR)

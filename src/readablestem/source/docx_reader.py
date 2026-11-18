@@ -147,6 +147,8 @@ class _Reader:
         self.loose: list[dict[str, Any]] = []  # pictures met in the block being read
         self.captions: dict[str, str] = {}  # id of a caption paragraph -> its text
         self.title_set = False
+        # table node -> its place among the tables of the tree (pandoc 3.1 gives no style id back)
+        self.table_place: dict[int, int] = {}
 
     # ------------------------------------------------------------------ elements
 
@@ -519,9 +521,14 @@ class _Reader:
         attr, caption, _, head, bodies, foot = content
         style = dict(attr[2]).get("custom-style", "")
         count = style.removeprefix(docx_package.HEADER_STYLE)
-        marked = (
-            int(count) if style.startswith(docx_package.HEADER_STYLE) and count.isdigit() else 0
-        )
+        if style.startswith(docx_package.HEADER_STYLE) and count.isdigit():
+            marked = int(count)
+        else:  # an older pandoc: the file's own list, when it lines up with the tree's tables
+            marks = self.prepared.facts.header_marks
+            place = self.table_place.get(id(content))
+            marked = (
+                marks[place] if place is not None and len(marks) == len(self.table_place) else 0
+            )
         head_rows = list(head[1])
         rows = [*head_rows]
         for body in bodies:
@@ -725,8 +732,9 @@ class _Reader:
         self.captions[element.id] = text
 
     def attach_captions(self) -> None:
-        """A caption paragraph straight after a picture, or straight before one, is that
-        picture's caption; any other stays a paragraph."""
+        """A caption paragraph straight after a picture or a table, or straight before one, is
+        that picture's or table's caption (pandoc 3.7 gives a table its caption itself, an older
+        one leaves the paragraph); any other stays a paragraph."""
         elements = self.out.elements
         for element in list(elements):
             if element.id not in self.captions:
@@ -734,18 +742,52 @@ class _Reader:
             at = elements.index(element)
             after = elements[at - 1] if at > 0 else None
             before = elements[at + 1] if at + 1 < len(elements) else None
-            for figure in (after, before):
-                if figure is not None and figure.kind is Kind.FIGURE and not figure.caption:
-                    figure.caption = element.text
-                    elements.remove(element)
-                    self.report.captions += 1
-                    break
+            for target in (after, before):
+                if target is None or not self._captioned(target, element.text or ""):
+                    continue
+                elements.remove(element)
+                self.report.captions += 1
+                break
+
+    def _captioned(self, target: Element, text: str) -> bool:
+        if target.kind is Kind.FIGURE and not target.caption:
+            target.caption = text
+            return True
+        fix = self.out.fixes.get(target.id)
+        if (
+            target.kind is Kind.TABLE
+            and target.table is not None
+            and not target.table.caption
+            and fix is not None
+            and fix.table is not None
+        ):
+            target.table = target.table.model_copy(update={"caption": text})
+            fix.table = fix.table.model_copy(update={"grid": target.table})
+            return True
+        return False
 
 
 # ---------------------------------------------------------------------------- helpers
 
 
 META_KEYS = ("title", "subtitle", "author", "date", "abstract")
+
+
+def _tables_of(tree: dict[str, Any]) -> list[Any]:
+    """The `Table` nodes' contents of the tree, in the order of the file (a table inside a cell
+    after the cell's table)."""
+    found: list[Any] = []
+    stack: list[Any] = [tree.get("blocks", [])]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, list):
+            stack.extend(reversed(node))
+        elif isinstance(node, dict):
+            if node.get("t") == "Table":
+                found.append(node["c"])
+            if "c" in node:
+                stack.append(node["c"])
+    return found
 
 
 def _meta_blocks(value: dict[str, Any]) -> list[Any]:
@@ -976,6 +1018,7 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
     file. `ReadError` for a tree that is too large or too deep."""
     reader = _Reader(prepared)
     facts = prepared.facts
+    reader.table_place = {id(table): n for n, table in enumerate(_tables_of(tree))}
     reader.meta(tree.get("meta", {}))
     reader.blocks(tree.get("blocks", []))
     reader.attach_captions()
