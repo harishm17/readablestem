@@ -264,18 +264,25 @@ def test_the_selected_mark_is_inside_the_page_region_and_the_window_stays_at_the
 
 @pytest.mark.parametrize("viewport", [DESKTOP, PHONE, NARROW], ids=["1440", "390", "320"])
 def test_every_mark_is_a_link_of_at_least_24_css_px(site, browser, job, viewport):
+    """On each page of the document, which has its own stylesheet of mark positions."""
     context, page = open_page(browser, site, viewport=viewport)
-    page.goto(f"{site.base}/jobs/{job}/review?accepted=1")
-    wait_images(page)
-    sizes = page.eval_on_selector_all(
-        ".box",
-        "els => els.map(e => [e.id, e.tagName, e.getBoundingClientRect().width, "
-        "e.getBoundingClientRect().height])",
-    )
+    found = {}
+    for number in (1, 2):
+        page.goto(f"{site.base}/jobs/{job}/review?accepted=1&page={number}")
+        wait_images(page)
+        found[number] = page.eval_on_selector_all(
+            ".box",
+            "els => els.map(e => { const r = e.getBoundingClientRect();"
+            " return [e.id, e.tagName, r.width, r.height, r.left, r.top]; })",
+        )
     context.close()
-    assert len(sizes) == 6
-    small = [s for s in sizes if s[1] != "A" or s[2] < 24 or s[3] < 24]
-    assert not small, small
+    assert {n: len(boxes) for n, boxes in found.items()} == {1: 6, 2: 2}
+    for boxes in found.values():
+        small = [b for b in boxes if b[1] != "A" or b[2] < 24 or b[3] < 24]
+        assert not small, small
+    # The two marks of page 2 (a heading and an equation, apart on the page) do not overlap.
+    (a, b) = found[2]
+    assert a[4] + a[2] <= b[4] or b[4] + b[2] <= a[4] or a[5] + a[3] <= b[5] or b[5] + b[3] <= a[5]
 
 
 def test_marks_are_named_and_link_to_their_decision(site, browser, job):

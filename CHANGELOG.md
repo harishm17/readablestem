@@ -176,6 +176,22 @@
   would start a second service whatever the setting says); rolling back is `WORKER_MODE=inline`.
   No model call, no change to what is sent to a model or stored, no migration (the table was
   there), no version bump.
+## Unreleased: the marks stylesheet is made once for a page (branch perf/marks-per-page)
+
+- PF1 (F-273, F-274): the review screen's `marks.css` is served for one page
+  (`marks.css?page=N`) and the screen links the page it shows (and an equation card's page when
+  that is another). Its `ETag` is a hash of what the page's marks are made of (the boxes of the
+  fixes and of the notices that get a mark, inline or not, the page's content edges and size,
+  each equation's box and font size, and `marks.PLACEMENT_VERSION`); `Cache-Control` is
+  `private, no-cache`; a request with the tag is answered 304 after the same access checks and
+  without placing a mark. A decision changes no tag. The check reads the stored result only
+  (not the job summary and crops the screen needs). Placement compares only links that can ever
+  touch, in the order every pair would have been (the same result wherever the old loop
+  settled) and stops after `TRIES_PER_MARK` pairs tried for each mark where it cannot settle.
+  On a generated document with b2's numbers (14 pages, 647 marks, 143 decisions) the whole
+  stylesheet took 2.5 s and 173 KB on every load; a page takes 40 to 50 ms and 11 KB the first
+  time and a 304 about 25 ms after. No change to how marks look, no model call, no
+  stored-data change, no migration, no version bump.
 ## Unreleased: the scan box states its cost (branch feat/scan-option-cost)
 
 - WS7.2 (F-014): the box "Convert scanned or handwritten pages" says what reading a page costs

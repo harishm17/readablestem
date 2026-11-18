@@ -109,12 +109,12 @@ def cached_html(
     etag = '"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
     control = "public, no-cache" if revalidate else f"public, max-age={max_age}"
     sent = {**(headers or {}), "ETag": etag, "Cache-Control": control}
-    if _asked_for(request, etag):
+    if asked_for(request, etag):
         return Response(status_code=304, headers=sent, background=background)
     return HTMLResponse(body, headers=sent, background=background)
 
 
-def _asked_for(request: Request, etag: str) -> bool:
+def asked_for(request: Request, etag: str) -> bool:
     """Does the request's `If-None-Match` name this ETag? A weak tag counts: a compressed
     copy of the same page carries `W/` (`web.security.CompressionMiddleware`)."""
     sent = request.headers.get("if-none-match", "").split(",")
@@ -131,6 +131,6 @@ def fixed_file(
     response = FileResponse(path, media_type=media_type, headers={"Cache-Control": cache_control})
     response.set_stat_headers(path.stat())  # the response makes them itself only as it is sent
     etag = response.headers["etag"]
-    if _asked_for(request, etag):
+    if asked_for(request, etag):
         return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
     return response

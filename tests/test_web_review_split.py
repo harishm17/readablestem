@@ -11,6 +11,7 @@ test_web_review*.py; axe, reflow and keyboard in test_web_review_split_browser.p
 
 from __future__ import annotations
 
+import copy
 import re
 from collections import Counter
 from html import unescape
@@ -295,7 +296,7 @@ def test_results_stored_before_page_sizes_and_tiers_still_load(split):
     assert "5 decisions to make." in page
     # Page sizes come from the PDF itself, so the marks are still placed.
     assert "The marks could not be placed" not in page
-    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
+    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=1").text
     assert "#box-p1-e2{left:" in css
 
 
@@ -311,8 +312,65 @@ def test_without_page_sizes_a_failed_probe_leaves_the_decisions_usable(split, mo
     assert "Decision 1 of 5" in panel(page)
     assert "No marks on this page." in page
     assert boxes(page) == {}
-    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
+    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=1").text
     assert "#box-" not in css
+
+
+def test_marks_are_served_per_page_and_asked_again_only_to_be_told_nothing_changed(
+    split, monkeypatch
+):
+    """Each page has its own stylesheet and tag. A repeat with the tag is a 304 and places no
+    mark; moving a mark on page 2 changes only page 2's tag; a decision changes none."""
+    from readablestem.web import marks
+
+    def sheet(number: int, tag: str = ""):
+        headers = {"If-None-Match": tag} if tag else {}
+        return split.browser.get(
+            f"/jobs/{split.job_id}/review/marks.css?page={number}", headers=headers
+        )
+
+    first, second = sheet(1), sheet(2)
+    assert "#box-p1-e2{" in first.text and "#box-p1-e2{" not in second.text
+    assert "#box-p2-e0{" in second.text and "#box-p2-e0{" not in first.text
+    assert first.headers["cache-control"] == "private, no-cache"
+    tags = {1: first.headers["etag"], 2: second.headers["etag"]}
+    assert tags[1] != tags[2]
+    for number in (0, 3, "x"):
+        assert (
+            split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page={number}").status_code
+            == 404
+        )
+    assert split.browser.get(f"/jobs/{split.job_id}/review/marks.css").status_code == 404
+
+    # The screen links the stylesheet of the page it shows.
+    assert 'marks.css?page=2"' in screen(split, "?item=p2-e2&page=2")
+
+    def placed(*args, **kwargs):
+        raise AssertionError("a mark was placed")
+
+    monkeypatch.setattr(marks, "place", placed)
+    for number, tag in tags.items():
+        again = sheet(number, tag)
+        assert (again.status_code, again.content) == (304, b"")
+        assert again.headers["etag"] == tag
+    monkeypatch.undo()
+
+    # A decision is a class on the card, not new geometry: no tag changes.
+    assert post(split, "p1-e2", action="accept", version="0").status_code == 303
+    assert {n: sheet(n).headers["etag"] for n in (1, 2)} == tags
+
+    # An element that moves on page 2: that page's stylesheet is new, page 1's is not.
+    with session_scope(split.ctx.factory) as session:
+        job = session.get(Job, split.job_id)
+        assert job is not None and job.result_json is not None
+        data = copy.deepcopy(job.result_json)
+        for element in data["elements"]:
+            if element["id"] == "p2-e2":
+                element["bbox"] = [element["bbox"][0] + 40, *element["bbox"][1:]]
+        job.result_json = data
+    moved = sheet(2, tags[2])
+    assert moved.status_code == 200 and moved.headers["etag"] != tags[2]
+    assert sheet(1, tags[1]).status_code == 304
 
 
 def test_a_long_difference_list_is_folded_and_the_latex_box_opens_tall(tmp_path):

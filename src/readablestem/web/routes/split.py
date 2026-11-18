@@ -25,12 +25,16 @@ htmx checks LaTeX while it is typed, `live_check`). Every form carries the revie
 version its page was drawn at, so a form from an out-of-date tab is refused, not applied
 (`routes/review.py`). The full list of every item is still at `/jobs/{id}/review/list`.
 
-Mark positions come from a stylesheet made per job (`/jobs/{id}/review/marks.css`:
-element ids and percentages only), because the CSP allows no inline styles.
+Mark positions come from a stylesheet made per page (`/jobs/{id}/review/marks.css?page=N`:
+element ids and percentages only), because the CSP allows no inline styles. The screen links
+the stylesheet of the page it shows; an `ETag` made from what the page's marks are made of
+lets the browser keep it (`PageMarks`).
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 from collections.abc import Callable, Sequence
@@ -59,6 +63,7 @@ from readablestem.web import (
     page_images,
     queue,
 )
+from readablestem.web.assets import asked_for
 from readablestem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
@@ -128,7 +133,7 @@ from readablestem.web.routes.review import (
 )
 from readablestem.web.shares import REVIEW
 from readablestem.web.speech_diff import SpokenDiff, spoken_diff
-from readablestem.web.views import JobView, last_decision
+from readablestem.web.views import last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -426,8 +431,9 @@ def _label(fix: Fix, labels: dict[str, str]) -> str:
     return labels.get(fix.element_id) or KIND_LABELS.get(fix.kind, fix.kind.value.title())
 
 
-def _page_count(view: JobView, result: DocumentResult) -> int:
-    pages = [view.page_count, result.stats.pages, *(e.page + 1 for e in result.elements)]
+def _page_count(stored: int, result: DocumentResult) -> int:
+    """The pages of the document: what the job row says, or the result (an older one) shows."""
+    pages = [stored, result.stats.pages, *(e.page + 1 for e in result.elements)]
     return max(1, *pages)
 
 
@@ -579,7 +585,7 @@ class SplitBuilder:
         self.places = heading_places(self.result)
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
-        self.page_count = _page_count(self.view, self.result)
+        self.page_count = _page_count(self.view.page_count, self.result)
         self.omitted = set(self.result.omitted_pages)
         self.items: dict[str, ReviewItem] = {}
         # A source's items are not read again from a picture (`review._own_equation`).
@@ -1396,6 +1402,13 @@ def split_page(
     if page_mode:
         panel.title = f"Page {number}"
     page_view = builder.page_view(number, selected, current_key, place.key if place else None)
+    # Stylesheets of mark positions: the page shown, and the page of the decision's equation
+    # (its proposal is sized under its crop by a rule in that page's stylesheet).
+    mark_pages = [number]
+    if panel.item is not None and panel.item.kind == "equation":
+        home = builder.elements.get(panel.item.element_id)
+        if home is not None and home.page + 1 != number:
+            mark_pages.append(home.page + 1)
     open_count = sum(d.open for d in builder.queue)
     optional = builder.optional_lines(number if page_mode else None)
     flashes = pop_flash(request)
@@ -1405,6 +1418,7 @@ def split_page(
         "job": builder.view,
         "panel": panel,
         "page": page_view,
+        "mark_pages": mark_pages,
         "pages": builder.page_links(number, current_key),
         "steps": [] if page_mode else builder.steps(decision),
         "total": len(builder.queue),
@@ -1655,64 +1669,121 @@ def _box_rules(mark: marks.Mark, size: tuple[float, float]) -> str:
     return rule + "}"
 
 
-@router.get("/jobs/{job_id}/review/marks.css")
-def marks_css(request: Request, job_id: str, user: UserDep) -> Response:
-    """Where each mark goes on its page image (`web.marks`: a frame round the element and
-    a clickable area of at least 24 CSS px that overlaps no other), and the size the
-    proposal of each equation is drawn at under its crop. Element ids and numbers only."""
-    _, result, _ = _load(request, job_id, user)
-    sizes = resolve_page_sizes(request, job_id, user, result)
-    elements = {e.id: e for e in result.elements}
-    rules = []
-    by_page: dict[int, dict[str, tuple[float, float, float, float]]] = {}
-    inline = frozenset(
-        e.id for e in result.elements if e.kind is Kind.EQUATION and e.display == "inline"
-    )
-    text: dict[int, tuple[float, float]] = {}  # how far each page's content reaches
-    for e in result.elements:
-        left, right = text.get(e.page, (e.bbox[0], e.bbox[2]))
-        text[e.page] = (min(left, e.bbox[0]), max(right, e.bbox[2]))
-    for fix in result.fixes:
-        element = elements.get(fix.element_id)
-        if element is not None and fix.kind in REVIEW_KINDS:
-            by_page.setdefault(element.page, {})[element.id] = element.bbox
-    for page, boxes in sorted(by_page.items()):
-        size = sizes.get(page)
-        if size is not None:
-            placed = marks.place(boxes, size, inline=inline, text=text.get(page))
-            rules.extend(_box_rules(m, size) for m in placed.values())
-    # Notices about text (T3-7) are marked on their paragraph. They are laid out apart from
-    # the fixes' marks and sit under them (they come first in the page), so a paragraph's
-    # mark never takes a click from an equation inside it.
-    first_fix: dict[str, Fix] = {}
-    for fix in result.fixes:
-        first_fix.setdefault(fix.element_id, fix)
-    noted: dict[int, dict[str, tuple[float, float, float, float]]] = {}
-    for place in notice_places.places(result, item_labels(result)):
-        element = elements.get(place.notice.element_id or "")
-        if place.key and element is not None and notice_places.shown_in_review(place, first_fix):
-            noted.setdefault(element.page, {})[element.id] = element.bbox
-    for page, boxes in sorted(noted.items()):
-        size = sizes.get(page)
-        if size is not None:
-            placed = marks.place(boxes, size, inline=frozenset(), text=text.get(page))
-            rules.extend(_box_rules(m, size) for m in placed.values())
-    for fix in result.fixes:
-        element = elements.get(fix.element_id)
-        if element is None:
-            continue
-        size = sizes.get(element.page)
-        if fix.kind is Kind.EQUATION:
-            clip = context_clip(element, size)
+@dataclass
+class PageMarks:
+    """What one page's stylesheet is made from, and nothing else: the boxes of the fixes and
+    of the notices that get a mark, which of them sit in a line of text, how far the page's
+    content reaches, the page's size, and the equations whose proposal is sized under its
+    crop. A decision is not here: a mark looks the same whether its item is open or done
+    (the state is a class on the mark, `app.css`)."""
+
+    size: tuple[float, float] | None
+    fixes: dict[str, marks.BBox]
+    inline: frozenset[str]
+    text: tuple[float, float] | None
+    notes: dict[str, marks.BBox]
+    equations: list[Element]  # one for each fix of an equation on the page
+
+    def etag(self) -> str:
+        """Same inputs, same stylesheet, same tag (`marks.PLACEMENT_VERSION` changes it when
+        the code that makes the stylesheet does)."""
+        parts = [
+            marks.PLACEMENT_VERSION,
+            self.size,
+            list(self.fixes.items()),
+            sorted(self.inline),
+            self.text,
+            list(self.notes.items()),
+            [(e.id, e.bbox, e.font_size, e.display) for e in self.equations],
+        ]
+        return '"' + hashlib.sha256(json.dumps(parts).encode("utf-8")).hexdigest()[:32] + '"'
+
+    def css(self) -> str:
+        rules: list[str] = []
+        if self.size is not None:
+            # The fixes' marks, then the notices about text (T3-7), laid out apart from them
+            # and under them (they come first in the page), so a paragraph's mark never takes
+            # a click from an equation inside it.
+            for boxes, inline in ((self.fixes, self.inline), (self.notes, frozenset[str]())):
+                if boxes:
+                    placed = marks.place(boxes, self.size, inline=inline, text=self.text)
+                    rules.extend(_box_rules(m, self.size) for m in placed.values())
+        for element in self.equations:
+            clip = context_clip(element, self.size)
             geometry = compare_geometry(element, clip, max_side_px=page_images.REGION_MAX_SIDE_PX)
             rules.append(
                 f"#cmp-{element.id}{{max-width:{geometry.max_width_px}px}}"
                 f"#cmp-{element.id} .cmp-math{{font-size:{geometry.font_cqw}cqw;"
                 f"margin-left:{geometry.left_cqw}cqw}}"
             )
-    return Response(
-        "\n".join(rules) + "\n", media_type="text/css; charset=utf-8", headers=IMAGE_HEADERS
+        return "\n".join(rules) + "\n"
+
+
+def page_marks(
+    result: DocumentResult, sizes: dict[int, tuple[float, float]], index: int
+) -> PageMarks:
+    """The inputs of the stylesheet of page `index` (0-based), from that page's elements, the
+    fixes on them and the notices about them."""
+    on_page = {e.id: e for e in result.elements if e.page == index}
+    left, right = (
+        min((e.bbox[0] for e in on_page.values()), default=0.0),
+        max((e.bbox[2] for e in on_page.values()), default=0.0),
     )
+    fixes: dict[str, marks.BBox] = {}
+    equations: list[Element] = []
+    first_fix: dict[str, Fix] = {}
+    for fix in result.fixes:
+        first_fix.setdefault(fix.element_id, fix)
+        element = on_page.get(fix.element_id)
+        if element is None:
+            continue
+        if fix.kind in REVIEW_KINDS:
+            fixes[element.id] = element.bbox
+        if fix.kind is Kind.EQUATION:
+            equations.append(element)
+    notes: dict[str, marks.BBox] = {}
+    for place in notice_places.places(result, item_labels(result)):
+        element = on_page.get(place.notice.element_id or "")
+        if place.key and element is not None and notice_places.shown_in_review(place, first_fix):
+            notes[element.id] = element.bbox
+    inline = frozenset(
+        e.id for e in on_page.values() if e.kind is Kind.EQUATION and e.display == "inline"
+    )
+    return PageMarks(
+        size=sizes.get(index),
+        fixes=fixes,
+        inline=inline,
+        text=(left, right) if on_page else None,
+        notes=notes,
+        equations=equations,
+    )
+
+
+@router.get("/jobs/{job_id}/review/marks.css")
+def marks_css(request: Request, job_id: str, user: UserDep, page: str = "") -> Response:
+    """Where each mark goes on one page image (`web.marks`: a frame round the element and a
+    clickable area of at least 24 CSS px that overlaps no other), and the size the proposal of
+    each equation on that page is drawn at under its crop. Element ids and numbers only.
+
+    The screen links the stylesheet of the page it shows. Its `ETag` is a hash of
+    what it is made from (`PageMarks.etag`), so the browser asks again each time
+    (`no-cache`) and gets a 304 when that has not changed, without a mark being placed. It is
+    asked only after the same checks as the screen itself."""
+    # Not `_load`: the job's summary and crops are the screen's, and cost far more than this.
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        stored = int(job.page_count or 0)
+    if not (page.isdigit() and 1 <= int(page) <= _page_count(stored, result)):
+        raise PageError(404, *NOT_FOUND)
+    sizes = resolve_page_sizes(request, job_id, user, result)
+    plan = page_marks(result, sizes, int(page) - 1)
+    etag = plan.etag()
+    headers = {"Cache-Control": "private, no-cache", "ETag": etag}
+    if asked_for(request, etag):
+        return Response(status_code=304, headers=headers)
+    return Response(plan.css(), media_type="text/css; charset=utf-8", headers=headers)
 
 
 def _png(png: bytes) -> Response:

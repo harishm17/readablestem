@@ -6,7 +6,8 @@
    link to its item, every decision a form: it all works without JavaScript. #}
 {% block title %}{% if errors %}Error: {% endif %}{% if panel.mode == "decision" %}{{ panel.title }}: {% endif %}Review {{ job.filename }}{% endblock %}
 {% block main_class %}wrap wrap-review{% endblock %}
-{% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">
+{# The marks of the page shown, and the proposal sizes of the decision's equation (its own page's stylesheet) #}
+{% block head %}{% for n in mark_pages %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css?page={{ n }}">{% endfor %}
   <script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 {% from "_table_card.html" import table_split_body with context %}
 {% from "_describe.html" import describe_box with context %}
