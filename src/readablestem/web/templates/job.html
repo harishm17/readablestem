@@ -21,6 +21,7 @@
 {% if job.title != job.filename %}<p class="doc-file">File: {{ job.filename }}</p>{% endif %}
 {% if not job.is_owner %}{% include "_job_shared.html" %}{% endif %}
 {% include "_job_course.html" %}
+{% include "_job_exam.html" %}
 {% if job.is_sample %}{% include "_job_sample.html" %}{% endif %}
 {% if job.part_label and job.is_owner %}{% include "_job_parts.html" %}{% endif %}
 {# A polite live region that changes per step, not per element: the counts are in the

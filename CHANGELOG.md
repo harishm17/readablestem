@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: exam mode is in view at upload and said wherever the document is handled (branch feat/exam-mode-visible-and-used)
+
+- WS11.3c (F-047, F-015 exam half), points 1 and 2: the "Exam or quiz" box is under the file field,
+  not inside the closed "How to convert it" group. The stored choice is said on the job page (with
+  "Change the exam or quiz choice" for the owner, the revised-upload form with the box ready), on
+  the documents list and batch rows, in the review header, in the review record and its CSV, and
+  on the job page a reviewer opens from a share; the student's page and files say nothing. One
+  set of words, `web/exam.py`. No request, prompt or stored document changes, so no version bump.
+- WS6.8, the part that changes no request: the conversion options reach every step already
+  (`pipeline/options.py`); only the figure step acts on exam mode. The page-image reader's figure
+  descriptions would need a line in `image_page.md` (proposed in the report, not made here).
+
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 
 - SW36 follow-up: a drawn rule was written as a blank to fill in ("_____") when the nearest

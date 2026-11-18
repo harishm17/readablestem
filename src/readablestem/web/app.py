@@ -56,6 +56,7 @@ from readablestem.web.deps import (
     current_user,
     render,
 )
+from readablestem.web.exam import EXAM_WORDS
 from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
@@ -197,6 +198,8 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     # Every sentence about what was converted, checked or reviewed (SW7): templates print
     # these, read from a `pipeline.checked.CheckedSummary`, and compose none of their own.
     env.globals["checked_words"] = checked_words  # ty: ignore[invalid-assignment]
+    # The exam choice's words (web/exam.py), the same on every page that says it.
+    env.globals["exam_words"] = EXAM_WORDS  # ty: ignore[invalid-assignment]
     # Structured data for the public pages (web.seo), with the same absolute address.
     env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
         seo.page_json_ld, site_url.rstrip("/")

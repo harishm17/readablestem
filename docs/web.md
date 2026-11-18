@@ -625,16 +625,30 @@ it names, tested); no PowerPoint conversion could be run on the development box 
 not installed there), so that path is covered by the file checks and a stand-in only.
 `readablestem convert FILE.docx` takes Word and PowerPoint files too.
 
-A third box, off by default: "Exam or quiz: describe figures without giving answers"
+A third box, off by default and always in view under the file field (it changes what students
+get, so it is not folded into a group): "Exam or quiz: describe figures without giving answers"
 (`exam`). It is stored as `jobs.exam_mode` and the worker passes it to the conversion as
 `ConversionOptions.exam_mode` (`web/notation.conversion_options`, which also carries the
-course notation; with neither, the run uses the settings' flags as before). Figure
-descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
+course notation; with neither, the run uses the settings' flags as before). The options are in
+force for every step of the run (`pipeline/options.py`), so each step that describes content can
+read the fact. Figure descriptions say what is shown and never the result
+(`pipeline/figure_step.py`); the page-image reader's figure descriptions do not read it yet (the
+prompt `image_page.md` has no exam wording, and a changed prompt is a changed request).
+
+The choice is said where the document is handled, in one set of words (`web/exam.py`, the Jinja
+global `exam_words`): the job page ("Exam or quiz: figure descriptions do not give answers." or
+"Not an exam or quiz: figures are described normally.", with "Change the exam or quiz choice" for
+the owner of a finished document, which opens the revised-upload form with the box ready), a mark
+on the row of the documents list and of an upload's batch page, the review header, the review
+record and its CSV, and the job page a reviewer opens from a share. The student's page, files and
+Listen text never say it. Changing the choice is a revised upload (the file again, decisions
+carried over); a change in place that re-describes only the description steps is not built.
 
 **The form's shape** (`_upload_form.html`, ux2-lane-a): the file field with its facts, then two
-groups that are one line each until opened, then "Upload and convert". "How to convert it" (course,
-exam or quiz, scanned and handwritten pages when offered) and "How long to keep it" each say what
-is set now ("No course · Figures described normally · Scanned pages kept as pictures"; "Deleted 24
+groups that are one line each until opened, then "Upload and convert". The exam box sits between the
+file field and the groups. "How to convert it" (course and scanned and handwritten pages, each when
+offered) and "How long to keep it" each say what
+is set now ("No course · Scanned pages kept as pictures"; "Deleted 24
 hours after you last work on it."); static/app.js rewrites that line as boxes change, and a group opens by itself when it
 holds a choice that is not its default. The scan box says first what it is for: needed for a PDF
 that is all scans or handwriting (refused without it), while a mixed PDF keeps its scanned pages
