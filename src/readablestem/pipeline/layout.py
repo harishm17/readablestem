@@ -108,6 +108,7 @@ from readablestem.pipeline import (
     glyph_math,
     glyph_names,
     glyph_reconcile,
+    glyph_strokes,
     hyphens,
     named_links,
     outline,
@@ -1727,10 +1728,12 @@ def _raw_blocks(page: pymupdf.Page) -> list[dict]:
 def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
     """`page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]` with the codes of
     symbol and TeX fonts read as what they draw (`font_codes`) and each ligature's
-    characters given their own share of the glyph's width (`_spread_ligatures`). Every
-    place layout reads characters from the PDF goes through here (rows, line glyphs, the
-    text pass's glyphs), so no path sees the zero-width boxes ligatures come out with."""
+    characters given their own share of the glyph's width (`_spread_ligatures`), and the
+    glyphs of drawing fonts taken out of the text (`glyph_strokes`). Every place layout reads
+    characters from the PDF goes through here (rows, line glyphs, the text pass's glyphs), so
+    no path sees the zero-width boxes ligatures come out with, or a line set as glyphs."""
     blocks = page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]
+    glyph_strokes.take(blocks)  # the glyphs of drawing fonts are strokes, not text
     glyph_names.recover(page, blocks)
     font_codes.remap(blocks)
     glyph_names.mark_gaps(blocks)
@@ -10870,7 +10873,7 @@ def _read_page(
     step, here and in the readers that open the file again, sees the display frame."""
     page_type.turn_page(page)
     raw = _raw_blocks(page)
-    drawings = page.get_cdrawings()
+    drawings = [*page.get_cdrawings(), *glyph_strokes.strokes(page, raw)]
     images = page_type.image_boxes(page)
     if page_type.too_complex(drawings):  # PAGE_MAX_PATHS: no path is read (`kept_reason`)
         kind = page_type.classify(
