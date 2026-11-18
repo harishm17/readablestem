@@ -417,3 +417,80 @@ def test_a_flagged_symbol_is_outlined_in_the_proposal(site, browser, job):
     element_width_pt = 8.71 + 2 * 4 * 11  # the omega's box plus 4 font sizes each side
     assert size == pytest.approx(11 * width / element_width_pt, rel=0.05)
     context.close()
+
+
+@pytest.fixture
+def abstained_job(site, browser) -> str:
+    """A fresh finished job whose block equation (p1-e5) the tool abstained on: no proposal."""
+    from readablestem.core.types import Status
+    from readablestem.models.fake import FakeVisionClient
+
+    output = review_output()
+    fix = output.result.fix_for("p1-e5")
+    assert fix is not None
+    fix.status, fix.equation, fix.reason, fix.review = (
+        Status.ABSTAINED,
+        None,
+        "low_confidence",
+        "required",
+    )
+    site.converter.output = output
+    answer = {"is_equation": True, "latex": "d_0 = 0", "confidence": 0.99}
+    site.ctx.client_factory = lambda settings, budget: FakeVisionClient(
+        budget=budget, defaults={"equation": answer}
+    )
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/app")
+    page.locator("#pdf").set_input_files(
+        files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": review_pdf()}]
+    )
+    page.get_by_role("button", name="Upload and convert").click()
+    page.wait_for_url(f"{site.base}/jobs/*")
+    job_id = page.url.rsplit("/", 1)[-1]
+    context.close()
+    assert site.run_worker() == job_id
+    site.converter.output = review_output()
+    return job_id
+
+
+def test_an_equation_with_no_proposal_can_be_decided_by_keyboard(
+    site, browser, abstained_job, axe_source
+):
+    """Read again, then Not an equation, by keyboard: the result is announced, focus goes
+    to the decision's heading, Save waits for something typed, and axe finds nothing."""
+    context, page = open_page(browser, site)
+    url = f"{site.base}/jobs/{abstained_job}/review?item=p1-e5"
+    page.goto(url)
+    wait_images(page)
+    page.get_by_text("Edit the LaTeX").click()  # closed until typing is the way forward
+    save = page.get_by_role("button", name=re.compile("^Save edit"))
+    assert save.is_disabled()
+    typed = page.locator("textarea[name=latex]")
+    typed.fill("d_0")
+    assert save.is_enabled()
+    typed.fill("")
+    assert save.is_disabled()
+    assert strict_axe(page, axe_source) == []
+
+    again = page.get_by_role("button", name="Read again")
+    again.focus()
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+    page.wait_for_load_state("networkidle")
+    _wait_focus(page, "decision-title")
+    assert "tool read it again" in page.get_by_role("status").inner_text()
+    assert page.locator(".cmp-math").count() == 1  # a proposal where there was none
+    assert strict_axe(page, axe_source) == []
+
+    page.goto(url)  # a fresh view of the same item
+    page.get_by_role("button", name="Not an equation").focus()
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+    page.wait_for_load_state("networkidle")
+    _wait_focus(page, "decision-title")
+    assert "now text" in page.get_by_role("status").inner_text()
+    assert page.locator("#fix-p1-e5").count() == 0
+    assert strict_axe(page, axe_source) == []
+    context.close()
