@@ -42,6 +42,7 @@ from readablestem.web.routes.bundle import _zip_response
 from readablestem.web.routes.jobs import (
     UPLOAD_RESULT_GONE,
     Placed,
+    scans_note,
     upload_error_message,
 )
 
@@ -196,6 +197,8 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
                 "badge": state.badge,
                 "state": _state(state),
                 "action": state.primary if row else None,
+                # Scanned and handwritten pages kept as pictures, and the price of reading them
+                "note": scans_note(ctx.settings, item),
             }
         )
     choose = [i for i in placed if i.pending_id]

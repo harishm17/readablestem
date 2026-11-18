@@ -275,11 +275,13 @@ def inspect_pdf_detail(
     max_pages: int,
     timeout_s: float = INSPECT_TIMEOUT_S,
     allow_image_pages: bool = False,
+    count_image_pages: bool = False,
 ) -> tuple[int, ImagePageCount]:
     """`(pages, image_pages)`: `inspect_pdf_isolated` and, when `allow_image_pages` (the person
-    asked for scanned and handwritten pages to be converted), how many pages the probe found
-    scanned or handwritten, "at least" when some page's drawings were not analysed
-    (`page_type.ImagePageCount`; none without the request)."""
+    asked for scanned and handwritten pages to be converted) or `count_image_pages` (the
+    deployment offers to read them), how many pages the probe found the image page pass would
+    read, by kind, "at least" when some page's drawings were not analysed
+    (`page_type.ImagePageCount`; none without either)."""
     if not data:
         raise UploadRejected("empty")
     if not looks_like_pdf(data):
@@ -291,7 +293,7 @@ def inspect_pdf_detail(
                 "-m",
                 "readablestem.web.pdf_probe",
                 str(max_pages),
-                *(["image_pages"] if allow_image_pages else []),
+                *(["image_pages"] if allow_image_pages else ["count"] if count_image_pages else []),
             ],
             input=data,
             capture_output=True,  # MuPDF's own messages are discarded, never logged
@@ -307,10 +309,18 @@ def inspect_pdf_detail(
     if answer.get("ok") is True and isinstance(answer.get("pages"), int):
         from readablestem.pipeline.page_type import ImagePageCount
 
-        found, unsure = answer.get("image_pages"), answer.get("image_pages_unanalysed")
+        counts = answer.get("image_pages")
+        counts = counts if isinstance(counts, dict) else {}
+
+        def count(key: str) -> int:
+            value = counts.get(key)
+            return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
         return answer["pages"], ImagePageCount(
-            found if isinstance(found, int) and found >= 0 else 0,
-            unsure if isinstance(unsure, int) and unsure >= 0 else 0,
+            max(count("scanned"), 0),
+            max(count("handwritten"), 0),
+            max(count("unread"), 0),
+            max(count("unanalysed"), 0),
         )
     code = answer.get("code")
     pages = answer.get("pages")

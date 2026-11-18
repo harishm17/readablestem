@@ -97,10 +97,34 @@ def test_with_the_option_a_scan_becomes_a_job_that_remembers_it(offered):
 
 
 def test_a_mixed_pdf_with_the_option_converts_and_without_it_keeps_the_scans_as_images(offered):
-    asked = job_of(upload(offered.browser, mixed_pdf(), image_pages=True), offered)
-    plain = job_of(upload(offered.browser, mixed_pdf()), offered)
+    asked_at = upload(offered.browser, mixed_pdf(), image_pages=True)
+    plain_at = upload(offered.browser, mixed_pdf())
+    asked, plain = job_of(asked_at, offered), job_of(plain_at, offered)
     assert asked.image_pages is True and plain.image_pages is False
     assert asked.page_count == plain.page_count == 3
+
+    # Without the box the answer says how many pages are scans, that they stay pictures
+    # and what reading them would cost (2 pages at the per-page setting, $0.25 by default).
+    said = " ".join(offered.browser.get(plain_at.headers["location"]).text.split())
+    assert "2 pages are scanned or handwritten (2 scanned images)" in said
+    assert "kept as pictures" in said and "would cost about $0.50 (2 pages at $0.25 each)" in said
+    # With it, nothing is offered: the pages are being read.
+    assert "scanned or handwritten (" not in offered.browser.get(asked_at.headers["location"]).text
+
+
+def test_a_batch_names_the_scanned_pages_of_each_document_that_has_them(offered):
+    client = offered.browser
+    response = client.post(
+        "/jobs",
+        data={"csrf_token": token(client)},
+        files=[
+            ("pdf", ("mixed.pdf", mixed_pdf(), "application/pdf")),
+            ("pdf", ("typed.pdf", make_pdf(), "application/pdf")),
+        ],
+    )
+    said = " ".join(client.get(response.headers["location"]).text.split())
+    assert said.count("scanned or handwritten (") == 1  # the typed document has none
+    assert "would cost about $0.50" in said
 
 
 def test_the_pages_of_a_converted_scan_count_against_the_daily_quota_as_usual(offered):

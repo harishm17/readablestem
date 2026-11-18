@@ -316,8 +316,7 @@ def job_caps(settings: Settings, page_count: int, image_pages: bool = False) -> 
     pages = page_count if page_count > 0 else settings.max_pages_per_job
     usd = min(settings.max_usd_per_job, pages * settings.max_usd_per_page)
     if image_pages and settings.feature_image_pages:
-        wider = min(settings.image_pages_max_usd_per_job, pages * settings.image_pages_usd_per_page)
-        usd = max(usd, wider)
+        usd = max(usd, settings.image_pages_estimate(pages))
     return (
         usd,
         min(settings.max_model_calls_per_job, pages * settings.max_model_calls_per_page),

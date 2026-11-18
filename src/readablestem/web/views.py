@@ -761,7 +761,7 @@ def job_view(
             context=states.Context(
                 budget_closed=base.budget_closed,
                 waiting_line=line,
-                image_pages_offered=base.image_pages_offered,
+                settings=base.settings,
                 now=base.now,
             ),
         )

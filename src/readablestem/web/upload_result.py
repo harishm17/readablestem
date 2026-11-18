@@ -34,6 +34,7 @@ FIELDS = (
     "left",
     "retry_after",
     "office",
+    "scans",
 )
 
 

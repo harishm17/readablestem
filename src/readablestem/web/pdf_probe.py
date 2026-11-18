@@ -20,7 +20,7 @@ Besides counting pages it refuses, before any quota is spent:
   them again, and a 260 KB file can inflate to 256 MB. They are counted before anything
   parses a page, through decoders that stop at the budget; the object streams are counted
   the same way before the page count is read, since reading it loads them.
-- PDFs with nothing to convert (`pipeline.page_type.document_refusal`): every page
+- PDFs with nothing to convert (`pipeline.page_type.probe_pages`): every page
   handwritten ("handwritten", or "handwritten_no_text" without a hidden recognition
   layer), a scanned image ("scanned", or "scanned_ocr" with a hidden OCR layer), or
   blank ("no_content"). Text nobody sees never counts as text. The text of every page
@@ -106,7 +106,7 @@ def looks_like_pdf(data: bytes) -> bool:
     return PDF_MAGIC in data[:MAGIC_WINDOW]
 
 
-# What `document_refusal` says of a document whose every page is a scan or handwriting: with
+# What `probe_pages` says of a document whose every page is a scan or handwriting: with
 # `FEATURE_IMAGE_PAGES` on, the conversion reads such pages from an image of the page
 # (ADR 0007), so these are let through. A blank document is still refused.
 IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
@@ -119,13 +119,14 @@ def probe(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> in
 
 
 def inspect(
-    data: bytes, *, max_pages: int, allow_image_pages: bool = False
+    data: bytes, *, max_pages: int, allow_image_pages: bool = False, count: bool = False
 ) -> tuple[int, ImagePageCount]:
-    """`(pages, image_pages)` or raise ProbeRejected. `image_pages` is how many pages are
-    scanned or handwritten (`page_type.image_page_count`, "at least" when some page's
-    drawings were not analysed), counted only with `allow_image_pages` (the person asked for
-    them to be converted: a document with none is not refused, the request just does not
-    apply); none otherwise."""
+    """`(pages, image_pages)` or raise ProbeRejected. `image_pages` is how many pages the
+    image page pass reads, by kind (`page_type.image_page_count`, "at least" when some page's
+    drawings were not analysed). It is counted with `allow_image_pages` (the person asked for
+    them to be converted: a document of such pages is not refused, and one with none is not
+    refused either, the request just does not apply) and with `count` (the deployment offers
+    to read them: the person is told how many there are); none otherwise."""
     if not data:
         raise ProbeRejected("empty")
     if not looks_like_pdf(data):
@@ -156,24 +157,12 @@ def inspect(
             raise ProbeRejected("damaged" if doc.is_repaired else "no_pages")
         if pages > max_pages:
             raise ProbeRejected("too_many_pages", pages=pages)
-        _check_pages(doc, allow_image_pages=allow_image_pages)
-        image_pages = _image_pages(doc, counted=allow_image_pages)
+        image_pages = _check_pages(
+            doc, allow_image_pages=allow_image_pages, count=allow_image_pages or count
+        )
     finally:
         doc.close()
     return pages, image_pages
-
-
-def _image_pages(doc: pymupdf.Document, *, counted: bool) -> ImagePageCount:
-    """The scanned and handwritten pages of an open document; none when MuPDF cannot say (the
-    conversion would fail such a page as well, and says so)."""
-    from readablestem.pipeline.page_type import ImagePageCount, image_page_count
-
-    if not counted:
-        return ImagePageCount()
-    try:
-        return image_page_count(doc)
-    except Exception:
-        return ImagePageCount()
 
 
 def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
@@ -186,10 +175,14 @@ def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
         return 0  # unreadable page objects fail the checks after this one
 
 
-def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
+def _check_pages(
+    doc: pymupdf.Document, *, allow_image_pages: bool = False, count: bool = False
+) -> ImagePageCount:
     """Refuse oversized pages, too much content and documents with nothing to convert
-    (module docstring)."""
-    from readablestem.pipeline.page_type import document_refusal
+    (module docstring); with `count`, the pages the image page pass reads, from the same
+    analysis (`page_type.probe_pages`). A page MuPDF cannot read only costs the count: the
+    document is checked as it would be without it."""
+    from readablestem.pipeline.page_type import ImagePageCount, probe_pages
 
     try:
         for number in range(doc.page_count):
@@ -202,13 +195,20 @@ def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> N
             content_budget.check(doc)
         except content_budget.ContentTooLarge:
             raise ProbeRejected("content_too_large") from None
-        reason = document_refusal(doc)
+        found = ImagePageCount()
+        try:
+            reason, found = probe_pages(doc, count=count)
+        except Exception:
+            if not count:
+                raise
+            reason = probe_pages(doc)[0]
     except ProbeRejected:
         raise
     except Exception:  # a page MuPDF cannot read would fail the conversion as well
         raise ProbeRejected("unreadable") from None
     if reason is not None and not (allow_image_pages and reason in IMAGE_PAGE_REFUSALS):
         raise ProbeRejected(reason)
+    return found
 
 
 def limit_memory(max_bytes: int = MEMORY_LIMIT_BYTES) -> None:
@@ -573,14 +573,21 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(json.dumps({"ok": True, "sizes": sizes}) + "\n")
         return 0
     max_pages = int(args[0]) if args else 1
-    images = len(args) > 1 and args[1] == "image_pages"
+    images = "image_pages" in args[1:]  # accept them; and count them
+    counted = images or "count" in args[1:]  # count them only
     data = sys.stdin.buffer.read()
     try:
-        pages, image_pages = inspect(data, max_pages=max_pages, allow_image_pages=images)
+        pages, image_pages = inspect(
+            data, max_pages=max_pages, allow_image_pages=images, count=counted
+        )
         answer: dict[str, object] = {"ok": True, "pages": pages}
-        if images:
-            answer["image_pages"] = image_pages.found
-            answer["image_pages_unanalysed"] = image_pages.unanalysed
+        if counted:
+            answer["image_pages"] = {
+                "scanned": image_pages.scanned,
+                "handwritten": image_pages.handwritten,
+                "unread": image_pages.unread,
+                "unanalysed": image_pages.unanalysed,
+            }
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
         if exc.pages is not None:

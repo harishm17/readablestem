@@ -30,6 +30,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from readablestem.config import Settings
 from readablestem.core import sandbox, uid
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import (
@@ -41,6 +42,7 @@ from readablestem.pipeline import (
     text_pass,
 )
 from readablestem.pipeline import language as languages
+from readablestem.pipeline.page_type import ImagePageCount
 from readablestem.source import envelope as source_envelope
 from readablestem.source import intake as source_intake
 from readablestem.source import latexml
@@ -64,6 +66,7 @@ from readablestem.web import (
 from readablestem.web import combine as combine_rules
 from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
+from readablestem.web import outcome as outcome_words
 from readablestem.web import retry as retry_rules
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import as_utc, utc_today
@@ -647,11 +650,14 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
 
 
 @router.get("/app")
-def app_home(request: Request, user: UserDep, revises: str = "") -> Response:
+def app_home(request: Request, user: UserDep, revises: str = "", image_pages: str = "") -> Response:
     ctx = get_ctx(request)
     context = app_context(ctx, user)
     if revises:
         context |= revision_context(ctx, user, revises)
+        if image_pages == "on" and context.get("revises"):
+            # The job page's "Upload it again with the box checked" (`states._offer`).
+            context["image_pages_default"] = True
     return render(request, "app.html", context)
 
 
@@ -861,6 +867,9 @@ class Placed:
     left: int | None = None
     retry_after: str = ""
     office: bool = False  # the file was Word or PowerPoint, made into a PDF first (T3-30)
+    # Scanned and handwritten pages the box was not checked for (`page_type.ImagePageCount`
+    # as a dict): kept as pictures, with the price of reading them said beside the document.
+    scans: dict[str, int] | None = None
 
 
 # How long the probes of one upload may take in all: each file has its own 30 s, but ten
@@ -992,16 +1001,20 @@ def _place_files(
             if remaining < 1.0:
                 raise UploadRejected("unreadable")
             limit_s = min(INSPECT_TIMEOUT_S, remaining)
-            if image_pages:  # also counts the scanned and handwritten pages
+            # With the offer on, the same probe counts the scanned and handwritten pages
+            # (`page_type.ImagePageCount`): they are read when asked, and said when not.
+            if s.feature_image_pages:
                 pages, found = inspect_pdf_detail(
-                    data, max_pages=s.source_page_limit, timeout_s=limit_s, allow_image_pages=True
+                    data,
+                    max_pages=s.source_page_limit,
+                    timeout_s=limit_s,
+                    allow_image_pages=image_pages,
+                    count_image_pages=True,
                 )
-                may_have = found.possible
+                may_have = image_pages and found.possible
             else:
                 pages = inspect_pdf_isolated(data, max_pages=s.source_page_limit, timeout_s=limit_s)
-                may_have = False
-            # The request applies to a file with scanned or handwritten pages and to no other
-            # (or that may have one: a page whose drawings were not analysed).
+                found, may_have = ImagePageCount(), False
             convert_images = image_pages and may_have
             if len(data) > s.upload_limit_bytes:  # the PDF made from a Word file can be big
                 raise UploadRejected("too_large")
@@ -1107,7 +1120,9 @@ def _place_files(
         events.record_upload(
             ctx.factory, s, user_id=user.id, job_id=job_id, data=file.data, pages=pages
         )
-        placed.append(Placed(file.filename, pages, job_id=job_id, office=office))
+        # Pages kept as pictures for want of the box are said at once (`scans_note`).
+        scans = asdict(found) if found.possible and not convert_images else None
+        placed.append(Placed(file.filename, pages, job_id=job_id, office=office, scans=scans))
     return placed
 
 
@@ -1315,6 +1330,8 @@ async def _answer_one(
     """The answer to an upload of one file: its job page, the page for choosing its pages,
     or the upload form again with the reason."""
     if item.job_id:
+        if note := scans_note(get_ctx(request).settings, item):
+            flash(request, note, undo=False)
         return RedirectResponse(f"/jobs/{item.job_id}", status_code=303)
     if item.pending_id:
         return RedirectResponse(f"/uploads/{item.pending_id}", status_code=303)
@@ -1336,6 +1353,15 @@ async def _answer_one(
             fields=fields,
         )
     )
+
+
+def scans_note(settings: Settings, item: Placed) -> str:
+    """What is said of a document's scanned and handwritten pages when the box was not
+    checked: how many, that they stay pictures, and what reading them would cost ("" when it
+    has none). The upload's answer and the batch page's row both say it, from the stored counts."""
+    if not item.scans or not settings.feature_image_pages:
+        return ""
+    return outcome_words.image_pages_offer(ImagePageCount(**item.scans), settings)
 
 
 def _results_redirect(ctx: AppContext, user: CurrentUser, placed: list[Placed]) -> Response:
@@ -1474,9 +1500,7 @@ def load_job_status(request: Request, job_id: str, user: CurrentUser) -> JobView
             job,
             with_page=True,
             role=shares.role_of(session, job, user) or VIEW,
-            context=states.Context(
-                budget_closed=closed, image_pages_offered=ctx.settings.feature_image_pages
-            ),
+            context=states.Context(budget_closed=closed, settings=ctx.settings),
         )
 
 

@@ -22,6 +22,11 @@
   {% if state.key != "partly_converted" %}{% for gap in state.gaps %}
   <p class="gap-note">{{ gap.text }}</p>
   {% endfor %}{% endif %}
+  {# The way to ask for scanned and handwritten pages to be read: the upload form with the
+     box checked (`states._offer`). #}
+  {% for gap in state.gaps if gap.action and gap.action.kind == "upload" %}
+  <p class="gap-action"><a href="{{ gap.action.href }}" id="read-pages-link">{{ gap.action.label }}</a></p>
+  {% endfor %}
   {% if provider_down|default(false) and job.status in ("queued", "running") %}
   <p id="provider-down-note">The AI service is not answering right now, so this document
     may stop early with parts not converted. If it does, “Try again” converts them once the

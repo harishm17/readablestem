@@ -2036,17 +2036,34 @@ def ink_stops(pages: Mapping[int, PageTypeResult]) -> dict[int, str]:
     }
 
 
-def reads_image(page: PageTypeResult | PageType) -> bool:
-    """Is this page one the image page pass reads (ADR 0007)? A scanned or handwritten kept
-    page, and a picture of a page under a text layer that does not cover it
-    (`TEXT_NOT_COVERING`): kept as an unread page, its visible text read, but it is a scan
-    as far as the pass is concerned. Works on a classifier result and on the stored record."""
+def image_kind(page: PageTypeResult | PageType) -> str | None:
+    """What the image page pass reads this page as ("scanned", "handwritten" or "unread"), or
+    None when it does not read it (ADR 0007). The one predicate for every place that asks:
+    the pass itself (`image_page.kept_reads`) and the count (`count_image_pages`). A kept page
+    whose content is a picture or ink is read when the instructor asked for scans and
+    handwriting to be converted: a scanned or handwritten page, a picture of a page under a
+    text layer that does not cover it (`TEXT_NOT_COVERING`: a scan as far as the pass is
+    concerned), and an unread page of vector ink (notes under a typed title whose ink was not
+    analysed, a page over the drawings cap). Not a full-page picture with a few typed
+    characters and nothing hidden: it may be a title slide on a photo (`kept_reason`). Works
+    on a classifier result and on the stored record alike."""
     reason = kept_reason(page)
-    if reason in (SCANNED_PAGE, HANDWRITTEN_PAGE):
-        return True
-    return (
-        reason == UNREAD_PAGE and page.kind == "scan_no_text" and TEXT_NOT_COVERING in page.reasons
-    )
+    if reason == HANDWRITTEN_PAGE:
+        return "handwritten"
+    if reason == SCANNED_PAGE:
+        return "scanned"
+    if reason != UNREAD_PAGE:
+        return None
+    if page.kind == "scan_no_text":
+        return "scanned" if TEXT_NOT_COVERING in page.reasons else None
+    # A page over the drawings cap may be a typed page with one dense plot: its typed text is
+    # exact and stays as layout read it. Only a page with less than a line of type is ink.
+    return "unread" if _visible_chars(page) < TEXT_MIN else None
+
+
+def reads_image(page: PageTypeResult | PageType) -> bool:
+    """Is this page one the image page pass reads (`image_kind`)?"""
+    return image_kind(page) is not None
 
 
 def keeps_text(page: PageTypeResult | PageType) -> bool:
@@ -2213,36 +2230,59 @@ def _probe_ink(page: pymupdf.Page, budget: InkBudget) -> InkStats:
 
 
 def document_refusal(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> str | None:
-    """`refusal_code` for a whole open document (the upload probe). Reads the text of
-    each page first and stops at the first clearly typed page, so only documents with
-    no such page pay for the drawings and the ink analysis (within `PROBE_MAX_ITEMS` path
-    items, and `budget_s` as the guard). A page whose ink was not analysed is never refused:
-    the conversion keeps it as an image with a decision."""
-    texts: list[tuple[int, pymupdf.Page, TextStats, float]] = []
+    """`refusal_code` for a whole open document (the upload probe): `probe_pages` without the
+    count, so the text is read only as far as the first clearly typed page."""
+    return probe_pages(doc, budget_s=budget_s)[0]
+
+
+def probe_pages(
+    doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S, count: bool = False
+) -> tuple[str | None, ImagePageCount]:
+    """`(refusal_code, image page count)` of a whole open document (the upload probe). Reads
+    the text of each page first, so only a page that is not clearly typed pays for the drawings
+    and the ink analysis (within `PROBE_MAX_ITEMS` path items, and `budget_s` as the guard). A
+    page whose ink was not analysed is never refused: the conversion keeps it as an image with
+    a decision. Without `count` the text is read only as far as the first clearly typed page
+    (the document is then not refused and its count is not made); with it every page is read,
+    and the refusal and the count come from one analysis of the same pages (`count_image_pages`,
+    `ImagePageCount.unanalysed` for a page whose ink was not analysed)."""
+    candidates: list[tuple[int, pymupdf.Page, TextStats, float]] = []
+    typed = False
     for number in range(doc.page_count):
         page = doc[number]
         raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
         images, coverage = image_boxes(page)
         stats = text_stats(page, raw, images, None)
         if clearly_convertible(stats, coverage):
-            return None
-        texts.append((number, page, stats, coverage))
+            typed = True
+            if not count:
+                return None, ImagePageCount()
+        else:
+            candidates.append((number, page, stats, coverage))
+    if not candidates:
+        return None, ImagePageCount()
     budget = _probe_budget(budget_s)
     hint = producer_hint(doc)
     records = [
         decide(stats, _probe_ink(page, budget), coverage, hint).to_record(number)
-        for number, page, stats, coverage in texts
+        for number, page, stats, coverage in candidates
     ]
-    return refusal_code(records)
+    return (None if typed else refusal_code(records)), count_image_pages(records)
 
 
 @dataclass(frozen=True)
 class ImagePageCount:
-    """How many pages are scanned or handwritten (`image_page_count`): `found`, and
-    `unanalysed` pages whose ink was not analysed, any of which may be one more."""
+    """How many pages the image page pass reads (`image_kind`), by kind, and `unanalysed`
+    pages whose ink was not analysed, any of which may be one more."""
 
-    found: int = 0
+    scanned: int = 0
+    handwritten: int = 0
+    unread: int = 0  # unread pages of ink or drawings (`image_kind`)
     unanalysed: int = 0
+
+    @property
+    def found(self) -> int:
+        return self.scanned + self.handwritten + self.unread
 
     @property
     def at_least(self) -> bool:
@@ -2259,31 +2299,22 @@ class ImagePageCount:
         return f"at least {self.found}" if self.at_least else str(self.found)
 
 
-def image_page_count(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> ImagePageCount:
-    """How many pages of an open document are scanned or handwritten, the pages the image
-    page pass reads (ADR 0007: `kept_reason` "scanned_page" or "handwritten_page"). Typed
-    pages are told from their text alone, so only a page that is not clearly typed pays for the
-    drawings and the ink analysis, within `PROBE_MAX_ITEMS` path items and `budget_s` as the
-    guard. A page whose ink was not analysed, and that its text and pictures do not already
-    make a scan, is counted apart (`ImagePageCount.unanalysed`): the count is then "at least"."""
-    candidates: list[tuple[int, pymupdf.Page, TextStats, float]] = []
-    for number in range(doc.page_count):
-        page = doc[number]
-        raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
-        images, coverage = image_boxes(page)
-        stats = text_stats(page, raw, images, None)
-        if not clearly_convertible(stats, coverage):
-            candidates.append((number, page, stats, coverage))
-    if not candidates:
-        return ImagePageCount()
-    budget = _probe_budget(budget_s)
-    hint = producer_hint(doc)
-    found = unanalysed = 0
-    for number, page, stats, coverage in candidates:
-        ink = _probe_ink(page, budget)
-        record = decide(stats, ink, coverage, hint).to_record(number)
-        if reads_image(record):
-            found += 1
-        elif not ink.analysed:
+def count_image_pages(pages: Iterable[PageType]) -> ImagePageCount:
+    """The count by kind of the pages the image page pass reads (`image_kind`) among page
+    records: the one place a count is made, for the upload probe and for a stored result. A
+    page the pass does not read whose ink was not analysed is counted apart: it may be
+    handwriting."""
+    kinds: Counter[str] = Counter()
+    unanalysed = 0
+    for page in pages:
+        if (kind := image_kind(page)) is not None:
+            kinds[kind] += 1
+        elif "ink_not_analysed" in page.reasons:
             unanalysed += 1
-    return ImagePageCount(found, unanalysed)
+    return ImagePageCount(kinds["scanned"], kinds["handwritten"], kinds["unread"], unanalysed)
+
+
+def image_page_count(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> ImagePageCount:
+    """How many pages of an open document the image page pass reads, by kind
+    (`probe_pages`); "at least" when a page's ink was not analysed (`ImagePageCount`)."""
+    return probe_pages(doc, budget_s=budget_s, count=True)[1]

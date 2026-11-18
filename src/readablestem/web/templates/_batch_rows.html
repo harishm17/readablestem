@@ -29,6 +29,7 @@
           <th scope="row" role="rowheader">
             {% if row.state == "deleted" %}{{ row.name }}{% else %}<a id="batch-doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.name }}</a>{% endif %}
             <span class="doc-file">{% if row.also %}{{ row.also }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }}{% if row.exam_mode %} · {{ exam_words.short }}{% endif %}</span>
+            {% if row.note %}<span class="doc-file batch-scans">{{ row.note }}</span>{% endif %}
           </th>
           <td role="cell" data-label="Status">
             <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>

@@ -42,6 +42,28 @@
   and compared by parsed value; `eval-unchanged` still opts out. The README's version is
   checked against `PIPELINE_VERSION` (`tests/test_eval_docs.py`).
   No version bump, no migration.
+## Unreleased: image pages are all read and always counted (branch feat/image-pages-read-and-offer)
+
+- SW19 (WS7.6, F-268): the image page pass reads every page it was asked to read. One predicate,
+  `page_type.image_kind` (scanned, handwritten, or unread pages whose content is a picture or
+  ink), picks them for the upload count and the pass (`image_page.kept_reads`); a page of
+  drawings whose ink the time guard did not analyze used to be kept as a picture with no model
+  call. The title typed over a read page is kept (`image_page.build(typed=...)`) when the read
+  leaves it out. The request for a page read is unchanged byte for byte, so the typed title is not
+  passed to the model as context: that half needs a request field and prompt wording and is left
+  as a proposal.
+- WS7.8 (F-360): image pages are always counted, by one function (`page_type.count_image_pages`,
+  with `probe_pages` for the upload) that returns scanned, handwritten and unread pages and says
+  "at least" when a page could not be analyzed. A file with such pages and the box not checked
+  now says how many pages are scans or handwriting, that they stay pictures, and what reading
+  them would cost (`Settings.image_pages_estimate`, the figure the job's cap uses): on the job
+  page right after the upload, on the batch page beside the document, and in the finished job's
+  note, with "Upload it again with the box checked" (`/app?revises=<id>&image_pages=on`).
+- Changes: no stored document, recording, registered hash or prompt changes; a job that asked
+  for image pages reads the pages of ink the guard stopped (one more model call each, within the
+  job's image page cap) and keeps the typed title of a read page. `PIPELINE_VERSION` is not
+  bumped here; it is owed at merge only if a finished document that asked for image pages should
+  be offered a re-run for these pages.
 
 ## Unreleased: a rule beside a maths sign, a column or an axis is no blank (branch fix/legend-sample-not-blank)
 

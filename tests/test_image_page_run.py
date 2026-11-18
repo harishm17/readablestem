@@ -181,6 +181,30 @@ def test_a_page_that_is_not_a_scan_is_never_sent_to_the_pass():
     assert result.image_pages is None and result.image_only_pages == []
 
 
+def test_a_page_of_ink_the_guard_stopped_is_read_and_keeps_its_typed_title(monkeypatch):
+    """Every kept page the box asked for is read: also a page of drawings whose ink was not
+    analysed (kind "unread"), which used to stay a picture with no call made. The title typed
+    over it is kept when the read leaves it out."""
+    from pathlib import Path
+
+    from readablestem.pipeline import page_type
+
+    monkeypatch.setattr(page_type, "INK_GUARD_S", 0.0)
+    doc = pymupdf.open(Path(__file__).parent / "fixtures" / "handwriting" / "ink_no_layer.pdf")
+    doc[0].insert_text((72, 60), "Kinematics", fontsize=22)
+    fake = client()
+    result = convert(doc.tobytes(), fake=fake)
+    assert [r.step for r in fake.requests].count("image_page") == 1
+    assert result.image_only_pages == []
+    assert result.image_pages is not None and result.image_pages.converted == 1
+    said = [e.text for e in result.elements if e.kind in (Kind.HEADING, Kind.PARAGRAPH)]
+    assert "Motion in one dimension" in said and "Kinematics" in said
+
+    # With the box off no page is read, and nothing says one was.
+    off = convert(doc.tobytes(), on=False)
+    assert off.image_pages is None and off.image_only_pages == [0]
+
+
 # ------------------------------------------------------------- review changes the output
 
 
