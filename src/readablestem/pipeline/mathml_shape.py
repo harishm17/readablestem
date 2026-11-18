@@ -15,6 +15,16 @@ thing (docs/mathml-alttext.md, "Shape for screen readers"). Chemistry has its ow
   ("Pattern match/replacement failure") and the reader says nothing for the whole equation. The
   arrow and the label are put directly in the `mover` or `munder`, which a browser draws the same
   (the arrow stretches to the label).
+- **A struck relation.** `\\not=` and `\\not\\perp` are converted to a slash in a zero-width
+  `mpadded` and then the relation, two things that read as "solidus" and "equals". They are
+  joined into one operator: the relation with the combining long solidus overlay (U+0338), as the
+  single negated character where Unicode has one (`\\not=` is U+2260, `\\not\\in` U+2209) and the
+  pair where it does not (`\\not\\perp`). `\\nleq` and the like are already one character.
+- **Operators left as identifiers.** `\\pm`, `:`, `\\ldots`, `\\langle` and `\\rangle` come out as
+  `<mi>`, which a browser sets without the spacing of an operator (about 0.44 em narrower for
+  `a \\pm b`, 0.17 em for `f : A`, 0.55 em for `a \\ldots b`), so they are `<mo>`. Neither the
+  speech here nor either engine reads them differently; the prime and the percent sign are
+  `<mi>` too and are drawn and read the same as `<mo>`, so they stay as they are.
 
 What was checked and needs no change: `mtable` rows and columns (pmatrix, bmatrix, vmatrix,
 cases, aligned) are spoken as matrices, determinants, cases and lines by both engines, and
@@ -24,6 +34,7 @@ over-scripts (`tests/test_screenreader_shape.py` pins these readings when the en
 
 from __future__ import annotations
 
+import unicodedata
 import xml.etree.ElementTree as ET
 
 RING = "∘"
@@ -32,6 +43,10 @@ HORIZONTAL_BAR = "―"
 MACRON = "¯"
 LOW_LINE = "_"
 _OVER_UNDER = frozenset({"mover", "munder", "munderover"})
+SOLIDUS_OVERLAY = "\u0338"
+_BIG_SOLIDUS = "\u29f8"
+# The operators the converter leaves as `<mi>` and a browser then sets without operator spacing.
+_OPERATORS_AS_IDENTIFIERS = frozenset("±:…⟨⟩")
 
 
 def _local(node: ET.Element) -> str:
@@ -59,8 +74,40 @@ def _unwrap_label(node: ET.Element, index: int) -> None:
         node[index] = _only_child(kids[0])
 
 
+def _as_operator(node: ET.Element) -> str:
+    """The tag of `node` with its local name `mo`, in the same namespace."""
+    return node.tag[: len(node.tag) - len(_local(node))] + "mo"
+
+
+def _is_strike(node: ET.Element) -> bool:
+    """`mpadded(mtext "big solidus")`: how the converter writes the slash of `\\not`."""
+    return (
+        _local(node) == "mpadded"
+        and len(node) == 1
+        and _local(node[0]) == "mtext"
+        and (node[0].text or "").strip() == _BIG_SOLIDUS
+    )
+
+
+def _join_struck_relations(parent: ET.Element) -> None:
+    """A strike followed by a one-character relation -> one `mo` with the overlay on it."""
+    index = 0
+    while index + 1 < len(parent):
+        relation = parent[index + 1]
+        text = (relation.text or "").strip()
+        if _is_strike(parent[index]) and _local(relation) in {"mo", "mi"} and len(text) == 1:
+            joined = ET.Element(_as_operator(relation))
+            joined.text = unicodedata.normalize("NFC", text + SOLIDUS_OVERLAY)
+            parent[index : index + 2] = [joined]
+        index += 1
+
+
 def shape_general(root: ET.Element) -> None:
     """Apply the fixes above to a converted `math` tree, in place."""
+    for node in list(root.iter()):
+        _join_struck_relations(node)
+        if _local(node) == "mi" and (node.text or "") in _OPERATORS_AS_IDENTIFIERS:
+            node.tag = _as_operator(node)
     for node in root.iter():
         tag = _local(node)
         if tag in _OVER_UNDER and len(node) >= 2:

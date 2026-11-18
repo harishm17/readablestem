@@ -179,8 +179,8 @@ def test_excited_nuclide(latex: str, speech: str) -> None:
 
 
 def test_a_star_outside_a_nuclide_reads_as_before() -> None:
-    # `O*` on its own could be a set or an operator, so it is not guessed to be excited
-    assert say(r"\text{O}^*") == "O to the power times"
+    # `O*` on its own could be a set or an operator, so it is not guessed to be excited (said "star")
+    assert say(r"\text{O}^*") == "O star"
 
 
 # ------------------------------------------------------------------------ units

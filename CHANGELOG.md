@@ -24,6 +24,40 @@
   12 forms and worksheets are unchanged. Four false blanks remain (fraction bars and overlines
   whose other parts sit in other rows).
 - Changes the text of a PDF that had such a blank, so `PIPELINE_VERSION` needs a bump at merge.
+## Unreleased: negated relations convert, empty arguments fail, and two prints are not said alike (branch fix/notation-and-speech)
+
+- Negated relations: `\not` before `=`, `<`, `>` or a relation or arrow command, and the `\n...`
+  commands (`\nleq`, `\nless`, `\ngeq`, `\nsubseteq`, `\ncong`, `\nsim`, `\nparallel`, `\nrightarrow`, ...)
+  pass `validate.check_latex` (`\not` before anything else is `bad_argument`). The tree shape
+  (`mathml_shape.shape_general`) joins the converter's zero-width slash and relation into one sign: the
+  single Unicode character where there is one (`≠ ∉ ≰ ⊄`), the relation and U+0338 otherwise. Each is
+  said by what it says ("is not an element of", "is neither less than nor equal to"), as MathCAT and
+  Speech Rule Engine do. `\not=` was read "a ⧸ equals b"; it is now "a not equal to b".
+- An empty `\frac{}{}`, `\sqrt{}`, base or script is the check `mathml.structure`, code
+  `empty_argument`, with its own sentence on the review screen (`web/messages.py`).
+- `\textbf{F}` of one letter keeps its bold ("bold capital F"; it was the plain text "F").
+- `±`, `:`, `…`, `⟨` and `⟩` that the converter writes as identifiers are operators in the tree
+  (`mathml_shape`), measured against Chromium's MathML widths; `′` and `%` stay as they are, since
+  setting them as operators moves nothing a reader sees or hears.
+- Speech (`pipeline/speech.py`): `\mid` is "given" between the arguments of `P(...)` and `E[...]`, "such
+  that" in set braces and "divides" only for divisibility; a centered dot or a cross between vectors
+  is "dot" and "cross" (the vector test of `signs.py`), "times" between numbers and scalars; `A^T`
+  "transpose", `x^*` "star", `\dagger`, `\sin^{-1}` "inverse sine", `0^+` "0 plus"; `\sim` before a
+  distribution "is distributed as"; `\setminus` "set minus"; `\mathit{diff}` is the word.
+- Two different prints were said alike: `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{a}{bc}` and
+  `\frac{a}{b}c`, `x_{iy}` and `x_i y`, `a_{nb}` and `a_n b`, `a\frac{b}{2}` and `\frac{ab}{2}`,
+  `a_{ab}^2` and `a_a b^2`, `e^{-x}` and `e^{-}x`. A short fraction, subscript or sign a plain token
+  follows now says where it ends, and a fraction after a plain token takes the long form. A search
+  over 36,000 small formulas finds no pair left that differs in print and not in words, except those
+  listed in docs/steps.md ("Speech"). Two spellings of one print are said alike: bars and signs the
+  converter leaves as identifiers read as operators, as does a transposed run of letters.
+- The spoken report (`scripts/realworld_report.py --spoken`) counts, beside the spoken score, the pairs
+  the spoken rule moved from wrong to right and how many of them are one print.
+- Changes what a conversion stores (an equation that passed with an empty part is now refused; every
+  reading changes words), so `PIPELINE_VERSION` needs a bump at merge. Stored readings keep their
+  words until the document is converted again (docs/steps.md, "Speech"). The registration of fresh5
+  names `speech.py`, `validate.py`, `mathml_shape.py` and `rw_spoken.py`, whose hashes this changes;
+  it already differed at the base on `math_canonical.py`.
 
 ## Unreleased: a drawing set as glyphs is a figure (branch fix/glyph-drawn-figures)
 

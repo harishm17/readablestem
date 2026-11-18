@@ -104,6 +104,30 @@ def test_every_gold_equation_has_speech(record):
             "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix",
         ),
         (r"\begin{aligned} a &= b \end{aligned}", "a equals b"),
+        # a negated relation is the one sign, said as what it says
+        (r"a \not\in B", "a is not an element of capital B"),
+        (r"a \not= b", "a not equal to b"),
+        (r"a \nleq b", "a is neither less than nor equal to b"),
+        (r"A \not\subset B", "capital A is not a subset of capital B"),
+        (r"\textbf{F} = m a", "bold capital F equals m a"),
+        # a sign is said for what it does: a bar, a dot, a cross, a script
+        (r"P(A \mid B)", "capital P open parenthesis capital A given capital B close parenthesis"),
+        (r"\{x \mid x>0\}", "open brace x such that x greater than 0 close brace"),
+        (r"\{n \mid 3 \mid n\}", "open brace n such that 3 divides n close brace"),
+        (r"3 \mid 12", "3 divides 12"),
+        (r"\mathbf{a} \cdot \mathbf{b}", "bold a dot bold b"),
+        (r"\mathbf{a} \times \mathbf{b}", "bold a cross bold b"),
+        (r"2 \cdot 3", "2 times 3"),
+        (r"A^T", "capital A transpose"),
+        (r"x^*", "x star"),
+        (r"\sin^{-1} x", "inverse sine x"),
+        (r"\lim_{x \to 0^+} f", "the limit as x approaches 0 plus of f"),
+        (
+            r"X \sim N(0,1)",
+            "capital X is distributed as capital N open parenthesis 0 comma 1 close parenthesis",
+        ),
+        (r"A \setminus B", "capital A set minus capital B"),
+        (r"\mathit{diff}", "diff"),
         # sentence punctuation at the end is not read
         (r"x = 1.", "x equals 1"),
         (r"x = 1,", "x equals 1"),
@@ -111,6 +135,22 @@ def test_every_gold_equation_has_speech(record):
 )
 def test_speech_rules(latex, expected):
     assert say(latex) == expected
+
+
+@pytest.mark.parametrize(
+    ("one", "other"),
+    [
+        (r"\frac{1}{2m}v^2", r"\frac{1}{2}mv^2"),
+        (r"\frac{a}{bc}", r"\frac{a}{b}c"),
+        (r"x_{iy}", r"x_i y"),
+        (r"a_{nb}", r"a_n b"),
+        (r"\frac{ab}{2}", r"a \frac{b}{2}"),
+        (r"a_{ab}^2", r"a_a b^2"),
+        (r"e^{-x}", r"e^{-}x"),
+    ],
+)
+def test_two_different_formulas_are_not_said_alike(one, other):
+    assert say(one) != say(other)
 
 
 @pytest.mark.parametrize(

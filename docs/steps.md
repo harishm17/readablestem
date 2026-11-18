@@ -807,7 +807,7 @@ send the fix to review.
 | `latex.allowed_commands` | `unknown_command` | error | any control word or symbol not in the allowlist |
 | `latex.allowed_commands` | `unsupported_ce` | error | a `\ce{...}` the chemistry subset could not write out (`pipeline/chem.py`); it is the only unknown command |
 | `latex.allowed_environments` | `unknown_environment` | error | an environment other than `array matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix cases aligned align align* gathered split` |
-| `latex.command_arguments` | `bad_argument` | error | `\hspace` without a braced, non-negative dimension (`x \hspace y` would become `<mspace width="y">` and lose the `y`) |
+| `latex.command_arguments` | `bad_argument` | error | `\hspace` without a braced, non-negative dimension (`x \hspace y` would become `<mspace width="y">` and lose the `y`); `\not` before anything but `=`, `<`, `>` or a relation or arrow command (`\not a` would become a stray slash) |
 | `latex.plain_text_arguments` | `markup_in_text` | error | `<`, `>` or `&` in the argument of `\text \textrm \textbf \textit \textsf \texttt \textnormal \textup \mbox` (latex2mathml copies that argument into its XML unescaped, so it would become markup) |
 
 The allowlist (`validate.ALLOWED_COMMANDS`) covers Greek letters, binary operators,
@@ -817,7 +817,13 @@ delimiters, accents (`\vec \hat \bar \dot \ddot \tilde \overline \underline
 \textrm \textbf \operatorname ...`) and structures (`\frac \dfrac \tfrac \sqrt \binom
 ...`). A test converts every allowed command with latex2mathml and fails if any of them
 comes through unconverted, so the allowlist cannot drift from what the converter
-supports. `\not` and `\arg` are left out for that reason.
+supports. `\arg` is left out for that reason. A negated relation is allowed in either
+spelling: `\not` before a relation or arrow (`\not\in`, `\not=`, `\not\equiv`) and the `\n...` commands
+(`\nleq`, `\nless`, `\ngeq`, `\nsubseteq`, `\ncong`, `\nsim`, `\nparallel`, `\nrightarrow`, ...). The tree
+shape joins the two into the one negated sign (`mathml_shape.shape_general`): the Unicode character
+where there is one (`≠ ∉ ≰ ⊄`), the relation and U+0338 otherwise.
+`\textbf` of one letter is baked to a bold letter before the conversion (`\textbf{F}` is "bold
+capital F", not the text "F").
 
 Before checking, the equation step removes wrappers the prompt forbids but models still
 add: `$...$`, `$$...$$`, `\[...\]`, `\(...\)`, `equation` environments, `\displaystyle`,
@@ -874,6 +880,7 @@ Inputs so deeply nested that the converter recurses too far fail the same way.
 | `mathml.token_content` | `markup_in_token` | an element inside `mi`, `mn`, `mo`, `mtext` or `ms` (other than `malignmark`); browsers parse children of `<mtext>` as HTML |
 | `mathml.depth` | `too_deep` | nesting deeper than 64 (measured without recursion) |
 | `mathml.structure` | `bad_arity` | `mfrac`, `mroot`, `msub`, `msup`, `munder`, `mover` without 2 children, or `msubsup`, `munderover` without 3 (latex2mathml turns `\frac{a}` into a one-child `mfrac`) |
+| `mathml.structure` | `empty_argument` | a fraction, root or script with an empty part (`\frac{}{2}`, `\sqrt{}`, `x^{}`, an empty base): the part of the equation that was read is missing, and a reading of the rest would say a different equation |
 | `mathml.converted` | `unconverted_command` | LaTeX left in a token (`<mi>\foo</mi>`, `<mtext>\textbf{x</mtext>`, `<mtext>a\,b</mtext>`: a backslash followed by a command name or any non-alphanumeric character), any `merror`, or a stray alignment `&` in an `mi` |
 
 All are error-level. All 30 gold MathML equations pass.
@@ -925,12 +932,17 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 
 | Construct | Reading |
 |---|---|
-| Simple fraction (each side one or two plain tokens) | "a over b", "capital delta bold d over capital delta t" |
+| Simple fraction (each side one or two plain tokens) | "a over b", "capital delta bold d over capital delta t"; "a over b end fraction" when a plain token follows it, and the long form after a plain token, so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}` are not said alike |
 | Other fractions | "the fraction ... over ... end fraction" |
 | `linethickness=0` fraction | "n choose k" |
 | Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power" |
 | Primes, degrees | "y double prime", "30 degrees" |
-| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub" |
+| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a short subscript a plain token (or a script on one) follows is closed, "x sub i end sub y" against `x_{iy}` "x sub i y" |
+| Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "capital A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
+| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides" and a pair of bars the absolute value |
+| A centered dot or a cross | between vectors (bold letters, arrows, nabla, the test of `signs.py`) "dot" and "cross"; between numbers and scalars "times" |
+| A negated relation | "is not an element of", "is neither less than nor equal to", "not equal to", "is not a subset of", ...; a relation with no word of its own "with stroke" |
+| Distribution and sets | `\sim` after a variable before a distribution "is distributed as"; `\setminus` "set minus"; `\mathit{diff}` is the word "diff" (a plain `diff` is still d, i, f, f) |
 | Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
 | Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
 | Roots | "the square root of x", "... end root" when compound, "the cube root of", "the root of index n of" |
@@ -947,6 +959,33 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Units | upright letters or text right after a number: "5 m/s" reads "5 meters per second", "9.8 m/s^2" "9.8 meters per second squared", "3 kg·m/s" "3 kilogram meters per second", "2.9 m/s" "2.9 meters per second", "25 °C" "25 degrees Celsius"; singular after 1. Italic letters (a variable `m`), ambiguous divisions (`J/kg K`) and unknown symbols read as before (`speech_units.py`) |
 | Text | verbatim, except words that are a single math symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
+
+Two prints that differ are not said alike, and two spellings of one print are: an operator the
+converter leaves as an identifier (`\vert`, `\Vert`, `\pm`, `\langle`, `\geqslant`) reads as the operator,
+and a transposed run of letters (`\boldsymbol{BB}^T`) as one print with `BB^T`. Left alike on
+purpose: `ab_2` and `{ab}_2` (the same print), round and square matrix brackets, `\cdot`, `\times` and
+`*` between scalars, `\simeq` and `\approx`, `\implies` and `\Rightarrow`, `5^\circ` and `5\degree`,
+`\mathrm{diff}` and a plain `diff` (upright letters are read one by one: units).
+
+**Stored readings.** What keeps its old words and what takes the new ones, for a document converted
+before a change to these rules:
+
+- The reading stored with an equation (`EquationFix.speech`) is made once, in the equation step. The
+  review screen's "Read aloud roughly as" line, the Listen transcript (`web/listen.py`, which uses
+  the stored reading first) and the `alttext` of `MATHML_ALTTEXT` (`assemble.alttext_from_speech`)
+  all read it, so a stored document keeps the old words in all three until it is converted again
+  (a `PIPELINE_VERSION` bump does not convert a stored result again: only a new upload or a
+  revision does). An equation the author edits is read again at once (`web/edit_check.py`), with the
+  new words.
+- Where no reading is stored (a LaTeX one is not used) the Listen transcript, `speech_diff` and the
+  decision cards speak the MathML with the speech of the day: the new words, whenever a page is opened.
+- A table header's name (`table_html.named_maths`) is spoken from the stored cell MathML each time the
+  page is made, so a stored document takes the new words when its page is made again (a
+  `RENDER_VERSION` bump, or an edit that renders the HTML) and keeps the old in the file it
+  already holds.
+- `PIPELINE_VERSION` is not bumped here: this change alters what a conversion stores (a negated
+  relation is accepted, an equation with an empty part is refused, one-letter `\textbf` keeps its
+  bold, every reading changes words), so a bump is owed at merge.
 
 Sentence punctuation at the very end of the equation is not read. Unreadable input
 raises `SpeechError` with a content-free message. In the equation step a speech failure

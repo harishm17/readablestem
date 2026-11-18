@@ -34,6 +34,7 @@ from __future__ import annotations
 import re
 from functools import cache
 
+from readablestem.eval.equations import canonical
 from readablestem.gold import arxiv_gold as ag
 from readablestem.pipeline import validate
 from readablestem.pipeline.equation_step import clean_latex
@@ -113,6 +114,32 @@ def spoken_exact_mathml_gold(pred_latex: str | None, gold_mathml: str, registere
     return said is not None and said == _mathml_speech(gold_mathml)
 
 
+def _same_print(pred_latex: str, gold: dict) -> bool:
+    """Whether the prediction and the gold are one print: the same normalised MathML, as written
+    or once `speakable_latex` has written each one way. The strict count of the spoken reading
+    counts a credited pair only if this holds."""
+    try:
+        if _is_markup(pred_latex):
+            mine = [pred_latex]
+        else:
+            mine = [
+                validate.safe_latex_to_mathml(
+                    clean_latex(repair_converter_gaps(pred_latex)), "inline"
+                ),
+                ag.to_mathml(speakable_latex(pred_latex), False),
+            ]
+        if gold.get("latex"):
+            theirs = [
+                ag.to_mathml(repair_converter_gaps(gold["latex"]), False),
+                ag.to_mathml(speakable_latex(gold["latex"]), False),
+            ]
+        else:
+            theirs = [gold.get("mathml") or ""]
+        return any(canonical(a) == canonical(b) for a in mine for b in theirs)
+    except Exception:  # a print the converter cannot read is not shown to be the same
+        return False
+
+
 def _right(pair: dict, gold: dict) -> bool:
     if gold.get("latex"):
         return spoken_exact(pair.get("pred_latex"), gold["latex"], pair["exact_lenient"])
@@ -122,6 +149,17 @@ def _right(pair: dict, gold: dict) -> bool:
 
 
 def refold(item: dict, gold: dict[str, dict]) -> dict:
-    """The item with `exact_lenient` of each aligned pair read by what is spoken."""
-    pairs = [p | {"exact_lenient": _right(p, gold[p["gold_id"]])} for p in item["pairs"]]
+    """The item with `exact_lenient` of each aligned pair read by what is spoken. A pair the
+    spoken rule moved from wrong to right says whether it is also one print (`spoken_strict`)."""
+    pairs = []
+    for p in item["pairs"]:
+        g = gold[p["gold_id"]]
+        right = _right(p, g)
+        moved = right and not p["exact_lenient"]
+        extra = (
+            {"spoken_moved": True, "spoken_strict": _same_print(p["pred_latex"], g)}
+            if moved
+            else {}
+        )
+        pairs.append(p | {"exact_lenient": right} | extra)
     return item | {"pairs": pairs}
