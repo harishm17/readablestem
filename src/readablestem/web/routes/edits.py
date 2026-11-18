@@ -78,7 +78,11 @@ from readablestem.web.worker import db_safe
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-STALE_FLASH = "Nothing was changed: this document changed after this page was opened."
+# The page the person lands on is drawn from the document as it is now.
+STALE_FLASH = (
+    "Nothing was changed: this document changed after this page was opened. "
+    "Check the page as it is now and make the change again."
+)
 
 
 def page_number(raw: str, count: int) -> int:
