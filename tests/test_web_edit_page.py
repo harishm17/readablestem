@@ -412,6 +412,8 @@ def test_the_stale_form_adds_nothing(edits):
     response = edits.browser.post(f"/jobs/{edits.job_id}/pages/1/add", data=data)
     assert response.status_code == 303
     assert not any(e.id.startswith("p1-x") for e in stored(edits).elements)
+    landed = unescape(edits.browser.get(response.headers["location"]).text)
+    assert "Nothing was changed" in landed and "make the change again" in landed  # a next step
 
 
 # --------------------------------------------------------------------------- equations

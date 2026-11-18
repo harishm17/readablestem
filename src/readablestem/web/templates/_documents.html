@@ -35,7 +35,7 @@
       <tr role="row">
         <th scope="row" role="rowheader">
           <a id="doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.name }}</a>
-          <span class="doc-file">{% if row.file_note %}File: {{ row.file_note }}<br>{% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }}{% if row.part_label %}, part of a larger file{% endif %} · uploaded {{ row.created_at|utc }}{% if row.exam_mode %} · {{ exam_words.short }}{% endif %}</span>
+          <span class="doc-file">{% if row.file_note %}File: {{ row.file_note }}<br>{% endif %}{{ row.page_words }}{% if row.part_label %}, part of a larger file{% endif %} · uploaded {{ row.created_at|utc }}{% if row.exam_mode %} · {{ exam_words.short }}{% endif %}</span>
         </th>
         <td role="cell" data-label="Status"><span class="status-badge status-{{ row.badge }}">{{ row.label }}</span></td>
         <td role="cell" data-label="Deleted automatically">{{ row.retain_until|utc }}{% if row.ending %}<br><strong>{{ row.ending }}</strong>{% endif %}</td>

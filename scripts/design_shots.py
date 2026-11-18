@@ -148,7 +148,7 @@ def main() -> None:
         page = seed.new_page()
         sign_in(page, base, ALICE)  # the development login, used once to make the session
         page.goto(f"{base}/app")
-        page.get_by_label("PDF file").set_input_files(
+        page.locator("#pdf").set_input_files(
             files=[
                 {
                     "name": "Ch2_Kinematics_lecture_notes.pdf",

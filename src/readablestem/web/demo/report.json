@@ -11484,91 +11484,120 @@
         "name": "html.lang",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.title",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.main",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.heading_order",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.heading_text",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.img_alt",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
+      },
+      {
+        "name": "html.img_alt_content",
+        "passed": true,
+        "severity": "error",
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.unique_ids",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.list_structure",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.math_display",
         "passed": true,
         "severity": "warning",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.self_contained",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.wording",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
+      },
+      {
+        "name": "html.characters",
+        "passed": true,
+        "severity": "error",
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.link_text",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.link_href",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.lang_tags",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       },
       {
         "name": "html.text_contrast",
         "passed": true,
         "severity": "error",
-        "code": null
+        "code": null,
+        "added_on": null
       }
     ],
     "page_sizes": {

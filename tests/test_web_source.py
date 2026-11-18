@@ -115,6 +115,7 @@ def test_a_zip_is_stored_with_its_main_file_and_a_longer_one_costs_more(web):
     assert response.status_code == 303
     [job] = jobs(web)
     assert job.page_count == 3 and pages_used(web) == 3
+    assert "counts as 3 pages" in web.browser.get("/app").text  # an estimate, not a count
     blob = stored(web, job.id)
     assert blob.media_type == "application/x-readablestem-zip"
     assert envelope.unwrap(bytes(blob.content))[:2] == ("zip", "paper.tex")
@@ -282,9 +283,12 @@ def test_the_quota_is_enforced_for_a_source_like_for_a_pdf(tmp_path, available):
         env.allow(ALICE)
         login(client, ALICE)
         env.browser = client
-        long = "\\documentclass{article}\\begin{document}" + "word " * 7000 + "\\end{document}"
+        long = "\\documentclass{article}\\begin{document}" + "word " * 1500 + "\\end{document}"
         text = refused(env, long.encode(), "long.tex")
-        assert "page" in text and "today" in text
+        # 7,500 characters is an estimate of pages, not a count of them
+        assert (
+            "long.tex counts as 3 pages" in text and "today" in text and "long.tex has" not in text
+        )
 
 
 @pytest.mark.parametrize("kind", ["tex", "zip"])

@@ -1048,6 +1048,9 @@ def found_sentence(result: DocumentResult) -> str:
     )
     pages = plural(result.stats.pages, "page")
     found = kinds_phrase(dict(kinds)) if any(kinds.get(k) for k in KIND_WORDS) else ""
+    if result.origin != "pdf":  # a source has no printed pages: one per 3,000 characters
+        file = f"a file that counts as {pages}"
+        return f"Found {found} in {file}." if found else f"Read {file}."
     return f"Found {found} on {pages}." if found else f"Read {pages}."
 
 

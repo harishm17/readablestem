@@ -37,6 +37,7 @@ from readablestem.web import documents, states, upload_result
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, conversions_closed, get_ctx, render
+from readablestem.web.documents import plural
 from readablestem.web.job_page import elapsed_words
 from readablestem.web.routes.bundle import _zip_response
 from readablestem.web.routes.jobs import (
@@ -187,7 +188,7 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
                 "id": item.job_id,
                 "name": name,
                 "also": row.file_note if row else "",
-                "pages": item.pages,
+                "pages": row.page_words if row else plural(item.pages, "page", "pages"),
                 "exam_mode": bool(row and row.exam_mode),
                 "label": row.label if row else state.label,
                 "badge": state.badge,
@@ -207,6 +208,7 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
                 i.pages or None,
                 i.left,
                 office=i.office,
+                estimated=i.estimated,
                 tier=user.access_tier,
             )
         }
