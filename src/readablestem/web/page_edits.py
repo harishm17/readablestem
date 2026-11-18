@@ -17,6 +17,7 @@ Content: a snapshot holds the document's own text (it is deleted with the job, l
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from collections import Counter
@@ -557,6 +558,27 @@ def next_added_id(result: DocumentResult, page: int) -> str:
         if e.id.startswith(prefix) and e.id.removeprefix(prefix).isdecimal()
     ]
     return f"{prefix}{max(used) + 1 if used else 1}"
+
+
+def region_between(
+    size: tuple[float, float],
+    content: tuple[float, float],
+    after: tuple[float, float, float, float] | None,
+    before: tuple[float, float, float, float] | None,
+) -> dict[str, str]:
+    """The four edges, as the form's fields give them (percent of the page), of the part of
+    a page that starts below the line `after` (None: at the top of the page) and ends above
+    the line `before` (None: at the bottom), as wide as the page's content (`content`: its
+    left and right edge). Each edge is rounded outward, so the region never takes in more of
+    the lines around it than the number would. `region_box` then checks it like any other."""
+    width, height = size
+    edges = {
+        "left": math.floor(10000 * content[0] / width) / 100,
+        "top": math.ceil(10000 * (after[3] if after else 0.0) / height) / 100,
+        "right": math.ceil(10000 * content[1] / width) / 100,
+        "bottom": math.floor(10000 * (before[1] if before else height) / height) / 100,
+    }
+    return {name: f"{min(max(value, 0.0), 100.0):g}" for name, value in edges.items()}
 
 
 def region_box(

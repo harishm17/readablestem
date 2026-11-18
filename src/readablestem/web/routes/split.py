@@ -37,7 +37,7 @@ import hashlib
 import json
 import logging
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 from urllib.parse import quote, urlencode
@@ -148,6 +148,7 @@ NOTE_KEY = re.compile(r"^[a-z_]{1,40}:[A-Za-z0-9_-]{1,64}$")
 EXCERPT_CHARS = 400  # of a paragraph a notice is about, shown in its panel
 # Elements with words of their own that the page tools can change (T3-5).
 TEXT_KINDS = frozenset({Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING})
+LINES_BOTH = "Choose both lines, or leave both empty and give the four edges."
 MAX_TEXT_LINES = 120  # lines of text the page tools list for one page
 LINE_CHARS = 80  # of a line, in that list
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
@@ -261,6 +262,11 @@ class AddTool:
     errors: dict[str, str] = field(default_factory=dict)  # "region", "addalt", "add"
     change_href: str | None = None  # back to step 1 with the same numbers
     open: bool = False
+    # The region by lines: the page's lines in reading order (the options of "Starts after
+    # line" and "Ends before line") and the two chosen ("top"/"bottom" or an element id).
+    lines: list[TextLine] = field(default_factory=list)
+    after: str = ""
+    before: str = ""
 
     @property
     def confirming(self) -> bool:
@@ -1061,10 +1067,7 @@ class SplitBuilder:
         )
         if tools.omitted:
             return tools
-        texts = sorted(
-            (e for e in self.result.elements if e.page == index and e.kind in TEXT_KINDS),
-            key=lambda e: e.order,
-        )
+        texts = self.page_texts(index)
         for element in texts[:MAX_TEXT_LINES]:
             tools.lines.append(self.text_line(element, current=element.id == change))
         tools.lines_cut = max(0, len(texts) - MAX_TEXT_LINES)
@@ -1079,6 +1082,13 @@ class SplitBuilder:
         tools.add = self.add_tool(number, add or {}, invalid)
         tools.opens = tools.opens or tools.add.open
         return tools
+
+    def page_texts(self, index: int) -> list[Element]:
+        """The paragraphs, list items and headings of page `index` (0-based), in reading order."""
+        return sorted(
+            (e for e in self.result.elements if e.page == index and e.kind in TEXT_KINDS),
+            key=lambda e: e.order,
+        )
 
     def text_line(self, element: Element, *, current: bool = False) -> TextLine:
         fix = self.first_fix.get(element.id)
@@ -1153,8 +1163,28 @@ class SplitBuilder:
             tool.values.update(invalid[1].values)
             for error in invalid[1].errors:
                 tool.errors[error.field_id.split("-", 1)[0]] = error.message
-        edges = [tool.values[k] for k in ("left", "top", "right", "bottom")]
         size = self.sizes.get(number - 1)
+        texts = self.page_texts(number - 1)[:MAX_TEXT_LINES]
+        tool.lines = [self.text_line(e) for e in texts]
+        tool.after, tool.before = add.get("after", ""), add.get("before", "")
+        if tool.kind and (tool.after or tool.before) and size is not None:
+            # The lines win over the four numbers (the form says so): the box they make is
+            # written into the four, and everything after is the same as for typed numbers.
+            by_id = {e.id: e for e in texts}
+            above, below = by_id.get(tool.after), by_id.get(tool.before)
+            both = bool(tool.after and tool.before)
+            if not both or (tool.after != "top" and above is None) or (
+                tool.before != "bottom" and below is None
+            ):
+                tool.errors["region"] = LINES_BOTH
+            else:
+                tool.values |= page_edits.region_between(
+                    size,
+                    content_edges(self.result.elements, number - 1),
+                    above.bbox if above else None,
+                    below.bbox if below else None,
+                )
+        edges = [tool.values[k] for k in ("left", "top", "right", "bottom")]
         if tool.kind and any(edges) and size is not None and "region" not in tool.errors:
             try:
                 page_edits.region_box(
@@ -1365,6 +1395,8 @@ def split_page(
     top: str = "",
     right: str = "",
     bottom: str = "",
+    after: str = "",
+    before: str = "",
     page_mode: bool = False,
 ) -> Response:
     """`page_mode`: "Fix something on a page" (WS19.6): the page's tools are the first panel,
@@ -1455,7 +1487,15 @@ def split_page(
             number,
             opens=tools or bool(change) or page_mode,
             change=change,
-            add={"add": add, "left": left, "top": top, "right": right, "bottom": bottom},
+            add={
+                "add": add,
+                "left": left,
+                "top": top,
+                "right": right,
+                "bottom": bottom,
+                "after": after,
+                "before": before,
+            },
             invalid=invalid,
         ),
         # Undo, in the notice after a decision: only for the write this page shows.
@@ -1530,12 +1570,15 @@ def review_screen(
     top: str = "",
     right: str = "",
     bottom: str = "",
+    after: str = "",
+    before: str = "",
     mode: str = "",
 ) -> Response:
     """`cell` ("r1c2"): a table's "Change a cell" choice, whose form is then open.
     `mode` "page": the page's tools first, for the page `page` (WS19.6).
     `tools` ("1"): the page tools are open; `change`: the text open in them; `add`, `left`,
-    `top`, `right`, `bottom`: the region being described for something to add."""
+    `top`, `right`, `bottom` (or `after` and `before`, two lines of the page): the region being
+    described for something to add."""
     shown = accepted == "1"
     view, loaded, _ = _load(request, job_id, user)
     if loaded.origin != "pdf":
@@ -1563,6 +1606,8 @@ def review_screen(
         top=top,
         right=right,
         bottom=bottom,
+        after=after,
+        before=before,
         page_mode=mode == "page" and not item and not note,
     )
     ctx = get_ctx(request)  # usage event (web/events.py)
@@ -1719,16 +1764,23 @@ class PageMarks:
         return "\n".join(rules) + "\n"
 
 
+def content_edges(elements: Iterable[Element], index: int) -> tuple[float, float]:
+    """How far the content of page `index` (0-based) reaches left and right: the page's text
+    margins, for the marks' numbers and for a region given by lines."""
+    on_page = [e for e in elements if e.page == index]
+    return (
+        min((e.bbox[0] for e in on_page), default=0.0),
+        max((e.bbox[2] for e in on_page), default=0.0),
+    )
+
+
 def page_marks(
     result: DocumentResult, sizes: dict[int, tuple[float, float]], index: int
 ) -> PageMarks:
     """The inputs of the stylesheet of page `index` (0-based), from that page's elements, the
     fixes on them and the notices about them."""
     on_page = {e.id: e for e in result.elements if e.page == index}
-    left, right = (
-        min((e.bbox[0] for e in on_page.values()), default=0.0),
-        max((e.bbox[2] for e in on_page.values()), default=0.0),
-    )
+    left, right = content_edges(result.elements, index)
     fixes: dict[str, marks.BBox] = {}
     equations: list[Element] = []
     first_fix: dict[str, Fix] = {}
