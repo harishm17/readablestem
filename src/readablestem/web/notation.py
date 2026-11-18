@@ -87,6 +87,12 @@ def enabled(settings: Settings) -> bool:
     return settings.feature_notation_memory
 
 
+def course_grants_enabled(settings: Settings) -> bool:
+    """Whether course grants exist at all (WS27.1): the setting, and the courses it hangs
+    from. Off: the People routes are 404 and no grant row gives any right."""
+    return settings.feature_course_grants and settings.feature_notation_memory
+
+
 # --------------------------------------------------------------------------- errors
 
 

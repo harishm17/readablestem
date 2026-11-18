@@ -185,6 +185,7 @@ FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-ra
 FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04" }
 FEATURE_WORD_SOURCE = { value = false, source = "not stated; code default" }
 FEATURE_CLASS_LINK = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done" }
+FEATURE_COURSE_GRANTS = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done" }
 IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default" }
 IMAGE_PAGES_DPI = { value = 200, source = "not stated; code default" }
 IMAGE_PAGES_OMISSION_CHECK = { value = true, source = "not stated; code default" }
