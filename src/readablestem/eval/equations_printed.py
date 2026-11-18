@@ -142,9 +142,21 @@ _TAKES_ARGUMENT = frozenset(
         "not",
         "ensuremath",
         "textcolor",
+        "atop",
     )
 )
-_TAKES_TWO = frozenset(("frac", "dfrac", "tfrac", "binom", "overset", "underset", "sqrtroot"))
+_TAKES_TWO = frozenset(
+    ("frac", "dfrac", "tfrac", "binom", "overset", "underset", "sqrtroot", "atop")
+)
+# The old infix forms, and the prefix command each is.
+_INFIX = re.compile(r"\\(over|choose|atop)(?![A-Za-z])")
+_PREFIX_OF = {"over": "frac", "choose": "binom", "atop": "atop"}
+# What `&` may stand beside and still be only an alignment mark (`a &= b`, `a &=& b`).
+_RELATION = (
+    r"(?:[=<>]|\\(?:leq|geq|neq|approx|sim|simeq|equiv|propto|cong|in|subset|subseteq|ll|gg"
+    r"|rightarrow|leftarrow|Rightarrow|Leftrightarrow|iff|implies)(?![A-Za-z]))"
+)
+_BREAK = "\u23ce"  # a line break of the formula (`\\\\`); never a character the source can hold
 
 
 def _group_open(s: str, close: int) -> int:
@@ -262,6 +274,51 @@ def _brace_arguments(s: str) -> str:
                 break
 
 
+def _unescaped(s: str, i: int) -> bool:
+    return i == 0 or s[i - 1] != "\\"
+
+
+def _prefix_form(s: str) -> str:
+    """`{a \\over b}` as `{\\frac{a}{b}}`, `{n \\choose k}` as `{\\binom{n}{k}}`: the infix
+    command takes everything in its group, so written as arguments `{a \\over b}c` stays apart
+    from `{a \\over bc}`."""
+    while (match := _INFIX.search(s)) is not None:
+        start, depth = -1, 0  # the `{` of the group the command is in, or the start
+        for i in range(match.start() - 1, -1, -1):
+            if s[i] == "}" and _unescaped(s, i):
+                depth += 1
+            elif s[i] == "{" and _unescaped(s, i):
+                if depth == 0:
+                    start = i
+                    break
+                depth -= 1
+        end, depth = len(s), 0
+        for i in range(match.end(), len(s)):
+            if s[i] == "{" and _unescaped(s, i):
+                depth += 1
+            elif s[i] == "}" and _unescaped(s, i):
+                if depth == 0:
+                    end = i
+                    break
+                depth -= 1
+        above, below = s[start + 1 : match.start()].strip(), s[match.end() : end].strip()
+        command = _PREFIX_OF[match.group(1)]
+        s = f"{s[: start + 1]}\\{command}{{{above}}}{{{below}}}{s[end:]}"
+    return s
+
+
+def _alignment_marks_off(s: str) -> str:
+    """`s` without the `&` that only align: at the start or the end of a row, or beside a relation
+    (`a &= b`, `a &=& b`). Any other `&` is between two cells and stays: a matrix row `a & b` does
+    not print as `ab`, and a case `x & y>0` does not print as `xy>0`."""
+    row_start = rf"(^|{_BREAK}|\\begin\{{[a-z]+\}})\s*&"
+    while (shorter := re.sub(row_start, r"\1", s)) != s:
+        s = shorter
+    s = re.sub(rf"&\s*(?={_BREAK}|\\end\{{|$)", "", s)
+    s = re.sub(rf"&\s*(?={_RELATION})", "", s)
+    return re.sub(rf"({_RELATION})\s*&", r"\1", s)
+
+
 def canon(latex: str, keep_styles: bool = True) -> str:
     """One spelling for every notation that prints alike. `keep_styles=False` also drops the
     letter-style commands (`\\mathbf`, `\\mathcal`, ...), for the second test of `exact_printed`."""
@@ -278,7 +335,8 @@ def canon(latex: str, keep_styles: bool = True) -> str:
     s = re.sub(r"\\ensuremath\{|\\mathit\{|\\textit\{", "{", s)
     s = s.replace("^{^{", "^{{")
     # A line break goes first, before the control spaces after it are taken off (`\\ \nu`).
-    s = s.replace("\\\\", ";")
+    s = s.replace("\\\\", _BREAK)
+    s = _prefix_form(s)
     s = re.sub(_DROP, " ", s)  # a space, not nothing: `\\log\\,p` is not `\\logp`
     # `{\rm x}` is `\mathrm{x}`; likewise bold and script.
     s = re.sub(r"\{\\(?:rm|mathrm)\s+([^{}]*)\}", r"\\mathrm{\1}", s)
@@ -318,7 +376,7 @@ def canon(latex: str, keep_styles: bool = True) -> str:
     # One name for the symbols that have two (whole commands only: `\\to` is not `\\top`).
     for old, new in _SYNONYMS:
         s = re.sub(rf"\\{old}(?![A-Za-z])", lambda _match, new=new: new, s)
-    s = s.replace("\\\\", ";").replace("&", "")
+    s = _alignment_marks_off(s)
     # A ket and a bra are bars and an angle bracket.
     s = re.sub(r"\\ket\{([^{}]*)\}", r"|\1\\rangle", s)
     s = re.sub(r"\\bra\{([^{}]*)\}", r"\\langle\1|", s)
@@ -360,7 +418,7 @@ def canon(latex: str, keep_styles: bool = True) -> str:
     tok = rf"({group}|\([^()]*\)|\\mathrm\{{[^{{}}]*\}}|\\[A-Za-z]+|[^_^{{}}\\])"
     s = re.sub(r"\^" + tok + r"_" + tok, r"_\2^\1", s)
     # A trailing comma, full stop or line break is punctuation of the sentence, not of the formula.
-    return re.sub(r"[,.;:\\]+$", "", s)
+    return re.sub(rf"[,.;:\\{_BREAK}]+$", "", s)
 
 
 _STYLE_COMMANDS = re.compile(r"\\math(?:bf|cal|bb|frak)|\\boldsymbol")
