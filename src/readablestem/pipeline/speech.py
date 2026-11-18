@@ -34,7 +34,7 @@ conventions, kept short:
   token follows directly closes itself ("1 over 2 end fraction m v squared" for `\\frac{1}{2}mv^2`,
   "1 over 2 m v squared" for `\\frac{1}{2m}v^2`);
 - a sign is read for what it does in its place: a bar between the arguments of a probability or
-  an expectation is "given" and in set braces "such that" (elsewhere "divides"); a centred dot or a
+  an expectation is "given" and in set braces "such that" (elsewhere "divides"); a centered dot or a
   cross between vectors is "dot" or "cross" (between numbers and scalars "times"); a transpose,
   a star, a dagger and an inverse function are "A transpose", "x star", "A dagger" and "inverse
   sine"; a negated relation is read as its own words ("is not less than or equal to").
@@ -1125,7 +1125,7 @@ def _operand(kids: list[ET.Element], i: int, step: int) -> ET.Element | None:
 
 
 def _mark_products(kids: list[ET.Element]) -> None:
-    """A centred dot or a cross between vectors (or after or before nabla) is "dot" or "cross";
+    """A centered dot or a cross between vectors (or after or before nabla) is "dot" or "cross";
     between numbers and scalars both stay "times". The vector test is the one `signs.py` uses on
     the text layer: a bold letter or a vector arrow on both sides."""
     for i, kid in enumerate(kids):
