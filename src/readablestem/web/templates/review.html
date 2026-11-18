@@ -148,7 +148,7 @@
 {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "review-form"}) %}
   {{ hidden_fields() }}
   {% if item.kind == "equation" %}
-  {{ latex_field(item, rows=3) }}
+  {{ latex_field(item, live=True) }}
   {% elif item.kind == "figure" %}
   {{ alt_fields(item) }}
   {% elif item.kind == "heading" %}

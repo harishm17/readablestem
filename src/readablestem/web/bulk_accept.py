@@ -118,12 +118,15 @@ class Offer:
         return f"{self.count} {self.one if self.count == 1 else self.many}"
 
 
+MIN_OFFERED = 2  # "Accept many figures (1)" is no offer: one item is decided on its card
+
+
 def offers(result: DocumentResult) -> list[Offer]:
-    """The bulk actions worth showing: those with something to accept."""
+    """The bulk actions worth showing: those with at least two items to accept."""
     out = []
     for slug, spec in BULK_KINDS.items():
         n = len(candidates(result, slug))
-        if n:
+        if n >= MIN_OFFERED:
             out.append(Offer(slug, n, spec.title, spec.one, spec.many))
     return out
 

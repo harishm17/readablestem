@@ -320,12 +320,12 @@
     {% if t.local and (not t.proposal or not t.is_data) %}
     {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
       {{ table_fields("list") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
-      <button type="submit" class="{{ 'button-secondary' if t.local_flat or t.proposal else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
+      <button type="submit" class="{{ 'button-secondary' if t.local_flat or t.proposal else 'button' }}"{% if t.proposal %} aria-describedby="local-note-{{ eid }}"{% endif %}>Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
     {% endcall %}
     {% endif %}
   </div>
   {% if t.proposal and t.is_data %}<p class="hint">To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>
-  {% elif t.proposal and t.local %}<p class="hint">Use the grid read from the PDF: students get it as a table, as read from the PDF; compare it with the image first.</p>{% endif %}
+  {% elif t.proposal and t.local %}<p class="hint" id="local-note-{{ eid }}">Students get the grid as a table, as read from the PDF; compare it with the image first.</p>{% endif %}
   {% set sole_action = not t.proposal and (not t.local or t.local_flat) %}
   <div class="fallback" role="group" aria-labelledby="fallback-title-{{ eid }}">
     <p class="fallback-title" id="fallback-title-{{ eid }}">{{ "If it cannot be used as a table" if t.proposal else "Or leave it as an image" }}</p>

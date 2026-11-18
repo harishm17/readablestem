@@ -576,3 +576,25 @@ def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
     assert back.status_code == 303
     fix = stored(as_text).fix_for("p2-e1")
     assert fix is not None and fix.table is not None and fix.table.grid.is_data
+
+
+def test_a_list_card_names_the_grid_action_once(tmp_path):
+    """A table written as text with a grid to use instead: the button says what it does and
+    the line under it says what students get, without saying the button's words again."""
+    output = table_output()
+    for fix in output.result.fixes:
+        if fix.element_id == "p1-e1":
+            assert fix.table is not None
+            fix.table.grid.is_data = False
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, table_pdf()))
+        env.run_worker()
+        html = client.get(f"/jobs/{env.job_id}/review/list").text
+        card = html[html.index('id="item-p1-e1"') :]
+        card = card[: card.index('id="item-', 20)]
+        assert len(re.findall("use the grid read from the PDF", card, re.I)) == 1

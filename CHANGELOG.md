@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: the accept-many count and the review fields (branch feat/review-identical-and-counts)
+
+- WS8.1 (identical items decided as one write) is not built: the tracked fixtures hold no
+  group, the replayed corpus cannot be converted from its recording, and the recorded
+  real-world runs repeat a picture's answer key in 0.12% of equation and figure answers.
+- WS8.13 (F-068): "Accept many" is offered only where at least two items qualify; the
+  one-item "Accept many figures (1)" is gone. Crop sizing (F-067) and accepting by risk band
+  are not built.
+- WS8.6 (F-077, F-090): the split view's "What differs" shows five rows and folds the rest;
+  the LaTeX box opens at six lines and grows with its text; the list view's box has the live
+  check. The table card's list view names "use the grid read from the PDF" once, not twice.
+  No model call, no stored-data change, no migration, no version bump.
+
 ## Unreleased: page pictures and exports are made once (branch perf/render-once)
 
 - PF4 (F-284): the review screen's page and region pictures are kept in a small memory cache in

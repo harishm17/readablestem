@@ -44,7 +44,7 @@
 {# The LaTeX of an equation. With `live` (the review screen), htmx checks it as it is typed (a
    pause of 0.6 s first) and shows the result below; the server-side checks on Save edit are
    the same. #}
-{% macro latex_field(item, live=False, rows=2) %}
+{% macro latex_field(item, live=False, rows=6) %}
 {% set eid = item.element_id %}
 {% set err = item.errors.get("latex") %}
 <div class="field{% if err %} field-error{% endif %}">

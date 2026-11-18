@@ -2370,7 +2370,10 @@ image itself without script).
   plain "R" there, so for `\mathbb{R}` the screen says "The proposal has a double-struck
   ℝ. The PDF's text cannot show that style, so check it in the image." instead of
   calling the PDF's R plain (unless the R is known to come from a regular text font).
-  The proposal is drawn in Latin Modern Math (served from `static/vendor/fonts`, see
+  "What differs" shows the first five rows and folds the rest under "N more differences"
+  (F-077: a long array listed every number), and the LaTeX box opens tall and grows with
+  its text (`field-sizing: content`, at least 6 lines, at most 60% of the window); the list
+  view's box has the same live check as the split view's. The proposal is drawn in Latin Modern Math (served from `static/vendor/fonts`, see
   its README), the OpenType math font of the family LaTeX PDFs are set in: in the
   browser's default math font a plain omega is as heavy as a bold Computer Modern one.
   Under them, two readings: "Read aloud roughly as: …" (the proposal's speech text) and
@@ -3199,6 +3202,17 @@ count ("Accepted 12 equations whose checks passed. Undo takes them all back in o
 *Undo.* All the fixes are one write, so the notice's Undo ("Undo the last decision" in the list
 view, **Undo** on the review screen) puts every one back to undecided in one step, from the
 `before` snapshots the write stored (`web.review.undo_last`), as it does for a heading group.
+
+*At least two (F-068).* A kind is offered only when `MIN_OFFERED` (2) items qualify; one item
+is decided on its own card, so the page no longer says "Accept many figures (1)".
+
+*Identical items (WS8.1) are not built.* The plan asked for one decision on open equations and
+figures of one document with a byte-equal crop and an equal proposal. The measure came first
+(rule 12): the tracked fixtures hold no such group, the replayed corpus cannot be converted
+from its recording on this tree (the model answers are not in it), and the recorded real-world
+development runs (dev, dev2, fresh, fresh2, fresh3) repeat an equation or figure picture's
+answer key in 513 of about 417,000 answers (0.12%), an upper bound that also counts
+retries and repeats across documents. Near zero, so nothing was built.
 
 *Filter.* A plain GET form ("Show only some decisions", shown when more than one decision is
 waiting): **Kind** (a select of the kinds that still have decisions, with their counts) and
