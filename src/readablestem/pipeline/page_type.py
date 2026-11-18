@@ -2070,12 +2070,16 @@ def classify(
     producer: str = "other",
     images: tuple[list[BBox], float] | None = None,
     seen: Sequence[tuple[bool, bool]] | None = None,
+    covers: Sequence[dict[str, Any]] | None = None,
 ) -> PageTypeResult:
     """The page's type, from the rawdict blocks and drawings layout already extracted.
     `images` (`image_boxes`) and `seen` (`paint_visibility` of these drawings and those
-    images) are passed by a caller that has them already."""
+    images) are passed by a caller that has them already. `covers`: the drawings the
+    hidden-text check reads, when they are more than `drawings` (which the ink analysis
+    reads): the annotations' drawings, left out of the ink (`without_annotation_art`), can
+    still hide words."""
     boxes, coverage = images if images is not None else image_boxes(page)
-    text = text_stats(page, raw_blocks, boxes, drawings)
+    text = text_stats(page, raw_blocks, boxes, drawings if covers is None else covers)
     ink = ink_stats(page, drawings, budget, seen)
     return decide(text, ink, coverage, producer)
 
