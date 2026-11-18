@@ -1475,9 +1475,7 @@ class ListPart:
 
     def shown(self, section: str, slug: str = "") -> list[Any]:
         return [
-            e.payload
-            for e in self.entries
-            if e.section == section and (not slug or e.slug == slug)
+            e.payload for e in self.entries if e.section == section and (not slug or e.slug == slug)
         ]
 
     def shows(self, anchor: str, *sections: str) -> bool:

@@ -213,7 +213,9 @@ def test_apply_to_all_keeps_every_heading_of_the_group(tri):
     response = post(tri, GROUP, action="accept")
     assert response.status_code == 303
     # Nothing in this group is left; the next decision is the equation.
-    assert response.headers["location"] == f"/jobs/{tri.job_id}/review/list?at=item-p2-e2#item-p2-e2"
+    assert (
+        response.headers["location"] == f"/jobs/{tri.job_id}/review/list?at=item-p2-e2#item-p2-e2"
+    )
     after = stored(tri)
     for eid in MEMBERS:
         fix = after.fix_for(eid)
@@ -261,7 +263,10 @@ def test_a_level_that_skips_is_refused_for_the_whole_group(tri):
 
 def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
     response = post(tri, "p2-e0", action="reject")
-    assert response.headers["location"] == f"/jobs/{tri.job_id}/review/list?at=group-card-{GROUP}#group-card-{GROUP}"
+    assert (
+        response.headers["location"]
+        == f"/jobs/{tri.job_id}/review/list?at=group-card-{GROUP}#group-card-{GROUP}"
+    )
     page = page_of(tri)
     card = group_card(page)
     # Working through them one by one: their cards stay unfolded, with a link back.
