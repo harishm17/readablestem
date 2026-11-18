@@ -25,6 +25,14 @@
   decision, the notices, the job page and the review screen use it. Crop pictures get their width
   and height from the PNG so the page does not move when one loads. Bulk actions are unchanged:
   they were already over the whole document. No migration and no version bump.
+## Unreleased: the state of "Download all" from the job summary (branch perf/download-state)
+
+- PF10 (F-283): "Download all", the course zip, the batch zip and `/account/export` decide which
+  documents are ready, held back or over the zip's cap from one query over the jobs' summary
+  columns (`routes/bundle._ready_files`), not by loading each job. "Nothing to download yet" now
+  costs 2 statements and about 8 ms at 50 documents (52 and 21 ms before); a document over the
+  cap or held back costs no statement; only a document taken is read further. What the page
+  offers and says is unchanged. No migration and no version bump.
 
 ## Unreleased: accuracy in use, truthful admin messages and the pages sign-in comes back to (branch feat/admin-accuracy-and-messages)
 
