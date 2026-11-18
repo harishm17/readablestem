@@ -377,6 +377,10 @@ BESIDE = (
 )
 
 
+def _figure(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:g}" if value == int(value) else f"{value:.3f}"
+
+
 def _beside_notes(current: dict, baseline: dict) -> list[str]:
     """Lines giving the canonical-form score of the baseline and the current report, for the
     task they belong to; empty when neither report has it (a record made before the field)."""
@@ -389,8 +393,7 @@ def _beside_notes(current: dict, baseline: dict) -> list[str]:
             continue
         lines.append(
             f"{name} (beside exact_lenient, not gated): baseline "
-            f"{'n/a' if old is None else f'{old:.3f}'}, current "
-            f"{'n/a' if new is None else f'{new:.3f}'}"
+            f"{_figure(old)}, current {_figure(new)}"
         )
     return lines
 

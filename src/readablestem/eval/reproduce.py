@@ -160,12 +160,15 @@ def check_scorer_ceiling(root: Path, predictions: Path | None = None) -> Check:
     summary = score_equations(list(gold.values()), load_predictions(path))["summary"]
     n = len(rows)
     # Beside it for one release: the same known-correct LaTeX under the canonical-form score.
+    # It needs gold LaTeX, which the OpenStax sample does not have: then it says so.
+    has_latex = all(gold[r["id"]].get("latex") for r in rows)
     printed = sum(exact_printed(r["latex"], gold[r["id"]].get("latex")) for r in rows)
+    printed_text = f"{printed / n:.3f} ({printed} of {n})" if has_latex else "n/a (no gold LaTeX)"
     matched = sum("known_gap" not in r for r in rows)
     ok = math.isclose(summary["exact_lenient"], matched / n, abs_tol=TOLERANCE)
     detail = (
         f"exact_lenient {summary['exact_lenient']:.3f} ({matched} of {n}), "
-        f"exact_printed {printed / n:.3f} ({printed} of {n}), "
+        f"exact_printed {printed_text}, "
         f"exact_strict {summary['exact_strict']:.3f}, mean TEDS {summary['mean_teds']:.3f}; "
         f"{n - matched} known normalisation gaps, so equation scores understate quality "
         f"by up to {1 - matched / n:.0%}; the secondary stream scorer (T2-12) matches "
