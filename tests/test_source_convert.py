@@ -491,10 +491,11 @@ def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_
         ("crossref", "Section 1", heading),
         ("crossref", "Equation (1)", equation),
         ("crossref", "Table 1", table),  # "Figure 1": no figure has that number, so no link
-        ("crossref", "Table 1", table),
+        ("internal", "Table 1", table),  # the file's own \ref: exact, widened to its word
     ]
     assert links_of(result, last) == [("crossref", "Section 1", heading)]
     for target in (heading, equation, table):  # every link goes to a place in the file
         assert f'href="#{target}"' in result.html and f'id="{target}"' in result.html
-    # the count the job page keeps ("links kept of N in the file") is still the file's own
-    assert sum(k.kind in ("uri", "internal") for e in result.elements for k in e.links) == 1
+    # the count the job page keeps ("links kept of N in the file") is the file's own: the \href
+    # and the \ref, not the typed addresses and the numbers that were guessed
+    assert sum(k.kind in ("uri", "internal") for e in result.elements for k in e.links) == 2

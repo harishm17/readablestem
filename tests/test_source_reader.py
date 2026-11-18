@@ -302,7 +302,7 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
         '<div id="S1" class="ltx_section"><h2 class="ltx_title ltx_title_section">'
         '<span class="ltx_tag ltx_tag_section">1 </span>First</h2>'
         f'<div class="ltx_para"><p class="ltx_p">See Section {ref("S2", "2")}, equation '
-        f'({ref("S1.E2", "2")}), {ref("bib.bib1", "1")} and {ref("nowhere", "?")}.</p></div>'
+        f"({ref('S1.E2', '2')}), {ref('bib.bib1', '1')} and {ref('nowhere', '?')}.</p></div>"
         '<div id="Thm1" class="ltx_theorem"><h6 class="ltx_title ltx_runin">'
         '<span class="ltx_tag">Theorem 1</span>.</h6><div class="ltx_para">'
         f'<p class="ltx_p">It holds, as {ref("Thm1", "Theorem 1")} says.</p></div></div>'
