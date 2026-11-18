@@ -100,6 +100,7 @@ from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, Spe
 from readablestem.core.types import (
     ConversionOutput,
     DocumentResult,
+    NotationEntry,
     ProgressEvent,
     StageFact,
     StepFacts,
@@ -436,6 +437,9 @@ class _Attempt:
     began: float | None = None
     converted: float | None = None
     facts: StepFacts | None = None
+    # The course symbols this attempt's conversion was handed (`_converter_kwargs`), kept with
+    # the result (`web.notation.applied_record`). User content: never logged.
+    notation: list[NotationEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -868,6 +872,7 @@ class Worker:
         options = notation.conversion_options(self.factory, self.settings, attempt.claim.job_id)
         if options is not None:
             kwargs["options"] = options
+        attempt.notation = list(options.notation) if options is not None else []
 
         # stage_progress: live progress by stage, stored on the job row for its page
         # (only to a converter that takes it: older fakes and scripts do not).
@@ -1232,6 +1237,11 @@ class Worker:
                 or job.attempts != attempt.claim.attempt
             ):
                 return False
+            from readablestem.web import notation
+
+            result.notation_applied = notation.applied_record(
+                self.settings, job, result, attempt.notation
+            )
             earlier = self._earlier_version(session, job)  # before its crops are replaced
             session.execute(delete(Blob).where(Blob.job_id == job.id, Blob.kind == "crop"))
             for element_id, png in output.crops.items():

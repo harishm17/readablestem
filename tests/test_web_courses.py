@@ -16,7 +16,9 @@ from sqlalchemy import func, select
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token
 from readablestem.ops.retention import erase_user
+from readablestem.web import shares
 from readablestem.web.db import Course, CourseNotation, Job, User, session_scope
+from readablestem.web.recipients import model_vendor
 
 BOLD_D = "\U0001d41d"
 BOLD_OMEGA = "\U0001d6da"
@@ -262,6 +264,75 @@ def test_an_upload_for_someone_elses_course_is_refused(web):
 
 
 # --------------------------------------------------------------------------- worker
+
+
+# --------------------------------------------------------------------------- what was applied
+
+CAROL = "carol@example.org"
+
+
+def read_for_course(web) -> str:
+    """A finished document converted in a course that has bold v and the reals."""
+    course_id = new_course(web.browser, "Physics 201")
+    add(web.browser, course_id, "bold v")
+    add(web.browser, course_id, "double-struck R", meaning="set")
+    web.course_id = course_id
+    web.job_id = job_id_from(upload_for(web.browser, course_id))
+    assert web.run_worker() == web.job_id
+    return web.job_id
+
+
+def job_page_for(web, who: str) -> str:
+    client = web.client()
+    login(client, who)
+    return text_of(client.get(f"/jobs/{web.job_id}").text)
+
+
+def test_a_job_lists_the_symbols_it_was_read_with_for_its_owner_and_a_reviewer_not_a_reader(web):
+    web.allow(CAROL)
+    job_id = read_for_course(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        shares.share(session, job, ALICE, BOB, "review")
+        shares.share(session, job, ALICE, CAROL, "view")
+    add(web.browser, web.course_id, "bold F")  # added after the conversion
+    for who in (ALICE, BOB):
+        page = job_page_for(web, who)
+        assert "bold v is a vector" in page and "double-struck R is a set" in page, who
+        assert "bold F" not in page, who  # the record, not the course as it is now
+    assert "Physics 201" in job_page_for(web, BOB)
+    reader = job_page_for(web, CAROL)
+    assert "bold v" not in reader and "Physics 201" not in reader
+
+
+def test_a_job_with_no_record_says_the_course_notation_was_applied_and_lists_nothing(web):
+    job_id = read_for_course(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        stored = dict(job.result_json)
+        assert {s["meaning"] for s in stored.pop("notation_applied")} == {"vector", "set"}
+        job.result_json = stored
+    page = web.browser.get(f"/jobs/{job_id}").text
+    assert 'id="job-course"' in page and "Physics 201" in page
+    assert "bold v" not in page and "double-struck" not in page
+
+
+def test_the_privacy_sentence_names_the_provider_the_recipients_source_names(tmp_path):
+    for provider in ("anthropic", "openai"):
+        env = WebEnv(tmp_path / provider, feature_notation_memory=True, model_provider=provider)
+        with env.running() as client:
+            env.allow(ALICE)
+            login(client, ALICE)
+            env.browser = client
+            course_id = new_course(client)
+            add(client, course_id, "bold v")
+            vendor = model_vendor(env.settings)
+            pages = [
+                client.get(path).text for path in ("/courses", f"/courses/{course_id}", "/app")
+            ]
+        for page in pages:
+            text = text_of(page)
+            assert f"sent to {vendor}" in text and "each equation" in text, provider
 
 
 # --------------------------------------------------------------------------- review

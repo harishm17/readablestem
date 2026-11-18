@@ -264,6 +264,36 @@ def vendor_sentence(settings: Settings) -> str:
     return " ".join([line + ".", *slots["sentence"], "They are not used to train models."])
 
 
+def notation_words(settings: Settings) -> dict[str, str]:
+    """The course notation disclosure, in the two places a person is told it: `course` (the
+    course pages) and `upload` (the upload form's course choice). Built from the same facts
+    as the `notation` row of `MATERIALS`: the company is the model provider (`model_vendor`),
+    what is sent is each symbol's styled letter, its name and its meaning, at most
+    `MAX_CONTEXT_ENTRIES` of them with each equation, and not the notes
+    (`pipeline.notation_memory.notation_context`); who else sees the list is the course's
+    name and the symbols that concern an equation, shown to a person who reviews a shared
+    document (`web.notation.card_notation`, the job page's line)."""
+    from readablestem.pipeline.notation_memory import MAX_CONTEXT_ENTRIES
+
+    vendor = model_vendor(settings)
+
+    def sent(documents: str) -> str:
+        return (
+            f"are sent to {vendor}, the model provider, with each equation of {documents}, "
+            f"at most {MAX_CONTEXT_ENTRIES} symbols with each equation"
+        )
+
+    return {
+        "course": (
+            "Only you can open a course\u2019s list. A person you share a document with to review "
+            "sees the course\u2019s name, the symbols the document was read with and, for each "
+            "equation they review, the ones that apply to it. The symbols and their meanings "
+            f"{sent('the documents you convert in the course')}. Your notes are not sent."
+        ),
+        "upload": (f"If the course has symbols, they and their meanings {sent('this document')}."),
+    }
+
+
 def material_context(settings: Settings) -> dict[str, Any]:
     """What every page that states what is sent renders with (`deps.render` adds it to all
     pages; `privacy_context` to the privacy page and the offices pages)."""
@@ -275,6 +305,7 @@ def material_context(settings: Settings) -> dict[str, Any]:
         # text and page pictures".
         "sent_short": _join(list(dict.fromkeys(m.short for m in sent if m.short))),
         "whole_pages_sent": any(m.whole_pages for m in sent),
+        "notation_words": notation_words(settings),
     }
 
 

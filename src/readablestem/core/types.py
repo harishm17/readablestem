@@ -1281,6 +1281,13 @@ class DocumentResult(BaseModel):
     origin: Literal["pdf", "latex", "beamer", "docx"] = Field(
         default="pdf", exclude_if=lambda v: v == "pdf"
     )
+    # The symbols of the job's course the conversion was handed (`web.worker`, which hands them
+    # over), for the job page's "Read with 6 symbols from ..." line. None: no record (a
+    # result from before it, a document with no course, a source file), left out of the JSON;
+    # an empty list: the course had no symbols then.
+    notation_applied: list[AppliedSymbol] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
     # A source only: what LaTeXML reported and where its error nodes are (`SourceReport`).
     # It holds names from the source, so it lives and dies with the document. None for a PDF
     # and for a source converted before it existed, and left out of the JSON then.
@@ -1408,6 +1415,15 @@ class NotationEntry(BaseModel):
     meaning: NotationMeaning
     note: str | None = Field(default=None, max_length=200)
     source: Literal["user", "review", "document"] = "user"
+
+
+class AppliedSymbol(BaseModel):
+    """One symbol a conversion was handed from its course, as the job page lists it: the key
+    (`NotationEntry.canonical`) and its meaning, nothing else (not the instructor's spelling or
+    note). User content: stored with the result, deleted with the job, never logged."""
+
+    canonical: str = Field(min_length=1, max_length=64)
+    meaning: NotationMeaning
 
 
 # --------------------------------------------------------------------------- run options

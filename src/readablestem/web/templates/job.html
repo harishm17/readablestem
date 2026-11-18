@@ -19,7 +19,7 @@
 {% include "_error_summary.html" %}
 {% include "_job_heading.html" %}
 {% if not job.is_owner %}{% include "_job_shared.html" %}{% endif %}
-{% if job.is_owner %}{% include "_job_course.html" %}{% endif %}
+{% if job.audience != "reader" %}{% include "_job_course.html" %}{% endif %}
 {% include "_job_exam.html" %}
 {% if job.is_sample %}{% include "_job_sample.html" %}{% endif %}
 {% if job.part_label and job.is_owner %}{% include "_job_parts.html" %}{% endif %}

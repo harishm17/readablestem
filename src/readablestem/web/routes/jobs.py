@@ -1601,18 +1601,26 @@ def _office_to_pdf(
     )
 
 
-def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, str] | None:
-    """The course the job is read for (id and name), for the job page; None without
-    one or with the feature off."""
+def _job_course(
+    request: Request, job_id: str, user: CurrentUser, job: JobView
+) -> dict[str, Any] | None:
+    """The course the job is read for, for the job page: its id and name, and `applied`, the
+    symbols the conversion was handed ("bold d is a vector"; None where no record was kept).
+    Only its owner and a person who reviews it get it (`views.audience_of`), and only with the
+    feature on; the owner alone gets the link to the course (`id`)."""
     ctx = get_ctx(request)
-    if not notation.enabled(ctx.settings):
+    if not notation.enabled(ctx.settings) or job.audience == "reader":
         return None
     with session_scope(ctx.factory) as session:
-        job = job_access(session, job_id, user, VIEW)
-        if not is_owner(job, user):  # the course and its notation are the owner's
-            return None
-        course = notation.job_course(session, job)
-        return {"id": course.id, "name": course.name} if course is not None else None
+        stored = job_access(session, job_id, user, VIEW)
+        course = notation.job_course(session, stored)
+    if course is None and job.notation_applied is None:
+        return None
+    return {
+        "id": course.id if course is not None and job.is_owner else None,
+        "name": course.name if course is not None else None,
+        "applied": job.notation_applied,
+    }
 
 
 def _job_suggestions(request: Request, job_id: str, user: CurrentUser) -> dict[str, Any]:
@@ -1724,7 +1732,7 @@ def job_page_context(
     """Everything the job page prints beyond the status box: the page itself, and the body a
     finished job sends in place of the waiting one (`job_status`)."""
     context = status_context(job)
-    context["course"] = _job_course(request, job_id, user)  # notation memory
+    context["course"] = _job_course(request, job_id, user, job)  # notation memory
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     context["word_export"] = export_docx.available()  # the Word button needs pandoc

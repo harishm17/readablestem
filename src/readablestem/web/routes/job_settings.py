@@ -62,7 +62,7 @@ def _job_page_with_errors(
     """The job page again, status 400, with `message` under `field` and `typed` kept."""
     job = load_job_status(request, job_id, user)
     context: dict[str, Any] = status_context(job) | {"auto_reload": False}
-    context["course"] = _job_course(request, job_id, user)
+    context["course"] = _job_course(request, job_id, user, job)
     context["after_download"] = after_download_state(request, job_id, user)
     context["auto_reload_s"] = AUTO_RELOAD_S
     context["errors"] = [{"field_id": field, "message": message}]
