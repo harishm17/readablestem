@@ -1065,6 +1065,11 @@ section.job-group { padding-top: 0; }
 .text-lines li:first-child { border-top: 0; }
 .text-lines a[aria-current="true"] { font-weight: 700; }
 .line-kind { color: var(--ink-muted); }
+/* The page's marks as text, under the image (review_split.html). */
+.mark-list { list-style: none; margin: var(--space-2) 0; padding: 0; }
+.mark-list li { padding: var(--space-1) 0; border-top: 1px solid var(--border-subtle); }
+.mark-list li:first-child { border-top: 0; }
+.mark-list a[aria-current="true"] { font-weight: 700; }
 .tool-editor { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--mark-current); background: var(--surface); border-radius: var(--radius-control); }
 .tool-editor h4 { margin: 0 0 var(--space-2); }
 .tool-editor .heading-make { margin-top: var(--space-3); }

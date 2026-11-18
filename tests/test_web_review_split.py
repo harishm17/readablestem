@@ -403,3 +403,56 @@ def test_a_long_difference_list_is_folded_and_the_latex_box_opens_tall(tmp_path)
         assert len(rows) > 5 and len(rows) - len(folded) <= 5
         box = re.search(r'<textarea id="latex-p1-e5"[^>]*rows="(\d+)"', body)
         assert box is not None and int(box.group(1)) >= 6
+
+
+def test_the_marks_of_a_page_are_listed_as_text_in_reading_order(split):
+    """WS19.5: under the image, every mark of the page is a text link to the item its frame
+    opens, in reading order, with the first words of the item where it has text."""
+    html = screen(split, "?page=1&accepted=1")
+    frames = boxes(html)
+    link = {i: re.search(r'href="([^"]+)"', frame) for i, frame in frames.items()}
+    in_order = sorted(frames, key=lambda i: int(i.split("-e")[1]))
+    listed = section(html, 'id="mark-list-title"', "</ol>")
+    assert re.findall(r'<a href="([^"]+)"', listed) == [link[i].group(1) for i in in_order]
+    assert "1 Vectors" in text_of(listed)  # the first words of the heading
+
+
+def evidence_env(tmp_path, *, scanned: bool):
+    from readablestem.core.types import PageType
+
+    output = review_output()
+    fix = output.result.fix_for("p1-e2")
+    assert fix is not None and fix.equation is not None
+    fix.equation.speech = "omega"
+    for element in output.result.elements:
+        if element.id == "p1-e4":
+            element.text = "Discuss vectors. As Figure 1 shows, a car moves from home to school."
+    if scanned:
+        output.result.page_types = [PageType(page=0, kind="scan_no_text", route="vision_page")]
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    return env
+
+
+@pytest.mark.parametrize("scanned", [False, True])
+def test_a_card_states_its_evidence_in_words(tmp_path, scanned):
+    """WS19.7: an equation card gives the sentence around it with the proposal read aloud
+    in its place; where the page has no text layer, or a figure has no caption and no
+    sentence that refers to it, the card says it can only be checked against the page image."""
+    env = evidence_env(tmp_path, scanned=scanned)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        equation = text_of(panel(screen(env, "?item=p1-e2")))
+        figure = text_of(panel(screen(env, "?item=p1-e6")))
+    only = "This can only be checked against the page image."
+    if scanned:
+        assert only in equation and only in figure
+        assert "angular velocity omega" not in equation
+    else:
+        assert "A rigid body turning with angular velocity omega moves a point" in equation
+        assert only not in equation and only not in figure  # the caption is there
+        assert "Where the text refers to it: “As Figure 1 shows, a car moves" in figure

@@ -258,10 +258,9 @@ def _space_tags(
     taken = [box(lefts[i], i) for i in range(len(marks)) if i not in crowded]
     for i in sorted(crowded):
         margin = None  # the margin the number is in, if it is in one
-        if text is not None and marks[i].tag_x is not None:
-            margin = (
-                (text[1], page_size[0]) if marks[i].tag_x > page_size[0] / 2 else (0.0, text[0])
-            )
+        tag_x = marks[i].tag_x
+        if text is not None and tag_x is not None:
+            margin = (text[1], page_size[0]) if tag_x > page_size[0] / 2 else (0.0, text[0])
         elif text is not None and lefts[i] >= 0.0 and lefts[i] + tag_w <= text[0] + NEAR_PT:
             margin = (0.0, text[0])  # beside a frame, and in the left margin
         if margin is None:

@@ -138,6 +138,25 @@
 {% endif %}
 {% endmacro %}
 
+{# What the card rests on, in words (routes/split.py `Evidence`): for a reviewer who cannot
+   see the page image. Document content, shown where the PDF's own text is. #}
+{% macro evidence_block(p) %}
+{% set ev = p.evidence %}
+{% if ev %}
+<section class="evidence" aria-labelledby="evidence-title">
+  <h3 id="evidence-title" class="part-label">In words</h3>
+  {% if ev.sentence %}<p class="speech"><span class="speech-label">The words around it, with the proposal read aloud in its place:</span> “{{ ev.sentence }}”</p>{% endif %}
+  {% if ev.reference %}<p class="speech"><span class="speech-label">Where the text refers to it:</span> “{{ ev.reference }}”</p>{% endif %}
+  {% if ev.readings %}
+  <ul class="evidence-readings">
+    {% for r in ev.readings %}<li><span class="speech-label">{{ r.who }}:</span>{% if r.speech %} read aloud roughly as “{{ r.speech }}”,{% endif %} LaTeX <code class="text-layer">{{ r.latex }}</code></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if ev.image_only %}<p class="evidence-image-only">{{ evidence_image_only }}</p>{% endif %}
+</section>
+{% endif %}
+{% endmacro %}
+
 {% macro equation_body(p) %}
 {% set item = p.item %}
 {% set eid = item.element_id %}
@@ -170,6 +189,7 @@
   {{ speech_lines(item, p.spoken) }}
 </div>
 {% endif %}
+{{ evidence_block(p) }}
 {% if p.suggestion %}
 {# The fix the table points to: an edit with only that letter changed, checked again like a
    typed one. A form of its own, so the edit box below is not sent; its button is in the
@@ -266,6 +286,7 @@
   {% if item.caption %}<figcaption><span class="cap-label">Caption in the PDF:</span> {{ item.caption }}</figcaption>{% endif %}
 </figure>
 {{ hear_button(item) }}
+{{ evidence_block(p) }}
 {# Long descriptions on (figures work): the chart's data table as students will get it.
    It scrolls sideways in its own box on a narrow screen, so it can take focus, and its
    cells keep whole numbers (`table-view`). A table whose values were read from the image
@@ -488,6 +509,7 @@
 {% set key = pg.key %}
 <p class="group-question">{{ pg.lead }}</p>
 <p>{{ pg.explain }}</p>
+{{ evidence_block(p) }}
 {% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
 {% if pg.waiting %}
 {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key, {"class": "inline-form"}) %}
@@ -756,6 +778,18 @@
       {% if not page.placed %}<p class="page-note">No marks on this page. Every item is in <a href="{{ list_url }}">the list view</a>.</p>{% endif %}
       <p class="page-note page-failed" hidden>The page image did not load. Every item is in <a href="{{ list_url }}">the list view</a>.</p>
     </div>
+    {# The same marks as text, in reading order, each to the item its frame opens: for frames
+       that are small or overlap, and for a page nobody can see. #}
+    {% if page.boxes %}
+    <section class="mark-list-box" aria-labelledby="mark-list-title">
+      <h3 id="mark-list-title" class="part-label">The marks on page {{ page.number }}, in reading order</h3>
+      <ol class="mark-list">
+        {% for b in page.listed %}
+        <li><a href="{{ b.href }}"{% if b.current %} aria-current="true"{% endif %}>{% if b.tier != "accepted" %}<span class="line-kind">{{ b.tag }}:</span> {% endif %}{{ b.name }}{% if b.preview %}, “{{ b.preview }}”{% endif %}</a></li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
   </section>
 </div>
 {% endblock %}
