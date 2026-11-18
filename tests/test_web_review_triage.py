@@ -36,7 +36,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.web import review
+from readablestem.web import queue, review
 from readablestem.web.db import ReviewEdit, session_scope
 from test_web_review import install_fake_pipeline
 
@@ -201,6 +201,103 @@ def test_results_stored_before_tiers_get_them_from_their_status():
     assert (fix.group_key, fix.group_size, fix.optional_note) == (None, None, False)
     # An explicit tier is kept, and a reviewer's decision never changes it.
     assert Fix.model_validate(stored_fix | {"review": "optional"}).review == "optional"
+
+
+def risk_result() -> DocumentResult:
+    """Four decisions placed so that kind order and risk order differ: an equation held only by
+    its confidence (page 1, band 4), an equation with a failed check (page 2, band 2), a figure
+    kept as it was (page 3, band 1), and a heading group (page 1, band 5)."""
+    layout = [
+        ("p1-e0", Kind.EQUATION, 0), ("p1-e1", Kind.HEADING, 0), ("p1-e2", Kind.HEADING, 0),
+        ("p2-e0", Kind.EQUATION, 1), ("p3-e0", Kind.FIGURE, 2),
+    ]  # fmt: skip
+    elements = [
+        Element(id=eid, kind=kind, page=page, bbox=(0, n, 1, n + 1), order=n, text="x")
+        for n, (eid, kind, page) in enumerate(layout)
+    ]
+    equation = EquationFix(
+        latex="x", mathml="<math><mi>x</mi></math>", speech="x", display="inline"
+    )
+    failed = Check(name="equation.latex", passed=False, code="unknown_command")
+    heading = HeadingFix(level=3, text="x")
+    fixes = [
+        Fix(element_id="p1-e0", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, equation=equation),
+        *(
+            Fix(element_id=eid, kind=Kind.HEADING, status=Status.NEEDS_REVIEW, heading=heading,
+                group_key="hg-p1-e1", group_size=2)
+            for eid in ("p1-e1", "p1-e2")
+        ),
+        Fix(element_id="p2-e0", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, equation=equation,
+            checks=[failed]),
+        Fix(element_id="p3-e0", kind=Kind.FIGURE, status=Status.FAILED, reason="figure_failed"),
+    ]  # fmt: skip
+    triage.stamp(fixes)
+    return DocumentResult(
+        pipeline_version="test",
+        title="t",
+        elements=elements,
+        fixes=fixes,
+        stats=DocumentStats(pages=3, cost_usd=0, latency_ms=1, model_calls=0),
+        html="<!doctype html><html><head><title>t</title></head><body></body></html>",
+    )
+
+
+def test_one_function_decides_the_tier_and_the_review_walks_the_risk_bands():
+    """The walk was equations, figures, then headings, each in page order: the figure nothing was
+    made for came after both equations. It now goes band by band, and the stopping line comes
+    once bands 1 to 3 are decided, whatever the decisions did to the checks."""
+    result = risk_result()
+    walk = [d.key for d in queue.decisions(result)]
+    assert walk == ["p3-e0", "p2-e0", "p1-e0", "hg-p1-e1"]  # bands 1, 2, 4, 5
+    assert [d.band for d in triage.decisions(result)] == [4, 5, 2, 1]
+    assert dict(triage.review_load(result.fixes).required_by_band) == {
+        "1": 1,
+        "2": 1,
+        "4": 1,
+        "5": 1,
+    }
+    assert queue.stopping_words(result.fixes) == ""
+    # A result stored before tiers existed: waiting is required whatever its stored tier says.
+    old = result.fixes[0].model_copy(update={"review": "none"})
+    assert triage.tier_for(old) == "required"
+    assert triage.required_decisions([old]) == 1
+    # "Next" follows the review's order, not the page's: the equation of band 2 comes before the
+    # one of band 4 although it sits on a later page.
+    assert [review.next_to_review(result, key) for key in ("p2-e0", "p1-e0", "p3-e0")] == [
+        "p1-e0",
+        "p3-e0",
+        "p1-e1",
+    ]
+    # Deciding the first two (the failed check is replaced by the edit) moves nobody.
+    for fix in result.fixes:
+        if fix.element_id in {"p3-e0", "p2-e0"}:
+            fix.status, fix.reviewed, fix.checks = Status.EDITED, True, []
+    assert [d.key for d in queue.decisions(result)] == walk
+    assert queue.stopping_words(result.fixes).endswith(
+        "The 2 are left, lower risk. You can share now or keep going."
+    )
+
+
+def test_a_second_source_on_one_cause_adds_its_name_and_an_unknown_source_is_refused():
+    """One cause, one card: a source that flags what is already asked adds its name and makes no
+    second decision; one that flags what was not asked opens it. A name outside `SOURCES` cannot
+    be stored or added, so no source outside the table can ask for a person."""
+    result = risk_result()
+    asked = result.fix_for("p1-e0")
+    assert asked is not None
+    triage.add_source(asked, "decoration")
+    assert triage.required_decisions(result.fixes) == 4
+    first = next(d for d in triage.decisions(result) if d.members == 1 and d.band == 4)
+    assert first.sources == ("pipeline", "decoration")
+    quiet = Fix(element_id="p9-e0", kind=Kind.FIGURE, status=Status.ACCEPTED, review="none")
+    triage.add_source(quiet, "decoration")
+    assert (quiet.review, quiet.sources) == ("required", ["decoration"])
+    load = triage.review_load([asked, quiet])
+    assert dict(load.required_by_class) == {"doubt": 1, "rule": 1}
+    with pytest.raises(ValueError):
+        triage.add_source(quiet, "audit")
+    with pytest.raises(ValueError):
+        Fix(element_id="e", kind=Kind.FIGURE, status=Status.FAILED, sources=["audit"])
 
 
 # --------------------------------------------------------------------------- page

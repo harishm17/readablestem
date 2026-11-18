@@ -710,6 +710,7 @@ class _Reader:
                 status=Status.FAILED,
                 reason=UNKNOWN_FIGURE_REASON,
                 review="required",
+                sources=["source_read"],
             )
         else:
             self.out.images[element.id] = png

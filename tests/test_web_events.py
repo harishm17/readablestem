@@ -149,12 +149,11 @@ def test_a_failing_event_never_breaks_what_the_person_was_doing(web, monkeypatch
 # --------------------------------------------------------------------------- admin
 
 
-def test_outcome_cells_count_one_release_per_lane_and_withhold_small_cells(web, monkeypatch):
+def test_outcome_cells_count_one_release_per_lane_and_withhold_small_cells(web):
     """`outcome_cells` (decision A15, rule 4 of WS11.18): equations from 5 accounts and 10
     documents are shown with their three measures; tables from 4 accounts are withheld, and
     with them the next smallest lane (figures), so "all" cannot give tables away. An admin's
     rows and another release's rows count nowhere, and no cell holds a user or job id."""
-    monkeypatch.setitem(events.SOURCE_CLASSES, "pipeline", events.DOUBT)
     ids: list[str] = []
 
     def outcome(user: str, job: str, kind: str, reason: str, what: str, release="0.5.9"):

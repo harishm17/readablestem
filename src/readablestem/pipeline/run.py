@@ -2062,6 +2062,7 @@ def _convert(
         # A paragraph or list item layout doubts (`option_labels`, `rtl_text`) gets its decision.
         for fix in notice_rules.text_decisions(elements, run.fixes):
             run.fixes[fix.element_id] = fix
+        triage.stamp(run.fixes.values())  # the risk band each decision was asked at
         ordered = _ordered_fixes(elements, run.fixes)
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:

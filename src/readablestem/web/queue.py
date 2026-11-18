@@ -1,17 +1,16 @@
 """The review screen's queue: the decisions the pipeline asked for, numbered, in order.
 
-A reviewer makes decisions, not fixes:
-a fix that needs a decision is one, and a group of repeated headings that share a
-`Fix.group_key` is one for all of its headings, and so are the pages (or the pieces of
-handwriting) kept as images for one reason ("pg-" keys, `web.review.is_kept_image`). The
-queue holds every decision the
-pipeline asked for (`Fix.review == "required"`, plus anything still waiting, for results
-stored before tiers existed), in the review order of `web.review` (equations, then
-figures, then tables, then headings, each in page and reading order), numbered from 1. A
-table kept as an image is a decision like any other (keep the image, or use the grid
-read from the PDF). Numbers do not
-change while the reviewer works, so "Decision 2 of 3" names the same thing before and
-after decision 1 is made; a decision is *open* while any of its fixes is still waiting.
+A reviewer makes decisions, not fixes: a fix that needs a decision is one, and a group of
+repeated headings that share a `Fix.group_key` is one for all of its headings, and so are the
+pages (or the pieces of handwriting) kept as images for one reason ("pg-" keys,
+`web.review.is_kept_image`). The queue holds every decision the pipeline asked for
+(`core.triage.tier_for`), in risk order (`core.triage.risk_rank`): band 1 first (what a
+student cannot get any other way), then what may be wrong, then the weaker flags, and inside a
+band in page and reading order. It is numbered from 1. A table kept as an image is a decision
+like any other (keep the image, or use the grid read from the PDF). Numbers do not change
+while the reviewer works (a decision's band is fixed when it is asked, `Fix.band`), so
+"Decision 2 of 3" names the same thing before and after decision 1 is made; a decision is
+*open* while any of its fixes is still waiting.
 
 Counts are in decisions everywhere: the sentence at the top, the progress, the page list
 (an open decision counts on the page of its first fix still waiting, so the pages add up
@@ -20,6 +19,7 @@ to the total) and the job page.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from readablestem.core import triage
@@ -63,11 +63,12 @@ class Decision:
 
 
 def _asked(fix: Fix) -> bool:
-    return fix.kind in GROUP_KINDS and (fix.review == "required" or fix.pending)
+    return fix.kind in GROUP_KINDS and triage.tier_for(fix) == "required"
 
 
 def decisions(result: DocumentResult) -> list[Decision]:
-    """Every decision the pipeline asked for, in review order, numbered from 1."""
+    """Every decision the pipeline asked for, in risk order, numbered from 1. A decision's band
+    is fixed when it is asked (`Fix.band`), so deciding it does not move it or the others."""
     far = (1 << 30, 1 << 30)  # a fix whose element is missing goes last in its kind
     rank = {e.id: (e.page, e.order) for e in result.elements}
     ordered = [
@@ -80,7 +81,11 @@ def decisions(result: DocumentResult) -> list[Decision]:
         if _asked(fix)
     ]
     out: list[Decision] = []
-    for number, unit in enumerate(triage.units(ordered), start=1):
+    asked = sorted(
+        triage.units(ordered),
+        key=lambda u: (triage.risk_rank(u[0]), rank.get(u[0].element_id, far)),
+    )
+    for number, unit in enumerate(asked, start=1):
         first = unit[0]
         grouped = first.kind is Kind.HEADING or is_kept_image(first)
         key = first.group_key if first.group_key and grouped else None
@@ -141,3 +146,16 @@ def open_by_page(queue: list[Decision], elements: dict[str, Element]) -> dict[in
         for page in pages:
             counts[page] = counts.get(page, 0) + 1
     return counts
+
+
+def stopping_words(fixes: Iterable[Fix]) -> str:
+    """The sentence at the stopping line (`core.triage.stopping_line`), or "" while a decision
+    of the first three bands is open or nothing lower is left."""
+    line = triage.stopping_line(fixes)
+    if not line.reached:
+        return ""
+    left = f"{line.below_open} {'is' if line.below_open == 1 else 'are'}"
+    return (
+        "Everything that could change what a student reads is decided. "
+        f"The {left} left, lower risk. You can share now or keep going."
+    )

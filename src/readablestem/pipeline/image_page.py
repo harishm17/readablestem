@@ -1490,7 +1490,7 @@ def final_counts(
         if record.outcome != "converted":
             continue
         mine = [f for f in fixes if page_of.get(f.element_id) == record.page]
-        record.required = len(triage.units(f for f in mine if f.review == "required"))
+        record.required = len(triage.units(f for f in mine if triage.tier_for(f) == "required"))
         record.optional = sum(1 for f in mine if f.review == "optional")
 
 

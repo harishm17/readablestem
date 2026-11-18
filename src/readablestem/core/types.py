@@ -792,6 +792,24 @@ class Fix(BaseModel):
     # the fixed words (T3-16). Cleaned and checked like any alt text (`web.review`); None
     # when there is none.
     described: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # The sources that raised this decision, the one that opened it first (`core.triage.SOURCES`).
+    # Empty is the pipeline's own flag: every result stored before sources existed. A name
+    # that is not in the table is refused, so no source outside it can ask for a person.
+    sources: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # The risk band of a required decision (`core.triage.risk_rank`), fixed when it was asked:
+    # a review changes the checks and the status the band is read from, and the review order
+    # must not move while a person works. None: not set (read from the fix as it is).
+    band: int | None = Field(default=None, exclude_if=lambda v: v is None)
+
+    @field_validator("sources")
+    @classmethod
+    def _known_sources(cls, value: list[str]) -> list[str]:
+        from readablestem.core.triage import SOURCES
+
+        unknown = [name for name in value if name not in SOURCES]
+        if unknown:
+            raise ValueError("not a source of decisions: " + ", ".join(unknown))
+        return value
 
     @model_validator(mode="before")
     @classmethod

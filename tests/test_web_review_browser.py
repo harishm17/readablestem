@@ -155,11 +155,13 @@ def walk_states(page, site, job: str, check) -> None:
     assert "Your edit passed the required checks" in page.locator("#review-progress").inner_text()
     check("just edited")
 
+    unfold_everything(page)
     page.locator("#acknowledge-p1-e2").check()  # what it means for students
     page.get_by_role("button", name="Keep without a description (figure 1)", exact=True).click()
     page.wait_for_url(f"{url}?at=item-*#item-*")
     check("just rejected")
 
+    unfold_everything(page)  # equation 1 asks least, so it comes last in its section: folded
     page.get_by_label("LaTeX for equation 1").fill("\\input{secret}")
     page.get_by_role("button", name="Save edit to equation 1").click()
     assert page.locator(".error-summary").is_visible()
@@ -167,9 +169,11 @@ def walk_states(page, site, job: str, check) -> None:
     check("refused edit")
 
     page.goto(url)
+    unfold_everything(page)
     page.get_by_role("button", name="Accept equation 1", exact=True).click()
     page.wait_for_url(f"{url}?at=item-*#item-*")
     page.goto(url)
+    unfold_everything(page)
     page.get_by_role("button", name="Accept heading 2", exact=True).click()
     page.wait_for_url(f"{url}?at=item-*#item-*")
     check("after more decisions")
@@ -247,10 +251,11 @@ def test_a_decision_lands_on_the_next_fix_with_a_link_back(site, browser, job):
     context, page = open_page(browser, site)
     url = review_url(site, job)
     page.goto(url)
+    unfold_everything(page)
     page.get_by_role("button", name="Accept equation 1", exact=True).click()
-    page.wait_for_url(f"{url}?at=item-p2-e1#item-p2-e1")
+    page.wait_for_url(f"{url}?at=item-p3-e1#item-p3-e1")  # the figure nothing was made for
     # The landing item has focus, so the next Tab reaches the link back to the change.
-    assert page.evaluate("document.activeElement.id") == "item-p2-e1"
+    assert page.evaluate("document.activeElement.id") == "item-p3-e1"
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.textContent") == "Equation 1 on page 1"
     page.keyboard.press("Enter")
@@ -265,7 +270,6 @@ def test_decisions_work_without_javascript(site, browser, job):
     url = review_url(site, job)
     page.goto(url)
     assert page.get_by_role("button", name=re.compile("^Accept (all|these)")).count() == 0
-    page.locator("#item-p3-e1 > details > summary").click()  # the rows are folded after the first
     page.locator("#acknowledge-p3-e1").check()
     page.locator("#fix-p3-e1").get_by_role(
         "button", name="Keep without a description (figure 2)"

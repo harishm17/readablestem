@@ -1376,6 +1376,7 @@ def split_page(
         "open_count": open_count,
         "decided": len(builder.queue) - open_count,
         "headline": headline(open_count, len(builder.queue), len(optional)),
+        "stopping_line": queue.stopping_words(builder.result.fixes),
         "optional": optional,
         "optional_open": panel.mode == "item" and panel.status_class == "pill-optional",
         "notice": notice,

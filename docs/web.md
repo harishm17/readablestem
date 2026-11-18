@@ -1425,7 +1425,7 @@ so production can count false flags per true flag, corrections nobody was asked 
 checked against a closed list by `events.make`, hold the element kind, the reason code
 that put it in front of the reviewer (or `none`), the outcome (`kept`, `edited`,
 `replaced`, `rejected`, `removed`, `added`), the origin (`page` or `source`), what raised
-it (`pipeline` or `browsing`), `single` or `group`, the write mode (`single`, `group`,
+it (a source of `core.triage.SOURCES`, or `browsing`), `single` or `group`, the write mode (`single`, `group`,
 `structure`) and the release (the output's `pipeline_version`). The value is the signed
 count. `web/outcomes.py` works out the rows from a write (the rules are in its docstring)
 and keeps them in the write's `ReviewEdit`, so Undo writes them again negated and the
@@ -1438,6 +1438,9 @@ fewer than 5 accounts or 10 documents, or with one account giving more than half
 decisions or pages, is withheld (with the next smallest lane when it is the only one).
 Flags count in false flags per true flag only when `events.SOURCE_CLASSES` names their source
 a doubt source; a rule source counts on its own line; any other is "not classified".
+`events.SOURCE_CLASSES` and `events.SOURCES` are made from the one table of sources,
+`core.triage.SOURCES` (below), and the source of a row is the first source the flagged fix
+names (`Fix.sources`).
 `readablestem ops accuracy` prints it by release (`events.outcome_releases`), and
 `readablestem ops lookup` shows one account's three figures (docs/operations.md).
 
@@ -2627,6 +2630,35 @@ fragment, which would cancel autofocus) and is described by a status line above 
 ("Decision 2 of 3: Review …"). A refused edit comes back on the same decision (422) with
 the error summary and the field open.
 
+**Tier, sources and the risk order (`core.triage`).** `tier_for(fix)` is the one place a tier
+is decided (required, optional or none): a fix is required when the pipeline asked for a decision
+(`Fix.review`, which a review never changes) or is waiting for a person whatever its stored tier
+says, as in a result stored before tiers existed. Every counter and the review queue call it.
+`SOURCES` is the one table of what can raise a required decision: `pipeline` (the conversion's
+own steps and the reading of a scanned page), `text` (layout doubts a paragraph or list item:
+`text.rtl_order`, `text.option_labels`), `source_read` (a LaTeX or Word source: a picture with no
+file, a formula that could not be read) and `decoration` (a figure called decorative that nothing
+proves is). Each row says whether its flags are doubts or rules and, for a row with one, its
+band. A fix keeps the list of sources that raised it (`Fix.sources`, empty meaning `pipeline`,
+so older results are unchanged); a second source that flags a fix already asked for adds its name
+(`add_source`) and makes no second decision; a name outside the table is refused when the fix is
+built. A row is added by the item that brings its source; a source with no row can raise nothing.
+
+`risk_rank(fix)` puts a required decision in one of five bands, fixed when it is asked
+(`Fix.band`, set by `stamp`: a review changes the checks and the status the band is read from,
+and the numbers of the one-at-a-time view must not move). 1: nothing usable was made for content a
+student cannot get another way (a formula, figure or table kept as it was, a page kept as a
+picture). 2: what a student reads is or may be wrong (a failed check, a text doubt, an unproven
+decoration). 3: order or structure of a page (no source raises it yet). 4: confidence under the
+bar with no failed check. 5: repeated headings and other weak structure. The one-at-a-time view
+(`web.queue`) walks the bands in this order and, inside a band, in page and reading order; the
+list view keeps its sections by kind and orders each section the same way. Once every decision of
+bands 1 to 3 is decided and some of bands 4 and 5 are left, both views say "Everything that could
+change what a student reads is decided. The N left, lower risk. You can share now or keep going."
+(`triage.stopping_line`, `queue.stopping_words`). `review_load` also counts required decisions by
+band, by opening source and by class (`required_by_band`, `required_by_source`,
+`required_by_class`).
+
 **Target sizes.** Undo is 44 CSS px high and wide. The marks on the page image are at least 24
 px (WCAG 2.5.8, overlapping no other mark) and are grown to 44 px wherever the page has room
 around them (`web.marks._grow`): a mark in a quiet part of the page is a 44 px target, one
@@ -3087,10 +3119,10 @@ works on the whole document, not on the view (below).
 
 **Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
-1. **Needs your decision (N)**: equations, then figures, then tables, then headings (a
-   mistake there costs a student most), each with the fixes still waiting (needs review, failed and not
-   converted alike) in page and reading order. N counts decisions: a group of repeated
-   headings is one.
+1. **Needs your decision (N)**: grouped by kind (equations, figures, tables, headings, text),
+   and inside each kind the higher risk band first, then page and reading order (the bands are
+   below). Each holds the fixes still waiting (needs review, failed and not converted alike).
+   N counts decisions: a group of repeated headings is one.
 2. **Optional checks (M)**: fixes accepted automatically with a note (`Fix.review ==
    "optional"`: a bold subscript, a double-struck R the PDF cannot show, a heading with
    weak evidence, a long alt text), folded into a `<details>`. Each item's summary line is

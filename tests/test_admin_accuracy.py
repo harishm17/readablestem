@@ -38,14 +38,6 @@ def database(tmp_path, monkeypatch):
     engine.dispose()
 
 
-@pytest.fixture
-def classed(monkeypatch):
-    """Two sources with a class: "pipeline" raises doubt flags, "gate" is a rule."""
-    monkeypatch.setattr(events, "SOURCES", (*events.SOURCES, "gate"))
-    monkeypatch.setitem(events.SOURCE_CLASSES, "pipeline", events.DOUBT)
-    monkeypatch.setitem(events.SOURCE_CLASSES, "gate", events.RULE)
-
-
 class Builder:
     """Accounts and documents with outcome rows, spread evenly so no account dominates."""
 
@@ -101,12 +93,11 @@ def accuracy(capsys) -> str:
     return capsys.readouterr().out
 
 
-def test_each_release_prints_the_three_measures_with_the_small_count_rule(
-    database, classed, capsys
-):
+def test_each_release_prints_the_three_measures_with_the_small_count_rule(database, capsys):
     """6 accounts, 12 documents, 200 pages: 30 kept and 15 changed doubt flags are 2.0 false
     flags per true flag; 4 silent edits and 3 added by hand are 3.5 per 100 pages; 40 rule
-    decisions (6 changed) are on their own line and leave the ratio alone; a decision made,
+    decisions (6 changed, source "decoration", a rule in `triage.SOURCES`; "pipeline" is a doubt
+    source) are on their own line and leave the ratio alone; a decision made,
     undone and made again counts once; a flag whose source has no class is "not classified";
     one release under two profile hashes is two tables; an admin's rows change nothing."""
     b = Builder(database, accounts=6, documents=12, pages=200)
@@ -114,8 +105,8 @@ def test_each_release_prints_the_three_measures_with_the_small_count_rule(
     b.outcome("unknown_command", "edited", "pipeline", 15)
     b.outcome("none", "edited", "browsing", 3)
     b.outcome("none", "added", "browsing", 3)
-    b.outcome("table_not_rebuilt", "kept", "gate", 34)
-    b.outcome("table_not_rebuilt", "edited", "gate", 6)
+    b.outcome("table_not_rebuilt", "kept", "decoration", 34)
+    b.outcome("table_not_rebuilt", "edited", "decoration", 6)
     b.outcome("below_accept", "kept", "browsing", 2)  # no class: in no ratio
     b.outcome("none", "edited", "browsing", 1, at=5)  # made ...
     b.outcome("none", "edited", "browsing", -1, at=5)  # ... undone ...
@@ -147,9 +138,7 @@ def test_each_release_prints_the_three_measures_with_the_small_count_rule(
     assert "@example.org" not in out and not any(job in out for job in b.jobs)
 
 
-def test_a_cell_with_too_few_accounts_or_one_dominant_account_is_withheld(
-    database, classed, capsys
-):
+def test_a_cell_with_too_few_accounts_or_one_dominant_account_is_withheld(database, capsys):
     """4 accounts: "needs 1 more account", and nothing of its numbers is printed; with 5
     accounts of which one supplies 60% of the decisions it is withheld too."""
     four = Builder(database, accounts=4, documents=12, pages=100, release="0.5.10")

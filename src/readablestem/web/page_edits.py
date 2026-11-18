@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
-from readablestem.core import inline
+from readablestem.core import inline, triage
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     PENDING_STATUSES,
@@ -741,6 +741,7 @@ def add_equation(
         asked = read.model_copy(update={"status": Status.NEEDS_REVIEW})
     asked.review = "required"
     asked.reviewed = False
+    triage.stamp([asked])
     result.fixes.append(asked)
     _recount(result)
     return StructureChange(
@@ -785,6 +786,8 @@ def read_again(result: DocumentResult, element: Element, read: Fix) -> Structure
     asked.review = "required"
     asked.reviewed = False
     asked.group_key = fix.group_key
+    asked.band = fix.band  # the same place in the review order
+    triage.stamp([asked])
     result.fixes[next(n for n, f in enumerate(result.fixes) if f is fix)] = asked
     for index, current in enumerate(result.elements):
         if current.id == element.id and element.equation_label != current.equation_label:

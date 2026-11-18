@@ -27,6 +27,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Fix
 
 PAGE_READING = "equation.page_reading"
@@ -41,7 +42,7 @@ def _asked_about(element_id: str, result: DocumentResult, fixes: Mapping[str, Fi
     fix = fixes.get(element_id)
     if element is not None and element.parent_id is not None:  # inline: its paragraph's item
         fix = fixes.get(element.parent_id)
-    return fix is not None and fix.review == "required"
+    return fix is not None and triage.tier_for(fix) == "required"
 
 
 def _agreed(fix: Fix | None) -> bool | None:

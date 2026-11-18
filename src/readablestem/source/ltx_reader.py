@@ -915,6 +915,7 @@ class _Reader:
                 status=Status.FAILED,
                 reason=UNKNOWN_FIGURE_REASON,
                 review="required",
+                sources=["source_read"],
             )
         else:
             self.out.images[element.id] = png
@@ -1183,6 +1184,7 @@ def equation_fix(
             equation=proposal,
             checks=[Check(name="source.macro", passed=False, code="unknown_command")],
             review="required",
+            sources=["source_read"],
         )
         return fix, True
     speech, speech_check = "", None

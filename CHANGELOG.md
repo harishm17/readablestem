@@ -98,6 +98,27 @@
   the same as for 2. A document with an outcome code, an outage, unread LaTeX or a notice that
   holds it back still has its result read. One migration (`state_facts`, nullable): a row from
   before it is read once and filled the first time a list shows it. No version bump.
+## Unreleased: one tier, one table of sources, a risk order (branch feat/decision-sources-and-tier)
+
+- SW4 (F-064, F-092, as triage reduces it): `core.triage.tier_for` is the one place a tier is
+  decided and every counter and the review queue call it. `risk_rank` puts a required decision in
+  one of five bands (nothing usable made; may be wrong; page order; confidence only; weak
+  structure), fixed when it is asked (`Fix.band`). The one-at-a-time review walks the bands in
+  order, then page order, and the list view orders each kind's cards the same way. When every
+  decision of bands 1 to 3 is decided and lower-risk ones are left, both views say so and that
+  the document can be shared now. Not built: the per-card line saying why a card is where it is
+  (it waits for the card words), sharing rules reading the line (P6b).
+- WS8.22 and what WS8.23 left (as triage reduces them): `core.triage.SOURCES`, the one table of
+  what can raise a required decision, today `pipeline`, `text`, `source_read` and `decoration`,
+  each a doubt or a rule. A fix keeps the list of sources that raised it (`Fix.sources`);
+  a second source on a decision already asked for adds its name and raises nothing; a name outside
+  the table is refused. Outcome rows carry the opening source, `events.SOURCE_CLASSES` is filled
+  from the table, so `readablestem ops accuracy` prints doubt flags (with false per true) and rule
+  decisions on their own line. `review_load` counts by band, source and class. Not built: rows for
+  the page audit, the line check, the structure reader, reports and the Word reader's rows (each
+  arrives with its source), the three-position switch, the live ratio bookkeeping and the card
+  words census. Stored results are unchanged (new fields are left out when empty); a stored
+  document shows the same decisions in the same count, and the review order changes as above.
 
 ## Unreleased: page pictures and exports are made once (branch perf/render-once)
 

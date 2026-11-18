@@ -255,8 +255,9 @@ class FixGroup:
 
     @property
     def units(self) -> list[list[Fix]]:
-        """The decisions waiting: one per fix, one per group of repeated headings."""
-        return triage.units(self.pending)
+        """The decisions waiting: one per fix, one per group of repeated headings, the
+        higher risk bands first (`triage.risk_rank`), each band in page order."""
+        return sorted(triage.units(self.pending), key=lambda unit: triage.risk_rank(unit[0]))
 
 
 # --------------------------------------------------------------------------- order
@@ -418,8 +419,15 @@ def next_to_review(result: DocumentResult, element_id: str) -> str | None:
         for unit in g.units
         if unit[0].element_id != element_id
     ]
-    here = position.get(element_id)
-    later = [e for e in heads if here is not None and position[e] > here]
+
+    def place(eid: str) -> tuple[int, int, int, int] | None:
+        """Where an element stands in the walk: its kind section, its risk band, then
+        its page and reading order."""
+        at, member = position.get(eid), result.fix_for(eid)
+        return None if at is None or member is None else (at[0], triage.risk_rank(member), *at[1:])
+
+    here = place(element_id)
+    later = [e for e in heads if here is not None and (place(e) or here) > here]
     remaining = later or heads
     return remaining[0] if remaining else None
 

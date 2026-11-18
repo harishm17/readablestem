@@ -191,7 +191,7 @@ def _outcome(
     reason = events.NO_REASON if decided else _flag_reason(change.fix, before)
     if outcome == "kept" and reason == events.NO_REASON:
         return None  # nobody was asked, and nothing changed
-    return _made(change.fix.kind.value, reason, outcome, origin)
+    return _made(change.fix.kind.value, reason, outcome, origin, source=_opener(change.fix))
 
 
 def _structure_outcome(
@@ -213,29 +213,40 @@ def _structure_outcome(
     if change.action == "not_equation":
         # The equation that was asked about, and the code that asked.
         asked = (held.get("fixes") or {}).get(change.element_id)
-        reason = events.NO_REASON
+        reason, source = events.NO_REASON, triage.PIPELINE
         if isinstance(asked, dict):
             fix = Fix.model_validate(asked)
             if not fix.decided_by_reviewer:
-                reason = _flag_reason(fix, {})
-        return _made(kind, reason, outcome, origin)
+                reason, source = _flag_reason(fix, {}), _opener(fix)
+        return _made(kind, reason, outcome, origin, source=source)
     if change.action == "edit_text":
         was = ((first or {}).get(STRUCTURE_KEY) or {}).get("elements", {}).get(change.element_id)
         if isinstance(was, dict) and was.get("text") != element.get("text"):
             return None  # its words were already changed by a person, and counted
     fix = result.fix_for(change.element_id) if change.action == "edit_text" else None
-    reason = events.NO_REASON
+    reason, source = events.NO_REASON, triage.PIPELINE
     if fix is not None and not fix.decided_by_reviewer:
-        reason = _flag_reason(fix, {})
-    return _made(kind, reason, outcome, origin)
+        reason, source = _flag_reason(fix, {}), _opener(fix)
+    return _made(kind, reason, outcome, origin, source=source)
+
+
+def _opener(fix: Fix) -> str:
+    """The source that put this fix in front of the reviewer: the first it names."""
+    return triage.sources_of(fix)[0]
 
 
 def _made(
-    kind: str, reason: str, outcome: str, origin: str, count: int = 1
+    kind: str,
+    reason: str,
+    outcome: str,
+    origin: str,
+    count: int = 1,
+    source: str = triage.PIPELINE,
 ) -> events.Outcome | None:
     if kind not in events.OUTCOME_KINDS:
         return None
-    source = "browsing" if reason == events.NO_REASON else "pipeline"
+    if reason == events.NO_REASON:
+        source = events.BROWSING
     return events.Outcome(kind, reason, outcome, origin, source, count)
 
 

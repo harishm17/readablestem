@@ -253,6 +253,7 @@ def text_decisions(elements: Iterable[Element], fixes: Mapping[str, Fix]) -> lis
                     kind=element.kind,
                     status=Status.NEEDS_REVIEW,
                     review="required",
+                    sources=["text"],
                     reason=TEXT_REASONS[code],
                 )
             )
