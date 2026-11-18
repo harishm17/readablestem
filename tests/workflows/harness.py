@@ -85,6 +85,9 @@ OWED = {
     "f4_matrices": 12,
     "ar3_sideways90": 2,
     "ar4_sideways270": 2,
+    "r15_openstax_chem_ch3": 2,
+    "r19_poster_codesign": 4,
+    "r20_newsletter_drp": 2,
 }
 
 
