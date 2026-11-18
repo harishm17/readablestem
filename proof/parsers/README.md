@@ -224,6 +224,15 @@ What the plumbing showed, beyond the plan's earlier three-page look:
 - 2 gold equations is too few to rank anything: a rate of 0 of 2 has a Wilson interval up to
   0.66.
 
+## olmOCR-Bench (the product only)
+
+`runners/olmocr_check.py` is the benchmark's checker (the pinned `olmocr` release, run in its
+own environment) applied to the markdown of the student page. It scores ReadableSTEM, not the
+arms above, and is run by `readablestem eval parsing-bench`; the adapter that makes the markdown
+is `src/readablestem/eval/olmocr_bench.py` (in the package because the command lives there; the
+plan's "adapter in proof/parsers" is the runner only). See `docs/eval-parsing-benchmark.md`. The
+olmOCR model itself is still not run (no GPU).
+
 ## Not done, and limits
 
 - No held-out run, by design. `PARSERS-PLAN.md` is not frozen; it needs Harish's decisions

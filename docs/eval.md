@@ -650,6 +650,20 @@ harness never reads anything from `private-inputs/`, except the tables task's
 real-document check, which reads `private-inputs/tables/` and reports counts only (see
 "Tables").
 
+## Public benchmark at $0 (`eval parsing-bench`)
+
+`readablestem eval parsing-bench [--fetch] [--run-dir DIR] [--only CATEGORY] [--out FILE]` runs
+the categories of olmOCR-Bench that the text path answers without a model (order, headers and
+footers, long tiny text, tables, baseline) through the product's own conversion with a client
+that refuses every request, and scores them with the benchmark's own checker. Pages that need a
+model (scans, with or without an OCR layer) are dropped and counted; equations and old scans
+are reported as not run. The benchmark is fetched to `~/.cache/readablestem/bench/` (outside the
+repository, nothing from it is committed); page files go in `--run-dir` so a stopped run
+resumes. At most 3 conversions run at once. The record (`data/eval/parsing-bench-olmocr.json`)
+holds scores per category with n, the benchmark revision, the pipeline version and the profile
+hash. Results and the failures by cause: `docs/eval-parsing-benchmark.md`. The adapter is
+`eval/olmocr_bench.py`; the checker's runner is `proof/parsers/runners/olmocr_check.py`.
+
 ## How to rerun
 
 Without a key, a network or a browser: `make reproduce` checks the gold files against their
