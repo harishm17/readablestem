@@ -63,6 +63,7 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/feedback"): "owner",
     ("POST", "/jobs/{job_id}/feedback"): "owner",
     ("GET", "/jobs/{job_id}/combine"): "owner",
+    ("GET", "/jobs/{job_id}/combine/parts"): "owner",
     ("GET", "/jobs/{job_id}/delete"): "owner",
     ("POST", "/jobs/{job_id}/delete"): "owner",
     ("POST", "/jobs/{job_id}/retry"): "owner",

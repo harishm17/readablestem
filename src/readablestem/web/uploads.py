@@ -397,6 +397,31 @@ def extract_part_isolated(
     return completed.stdout
 
 
+OUTLINE_TIMEOUT_S = 15.0
+
+
+def outline_starts_isolated(data: bytes, *, timeout_s: float = OUTLINE_TIMEOUT_S) -> list[int]:
+    """The 0-based pages where the PDF's top-level bookmarks point, read in a child process
+    like the probe; empty when it has none or anything goes wrong (the suggestion then cuts
+    evenly). Call it from a worker thread, not the event loop."""
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "readablestem.web.pdf_probe", "outline"],
+            input=data,
+            capture_output=True,
+            timeout=timeout_s,
+            check=False,
+            env=child_env(),
+        )
+        if completed.returncode != 0:
+            return []
+        answer = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+        starts = answer["starts"]
+        return [p for p in starts if isinstance(p, int)] if isinstance(starts, list) else []
+    except (subprocess.TimeoutExpired, OSError, ValueError, KeyError, IndexError):
+        return []
+
+
 # --------------------------------------------------------------------------- Word and PowerPoint
 
 OFFICE_WAIT_S = 5.0  # how long a second conversion waits for the first before "busy"

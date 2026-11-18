@@ -17,6 +17,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
+from markupsafe import Markup
+
 from readablestem.web.database import as_utc
 
 Style = Literal["long", "short"]
@@ -35,3 +37,14 @@ def machine_date(value: datetime | None) -> str:
     """A time for a machine: ISO 8601 in UTC, "" for none."""
     when = as_utc(value)
     return when.strftime("%Y-%m-%dT%H:%M:%SZ") if when is not None else ""
+
+
+def time_tag(value: datetime | None) -> Markup:
+    """A time for the page body: `<time datetime>` saying it in UTC, which app.js rewrites in
+    the reader's own time zone; without JavaScript the UTC text stays (the `utc` template
+    filter). Not for <title> or attributes: use `format_when` there."""
+    if value is None:
+        return Markup("")
+    return Markup('<time class="local-time" datetime="{}">{}</time>').format(
+        machine_date(value), format_when(value, "short")
+    )

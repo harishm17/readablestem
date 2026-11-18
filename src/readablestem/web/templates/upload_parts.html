@@ -3,7 +3,8 @@
 {# T3-3: a file over the page or size limit is kept for a while and the person chooses which
    pages to convert, in parts that each fit (web/routes/parts.py, web/ranges.py). Every part
    becomes its own document. The parts are built with two page fields and "Add part" (script,
-   static/parts.js) and shown as a list with their page counts, fetched again as they change;
+   static/parts.js) and shown as a list with their page counts, fetched again as they change, and the button that
+   starts them follows the list;
    the text box they fill is the same box the form has always sent, kept under "Type the pages
    instead" and open when there is no script or something to fix. #}
 {% set field_errors = field_errors|default({}) %}
@@ -32,6 +33,11 @@
 {% endif %}
 {% call form("upload.parts", "/uploads/" ~ pending.id, {"novalidate": true, "class": "upload-form parts-form"}) %}
   {% set parts_error = field_errors.get("parts") %}
+  <div class="field checkbox-field">
+    <input type="checkbox" id="shrink" name="shrink" value="on" aria-describedby="shrink-hint"{% if shrink %} checked{% endif %}>
+    <label for="shrink">Shrink large pictures first</label>
+    <p class="hint" id="shrink-hint">{% if heavy %}Checked because this file is large. {% endif %}Pictures above {{ shrink_from }} dpi are saved at {{ shrink_to }}; text is unchanged.</p>
+  </div>
   <section aria-labelledby="parts-heading" class="parts-section">
     <h2 id="parts-heading">Parts</h2>
     {# Script shows these: two page fields and a button that adds one line to the box below. #}
@@ -47,9 +53,6 @@
       <button type="button" class="button-secondary" data-add-part>Add part</button>
       <p class="hint parts-builder-note" data-builder-note role="status"></p>
     </div>
-    <p id="parts-summary" class="parts-summary" role="status">{{ preview_summary }}</p>
-    {% include "_parts_preview.html" %}
-
     <details class="parts-advanced" data-parts-advanced open{% if parts_error %} data-has-error{% endif %}>
       <summary>Type the pages instead</summary>
       <div class="field{% if parts_error %} field-error{% endif %}">
@@ -61,12 +64,9 @@
           aria-describedby="parts-hint{% if parts_error %} parts-error{% endif %}"{% if parts_error %} aria-invalid="true"{% endif %}>{{ typed_parts }}</textarea>
       </div>
     </details>
+    <p id="parts-summary" class="parts-summary" role="status">{{ preview_summary }}</p>
+    {% include "_parts_preview.html" %}
   </section>
-  <div class="field checkbox-field">
-    <input type="checkbox" id="shrink" name="shrink" value="on" aria-describedby="shrink-hint"{% if shrink %} checked{% endif %}>
-    <label for="shrink">Shrink large pictures first</label>
-    <p class="hint" id="shrink-hint">{% if heavy %}Checked because this file is large. {% endif %}Pictures above {{ shrink_from }} dpi are saved at {{ shrink_to }}; text is unchanged.</p>
-  </div>
   <button type="submit" class="button">Convert these parts</button>
 {% endcall %}
 {% else %}

@@ -117,7 +117,7 @@ from readablestem.web.uploads import (
     read_upload_form,
     zip_limits,
 )
-from readablestem.web.views import JobView, job_view, last_decision
+from readablestem.web.views import JobView, combine_view, job_view, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1995,6 +1995,41 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     )
 
 
+def _combine_page(request: Request, session: Session, job: Job) -> Response:
+    """The combine page for `job`'s source: a row per part with its state and what it still
+    needs, and the button to join the ready ones when there are two or more."""
+    if not job.part_group:
+        raise PageError(
+            404,
+            "This document is not a part of a larger file",
+            "Only the parts of a file converted in parts can be combined.",
+            context={"job_id": job.id},
+        )
+    view = combine_view(session, job)
+    first = combine_rules.kept_parts(session, job)
+    return render(
+        request,
+        "combine.html",
+        {
+            "job_id": job.id,
+            "name": combine_rules.title_of(first[0].job if first else job),
+            "view": view,
+            "word_export": export_docx.available(),
+            "active": "app",
+        },
+    )
+
+
+@router.get("/jobs/{job_id}/combine/parts")
+def combine_page(request: Request, job_id: str, user: UserDep) -> Response:
+    """The parts of this document's source and what each needs before they can be joined.
+    Always answers for the owner of a part, even with nothing ready: it is where "Combine
+    parts" starts, and where a part with decisions open is sent for them."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, OWNER)
+        return _combine_page(request, session, job)
+
+
 @router.get("/jobs/{job_id}/combine")
 def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "html") -> Response:
     """One HTML file from the finished parts of this document's source that the owner still
@@ -2013,15 +2048,8 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
         job = job_access(session, job_id, user, OWNER)
         require_done(job)
         kept = combine_rules.kept_parts(session, job)
-        if len(kept) < 2:
-            raise PageError(
-                409,
-                "Nothing to combine yet",
-                "Combining needs at least two finished parts of this file that you still "
-                "have. A part you deleted, or one that has not finished or still has a "
-                "decision to make, cannot be joined.",
-                context={"job_id": job.id},
-            )
+        if len(kept) < 2:  # nothing to join yet: the page says what each part still needs
+            return _combine_page(request, session, job)
         if is_head(request):  # the name and type only: nothing joined, no clock restarted
             head_name = download_filename(
                 f"{combine_rules.title_of(kept[0].job)} combined", job.part_group or job.id

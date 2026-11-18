@@ -10,7 +10,11 @@ and the arithmetic, with no file in it:
   plain words, naming the part and the page, never a code.
 - `suggest_parts` offers a starting point: the pages not yet converted, cut into as few
   parts as the limit allows, of nearly equal size (59 pages with a limit of 30 are two
-  parts, 30 and 29 pages; 61 pages are three, 21, 20 and 20).
+  parts, 30 and 29 pages; 61 pages are three, 21, 20 and 20). Given the PDF's chapter
+  starts it cuts there when a chapter fits, and given the pages left today it makes the
+  first part what can start now (60 pages left: the first part has at most 60 pages).
+- `schedule` counts which of the typed parts start now and which wait for the day's reset,
+  the one count behind the preview's sentences; `spoken` writes a label in words ("1 to 80").
 - `label` writes a set of pages the way people write them ("1-30", "1-5, 9") for a part's
   name and for the lists on the pages; `pages_of_label` reads one back.
 
@@ -90,7 +94,7 @@ def parse_parts(text: str, *, total: int, limit: int, taken: set[int] | None = N
     parts: list[Part] = []
     seen: dict[int, int] = {}
     for number, entry in enumerate(entries, start=1):
-        named = f"Part {number}" if len(entries) > 1 else "The pages"
+        named = f"Part {number}" if len(entries) > 1 else ""
         parts.append(_read_entry(entry, number, named, total, limit, taken, seen))
     return parts
 
@@ -98,6 +102,12 @@ def parse_parts(text: str, *, total: int, limit: int, taken: set[int] | None = N
 def entries_of(text: str | None) -> list[str]:
     """The parts typed in `text`: one per line, or separated by semicolons, blanks left out."""
     return [e.strip() for e in re.split(r"[\n;]+", text or "") if e.strip()]
+
+
+def _open(named: str, text: str) -> str:
+    """An error about one typed part: "Part 2: page 5 ..." when there are several, and with a
+    single one just the sentence ("Page 5 ..."), never "The pages:"."""
+    return f"{named}: {text}" if named else text[:1].upper() + text[1:]
 
 
 def _read_entry(
@@ -116,29 +126,33 @@ def _read_entry(
         match = _RANGE.match(piece)
         if not piece or match is None:
             raise PartsError(
-                f"{named}: “{_short(piece or entry)}” is not a page number or a range such "
-                "as 3-10. Use numbers, hyphens and commas."
+                _open(
+                    named,
+                    f"“{_short(piece or entry)}” is not a page number or a range such as "
+                    "3-10. Use numbers, hyphens and commas.",
+                )
             )
         first = int(match.group(1))
         last = int(match.group(2) or first)
         if first < 1 or last < 1:
-            raise PartsError(f"{named}: pages are numbered from 1.")
+            raise PartsError(_open(named, "pages are numbered from 1."))
         if last < first:
-            raise PartsError(f"{named}: “{piece}” runs backwards. Write it as {last}-{first}.")
+            raise PartsError(_open(named, f"“{piece}” runs backwards. Write it as {last}-{first}."))
         beyond = max(first, last)
         if beyond > total:
             raise PartsError(
-                f"{named}: page {beyond} is not in this file, which has {total} pages."
+                _open(named, f"page {beyond} is not in this file, which has {total} pages.")
             )
         pages.update(range(first - 1, last))
     if len(pages) > limit:
         raise PartsError(
-            f"{named} has {len(pages)} pages. A part can have at most {limit}: split it into two."
+            f"{named or 'This'} has {len(pages)} pages. A part can have at most {limit}: "
+            "split it into two."
         )
     placed: dict[int, int] = {}
     for page in sorted(pages):
         if taken and page in taken:
-            raise PartsError(f"{named}: page {page + 1} was already converted.")
+            raise PartsError(_open(named, f"page {page + 1} was already converted."))
         if page in seen:
             raise PartsError(
                 f"Page {page + 1} is in part {seen[page]} and part {number}. "
@@ -159,6 +173,11 @@ class PreviewRow:
     count: int
     error: str = ""
 
+    @property
+    def words(self) -> str:
+        """The pages in words ("1 to 80"), for the sentences and the list."""
+        return spoken(self.label)
+
 
 def preview(
     text: str, *, total: int, limit: int, taken: set[int] | None = None
@@ -170,7 +189,7 @@ def preview(
     rows: list[PreviewRow] = []
     seen: dict[int, int] = {}
     for number, entry in enumerate(entries[:MAX_PARTS], start=1):
-        named = f"Part {number}" if len(entries) > 1 else "The pages"
+        named = f"Part {number}" if len(entries) > 1 else ""
         try:
             part = _read_entry(entry, number, named, total, limit, taken, seen)
         except PartsError as exc:
@@ -187,26 +206,95 @@ def _short(text: str, limit: int = 30) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def suggest_parts(total: int, limit: int, taken: set[int] | None = None) -> list[Part]:
+def suggest_parts(
+    total: int,
+    limit: int,
+    taken: set[int] | None = None,
+    *,
+    left: int | None = None,
+    chapters: list[int] | tuple[int, ...] = (),
+) -> list[Part]:
     """The pages not yet converted, in as few parts as `limit` allows and of nearly equal
-    size, each a run of consecutive pages (a gap left by converted pages starts a new part)."""
-    left = [p for p in range(total) if not taken or p not in taken]
+    size, each a run of consecutive pages (a gap left by converted pages starts a new part).
+
+    `left`: the pages the person may still convert today. When fewer than the pages to
+    convert, the first parts are cut to exactly what can start now (the rest follow, cut
+    the same way), so a part is never suggested that today's pages cannot start. `chapters`:
+    the 0-based pages where the PDF's chapters start (`pdf_probe outline`); a part ends before
+    one when that leaves it at least half the limit, and the pages are cut evenly otherwise."""
+    starts = set(chapters)
+    todo = [p for p in range(total) if not taken or p not in taken]
     runs: list[list[int]] = []
-    for page in left:
+    for page in todo:
         if runs and page == runs[-1][-1] + 1:
             runs[-1].append(page)
         else:
             runs.append([page])
     parts: list[Part] = []
+    budget = left
     for run in runs:
-        count = -(-len(run) // limit)  # as few parts as fit
-        size, extra = divmod(len(run), count)
-        start = 0
-        for index in range(count):
-            end = start + size + (1 if index < extra else 0)
-            parts.append(Part(tuple(run[start:end])))
-            start = end
+        if budget is not None and 0 < budget < len(run):
+            pieces = [run[:budget], run[budget:]]
+            budget = 0
+        else:
+            pieces = [run]
+            budget = None if budget is None else budget - len(run)
+        for piece in pieces:
+            parts += _cut(piece, limit, starts)
     return parts[:MAX_PARTS]
+
+
+def _cut(run: list[int], limit: int, chapters: set[int]) -> list[Part]:
+    """One run of consecutive pages in parts of at most `limit`: ending before the latest
+    chapter start that leaves the part at least half the limit, else evenly (the size the
+    rest would have if it were cut into as few equal parts as fit)."""
+    parts: list[Part] = []
+    rest = run
+    while rest:
+        if len(rest) <= limit:
+            parts.append(Part(tuple(rest)))
+            break
+        size = -(-len(rest) // -(-len(rest) // limit))
+        at = [i for i in range(max(1, limit // 2), limit + 1) if rest[i] in chapters]
+        if at:
+            size = at[-1]
+        parts.append(Part(tuple(rest[:size])))
+        rest = rest[size:]
+    return parts
+
+
+def spoken(text: str) -> str:
+    """A `label` in words: "1-80" is "1 to 80", "1-5, 9, 12" is "1 to 5, 9 and 12"."""
+    pieces = [piece.replace("-", " to ") for piece in text.split(", ")]
+    if len(pieces) == 1:
+        return pieces[0]
+    return ", ".join(pieces[:-1]) + " and " + pieces[-1]
+
+
+@dataclass(frozen=True)
+class Schedule:
+    """Which of the usable typed parts start now and which wait for the day's reset, in the
+    order they run (`routes.parts._start_parts` stops at the first part today's pages cannot
+    start): the one count the preview's sentences are written from. `bad` is the number of
+    parts that cannot be used."""
+
+    now: tuple[PreviewRow, ...]
+    later: tuple[PreviewRow, ...]
+    bad: int
+
+
+def schedule(rows: list[PreviewRow], left: int | None) -> Schedule:
+    """Split the rows into the parts `left` pages today start now and the rest. `left=None`:
+    no daily limit, everything starts now."""
+    good = [r for r in rows if not r.error]
+    used = 0
+    fits = 0
+    for row in good:
+        if left is not None and used + row.count > left:
+            break
+        used += row.count
+        fits += 1
+    return Schedule(tuple(good[:fits]), tuple(good[fits:]), len(rows) - len(good))
 
 
 def left_out(total: int, taken: set[int] | None, parts: list[Part]) -> list[int]:
