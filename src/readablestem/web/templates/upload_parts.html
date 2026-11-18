@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "components/fields.html" import field %}
+{% from "components/notices.html" import notice_box %}
 {% from "components/forms.html" import form with context %}
 {# T3-3: a file over the page or size limit is kept for a while and the person chooses which
    pages to convert, in parts that each fit (web/routes/parts.py, web/ranges.py). Every part
@@ -14,12 +16,12 @@
 <h1>Choose which pages to convert</h1>
 {% include "_error_summary.html" %}
 {% if started|default([]) %}
-<div class="notice" id="parts-started" role="status" tabindex="-1">
+{% call notice_box("success", id="parts-started", attrs={"tabindex": "-1"}) %}
   <p><strong>{{ started|length }} {{ "part is" if started|length == 1 else "parts are" }} converting.</strong></p>
   <ul>
     {% for part in started %}<li><a href="/jobs/{{ part.id }}">Pages {{ part.label }}</a></li>{% endfor %}
   </ul>
-</div>
+{% endcall %}
 {% endif %}
 {% if scans_choice %}
 {# Most pages are scans or handwriting (WS7.8): the file waits for a choice, and nothing is
@@ -83,14 +85,11 @@
     </div>
     <details class="parts-advanced" data-parts-advanced open{% if parts_error %} data-has-error{% endif %}>
       <summary>Type the pages instead</summary>
-      <div class="field{% if parts_error %} field-error{% endif %}">
-        <label for="parts">Pages for each part</label>
-        <p class="hint" id="parts-hint">One part per line, for example <code>{{ examples[0] }}</code>.</p>
-        {% if parts_error %}<p class="error-message" id="parts-error"><span class="visually-hidden">Error: </span>{{ parts_error.message }}</p>{% endif %}
+      {% set parts_hint %}One part per line, for example <code>{{ examples[0] }}</code>.{% endset %}
+      {% call(aria) field("parts", "Pages for each part", error=parts_error, hint=parts_hint) %}
         <textarea id="parts" name="parts" rows="{{ [3, [suggestion_lines, 8]|min]|max }}" spellcheck="false" autocomplete="off"
-          hx-get="/uploads/{{ pending.id }}/preview" hx-trigger="input changed delay:250ms" hx-target="#parts-preview" hx-swap="outerHTML" hx-sync="this:replace"
-          aria-describedby="parts-hint{% if parts_error %} parts-error{% endif %}"{% if parts_error %} aria-invalid="true"{% endif %}>{{ typed_parts }}</textarea>
-      </div>
+          hx-get="/uploads/{{ pending.id }}/preview" hx-trigger="input changed delay:250ms" hx-target="#parts-preview" hx-swap="outerHTML" hx-sync="this:replace"{{ aria }}>{{ typed_parts }}</textarea>
+      {% endcall %}
     </details>
     <p id="parts-summary" class="parts-summary" role="status">{{ preview_summary }}</p>
     {% include "_parts_preview.html" %}

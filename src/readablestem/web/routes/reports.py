@@ -107,5 +107,6 @@ def send_report(
         f"Thank you. Your report went to the people who run ReadableSTEM. "
         f"Its reference is {number}.",
         undo=False,
+        kind="success",
     )
     return RedirectResponse(_back(job_id, where.item_ref), status_code=303)

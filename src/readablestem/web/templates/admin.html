@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
+{% from "components/notices.html" import notice_box %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Admin{% endblock %}
 {% block content %}
 <h1>Admin</h1>
@@ -73,11 +75,11 @@
     sign-up was open keep working until you block them.){% endif %}
     Set with <code>SIGNUP_MODE</code>.</p>
   {% if signup.full %}
-  <div class="notice notice-warning" role="status">
+  {% call notice_box("warning", role="status") %}
     <p>Today's limit on new accounts is reached: {{ allowance(signup.today, signup.limit, "account") }} New
       people are told to come back tomorrow. Raise <code>MAX_NEW_ACCOUNTS_PER_DAY</code> if that
       is not what you want.</p>
-  </div>
+  {% endcall %}
   {% endif %}
   <dl class="summary-list">
     <div><dt>New accounts today (UTC day)</dt><dd>{{ allowance(signup.today, signup.limit, "account") }}</dd></div>
@@ -123,12 +125,10 @@
     {% if people_rows %}The newest {{ people_rows }} accounts are listed; to block an older one, use
     "Block by email" below.{% endif %}</p>
   {% call form("admin.allow", "/admin/allowlist", {"novalidate": true, "class": "stack-form"}) %}
-    <div class="field{% if email_error %} field-error{% endif %}">
-      <label for="allow-email">Email address to allow</label>
-      {% if email_error %}<p class="error-message" id="allow-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
+    {% call(aria) field("allow-email", "Email address to allow", error=email_error) %}
       <input type="email" id="allow-email" name="email" autocomplete="off" spellcheck="false"
-             value="{{ email_value }}"{% if email_error %} aria-invalid="true" aria-describedby="allow-email-error"{% endif %}>
-    </div>
+             value="{{ email_value }}"{{ aria }}>
+    {% endcall %}
     <div class="field checkbox-field">
       <input type="checkbox" id="allow-admin" name="admin" value="on" aria-describedby="allow-admin-hint">
       <label for="allow-admin">Make this person an admin</label>
@@ -237,12 +237,10 @@
       <label for="link-owner">Instructor's address on the allowlist</label>
       <input type="email" id="link-owner" name="email" autocomplete="off" spellcheck="false" value="{{ link_owner_value }}">
     </div>
-    <div class="field{% if link_error %} field-error{% endif %}">
-      <label for="link-other">Their other Google address</label>
-      {% if link_error %}<p class="error-message" id="link-other-error"><span class="visually-hidden">Error: </span>{{ link_error }}</p>{% endif %}
+    {% call(aria) field("link-other", "Their other Google address", error=link_error) %}
       <input type="email" id="link-other" name="other" autocomplete="off" spellcheck="false"
-             value="{{ link_other_value }}"{% if link_error %} aria-invalid="true" aria-describedby="link-other-error"{% endif %}>
-    </div>
+             value="{{ link_other_value }}"{{ aria }}>
+    {% endcall %}
     <button type="submit" class="button">Link account</button>
   {% endcall %}
 </section>

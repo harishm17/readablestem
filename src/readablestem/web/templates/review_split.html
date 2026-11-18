@@ -21,6 +21,7 @@
 
 {% from "_review_shared.html" import error_line, speech_lines, latex_field, alt_fields, keep_original, own_choices, own_notes, figure_choices, figure_fallback with context %}
 {% from "_review_shared.html" import hidden_fields as shared_hidden with context %}
+{% from "components/fields.html" import field, field_classes, field_error, field_aria %}
 {% macro hidden_fields() %}{{ shared_hidden("split") }}{% endmacro %}
 
 {# The choices of a heading or of text read from an image: Accept, and "Reject" named for what
@@ -300,19 +301,15 @@
   {{ alt_fields(item) }}
   {% if item.long_description is not none %}
   {% set err = item.errors.get("longdesc") %}
-  <div class="field{% if err %} field-error{% endif %}">
-    <label for="longdesc-{{ eid }}">Longer description for {{ item.label|lower }}</label>
-    <p class="hint" id="longdesc-hint-{{ eid }}">Students can open it under the figure. Plain sentences: what it shows, the axes and units, the trend and the key values. Leave it empty for none.</p>
-    {{ error_line(item, "longdesc") }}
-    <textarea id="longdesc-{{ eid }}" name="long_description" rows="8" maxlength="2000" class="prose-input" data-edit-field
-              aria-describedby="longdesc-hint-{{ eid }}{% if err %} longdesc-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("long_description", "") }}</textarea>
-  </div>
+  {% call(aria) field("longdesc-" ~ eid, "Longer description for " ~ item.label|lower, error=err, hint="Students can open it under the figure. Plain sentences: what it shows, the axes and units, the trend and the key values. Leave it empty for none.", hint_id="longdesc-hint-" ~ eid, error_id="longdesc-error-" ~ eid) %}
+    <textarea id="longdesc-{{ eid }}" name="long_description" rows="8" maxlength="2000" class="prose-input" data-edit-field{{ aria }}>{{ item.values.get("long_description", "") }}</textarea>
+  {% endcall %}
   {% endif %}
   {% if item.data_table and not item.data_table_offered %}
   {% set err = item.errors.get("datatable") %}
-  <div class="field checkbox-field{% if err %} field-error{% endif %}">
+  <div class="{{ field_classes(err, "checkbox-field") }}">
     {{ error_line(item, "datatable") }}
-    <input type="checkbox" id="datatable-{{ eid }}" name="remove_data_table" value="on" data-edit-field{% if item.values.get("remove_data_table") %} checked{% endif %}{% if err %} aria-describedby="datatable-error-{{ eid }}" aria-invalid="true"{% endif %}>
+    <input type="checkbox" id="datatable-{{ eid }}" name="remove_data_table" value="on" data-edit-field{% if item.values.get("remove_data_table") %} checked{% endif %}{{ field_aria("datatable-error-" ~ eid, err) }}>
     <label for="datatable-{{ eid }}">Remove the data table (keep the descriptions)</label>
   </div>
   {% endif %}
@@ -326,7 +323,7 @@
   {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
     {{ hidden_fields() }}
     {{ error_line(item, "datatable") }}
-    <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if item.errors.get('datatable') %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
+    <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" {{ field_aria("datatable-error-" ~ eid, item.errors.get("datatable"), "offer-note-" ~ eid, invalid=false) }}>Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
   {% endcall %}
 </div>
 {% endif %}
@@ -362,18 +359,15 @@
 {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"id": "decide-" ~ eid, "class": "decide-form" ~ (" is-edited" if item.edited else "")}) %}
   {{ hidden_fields() }}
   {% set err = item.errors.get("level") %}
-  <div class="field field-inline{% if err %} field-error{% endif %}">
-    <label for="level-{{ eid }}">Level for {{ item.label|lower }}</label>
-    {% if item.heading_max_level %}<p class="hint" id="level-hint-{{ eid }}">Level 1 is the top; here level 1{% if item.heading_max_level > 1 %} to {{ item.heading_max_level }}{% endif %} fits.</p>{% endif %}
-    {{ error_line(item, "level") }}
-    {% set described = (["level-hint-" ~ eid] if item.heading_max_level else []) + (["level-error-" ~ eid] if err else []) %}
+  {% set level_hint = "Level 1 is the top; here level 1" ~ (" to " ~ item.heading_max_level if item.heading_max_level > 1 else "") ~ " fits." if item.heading_max_level else none %}
+  {% call(aria) field("level-" ~ eid, "Level for " ~ item.label|lower, error=err, hint=level_hint, extra="field-inline", hint_id="level-hint-" ~ eid, error_id="level-error-" ~ eid) %}
     <div class="inline-controls">
-      <select id="level-{{ eid }}" name="level" data-edit-field{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if err %} aria-invalid="true"{% endif %}>
+      <select id="level-{{ eid }}" name="level" data-edit-field{{ aria }}>
         {% for n in range(1, 7) %}<option value="{{ n }}"{% if item.values.get("level") == n|string %} selected{% endif %}>Level {{ n }}</option>{% endfor %}
       </select>
       {{ save_button(item) }}
     </div>
-  </div>
+  {% endcall %}
 {% endcall %}
 {% endmacro %}
 
@@ -416,7 +410,7 @@
 <p class="group-question">“{{ hg.text }}” appears {{ hg.times }} {{ hg.style }}{% if n and n != hg.size %} ({{ n }} still waiting){% endif %}.</p>
 {% if n and hg.fact %}<p class="group-fact" id="group-fact-{{ key }}"><strong>Suggested: {{ "make them bold text" if hg.suggest == "bold" else "keep them as headings" }}.</strong> {{ hg.fact }}</p>{% endif %}
 {% if n %}
-{% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
+{{ field_error("group-error-" ~ key, hg.error) }}
 <div class="decision-bar" role="group" aria-label="One choice for all {{ n }}">
   <div class="decide-row" id="group-actions-{{ key }}" tabindex="-1">
     {% if hg.bold_first %}
@@ -440,11 +434,11 @@
   {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key) %}
     {{ hidden_fields() }}
     <input type="hidden" name="action" value="edit">
-    <div class="field field-inline{% if hg.error %} field-error{% endif %}">
+    <div class="{{ field_classes(hg.error, "field-inline") }}">
       <label for="group-level-{{ key }}">Level for all {{ n }}</label>
       <p class="hint" id="group-level-hint-{{ key }}">Level 1{% if hg.level_max > 1 %} to {{ hg.level_max }}{% endif %} fits.</p>
       <div class="inline-controls">
-        <select id="group-level-{{ key }}" name="level" aria-describedby="group-level-hint-{{ key }}{% if hg.error %} group-error-{{ key }}{% endif %}"{% if hg.error %} aria-invalid="true"{% endif %}>
+        <select id="group-level-{{ key }}" name="level"{{ field_aria("group-error-" ~ key, hg.error, "group-level-hint-" ~ key) }}>
           {% for lv in range(1, 7) %}<option value="{{ lv }}"{% if hg.values.get("level") == lv|string %} selected{% endif %}>Level {{ lv }}</option>{% endfor %}
         </select>
         <button type="submit" class="button-secondary">Set the level for all {{ n }}<span class="visually-hidden"> “{{ hg.text }}”</span></button>
@@ -481,7 +475,7 @@
    ones still waiting). #}
 {% set all = "both" if hg.size == 2 else "all " ~ hg.size %}
 <p class="group-state">{{ p.group_state }}</p>
-{% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
+{{ field_error("group-error-" ~ key, hg.error) }}
 <p class="redo-lead" id="redo-{{ key }}">Change {{ all }}:</p>
 <div class="decide-row" id="group-actions-{{ key }}" role="group" aria-labelledby="redo-{{ key }}" tabindex="-1">
   {% if p.redo_keep %}
@@ -510,7 +504,7 @@
 <p class="group-question">{{ pg.lead }}</p>
 <p>{{ pg.explain }}</p>
 {{ evidence_block(p) }}
-{% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
+{{ field_error("group-error-" ~ key, pg.error) }}
 {% if pg.waiting %}
 {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ key, {"class": "inline-form"}) %}
   {{ hidden_fields() }}

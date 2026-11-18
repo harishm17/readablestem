@@ -1,5 +1,6 @@
 {# Audiences: owner #}
 {% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field, field_classes, field_error, field_aria %}
 {# Who can open every document of this course (routes/courses.py add_person, web/shares.py;
    FEATURE_COURSE_GRANTS). The share page's form and words, for a whole course. Needs course,
    people (rows, roles, role_words, max), people_typed, people_typed_role and the page's
@@ -12,16 +13,14 @@
   {% set role_error = field_errors.get("people-role") if field_errors else none %}
   <h3 id="people-add-heading">Add a person</h3>
   {% call form("people.add", "/courses/" ~ course.id ~ "/people", {"novalidate": true, "aria-labelledby": "people-add-heading"}) %}
-    <div class="field{% if email_error %} field-error{% endif %}">
-      <label for="people-email">Their email address</label>
-      <p class="hint" id="people-email-hint">The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.</p>
-      {% if email_error %}<p class="error-message" id="people-email-error"><span class="visually-hidden">Error: </span>{{ email_error.message }}</p>{% endif %}
+    {% set email_hint %}The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.{% endset %}
+    {% call(aria) field("people-email", "Their email address", error=email_error, hint=email_hint) %}
       <input type="email" id="people-email" name="email" maxlength="320" autocomplete="off" spellcheck="false"
-             value="{{ people_typed }}" aria-describedby="people-email-hint{% if email_error %} people-email-error{% endif %}"{% if email_error %} aria-invalid="true"{% endif %}>
-    </div>
-    <fieldset class="field{% if role_error %} field-error{% endif %}" id="people-role">
+             value="{{ people_typed }}"{{ aria }}>
+    {% endcall %}
+    <fieldset class="{{ field_classes(role_error) }}" id="people-role"{{ field_aria("people-role-error", role_error, invalid=false) }}>
       <legend>What they can do</legend>
-      {% if role_error %}<p class="error-message" id="people-role-error"><span class="visually-hidden">Error: </span>{{ role_error.message }}</p>{% endif %}
+      {{ field_error("people-role-error", role_error) }}
       <div class="role-list">
       {% for value, label, help in people.roles %}
       <label class="role-row" for="people-role-{{ value }}">

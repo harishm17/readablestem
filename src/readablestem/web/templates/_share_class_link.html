@@ -1,5 +1,7 @@
 {# Audiences: owner #}
 {% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
+{% from "components/notices.html" import notice_box %}
 {% if class_link %}
 {# The class link (web/links.py, routes/sharing.py): off unless FEATURE_CLASS_LINK. The address
    is in the page only in the answer to making the link; after that nothing here holds it. #}
@@ -8,9 +10,7 @@
   <h2 id="class-link-heading">Class link</h2>
   <p class="hint">One link for a whole class. Anyone who has it can read the published student version of this document without signing in. They cannot see or do anything else. It stops working on the last day you choose.</p>
   {% if cl.address %}
-  <div class="notice" role="status" tabindex="-1" autofocus>
-    <p>The link is made. Copy it now: it is not shown again. If you lose it, make a new link, and the old one stops working.</p>
-  </div>
+  {{ notice_box("success", body="The link is made. Copy it now: it is not shown again. If you lose it, make a new link, and the old one stops working.", attrs={"tabindex": "-1", "autofocus": true}) }}
   <label for="class-link-address">Class link</label>
   <div class="copy-row">
     <textarea id="class-link-address" readonly rows="3" spellcheck="false">{{ cl.address }}</textarea>
@@ -62,20 +62,12 @@
       <label for="link-label">Label (only you see it)</label>
       <input type="text" id="link-label" name="label" maxlength="80" autocomplete="off" value="{{ cl.typed.label|default('') }}">
     </div>
-    <div class="field{% if cl.errors.get('link-closes') %} field-error{% endif %}">
-      <label for="link-closes">Last day</label>
-      <p class="hint" id="link-closes-hint">The link works until the end of this day (UTC). It can work for at most {{ cl.max_days }} days, so the latest day is {{ cl.latest }}.</p>
-      {% if cl.errors.get('link-closes') %}<p class="error-message" id="link-closes-error"><span class="visually-hidden">Error: </span>{{ cl.errors.get('link-closes') }}</p>{% endif %}
-      <input type="date" id="link-closes" name="closes" required min="{{ cl.today }}" max="{{ cl.latest }}" value="{{ cl.typed.closes|default('') }}"
-             aria-describedby="link-closes-hint{% if cl.errors.get('link-closes') %} link-closes-error{% endif %}"{% if cl.errors.get('link-closes') %} aria-invalid="true"{% endif %}>
-    </div>
-    <div class="field{% if cl.errors.get('link-opens') %} field-error{% endif %}">
-      <label for="link-opens">First day (optional)</label>
-      <p class="hint" id="link-opens-hint">Leave empty to open it now.</p>
-      {% if cl.errors.get('link-opens') %}<p class="error-message" id="link-opens-error"><span class="visually-hidden">Error: </span>{{ cl.errors.get('link-opens') }}</p>{% endif %}
-      <input type="date" id="link-opens" name="opens" min="{{ cl.today }}" max="{{ cl.latest }}" value="{{ cl.typed.opens|default('') }}"
-             aria-describedby="link-opens-hint{% if cl.errors.get('link-opens') %} link-opens-error{% endif %}"{% if cl.errors.get('link-opens') %} aria-invalid="true"{% endif %}>
-    </div>
+    {% call(aria) field("link-closes", "Last day", error=cl.errors.get("link-closes"), hint="The link works until the end of this day (UTC). It can work for at most " ~ cl.max_days ~ " days, so the latest day is " ~ cl.latest ~ ".") %}
+      <input type="date" id="link-closes" name="closes" required min="{{ cl.today }}" max="{{ cl.latest }}" value="{{ cl.typed.closes|default('') }}"{{ aria }}>
+    {% endcall %}
+    {% call(aria) field("link-opens", "First day (optional)", error=cl.errors.get("link-opens"), hint="Leave empty to open it now.") %}
+      <input type="date" id="link-opens" name="opens" min="{{ cl.today }}" max="{{ cl.latest }}" value="{{ cl.typed.opens|default('') }}"{{ aria }}>
+    {% endcall %}
     <button type="submit" class="button">{% if cl.link and cl.link.kept %}Make a new link{% else %}Make the link{% endif %}</button>
   {% endcall %}
   {% else %}

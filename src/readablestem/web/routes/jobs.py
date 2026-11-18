@@ -2061,6 +2061,7 @@ def set_language(
         request,
         f"The language is now {page_rules.language_label(result.lang)}. "
         "The HTML file was made again with it.",
+        kind="success",
     )
     # No fragment: the confirmation (the flash at the top) takes focus on load, as after
     # any other change; a fragment would scroll past it and keep focus on the page.
@@ -2093,7 +2094,7 @@ def continue_cut_off(request: Request, job_id: str, user: UserDep) -> Response:
         bump_result_version(job)  # review forms open in other tabs are now stale
         say_new_time(request, retention.restart_clock_and_say(job, get_ctx(request).settings))
     log_event(logger, "cut_off_continued", job_id=job_id)
-    flash(request, "You chose to continue with the pages before the empty ones.")
+    flash(request, "You chose to continue with the pages before the empty ones.", kind="success")
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
@@ -2198,6 +2199,7 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
         else "Your document is queued to be converted again with the current version. Your "
         "decisions are kept, and nothing was counted against your daily pages.",
         undo=False,
+        kind="success",
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
@@ -2238,7 +2240,10 @@ def cancel_job(request: Request, job_id: str, user: UserDep) -> Response:
         )
     log_event(logger, "job_cancel_requested", job_id=owned_id, pages_given_back=gave_back)
     flash(
-        request, "Canceled. Your file is kept; you can convert it later or delete it.", undo=False
+        request,
+        "Canceled. Your file is kept; you can convert it later or delete it.",
+        undo=False,
+        kind="success",
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
@@ -2721,5 +2726,5 @@ def _delete_now(request: Request, job_id: str, user: CurrentUser) -> Response:
         delete_jobs(session, [job.id])
         events.forget_upload(session, job_id)  # the file's fingerprint goes with it
     log_event(logger, "job_deleted", job_id=job_id, reason="user")
-    flash(request, "Your document and everything made from it have been deleted.")
+    flash(request, "Your document and everything made from it have been deleted.", kind="success")
     return RedirectResponse("/app", status_code=303)

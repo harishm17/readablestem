@@ -1,17 +1,16 @@
 {# The upload form's course choice (notation memory, routes/courses.py). `courses` is
    None when FEATURE_NOTATION_MEMORY is off: then nothing shows. #}
+{% from "components/fields.html" import field %}
 {% if courses is defined and courses is not none %}
 {% set course_error = field_errors.get("course") %}
 {% if courses or course_error %}
-<div class="field{% if course_error %} field-error{% endif %}">
-  <label for="course">Course (optional)</label>
-  <p class="hint" id="course-hint">Read with the course’s notation. {{ notation_words.upload }} <a href="/courses">Your courses</a></p>
-  {% if course_error %}<p class="error-message" id="course-error"><span class="visually-hidden">Error: </span>{{ course_error.message }}</p>{% endif %}
-  <select id="course" name="course"  aria-describedby="course-hint{% if course_error %} course-error{% endif %}"{% if course_error %} aria-invalid="true"{% endif %}>
+{% set course_hint %}Read with the course’s notation. {{ notation_words.upload }} <a href="/courses">Your courses</a>{% endset %}
+{% call(aria) field("course", "Course (optional)", error=course_error, hint=course_hint) %}
+  <select id="course" name="course"{{ aria }}>
     <option value="">No course</option>
     {% for course in courses %}<option value="{{ course.id }}"{% if chosen_course is defined and chosen_course == course.id %} selected{% endif %}>{{ course.name }}</option>{% endfor %}
   </select>
-</div>
+{% endcall %}
 {% else %}
 <p class="hint"><a href="/courses">Add a course</a> to read documents with its notation.</p>
 {% endif %}

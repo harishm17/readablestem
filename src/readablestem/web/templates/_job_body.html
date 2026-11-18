@@ -21,6 +21,7 @@
 {# Stops a document that is waiting (at once, its pages back) or converting (at its next step).
    The upload is kept either way (web/routes/jobs.py `cancel_job`). #}
 {% from "components/forms.html" import form with context %}
+{% from "components/notices.html" import notice_box %}
 {% call form("job.cancel", "/jobs/" ~ job.id ~ "/cancel", {"class": "inline-form", "id": "cancel-form"}) %}
   <p id="cancel-explain" class="hint">Cancel stops it. Your file is kept, so you can convert it later or delete it.</p>
   <button type="submit" class="button-secondary" aria-describedby="cancel-explain">Cancel</button>
@@ -114,13 +115,13 @@
 <section aria-labelledby="results-heading">
   <h2 id="results-heading">Results</h2>
   {% if state.gaps %}
-  <div class="notice notice-warning" id="partial-note">
+  {% call notice_box("warning", id="partial-note") %}
     {% for gap in state.gaps %}
     <p><strong>{{ gap.title }}:</strong> part of this document was not converted. Those parts
       stay as images marked “Not converted”.</p>
     {% endfor %}
     {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
-  </div>
+  {% endcall %}
   {% elif job.rerun and job.is_owner %}
   {# A finished document made by an older converter: "Convert it again" (WS10.15). #}
   {% include "_job_retry.html" %}

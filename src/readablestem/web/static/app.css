@@ -285,12 +285,39 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover { background: var(--accent-tint); }
 @media (forced-colors: active) { input[type="file"]::file-selector-button { border-color: ButtonText; } }
 
-/* Errors: red bar plus the word "Error", never colour alone. */
-.field-error { border: 2px solid var(--err); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
+/* The field error (templates/components/fields.html), one block. A field in error is told by
+   more than color: its edge at the start is thicker, and its message has the word "Error"
+   (spoken) and a shape before it (drawn here, so the browser-built line of the upload form
+   has it too). Forced colors drop the red, so both use CanvasText and a thicker frame, and the
+   control gets a double edge. The compound selector outranks `fieldset.field` and
+   `.table-fieldset` further down, which take a frame off. */
+:is(.field, .table-fieldset, .fallback).field-error {
+  border: 2px solid var(--err);
+  border-inline-start-width: var(--space-2);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+}
 .error-message { color: var(--err); font-weight: 700; margin: 0 0 var(--space-2); }
+.error-message::before {
+  content: "";
+  display: inline-block;
+  inline-size: 1.1em;
+  block-size: 1.1em;
+  margin-inline-end: 0.4em;
+  vertical-align: -0.2em;
+  background-color: currentcolor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 5h2.4v7h-2.4zm0 9h2.4v2.4h-2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 5h2.4v7h-2.4zm0 9h2.4v2.4h-2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 [aria-invalid="true"] { border-color: var(--err); }
-/* Forced colors drop the red, so a field in error gets a different edge: a thick double line. */
-@media (forced-colors: active) { [aria-invalid="true"] { border-width: 4px; border-style: double; } }
+@media (forced-colors: active) {
+  :is(.field, .table-fieldset, .fallback).field-error {
+    border: 3px solid CanvasText;
+    border-inline-start-width: var(--space-2);
+  }
+  .error-message::before { background-color: CanvasText; }
+  [aria-invalid="true"] { border-width: 4px; border-style: double; }
+}
 .error-summary {
   border: 4px solid var(--err);
   border-radius: var(--radius-frame);
@@ -300,12 +327,30 @@ input[type="file"]::file-selector-button:hover { background: var(--accent-tint);
 .error-summary h2 { margin-top: var(--space-1); }
 .error-summary a { color: var(--err); font-weight: 700; }
 
+/* The notice (templates/components/notices.html), one block: info (the default), success
+   (the ok tint and a check shape), warning (a thicker warn frame). The error kind is the
+   error summary above. A shape, not color alone, marks success; forced colors draw every
+   kind with one CanvasText frame and the shape in CanvasText. */
 .notice { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--accent-tint); padding: var(--space-2) var(--space-4); margin: var(--space-4) 0; }
 .notice p { margin: var(--space-1) 0; }
 .notice-warning { background: var(--warn-tint); border: 2px solid var(--warn); }
 .notice-warning h2 { margin-top: var(--space-1); }
+.notice-success { background: var(--ok-tint); border: 2px solid var(--ok); display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-3); }
+.notice-success::before {
+  content: "";
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin-top: var(--space-2);
+  background-color: var(--ok);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.3 14.2-4.2-4.2 1.7-1.7 2.5 2.5 5.1-5.1 1.7 1.7z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.3 14.2-4.2-4.2 1.7-1.7 2.5 2.5 5.1-5.1 1.7 1.7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.notice-success > * { grid-column: 2; }
 .draft-note { border: 2px dashed var(--warn); border-radius: var(--radius-control); padding: var(--space-2) var(--space-4); color: var(--warn); background: var(--warn-tint); }
-@media (forced-colors: active) { .notice { border: 1px solid CanvasText; } }
+@media (forced-colors: active) {
+  .notice { border: 1px solid CanvasText; }
+  .notice-success::before { background-color: CanvasText; }
+}
 
 /* Tables. `position: relative` makes the scroller the containing block of the
    absolutely positioned .visually-hidden button text inside it; otherwise that text
@@ -337,9 +382,8 @@ tbody th { font-weight: 700; }
 .status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
 .status-sample { border-color: var(--ink-muted); color: var(--ink-muted); }
 
-.job-status { padding: var(--space-3) var(--space-4); background: var(--surface); border-radius: var(--radius-control); }
+.job-status { padding: var(--space-3) var(--space-4); background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
 .job-status p { margin: var(--space-1) 0; }
-@media (forced-colors: active) { .job-status { border: 1px solid CanvasText; } }
 .progress-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .progress-row label { font-weight: 700; }
 progress { width: 16rem; height: 1.1rem; }
@@ -959,8 +1003,6 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .table-continue { margin: var(--space-3) 0 0; font-weight: 700; }
 @media (forced-colors: active) {
   .table-view { border-color: CanvasText; }
-  /* After .table-fieldset above, which also sets a border: a fieldset with an error keeps its frame. */
-  .field-error { border: 1px solid CanvasText; }
 }
 /* What the checks found, each with its correction; one place to change it. */
 .finding-list { list-style: none; margin: 0; padding: 0; }

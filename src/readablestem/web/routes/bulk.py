@@ -154,7 +154,7 @@ def accept(
         return _stale_page(request, job_id, user, view, slug, changed=exc.changed)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"bulk_{slug}")
-        flash(request, " ".join(e.message for e in exc.errors), undo=False)
+        flash(request, " ".join(e.message for e in exc.errors), undo=False, kind="warning")
         where = (
             list_url(exc.job_id, "needs-decision") if view == LIST_VIEW else review_url(exc.job_id)
         )
@@ -167,9 +167,11 @@ def accept(
     if left:  # a page of a longer list: the next page is where the person goes on
         what_left = f"{left} more {spec.one if left == 1 else spec.many}"
         rest = f"{what_left} {'is' if left == 1 else 'are'} listed below."
-        flash(request, f"{message} Undo is on the review screen. {rest}", undo=False)
+        flash(
+            request, f"{message} Undo is on the review screen. {rest}", undo=False, kind="success"
+        )
         return RedirectResponse(f"/jobs/{job_id}/accept/{slug}?view={view}", status_code=303)
-    flash(request, message, element_id=GROUP_FLASH + slug)
+    flash(request, message, element_id=GROUP_FLASH + slug, kind="success")
     if view == LIST_VIEW:
         return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)
     return _split_redirect(owned_id, result, None)

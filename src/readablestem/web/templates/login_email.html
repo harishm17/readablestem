@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% set footer_mode = "minimal" %}
+{% from "components/fields.html" import field %}
 {% block title %}{% if error %}Error: {% endif %}{% if sent %}Check your email{% else %}Sign in by email{% endif %}{% endblock %}
 {% block content %}
 {% if sent %}
@@ -19,12 +20,10 @@
 {% endif %}
 <form method="post" action="/login/email" novalidate class="stack-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <div class="field{% if error %} field-error{% endif %}">
-    <label for="signin-email">Email address</label>
-    {% if error %}<p class="error-message" id="signin-email-error"><span class="visually-hidden">Error: </span>{{ error }}</p>{% endif %}
+  {% call(aria) field("signin-email", "Email address", error=error) %}
     <input type="email" id="signin-email" name="email" autocomplete="email" spellcheck="false"
-           value="{{ email }}"{% if error %} aria-invalid="true" aria-describedby="signin-email-error"{% endif %}>
-  </div>
+           value="{{ email }}"{{ aria }}>
+  {% endcall %}
   <button type="submit" class="button">Email me a sign-in link</button>
 </form>
 {% endif %}

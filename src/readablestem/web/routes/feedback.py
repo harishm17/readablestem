@@ -8,7 +8,7 @@ document. Owner only, like every /jobs/* route, and a 404 when the questions are
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
@@ -85,6 +85,7 @@ def save_feedback(
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, OWNER)
         owned_id = job.id  # the redirect is built from the owned row, not the request
+        kind: Literal["info", "success"] = "info"
         if events.answered(session, user.id, job.id):
             message = "You had already answered for this document, so your first answers are kept."
         elif answers.empty:
@@ -92,6 +93,7 @@ def save_feedback(
         else:
             feedback.record(session, user.id, job.id, answers)
             message = "Thank you. Your answers were saved."
+            kind = "success"
     log_event(
         logger,
         "feedback",
@@ -99,5 +101,5 @@ def save_feedback(
         will_post=answers.will_post,
         minutes=answers.minutes is not None,
     )
-    flash(request, message)
+    flash(request, message, kind=kind)
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

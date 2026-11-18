@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
@@ -221,7 +221,12 @@ def add_share(
                 status_code=422,
             )
     log_event(logger, "share_set", job_id=owned_id, role=kept_role)
-    flash(request, SHARE_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]), undo=False)
+    flash(
+        request,
+        SHARE_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]),
+        undo=False,
+        kind="info" if outcome == shares.UNCHANGED else "success",
+    )
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
 
 
@@ -238,7 +243,12 @@ def revoke_share(request: Request, job_id: str, share_id: str, user: UserDep) ->
         log_event(logger, "share_revoked", job_id=owned_id)
     # Not there (often a second click on Remove): the access is gone either way, so the
     # answer is the one the first click got (SW43, "already in that state").
-    flash(request, "Access removed. They cannot open this document any more.", undo=False)
+    flash(
+        request,
+        "Access removed. They cannot open this document any more.",
+        undo=False,
+        kind="success",
+    )
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)
 
 
@@ -401,9 +411,11 @@ def _link_change(request: Request, job_id: str, user, action: str) -> Response:
         owned_id = job.id
         row = links.current_link(session, owned_id)
         words = "There is no class link to change."
+        kind: Literal["info", "success", "warning"] = "info"
         if action == "remove":
             if links.remove(session, job, ctx.settings):
                 words = "The class link is removed. It cannot be opened any more."
+                kind = "success"
         elif action in ("pause", "resume"):
             if links.pause(session, job, paused=action == "pause"):
                 words = (
@@ -411,6 +423,7 @@ def _link_change(request: Request, job_id: str, user, action: str) -> Response:
                     if action == "pause"
                     else "The class link is resumed."
                 )
+                kind = "success"
             elif row is not None:
                 words = "No change: the link is already " + (
                     "paused." if action == "pause" else "not paused."
@@ -418,13 +431,16 @@ def _link_change(request: Request, job_id: str, user, action: str) -> Response:
         elif row is not None and links.is_live(row, serving=False):
             if output.export_state(job).key != output.READY:
                 words = NOT_READY_FOR_LINK
+                kind = "warning"
             else:
                 try:
                     version = _publish(ctx, session, job, user)
                     words = f"The published copy is now version {version}."
+                    kind = "success"
                 except (storage.StorageRefused, storage.StorageFull):
                     session.rollback()
                     words = NO_ROOM_FOR_LINK
+                    kind = "warning"
     log_event(logger, "link_changed", job_id=owned_id, action=action)
-    flash(request, words, undo=False)
+    flash(request, words, undo=False, kind=kind)
     return RedirectResponse(f"/jobs/{owned_id}/share", status_code=303)

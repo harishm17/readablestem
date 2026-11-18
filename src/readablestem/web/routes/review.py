@@ -388,6 +388,7 @@ class Notice:
     label: str | None = None  # the fix it is about, e.g. "Equation 3 on page 2"
     href: str | None = None  # link to that fix
     element_id: str = ""  # that fix's id (app.js forgets a draft of it kept in this tab)
+    kind: str = "info"  # what it says: "success" (a decision was saved), "warning" or "info"
 
 
 STALE_TITLE = "Your choice was not saved"
@@ -596,7 +597,7 @@ class HeadingGroupView:
     keep: int  # how many "Apply to all" would keep at their level
     values: dict[str, str] = field(default_factory=dict)
     error: str | None = None
-    notices: list[str] = field(default_factory=list)
+    notices: list[Notice] = field(default_factory=list)
     members_open: bool = False  # one of them was just decided on its own
     # The advice (`web.heading_groups`, T1-18): the answer to suggest ("bold" or "keep"),
     # the fact that decides it, and up to three copies to look at.
@@ -656,7 +657,7 @@ class PageGroupView:
     reading: str = ""  # when they were tried from an image (the option): why they stayed images
     values: dict[str, str] = field(default_factory=dict)
     error: str | None = None
-    notices: list[str] = field(default_factory=list)
+    notices: list[Notice] = field(default_factory=list)
     members_open: bool = False
     # Every page or piece of handwriting of the group, to describe in words (T3-16).
     describe: list[ReviewItem] = field(default_factory=list)
@@ -884,7 +885,7 @@ class GroupView:
     done: list[ReviewItem]
     needs_review: int
     not_converted: int
-    notices: list[str] = field(default_factory=list)
+    notices: list[Notice] = field(default_factory=list)
     error: str | None = None
     clean: int = 0  # tables waiting with nothing wrong found in them (T3-11)
     of: int = 0  # decisions in all when `units` is one view of them (0: all are in it)
@@ -1306,32 +1307,34 @@ def _place_flashes(
     top: list[Notice] = []
     for entry in flashes:
         message = str(entry.get("message", ""))
+        kind = str(entry.get("kind", "info"))
         target = entry.get("element_id")
         target = target if isinstance(target, str) else ""
         if target.startswith(GROUP_FLASH):
             group = groups.get(target.removeprefix(GROUP_FLASH))
             if group is not None:
-                group.notices.append(message)
-            top.append(Notice(message))
+                group.notices.append(Notice(message, kind=kind))
+            top.append(Notice(message, kind=kind))
             continue
         if target.startswith(HEADING_GROUP_FLASH):
             card = cards.get(target.removeprefix(HEADING_GROUP_FLASH))
             if card is not None:
-                card.notices.append(message)
-            top.append(Notice(message))
+                card.notices.append(Notice(message, kind=kind))
+            top.append(Notice(message, kind=kind))
             continue
         changed = items.get(target)
         if changed is None:
-            top.append(Notice(message))
+            top.append(Notice(message, kind=kind))
             continue
         changed.changed.append(message)
         where = f" on page {changed.page}" if changed.page else ""  # 0: element missing
-        notice = Notice(message, changed.label + where, f"#item-{target}", target)
+        notice = Notice(message, changed.label + where, f"#item-{target}", target, kind)
         landing = next_to_review(result, changed.element_id)
         landing_fix = result.fix_for(landing) if landing else None
         if landing_fix is not None and landing_fix.group_key in cards:
             card = cards[landing_fix.group_key]
-            card.notices.append(f"{notice.label}: {message}" if notice.label else message)
+            text = f"{notice.label}: {message}" if notice.label else message
+            card.notices.append(Notice(text, kind=kind))
             changed_fix = result.fix_for(target)
             if changed_fix is not None and changed_fix.group_key == card.key:
                 card.members_open = True  # deciding them one by one: keep them in view
@@ -2191,7 +2194,7 @@ def review_action(
     element = next((e for e in result.elements if e.id == element_id), None)
     message = done_message(change_made, element, result.origin)
     message += _moved_message(change_made.moved, item_numbers(result))
-    flash(request, message, element_id=element_id)
+    flash(request, message, element_id=element_id, kind="success")
     if view != LIST_VIEW:
         if (
             (table and action == "edit")
@@ -2312,7 +2315,7 @@ def _group_action(
         left=len(outcome.left),
     )
     message = _group_message(action, level, outcome, every=every)
-    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
+    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key, kind="success")
     if view != LIST_VIEW:
         if outcome.left:
             # Headings left waiting (the output would move their level) keep the group
@@ -2381,7 +2384,12 @@ def _page_group_action(
         message = f"Kept {n} as {'an image' if n == 1 else 'images'}, marked “Not converted”."
     else:
         message = "Nothing changed: none of these were waiting for a decision."
-    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
+    flash(
+        request,
+        message,
+        element_id=HEADING_GROUP_FLASH + group_key,
+        kind="success" if n else "info",
+    )
     if view != LIST_VIEW:
         return _split_redirect(owned_id, result, group_key)
     landing = next_to_review(result, outcome.changes[-1].fix.element_id) if n else None
@@ -2597,7 +2605,11 @@ def undo(
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
-        flash(request, "Nothing was undone: this document changed after this page was opened.")
+        flash(
+            request,
+            "Nothing was undone: this document changed after this page was opened.",
+            kind="warning",
+        )
         return _back(exc.job_id, view)
     except _NothingToUndo as exc:
         flash(request, "There is nothing to undo here.")
@@ -2609,7 +2621,7 @@ def undo(
     if len(edits) == 1 and edits[0].action in ITEM_WRITES:
         # Read again or "Not an equation": back on the item, where the choice was.
         target = edits[0].element_id
-        flash(request, UNDO_ITEM, element_id=target, undo=False)
+        flash(request, UNDO_ITEM, element_id=target, undo=False, kind="success")
         if view == LIST_VIEW:
             where = list_url(owned_id, review_anchor(result, target))
             return keep_filter(RedirectResponse(where, status_code=303), flt)
@@ -2617,7 +2629,7 @@ def undo(
         return RedirectResponse(where, status_code=303)
     if structural:
         # An edit to the text, a page or something added: back on the page it was on.
-        flash(request, "Undone. The document is as it was before.", element_id=None)
+        flash(request, "Undone. The document is as it was before.", element_id=None, kind="success")
         page = structural[0].page
         where = review_url(
             owned_id,
@@ -2633,7 +2645,7 @@ def undo(
     words = {"it": "They are" if many else "It is", "was": "they were" if many else "it was"}
     message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
     if view == SYMBOLS_VIEW:  # the Symbols screen: back on it, no Undo under an Undo
-        flash(request, message, element_id=SYMBOLS_FLASH, undo=False)
+        flash(request, message, element_id=SYMBOLS_FLASH, undo=False, kind="success")
         return RedirectResponse(symbols_url(owned_id, "split"), status_code=303)
     keys = {f.group_key for f in fixes}
     if len(fixes) == 1:
@@ -2644,7 +2656,7 @@ def undo(
     else:  # a bulk accept
         slug = GROUP_SLUGS.get(fixes[0].kind, "")
         target, flashed = slug, GROUP_FLASH + slug
-    flash(request, message, element_id=flashed)
+    flash(request, message, element_id=flashed, kind="success")
     if view == LIST_VIEW:
         where = RedirectResponse(list_url(owned_id, _stale_anchor(result, target)), status_code=303)
         return keep_filter(where, flt)

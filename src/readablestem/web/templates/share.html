@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field, field_classes, field_error, field_aria %}
 {# Who can open one document (routes/sharing.py, web/shares.py). Owner only. Plain forms: no
    script is needed. Nothing is emailed; the owner copies the address and sends it. The page
    leads with the three steps; the exact-address rule and what only the owner can do are under
@@ -14,16 +15,14 @@
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add a person</h2>
   {% call form("share.add", "/jobs/" ~ job_id ~ "/share", {"novalidate": true}) %}
-    <div class="field{% if email_error %} field-error{% endif %}">
-      <label for="share-email">Their email address</label>
-      <p class="hint" id="share-email-hint">The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.</p>
-      {% if email_error %}<p class="error-message" id="share-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
+    {% set email_hint %}The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.{% endset %}
+    {% call(aria) field("share-email", "Their email address", error=email_error, hint=email_hint) %}
       <input type="email" id="share-email" name="email" maxlength="320" autocomplete="off" spellcheck="false"
-             value="{{ typed }}" aria-describedby="share-email-hint{% if email_error %} share-email-error{% endif %}"{% if email_error %} aria-invalid="true"{% endif %}>
-    </div>
-    <fieldset class="field{% if role_error %} field-error{% endif %}" id="share-role">
+             value="{{ typed }}"{{ aria }}>
+    {% endcall %}
+    <fieldset class="{{ field_classes(role_error) }}" id="share-role"{{ field_aria("share-role-error", role_error, invalid=false) }}>
       <legend>What they can do</legend>
-      {% if role_error %}<p class="error-message" id="share-role-error"><span class="visually-hidden">Error: </span>{{ role_error }}</p>{% endif %}
+      {{ field_error("share-role-error", role_error) }}
       <div class="role-list">
       {% for value, label, help in roles %}
       <label class="role-row" for="share-role-{{ value }}">

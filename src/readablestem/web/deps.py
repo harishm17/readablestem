@@ -11,7 +11,7 @@ import logging
 import re
 import secrets
 from dataclasses import dataclass, field
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, Request
 from fastapi.templating import Jinja2Templates
@@ -388,8 +388,12 @@ def flash(
     element_id: str | None = None,
     undo: bool = True,
     edit: bool = False,
+    kind: Literal["info", "success", "warning"] = "info",
 ) -> None:
     """One-time notice for the next page. Content-free: it lives in the session cookie.
+    `kind` is what the notice says (`components/notices.html`): `success` for something saved
+    or done, `warning` for a refusal or something that was left as it was and needs a look,
+    `info` for anything else (a thank-you, a repeat that changed nothing).
     `undo` False: the notice is not about a review write, so the review screen offers no
     Undo under it (Undo would take back the write before, which the notice is not about).
     `edit`: the write was a change to a page, not a decision, so the notice does not speak of
@@ -406,6 +410,8 @@ def flash(
         entry["undo"] = False
     if edit:
         entry["edit"] = True
+    if kind != "info":
+        entry["kind"] = kind
     items.append(entry)
     request.session[SESSION_FLASH] = items[-5:]
 

@@ -1,10 +1,10 @@
 {# Audiences: owner, reviewer #}
+{% from "components/notices.html" import notice_box %}
 {% if stale|default(none) %}
 {# A write from a page drawn before the document's last review write (routes/review.py
    `_stale_page`): nothing was saved. Like the error summary, it takes focus. #}
-<div class="error-summary stale-notice" role="alert" aria-labelledby="stale-title" tabindex="-1" autofocus>
-  <h2 id="stale-title" class="card-title">{{ stale.title }}</h2>
+{% call notice_box("error", stale.title, title_id="stale-title", extra="stale-notice", attrs={"tabindex": "-1", "autofocus": true}) %}
   <p>{{ stale.message }}{% if stale.now %} {{ stale.now }}{% endif %}</p>
   <p><a href="{{ stale.href }}">Reload this page</a></p>
-</div>
+{% endcall %}
 {% endif %}

@@ -457,6 +457,7 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
             request,
             f"{len(outcome.started)} parts are converting. Each part is its own document.",
             undo=False,
+            kind="success",
         )
         return RedirectResponse("/app", status_code=303)
     errors = [{"field_id": "parts", "message": outcome.error}]
@@ -490,7 +491,7 @@ async def discard(request: Request, upload_id: str, user: UserDep) -> Response:
 
     await run_in_threadpool(delete)
     log_event(logger, "pending_discarded", reason="user")
-    flash(request, "The file was discarded.", undo=False)
+    flash(request, "The file was discarded.", undo=False, kind="success")
     return RedirectResponse("/app", status_code=303)
 
 

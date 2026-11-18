@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/forms.html" import form with context %}
+{% from "components/notices.html" import notice_box %}
 {# The Symbols screen (routes/inventory.py, web/inventory.py): every letter and symbol read in
    the handwritten equations, grouped with the ones that look alike, one form per symbol that
    changes it everywhere. A plain form: it works without JavaScript, and the places a symbol
@@ -14,7 +15,7 @@
 {% include "_stale_notice.html" %}
 {% if notice %}
 <div class="decision-notice symbols-notice">
-  <div class="notice" role="status" tabindex="-1" autofocus><p>{{ notice }}</p></div>
+  {{ notice_box("success", body=notice, attrs={"tabindex": "-1", "autofocus": true}) }}
   {% if undo %}
   {% call form("review.undo", "/jobs/" ~ job.id ~ "/undo", {"class": "undo-form"}) %}
     <input type="hidden" name="view" value="symbols"><input type="hidden" name="version" value="{{ result_version }}">

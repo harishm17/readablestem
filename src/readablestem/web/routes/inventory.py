@@ -148,5 +148,5 @@ def relabel(
         left=len(done.left),
         left_out=len(left_out),
     )
-    flash(request, inventory.done_message(done), element_id=SYMBOLS_FLASH)
+    flash(request, inventory.done_message(done), element_id=SYMBOLS_FLASH, kind="success")
     return RedirectResponse(symbols_url(owned_id, view), status_code=303)
