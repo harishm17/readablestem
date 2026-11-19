@@ -3328,8 +3328,17 @@ number of uploads.
 | Exit | When |
 |---|---|
 | 0 | the bar is met, or no record was given |
-| 1 | the set or a page kind asks for more than before; the lines name each |
+| 1 | the set or a page kind asks for more than before, or a decision of band 1 or 2 became optional; the lines name each |
 | 2 | not judged: other documents, or a different number of uploads measured (with `--same`: no upload was measured) |
+
+**A decision that became optional.** The count cannot see a risky decision turned into a note.
+Each upload's row in a record also holds its decisions' elements with their bands (`asked`)
+and the elements whose fix is optional (`optional`). Against an earlier record that holds
+them, the bar fails when an element that was a decision of band 1 or 2 is optional now, and
+names it (`upload element`). Element ids can move when a reader changes, so a line naming an
+element that no longer means the same thing is read, not trusted. A record made before the
+rows held these (`data/eval/burden-corpus.json` is one until it is made again) is compared by
+the counts alone and the output says "The band check was not made".
 
 **Fewer is not better by itself.** A change that stops asking about something wrong lowers
 this figure and raises the errors nobody is told about. The bar is read with the counts of
