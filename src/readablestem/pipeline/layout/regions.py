@@ -1036,9 +1036,9 @@ MATCHING_CELLS = 3  # a labeled list of at least this many cells
 def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[list[Item]]]:
     """The gutters of the tree that `lines` (the cells of a table proposal) stand across: for
     each, the lines on each of its sides. A horizontal cut is no gutter (a table has rows), and
-    a gutter counts only where the page has lines of its own on a side (`rest`: the lines that
-    are not the proposal's): a table whose own columns are cut, with nothing else in the cut,
-    is a table that spans the region."""
+    a gutter counts only where the page has lines of its own on two sides (`rest`: the lines that
+    are not the proposal's): a table whose own columns are cut is no gutter of the page, though
+    text below it may stand under one of its columns."""
     if not lines:
         return []
     found: list[list[list[Item]]] = []
@@ -1055,7 +1055,7 @@ def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[
         cells: dict[int, list[Item]] = {}
         for it in lines:
             cells.setdefault(_nearest_cell(node.cells, it[0]), []).append(it)
-        if len(cells) >= 2 and _others(node.box, rest):
+        if len(cells) >= 2 and sum(_others(c, rest) for c in node.cells) >= 2:
             found.append(list(cells.values()))
         return found
     if node.kind == "cols":
@@ -1064,7 +1064,7 @@ def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[
             [it for it in lines if (it[0][0] + it[0][2]) / 2 < middle],
             [it for it in lines if (it[0][0] + it[0][2]) / 2 >= middle],
         ]
-        if all(sides) and any(_others(c.box, rest) for c in node.children):
+        if all(sides) and all(_others(c.box, rest) for c in node.children):
             found.append(sides)
         for child, side in zip(node.children, sides, strict=True):
             found += _between(child, side, rest)
@@ -1079,11 +1079,18 @@ def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[
         else:
             outside.append(it)
     groups = ([outside] if outside else []) + list(inside.values())
-    if len(groups) >= 2 and _others(node.box, rest):
+    standing = sum(_others(node.boxes[k][0], rest) for k in inside)
+    if outside:  # the page's own lines in the leaf itself, outside its boxes
+        standing += any(_centre_in(b, node.box) and not _in_a_box(b, node) for b in rest)
+    if len(groups) >= 2 and standing >= 2:
         found.append(groups)
     for k, part in inside.items():
         found += _between(node.boxes[k][1], part, rest)
     return found
+
+
+def _in_a_box(box: BBox, leaf: _Node) -> bool:
+    return any(_centre_in(box, rect) for rect, _ in leaf.boxes)
 
 
 def _others(box: BBox, rest: Sequence[BBox]) -> bool:

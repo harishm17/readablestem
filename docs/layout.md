@@ -429,6 +429,39 @@ right again (163 right on, 22 made right, none made wrong; the corpus gold pages
 - The gaps that inline formulas leave in two lines were counted as a channel with three lines on
   each side, which they are in pieces and not in lines (2 pages).
 
+**Where a table proposal is accepted (WS15.2).** `tables.find` proposes tables on the raw page,
+before the page has columns, so a proposal box can take the lines of two columns (a syllabus's
+sidebar and its body, paired at their sentence ends: `s02_syllabus_sidebar` page 1). With the tree
+on, `layout.document._analyze_document` still calls `_claim_tables` first, but `_claim_tables`
+asks `page._accepted` about what the detector proposes before anything is taken out of the page.
+`_accepted` builds the page's tree from every fragment (the proposals' lines among them; no
+table is an item yet) and `regions.table_refusal` judges each proposal against it:
+
+- A proposal whose lines stand in one region (a leaf, a column, a drawn box) is accepted. So is a
+  ruled table that spans the columns on purpose: it is a band of its own, so the cut that would
+  part its cells has nothing else of the page on a side of it (`_between` counts a gutter only
+  where a line that is not the proposal's stands in the region on a side). A horizontal cut is
+  no gutter: a table has rows.
+- A proposal across a gutter (a `cols` channel, the edge of a drawn box, two cells of a label
+  grid) is refused when (a) a line of three words or more stands on each of two sides
+  (`REFUSED_PROSE`), or (b) its alignment, the share of its cells that line up in their column
+  (`Judgement.alignment`, now kept on `PageTable.alignment`), is under 0.6
+  (`REFUSED_ALIGNMENT`), or (c) every side is a list of three or more labeled cells, as the tree
+  reads an exercise that matches terms with definitions (`REFUSED_MATCHING`). Nothing else
+  refuses it. The wider veto this replaces lost tables of the development files.
+- A refused proposal is left where it is: its lines and rules stay in the page, and are read
+  by the tree like any other line. The tree that reads the page is built after the judging,
+  from the accepted tables only, as above, so the tree a proposal was judged against is not the
+  tree that reads the page, and it does not need to be: the judging tree differs from the
+  reading tree only by the room the accepted tables take, which cannot make a refused proposal
+  stand in one region. Verdicts are not made again.
+- The refusals are on `Layout.table_refusals` (page, box and reason code; no text). No page trace
+  exists yet (WS14.8), so this is where they are kept.
+- The next page's continued-table check (`find_continued`) is given only the accepted tables.
+- `_text_block_dropped` and the "box extended along rules" growth (`REASON_EXTENDED`) are not
+  changed: they run on the raw page and take no region argument; that belongs to the second
+  table reader (WS5.16).
+
 Still not an item: a vector figure (its drawings are read after the rows are made), so a figure
 drawn as vectors at the top of a column beside text is placed by its labels only.
 

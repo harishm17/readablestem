@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import itertools
 import re
+from pathlib import Path
 
 import pymupdf
 
 from readablestem import config
 from readablestem.pipeline import layout
+from readablestem.pipeline.layout import regions
 from test_tables_detect import grid_table
 
 TAG = re.compile(r"[A-Z]\d\d")
@@ -120,6 +122,49 @@ def test_a_table_at_the_top_of_a_column_is_read_before_the_text_beside_it():
     _lines(page, "B", 320, 130, 40, 44)
     assert _read(doc, on=True) == "TAB"
 
+
+SELFMADE = Path(__file__).parent / "workflows" / "corpus" / "selfmade"
+
+
+def _tables(name: str, page: int, *, on: bool = True) -> tuple[list, layout.Layout]:
+    result = layout.analyze((SELFMADE / f"{name}.pdf").read_bytes(), region_tree=on)
+    return [e for e in result.elements if e.page == page and e.kind.value == "table"], result
+
+
+def test_a_table_proposal_across_a_gutter_with_prose_on_both_sides_is_refused():
+    # The detector boxes lines of the body and of the sidebar of a syllabus together and takes
+    # their sentence ends for cells; with the tree on they stay in their columns and the
+    # reason is recorded. The grading table, in one column, is kept.
+    tables, result = _tables("s02_syllabus_sidebar", 0)
+    assert [t.bbox[2] < 400 for t in tables] == [True]
+    assert [why for _, why in result.table_refusals[0]] == [regions.REFUSED_PROSE]
+    texts = {e.text for e in result.elements if e.page == 0 and e.kind.value == "heading"}
+    assert {"Learning Outcomes", "Key Dates"} <= texts
+    assert len(_tables("s02_syllabus_sidebar", 0, on=False)[0]) == 2  # off: the old reading
+
+
+def test_a_ruled_table_that_spans_the_columns_on_purpose_is_kept():
+    doc, page = _page()
+    _lines(page, "A", 40, 80, 12, 44)
+    _lines(page, "B", 320, 80, 12, 44)
+    rows = [["term and its meaning", "what the term means here", "an example of the term"]] + [
+        [f"term {i} is described", f"meaning {i} in plain words", f"example {i} given here"]
+        for i in range(5)
+    ]
+    grid_table(page, rows, x0=40, y0=260, widths=[170.0, 170.0, 170.0], height=20)
+    _lines(page, "C", 40, 420, 12, 44)
+    _lines(page, "D", 320, 420, 12, 44)
+    result = layout.analyze(doc.tobytes(), region_tree=True)
+    assert [e.kind.value for e in result.elements].count("table") == 1
+    assert not result.table_refusals
+
+
+def test_a_matching_table_is_kept():
+    # Terms to number and definitions to letter, side by side, and nothing else of the page in
+    # the other column: the table's own columns are no gutter of the page.
+    tables, result = _tables("s04_worksheet", 1)
+    assert len(tables) == 1
+    assert not result.table_refusals
 
 def _picture(page: pymupdf.Page, rect: pymupdf.Rect) -> None:
     pixels = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 200), False)
