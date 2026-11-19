@@ -934,6 +934,15 @@ NOTICE_CODES = frozenset(
         "second_reader_budget",
         # LaTeX source: text LaTeXML could not read (an unknown command), kept as written.
         "source_error",
+        # LaTeX source: LaTeX errors the reader could not tie to a place in the result, and
+        # pictures the source names that were not found or not read (one decision each).
+        "source_unplaced",
+        "source_figure_missing",
+        # A source job (LaTeX or Word): no compile witness ran, so its text was not compared
+        # with a compiled copy (`core.page_checks`, `source.convert`).
+        "source_not_compared",
+        # A page saved sideways (no /Rotate) that was turned to be read (`layout.document`).
+        "page_turned",
         # LaTeX source: words or pictures no rule of the reader took (`source.report`
         # `SourceReport.unread_words`, `unread_pictures`): `count` of them.
         "source_unread",

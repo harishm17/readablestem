@@ -56,6 +56,12 @@ def _hidden_text_notices(
     return notices
 
 
+def _turned_notices(types: dict[int, page_type.PageTypeResult]) -> list[Notice]:
+    """A page saved sideways with no /Rotate was turned to be read (`page_type.turn_page`): what
+    the pictures of the page show is the turned page. Information, counted per page."""
+    return [make("page_turned", page=number) for number, kind in sorted(types.items()) if kind.turn]
+
+
 FOOTNOTE_CONTEXT = 10  # characters printed before a footnote's mark that find it again
 
 

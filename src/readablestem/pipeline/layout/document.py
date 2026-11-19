@@ -72,6 +72,7 @@ from readablestem.pipeline.layout.notices import (
     _hidden_text_notices,
     _ink_notices,
     _layout_notices,
+    _turned_notices,
 )
 from readablestem.pipeline.layout.page import (
     _covered_points,
@@ -231,7 +232,7 @@ def _read_page(
     drawings list (`pipeline.page_type` reads the same two). A page saved sideways with no
     /Rotate is turned first (`page_type.turn_page`): its rows are horizontal and every later
     step, here and in the readers that open the file again, sees the display frame."""
-    page_type.turn_page(page)
+    turn = page_type.turn_page(page)
     fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
     drawn = page.get_cdrawings()
@@ -247,6 +248,7 @@ def _read_page(
             page, raw, drawings, budget=document.ink, producer=producer, images=images,
             covers=covers,
         )  # fmt: skip
+        kind.turn = turn
         rows = _page_rows(page, raw, kind.text.covered)
         return rows + _field_rows(fields, rows), [], kind
     seen = page_type.paint_visibility(drawings, images[0])  # once: the page type reads it too
@@ -254,6 +256,7 @@ def _read_page(
         page, raw, drawings, budget=document.ink, producer=producer, images=images, seen=seen,
         covers=covers,
     )  # fmt: skip
+    kind.turn = turn
     rows = _page_rows(page, raw, kind.text.covered)
     return rows + _field_rows(fields, rows), _page_paths(page, drawings, seen), kind
 
@@ -501,7 +504,12 @@ def _analyze_document(
         page_sizes=[p.size for p in pages],
         title=title,
         lang=_document_lang(doc),
-        notices=notices + _hidden_text_notices(types, kept) + _ink_notices(types, kept),
+        notices=(
+            notices
+            + _hidden_text_notices(types, kept)
+            + _ink_notices(types, kept)
+            + _turned_notices(types)
+        ),
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
         sources=sources,

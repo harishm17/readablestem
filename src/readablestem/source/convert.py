@@ -38,6 +38,7 @@ from typing import Any, Literal
 
 from readablestem.config import Settings
 from readablestem.core import sandbox, triage
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     ConversionOptions,
     ConversionOutput,
@@ -366,6 +367,19 @@ def _convert(
     return finish(reading, origin="beamer" if beamer else "latex", report=report)
 
 
+def _source_lines(report: SourceReport | None) -> list[Notice]:
+    """The lines a source job has beyond its reader's own (`source_error`, `source_unread`): what
+    LaTeX reported that the reader could not place, the pictures it could not find, and, for
+    every source, that no compile witness ran (nothing compiles a source in a job yet, so the
+    line is unconditional: the day a witness runs, it is made only when none did)."""
+    found = [make("source_not_compared")]
+    if report is not None and report.unplaced_errors:
+        found.append(make("source_unplaced", count=report.unplaced_errors))
+    if report is not None and report.figures:
+        found.append(make("source_figure_missing", count=len(report.figures)))
+    return found
+
+
 def _finish(
     reading: ltx_reader.Reading,
     *,
@@ -467,6 +481,7 @@ def _finish(
     derived = [
         *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),
         *notice_rules.from_runs(elements),
+        *_source_lines(report),
     ]
     notices: list[Notice] = notice_rules.ordered(
         notice_rules.merge(derived, reading.notices), elements

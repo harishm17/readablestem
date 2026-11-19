@@ -485,6 +485,9 @@ class PageTypeResult:
     ink: InkStats
     image_coverage: float
     producer: str = "other"
+    # The clockwise turn (90 or 270) a page saved with no /Rotate was read with (`turn_page`),
+    # else 0. Not in the stored record: the notice `page_turned` says it.
+    turn: int = 0
 
     def to_record(self, page: int) -> PageType:
         """The content-free record stored on the result (`core.types.PageType`)."""
