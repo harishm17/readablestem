@@ -30,6 +30,16 @@
   the document does not have now leads back to the job page. The contact line's two patterns
   are anchored and match a text in one way only; a host with an empty label
   (`example..edu`, `example.edu./x`) is now refused.
+- A waiting job page whose document finished with parts not converted got a server error from
+  every status poll, so it never became the finished page without a reload: `_job_body.html`
+  imported the notice macro inside the branch of a job that is still waiting, and the status
+  answer includes that file on its own. The import is at the top of the file. Found by CI's
+  browser run (the machine there has no table model, so its conversion has a gap); every other
+  template imports the macros it calls at its own top level (checked over all of them). The
+  outage test of the job page also polls.
+- Workflow replay: `harness.OWED` lists the 18 more files whose conversions ask for answers
+  the recording does not hold since this wave (29 files and 1,260 answers in all; no recording
+  was paid for). The cost test replays `s18_exam_twocol`, which still has every answer.
 - Not changed, recorded as open: the job page does not yet say how many equations a Word file
   holds in words (the route logs the count, `docx_equations_as_words`); a page read without its
   ActualText raises no notice when the two readings differ. No model request changed.

@@ -212,6 +212,9 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
     assert "4 decisions need you before you give it to students." in text
     assert 'id="partial-note"' in html
     assert "All 0 checks" not in text
+    # The waiting page gets the same note when its poll finds the job finished.
+    polled = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
+    assert polled.status_code == 200 and 'id="partial-note"' in polled.text
 
 
 def stop(web, job_id: str, code: str, retries: int = 0) -> None:

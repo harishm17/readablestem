@@ -1,5 +1,8 @@
 {# Audiences: owner, reviewer #}
 {% from "components/forms.html" import form with context %}
+{# Imported here, not inside a branch: the status answer of a job that has just finished
+   includes this file on its own, and an import in a branch not taken leaves the name unset. #}
+{% from "components/notices.html" import notice_box %}
 {# Everything on the job page that differs between a waiting, a stopped and a finished job: the
    waiting note and steps, then the results, the settings and the delete box. The page holds it in
    #job-body, and the status answer of a job that has just finished sends it again out of band, so
@@ -21,7 +24,6 @@
 {% if job.is_owner and state.key != "stopping" %}
 {# Stops a document that is waiting (at once, its pages back) or converting (at its next step).
    The upload is kept either way (web/routes/jobs.py `cancel_job`). #}
-{% from "components/notices.html" import notice_box %}
 {% call form("job.cancel", "/jobs/" ~ job.id ~ "/cancel", {"class": "inline-form", "id": "cancel-form"}) %}
   <p id="cancel-explain" class="hint">Cancel stops it. Your file is kept, so you can convert it later or delete it.</p>
   <button type="submit" class="button-secondary" aria-describedby="cancel-explain">Cancel</button>

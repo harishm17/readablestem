@@ -76,8 +76,26 @@ UPLOADS = corpus.UPLOADS
 # Files whose conversion asks for answers that are not recorded yet, with how many: the
 # next refresh owes them (docs/eval.md, "Recording and replay").
 OWED = {
-    "w_lecture_5111": 2,
-    "d1_scripts": 14,
+    # Wave 1a changed what these files' conversions ask (words with their styles, kept line
+    # ends, new boxes), and no recording was paid for in it. One refresh owes them all.
+    "w_lecture_5111": 30,
+    "w_exam_5111": 38,
+    "w_notes_6042_ch2": 646,
+    "w_pset_801": 6,
+    "w_slides_60001_lec1": 48,
+    "w_slides_60001_lec10": 98,
+    "w_solutions_1802": 50,
+    "r01_syllabus_16851": 6,
+    "r05_labmanual_5310_lab1": 22,
+    "r07_labnotebook_5310": 8,
+    "r09_handout_14451": 18,
+    "r14_exam_513": 44,
+    "r16_openstax_physics_ch4_end": 20,
+    "r17_arxiv_ligo": 74,
+    "r18_arxiv_opt": 34,
+    "r21_infographic_orcid": 8,
+    "s15_charts_figures": 4,
+    "d1_scripts": 8,
     "e1_mc_columns": 6,
     "e2_solutions_rubric": 6,
     "e3_calendar": 2,
