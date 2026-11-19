@@ -259,7 +259,9 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
             i += 1
             continue
         j = i + 1
-        while j < n and capital(chars[j]) and chars[j].size < limit and chars[j].font == chars[i].font:
+        while (
+            j < n and capital(chars[j]) and chars[j].size < limit and chars[j].font == chars[i].font
+        ):
             j += 1
         i, start = j, i
         if j < n and chars[j].c.isalnum():
