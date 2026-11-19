@@ -382,7 +382,6 @@ class _Build:
         node.cells = [_union([items[i][0] for i in m]) for _, m in cells]
         return node
 
-
     def _grid_above(
         self,
         idx: list[int],
@@ -412,9 +411,7 @@ class _Build:
         if not isinstance(grid, _Node):
             return None
         cut = (max(items[i][0][3] for i in above) + top) / 2
-        return _Node(
-            "stack", box, [grid, self.build(below, column, 1)], [cut], column=column
-        )
+        return _Node("stack", box, [grid, self.build(below, column, 1)], [cut], column=column)
 
 
 def _side(column: str, side: str) -> str:

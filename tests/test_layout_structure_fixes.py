@@ -528,9 +528,7 @@ def options_page(*lines: str) -> bytes:
 )
 def test_answer_options_inside_one_block_are_split_or_flagged_never_silent(lines, texts, flagged):
     layout = analyze(options_page(*lines))
-    options = [
-        e for e in layout.elements if e.list_marker or (e.text and e.text.startswith("("))
-    ]
+    options = [e for e in layout.elements if e.list_marker or (e.text and e.text.startswith("("))]
     assert [e.text for e in options] == texts
     assert [OPTION_LABELS in e.reasons for e in options] == [flagged] * len(options)
     assert [n.review for n in from_reasons(options)] == ["required"] * flagged

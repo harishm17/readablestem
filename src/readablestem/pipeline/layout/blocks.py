@@ -1123,7 +1123,10 @@ def _option_label(row: _Row) -> tuple[str, tuple[tuple[str, int], ...]] | None:
         return None
     (start, end), (text_start, _) = tokens[0], tokens[1]
     parsed = _ordered_marker("".join(c.c for c in row.chars[start:end]))
-    if parsed is None or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size:
+    if (
+        parsed is None
+        or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size
+    ):
         return None
     readings = marker_readings(parsed[1])
     return (parsed[0], readings) if readings else None
@@ -1223,9 +1226,10 @@ def _option_grid(
     rows: list[_Row], start: int, ctx: _Context, skip: dict[int, int], *, document: _Document
 ) -> tuple[int, list[_Row]] | None:
     first = rows[start]
-    if id(first) in skip or not _option_row(first) or _option_label(first) is None:
+    opening = _option_label(first)
+    if id(first) in skip or not _option_row(first) or opening is None:
         return None
-    form = _option_label(first)[0]  # type: ignore[index]
+    form = opening[0]
     cells: list[_OptionCell] = []
     at = start
     while at < len(rows):
@@ -1270,24 +1274,27 @@ def _option_grid(
     return at - start, ordered
 
 
+def _option_place(block: _Block) -> tuple[int, int] | None:
+    """(grid, place in label order) of an option block, None for any other block."""
+    return block.marker.option if block.marker is not None else None
+
+
 def _option_order(blocks: list[_Block]) -> list[_Block]:
     """The options of a grid next to each other in the reading order of the page's blocks, which
     follows their boxes (A, C / B, D), are put back in label order (`_option_grids`)."""
     out: list[_Block] = []
     at = 0
     while at < len(blocks):
-        marker = blocks[at].marker
+        place = _option_place(blocks[at])
         end = at + 1
-        if marker is not None and marker.option is not None:
-            grid = marker.option[0]
-            while end < len(blocks):
-                other = blocks[end].marker
-                if other is None or other.option is None or other.option[0] != grid:
-                    break
-                end += 1
-            out += sorted(blocks[at:end], key=lambda b: b.marker.option[1])  # type: ignore[union-attr, index]
-        else:
+        if place is None:
             out.append(blocks[at])
+        else:
+            while (
+                end < len(blocks) and (other := _option_place(blocks[end])) and other[0] == place[0]
+            ):
+                end += 1
+            out += sorted(blocks[at:end], key=lambda b: (_option_place(b) or place)[1])
         at = end
     return out
 

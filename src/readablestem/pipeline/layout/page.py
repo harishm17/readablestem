@@ -31,9 +31,9 @@ from readablestem.pipeline.layout.blocks import (
     _leave_out_teacher_tags,
     _merge_chapter_numbers,
     _merge_style_splits,
+    _option_order,
     _paragraph_pieces,
     _runs,
-    _option_order,
     _split_options,
 )
 from readablestem.pipeline.layout.context import _Document, _PageGuard
