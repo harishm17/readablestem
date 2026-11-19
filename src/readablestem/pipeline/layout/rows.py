@@ -156,7 +156,8 @@ def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
     the size its glyphs are drawn at (`page_type.drawn_size`). Every place layout reads
     characters from the PDF goes through here (rows, line glyphs, the text pass's glyphs), so
     no path sees the zero-width boxes ligatures come out with, or a line set as glyphs."""
-    blocks = page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]
+    flags = TEXT_FLAGS | page_type.actualtext_flag(page)  # the page's one choice (page_type)
+    blocks = page.get_text("rawdict", flags=flags, **kwargs)["blocks"]
     for block in blocks:  # before anything measures by a span's size
         for line in block.get("lines", ()):
             for span in line["spans"]:

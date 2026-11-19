@@ -294,6 +294,39 @@ def test_a_date_an_address_and_a_compound_broken_at_line_ends_join_without_a_spa
     )
 
 
+# ---------------------------------------------------------------- ActualText, chosen by page
+
+SELFMADE = Path(__file__).parent / "workflows" / "corpus" / "selfmade"
+
+
+def test_labels_a_file_replaces_with_actualtext_are_read_as_printed():
+    """A tagged PDF can give a figure's labels an ActualText of the whole figure's alt text,
+    and MuPDF then reads the label as that text: the printed words are lost."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    for i, line in enumerate(("Income per person has grown at different rates since 1870.",) * 3):
+        page.insert_text((72, 100 + 16 * i), line, fontname="helv", fontsize=11)
+    marked = (
+        b"/Span <</ActualText (Figure 1)>> BDC BT /helv 9 Tf 1 0 0 1 120 %d Tm (%s) Tj ET EMC\n"
+    )
+    stream = b"".join(marked % (y, word) for y, word in ((300, b"Switzerland"), (330, b"Nigeria")))
+    xref = page.get_contents()[-1]
+    doc.update_stream(xref, doc.xref_stream(xref) + stream)
+    text = " ".join(e.text or "" for e in analyze(doc.tobytes()).elements)
+    assert "Switzerland" in text and "Nigeria" in text
+    assert "Figure 1" not in text
+
+
+@pytest.mark.parametrize("name", ["d1_scripts", "d4_chinese_doc"])
+def test_a_page_whose_script_needs_actualtext_keeps_it(name):
+    """Chromium writes ActualText for Hindi conjuncts and for CJK; the glyphs alone read as
+    U+FFFD and Kangxi radicals, so those pages keep ActualText."""
+    text = "".join(e.text or "" for e in analyze((SELFMADE / f"{name}.pdf").read_bytes()).elements)
+    assert "\ufffd" not in text
+    assert not any("\u2f00" <= c <= "\u2fdf" for c in text)
+    assert sum("\u0900" <= c <= "\u097f" or "\u4e00" <= c <= "\u9fff" for c in text) > 20
+
+
 # ---------------------------------------------------------------- the files themselves
 
 

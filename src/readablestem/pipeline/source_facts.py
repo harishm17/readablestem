@@ -249,7 +249,9 @@ def _bold_letters(page) -> list[tuple[float, float]]:
     """Where a bold font draws a plain letter on the page, read once for all the page's
     equations: the centre (x, y) of each letter."""
     letters = []
-    for block in page.get_text("rawdict")["blocks"]:
+    for block in page.get_text(
+        "rawdict", flags=pymupdf.TEXTFLAGS_RAWDICT | page_type.actualtext_flag(page)
+    )["blocks"]:
         for line in block.get("lines", ()):
             for span in line.get("spans", ()):
                 if not _bold_span(span):
