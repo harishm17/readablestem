@@ -9,6 +9,7 @@ last review decision.
 
 from __future__ import annotations
 
+import struct
 import zlib
 from collections import Counter
 from dataclasses import dataclass, field
@@ -34,7 +35,7 @@ from readablestem.web import (
     states,
 )
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
+from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
 from readablestem.web.outcome import FAILED_MESSAGES
 
@@ -704,6 +705,27 @@ def last_decision(session: Session, job: Job) -> date | None:
     return when.date() if when is not None else None
 
 
+# A PNG file holds its width and height as two 4-byte numbers at bytes 16 to 24: the
+# database hands back those 8 bytes, not the crop.
+CropSizes = dict[str, tuple[int, int] | None]
+
+
+def crop_sizes(session: Session, job_id: str) -> CropSizes:
+    """The size in pixels of each stored crop of a job, by element: the picture's own header."""
+    rows = session.execute(
+        select(Blob.element_id, func.substr(Blob.content, 17, 8)).where(
+            Blob.job_id == job_id, Blob.kind == "crop"
+        )
+    ).all()
+    sizes: CropSizes = {}
+    for element_id, header in rows:
+        if not element_id:
+            continue
+        width, height = struct.unpack(">II", bytes(header)) if len(header or b"") == 8 else (0, 0)
+        sizes[element_id] = (width, height) if width and height else None
+    return sizes
+
+
 def job_view(
     session: Session,
     job: Job,
@@ -739,7 +761,9 @@ def job_view(
     if with_page and job.status == JobStatus.DONE and job.result_json:
         result = DocumentResult.model_validate(job.result_json)
         applied = notation.applied_phrases(result.notation_applied)
-        page = job_page.page_data(result, last_decision(session, job), job.filename)
+        page = job_page.page_data(
+            result, last_decision(session, job), job.filename, crop_sizes(session, job.id)
+        )
         carried = carry_view(job, result)
     # Only a finished job has a summary (the job page shows it for no other); a poll of one
     # that is waiting or converting does not load its result.

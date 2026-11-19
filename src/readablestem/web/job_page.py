@@ -351,6 +351,7 @@ class Example:
     pdf_reading: str  # document content: for the owner's eyes only, never logged
     html_reading: str
     lost: str
+    crop_size: tuple[int, int] | None = None  # its picture's size in pixels
 
 
 @dataclass(frozen=True)
@@ -459,7 +460,9 @@ def _lost_sentence(parts: list[str]) -> str:
     return sentence[0].upper() + sentence[1:]
 
 
-def _examples(result: DocumentResult) -> list[Example]:
+def _examples(
+    result: DocumentResult, crop_sizes: dict[str, tuple[int, int] | None] | None = None
+) -> list[Example]:
     """Up to four equations whose text layer loses the most, display ones first."""
     refresh_readings(result)
     fixes = _first_fixes(result)
@@ -487,6 +490,7 @@ def _examples(result: DocumentResult) -> list[Example]:
             pdf_reading=pdf_reading(element.text or ""),
             html_reading=fix.equation.speech,
             lost=_lost_sentence(parts),
+            crop_size=(crop_sizes or {}).get(element.id),
         )
         block = 1 if element.display == "block" else 0
         scored.append((len(parts), block, -element.order, example))
@@ -675,7 +679,11 @@ def _language_row(facts: SourceFacts, result: DocumentResult) -> Row:
     return Row("hear the right language", pdf, html)
 
 
-def before_after(result: DocumentResult, summary: CheckedSummary | None = None) -> Card | None:
+def before_after(
+    result: DocumentResult,
+    summary: CheckedSummary | None = None,
+    crop_sizes: dict[str, tuple[int, int] | None] | None = None,
+) -> Card | None:
     """The card, or None for results measured before source facts existed. Its equation
     row and the start of its structure rows ("Yes", or "In the converted parts" when a part
     is a picture or a page is left out) are the summary's (`pipeline.checked_words`)."""
@@ -709,7 +717,7 @@ def before_after(result: DocumentResult, summary: CheckedSummary | None = None) 
     tail = [_title_row(facts, result), _language_row(facts, result)]
     rows += tail[::-1] if language_needs_check(result) else tail
     kept = [row for row in rows if row is not None][:MAX_ROWS]
-    return Card(kept, _examples(result), tagged=bool(facts.tagged))
+    return Card(kept, _examples(result, crop_sizes), tagged=bool(facts.tagged))
 
 
 # --------------------------------------------------------------------------- notices
@@ -1063,7 +1071,12 @@ def found_sentence(result: DocumentResult) -> str:
     return f"Found {found} on {pages}." if found else f"Read {pages}."
 
 
-def page_data(result: DocumentResult, last_decision: date | None, filename: str = "") -> PageData:
+def page_data(
+    result: DocumentResult,
+    last_decision: date | None,
+    filename: str = "",
+    crop_sizes: dict[str, tuple[int, int] | None] | None = None,
+) -> PageData:
     from readablestem.web import queue
 
     counts = breakdown(result.fixes, result.notices)
@@ -1075,7 +1088,7 @@ def page_data(result: DocumentResult, last_decision: date | None, filename: str 
         counts=counts,
         checked=summary,
         found=found_sentence(result),
-        card=before_after(result, summary),
+        card=before_after(result, summary, crop_sizes),
         notices=notices,
         language=language_line(result),
         lang=result.lang,

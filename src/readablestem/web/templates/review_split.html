@@ -14,7 +14,7 @@
 {% from "_report_item.html" import report_link with context %}
 {% from "_leave_out.html" import leave_out_forms with context %}
 {% from "_hear.html" import hear_button %}
-{% from "_crop.html" import crop_image %}
+{% from "_crop.html" import crop_image, region_image %}
 {# The second Tab stop: straight to the decision's heading, past the site menu, the steps
    and the links (UX review BW11). #}
 {% block skip_links %}<a class="skip-link" href="#decision-title">Skip to the decision</a>{% endblock %}
@@ -81,7 +81,7 @@
 {% endmacro %}
 
 {% macro region(p) %}
-{% if p.region_url %}<img class="region-image" src="{{ p.region_url }}" alt="{{ p.region_alt }}">{{ enlarge(p.region_url, p.item.label|lower if p.item else "the PDF") }}{% endif %}
+{% if p.region_url %}{{ region_image(p.region_url, p.region_alt, p.region_size, p.item.label|lower if p.item else "the PDF") }}{{ enlarge(p.region_url, p.item.label|lower if p.item else "the PDF") }}{% endif %}
 {% endmacro %}
 
 {# The preview of the PDF's own picture of an item, with a link that shows it larger: with
@@ -395,7 +395,7 @@
 <ul class="group-crops" aria-label="Some of the copies in the PDF">
   {% for c in hg.crops %}
   <li><figure>
-    <img class="region-image" loading="lazy" src="/jobs/{{ job.id }}/regions/{{ c.element_id }}.png" alt="“{{ hg.text }}” on page {{ c.page }} of the PDF, with the lines around it.">
+    {{ region_image("/jobs/" ~ job.id ~ "/regions/" ~ c.element_id ~ ".png", "“" ~ hg.text ~ "” on page " ~ c.page ~ " of the PDF, with the lines around it.", hg.region_sizes.get(c.element_id), "the copy on page " ~ c.page, lazy=true) }}
     <figcaption>Page {{ c.page }}</figcaption>
   </figure></li>
   {% endfor %}
@@ -455,7 +455,7 @@
     {% for m in hg.members %}
     <li class="member" id="member-{{ m.element_id }}">
       <p class="member-where"><a href="/jobs/{{ job.id }}/review?item={{ m.element_id }}">{{ m.label }}</a>{% if m.page %}, page {{ m.page }}{% endif %}{% if m.heading_level %}, proposed as level {{ m.heading_level }}{% endif %}</p>
-      <img class="region-image" loading="lazy" src="/jobs/{{ job.id }}/regions/{{ m.element_id }}.png" alt="“{{ hg.text }}”{% if m.page %} on page {{ m.page }}{% endif %} of the PDF, with the lines around it.">
+      {{ region_image("/jobs/" ~ job.id ~ "/regions/" ~ m.element_id ~ ".png", "“" ~ hg.text ~ "”" ~ (" on page " ~ m.page if m.page else "") ~ " of the PDF, with the lines around it.", hg.region_sizes.get(m.element_id), m.label, lazy=true) }}
       {{ error_line(m, "actions") }}
       {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ m.element_id, {"class": "inline-form member-form"}) %}
         {{ hidden_fields() }}<input type="hidden" name="stay" value="{{ key }}">

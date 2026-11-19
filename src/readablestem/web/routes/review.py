@@ -43,7 +43,6 @@ the one just changed.
 from __future__ import annotations
 
 import logging
-import struct
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
@@ -52,7 +51,7 @@ from urllib.parse import parse_qsl, urlencode
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
@@ -82,9 +81,11 @@ from readablestem.web import (
     outcomes,
     output,
     page_edits,
+    page_images,
     queue,
     shares,
 )
+from readablestem.web.compare import region_pixels
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -175,7 +176,9 @@ from readablestem.web.routes.jobs import (
 from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
+    CropSizes,
     JobView,
+    crop_sizes,
     decisions_label,
     fix_status_label,
     job_view,
@@ -601,6 +604,9 @@ class HeadingGroupView:
     suggest: str = "keep"
     fact: str = ""
     crops: list[heading_groups.Crop] = field(default_factory=list)
+    # The size in pixels of the region picture of each copy shown (crops and members), by
+    # element, so the page keeps their places while they load.
+    region_sizes: dict[str, tuple[int, int] | None] = field(default_factory=dict)
 
     @property
     def times(self) -> str:
@@ -1201,7 +1207,17 @@ def _heading_group(
         values={"level": str(level or 1)},
         suggest=(advised := heading_groups.advice(result, unit)).suggest,
         fact=advised.fact,
-        crops=heading_groups.crops(unit, elements),
+        crops=(shown := heading_groups.crops(unit, elements)),
+        region_sizes={
+            element_id: region_pixels(
+                elements[element_id],
+                Kind.HEADING,
+                result.page_sizes.get(elements[element_id].page),
+                max_side_px=page_images.REGION_MAX_SIDE_PX,
+            )
+            for element_id in [c.element_id for c in shown] + [f.element_id for f in unit]
+            if element_id in elements
+        },
     )
 
 
@@ -1263,32 +1279,13 @@ def _load_versioned(request: Request, job_id: str, user: CurrentUser) -> Loaded:
         view = job_view(session, job, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
         refresh_readings(result)  # "Read aloud roughly as" says what the rules in force say
-        crops = _crop_sizes(session, job.id)
+        crops = crop_sizes(session, job.id)
         version = job.result_version or 0
     return view, result, crops, version
 
 
-# A PNG file holds its width and height as two 4-byte numbers at bytes 16 to 24: the
-# database hands back those 8 bytes, not the crop.
-CropSizes = dict[str, tuple[int, int] | None]
-
 # What `_load_versioned` reads: the job's view, its result, its crops and its review version.
 Loaded = tuple[JobView, DocumentResult, CropSizes, int]
-
-
-def _crop_sizes(session: Session, job_id: str) -> CropSizes:
-    rows = session.execute(
-        select(Blob.element_id, func.substr(Blob.content, 17, 8)).where(
-            Blob.job_id == job_id, Blob.kind == "crop"
-        )
-    ).all()
-    sizes: CropSizes = {}
-    for element_id, header in rows:
-        if not element_id:
-            continue
-        width, height = struct.unpack(">II", bytes(header)) if len(header or b"") == 8 else (0, 0)
-        sizes[element_id] = (width, height) if width and height else None
-    return sizes
 
 
 def _place_flashes(

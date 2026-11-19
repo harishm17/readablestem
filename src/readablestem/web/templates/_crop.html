@@ -17,3 +17,17 @@
   <p class="crop-more" hidden>Wider than the screen: scroll sideways to see all of it.</p>
 </div>
 {%- endmacro %}
+
+{# A picture of an item with the page round it (`/jobs/{id}/regions/{element}.png`, or a region
+   cut on request). On a screen wider than a phone it is a picture that shrinks to fit its
+   column. On a phone it is shown whole at its own size in the same box a crop is, which scrolls
+   sideways, so no part of what the person must judge is cut off. `size` is its size in
+   pixels (`compare.region_pixels`), about: the page keeps the picture's place while it loads. #}
+{% macro region_image(url, alt, size=None, label="", lazy=False) -%}
+<div class="crop-box region-box">
+  <div class="crop-scroll" role="group" aria-label="PDF picture{% if label %} of {{ label }}{% endif %}" tabindex="0">
+    <img class="region-image" src="{{ url }}"{% if size %} width="{{ size[0] }}" height="{{ size[1] }}"{% endif %}{% if lazy %} loading="lazy"{% endif %} alt="{{ alt }}">
+  </div>
+  <p class="crop-more" hidden>Wider than the screen: scroll sideways to see all of it.</p>
+</div>
+{%- endmacro %}

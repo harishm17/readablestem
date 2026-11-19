@@ -409,6 +409,16 @@ def region_clip(box: tuple[float, float, float, float]) -> tuple[float, float, f
     return box[0] - p, box[1] - p, box[2] + p, box[3] + p
 
 
+def region_crop_pixels(box: tuple[float, float, float, float]) -> tuple[int, int]:
+    """The size in pixels `render_region_crop` makes for this box (its zoom, held to the
+    side limit as the render child does), so the page can keep the place of the preview while
+    it loads."""
+    clip = region_clip(box)
+    width, height = clip[2] - clip[0], clip[3] - clip[1]
+    scale = min(REGION_DPI / 72.0, (REGION_MAX_SIDE_PX - 1) / max(width, height, 1.0))
+    return max(1, round(width * scale)), max(1, round(height * scale))
+
+
 def render_region_crop(
     pdf: bytes | Callable[[], bytes],
     page: int,

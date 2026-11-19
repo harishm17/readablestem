@@ -20,6 +20,21 @@
   once for its parts and kept like the other exports (3 parts of 30 pages took 0.75 to 2.5 s each
   time); it goes with any part.
 
+## Unreleased: region pictures whole on a phone and sized before they load (branch fix/review-second-batch)
+
+- On a phone a heading's band, the lines around an item and a region cut on request are no
+  longer cut to a strip with a fade: each is shown whole in the box a crop uses, which scrolls
+  sideways, can be reached from the keyboard and says it is wider than the screen.
+- Pictures cut on request (a heading's band, an item with the page around it, the repeated
+  headings' copies in both views, a table's picture, the region preview of the page tools) and
+  the job card's example picture carry their width and height, so the page does not move while
+  they load. A heading's or a table's picture is cut to whole lines, so its height is a little
+  smaller than the one given and the page moves by that once.
+- The keyboard browser test runs "A" on a repeated-heading group the page advises as bold: focus
+  goes to "Keep as headings" and the status line says why. The path was never broken.
+- `docs/web.md` says why the list view has no shortcuts and no reordering, that the pane is a
+  header's height short once the window is scrolled, and that the instructor's preview is the bare
+  student file. Nothing changes in the student's page: `RENDER_VERSION` is not owed.
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
 - Speech: `\{x | |x|<1\}` (a plain bar before an absolute value in set braces) read "vertical

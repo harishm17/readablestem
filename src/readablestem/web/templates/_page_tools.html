@@ -1,6 +1,7 @@
 {# Audiences: owner, reviewer #}
 {% from "components/forms.html" import form with context %}
 {% from "components/fields.html" import field_classes, field_error, field_aria %}
+{% from "_crop.html" import region_image %}
 {# The page tools (T3-5, T3-16), under the optional checks on the review screen: change the
    words of a paragraph or a heading, make a line a heading, add a picture or an equation
    the tool missed, leave the page out of the student file (and put it back). Included by
@@ -120,7 +121,7 @@
     {% set add = tools.add %}
     {% if add.confirming %}
     <figure class="region-preview">
-      <img class="region-image" src="{{ add.preview_url }}" alt="The part of page {{ tools.number }} you chose, cut out.">
+      {{ region_image(add.preview_url, "The part of page " ~ tools.number ~ " you chose, cut out.", add.preview_size, "the part of page " ~ tools.number ~ " you chose") }}
       <figcaption>The part of page {{ tools.number }} you chose.</figcaption>
     </figure>
     {% call form("review.add_region", "/jobs/" ~ job.id ~ "/pages/" ~ tools.number ~ "/add", {"class": "decide-form"}) %}

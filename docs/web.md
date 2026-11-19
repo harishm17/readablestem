@@ -3413,6 +3413,35 @@ flag in `sessionStorage`), as it does after a saved decision. On each card the c
 first after the heading (equation, heading, text, figure, table, repeated-heading and page
 cards), so Accept is at most three Tab stops from the heading.
 
+**A group the page advises as bold.** On a repeated-heading card where the page advises bold
+text, "Keep as headings" is the other choice (`data-anyway="advice"`), so A does not press it:
+focus goes to the button and the status line says the page suggests the other choice. The
+keyboard browser test runs this path on a group labeled "Solution".
+
+**Known limits of the review screen.**
+
+- The list view has no keyboard shortcuts and its cards are not reordered. The shortcuts
+  act on the one card the review screen shows (`#decision`, its `.decision-nav` links, the key
+  list written from that card). The list view has no such card: every card is on the page at
+  once, the heading group's buttons are not marked `data-role="accept"`, and N and P have
+  nothing to go to. Acting on "the card that holds focus" would need a second handler and a key
+  list that changes with focus, so the list view is worked with Tab and the buttons.
+- Once the window is scrolled, the side-by-side page pane is about a header's height shorter
+  than it could be: its height is measured once under the header (`--page-top`), not followed
+  as the header scrolls away. Accepted, not built.
+- The instructor's preview (`GET /jobs/{id}/view`, `routes.jobs.student_page`) is the bare
+  student file, with nothing of the app around it, and it carries nothing that is not in the
+  file. The way back to the page tools is the browser's Back button and the job page ("Fix
+  something on a page").
+- A picture of an item or of a region cut on request (`/jobs/{id}/regions/{element}.png`,
+  `/jobs/{id}/pages/{n}/region.png`) is not cut on a phone: it is shown whole in the same
+  focusable, named box that scrolls sideways as a crop (`templates/_crop.html`
+  `region_image`). Its tag carries a width and height worked out before it is cut
+  (`compare.region_pixels`, `routes.edits.region_crop_pixels`) so the page does not move while
+  it loads. A heading's and a table's edges move to whole lines when the picture is cut, so
+  its height is a little more than the picture's own (a band's picture was 154 px high where
+  188 was given): the page then moves by that difference once.
+
 **Describe it in words** (T3-16; `web.review.describe_in_words`, `templates/_describe.html`).
 An item shown as an image (an equation or table kept as the original, a page or handwriting
 kept as an image; `web.review.can_describe`) has a folded "Describe it in words" box, in both
