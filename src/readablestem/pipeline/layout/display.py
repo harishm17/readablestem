@@ -30,6 +30,7 @@ from readablestem.pipeline.layout.inline_runs import (
 from readablestem.pipeline.layout.shared import (
     _ROW_RELATIONS,
     SCRIPT_RATIO,
+    _CharInfo,
     _Marker,
     _Path,
     _Region,
@@ -37,6 +38,7 @@ from readablestem.pipeline.layout.shared import (
     _RowIndex,
     _tokens,
 )
+from readablestem.pipeline.parse import EQUATION_THRESHOLD
 
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
@@ -49,7 +51,7 @@ MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligne
 CONNECTIVE_GAP = 9.0
 
 
-def _split_labels(rows: list[_Row]) -> list[_Row]:
+def _split_labels(rows: list[_Row], *, document: _Document) -> list[_Row]:
     """Cut an equation number off the end of a maths row into a row of its own.
 
     `_merge_baselines` joins pieces of a line up to 4 x font size apart, so an equation
@@ -59,6 +61,11 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
     and the rest has maths in it (or is only the comma that ends the maths) and does not
     end in a relation or operator ("x =   2.4" keeps its right-hand side). Whether it is
     an equation number is decided later, by where it sits (`_equation_regions`).
+
+    A bracketed number that follows the comma or full stop ending the maths may stand closer
+    (`CLOSE_NUMBER_GAP`): a display that fills its column ("..., (2)") leaves less than a font
+    size before the number. Then the rest must read as a display equation on its own, so a
+    line of prose that ends in a reference ("... as in Eq. (2)") keeps it.
     """
     out: list[_Row] = []
     for row in rows:
@@ -76,7 +83,10 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
         if (
             _is_equation_number(label)
             and before
-            and row.chars[start].x0 - before[-1].x1 >= 1.0 * row.size
+            and (
+                row.chars[start].x0 - before[-1].x1 >= 1.0 * row.size
+                or _closes_display(row, start, before[-1], label, document=document)
+            )
             and before[-1].c not in _CONTINUATION_SIGNS
             and (
                 any(c.math or c.c in _ROW_RELATIONS or c.c in _SIGNS for c in before)
@@ -90,6 +100,80 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
         else:
             out.append(row)
     return out
+
+
+NUMBERED_REASON = "equation number beside it"
+NUMBERED_SHARE = 0.45  # share of a numbered line's characters that must read as maths
+NUMBERED_INDENT = 1.5  # x font size: how far a display stands in from its column's text edge
+
+
+def _promote_numbered_lines(rows: list[_Row]) -> None:
+    """Make a line of maths and a few words a display equation when its number stands beside it.
+
+    A line with an English word in it ("DiD Estimate = ...", "x = ... times switch", "... i.i.d.
+    ...", "H0 : ... versus H1 : ...") reads as text, so the "(7)" at the right edge, on its
+    baseline, was a paragraph of its own. Such a number is the evidence the row is a display:
+    the nearest row to its left on its baseline is made maths when it is mostly maths
+    (`NUMBERED_SHARE`, and the score of a maths row), is not a list item, is not another number,
+    and stands in from the text edge of its column (a last line of prose that ends in a mark
+    such as "(5)" starts at the edge). Only a bracketed number does this, not a bare "2.4".
+    """
+    for number in rows:
+        if (
+            number.kind == "frag"
+            or number.absorbed
+            or number.vertical
+            or not EQUATION_NUMBER.match(number.clean)
+        ):
+            continue
+        beside = [
+            r
+            for r in rows
+            if r is not number
+            and not r.absorbed
+            and not r.vertical
+            and r.x1 <= number.x0
+            and _number_beside(number, r.bbox, max(r.size, number.size))
+        ]
+        line = max(beside, key=lambda r: r.x1, default=None)
+        if (
+            line is None
+            or line.kind != "text"
+            or line.marker is not None
+            or line.exercise_number
+            or _is_equation_number(line.clean)
+            or line.score < EQUATION_THRESHOLD
+        ):
+            continue
+        info = _CharInfo.of(line)
+        counted = [i for i, c in enumerate(line.chars) if not c.blank and c.c not in ",.;:"]
+        if sum(info.mathy(i) for i in counted) < NUMBERED_SHARE * len(counted):
+            continue
+        edge = min(r.x0 for r in rows if r.kind == "text" and r.column == line.column)
+        if line.x0 - edge < NUMBERED_INDENT * line.size:
+            continue
+        line.kind = number.kind = "math"
+        line.reasons = [*line.reasons, NUMBERED_REASON]
+
+
+CLOSE_NUMBER_GAP = (
+    0.3  # x font size: the least a bracketed number stands from the "," or "." before it
+)
+
+
+def _closes_display(row: _Row, start: int, last: _Char, label: str, *, document: _Document) -> bool:
+    """Is the bracketed number from `row.chars[start]` on the number of the display equation
+    that ends with `last` (a "," or "."), though it stands less than a font size from it?"""
+    if (
+        last.c not in ",."
+        or not label.endswith(")")
+        or not any(c.isdigit() for c in label)
+        or row.chars[start].x0 - last.x1 < CLOSE_NUMBER_GAP * row.size
+    ):
+        return False
+    probe = _Row(row.chars[:start], column=row.column)
+    _classify_row(probe, document=document)
+    return probe.kind in ("math", "frag")
 
 
 def _marker_left(marker: _Marker | None, cut: int) -> _Marker | None:

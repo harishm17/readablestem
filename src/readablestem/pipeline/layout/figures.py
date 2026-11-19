@@ -34,6 +34,7 @@ from readablestem.pipeline.layout.shared import (
     _Display,
     _Figure,
     _lead_end,
+    _limit_end,
     _Path,
     _Row,
     _RowIndex,
@@ -89,10 +90,17 @@ def _prose_spans(row: _Row, info: _CharInfo) -> list[tuple[int, int, str]]:
             i += 1
             continue
         j = i
-        while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
-            j += 1
-        word = "".join(c.c for c in chars[i:j]).lower()
-        variables = j - i > 1 and info.words[i] == 1  # italic maths letters, see _word_lengths
+        letters = 0
+        while True:
+            while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
+                letters += 1
+                j += 1
+            after = _limit_end(chars, info.classes, info.script, j)
+            if after == j:
+                break
+            j = after  # a limit set under the word ("argmin") is read inside it
+        word = "".join(chars[t].c for t in range(i, j) if not info.script[t]).lower()
+        variables = letters > 1 and info.words[i] == 1  # italic maths letters, see _word_lengths
         if not variables and (
             (len(word) >= 3 and word not in _MATH_WORDS) or word in _PROSE_TWO_LETTER
         ):
