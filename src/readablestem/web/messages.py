@@ -586,7 +586,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "students.",
 }
 
-# What the job page says of what it found and converted (`pipeline.notices.HANDLED_CODES`):
+# What the job page says of what it found and converted (`core.page_checks.HANDLED_CODES`):
 # the thing named singular and plural, then what was done with it, for any count.
 HANDLED_MESSAGES: dict[str, tuple[str, str, str]] = {
     "footnote": (

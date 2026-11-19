@@ -43,8 +43,8 @@ Content-free: codes, pages, element ids and counts only (rule 1).
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import Literal
 
+from readablestem.core.page_checks import NOT_HANDLED_CODES, TABLE, Section, make
 from readablestem.core.types import (
     KEPT_ORIGINAL_STATUSES,
     DocumentResult,
@@ -90,15 +90,14 @@ DERIVED_CODES = frozenset(
     {TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING, STRUCK_TEXT, *TEXT_CODES}
 ) | (KEPT_IMAGE_CODES)
 # Figures that need more than short alt text (W3C "complex images").
-# Where a notice is listed on the job page.
-Section = Literal["handled", "not_handled", "worth_checking"]
-# Notices that record something found and converted, with no decision and nothing to check:
-# a footnote kept where it falls, a block of program code kept as code. They are counted
-# under "Handled in this file", never listed as left out (F-043).
-HANDLED_CODES = frozenset({"footnote", "code_block"})
+# Where a notice is listed on the job page: `core.page_checks.Section`, from the table.
+# Notices that record something found and converted, with no decision and nothing to check
+# (a footnote kept where it falls, a block of program code kept as code) are counted under
+# "Handled in this file", never listed as left out (F-043): `HANDLED_CODES`.
 # The language is a check on the document (SW20a): the owner confirms or changes it before the
-# file is "Ready to share" (`web.states`), whatever `review` an older stored notice has.
-LANGUAGE_CODES = frozenset({"lang_assumed", "lang_mixed"})
+# file is "Ready to share" (`web.states`), whatever `review` an older stored notice has:
+# `LANGUAGE_CODES`, the table's rows that are always listed as not handled.
+LANGUAGE_CODES = NOT_HANDLED_CODES
 
 # A PDF repaired when it was opened (`source_facts.repair_notices`). `file_cut_off`: its last
 # pages are empty. It is required until the owner continues with the pages before them
@@ -133,10 +132,9 @@ def continue_cut_off(result: DocumentResult) -> DocumentResult:
 def section(notice: Notice) -> Section:
     """ "Handled in this file" for what was found and converted (`HANDLED_CODES`), "Not
     handled in this file" for the other required and none, "Worth checking" for optional."""
-    if notice.code in HANDLED_CODES:
-        return "handled"
-    if notice.code in LANGUAGE_CODES:
-        return "not_handled"
+    row = TABLE.get(notice.code)
+    if row is not None and row.section is not None:
+        return row.section
     return "worth_checking" if notice.review == "optional" else "not_handled"
 
 
@@ -165,26 +163,23 @@ def from_fixes(
     found: list[Notice] = []
     seen: set[tuple[str, str]] = set()
 
-    def add(code: str, fix: Fix, review: Literal["required", "optional", "none"]) -> None:
+    def add(code: str, fix: Fix) -> None:
         if (code, fix.element_id) in seen:
             return
         seen.add((code, fix.element_id))
-        found.append(
-            Notice(code=code, page=page_of.get(fix.element_id), element_id=fix.element_id,
-                   review=review)
-        )  # fmt: skip
+        found.append(make(code, page=page_of.get(fix.element_id), element_id=fix.element_id))
 
     for fix in fixes:
         if _not_rebuilt(fix):
-            add(TABLE_NOT_REBUILT, fix, "required")
+            add(TABLE_NOT_REBUILT, fix)
         if fix.kind is Kind.FIGURE and fix.reason in KEPT_IMAGE_CODES:
-            add(fix.reason, fix, "required")
+            add(fix.reason, fix)
         if fix.figure is not None and fix.figure.colour_only:
-            add(COLOUR_ONLY, fix, "optional")
+            add(COLOUR_ONLY, fix)
         if long_descriptions and _missing_long_description(fix):
-            add(LONG_DESCRIPTION_MISSING, fix, "optional")
+            add(LONG_DESCRIPTION_MISSING, fix)
         if fix.pending and fix.kind in TEXT_DECISION_KINDS and fix.reason in TEXT_NOTICE_OF:
-            add(TEXT_NOTICE_OF[fix.reason], fix, "required")
+            add(TEXT_NOTICE_OF[fix.reason], fix)
     return found
 
 
@@ -245,7 +240,7 @@ def from_runs(elements: Iterable[Element]) -> list[Notice]:
     never a decision: the words are kept and marked, and whether students need them at all
     is the instructor's call)."""
     return [
-        Notice(code=STRUCK_TEXT, page=e.page, element_id=e.id, count=n)
+        make(STRUCK_TEXT, page=e.page, element_id=e.id, count=n)
         for e in elements
         if (n := sum(1 for r in e.runs if r.kind == "deleted"))
     ]
@@ -261,7 +256,7 @@ def from_reasons(elements: Iterable[Element], fixes: Iterable[Fix] = ()) -> list
         (f.element_id, TEXT_NOTICE_OF[f.reason]) for f in fixes if f.reason in TEXT_NOTICE_OF
     }
     return [
-        Notice(code=code, page=e.page, element_id=e.id, review="required")
+        make(code, page=e.page, element_id=e.id)
         for e in elements
         for code in TEXT_CODES
         if code in e.reasons and (e.id, code) not in decided

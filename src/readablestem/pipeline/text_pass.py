@@ -77,6 +77,7 @@ from urllib.parse import urlsplit
 
 import pymupdf
 
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     BBox,
@@ -1065,9 +1066,7 @@ def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> li
             continue
         reach = running[max(0, index - COLOUR_REFERENCE_REACH) : index + COLOUR_REFERENCE_REACH + 1]
         if any(e.id in coloured and e.page == element.page for e in reach):
-            notices.append(
-                Notice(code="colour_reference", page=element.page, element_id=element.id)
-            )
+            notices.append(make("colour_reference", page=element.page, element_id=element.id))
     return notices
 
 
@@ -1399,16 +1398,16 @@ def _document_language(
         return (
             stated or language.DEFAULT_LANG,
             "pdf" if stated else "default",
-            ([] if stated else [Notice(code="lang_assumed", review="required")]),
+            ([] if stated else [make("lang_assumed")]),
         )
-    mixed = [Notice(code="lang_mixed", review="required")] if found and found.mixed else []
+    mixed = [make("lang_mixed")] if found and found.mixed else []
     if found is not None:
         if stated and _agrees(stated, found.lang):
             return stated, "pdf", mixed  # the file says it, and the text agrees
-        return found.lang, "detected", [Notice(code="lang_detected"), *mixed]
+        return found.lang, "detected", [make("lang_detected"), *mixed]
     if stated and language.fits_text(stated, texts):
         return stated, "pdf", []
-    return language.DEFAULT_LANG, "default", [Notice(code="lang_assumed", review="required")]
+    return language.DEFAULT_LANG, "default", [make("lang_assumed")]
 
 
 def _agrees(stated: str, detected: str) -> bool:
@@ -1572,24 +1571,24 @@ def annotate(
         updated.append(element.model_copy(update=update) if update else element)
     updated, comments = comment_notes(updated, pdf.marks, pdf.strikes)  # after the language
     if comments:
-        notices.append(Notice(code="annotations_read", count=comments))
+        notices.append(make("annotations_read", count=comments))
     if pdf.attachment_count:
         notices.append(
-            Notice(
-                code="attachments_not_converted",
+            make(
+                "attachments_not_converted",
                 count=pdf.attachment_count,
                 names=pdf.attachments[:MAX_ATTACHMENT_NAMES],
             )
         )
     for (page, owner), count in sorted(found.dropped.items(), key=lambda kv: str(kv[0])):
-        notices.append(Notice(code="link_scheme_dropped", page=page, element_id=owner, count=count))
+        notices.append(make("link_scheme_dropped", page=page, element_id=owner, count=count))
     for (page, owner), count in sorted(unclear.items()):
-        notices.append(Notice(code="link_text_unclear", page=page, element_id=owner, count=count))
+        notices.append(make("link_text_unclear", page=page, element_id=owner, count=count))
     if colour:
         notices.extend(_colour_reference_notices(updated, set(coloured)))
     notices.extend(notice_rules.from_runs(updated))
     if form := sum(len(v) for v in pdf.fields.values()):
-        notices.append(Notice(code="form_fields", count=form, review="none"))
+        notices.append(make("form_fields", count=form))
     notices.extend(lang_notices)
     found = sum(len(r) for r in struck.values())
     return TextPassResult(
@@ -1638,7 +1637,7 @@ def apply(
         if pdf.lang or layout_lang != language.DEFAULT_LANG:
             return TextPassResult(list(elements), pdf.lang or layout_lang, "pdf", [])
         # Nothing says which language this is: assumed, and the job page asks.
-        notices = [Notice(code="lang_assumed", review="required")]
+        notices = [make("lang_assumed")]
         return TextPassResult(list(elements), language.DEFAULT_LANG, "default", notices)
 
 

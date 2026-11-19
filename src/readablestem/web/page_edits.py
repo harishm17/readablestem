@@ -27,6 +27,7 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from readablestem.core import inline, triage
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     PENDING_STATUSES,
@@ -239,7 +240,7 @@ def omit_page(result: DocumentResult, page: int, *, pages: int) -> StructureChan
     result.elements = [e for e in result.elements if e.id not in ids]
     result.fixes = [f for f in result.fixes if f.element_id not in ids]
     result.notices = [n for n in result.notices if n.page != page]
-    result.notices.append(Notice(code=PAGE_OMITTED, page=page, review="none"))
+    result.notices.append(make(PAGE_OMITTED, page=page))
     _recount(result)
     after = capture(result, pages=True)
     return StructureChange(

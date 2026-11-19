@@ -74,6 +74,7 @@ from readablestem.config import ConfigError, Settings
 from readablestem.core import triage, types
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.images import open_within_budget
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     IMAGE_PAGE_OMISSION_REASON,
     BBox,
@@ -1556,8 +1557,6 @@ def enforce_maths_required(elements: Sequence[Element], fixes: dict[str, Fix]) -
 def notices(built: Mapping[int, Built]) -> list[Notice]:
     """One content-free notice per converted page: how many blocks were read from the image."""
     return [
-        Notice(
-            code="image_page_converted", page=page, count=max(1, b.record.blocks), review="optional"
-        )
+        make("image_page_converted", page=page, count=max(1, b.record.blocks))
         for page, b in sorted(built.items())
     ]

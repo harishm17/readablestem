@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from readablestem.core.page_checks import make
 from readablestem.core.types import Notice
 from readablestem.web.office_convert import Census
 
@@ -46,14 +47,14 @@ def notices_of(census: Census, origin: str = "pdf") -> list[Notice]:
     changes = census.tracked_insertions + census.tracked_deletions
     out: list[Notice] = []
     if changes and origin != "docx":
-        out.append(Notice(code=TRACKED_CHANGES, count=changes, review="required"))
+        out.append(make(TRACKED_CHANGES, count=changes))
     for code, count in (
         (SPEAKER_NOTES, census.speaker_notes),
         (HIDDEN_SLIDES, census.hidden_slides),
         (COMMENTS, census.comments),
     ):
         if count:
-            out.append(Notice(code=code, count=count))
+            out.append(make(code, count=count))
     return out
 
 
