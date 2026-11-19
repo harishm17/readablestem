@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import logging
 from collections import Counter
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -93,7 +94,6 @@ def _on_third_look():
 # ruled out, so it is the first page it fails on.
 STAGES = {
     "read": (document, "_read_page", _on_page, 1),
-    "slide_deck": (document, "_slide_marks", _on_page, 1),
     "margins": (furniture, "_band_figures", _on_page, 1),
     "page_kind": (page_type, "kept_reason", "third_look", 1),
     "tables": (document, "_claim_tables", _on_page, 1),
@@ -187,3 +187,22 @@ def test_a_document_in_which_every_page_raises_still_fails_whichever_steps_they_
         _make_raise(monkeypatch, stage, KeyError("x"), page=page)
     with pytest.raises(KeyError):
         layout.analyze(_document(3))
+
+
+def test_a_slide_whose_pictures_cannot_be_read_is_its_picture_and_the_deck_goes_on(monkeypatch):
+    """A step of a frame is compared with its frame's last page by its pictures and drawings,
+    read then and not before (`slides.LazyMarks`): a page they cannot be read for is kept as its
+    picture, as for any step, and the pages beside it are read as a deck."""
+    fixtures = Path(__file__).parent / "fixtures" / "layout" / "latex"
+    pdf = (fixtures / "beamer_overlay.pdf").read_bytes()
+    real = document._slide_marks
+
+    def marks(page, *args, **kwargs):
+        if page.number == 1:
+            raise KeyError("x")
+        return real(page, *args, **kwargs)
+
+    monkeypatch.setattr(document, "_slide_marks", marks)
+    result = layout.analyze(pdf)
+    assert result.kept_pages == {1: page_type.PAGE_READ_FAILED}
+    assert result.elements and 1 not in {e.page for e in result.elements}

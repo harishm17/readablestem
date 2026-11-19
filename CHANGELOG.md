@@ -85,6 +85,26 @@
   and the next one that began in Han, Kana, Thai, Lao or Khmer (or their full-width punctuation)
   were joined with a space in the middle of a word; they now join with none. Text of such
   paragraphs changes. One PIPELINE_VERSION bump is owed at the next PR.
+## Unreleased: a slide page's pictures and drawings are read only when a step needs them (branch perf/image-heavy-pages)
+
+- PF16 (F-494), as far as it reproduces. `_read_deck` read every page's slide marks (a digest of
+  each picture's pixels and `_drawing_key` of each drawing) before it knew whether the file was a
+  deck, and `slides._repeats` uses them only for a page of a multi-page frame whose rows are all
+  on the frame's last page. They are now read when `_repeats` asks (`slides.LazyMarks`). Measured
+  on generated files, one process, interleaved base and after, best of 3 (box load 7 to 12):
+  `_drawing_key` 424 calls to 0 on a 2-page ink file, 400 to 0 on a one-page slide with 400 pen
+  strokes, 71 to 0 on `tables.pdf`, 65 to 50 on the 13-page `slides_steps` deck (the
+  steps that are compared); picture decodes in `get_image_info(hashes=True)` 2 fewer a file;
+  `get_cdrawings` 2 fewer a file. Seconds a page: 6 scans at 300 dpi 0.37 to 0.33, 8 photo slides
+  0.143 to 0.130, 2 pen-stroke pages 0.334 to 0.292, a text page 0.568 to 0.515, `tables.pdf`
+  0.424 to 0.416; vector handwriting (3 units, 48 to 2,300 paths a page) was 0.09 to 0.40 and is
+  unchanged. Not reproduced: `_drawing_key` already ran once per drawing (2,400 calls for 2,400
+  paths on 4 ink pages, the audit's 2,670 on 4 pages), and the page is rendered once. A page of
+  400 to 600 pen strokes that is not read as handwriting spends 3.6 to 7.7 s of its time in the
+  table detector (`tables.propose`, `find_tables`), once a page: not a repeat, not changed here.
+  No progress report during layout: `analyze` has no callback, so it needs new plumbing and is
+  not built. `layout.analyze` of the 332 files of the corpus in three variants (996 results):
+  0 differences, so no PIPELINE_VERSION bump is owed.
 
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 

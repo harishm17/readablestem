@@ -30,7 +30,7 @@ back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, 
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
 from readablestem.core.types import BBox, Element, Kind
@@ -73,6 +73,23 @@ class Mark:
     bbox: BBox
 
 
+class LazyMarks:
+    """A page's marks, read the first time `detect` looks at them. A page's marks are compared
+    only when its rows are all on the last page of its frame (`_repeats`), so a file with no
+    deck, or a page that is the only one of its frame, never has them read: reading them
+    decodes every picture of the page and keys every drawing on it."""
+
+    def __init__(self, read: Callable[[], Sequence[Mark]]) -> None:
+        self._read: Callable[[], Sequence[Mark]] | None = read
+        self._marks: Sequence[Mark] = ()
+
+    def __iter__(self) -> Iterator[Mark]:
+        if self._read is not None:
+            read, self._read = self._read, None
+            self._marks = read()
+        return iter(self._marks)
+
+
 @dataclass(frozen=True)
 class PageView:
     """What `detect` needs to know of one page."""
@@ -82,7 +99,8 @@ class PageView:
     height: float
     label: str | None  # the page label the PDF gives it, if any
     rows: Sequence[RowView]
-    marks: Sequence[Mark] = ()  # every image, and the drawings in the body of the slide
+    # every image, and the drawings in the body of the slide (`LazyMarks` reads them late)
+    marks: Iterable[Mark] = ()
 
 
 @dataclass(frozen=True)
