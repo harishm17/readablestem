@@ -1546,12 +1546,13 @@ lower ends of its 95% intervals, and decide whether CI gates on the committed
 
 ```
 uv run readablestem gold fetch --set tables --date 2026-10-08     # only to refresh the gold
-uv run readablestem eval pipeline --task tables --mode local --items .local/eval/tables-local.jsonl
+uv run readablestem eval pipeline --task tables --mode local   # writes data/eval/latest-tables-local.json
 uv run readablestem eval pipeline --task tables --mode model --max-usd 1.00
 uv run readablestem eval gate --current data/eval/latest-tables-local.json
 ```
 
-`--styles grid,norules` prints fewer styles, `--no-authored` leaves the authored documents
+`--items FILE` also writes the per-document rows as JSONL (the local mode needs none: the
+report holds the figures). `--styles grid,norules` prints fewer styles, `--no-authored` leaves the authored documents
 out, `--limit N` takes the first N documents (a page's three prints are next to each
 other). Printing needs Chromium and the OpenStax page XHTML in `.cache/openstax` (`gold
 fetch` fills it); figure images download once into `.cache/eval/images`. A local run
