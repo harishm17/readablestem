@@ -370,6 +370,31 @@
   of a tagged file is not read (its tag evidence is not built). A table that gains a caption gets
   it in its model request ("Caption: ..."), so its recorded answer is read again. Stored documents
   differ; `PIPELINE_VERSION` is not bumped (the one bump owed at the next PR covers it).
+## Unreleased: equation numbers stay with their equation (branch fix/equation-numbers-attached)
+
+- WS2.10 (F-520). The number at the right edge of a display equation ("(3)", "(2.4)", a tag
+  such as "(*)") was the equation's `equation_label` only when the equation was one block;
+  beside equation pieces it became a paragraph (or a display equation of its own), and a
+  reference to it had no target. A number at the right edge is now the label of the piece on its
+  baseline, or, when it is centered between lines, of the nearest piece within 2.5 font sizes
+  that has no number yet and is not level with a numbered line; a number that fits none stays
+  text. A symbolic tag ("(*)", "(A)", "(†)") counts as a number. On a page with a two-column
+  section, a number tagged as the right column goes to an equation of the left column, unless
+  text of its own column stands within two lines of it. Measured on three test PDFs (numbers
+  attached of numbers printed, before to after): a document with every shape 13 of 16 to 15 of
+  16 (the symbolic tag 0 of 1 to 1 of 1, a number centered on a group 0 of 1 to 1 of 1, the one-line, aligned and
+  per-line shapes unchanged at their full count; a `multline`'s number set 0.9 font size from its
+  equation stays in the equation's text, as before), a page with a number per line 1 of 5 to 5 of
+  5, a page with a symbolic tag 4 of 5 to 5 of 5. Corpus `layout.analyze` hash, 332 PDFs in
+  three variants (996 results): 12 results changed (4 documents; 1 public fixture,
+  `data/real-tables/2407.13734.pdf`), and every change is a number paragraph (or a number-only
+  display equation) removed with the equation it stood beside now carrying it as its label: 7
+  numbers in all. Equation pieces that `display_grouping` does not join keep a number each or
+  none, as before. Stored documents of a changed conversion differ in those equations. No
+  migration; no model request or prompt changed; PIPELINE_VERSION and RENDER_VERSION not bumped
+  (one bump is owed at the next PR). A symbolic tag is not yet a cross-reference target
+  (`text_pass._LABEL_NUMBER` reads digits only).
+
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 
 - WS18.9 (F-557). LaTeXML already wrote `\ref`, `\eqref`, `\autoref`, `\cite` and each contents

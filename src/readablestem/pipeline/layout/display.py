@@ -15,7 +15,9 @@ from readablestem.pipeline.layout.drawings import (
     _OPENING_BRACES,
     EQUATION_NUMBER,
     STRAY_BRACE_REACH,
+    _column_content_near,
     _number_beside,
+    _number_column,
     _rule_rows,
 )
 from readablestem.pipeline.layout.glyphs import _SIGNS, _Char, _clean, _union
@@ -558,21 +560,41 @@ def _equation_regions(
     ]
     if document.grouping:
         lines = _join_connectives(lines, rows)
-    for label in labels:
+    # Numbers beside a line first, then the far ones (`_Row.far_number`), which go only to a
+    # line with no number yet, and not to one level with a numbered line (it would split that
+    # equation): a number that fits none was never maths.
+    for label in sorted(labels, key=lambda r: r.far_number):
         centre = (label.y0 + label.y1) / 2
         beside = [
             line
             for line in lines
-            if line.rows[0].column == label.column
-            and _number_beside(label, line.box, line.size)
+            if _number_beside(label, line.box, line.size, far=label.far_number)
+            and not (label.far_number and _level_with_numbered(line, lines))
             and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
         ]
+        # Another column's maths only when the number's own column has no content beside it.
+        own_column = [ln for ln in beside if ln.rows[0].column == label.column]
+        if not own_column and not _column_content_near(label, rows):
+            own_column = [
+                ln for ln in beside if _number_column(label, ln.rows[0].column, ln.box[2])
+            ]
+        beside = own_column
         if beside:
             nearest = min(beside, key=lambda ln: abs((ln.box[1] + ln.box[3]) / 2 - centre))
             nearest.labels.append(label)
+        elif label.far_number:
+            label.kind, label.far_number = "text", False
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
     return _stack_lines(lines, document=document)
+
+
+def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:
+    """Is `line` at the height of a line that has an equation number (or has one itself)?"""
+    return any(
+        other.labels and other.box[1] < line.box[3] and line.box[1] < other.box[3]
+        for other in lines
+    )
 
 
 def _join_connectives(lines: list[_Line], rows: Sequence[_Row]) -> list[_Line]:
