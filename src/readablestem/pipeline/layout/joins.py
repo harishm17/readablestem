@@ -8,7 +8,7 @@ import bisect
 import re
 import statistics
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from itertools import pairwise
 
 from readablestem.core.types import Kind
@@ -20,6 +20,7 @@ from readablestem.pipeline.layout.blocks import (
     REASON_LARGER_FONT,
     REASON_NUMBERED_LINE,
 )
+from readablestem.pipeline.layout.furniture import _is_page_number
 from readablestem.pipeline.layout.page import FOOTNOTE_SIZE
 from readablestem.pipeline.layout.shared import _Block, _Context, _Inline, _PageBlocks, _Row
 
@@ -270,23 +271,63 @@ def _body_sized(block: _Block, ctx: _Context) -> bool:
     return block.font_size is not None and block.font_size >= FOOTNOTE_SIZE * ctx.body
 
 
-def _last_body_block(blocks: Sequence[_Block], ctx: _Context) -> _Block | None:
-    """The lowest block of a page that is not a footnote (smaller type below the text)."""
-    return next((b for b in reversed(blocks) if _body_sized(b, ctx)), None)
+# What may stand above the first text of a page, or below the last of it, without being part of
+# the text's flow: a picture, a table or a caption floats to the top or the foot of a page.
+_FLOATS = (Kind.FIGURE, Kind.TABLE, "caption")
+EDGE_TOLERANCE = 3.0  # pt: two left edges that are one
+MAX_INDENT = 3.0  # x font size: how far a one-line tail's first line may stand in
+LOW_PAGE_NUMBER = 0.8  # of the page height: a number below this is a page's own number
+
+
+def _page_number(block: _Block, page: _PageBlocks) -> bool:
+    """A lone page number in the foot of a page that the margin filter left in the body (a
+    footer set low on a tall page is outside its band)."""
+    return (
+        block.kind == Kind.PARAGRAPH
+        and len(block.rows) == 1
+        and block.bbox[1] > LOW_PAGE_NUMBER * page.size[1]
+        and _is_page_number(_text_of(block.pieces) or "")
+    )
+
+
+def _flow_tail(page: _PageBlocks, ctx: _Context) -> _Block | None:
+    """The last block of the body flow of a page: below it may be pictures and tables that
+    float to the foot, footnotes (smaller type) and the page's number, none of which a
+    paragraph goes on after."""
+    return next(
+        (
+            b
+            for b in reversed(page.blocks)
+            if b.kind not in _FLOATS and _body_sized(b, ctx) and not _page_number(b, page)
+        ),
+        None,
+    )
+
+
+def _flow_head(page: _PageBlocks) -> _Block | None:
+    """The first block of the body flow of a page: a picture or a table on top is not it."""
+    return next((b for b in page.blocks if b.kind not in _FLOATS), None)
 
 
 def _goes_on(
-    last: _Block, first: _Block, limits: tuple[float, float], edges: Sequence[float] = ()
+    last: _Block,
+    first: _Block,
+    tail_edges: Mapping[str, float],
+    head_edges: Mapping[str, float],
 ) -> bool:
-    """Is `first`, the top block of a page, the rest of the paragraph that `last` ends on the
-    page before? The first part must not end a sentence, the second must start in the middle
-    of one (a lower-case letter), and the two must look alike: the same size, typeface and
-    weight, the left edge of the second at the first's text edge, or at the left edge of
-    another body block of its page (`edges`: a two-column page ends in the right column and
-    the next starts in the left), with no first-line indent.
-    Both must sit at the text area's edges (`limits`: its bottom and its top, with slack)."""
+    """Is `first`, the first text of a page, the rest of the paragraph (or list item) that
+    `last` ends on the page before? The first part must not end a sentence, the second must
+    start in the middle of one (a lower-case letter, no list marker), and the two must look
+    alike: the same size, typeface and weight, and no first-line indent on the second.
+
+    The two stand at one edge: the lines of the first at the same x as the second's, or, in
+    its own column, each at its column's text edge (`tail_edges` for the page before,
+    `head_edges` for this page: odd and even pages have other margins, and a two-column page
+    ends in its right column and goes on in the left one) or, for a list item, the second
+    at the item's text. A first part of one line may stand in by a first-line indent. A
+    one-line tail across columns is too often a license or copyright line."""
     if (
-        last.kind != Kind.PARAGRAPH
+        last.kind not in _TEXT_BLOCKS
         or last.code
         or last.lines
         or first.kind != Kind.PARAGRAPH
@@ -299,58 +340,72 @@ def _goes_on(
         or last.font_size is None
         or first.font_size is None
         or abs(last.font_size - first.font_size) > 0.5
-        or last.bbox[3] < limits[0]
-        or first.bbox[1] > limits[1]
     ):
         return False
     tail, head = last.rows[-1], first.rows[0]
-    at_edge = abs(tail.x0 - head.x0) <= 3.0 or (
-        # across columns, a one-line tail is too often a license or copyright line
-        len(last.rows) >= 2 and any(abs(head.x0 - e) <= 3.0 for e in edges)
-    )
-    if not at_edge or head.x0 - first.bbox[0] > 3.0:
+    if head.x0 - first.bbox[0] > EDGE_TOLERANCE:
         return False
     if tail.family != head.family or tail.bold != head.bold:
         return False
     start = next((p for p in first.pieces if not isinstance(p, str) or p.strip()), None)
-    if not isinstance(start, str) or not start.lstrip()[:1].islower():
+    if (
+        not isinstance(start, str)
+        or not start.lstrip()[:1].islower()
+        or _ends_sentence(last.pieces)
+    ):
         return False
-    return not _ends_sentence(last.pieces)
+    return _same_edge(last, first, tail_edges, head_edges)
+
+
+def _same_edge(
+    last: _Block,
+    first: _Block,
+    tail_edges: Mapping[str, float],
+    head_edges: Mapping[str, float],
+) -> bool:
+    """The place test of `_goes_on`."""
+    tail, head = last.rows[-1], first.rows[0]
+    item = last.marker is not None
+    x = last.marker.x if last.marker is not None else tail.x0
+    if abs(x - head.x0) <= EDGE_TOLERANCE:
+        return True
+    tail_edge = last.origin if item else tail_edges.get(tail.column)
+    head_edge = head_edges.get(head.column)
+    if tail_edge is None or head_edge is None:
+        return False
+    across = tail.column != head.column
+    if across and len(last.rows) < 2:
+        return False
+    inset = x - tail_edge  # a paragraph's lines stand at its edge; an item's text stands in
+    first_line = len(last.rows) == 1 and not item and not across
+    if first_line and 0 < inset <= MAX_INDENT * (last.font_size or 0.0):
+        inset = 0.0  # the one line is the first of its paragraph, in by the first-line indent
+    return abs(head.x0 - head_edge - inset) <= EDGE_TOLERANCE
 
 
 def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
     """A paragraph that goes on over a page break is one block again.
 
-    The top block of a page continues the lowest body block of the page before (footnotes
-    below it, and the running header and footer, are not in the way: the margin filter has
-    dropped the latter and footnotes are smaller type) when `_goes_on`. The first part
+    The first text of a page continues the last block of the body flow of the page before
+    (`_flow_tail`, `_flow_head`: running heads, page numbers and footnotes, pictures and
+    tables on top or at the foot are not in the way) when `_goes_on`. The first part
     keeps its page and box (an element has one page and one box); the later part stays in
     its page's blocks, marked `joined`, so the notices and the safety net still see it, and
     `_to_elements` writes both parts as one element. A paragraph that runs over a second
     break joins again."""
-    bodies = [
-        b
-        for page in pages
-        for b in page.blocks
-        if b.kind in _TEXT_BLOCKS and _body_sized(b, ctx) and not b.code
-    ]
-    if not bodies:
-        return
-    slack = 3 * ctx.pitch
-    limits = (max(b.bbox[3] for b in bodies) - slack, min(b.bbox[1] for b in bodies) + slack)
     owner: dict[int, _Block] = {}
+    edges: dict[int, Mapping[str, float]] = {}
     for before, page in pairwise(pages):
         if page.number != before.number + 1 or not page.blocks:
             continue
-        last = _last_body_block(before.blocks, ctx)
-        edges = [
-            b.bbox[0]
-            for b in page.blocks[1:]
-            if b.kind in _TEXT_BLOCKS and _body_sized(b, ctx) and not b.code
-        ]
-        if last is None or not _goes_on(last, page.blocks[0], limits, edges):
+        last, part = _flow_tail(before, ctx), _flow_head(page)
+        if last is None or part is None:
             continue
-        host, part = owner.get(id(last), last), page.blocks[0]
+        for p in (before, page):
+            edges.setdefault(p.number, _text_edges(p))
+        if not _goes_on(last, part, edges[before.number], edges[page.number]):
+            continue
+        host = owner.get(id(last), last)
         host.parts.append((page.number, part))
         part.joined = True
         owner[id(part)] = host

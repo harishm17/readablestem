@@ -347,6 +347,8 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     stack: list[float] = []
     options: float | None = None  # the x the options of the grid being read are placed at
     for block in blocks:
+        if block.joined:  # the rest of the item before it, on the next page: no element of its own
+            continue
         if block.marker is None:
             if block.kind != Kind.EQUATION:
                 stack = []
