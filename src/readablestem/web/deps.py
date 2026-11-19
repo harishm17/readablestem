@@ -26,8 +26,10 @@ from readablestem.source import intake as source_intake
 from readablestem.source import pandoc as pandoc_step
 from readablestem.web import (
     analytics,
+    bulk_accept,
     dev_only,
     office_convert,
+    provider_health,
     recipients,
     report_item,
     retention,
@@ -528,8 +530,13 @@ def render(
         "one_file": uploads.one_file(ctx.settings),
         # What a LaTeX project zip may be, and how many characters of LaTeX count as a page.
         "project_zip": uploads.zip_limits(),
+        **uploads.latex_limits(),
         "chars_per_page": f"{source_intake.CHARS_PER_PAGE:,}",
         "retention_hours": ctx.settings.retention_hours,
+        "week_days": retention.WEEK_DAYS,
+        # How many documents a bulk-accept page lists, and the span the status page counts.
+        "bulk_page_size": bulk_accept.PAGE_SIZE,
+        "provider_window_minutes": int(provider_health.WINDOW_S // 60),
         "retention_rules": retention.rules_line(ctx.settings),
         "opt_in_days": ctx.settings.opt_in_retention_days,
         # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.

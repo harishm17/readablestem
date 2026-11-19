@@ -358,3 +358,18 @@ def test_launch_check_lists_a_half_set_microsoft_sign_in(tmp_path):
     assert len(secret_only) == 1 and "MS_CLIENT_ID is not set" not in secret_only[0]
     no_tenants = microsoft_items(ms_client_id="app", ms_client_secret="s")
     assert len(no_tenants) == 1 and "lists no tenant" in no_tenants[0]
+
+
+def test_the_pages_state_the_limits_and_times_the_code_holds(tmp_path, monkeypatch):
+    """The LaTeX help, the review help and the status page read their numbers from the intake
+    limits, the bulk page size and the health window, not from their own text."""
+    from readablestem.source import intake
+    from readablestem.web import bulk_accept, provider_health
+
+    monkeypatch.setattr(intake, "MAX_TEXT_FILE_BYTES", 5 * 1024 * 1024)
+    monkeypatch.setattr(bulk_accept, "PAGE_SIZE", 33)
+    monkeypatch.setattr(provider_health, "WINDOW_S", 1200.0)
+    with WebEnv(tmp_path).running() as client:
+        assert "file over 5 MB" in client.get("/help/latex").text
+        assert "33 to a page" in client.get("/help/review").text
+        assert "in the last 20 minutes" in client.get("/status").text

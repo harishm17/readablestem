@@ -198,24 +198,24 @@
 
       {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
          `retention_hours` after the last activity. The privacy page (privacy.html) says the
-         same. One wording for the 7 days everywhere: "Keep for 7 days". #}
+         same. One wording for the kept days (`week_days`) everywhere: "Keep for N days". #}
       <details class="option-group retention-choices" id="group-keep" data-summary="retention"
                data-text-default="Deleted {{ retention_hours }} hours after you last work on it."
-               data-text-keep="Deleted 7 days after you last work on it."
+               data-text-keep="Deleted {{ week_days }} days after you last work on it."
                data-text-share="Kept {{ opt_in_days }} days. We may look at the results."{% if open_keep %} open{% endif %}>
         <summary>
           <span class="group-name">How long to keep it</span>
           <span class="group-change">Change</span>
           <span class="group-state" id="keep-state" data-group-state>
             {%- if share_on %}Kept {{ opt_in_days }} days. We may look at the results.
-            {%- elif keep_on %}Deleted 7 days after you last work on it.
+            {%- elif keep_on %}Deleted {{ week_days }} days after you last work on it.
             {%- else %}Deleted {{ retention_hours }} hours after you last work on it.{% endif -%}
           </span>
         </summary>
         <div class="group-body">
           <div class="field checkbox-field">
             <input type="checkbox" id="keep"name="keep" value="on" aria-describedby="keep-who"{% if keep_on %} checked{% endif %}>
-            <label for="keep">Keep for 7 days</label>
+            <label for="keep">Keep for {{ week_days }} days</label>
             <p class="hint" id="keep-who">{% if keep_default|default(false) %}Checked by your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Make this the default in Account</a>.{% endif %}</p>
           </div>
           <div class="field checkbox-field">

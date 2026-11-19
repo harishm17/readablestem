@@ -209,7 +209,8 @@ def test_canceling_gives_the_pages_back_only_before_a_worker_began_the_document(
     begun_page = f"/jobs/{begun}"
     assert (
         site.browser.post(
-            f"{begun_page}/cancel", data={"csrf_token": csrf_from(site.browser.get(begun_page).text)}
+            f"{begun_page}/cancel",
+            data={"csrf_token": csrf_from(site.browser.get(begun_page).text)},
         ).status_code
         == 303
     )

@@ -50,6 +50,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import Request
 
 from readablestem.core.childenv import child_env
+from readablestem.source import intake as source_intake
 from readablestem.web import archive_intake, office_convert
 from readablestem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
 
@@ -156,6 +157,18 @@ def zip_limits(unpacked_bytes: int | None = None) -> str:
         f"{limits.max_zip_bytes // mb} MB, {unpacked // mb} MB unpacked and "
         f"{limits.max_entries} files"
     )
+
+
+def latex_limits() -> dict[str, object]:
+    """What the LaTeX help says of a source, read from the limits the intake enforces: one
+    `.tex` file, all the text of a zip, one file in a zip, and how deep a path may go."""
+    mb = 1024 * 1024
+    return {
+        "tex_file_limit": f"{source_intake.MAX_TEXT_FILE_BYTES // mb} MB",
+        "tex_total_limit": f"{source_intake.MAX_TEXT_TOTAL_BYTES // mb} MB",
+        "zip_member_limit": f"{archive_intake.DEFAULT_LIMITS.max_file_bytes // mb} MB",
+        "zip_depth": archive_intake.DEFAULT_LIMITS.max_depth,
+    }
 
 
 def one_file(settings: Settings) -> str:
