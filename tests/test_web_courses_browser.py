@@ -125,34 +125,6 @@ def course(site, browser) -> dict[str, str]:
     return {"id": course_id, "entry": entry, "job": job_id}
 
 
-def states(page, site, course: dict[str, str]):
-    """Every page and state to check, as (name, action) pairs run in order."""
-    base = site.base
-    yield "courses list", lambda: page.goto(f"{base}/courses")
-    yield "course page", lambda: page.goto(f"{base}/courses/{course['id']}")
-    yield "entry edit", lambda: page.goto(base + course["entry"])
-    yield "delete question", lambda: page.goto(f"{base}/courses/{course['id']}/delete")
-    yield "remove symbol question", lambda: page.goto(f"{base}{course['entry']}/delete")
-    yield "upload form", lambda: page.goto(f"{base}/app")
-    yield "job page", lambda: page.goto(f"{base}/jobs/{course['job']}")
-    yield "review card", lambda: page.goto(f"{base}/jobs/{course['job']}/review")
-
-    def empty_name():
-        page.goto(f"{base}/courses")
-        page.get_by_role("button", name="Add course").click()
-        page.locator(".error-summary").wait_for()
-
-    yield "course name missing", empty_name
-
-    def bad_symbol():
-        page.goto(f"{base}/courses/{course['id']}")
-        page.get_by_label("Symbol", exact=True).fill("the speed thing")
-        page.get_by_role("button", name="Add symbol").click()
-        page.locator(".error-summary").wait_for()
-
-    yield "symbol not understood", bad_symbol
-
-
 def test_without_javascript_a_course_symbol_and_a_remembered_letter(site, browser, axe_source):
     context, page = open_page(browser, site, javascript=False)
     add_course(page, site.base, "No script course")
