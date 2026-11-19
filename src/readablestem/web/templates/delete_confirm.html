@@ -7,8 +7,8 @@
 {% block content %}
 <h1>Delete “{{ title }}”?</h1>
 <p>{% if title != filename %}{{ filename }}, uploaded{% else %}Uploaded{% endif %} {{ uploaded|utc }}.
-  {% if decided %}You made {{ decided }} {{ "decision" if decided == 1 else "decisions" }} on it.{% endif %}</p>
-<p>Deletes the file we kept, the converted HTML, its images and your decisions. It cannot be undone. Files you downloaded are not affected.</p>
+  {% if decided %}{{ decided }} {{ "decision was" if decided == 1 else "decisions were" }} made on it.{% endif %}</p>
+<p>Deletes the file we kept, the converted HTML, its images and the decisions made on it. It cannot be undone. Files you downloaded are not affected.</p>
 {% include "_delete_notes.html" %}
 <div class="confirm-actions">
   {% call form("job.delete", "/jobs/" ~ job_id ~ "/delete", {"class": "inline-form"}) %}
