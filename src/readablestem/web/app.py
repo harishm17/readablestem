@@ -60,7 +60,8 @@ from readablestem.web.deps import (
     current_user,
     render,
 )
-from readablestem.web.exam import EXAM_WORDS
+from readablestem.web.exam import EXAM_WORDS, NAME_WORDS
+from readablestem.web.exam import word_in as exam_word_in
 from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
@@ -247,6 +248,9 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     )
     # The exam choice's words (web/exam.py), the same on every page that says it.
     env.globals["exam_words"] = EXAM_WORDS  # ty: ignore[invalid-assignment]
+    # The exam word a document's title or file name holds, for the job page's hint.
+    env.globals["exam_word"] = exam_word_in  # ty: ignore[invalid-assignment]
+    env.globals["exam_name_words"] = NAME_WORDS  # ty: ignore[invalid-assignment]
     # Structured data for the public pages (web.seo), with the same absolute address.
     env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
         seo.page_json_ld, site_url.rstrip("/")

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased: the exam box is suggested from the name (branch feat/exam-suggested-from-title)
+
+- WS2.11, in its reduced form. Nothing told an instructor who uploaded an exam and left "Exam or
+  quiz" unchecked that figure descriptions could give an answer away. Now, with JavaScript, a
+  chosen file whose name reads as an exam (the whole words exam, quiz or midterm, in any case,
+  with digits and `_`, `-`, `.` as breaks) gets one line under the box that names the word and
+  asks the person to check it if students will be tested with the file; it goes when the box is
+  checked or the files change. After the conversion, the job page of a document that was not
+  converted as an exam, and whose title or file name reads as one, says so with the existing
+  "Change the exam or quiz choice" link. "Final" and "test" alone are not exam words
+  (`..._FINAL.pdf` is a final draft). It is a hint: the box is never ticked for the person, a
+  stored choice never changes, nothing is stored or counted, and the student's page and files
+  say nothing of it.
+- No migration; no model request, `PIPELINE_VERSION` or `RENDER_VERSION` changed.
+
 ## Unreleased: every form is answered once (branch feat/forms-stage-2)
 
 - SW43, stage 2. The forms that were still plain tags now follow the one submit rule: the

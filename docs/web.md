@@ -730,6 +730,24 @@ record and its CSV, and the job page a reviewer opens from a share. The student'
 Listen text never say it. Changing the choice is a revised upload (the file again, decisions
 carried over); a change in place that re-describes only the description steps is not built.
 
+The box is never checked for the person, but the page can suggest it from a name
+(`web/exam.py` `word_in`, `NAME_WORDS`: exam, quiz and midterm, in the plural too, as whole
+words in any case; a digit, `_`, `-`, `.` or a camel-case join breaks a word, so "Midterm2" and
+"quiz-03" count and "Examples" does not). "Final" and "test" are left out on purpose:
+`..._FINAL.pdf` is a final draft and "test" is a draft label; "final exam" is caught by "exam".
+Homework, worksheets and problem sets are not read as exams. With JavaScript, when the box is not
+checked and a chosen file's name holds one of the words, `static/app.js` writes one line into the
+polite region `#exam-hint` under the box ("A file name says “midterm”. Check the box above if
+students will be tested with it."); it goes when the box is checked or the files change, and it
+never checks the box or moves focus. The words and the sentence reach the script as data
+attributes of the box. The server cannot see a file name before the upload, so without
+JavaScript nothing changes there. After the conversion, the job page of a finished document that
+was not converted as an exam, and whose title or file name holds one of the words, adds one line
+(`_job_exam.html`, `#job-exam-hint`) with the word and, for the owner, the same "Change the exam
+or quiz choice" link. It is computed from the title and file name when the page is rendered and
+stored nowhere; it blocks nothing and changes no count, and no prompt reads it. The student's
+page and files never say it.
+
 **The form's shape** (`_upload_form.html`, ux2-lane-a): the file field with its facts, then two
 groups that are one line each until opened, then "Upload and convert". The "Language of the document" select ("Detect it" by default; stored as `Job.language` and `PendingUpload.language`, and handed to the converter as `ConversionOptions.language`, which is not part of a step's key) and the exam box sit between the
 file field and the groups. "How to convert it" (course and scanned and handwritten pages, each when

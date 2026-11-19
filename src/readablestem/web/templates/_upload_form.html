@@ -138,9 +138,13 @@
        folded into a disclosure. The figure step then describes what is shown and never the
        result. The words are `exam_words` (web/exam.py), the same on every page that says it. #}
     <div class="field checkbox-field exam-choice">
-      <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}>
+      <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}
+             data-name-words="{{ exam_name_words|join(' ') }}" data-hint="{{ exam_words.file_hint }}">
       <label for="exam">{{ exam_words.choice }}</label>
     </div>
+    {# With JavaScript, static/app.js says here, politely, when a chosen file's name reads as
+       an exam and the box is not ticked. It never ticks the box and never moves focus. #}
+    <div id="exam-hint" aria-live="polite"></div>
 
     {# The language, when the person knows it (Job.language). "Detect it" leaves it to the
        converter, which then asks for a confirmation when it is not sure. #}
