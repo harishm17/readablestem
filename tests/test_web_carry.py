@@ -38,6 +38,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
+from readablestem.pipeline.layout import LayoutError
 from readablestem.web import carry, carry_snapshot
 from readablestem.web.db import Blob, Job, session_scope
 
@@ -248,6 +249,53 @@ def test_decisions_still_carry_when_the_earlier_version_is_deleted_while_the_new
         assert not session.scalar(
             select(Blob.id).where(Blob.job_id == second, Blob.kind == carry_snapshot.KIND)
         )
+
+
+def _snapshot_kept(env, job_id: str) -> bool:
+    with session_scope(env.ctx.factory) as session:
+        return bool(
+            session.scalar(
+                select(Blob.id).where(Blob.job_id == job_id, Blob.kind == carry_snapshot.KIND)
+            )
+        )
+
+
+def test_a_revision_that_cannot_go_on_loses_its_snapshot_and_a_canceled_one_keeps_it(web):
+    """WS20.2: what was kept of the earlier document goes with a revision no "Try again" is
+    offered for (the file cannot be converted), and stays for one that can still be started
+    (canceled), which then carries its decisions although the earlier document is gone."""
+    env = web
+    env.converter.output = first_output()
+    first = job_id_from(upload(env.alice, make_pdf(1)))
+    env.run_worker()
+    path = f"/jobs/{first}/review"
+    env.alice.post(f"{path}/p1-e3", data={"csrf_token": token(env.alice, path), "action": "accept"})
+
+    env.converter.output = revised_output()
+    broken = revise(env, env.alice, first, "broken.pdf")
+    canceled = revise(env, env.alice, first, "later.pdf")
+    assert _snapshot_kept(env, broken) and _snapshot_kept(env, canceled)
+    cancel = env.alice.post(
+        f"/jobs/{canceled}/cancel", data={"csrf_token": token(env.alice, f"/jobs/{canceled}")}
+    )
+    assert cancel.status_code == 303
+    env.converter.raises = LayoutError("encrypted", "no")
+    env.run_worker()
+    env.converter.raises = None
+    assert env.job(broken).status == "failed" and env.job(canceled).error_code == "canceled"
+    assert not _snapshot_kept(env, broken)
+    assert _snapshot_kept(env, canceled)
+
+    env.alice.post(
+        f"/jobs/{first}/delete", data={"csrf_token": token(env.alice, "/app"), "confirm": "yes"}
+    )
+    again = env.alice.post(
+        f"/jobs/{canceled}/retry", data={"csrf_token": token(env.alice, f"/jobs/{canceled}")}
+    )
+    assert again.status_code == 303
+    env.run_worker()
+    report = carry.CarryReport.from_json(env.job(canceled).carried_json)
+    assert report.carried == ["p1-e3"] and not _snapshot_kept(env, canceled)
 
 
 def test_someone_elses_document_cannot_be_named_as_the_earlier_version(web):

@@ -222,6 +222,12 @@ def _dump(earlier: Earlier) -> bytes:
 # --------------------------------------------------------------------------- at the finish
 
 
+def drop(session: Session, job_id: str) -> None:
+    """Remove the job's snapshot, in the caller's transaction: its revision ended without a
+    version to carry onto, so nothing will read it."""
+    session.execute(delete(Blob).where(Blob.job_id == job_id, Blob.kind == KIND))
+
+
 def pop(session: Session, job_id: str) -> Earlier | None:
     """The job's snapshot as an `Earlier`, removed in the caller's transaction (None when it
     has none or it cannot be read). Removed whatever it holds: once carry-over has run it has
