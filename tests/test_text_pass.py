@@ -73,6 +73,24 @@ def codes(result) -> list[tuple[str, str | None, int]]:
 # --------------------------------------------------------------------------- alignment
 
 
+def test_a_bold_capital_that_is_not_in_the_text_does_not_embolden_the_next_small_letter():
+    """A bold vector of an inline formula ("A", a marker in the text) stood before "and": with
+    letters compared without case its glyph took the place of the "a", which then read as one
+    bold letter. A name in small capitals (printed capitals, lower-case in the text) is still
+    placed, so its weight is still read."""
+    from dataclasses import replace
+
+    first, second = inline_marker("p1-e1"), inline_marker("p1-e2")
+    text = f"Letting {first} and {second} be the two sides, as Smith said."
+    printed = "Letting A and B be the two sides, as SMITH said."
+    bold = {printed.index("A and"), *range(printed.index("SMITH"), printed.index("SMITH") + 5)}
+    offsets = [i for i, c in enumerate(printed) if not c.isspace()]
+    glyphs = [replace(g, bold=i in bold) for i, g in zip(offsets, line(printed), strict=True)]
+    result = annotate([el("p1-e0", text=text)], pdf_with(glyphs), runs=True)
+    (paragraph,) = result.elements
+    assert [text[r.start : r.end] for r in paragraph.runs if r.kind == "strong"] == ["Smith"]
+
+
 # --------------------------------------------------------------------------- web links
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: a capital that is not in the text does not make the next small letter bold
+
+- Fixed, from the small-capitals change before it shipped: the text pass placed characters on
+  glyphs without regard to case everywhere, so the bold capital of an inline formula ("**A** and
+  **B**") could take the place of the "a" of "and", which then read as one bold letter (5
+  paragraphs of one corpus file, 1 of another). Characters are now placed as printed first, and
+  only what is left unplaced on both sides is compared without case, which is where a name in
+  small capitals is. One regression test. No migration, no model request changed.
+
 ## Unreleased: the review bar leaves a short window alone (integration)
 
 - WS8.14 and WS13.7, as triage reduces them (F-412). The Decision / Page bar on the review screen

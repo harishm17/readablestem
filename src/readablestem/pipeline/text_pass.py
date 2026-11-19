@@ -446,8 +446,11 @@ def align(text: str, glyphs: Sequence[Glyph]) -> list[int | None]:
     """For each character of `text`, the index of the glyph in `glyphs` that printed it,
     or None (spaces, inline markers, and characters the alignment could not place).
 
-    Letters are compared without their case: layout reads a small capital as the lower-case
-    letter it stands for (`layout.shared.mark_small_capitals`), and the page prints a capital."""
+    Characters are matched as printed first. What that leaves unplaced on both sides is then
+    compared without case: layout reads a small capital as the lower-case letter it stands
+    for (`layout.shared.mark_small_capitals`), and the page prints a capital. Only there: a
+    capital that is not in the text (a bold vector of an inline formula) must not take the
+    place of the same letter in lower case beside it."""
     out: list[int | None] = [None] * len(text)
     if not text or not glyphs or len(text) > MAX_ALIGN_CHARS:
         return out
@@ -455,12 +458,20 @@ def align(text: str, glyphs: Sequence[Glyph]) -> list[int | None]:
     for start, end in _marker_ranges(text):
         masked[start:end] = [True] * (end - start)
     offsets = [i for i, c in enumerate(text) if not masked[i] and not c.isspace()]
-    ours = "".join(_caseless(text[i]) for i in offsets)
-    theirs = "".join(_caseless(g.c) for g in glyphs)
-    matcher = SequenceMatcher(None, ours, theirs, autojunk=False)
-    for a, b, size in matcher.get_matching_blocks():
-        for k in range(size):
-            out[offsets[a + k]] = b + k
+    ours = "".join(text[i] for i in offsets)
+    theirs = "".join(g.c for g in glyphs)
+    for tag, a0, a1, b0, b1 in SequenceMatcher(None, ours, theirs, autojunk=False).get_opcodes():
+        if tag == "equal":
+            for k in range(a1 - a0):
+                out[offsets[a0 + k]] = b0 + k
+        elif tag == "replace":
+            left = "".join(map(_caseless, ours[a0:a1]))
+            right = "".join(map(_caseless, theirs[b0:b1]))
+            for a, b, size in SequenceMatcher(
+                None, left, right, autojunk=False
+            ).get_matching_blocks():
+                for k in range(size):
+                    out[offsets[a0 + a + k]] = b0 + b + k
     return out
 
 
