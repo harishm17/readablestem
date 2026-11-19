@@ -437,24 +437,26 @@ asks `page._accepted` about what the detector proposes before anything is taken 
 `_accepted` builds the page's tree from every fragment (the proposals' lines among them; no
 table is an item yet) and `regions.table_refusal` judges each proposal against it:
 
-- A proposal whose lines stand in one region (a leaf, a column, a drawn box) is accepted. So is a
-  ruled table that spans the columns on purpose: it is a band of its own, so the cut that would
-  part its cells has nothing else of the page on a side of it (`_between` counts a gutter only
-  where a line that is not the proposal's stands in the region on a side). A horizontal cut is
-  no gutter: a table has rows.
+- A proposal whose lines stand in one region (a leaf, a column, a drawn box) is accepted. A
+  horizontal cut is no gutter: a table has rows.
 - A proposal across a gutter (a `cols` channel, the edge of a drawn box, two cells of a label
-  grid) is refused when (a) a line of three words or more stands on each of two sides
-  (`REFUSED_PROSE`), or (b) its alignment, the share of its cells that line up in their column
-  (`Judgement.alignment`, now kept on `PageTable.alignment`), is under 0.6
+  grid) counts only where the page has lines of its own on two sides of it. The page's own lines
+  are the ones no proposal of the page takes (`_between`, `taken`). Without that, the cut that
+  parts a table's own columns, with text below the table in the segment under one of them, was
+  taken for a gutter and two real tables (a ruled rubric, a booktabs table) were refused. A
+  table that spans the columns on purpose, and a table with nothing else in the cut, are
+  therefore accepted, and so is `s04_worksheet`'s matching table (its lists have no line of the
+  page's beside them).
+- A proposal across such a gutter is refused when (a) a line of three words or more stands on
+  each of two sides (`REFUSED_PROSE`), or (b) its alignment, the share of its cells that line up
+  in their column (`Judgement.alignment`, now kept on `PageTable.alignment`), is under 0.6
   (`REFUSED_ALIGNMENT`), or (c) every side is a list of three or more labeled cells, as the tree
   reads an exercise that matches terms with definitions (`REFUSED_MATCHING`). Nothing else
-  refuses it. The wider veto this replaces lost tables of the development files.
+  refuses it. On the development files only (a) has fired.
 - A refused proposal is left where it is: its lines and rules stay in the page, and are read
   by the tree like any other line. The tree that reads the page is built after the judging,
-  from the accepted tables only, as above, so the tree a proposal was judged against is not the
-  tree that reads the page, and it does not need to be: the judging tree differs from the
-  reading tree only by the room the accepted tables take, which cannot make a refused proposal
-  stand in one region. Verdicts are not made again.
+  from the accepted tables only, so the tree a proposal was judged against is not the tree that
+  reads the page: it differs by the room the accepted tables take. Verdicts are not made again.
 - The refusals are on `Layout.table_refusals` (page, box and reason code; no text). No page trace
   exists yet (WS14.8), so this is where they are kept.
 - The next page's continued-table check (`find_continued`) is given only the accepted tables.

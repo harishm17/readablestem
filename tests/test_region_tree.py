@@ -166,6 +166,7 @@ def test_a_matching_table_is_kept():
     assert len(tables) == 1
     assert not result.table_refusals
 
+
 def _picture(page: pymupdf.Page, rect: pymupdf.Rect) -> None:
     pixels = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 200), False)
     pixels.set_rect(pixels.irect, (120, 160, 200))
