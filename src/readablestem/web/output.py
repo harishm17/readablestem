@@ -8,8 +8,9 @@ preview) asks `export_state` before it builds anything. The answer is one of:
 - `draft`: finished, with decisions still open. The file goes only after the person has
   said so on the draft page (`/jobs/{id}/draft`): that page's form, a POST with the CSRF
   token, mints a confirm token (`mint_token`) that is signed with the session's own secret,
-  lives `TOKEN_S` seconds, and names the job and its output version (`Job.result_version`,
-  bumped by every review write). A download address typed or bookmarked without one is sent
+  lives `TOKEN_S` seconds, and names the job and its output version (`Job.output_version`, counted by `output_changed`: a
+  change a student would get makes a confirm unusable, and a write that leaves the file alone,
+  such as answering the cut-off question, does not). A download address typed or bookmarked without one is sent
   to the draft page (`DraftConfirm`), so the question cannot be skipped. The file's name
   ends in `-draft` (`file_name`), and the file itself says so first
   (`pipeline.assemble.mark_draft`). A person the document was shared with to view only is
@@ -162,7 +163,7 @@ def download_url(job_id: str, file_type: str, token: str = "", **query: str) -> 
 
 
 def _signature(key: str, job: Job, expires: int) -> str:
-    message = f"draft:{job.id}:{job.result_version or 0}:{expires}".encode()
+    message = f"draft:{job.id}:{job.output_version or 1}:{expires}".encode()
     return hmac.new(key.encode(), message, hashlib.sha256).hexdigest()
 
 
