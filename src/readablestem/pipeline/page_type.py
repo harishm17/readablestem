@@ -2420,7 +2420,7 @@ def _probe_ink(page: pymupdf.Page, budget: InkBudget) -> InkStats:
         return InkStats(analysed=False, cause=INK_TIME, paths=1, marks=1)  # unknown
     if budget.items_left == 0:  # the allowance is spent: reading the drawings would cost more
         return InkStats(analysed=False, cause=INK_WORK, paths=1, marks=1)  # than analysing them
-    return ink_stats(page, page.get_cdrawings(), budget)
+    return ink_stats(page, without_annotation_art(page, page.get_cdrawings()), budget)
 
 
 def document_refusal(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> str | None:

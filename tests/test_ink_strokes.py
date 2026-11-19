@@ -239,6 +239,14 @@ def test_handwritten_rule_shorter_than_half_the_page_is_ink():
     assert len(ink.strokes) == 1 and not ink.dropped
 
 
+def test_what_a_comment_paints_is_not_the_pages_ink():
+    page = make_page("polyline")
+    before = len(extract_ink(page).strokes)
+    page.add_text_annot((250, 20), "Say why.")  # a sticky note's icon is drawn on the page
+    page.add_highlight_annot(pymupdf.Rect(20, 20, 120, 40)).update()
+    assert len(extract_ink(page).strokes) == before
+
+
 def test_hidden_ink_is_not_read():
     doc = pymupdf.open()
     page = doc.new_page(width=300, height=300)
