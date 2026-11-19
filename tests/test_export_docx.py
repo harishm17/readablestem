@@ -307,7 +307,9 @@ def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
     with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
         xml = archive.read("word/document.xml").decode()
     assert len(re.findall(r"<w:br ?/>", xml)) == 5  # one in the poem, four between the steps
-    assert "    <m:oMath>" in xml.replace("</w:t></w:r><m:oMath>", "<m:oMath>")
+    assert "\N{NO-BREAK SPACE}" * 4 + "<m:oMath>" in xml.replace(
+        "</w:t></w:r><m:oMath>", "<m:oMath>"
+    )
 
 
 def test_one_equation_pandoc_cannot_write_does_not_fail_the_file():
