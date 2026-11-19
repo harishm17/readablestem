@@ -44,10 +44,17 @@ from readablestem.web.logsafe import log_event
 logger = logging.getLogger(__name__)
 
 
-# The rule, in one sentence for every page that shows an allowance. The clause "A document
-# you cancel before it starts does" joins it when cancelling gives pages back (WS11.3a): a
-# sentence that says more than the code does would be untrue.
-PAGES_RULE = "Pages count when you upload. A failed or deleted document does not give them back."
+# The rule, in a few words for every page that shows an allowance; no page types it again. It
+# says what the code does and no more: a document canceled before a worker began it gives its
+# pages back on the day of the upload (`give_back_pages`, `routes.jobs.cancel_job`), and so does
+# one the conversion stopped because every page is a scan or handwriting
+# (`worker.Worker._give_back_pages`); a canceled one a worker began, a deleted one and any other
+# failed one give nothing back.
+PAGES_RULE = (
+    "Pages count when you upload. A document you cancel before it starts, or that stops for "
+    "being only scans or handwriting, gives them back that day. Any other failed or deleted "
+    "document does not."
+)
 
 
 def allowance_phrase(
