@@ -879,10 +879,14 @@ def _accent_counts(text: str) -> Counter[str]:
 
 def _mathml_accents(mathml: str) -> Counter[str]:
     """The accents of a MathML: an over-script accent character on a base that is no operator
-    (`\\overset{\\sim}{=}` is no accent)."""
+    (`\\overset{\\sim}{=}` is no accent), and the accents the letters of its text and
+    identifiers carry in themselves ("même", "años" in a `\\text{}`), which the PDF's side counts
+    too."""
     root = DET.fromstring(mathml, forbid_dtd=True)
     counts: Counter[str] = Counter()
     for node in root.iter():
+        if node.tag.rsplit("}", 1)[-1] in ("mtext", "mi"):
+            counts.update(_accent_counts(node.text or ""))
         if node.tag.rsplit("}", 1)[-1] in ("mover", "munderover") and len(node) >= 2:
             over = _single_operator(node[-1])
             kind = OVER_ACCENT.get("".join(over.itertext()).strip()) if over is not None else None

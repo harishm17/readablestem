@@ -175,7 +175,8 @@ def test_only_undecided_items_with_nothing_failed_are_candidates():
 def test_an_equation_whose_accent_differs_from_the_pdf_is_never_accepted_in_bulk():
     from readablestem.config import CHEAP_MODEL
     from readablestem.models.fake import FakeVisionClient
-    from readablestem.pipeline.equation_step import transcribe
+    from readablestem.pipeline.equation_step import accent_check, transcribe
+    from readablestem.pipeline.math_canonical import latex_to_mathml
     from test_steps_support import equation_element, make_settings, use_fallback_router
 
     # The reading drops the hat the PDF shows; the model is sure, the letters agree.
@@ -192,6 +193,10 @@ def test_an_equation_whose_accent_differs_from_the_pdf_is_never_accepted_in_bulk
         )
     assert CHEAP_MODEL in [r.model for r in client.requests]
     assert [c.code for c in step.failed_checks] == ["accent_mismatch"]
+    # The accent of a word in the equation's text ("même") is in the PDF and in the reading:
+    # no difference, so no decision is asked for it.
+    words = equation_element(display="block", text="x = 1 même si y = 0", element_id="p2-e31")
+    assert accent_check(words, latex_to_mathml(r"x = 1 \text{ même si } y = 0")) is None
     result = scaled_output().result
     element = Element(id="p2-e30", kind=Kind.EQUATION, page=1, bbox=BOX, order=90, display="block")
     result.elements.append(element)

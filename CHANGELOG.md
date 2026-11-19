@@ -41,6 +41,11 @@
   under a note that said the page was out, and the page's count of left-out paragraphs went
   stale), and text is not left out of a Word or LaTeX file, whose note would have named a page
   "of the original PDF" (`page_edits.put_back_block`, `left_out_blocked`).
+- The accent check asked for a decision ("An accent differs from the PDF") on a correct reading
+  whose text held an accented word (`x = 1 \text{ même si } y = 0`, "años", "não"): the PDF's
+  side counted the word's accent and the reading's side counted only `mover` accents.
+  `equation_step._mathml_accents` now counts the accents of the reading's `mtext` and `mi`
+  letters too. A hat the reading dropped is still found.
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 

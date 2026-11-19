@@ -270,7 +270,9 @@ every letter check passing, and it sits on the single-reading path (`SKIP_ESCALA
 What it compares: the accents of the PDF's text and of the glyphs under the box
 (`reading_layer`; the larger count of the two, since a wide hat or tilde of a TeX font reaches
 the glyphs as a name layout turns into the accent character) against the accents of the MathML
-(`mover` with an accent character over a base that is no operator). Every kind is counted (hat,
+(`mover` with an accent character over a base that is no operator, and the accents the letters of
+an `mtext` or `mi` carry in themselves, so "même" or "años" in a `\text{}` is on both sides).
+Every kind is counted (hat,
 tilde, bar, vector arrow, dot, double dot, breve, check, acute, grave), so a kind in the place of
 another is seen. Only these kinds and ways are reported (`COMPARED_ACCENTS`): a hat or a tilde
 the reading dropped, one it added, and one kind in the place of another for a hat, tilde, breve
