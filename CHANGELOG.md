@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: a reviewer leaves one paragraph out of the student file (branch fix/review-small-items, WS19.9 in part)
+
+- The page editor has "Leave it out" on a paragraph or list item, and the page's list shows a
+  paragraph left out as "left out of the student file" with "Put it back". It is the route
+  `POST /jobs/{id}/edit/{element}` with `action=leave_out` or `put_back`
+  (`page_edits.leave_out_block`, `put_back_block`). A left-out paragraph is stored the way a left-out
+  page is (`DocumentResult.left_out_blocks`, in the result's JSON: no migration), so the page,
+  Word, EPUB, Listen, the LMS packages and the counts drop it at the one place they already read.
+  Nothing disappears without a trace: the student file's note says how many paragraphs were left
+  out and on which pages, the job is "Ready" and not "Ready to share" while any is out (as for a
+  left-out page), and the record names the words taken out, by whom and when. Refused: a heading,
+  an equation, a figure, a table, a block an open decision points at, a footnote, a block another
+  element links to, a paragraph with an inline equation, and the document's last paragraph.
+  Undo, the outcome counts, the stale-form rule and carry-over to a document converted again
+  work as for "make heading" and the role. `RENDER_VERSION` is not raised by this item; the
+  student note changes only for a document that has a paragraph left out.
+
 ## Unreleased: a reviewer sets a block's role; LaTeX quotations (branch feat/set-block-role, WS19.9 in part)
 
 - The page editor ("Change page N", under "Change the words, make a line a heading, or set a

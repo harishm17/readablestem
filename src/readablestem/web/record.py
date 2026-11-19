@@ -58,6 +58,7 @@ from readablestem.web.review import (
     GROUP_KINDS,
     INVENTORY_KEY,
     MODEL_READ_KEY,
+    STRUCTURE_KEY,
     UNDO_ACTION,
     WITNESS_KEY,
     WRITE_KEY,
@@ -85,6 +86,8 @@ ACTION_WORDS = {
     "edit_text": "Changed the words of the text",
     "make_heading": "Made a heading of a paragraph",
     "set_role": "Made a paragraph a sidebar or a quotation, or took that off",
+    "leave_out_block": "Left a paragraph out of the student file",
+    "restore_block": "Put a paragraph left out back into the student file",
     "add_figure": "Added a picture the tool missed, with the person's own alt text",
     "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
     "omit_page": "Left the page out of the student file and of the review",
@@ -116,6 +119,7 @@ CARRIED_EDIT_WORDS = {
     "text": "change to the words of the text",
     "heading": "paragraph made a heading",
     "role": "paragraph made a sidebar or a quotation, or given back as neither",
+    "block_left_out": "paragraph left out of the student file",
     "picture": "picture added by hand",
     "equation": "equation marked by hand",
     "page_left_out": "page left out",
@@ -127,6 +131,8 @@ PAGE_CHANGES = frozenset(
         "edit_text",
         "make_heading",
         "set_role",
+        "leave_out_block",
+        "restore_block",
         "add_figure",
         "add_equation",
         "omit_page",
@@ -140,6 +146,8 @@ STRUCTURE_TOOL_HAD = {
     "edit_text": "Text as read from the PDF",
     "make_heading": "A paragraph",
     "set_role": "A paragraph",
+    "leave_out_block": "A paragraph in the file",
+    "restore_block": "A paragraph left out",
     "add_figure": "Not found by the tool",
     "add_equation": "Not found by the tool",
     "omit_page": "A page of the file",
@@ -243,6 +251,7 @@ class Record:
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
     left_out_pages: list[int] = field(default_factory=list)  # 1-based
+    left_out_blocks: list[int] = field(default_factory=list)  # 1-based page of each paragraph
     # The file types downloaded so far, in words; None when the app is not recording
     # downloads (EVENTS_ENABLED off), so the record does not say "none" when it cannot know.
     downloaded: list[str] | None = None
@@ -287,7 +296,38 @@ def _decision_words(edit: Any) -> str:
         return WITNESS_WORDS
     if action == "carried" and after.get("carried_edit") in CARRIED_EDIT_WORDS:
         return f"Carried over from the earlier version: {CARRIED_EDIT_WORDS[after['carried_edit']]}"
+    if action in LEFT_OUT_ACTIONS:
+        words = _left_out_words(edit)
+        return f"{ACTION_WORDS[action]}: “{words}”" if words else ACTION_WORDS[action]
     return ACTION_WORDS.get(action, "Changed")
+
+
+# The record says which words were taken out of the student file, so a left-out paragraph never
+# disappears without a trace; this much of them (the stored words are whole).
+LEFT_OUT_ACTIONS = frozenset({"leave_out_block", "restore_block"})
+MAX_LEFT_OUT_CHARS = 400
+
+
+def _left_out_words(edit: Any) -> str:
+    """The words of the paragraph a `leave_out_block` or `restore_block` edit is about, from
+    the snapshot the edit kept of it."""
+    structure = (edit.before or {}).get(STRUCTURE_KEY)
+    structure = structure if isinstance(structure, dict) else {}
+    held = (structure.get("elements") or {}).get(edit.element_id)
+    if not isinstance(held, dict):
+        blocks = [b for b in structure.get("left_out") or [] if isinstance(b, dict)]
+        held = next(
+            (
+                b["element"]
+                for b in blocks
+                if isinstance(b.get("element"), dict) and b["element"].get("id") == edit.element_id
+            ),
+            None,
+        )
+    text = " ".join(str((held or {}).get("text") or "").split())
+    if len(text) > MAX_LEFT_OUT_CHARS:
+        text = text[:MAX_LEFT_OUT_CHARS].rsplit(" ", 1)[0] + "…"
+    return text
 
 
 def _relabel_mark(edit: Any) -> dict[str, Any] | None:
@@ -350,6 +390,8 @@ def _item_ref(result: DocumentResult, review_url: str | None) -> Callable[[str, 
     that is not in the document any more (a page tool or a re-read took it out) is named with
     a note and no link."""
     pages = {e.id: e.page + 1 for e in result.elements}
+    # A paragraph left out is still listed on its page's tools, to put back.
+    pages |= {b.element.id: b.element.page + 1 for b in result.left_out_blocks}
     decided = {f.element_id for f in result.fixes if f.kind in GROUP_KINDS}
     held = {e.id for o in result.omitted for e in o.elements}
 
@@ -469,6 +511,13 @@ def by_hand_not_checked(result: DocumentResult) -> list[str]:
             f"Page {pages} {'was' if len(result.omitted) == 1 else 'were'} left out by the "
             "person: not reviewed, and not in the student file."
         )
+    if result.left_out_blocks:
+        n = len(result.left_out_blocks)
+        lines.append(
+            f"{n} {'paragraph or list item was' if n == 1 else 'paragraphs or list items were'} "
+            "left out by the person: not reviewed, and not in the student file. The words are "
+            "in the record of changes."
+        )
     return lines
 
 
@@ -509,6 +558,8 @@ def build(
             elements.setdefault(e.id, e)
         for f in held.fixes:
             fixes.setdefault(f.element_id, f)
+    for block in result.left_out_blocks:
+        elements.setdefault(block.element.id, block.element)
     labels = item_labels(result)
     ref = _item_ref(result, review_url)
     counts = job_page.breakdown(result.fixes, result.notices)
@@ -590,6 +641,7 @@ def build(
         not_checked=not_checked_list(result, summary),
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
+        left_out_blocks=[n + 1 for n in result.left_out_block_pages],
         downloaded=(
             None
             if downloaded_formats is None
@@ -686,6 +738,9 @@ def to_csv(record: Record) -> str:
     if record.left_out_pages:
         pages = " ".join(str(n) for n in record.left_out_pages)
         row("summary", "Pages left out of the student file", detail=pages)
+    if record.left_out_blocks:
+        pages = " ".join(str(n) for n in record.left_out_blocks)
+        row("summary", "Paragraphs left out of the student file, by page", detail=pages)
     for title, text in record.gaps:
         row("summary", title, detail=text)
     for d in record.decisions:

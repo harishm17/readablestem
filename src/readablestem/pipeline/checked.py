@@ -109,6 +109,8 @@ class Converted:
     text_blocks: int = 0
     pictures: tuple[Picture, ...] = ()
     left_out_pages: tuple[int, ...] = ()  # 1-based
+    # The page (1-based) of each paragraph or list item the reviewer left out, in page order.
+    left_out_blocks: tuple[int, ...] = ()
     # The empty pages at the end of a PDF that was repaired when it was opened: it looks cut
     # off (`source_facts.repair_notices`). Not in the file, whatever the owner decided.
     cut_off_pages: tuple[int, ...] = ()  # 1-based
@@ -174,6 +176,10 @@ class CheckedSummary:
         return len(self.converted.left_out_pages)
 
     @property
+    def left_out_blocks(self) -> int:
+        return len(self.converted.left_out_blocks)
+
+    @property
     def unread(self) -> int:
         return self.converted.unread_words + self.converted.unread_pictures
 
@@ -183,7 +189,13 @@ class CheckedSummary:
 
     @property
     def all_found_converted(self) -> bool:
-        return not self.pictures and not self.left_out and not self.unread and not self.cut_off
+        return (
+            not self.pictures
+            and not self.left_out
+            and not self.left_out_blocks
+            and not self.unread
+            and not self.cut_off
+        )
 
     # ----- the rules
 
@@ -203,6 +215,7 @@ class CheckedSummary:
             not self.reviewed
             or bool(self.pictures)
             or bool(self.left_out)
+            or bool(self.left_out_blocks)
             or bool(self.unread)
             or bool(self.cut_off)
         )
@@ -225,10 +238,12 @@ def converted(
     left_out_pages: Iterable[int] = (),
     pages: int | None = None,
     cut_off_pages: Iterable[int] = (),
+    left_out_blocks: Iterable[int] = (),
 ) -> Converted:
     """What was converted, part by part, as the renderer writes it (`assemble._Renderer`):
     an equation without MathML, a figure without a description or a table not rebuilt is
-    shown as its original picture. `left_out_pages` are 0-based."""
+    shown as its original picture. `left_out_pages` and `left_out_blocks` (the page of each
+    paragraph left out) are 0-based."""
     first = _first_fixes(fixes)
     counts: Counter[str] = Counter()
     pictures: list[Picture] = []
@@ -285,6 +300,7 @@ def converted(
         **counts,
         pictures=tuple(pictures),
         left_out_pages=tuple(sorted({p + 1 for p in left_out_pages})),
+        left_out_blocks=tuple(sorted(p + 1 for p in left_out_blocks)),
         cut_off_pages=tuple(sorted({p + 1 for p in cut_off_pages})),
         pages=pages,
     )
@@ -302,6 +318,7 @@ def summarize(
     origin: str = "pdf",
     unread: tuple[int, int] = (0, 0),
     cut_off_pages: Iterable[int] = (),
+    left_out_blocks: Iterable[int] = (),
 ) -> CheckedSummary:
     """The summary from the parts of a result. `html_checks` None: the page has not been
     checked yet (the renderer, before the checks run), which is not the same as none run.
@@ -314,7 +331,7 @@ def summarize(
     checks = list(html_checks) if html_checks is not None else None
     return CheckedSummary(
         converted=replace(
-            converted(elements, fixes, left_out_pages, pages, cut_off_pages),
+            converted(elements, fixes, left_out_pages, pages, cut_off_pages, left_out_blocks),
             unread_words=unread[0],
             unread_pictures=unread[1],
         ),
@@ -348,6 +365,7 @@ def of_result(
         origin=result.origin,
         unread=unread_of(result),
         cut_off_pages=cut_off_of(result),
+        left_out_blocks=result.left_out_block_pages,
     )
 
 

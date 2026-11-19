@@ -1869,13 +1869,13 @@ person's stored bytes like any blob.
 
 **Edits that are not decisions (`web/carry_edits.py`).** The review screen also changes what no
 fix covers: the words of a paragraph, a paragraph made a heading, a paragraph made a sidebar
-or a quotation, a picture or an equation added by hand, an image described in words, a page left out. They are carried by the same rule,
+or a quotation, a paragraph left out, a picture or an equation added by hand, an image described in words, a page left out. They are carried by the same rule,
 onto an item that is **unchanged**, and never onto changed content; the worker does it in this
 order (`Worker._carry_decisions`): words, headings and added items, then the decisions, then
 the pages left out. The earlier version is read with its omitted pages put back, so a decision
 made before a page was left out is found.
 
-- **Words, headings and roles** are found by what the item said before the edits: the earlier
+- **Words, headings, roles and paragraphs left out** are found by what the item said before the edits: the earlier
   version's `ReviewEdit` rows (`edit_text`, `make_heading`) are walked back from the result as it
   stands, so an edit that was undone is not carried and two edits in a row are one. The new
   file's item must say the same words (case and spacing aside, the content fingerprint of
@@ -3413,7 +3413,7 @@ and figures".
 `templates/_page_tools.html`). Under the optional checks, a folded "Change page N" (open after
 an edit or an error, and when `tools=1`) with, in this order:
 
-- *Change the words, make a line a heading, or set a paragraph apart.* Every paragraph, list item and heading of the
+- *Change the words, make a line a heading, set a paragraph apart, or leave it out.* Every paragraph, list item and heading of the
   page by its first words, each a link that opens it. The box holds the words as they read, an
   inline equation as "[equation 3]" (the review's own number for it): the mark the tool keeps in
   the stored text cannot be typed, so it is named and put back when the text is saved. Every
@@ -3441,6 +3441,38 @@ an edit or an error, and when `tools=1`) with, in this order:
   role in one wrapper. There is no keyboard shortcut for it: the list of keys on the review
   screen (N, P, A, E) is for decisions, and "Make it a heading" has none either. A paragraph made
   a heading loses its role.
+  *Leave it out of the student file* (`action=leave_out`, `page_edits.leave_out_block`; the same
+  route) takes one paragraph or list item of plain words out of the student file: a running head
+  or stamp that got into the body, a printer's mark, a line a scan repeated, text the tool cannot
+  tell from content. It is a page left out at the size of one element
+  (`DocumentResult.left_out_blocks`, `LeftOutBlock`, stored in the result's JSON like
+  `omitted`, so no migration): the element, its fixes and its own notices move out of
+  `result.elements`, which is the one place every writer, count and decision reads, so the page,
+  Word, EPUB, Listen, the LMS packages and the job page's counts follow with no filter of their
+  own. Nothing is deleted. The page's card keeps it in the list of lines as "Paragraph, left out
+  of the student file" with **Put it back** (`action=put_back`, `page_edits.put_back_block`,
+  which returns the element, its fixes and notices; its reading order was kept in `order`).
+  The honesty rule is the left-out page's: the student file's note counts them ("One paragraph
+  or list item on page 3 of the original PDF was left out of this file.", the same sentence and
+  anchor as for pages, `checked_words.left_out_sentence`, also in a combined document), so the
+  job is "Ready", not "Ready to share", while any is out (`CheckedSummary.all_found_converted`,
+  as for a page); the job page lists the notice `block_omitted` (one per page, with the count);
+  the record's row says "Left a paragraph out of the student file" with the words taken out
+  (`record._left_out_words`, up to 400 characters), by whom and when, and its not-checked list
+  says how many were left out. Refused (`page_edits.left_out_blocked`, each with a sentence): a
+  heading (the outline would change: it is made plain text first, in its own decision), an
+  equation, a figure or a table (each has its own decision), a block an open decision points at,
+  a footnote (the mark above it links to it), a block another element links or cross-refers to
+  (it would dangle), a paragraph that holds an inline equation (the equation has its own
+  decision; a left-out page lets its decisions go with it, and for one paragraph that was judged
+  too easy to bury), and the last paragraph of the document. One `ReviewEdit` each
+  (`leave_out_block`, `restore_block`; an Undo snapshot with the element and the lists;
+  counted among the changes to pages; outcome "removed"), stale only when the item itself
+  changed (`ITEM_ACTIONS`). A document converted again carries it over like a role
+  (`carry_edits`, kind `block_left_out`): the paragraph that says the same words is left out
+  again, only where the new file would allow it (an open decision, a link or an equation there
+  refuses it); a paragraph put back is not carried, and one not made again is listed as
+  "paragraph you left out". No keyboard shortcut.
 - *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
   the proposal read aloud in its place (the sentence before and after for one on its own line),
   and both readings, as speech and as LaTeX, where the page witness read it differently; a

@@ -119,7 +119,7 @@ the clock stays and no download is recorded (`routes.jobs.head_reply`).
 The review edits (T3-5, T3-11, T3-16) are owner-only and CSRF-checked like the decisions, and
 each carries the review version its page was drawn at (a form from an out-of-date tab is
 refused, nothing applied): `POST /jobs/{id}/edit/{element}` (the words of a paragraph or a
-heading; a paragraph made a heading, a sidebar or a quotation), `POST /jobs/{id}/pages/{n}/add` (a picture or an equation
+heading; a paragraph made a heading, a sidebar or a quotation; a paragraph left out and put back), `POST /jobs/{id}/pages/{n}/add` (a picture or an equation
 the tool missed), `GET /jobs/{id}/pages/{n}/region.png` (the region about to be added),
 `POST /jobs/{id}/pages/{n}/omit` and `/restore` (a page left out), `POST
 /jobs/{id}/tables/accept-clean` and `POST /jobs/{id}/tables/{element}/read-cell`, and `POST /jobs/{id}/symbols` (one symbol written as another in the

@@ -199,6 +199,33 @@ def test_a_role_that_was_undone_or_sits_on_a_changed_paragraph_is_not_carried():
     assert element(new, PLAIN).role is None
 
 
+# --------------------------------------------------------------------------- left out
+
+
+def test_a_paragraph_left_out_is_left_out_again_on_the_unchanged_paragraph_only():
+    old, old_crops = fresh()
+    made = page_edits.leave_out_block(old, PLAIN)
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [(carry_edits.BLOCK_LEFT_OUT, PLAIN)] and done.dropped == 0
+    assert [b.element.id for b in new.left_out_blocks] == [PLAIN]
+    assert all(e.id != PLAIN for e in new.elements)
+    # Put back, it is not carried; on a paragraph whose words changed it is listed, not made.
+    put_back = page_edits.put_back_block(old, PLAIN)
+    again, again_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, again, again_crops, rows_of(made, put_back))
+    assert done.items == [] and not again.left_out_blocks
+    old, old_crops = fresh()
+    made = page_edits.leave_out_block(old, PLAIN)
+    changed, changed_crops = fresh()
+    changed.elements = [
+        e.model_copy(update={"text": "Another sentence entirely."}) if e.id == PLAIN else e
+        for e in changed.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, changed, changed_crops, rows_of(made))
+    assert done.items == [] and done.dropped == 1 and not changed.left_out_blocks
+
+
 # --------------------------------------------------------------------------- headings
 
 

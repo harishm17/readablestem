@@ -53,6 +53,8 @@ STRUCTURE_ACTIONS = frozenset(
         "edit_text",
         "make_heading",
         "set_role",
+        "leave_out_block",
+        "restore_block",
         "add_figure",
         "add_equation",
         "omit_page",
@@ -181,8 +183,8 @@ def _looks(earlier: Earlier, pdf: bytes) -> dict[str, str]:
 
 
 def _dump(earlier: Earlier) -> bytes:
-    """The result as carry-over reads it: elements, fixes, page frames and the pages left
-    out (their elements and fixes), nothing else."""
+    """The result as carry-over reads it: elements, fixes, page frames, the pages left
+    out (their elements and fixes) and the paragraphs left out, nothing else."""
     result = earlier.result
     kept = DocumentResult(
         pipeline_version=result.pipeline_version,
@@ -191,6 +193,7 @@ def _dump(earlier: Earlier) -> bytes:
         fixes=result.fixes,
         page_sizes=result.page_sizes,
         omitted=[o.model_copy(update={"notices": []}) for o in result.omitted],
+        left_out_blocks=[b.model_copy(update={"notices": []}) for b in result.left_out_blocks],
     )
     document: dict[str, Any] = {
         "v": VERSION,

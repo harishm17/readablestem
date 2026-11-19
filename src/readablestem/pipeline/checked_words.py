@@ -100,6 +100,7 @@ MATHS_ALL = "Its equations are written so that screen readers can read them alou
 NOTICE_TITLE = "Before you read"
 NOTICE_ABOUT_LINK = "About this version"
 NOTICE_LEFT_OUT_LINK = "Which pages were left out"
+NOTICE_LEFT_OUT_BLOCKS_LINK = "What was left out"
 NOTICE_MAX_LINKS = 10  # links to pictures; the rest are counted
 
 
@@ -169,7 +170,13 @@ def pictures_sentence(s: CheckedSummary) -> str:
 
 
 def left_out_sentence(s: CheckedSummary) -> str:
-    """ "Page 1 of the original PDF was left out of this file." ("" when none was)."""
+    """ "Page 1 of the original PDF was left out of this file." ("" when none was), then, when
+    a person left single paragraphs or list items out, "One paragraph or list item on page 3
+    of the original PDF was left out of this file." The one anchor of the note's link."""
+    return " ".join(p for p in (_pages_left_out(s), _blocks_left_out(s)) if p)
+
+
+def _pages_left_out(s: CheckedSummary) -> str:
     pages = s.converted.left_out_pages
     if not pages:
         return ""
@@ -178,6 +185,28 @@ def left_out_sentence(s: CheckedSummary) -> str:
     total = s.converted.pages
     of = f" ({len(pages)} of {total})" if total and total >= len(pages) else ""
     return f"Pages {_pages_list(pages)}{of} of the original PDF were left out of this file."
+
+
+def _blocks_left_out(s: CheckedSummary) -> str:
+    pages = s.converted.left_out_blocks
+    if not pages:
+        return ""
+    where = _pages_list(tuple(dict.fromkeys(pages)))
+    if len(pages) == 1:
+        return (
+            f"One paragraph or list item on page {where} of the original PDF was left out "
+            "of this file."
+        )
+    label = "page" if len(set(pages)) == 1 else "pages"
+    return (
+        f"{len(pages)} paragraphs or list items on {label} {where} of the original PDF were "
+        "left out of this file."
+    )
+
+
+def left_out_link(s: CheckedSummary) -> str:
+    """The words of the notice's link to the sentence above."""
+    return NOTICE_LEFT_OUT_LINK if s.left_out else NOTICE_LEFT_OUT_BLOCKS_LINK
 
 
 def page_range(pages: tuple[int, ...]) -> str:
@@ -268,12 +297,20 @@ def as_image_sentence(s: CheckedSummary) -> str:
 
 def left_out_owner(s: CheckedSummary) -> str:
     n = s.left_out
+    blocks = s.left_out_blocks
+    if blocks:
+        words = f"{plural(blocks, 'paragraph or list item', 'paragraphs or list items')}"
+        said = f"{words} {'was' if blocks == 1 else 'were'} left out."
+    else:
+        said = ""
     if not n:
-        return ""
+        return said
     total = s.converted.pages
     if total and total >= n:
-        return f"{n} of {plural(total, 'page')} {'was' if n == 1 else 'were'} left out."
-    return f"{plural(n, 'page')} {'was' if n == 1 else 'were'} left out."
+        pages = f"{n} of {plural(total, 'page')} {'was' if n == 1 else 'were'} left out."
+    else:
+        pages = f"{plural(n, 'page')} {'was' if n == 1 else 'were'} left out."
+    return f"{pages} {said}".strip()
 
 
 def cut_off_owner(s: CheckedSummary) -> str:

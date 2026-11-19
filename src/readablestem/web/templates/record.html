@@ -49,6 +49,7 @@
     {% for title, text in record.gaps %}<li>{{ title }}: {{ text }}</li>{% endfor %}
     {% if record.checked.cut_off %}<li>{{ checked_words.cut_off_owner(record.checked) }}</li>{% endif %}
     {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
+    {% if record.left_out_blocks %}<li>{{ record.left_out_blocks|length }} {{ "paragraph or list item" if record.left_out_blocks|length == 1 else "paragraphs or list items" }} left out of the student file (page {{ record.left_out_blocks|unique|join(", ") }}). The words are in the changes below.</li>{% endif %}
   </ul>
 </section>
 

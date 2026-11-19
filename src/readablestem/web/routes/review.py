@@ -1982,6 +1982,8 @@ ITEM_ACTIONS = frozenset(
         "edit_text",
         "make_heading",
         "set_role",
+        "leave_out_block",
+        "restore_block",
     }
 )
 

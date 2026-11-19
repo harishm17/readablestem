@@ -566,6 +566,10 @@ NOTICE_MESSAGES: dict[str, str] = {
     "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
+    # "{count}" is the number of paragraphs or list items left out of this page.
+    "block_omitted": "Paragraphs or list items you left out of this page ({count}) are not in "
+    "the student file, and the file says so. They are still listed in the page's tools, each "
+    "with “Put it back”.",
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
     "source_unread": "This tool could not read part of the source file, so it is not in the file.",

@@ -22,12 +22,21 @@
   {% else %}
 
   <section class="tool-section" id="page-tools-edit" aria-labelledby="edit-title" tabindex="-1">
-    <h3 id="edit-title" class="part-label">Change the words, make a line a heading, or set a paragraph apart</h3>
+    <h3 id="edit-title" class="part-label">Change the words, make a line a heading, set a paragraph apart, or leave it out</h3>
     {% if tools.lines %}
     <p class="hint" id="edit-hint">Choose a paragraph, a list item or a heading on this page. The tool's own mistakes are changed here; an equation, a figure or a table is changed in its own decision.</p>
     <ul class="text-lines" aria-describedby="edit-hint">
       {% for line in tools.lines %}
+      {% if line.left_out %}
+      <li><span class="line-kind">{{ line.label }}, left out of the student file:</span> “{{ line.preview }}”
+        {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ line.element_id, {"class": "inline-form"}) %}
+          {{ tool_fields() }}<input type="hidden" name="action" value="put_back">
+          <button type="submit" class="button-secondary" data-role="put-back">Put it back<span class="visually-hidden">: {{ line.label|lower }} “{{ line.preview }}”</span></button>
+        {% endcall %}
+      </li>
+      {% else %}
       <li><a href="{{ line.href }}"{% if line.current %} aria-current="true"{% endif %}><span class="line-kind">{{ line.label }}:</span> “{{ line.preview }}”<span class="visually-hidden"> (change)</span></a></li>
+      {% endif %}
       {% endfor %}
     </ul>
     {% if tools.lines_cut %}<p class="hint">{{ tools.lines_cut }} more {{ "line is" if tools.lines_cut == 1 else "lines are" }} not listed here.</p>{% endif %}
@@ -89,6 +98,19 @@
           </div>
         </div>
       {% endcall %}
+      {% endif %}
+      {% if ed.can_leave_out %}
+      {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ eid, {"class": "decide-form"}) %}
+        {{ tool_fields() }}<input type="hidden" name="action" value="leave_out">
+        <div class="{{ field_classes(ed.errors.get("leave_out")) }}">
+          <p id="leave-out-label-{{ eid }}"><strong>Leave this {{ ed.label|lower }} out of the student file</strong></p>
+          <p class="hint" id="leave-out-hint-{{ eid }}">For text that is on the page but is not content for the student, such as a running head, a stamp or a printer's mark. The student file says that text was left out. It stays listed on this page with “Put it back”, and the record of changes keeps its words.</p>
+          {{ field_error("leave-out-error-" ~ eid, ed.errors.get("leave_out")) }}
+          <button type="submit" class="button-secondary" data-role="leave-out" aria-describedby="leave-out-hint-{{ eid }}">Leave it out<span class="visually-hidden">: {{ ed.label|lower }}</span></button>
+        </div>
+      {% endcall %}
+      {% elif ed.leave_out_why_not %}
+      <p class="hint">{{ ed.leave_out_why_not }}</p>
       {% endif %}
     </div>
     {% endif %}

@@ -399,6 +399,53 @@ def test_only_a_plain_paragraph_can_be_a_sidebar_or_a_quotation(edits):
         assert element(edits, target).role is None
 
 
+# --------------------------------------------------------------------------- one paragraph left out
+
+
+def test_a_paragraph_left_out_is_listed_to_put_back_named_in_the_record_and_not_in_the_file(edits):
+    page = f"/jobs/{edits.job_id}/review?page=1&tools=1&change={PLAIN}"
+    assert "Leave it out" in edits.browser.get(page).text
+    assert edit_post(edits, PLAIN, action="leave_out").status_code == 303
+    html = with_file(edits).html or ""
+    assert "Discuss vectors and scalars" not in html
+    assert "One paragraph or list item on page 1 of the original PDF was left out" in text_of(html)
+    # Not deleted: the page's card still lists it, as left out, with a way back.
+    shown = unescape(edits.browser.get(page.replace(f"&change={PLAIN}", "")).text)
+    assert "left out of the student file" in shown and "Put it back" in shown
+    assert "Discuss vectors and scalars" in shown
+    # The record says which words were taken out.
+    record = text_of(edits.browser.get(f"/jobs/{edits.job_id}/record").text)
+    assert "Left a paragraph out of the student file" in record
+    assert "Discuss vectors and scalars with the class." in record
+    # Back, and the file is whole again.
+    assert edit_post(edits, PLAIN, action="put_back").status_code == 303
+    assert "Discuss vectors and scalars" in (with_file(edits).html or "")
+    assert not stored(edits).left_out_blocks
+    assert edit_post(edits, PLAIN, action="put_back").status_code == 422  # not left out now
+
+
+def test_a_paragraph_left_out_is_undone(edits):
+    edit_post(edits, PLAIN, action="leave_out")
+    path = f"/jobs/{edits.job_id}/review"
+    done = edits.browser.post(
+        f"/jobs/{edits.job_id}/undo",
+        data={"csrf_token": token(edits.browser, path), "version": version(edits)},
+    )
+    assert done.status_code == 303
+    assert element(edits, PLAIN).text == "Discuss vectors and scalars with the class."
+    assert not stored(edits).left_out_blocks and not [
+        n for n in stored(edits).notices if n.code == "block_omitted"
+    ]
+
+
+def test_only_a_paragraph_or_list_item_nothing_points_at_is_left_out(edits):
+    # A heading, an equation, a figure, a paragraph with an equation in it, and a paragraph
+    # a decision waits on are each refused, and nothing changes.
+    for target in ("p1-e0", "p1-e2", "p1-e6", PARAGRAPH):
+        assert edit_post(edits, target, action="leave_out").status_code == 422, target
+    assert not stored(edits).left_out_blocks
+
+
 # --------------------------------------------------------------------------- pictures
 
 

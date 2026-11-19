@@ -1821,8 +1821,8 @@ def _checked_notice(
     if len(shown) > words.NOTICE_MAX_LINKS:
         rest = words.more_pictures(len(shown) - words.NOTICE_MAX_LINKS)
         links.append(f"<li>{_escape(rest)}</li>")
-    if summary.left_out:
-        links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.NOTICE_LEFT_OUT_LINK}</a></li>')
+    if summary.left_out or summary.left_out_blocks:
+        links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.left_out_link(summary)}</a></li>')
     why = ""
     if summary.pictures:  # the explanation each not-converted box used to repeat (F-114)
         said = NOT_CONVERTED_WHY if summary.origin == "pdf" else NOT_CONVERTED_WHY_WRITTEN
@@ -2057,6 +2057,7 @@ def render_html(
     contact: str | None = None,
     math_alttext: bool | None = None,
     omitted_pages: list[int] | None = None,
+    left_out_blocks: list[int] | None = None,
     page_labels: Mapping[int, str] | None = None,
     pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
@@ -2099,7 +2100,9 @@ def render_html(
     stored speech as the `alttext` of its <math> (None: `Settings.mathml_alttext`, off by
     default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
-    here, and the student note says so. `page_labels`: the printed label of each 0-based page
+    here, and the student note says so. `left_out_blocks`: the 0-based page of each paragraph
+    or list item the instructor left out; they are not here either, and the note counts them.
+    `page_labels`: the printed label of each 0-based page
     that has one (`DocumentResult.page_labels`), for the page markers. A page without one says its
     position in the PDF ("PDF page 5") when any page has a printed label, so two pages never
     both read "Page 5", and "Page 5" when none has. `pdf_pages` maps a page of this document to
@@ -2160,6 +2163,7 @@ def render_html(
         elements=elements,
         fixes=fixes,
         left_out_pages=omitted_pages or (),
+        left_out_blocks=left_out_blocks or (),
         pages=pages,
         reviewed_on=checked_on,
         origin=origin,
