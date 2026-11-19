@@ -1462,7 +1462,7 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
     marked = bool(header_rows or header_cols or any(c.header for c in cells))
     grid = TableGrid(
         rows=n_rows, cols=n_cols, cells=cells, header_rows=header_rows, header_cols=header_cols,
-        caption=caption, is_data=True, source="local", header_source="source" if marked else None,
+        caption=caption, is_data=True, source="local", header_source="source" if marked else "none",
     )  # fmt: skip
     from readablestem.core.types import grid_problems
 
@@ -1493,7 +1493,7 @@ def _lenient(grid: TableGrid) -> TableGrid | None:
         update={
             "header_rows": 0,
             "header_cols": 0,
-            "header_source": None,
+            "header_source": "none",
             "cells": [c.model_copy(update={"header": None}) for c in grid.cells],
         }
     )
