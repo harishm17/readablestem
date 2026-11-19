@@ -8,8 +8,8 @@ entry, never that it continues the run.
 
 - Rule 9, index pages. On a page of 20 or more lines where half end in a page number and the
   median line has seven words or fewer (`regions._is_index`), a line that starts at the entry
-  margin after a line that ends in a page number starts a new entry. The page is known to the rows by their
-  column's name (`INDEX_PAGE`), which every copy of a row keeps.
+  margin after a line that ends in a page number starts a new entry. The page is known to the
+  rows by their column's name (`INDEX_PAGE`), which every copy of a row keeps.
 - Rule 10, entry lists. A line at the first line's edge starts a new paragraph when the run
   hangs (a glossary: the lines after the first are indented), or when both lines open with a
   section number (a chapter outline) or with a bold term (key terms).
