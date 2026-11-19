@@ -31,6 +31,10 @@ if TYPE_CHECKING:
 MAX_PAGES_LISTED = 10
 
 
+# The counts of a stored page type that make up its hidden text (`PageType.left_out_chars`).
+LEFT_OUT_CHARS = ("invisible_chars", "covered_chars", "unseen_chars")
+
+
 def _plural(n: int, one: str, many: str) -> str:
     return one if n == 1 else many
 
@@ -314,8 +318,7 @@ def _kept(result_json: dict[str, Any] | None) -> tuple[dict[str, list[int]], lis
     hidden = any(
         isinstance(t, dict)
         and t.get("page") in kept
-        and sum(int(t.get(key) or 0) for key in ("invisible_chars", "covered_chars", "unseen_chars"))
-        >= HIDDEN_FEW
+        and sum(int(t.get(key) or 0) for key in LEFT_OUT_CHARS) >= HIDDEN_FEW
         for t in data.get("page_types") or []
     )
     return {r: sorted(set(p)) for r, p in by_reason.items()}, sorted(handwriting), hidden
