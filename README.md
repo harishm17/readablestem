@@ -28,7 +28,7 @@ production").
 **Status.** Beta. The service is live at https://readablestem.com as a free beta built and maintained by
 Harish Manoharan. Anyone with a Google account can sign in and try it (the beta runs `SIGNUP_MODE=open`;
 the code's default is `allowlist`, invitation only), with daily limits for new accounts; the demo
-needs no sign-in. The pipeline is version 0.5.12 (`PIPELINE_VERSION`). Questions go to
+needs no sign-in. The pipeline is version 0.5.13 (`PIPELINE_VERSION`). Questions go to
 hello@readablestem.com. The code, the evaluation harness and the documentation
 are here. `uv run readablestem ops launch-check` lists the checks a deploy has to pass.
 

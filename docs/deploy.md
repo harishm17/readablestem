@@ -825,6 +825,12 @@ notice codes that are new (`colour_used`, `struck_text`, `annotations_read`,
 release: after that each such document returns 500 on its job page and review screens
 until traffic goes forward again. Once anything has been converted, fix forward.
 
+0.5.13 adds to it. A result in which a reviewer left one paragraph out holds the notice code
+`block_omitted`, which 0.5.12 refuses to load (500 on that document), and 0.5.12 does not
+know the paragraph was taken out. A paragraph made a sidebar or a quotation loads in 0.5.12
+as a plain paragraph: the role is ignored, not refused. So a rollback from 0.5.13 to 0.5.12
+is safe until a reviewer has left a paragraph out; below 0.5.12 the limit above applies.
+
 If data has to come back, restore a backup (this overwrites the instance's current
 data):
 

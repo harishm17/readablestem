@@ -111,7 +111,12 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # written to the person who checks it ("Check it against the original.", "not checked",
 # "Needs a description.", "Check it before students use it."), and the image-page note and the
 # equation alt text are said to a student; a draft is made in the checker's words.
-RENDER_VERSION = 8
+# 9: a paragraph with a role is written in `<aside aria-label="Sidebar">` or `<blockquote>`
+# (WS16.3); a paragraph left out is counted in the note; a part that was not converted is
+# said once (the visible label is hidden from a screen reader when the alt text says it); an
+# equation of a Word or LaTeX file shown as its LaTeX is not called a picture, and its link
+# names no page; the speech rules for scripts and accents changed.
+RENDER_VERSION = 9
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII

@@ -831,7 +831,7 @@ against the original." (the student's is "This page was read from a picture of t
 small errors are possible."), the alt text of that page's original ("..., shown for checking the
 converted text."), the equation alt suffix "...; not checked" (the student's: "as written in the
 PDF"), the figure label "Needs a description." (the student's: "No description.") and the
-statement's last sentence "Check it before students use it.". `RENDER_VERSION` is 8 for these
+statement's last sentence "Check it before students use it.". `RENDER_VERSION` was raised to 8 for these
 words. A student file with no checker sentence is a rule (`tests/test_assemble_render.py`),
 not a wording.
 
@@ -860,7 +860,7 @@ and label are unchanged. The evaluations that read the PDF's text back out of th
 (`assemble.equation_alt_text`) strip both forms. In a document in another language the alt
 text is marked `lang="en"`, as the other fixed words are. The page's `generator` tag names the
 pipeline that converted the result the page is made from beside the version of the code
-(`ReadableSTEM 0.1.0, pipeline 0.5.12`), so a stored file made again still says which pipeline
+(`ReadableSTEM 0.1.0, pipeline 0.5.13`), so a stored file made again still says which pipeline
 converted it; a page made from several results names only the code.
 
 - The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The

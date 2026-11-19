@@ -1,5 +1,17 @@
 # Changelog
 
+## Pipeline 0.5.13, render 9 (2026-11-19)
+
+- `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"
+  entry below down to the 0.5.12 entry. What a PDF's result holds changed (lists, where a block
+  starts, paragraphs joined across a page, a table's box, the region tree), a paragraph can hold
+  a role and a reviewer can leave one paragraph out; the student page changed (the sidebar and
+  quotation wrappers, the left-out note, a part that was not converted said once, the words
+  for a Word or LaTeX equation shown as its LaTeX). Stored results load unchanged and their
+  pages are made again. `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`
+  and `data/eval/burden-corpus.json` are re-made at 0.5.13; the golden pages and the stored
+  demo page are written again at render 9. Roll back: docs/deploy.md.
+
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 
 - When a document is converted again, a paragraph the reviewer both reworded (or made a heading)

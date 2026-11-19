@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.12 as of 2026-11-19; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.13 as of 2026-11-19; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,14 +43,14 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.12 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.13 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
 **What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
 report is held to its baseline only when this pipeline version made it (`eval gate
 --require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
-so CI's `eval-gate` job gates those two, re-made at 0.5.12. Equations, figures and document
+so CI's `eval-gate` job gates those two, re-made at 0.5.13. Equations, figures and document
 need a paid run: their latest and baseline reports are historical records of the 0.5.0
 system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
 the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
