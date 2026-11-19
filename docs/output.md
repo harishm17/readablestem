@@ -1209,6 +1209,17 @@ A text edit that changes struck words takes the run off, and the edit's message 
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
 last run.
 
+### What the reviewers wrote on the page (F-541)
+
+A comment of a PDF's annotation is a paragraph of its own, "Note on the page: Correction: use 30 mL,
+not 25 mL.", after the text it marks, in every output: a paragraph in the HTML (the Canvas page,
+Common Cartridge and EPUB too), a paragraph in Word, a sentence in Listen. A struck date and
+the caret that gives the new one read "October 3 ... deleted ... Note on the page: October 10"; a
+caret the file calls a replacement says "Note on the page: replace with October 10". The notice
+`annotations_read` (optional) counts them, and `attachments_not_converted` (optional) names the
+files attached to the PDF ("The files: “rubric.txt”") on the job page. Neither adds a decision;
+the note paragraph is an ordinary one and an instructor may edit or remove it.
+
 `CONTENT_RUNS` (on by default since 2026-11-18, and in the production profile) is the
 rollout switch. Off, struck runs are found and counted in the trace (`deleted_runs`,
 `deleted_runs_written: 0`) but not stored or written, and no notice is raised: the output

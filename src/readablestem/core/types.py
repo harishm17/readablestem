@@ -902,6 +902,8 @@ NOTICE_CODES = frozenset(
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
         "struck_text",  # text the page shows struck through, kept and marked as deleted
         "form_fields",  # a fillable PDF form: its fields are read as text, not as live inputs
+        "annotations_read",  # comments in the PDF's annotations, included as paragraphs
+        "attachments_not_converted",  # files attached to the PDF, not converted
         "option_labels",  # answer options (A, B, C) that run together in one paragraph or item
         "rtl_text",  # right-to-left words, in the order the PDF gives them
         # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text
@@ -960,7 +962,7 @@ class Notice(BaseModel):
     Content-free like `Check`: a category `code` (see `NOTICE_CODES`), where it is
     (0-based `page`, `element_id`, either may be None for the whole document) and how
     many times it occurs there (`count`). Never document text, so notices can be shown,
-    logged and counted after the document is deleted.
+    logged and counted after the document is deleted; the one exception is `names` below.
 
     `review` places it on the job page: "required" and "none" are listed under "Not
     handled in this file", "optional" under "Worth checking". A notice never adds a
@@ -976,6 +978,10 @@ class Notice(BaseModel):
     element_id: str | None = None
     count: int = Field(default=1, ge=1)
     review: Review = "optional"
+    # The names of the files attached to the PDF (`attachments_not_converted`, the only code
+    # that has any): the owner's own words, shown on the owner's pages and kept with the
+    # result, never logged or counted.
+    names: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
 
 
 class SourceFacts(BaseModel):

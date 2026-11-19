@@ -570,6 +570,79 @@ def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
     assert not any(n.code == "struck_text" for n in shadow.notices)
 
 
+def reviewed_page() -> bytes:
+    """A lab sheet a reviewer marked up: a date struck out with a caret that gives the new one,
+    a quiz time replaced (the caret says so), a sticky note with its popup and a reply, a
+    highlight with a comment and one without, a file attached to the page and one to the PDF."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    lines = {
+        100: "The report is due May 1 at noon in the lab office.",
+        160: "Measure 25 mL of the buffer into the beaker.",
+        220: "The quiz is on June 1 in room 5.",
+        280: "Dispose of the waste in the labelled container only.",
+        340: "Questions about safety go to the lab manager.",
+    }
+    for y, words in lines.items():
+        page.insert_text((72, y), words, fontsize=12)
+
+    def at(y: float, part: str) -> pymupdf.Rect:
+        return page.search_for(part, clip=pymupdf.Rect(0, y - 14, 612, y + 4))[0]
+
+    page.add_strikeout_annot(date := at(100, "May 1"))
+    page.add_caret_annot(date.br).set_info(content="May 8")
+    page.add_strikeout_annot(quiz := at(220, "June 1"))
+    again = page.add_caret_annot(quiz.br)
+    again.set_info(content="June 2")
+    doc.xref_set_key(again.xref, "IT", "/Replace")
+    sticky = page.add_text_annot((500, 160), "Correction: use 30 mL, not 25 mL.")
+    sticky.set_popup(pymupdf.Rect(400, 170, 560, 240))
+    reply = page.add_text_annot((500, 340), "Agreed.")
+    doc.xref_set_key(reply.xref, "IRT", f"{sticky.xref} 0 R")
+    page.add_highlight_annot(at(280, "Dispose of the waste")).set_info(content="Important")
+    page.add_highlight_annot(at(340, "Questions about safety"))  # no comment: adds nothing
+    for annot in page.annots():
+        annot.update()
+    page.add_file_annot((540, 400), b"Data sheet.", "datasheet.txt")
+    doc.embfile_add("rubric.txt", b"Rubric.")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_a_reviewers_comments_are_notes_after_the_text_they_mark_and_attached_files_are_named():
+    # F-541: a sticky note, a comment on a highlight and a caret's new date were lost, so a
+    # student heard the stale text alone.
+    pdf = reviewed_page()
+    layout_result = layout.analyze(pdf)
+    result = text_pass.apply(pdf, layout_result.elements, pages=[0], runs=True)
+    texts = [e.text or "" for e in result.elements]
+    note = "Note on the page: "
+    assert [t for t in texts if t.startswith(note)] == [
+        note + "May 8",
+        note + "Correction: use 30 mL, not 25 mL.",
+        note + "Agreed.",  # its parent's reply, though it stands lower on the page
+        note + "replace with June 2",
+        note + "Important",
+    ]
+    # Each follows the text it marks; the struck date is still marked, beside its new one.
+    assert texts.index(note + "May 8") == 1 + next(i for i, t in enumerate(texts) if "May 1" in t)
+    assert texts.index(note + "Important") == 1 + next(
+        i for i, t in enumerate(texts) if t.startswith("Dispose")
+    )
+    struck = [(e.text or "")[r.start : r.end] for e in result.elements for r in e.runs]
+    assert [s for s in struck if s != ""][:2] == ["May 1", "June 1"]
+    (read,) = [n for n in result.notices if n.code == "annotations_read"]
+    assert read.count == 5 and read.review == "optional" and read.page is None
+    (attached,) = [n for n in result.notices if n.code == "attachments_not_converted"]
+    assert attached.count == 2 and sorted(attached.names) == ["datasheet.txt", "rubric.txt"]
+    # The ids stay what layout gave them: only the notes are new, one past the highest.
+    assert {e.id for e in layout_result.elements} <= {e.id for e in result.elements}
+    assert [e.order for e in result.elements] == list(range(len(result.elements)))
+
+
 def test_blanks_boxes_and_form_fields_are_tokens_said_in_words():
     # SW36 and SW39: a drawn blank, typed underscores and printed boxes, and the fields of an
     # AcroForm, are runs that the writer says ("blank", "Checkbox, checked:"); the form gets

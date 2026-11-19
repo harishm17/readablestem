@@ -2604,6 +2604,49 @@ With `CONTENT_RUNS` off (the shadow rollout, the default until 2026-11-18) the r
 (`TextPassResult.deleted_runs`, trace `deleted_runs` and `deleted_runs_written: 0`) but not
 stored, and no notice is raised. The LaTeX path follows the same switch for its `\sout` runs.
 
+### Annotation comments and attached files (F-541, F-362)
+
+A reviewer's comments live in the PDF's annotations, not in its text, so a student who heard the
+page heard the stale words alone. `text_pass.page_marks` reads each page's shown annotations
+(not the Hidden or NoView ones) while the pass already has the file open: a sticky note, a caret,
+a highlight, underline, squiggle, strike-out, box, circle, line, polygon or polyline with a
+non-empty `/Contents`. A text box (FreeText) is not a note: its words are
+already text on the page. A popup is the window of its parent's comment and is read once;
+a file-attachment annotation's `/Contents` is the label of the file and is not a note. A page is
+read for at most 500 comments and a comment for 10,000 characters. The box of an annotation is
+read with the page turned upright (PyMuPDF gives it unreliably on a page with `/Rotate`) and then
+turned into the display space the elements use.
+
+`text_pass.comment_notes` writes each comment as a paragraph, "Note on the page: <comment>", after
+the element whose text its box covers most (an annotation that covers none: the nearest element
+beside it, a margin sticky note included, by overlap, then vertical, then horizontal distance).
+A reply (`/IRT`) stands after the comment it answers. A caret that the file calls a replacement
+(`/IT /Replace`, or a reply to a strike-out) says "replace with <text>", and stands after the struck
+words it replaces; any other caret is the text alone. A highlight or underline without a comment
+adds nothing and no new kind of run exists. The paragraph is made by the text pass, after the
+passage languages, so no model request changes (the context texts were cut before). Ids are one past the
+highest on the page and only `order` is renumbered. Layout keeps no `notes` field (WS16.3), so a
+note is a paragraph that an edit can take out like any other. The notice `annotations_read` (optional,
+the whole document, a count) says how many were read.
+
+An attached file (an annotation on a page or an entry of the file's embedded files) is not
+converted. The optional notice `attachments_not_converted` carries the count and, in
+`Notice.names`, each file's name (cut to 120 characters, 20 names): a name is document content, so it
+is shown to the owner (the job page line, "The files: “rubric.txt”") and kept in the record, and it
+is never logged. `Notice.names` is empty for every other notice and is left out of a stored notice
+then. Counts by annotation type are not stored.
+
+The drawings of annotations are not the page's art. A sticky note's balloon, a caret, a pushpin, a
+highlight's fill and a box are painted after the page's own content, so they are the last of
+`page.get_cdrawings()`. `page_type.without_annotation_art` takes, from the end of that list, those
+that lie in the box of a shown annotation of a kind in `ANNOTATION_ART` (`ICON_ANNOTS`, the marks on text, the shapes
+and lines, FreeText), and drops them. It is applied where the page's drawings are first read:
+`layout/document.py` `_read_page` (the one list that figure, handwriting and ink detection use), and
+the slide-mark pass of the same file. The hidden-text check still sees every drawing
+(`classify(covers=...)`): a box drawn over a line is a fake redaction. A pen stroke (Ink) is kept: it is
+handwriting. Known limits: a drawing of the page itself that was painted last and lies inside such a box is dropped
+with them; the budgeted ink probe (`page_type._probe_ink`) and `ink_strokes.extract_ink` read the unfiltered list.
+
 ### Rules near a baseline, blanks, boxes and form fields (SW36, SW39)
 
 One function answers "what is this rule near a baseline": `pipeline/baseline_rules.classify`

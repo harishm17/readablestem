@@ -234,18 +234,26 @@ def _read_page(
     page_type.turn_page(page)
     fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
-    drawings = [*page.get_cdrawings(), *glyph_strokes.strokes(page, raw)]
+    drawn = page.get_cdrawings()
+    strokes = glyph_strokes.strokes(page, raw)
+    # What a reviewer's annotations paint (an icon, a caret, a highlight) is not the page's art:
+    # figures and handwriting are read without it. The hidden-text check is given the whole list
+    # (`covers`): an annotation can be drawn over words to hide them.
+    drawings = [*page_type.without_annotation_art(page, drawn), *strokes]
+    covers = [*drawn, *strokes] if len(drawings) != len(drawn) + len(strokes) else None
     images = page_type.image_boxes(page)
     if page_type.too_complex(drawings):  # PAGE_MAX_PATHS: no path is read (`kept_reason`)
         kind = page_type.classify(
-            page, raw, drawings, budget=document.ink, producer=producer, images=images
-        )
+            page, raw, drawings, budget=document.ink, producer=producer, images=images,
+            covers=covers,
+        )  # fmt: skip
         rows = _page_rows(page, raw, kind.text.covered)
         return rows + _field_rows(fields, rows), [], kind
     seen = page_type.paint_visibility(drawings, images[0])  # once: the page type reads it too
     kind = page_type.classify(
-        page, raw, drawings, budget=document.ink, producer=producer, images=images, seen=seen
-    )
+        page, raw, drawings, budget=document.ink, producer=producer, images=images, seen=seen,
+        covers=covers,
+    )  # fmt: skip
     rows = _page_rows(page, raw, kind.text.covered)
     return rows + _field_rows(fields, rows), _page_paths(page, drawings, seen), kind
 
@@ -577,7 +585,7 @@ def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[
             else f"{info.get('width')}x{info.get('height')}"
         )
         marks.append(slides.Mark("image", key, display.box(info["bbox"])))
-    drawings = page.get_cdrawings() if paths else []
+    drawings = page_type.without_annotation_art(page, page.get_cdrawings()) if paths else []
     width = page.rect.width
     for path in paths:
         centre = (path.bbox[1] + path.bbox[3]) / 2

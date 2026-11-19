@@ -521,6 +521,12 @@ NOTICE_MESSAGES: dict[str, str] = {
     "form_fields": "This PDF is a fillable form. Its fields are written out as text (a blank, a "
     "box with its state, or the value filled in), and the converted file cannot be filled in: "
     "keep the PDF for students who need to fill it in.",
+    "annotations_read": "Comments in the PDF ({count}) are included as paragraphs that start "
+    "“Note on the page:”. Some may have been written for the instructor and not for students: "
+    "take out any you do not want to share.",
+    "attachments_not_converted": "Files attached to this PDF ({count}) are not converted and "
+    "are not in this file. Give students the original PDF, or the files themselves, if they "
+    "need them.",
     "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
     "item, so a screen reader reads them as one block: check that each option can be told from "
     "the next, and change the words if not.",

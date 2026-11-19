@@ -369,6 +369,30 @@ def test_a_comment_icon_or_a_file_icon_over_a_word_hides_nothing():
         assert line in " ".join(e.text or "" for e in out.elements if e.page == n)
 
 
+def test_a_sticky_note_a_caret_and_a_pushpin_are_no_figure_and_no_handwriting():
+    # F-362, F-541: the appearances of a reviewer's annotations were drawings: a figure sent
+    # to the figure step, or a "handwriting on the page" decision, for each.
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    for y, words in {
+        100: "The report is due May 1 at noon.",
+        160: "Measure 25 mL of buffer.",
+    }.items():
+        page.insert_text((72, y), words, fontsize=12)
+    day = page.search_for("May 1")[0]
+    page.add_strikeout_annot(day)
+    page.add_caret_annot(day.br).set_info(content="May 8")
+    page.add_text_annot((500, 100), "Correction.")
+    page.add_file_annot((500, 160), b"notes", "notes.txt")
+    page.add_rect_annot(pymupdf.Rect(66, 144, 300, 166)).set_info(content="Check this.")
+    for annot in page.annots():
+        annot.update()
+    out = layout.analyze(doc.tobytes())
+    assert [e.kind for e in out.elements if e.kind is Kind.FIGURE] == []
+    assert out.page_types[0].kind == "born_digital"
+    assert [n.code for n in out.notices] == []
+
+
 def test_text_under_a_clip_a_shading_or_a_thick_stroke_never_reaches_the_student_file():
     text = text_of(convert("painted_over.pdf").result.html)
     assert not any(word in text for word in SECRET_WORDS)

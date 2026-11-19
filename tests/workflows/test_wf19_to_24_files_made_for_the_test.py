@@ -86,6 +86,26 @@ def test_wf19_hidden_text_is_left_out_and_counted_and_a_sideways_page_is_read_up
     assert "Its first sentence must be read upright" in text
     assert text.index("Week 1") < text.index("Week 8")
 
+    # F-541: what a reviewer wrote on the page is read as notes, the pen and the pushpins are
+    # no figures, and the attached files are named, not converted.
+    marked = made("annotations.pdf", files["annotations.pdf"].make())
+    text = student_text(site, marked)
+    for note in (
+        "Note on the page: Safety first: this step is graded.",
+        "Note on the page: Correction: use 30 mL, not 25 mL. The 25 is a typo.",
+        "Note on the page: Not 40: use 37 degrees.",
+    ):
+        assert note in text
+    assert "Answer key: the colour turns blue" not in text  # a hidden annotation stays hidden
+    found = {n.code: n for n in site.result(marked).notices}
+    assert found["annotations_read"].count == 3 and "Moved to May 8" in text
+    assert sorted(found["attachments_not_converted"].names) == [
+        "buffer_datasheet.txt",
+        "rubric.txt",
+    ]
+    page = harness.words(site.page(f"/jobs/{marked}").xpath("//main")[0])
+    assert "buffer_datasheet.txt" in page and "rubric.txt" in page
+
 
 def test_wf19_a_file_cut_off_is_not_ready_until_the_owner_answers_and_the_student_is_told_always(
     site: harness.ReplaySite, made: Callable[[str, bytes], str]
