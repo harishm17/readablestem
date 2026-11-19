@@ -101,7 +101,7 @@
     "errors_ours": "0 of 138",
     "errors_chatbot": "3 of 134"
   },
-  "settings_line": "It ran on 2026-11-04 with version 0.5.9. The file did not record its settings, and some of the live service's settings have changed since, so these numbers describe that run, not today's service.",
+  "settings_line": "It ran on November 4, 2026 with version 0.5.9. The file did not record its settings, and some of the live service's settings have changed since, so these numbers describe that run, not today's service.",
   "numbers": {
     "units": "26",
     "pages": "131",

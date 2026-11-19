@@ -100,7 +100,16 @@ def test_a_part_with_a_decision_open_is_held_back_like_in_download_all(web):  # 
     assert "p5-e0" not in ids_of(html) and {"p1-e0", "p9-e0"} <= set(ids_of(html))
     assert "Pages 5, 6, 7 and 8 of the original PDF were left out of this file." in html
     page = text_of(web.alice.get(f"/jobs/{jobs[0].id}").text)
-    assert "the 2 finished parts" in page  # the link counts what the file would hold
+    assert "Combine the 2 ready parts (leaves out 1)" in page  # as the combine page counts
+    with session_scope(web.ctx.factory) as session:  # a second part with a decision open
+        row = session.get(Job, jobs[2].id)
+        result = dict(row.result_json)
+        result["fixes"] = [
+            dict(f, status="needs_review", review="required") for f in result["fixes"]
+        ]
+        row.result_json = result
+    page = text_of(web.alice.get(f"/jobs/{jobs[0].id}").text)
+    assert "Combining needs at least two ready parts; 1 is ready now (2 of" in page
 
 
 def test_two_parts_with_a_page_in_common_keep_the_newest_not_a_409(web):  # noqa: F811

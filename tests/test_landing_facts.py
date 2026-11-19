@@ -60,7 +60,7 @@ def pages(tmp_path_factory) -> dict[str, str]:
 
 def test_limits_latest_registered_numbers_match_the_fresh5_report(pages):
     text = squash(pages["/limits"])
-    assert "It ran on 2026-11-04 with version 0.5.9" in text
+    assert "It ran on November 4, 2026 with version 0.5.9" in text
     assert "did not record its settings" in text and "live service uses" not in text
     for number in ("0.840", "0.836", "+0.004", "−0.023 to +0.036", "0.793", "0.770"):
         assert number in text, number

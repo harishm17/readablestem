@@ -460,7 +460,7 @@ def _cmd_storage_report(args: argparse.Namespace) -> int:
             f"p90 {totals[int(0.9 * (len(totals) - 1))]:,}, largest {totals[-1]:,}, "
             f"all together {sum(totals):,}"
         )
-        for part in ("upload", "crops", "html", "result", "steps", "exports"):
+        for part in ("upload", "crops", "html", "result", "steps", "exports", "carry"):
             sizes = [getattr(job, part) for job in jobs]
             lines.append(
                 f"  {part:<8} median {int(statistics.median(sizes)):>12,}  "
@@ -471,7 +471,7 @@ def _cmd_storage_report(args: argparse.Namespace) -> int:
             lines.append(
                 f"  {job.job_id}  {job.total:>12,}  (upload {job.upload:,}, crops {job.crops:,}, "
                 f"html {job.html:,}, result {job.result:,}, steps {job.steps:,}, "
-                f"exports {job.exports:,})"
+                f"exports {job.exports:,}, carry {job.carry:,})"
             )
     print("\n".join(lines))
     return 0

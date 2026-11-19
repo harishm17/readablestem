@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{# Confirm taking a person's access to one document away (routes/sharing.py revoke_share). The
+   question is the answer to the Remove POST, so the person's address is never in a URL. #}
+{% block title %}Remove {{ email }}?{% endblock %}
+{% block body_class %}page-confirm{% endblock %}
+{% block content %}
+<h1>Remove {{ email }} from “{{ doc_title }}”?</h1>
+<p>{{ email }} can now open this document ({{ role|lower }}). After you remove them they cannot, from their next request. Nothing is sent to them. To give them access again you share the document with them again.</p>
+<div class="confirm-actions">
+  {% call form("share.revoke", "/jobs/" ~ job_id ~ "/share/" ~ share_id ~ "/revoke", {"class": "inline-form"}) %}
+    <input type="hidden" name="confirm" value="yes">
+    <button type="submit" class="button-danger">Remove {{ email|truncate(48, True, "…") }}</button>
+  {% endcall %}
+  <a class="button-secondary" href="/jobs/{{ job_id }}/share">No, keep them</a>
+</div>
+{% endblock %}

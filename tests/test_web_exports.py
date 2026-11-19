@@ -245,16 +245,39 @@ def test_a_draft_leaves_only_through_its_page_and_says_so_inside(web, path):  # 
         assert '<meta name="readablestem-state" content="draft">' in response.text
 
 
-def test_a_confirm_does_not_outlive_a_change_to_the_document(web):  # noqa: F811
+def test_a_confirm_ends_with_a_change_a_student_would_get_and_not_with_other_writes(web):  # noqa: F811
+    """WS20.1: the draft confirm names the output version. A new title changes the file, so
+    the confirm no longer lets it through; answering the cut-off question changes no element
+    the student gets, so a confirm made before it still does."""
     job_id = finished_job(web)
-    confirmed = fetch(web.browser, f"/jobs/{job_id}/download")
-    assert confirmed.status_code == 200
-    token = confirmed.request.url.params["draft"]
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
-        job.result_version = (job.result_version or 0) + 1  # a review write
-    again = web.browser.get(f"/jobs/{job_id}/download?draft={token}")
+        job.result_json = {  # a file that looks cut off, as `test_web_batch` makes one
+            **(job.result_json or {}),
+            "notices": [{"code": "file_cut_off", "page": 1, "count": 1, "review": "required"}],
+        }
+    page = f"/jobs/{job_id}"
+
+    def confirm() -> str:
+        return fetch(web.browser, f"{page}/download").request.url.params["draft"]
+
+    def allowed(token: str) -> bool:
+        return web.browser.get(f"{page}/download?draft={token}").status_code == 200
+
+    token = confirm()
+    assert allowed(token)
+    answered = web.browser.post(
+        f"{page}/cut-off", data={"csrf_token": csrf_from(web.browser.get(page).text)}
+    )
+    assert answered.status_code == 303
+    assert allowed(token)  # a write that leaves the file alone
+    titled = web.browser.post(
+        f"{page}/title",
+        data={"csrf_token": csrf_from(web.browser.get(page).text), "title": "Week 4"},
+    )
+    assert titled.status_code == 303
+    again = web.browser.get(f"{page}/download?draft={token}")
     assert again.status_code == 303 and "/draft" in again.headers["location"]
 
 

@@ -51,6 +51,7 @@ from sqlalchemy.orm import Session
 from readablestem.config import Settings
 from readablestem.web import output, retention
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_day
 from readablestem.web.db import Blob, Job, JobLink, utcnow
 from readablestem.web.email_login import hash_token
 
@@ -184,7 +185,7 @@ def check_dates(
         raise LinkError(
             "link-closes",
             f"A link can work for at most {MAX_DAYS} days. Choose a day on or before "
-            f"{latest:%B} {latest.day}, {latest.year}.",
+            f"{format_day(latest)}.",
         )
     if opens is not None and opens > closes:
         raise LinkError("link-opens", "The first day cannot be after the last day.")

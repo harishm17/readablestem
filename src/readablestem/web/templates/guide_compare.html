@@ -62,7 +62,7 @@
    PROOF.md (registered result, run 2026-11-04), not a claim about any chatbot's features. No conformance
    claims, and accuracy only where we measured it. #}
 {% macro src(href, day, label="Source") -%}
-<span class="source-note"><a href="{{ href }}">{{ label }}</a>, read <time datetime="{{ day }}">{{ ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][(day[5:7]|int) - 1] }} {{ day[8:10]|int }}, {{ day[0:4] }}</time></span>
+<span class="source-note"><a href="{{ href }}">{{ label }}</a>, read <time datetime="{{ day }}">{{ day|day }}</time></span>
 {%- endmacro %}
 {% set RS = source_url ~ "/blob/main/README.md" %}
 {% set PF = source_url ~ "/blob/main/docs/eval-equation-fresh5.md" %}

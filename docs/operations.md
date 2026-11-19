@@ -126,7 +126,7 @@ indexes and large values; on Postgres a row for the database's own catalogs, so 
 up to `pg_database_size` (99.9% on a 60-document test database; on SQLite the total is the
 file's pages and the tables come from `dbstat`); and, for finished documents, the median, 90th
 percentile, largest and total bytes per document split into upload, crops, HTML, result, step
-records and kept exports, with the N largest documents by id.
+records, what was kept of an earlier version for carrying decisions over, and kept exports, with the N largest documents by id.
 
 The per-document figures are the document's content bytes (the same terms as the per-person cap
 above, plus step records and the Word, EPUB and Canvas files kept after a download, which the

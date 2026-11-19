@@ -87,12 +87,16 @@ class EditsCarried:
     """What was put on the new result: (kind, id in the new result) pairs (a page left out
     is `page_edits.page_key`), how many earlier edits were not carried, which ones (kind and
     1-based page of the earlier file; None when the page is not known), and the crops of
-    the pictures and equations added back."""
+    the pictures and equations added back. `changes` holds, for the kinds a later revision reads
+    back from rows (words, heading, role, "not an equation"), the structural change that made
+    each one on the new result, by (kind, id in the new result): the worker stores it with the
+    carried row, so the edit has the snapshots a person's own edit has (`edit_row`)."""
 
     items: list[tuple[str, str]] = field(default_factory=list)
     dropped: int = 0
     not_applied: list[tuple[str, int | None]] = field(default_factory=list)
     crops: dict[str, bytes] = field(default_factory=dict)
+    changes: dict[tuple[str, str], page_edits.StructureChange] = field(default_factory=dict)
 
     def drop(self, kind: str, page: int | None) -> None:
         """An earlier edit that was not made again: `page` is 0-based, as an element's."""
@@ -104,10 +108,40 @@ class EditsCarried:
         self.dropped += other.dropped
         self.not_applied.extend(other.not_applied)
         self.crops.update(other.crops)
+        self.changes.update(other.changes)
 
     @property
     def ids(self) -> list[str]:
         return [element_id for _, element_id in self.items]
+
+
+# The kinds of carried edit that a later revision reads back from the new job's rows, and the
+# structural action each one is read as. Pictures, equations, paragraphs and pages left out are
+# carried from the result as it stands, so they need no row.
+ROW_ACTIONS = {
+    TEXT: "edit_text",
+    HEADING: "make_heading",
+    ROLE: "set_role",
+    NOT_EQUATION: "not_equation",
+}
+
+
+def edit_row(
+    element_id: str, action: str, before: dict[str, Any] | None, after: dict[str, Any] | None
+) -> EditRow | None:
+    """A stored `ReviewEdit` as carry-over reads it, or None for a row it has no use for. An edit
+    that was itself carried onto this version is read as the edit it was (the carried row keeps
+    its snapshots), so it goes on to the next revision like one made by hand. A carried row of
+    an older release has no snapshots: it is kept as `carried`, and `_carry_unreadable` says it
+    could not be made again."""
+    if action != carry.CARRIED_ACTION:
+        return EditRow(element_id, action, before, after)
+    kind = (after or {}).get(CARRIED_KEY)
+    if kind not in ROW_ACTIONS:
+        return None
+    if isinstance((before or {}).get(STRUCTURE_KEY), dict):
+        return EditRow(element_id, ROW_ACTIONS[kind], before, after)
+    return EditRow(element_id, carry.CARRIED_ACTION, before, after)
 
 
 def with_omitted_back(result: DocumentResult) -> DocumentResult:
@@ -342,7 +376,9 @@ def _carry_words(
             for kind in lost:
                 out.drop(kind, old_by[old_id].page)
         else:
-            out.items.extend((kind, new_id) for kind in kinds)
+            carried, changes = kinds
+            out.items.extend((kind, new_id) for kind in carried)
+            out.changes.update({(kind, new_id): change for kind, change in changes.items()})
     return out
 
 
@@ -359,12 +395,13 @@ def _apply_words(
     set_role: bool = False,
     role: str | None = None,
     leave_out: bool = False,
-) -> list[str] | None:
+) -> tuple[list[str], dict[str, page_edits.StructureChange]] | None:
     """The edits of one item on its counterpart: the kind of each one made (HEADING, TEXT, ROLE,
-    BLOCK_LEFT_OUT, one per change the person made), None when they were not (the result is left
-    as it was). A paragraph left out is left out again last, and only where
-    `page_edits.leave_out_block` allows it: a new file that has a decision open on it, a link
-    to it or an equation in it keeps it, and the change is listed as not made again."""
+    BLOCK_LEFT_OUT, one per change the person made) and the structural change of each that
+    made one, None when they were not (the result is left as it was). A paragraph left out is
+    left out again last, and only where `page_edits.leave_out_block` allows it: a new file that
+    has a decision open on it, a link to it or an equation in it keeps it, and the change is
+    listed as not made again."""
     new_element = next(e for e in new.elements if e.id == new_id)
     typed = None
     if old_element.text != origin.text:
@@ -379,19 +416,20 @@ def _apply_words(
     before = page_edits.capture(
         new, elements=[new_id], fixes=[new_id], orders=True, blocks=leave_out
     )
+    changes: dict[str, page_edits.StructureChange] = {}
     try:
         if level is not None:
-            page_edits.make_heading(new, new_id, str(level))
+            changes[HEADING] = page_edits.make_heading(new, new_id, str(level))
         if typed is not None:
             try:
-                page_edits.edit_text(new, new_id, typed)
+                changes[TEXT] = page_edits.edit_text(new, new_id, typed)
             except ReviewInvalid as exc:
                 # "Nothing changed": the new file already says it. Anything else is a refusal.
                 if not all(e.message == page_edits.NOTHING_CHANGED for e in exc.errors):
                     raise
         if set_role:
             try:
-                page_edits.set_role(new, new_id, role)
+                changes[ROLE] = page_edits.set_role(new, new_id, role)
             except ReviewInvalid as exc:
                 # The new file already has that role (or none), or says nothing to set one on.
                 if not all(e.message == page_edits.NOTHING_CHANGED for e in exc.errors):
@@ -401,7 +439,7 @@ def _apply_words(
     except (ReviewInvalid, LookupError):
         page_edits.restore(new, before)
         return None
-    return [
+    kinds = [
         kind
         for kind, made in (
             (HEADING, level is not None),
@@ -411,6 +449,7 @@ def _apply_words(
         )
         if made
     ]
+    return kinds, changes
 
 
 # --------------------------------------------------------------------------- added items
@@ -539,11 +578,12 @@ def _carry_not_equation(
             out.drop(NOT_EQUATION, held.page)
             continue
         try:
-            page_edits.not_an_equation(new, found[0].id)
+            change = page_edits.not_an_equation(new, found[0].id)
         except (ReviewInvalid, LookupError):
             out.drop(NOT_EQUATION, held.page)
             continue
         out.items.append((NOT_EQUATION, found[0].id))
+        out.changes[(NOT_EQUATION, found[0].id)] = change
     return out
 
 
@@ -565,6 +605,27 @@ def _carry_read_again(old: DocumentResult, rows: list[EditRow]) -> EditsCarried:
     for element_id, actions in made.items():
         for _ in actions:
             out.drop(READ_AGAIN, pages.get(element_id))
+    return out
+
+
+# --------------------------------------------------------------------------- older carried rows
+
+
+def _carry_unreadable(old: DocumentResult, rows: list[EditRow]) -> EditsCarried:
+    """Edits an earlier release carried onto the earlier version and kept no snapshot of (a
+    `carried` row with nothing to read the edit back from): they cannot be made again, and the
+    instructor is told, by name and page, as for any edit that is not carried. An item the
+    person has edited again since has its own rows and is carried from those."""
+    out = EditsCarried()
+    pages = {e.id: e.page for e in old.elements}
+    again = {(r.element_id, r.action) for r in rows if r.action != carry.CARRIED_ACTION}
+    for row in rows:
+        if row.action != carry.CARRIED_ACTION:
+            continue
+        kind = str((row.after or {}).get(CARRIED_KEY) or "edit")
+        if (row.element_id, ROW_ACTIONS.get(kind, "")) in again:
+            continue
+        out.drop(kind, pages.get(row.element_id))
     return out
 
 
@@ -591,6 +652,7 @@ def carry_structure(
     out.extend(added)
     out.extend(_carry_not_equation(old_crops, new, new_crops, rows))
     out.extend(_carry_read_again(old, rows))
+    out.extend(_carry_unreadable(old, rows))
     return out
 
 

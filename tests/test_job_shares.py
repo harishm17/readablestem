@@ -187,7 +187,7 @@ def _site(tmp_path, *, ready: bool):
         give(env, CAROL, "view")
         give(env, DAVE, "review")
         give(env, ERIN, "review")
-        remove(env, ERIN)
+        assert remove(env, ERIN).status_code == 303
         make_course(env)
         yield env
         for actor, client in env.who.items():
@@ -252,16 +252,16 @@ def stored_shares(env) -> list[tuple[str, str]]:
         return [(r.email, r.role) for r in shares.shares_of(session, env.job_id)]
 
 
-def remove(env, email: str) -> None:
+def remove(env, email: str, confirm: str = "yes"):
+    """Press Remove for `email` (`confirm` empty is the first press, which only asks)."""
     with session_scope(env.ctx.factory) as session:
         row = next(r for r in shares.shares_of(session, env.job_id) if r.email == email)
         share_id = row.id
     owner = env.who[OWNER]
-    response = owner.post(
+    return owner.post(
         f"/jobs/{env.job_id}/share/{share_id}/revoke",
-        data={"csrf_token": page_token(owner, f"/jobs/{env.job_id}/share")},
+        data={"csrf_token": page_token(owner, f"/jobs/{env.job_id}/share"), "confirm": confirm},
     )
-    assert response.status_code == 303
 
 
 def heading(response) -> str:
@@ -563,7 +563,12 @@ def test_a_reviewer_cannot_delete_share_or_change_settings(site):
 def test_a_removed_share_stops_working_on_the_next_request(site):
     viewer = site.who[VIEWER]
     assert viewer.get(f"/jobs/{site.job_id}").status_code == 200  # signed in, session warm
-    remove(site, CAROL)
+    # The first press of Remove only asks, and names the person: nothing is taken away yet.
+    question = remove(site, CAROL, confirm="")
+    assert question.status_code == 200 and CAROL in heading(question)
+    assert (CAROL, "view") in stored_shares(site)
+    assert viewer.get(f"/jobs/{site.job_id}").status_code == 200
+    assert remove(site, CAROL).status_code == 303
     for path in ("", "/view", "/download", "/record", "/status", "/download.epub"):
         assert viewer.get(f"/jobs/{site.job_id}{path}").status_code == 404, path
     page = viewer.get("/app")
