@@ -603,6 +603,8 @@ def apply_review(
         message = "This proposal failed a required check, so it cannot be accepted as it is. "
         message += "Edit it, or reject it to keep the original."
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    if action == "accept" and headers_required(fix):
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), NO_HEADERS_TO_ACCEPT)])
     if action == "accept" and fix.heading is not None:
         _refuse_moved_level(result, element_id, fix.heading.level, then="then Save edit")
     if action == "accept":
@@ -1388,6 +1390,24 @@ NO_TABLE_TO_ACCEPT = (
     "There is no rebuilt table to accept. Use the grid read from the PDF, if there is one, "
     "or keep the image."
 )
+NO_HEADERS_TO_ACCEPT = (
+    "No cell of this table is a header, so it cannot be accepted as it is. Choose the first "
+    "row, the first column or both as headers, or say that the grid is not a table."
+)
+
+
+def headers_required(fix: Fix) -> bool:
+    """A data table of at least two rows in which no cell is a header (WS5.2): it is never
+    accepted as it is, whatever else the checks found. A person chooses the header row, the
+    header column or both, or says the grid is not a table."""
+    grid = fix.table.grid if fix.table is not None else None
+    return (
+        grid is not None
+        and grid.is_data
+        and grid.rows >= 2
+        and any(c.code == "no_headers" for c in fix.failed_checks)
+    )
+
 
 # What each `core.types.grid_problems` code means, for the table card and for an edit
 # that is refused. Positions and fixed words only.

@@ -460,7 +460,12 @@ def tables(tmp_path):
     output = table_output()
     fix = output.result.fix_for("p1-e1")
     assert fix is not None
-    fix.checks = [Check(name="table.headers", passed=False, severity="warning", code="no_headers")]
+    # The common case: the grid read from the PDF after no model answer could be used, in
+    # which nothing says a row is a header. Two findings, and still no Accept.
+    fix.checks = [
+        Check(name="table.source", passed=False, severity="warning", code="local_grid"),
+        Check(name="table.headers", passed=False, severity="warning", code="no_headers"),
+    ]
     env = make_env(tmp_path, output, table_pdf())
     with env.running() as client:
         env.allow(ALICE)
@@ -480,8 +485,11 @@ def test_a_table_with_no_header_cell_is_a_choice_of_four_and_a_choice_settles_it
         "This grid is not a table",
     ):
         assert answer in page
-    assert "Accept without headers" not in page
+    assert 'data-role="accept"' not in page
     version = tables.job(tables.job_id).result_version
+    # Accepting it as it is is refused, whoever sends the request.
+    refused = post(tables, "/review/p1-e1", status=422, action="accept", version=str(version))
+    assert "cannot be accepted as it is" in refused.text
     post(
         tables,
         "/review/p1-e1",

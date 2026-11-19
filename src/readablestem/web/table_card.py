@@ -29,7 +29,6 @@ from readablestem.pipeline.assemble_tables import (
 )
 from readablestem.pipeline.table_html import render_table
 from readablestem.pipeline.table_step import (
-    NOTE_CODES,
     STRUCTURE_PROBLEMS,
     CellDifference,
     maths_differences,
@@ -44,6 +43,7 @@ from readablestem.web.review import (
     first_row_is_header,
     grid_as_text,
     grid_problem_sentence,
+    headers_required,
     is_maths_cell,
     usable_local_grid,
 )
@@ -129,9 +129,9 @@ class TableCard:
     problems: list[str] = field(default_factory=list)  # structural, in plain English
     editing: CellChoice | None = None  # the cell whose form is open ("Change a cell")
     local_flat: bool = False  # the grid read from the PDF gives maths flat: not the main action
-    # The only thing the checks found is that no cell is a header (T1-19, WS5.2): a person
-    # chooses the first row, the first column, both, or "not a table", and one click settles it.
-    only_headers_missing: bool = False
+    # No cell is a header (T1-19, WS5.2): a person chooses the first row, the first column,
+    # both, or "not a table"; there is no Accept, whatever else the checks found.
+    needs_headers: bool = False
     # The first column can be the header too (a table of one column has none to offer).
     can_header_col: bool = False
     # "This grid is not a table" (T3-11): its words can be written one after another.
@@ -324,7 +324,7 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
         card.problems = [
             grid_problem_sentence(p) for p in grid_problems(grid) if not _reported(p, fix)
         ]
-        card.only_headers_missing = _only_headers_missing(fix, grid, card)
+        card.needs_headers = _needs_headers(fix, grid, card)
         card.can_header_col = grid.cols >= 2
         card.findings = _findings(fix, grid, card, differing)
     card.can_text = grid_as_text(fix, element) is not None and not (
@@ -381,21 +381,11 @@ def _findings(
     return out
 
 
-def _only_headers_missing(fix: Fix, grid: TableGrid, card: TableCard) -> bool:
-    """A table still waiting whose one finding is "no cell is marked as a header" and whose
-    first row can be that header: a data table of at least two rows with nothing else wrong
-    (no other failed check, no structural problem)."""
-    failed = fix.failed_checks
-    return (
-        fix.pending
-        and grid.is_data
-        and card.in_document
-        and not card.header_row
-        and grid.rows >= 2
-        and not card.problems
-        and any(c.code == "no_headers" for c in failed)
-        and all(c.code in {"no_headers", *NOTE_CODES} for c in failed)
-    )
+def _needs_headers(fix: Fix, grid: TableGrid, card: TableCard) -> bool:
+    """A table still waiting in which no cell is a header and whose first row can be one
+    (`review.headers_required`, WS5.2): whatever else the checks found, it is not accepted as
+    it is. The card offers the first row, the first column, both, or "not a table"."""
+    return fix.pending and _can_use_first_row(grid, card) and headers_required(fix)
 
 
 def _reported(problem: str, fix: Fix) -> bool:

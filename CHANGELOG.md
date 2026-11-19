@@ -11,7 +11,10 @@
   layout found, not with its first row made a header by default. Where layout found none, the
   table has no header cell and is a required choice. The card for a table where no cell is a
   header offers the first row, the first column, both, or "This grid is not a table", and no
-  longer "Accept without headers"; the choice is stored with `header_source` `reviewer`.
+  longer "Accept without headers"; the choice is stored with `header_source` `reviewer`. The
+  choice replaces Accept whenever a data table of two or more rows has no header cell, whatever
+  else was found about it (a grid read from the PDF carries a second finding), and the server
+  refuses an Accept of such a table (`review.headers_required`).
 - The Word and LaTeX readers record `source` when the file marks a header and `none` when it does
   not. Those tables are still accepted without a decision: see the review-load numbers in the
   branch report.

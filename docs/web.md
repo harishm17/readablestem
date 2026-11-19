@@ -3217,8 +3217,10 @@ with Accept (the proposal as it is now) or Keep as image. After one the reviewer
 now, with "Go on to decision N" when it was the last change; Accept and Keep as image
 move on as for other kinds. The rules (`web.review`, "tables"):
 
-- *Headers.* A table in which no cell is a header and nothing else is wrong is a choice
-  (`TableCard.only_headers_missing`, WS5.2): the decision bar has **Use the first row as
+- *Headers.* A data table of two or more rows in which no cell is a header is a choice,
+  whatever else the checks found (`review.headers_required`, `TableCard.needs_headers`, WS5.2;
+  the grid read from the PDF after a failed model answer is the common case, and it carries a
+  second finding). Accept is refused for it on the server too. The decision bar has **Use the first row as
   headers**, **Use the first column as headers** (not for a one-column table), **Use the first row
   and column as headers** and **This grid is not a table**, in place of Accept and "Accept without
   headers". The first three send the same `headers` edit as the two boxes below, and any such edit
