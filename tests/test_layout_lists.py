@@ -183,6 +183,23 @@ def test_a_bullet_set_against_its_text_is_an_item_when_another_line_has_the_same
     assert not items(analyze(word_list_page([(1, "Grading", 11)])).elements)
 
 
+def test_a_bold_phrase_that_goes_on_over_the_end_of_an_items_line_stays_in_the_item():
+    """A style change cuts a line off its block, and the pieces are joined again; a list item
+    was left out of the joining, so its last words were a paragraph of their own."""
+
+    def fill(page):
+        page.insert_text(
+            (72, 100), "\u2022 The interpreter is a special program that executes", fontsize=BODY
+        )
+        page.insert_text((90, 115), "each instruction in order", fontsize=BODY, fontname="hebo")
+        page.insert_text((72, 130), "\u2022 Variables name values", fontsize=BODY)
+
+    assert [(lvl, text) for _, _, lvl, text in items(analyze(one_page(fill)).elements)] == [
+        (1, "The interpreter is a special program that executes each instruction in order"),
+        (1, "Variables name values"),
+    ]
+
+
 # ---------------------------------------------------------------- nesting and indents
 
 

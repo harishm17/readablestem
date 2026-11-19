@@ -479,22 +479,9 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
         return False
     if _heading_sized(row, ctx) and abs(prev.size - row.size) > 0.5:
         return False
-    if prev.bold != row.bold and not _emphasis_runs_on(prev, row):
+    if prev.bold != row.bold:
         return False
     return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
-
-
-def _emphasis_runs_on(prev: _Row, row: _Row) -> bool:
-    """Does a bold phrase go on over the line break, so one line is all bold and the other is
-    not ("executes each" / "**instruction in order**")? The line above stops short of the end of
-    a sentence or clause, the line starts in lowercase (a bold label or heading starts in
-    capitals), and both are set in one size and typeface."""
-    return (
-        prev.clean[-1:] not in tuple(".:;!?")
-        and row.clean[:1].islower()
-        and abs(prev.size - row.size) <= 0.5
-        and prev.family == row.family
-    )
 
 
 # `Element.reasons` of a table of contents' entry (a list item): the link step looks for
@@ -1328,7 +1315,10 @@ def _series_label(
     (start, end), (text_start, _) = tokens[k], tokens[k + 1]
     text = "".join(c.c for c in row.chars[start:end])
     parsed = _ordered_marker(text)
-    if parsed is None or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size:
+    if (
+        parsed is None
+        or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size
+    ):
         return None
     readings = marker_readings(parsed[1])
     return (start, text_start, text, parsed[0], readings) if readings else None
@@ -1343,7 +1333,9 @@ def _series_pieces(row: _Row, *, document: _Document) -> list[_Row] | None:
     starts = []
     for k in range(len(tokens)):
         at = tokens[k][0]
-        if _series_label(row, tokens, k) is None or (starts and tokens[k][0] <= tokens[starts[-1]][1]):
+        if _series_label(row, tokens, k) is None or (
+            starts and tokens[k][0] <= tokens[starts[-1]][1]
+        ):
             continue
         if k and row.chars[at].x0 - row.chars[tokens[k - 1][1] - 1].x1 < OPTION_GAP * row.size:
             continue
@@ -1377,7 +1369,11 @@ def _matching_series(
     two lists are set a level below the question above, like those of a grid of options
     (`_list_levels`)."""
     first = rows[start]
-    if id(first) in skip or not _option_row(first) or _series_pieces(first, document=document) is None:
+    if (
+        id(first) in skip
+        or not _option_row(first)
+        or _series_pieces(first, document=document) is None
+    ):
         return None
     cells: list[_OptionCell] = []
     edges: list[float] = []  # the left edges of the series
@@ -1429,7 +1425,9 @@ def _matching_series(
     for part in series:
         for cell in sorted(part, key=_value):
             label_row = cell.rows[0]
-            label_start, text_start, text, _, _ = _series_label(label_row, _tokens(label_row), 0) or (0, 0, "", "", ())
+            label_start, text_start, text, _, _ = _series_label(
+                label_row, _tokens(label_row), 0
+            ) or (0, 0, "", "", ())
             label_row.marker = _Marker(
                 text,
                 True,
@@ -1986,14 +1984,16 @@ def _unspaced(c: str) -> bool:
 
 
 def _merge_style_splits(blocks: list[_Block], runs: list[_Run]) -> list[_Block]:
-    """Re-join paragraphs that were split only by a bold line that did not become a heading."""
+    """Re-join a paragraph or list item and the lines that a change of style cut off it (a bold
+    line that did not become a heading: the bold phrase "instruction in order" that goes on
+    over the end of an item's line)."""
     out: list[_Block] = []
     out_runs: list[_Run] = []
     for block, run in zip(blocks, runs, strict=True):
         if (
             out
             and block.kind == Kind.PARAGRAPH
-            and out[-1].kind == Kind.PARAGRAPH
+            and out[-1].kind in (Kind.PARAGRAPH, Kind.LIST_ITEM)
             and not run.block_start
             and not block.code
             and not out[-1].code

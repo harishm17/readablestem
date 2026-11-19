@@ -105,9 +105,7 @@ def _ordered_marker(text: str) -> tuple[str, str] | None:
     return "{}" + match["sep"], match["plain"]
 
 
-def _bullet_apart(
-    row: _Row, tokens: list[tuple[int, int]]
-) -> tuple[list[tuple[int, int]], bool]:
+def _bullet_apart(row: _Row, tokens: list[tuple[int, int]]) -> tuple[list[tuple[int, int]], bool]:
     """`tokens` with a bullet glyph at the start of the row cut from the text it touches, and
     whether it was set so close that only a sibling can tell it from a word that starts with
     the sign. `_tokens` splits at 0.3 x the font size, and Word's Wingdings bullet, set as
