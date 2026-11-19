@@ -141,16 +141,22 @@ def test_small_capitals_are_text_and_real_capital_scripts_are_not():
                 ("OTKA", "caps"),
                 ("-V", None),
                 ("OLTERRA", "caps"),
-                (" model", None),
+                (" model and ", None),
+                ("L", None),
+                ("ONG", "caps"),
+                ("M", None),
+                ("EM", "caps"),
+                ("E", None),
+                ("VAL", "caps"),
             ],
             [("Take X", None), ("T", "sup"), (" and Y", None), ("N", "sub"), (" here", None)],
         ]
     )
     elements = layout.analyze(pdf).elements
     assert not [e for e in elements if e.kind is Kind.EQUATION]
-    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
-    assert paragraph.text.startswith("The Lotka-Volterra model")
-    assert [(paragraph.text[r.start : r.end], r.kind) for r in paragraph.script_runs] == [
+    names, scripts = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert names.text == "The Lotka-Volterra model and LongMemEval"
+    assert [(scripts.text[r.start : r.end], r.kind) for r in scripts.script_runs] == [
         ("T", "sup"),
         ("N", "sub"),
     ]

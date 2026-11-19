@@ -231,23 +231,25 @@ class _Row:
 
 
 def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
-    """`chars` with `small_cap` set on the small capitals of a line, and the letters that
-    follow a full-size capital lower-cased: "L" and "OTKA" (Word and LibreOffice print the
-    lower-case letters of "Lotka" as capitals at 80 %) read "Lotka".
+    """`chars` with `small_cap` set on the small capitals of a line, and, in a word that also
+    has full-size capitals, lower-cased: "L" and "OTKA" (Word, LibreOffice and TeX with a
+    scaled font print the lower-case letters of "Lotka" as capitals at 80 %) read "Lotka".
 
-    A small capital is a capital letter in a text font, smaller than the line's text
-    (`SCRIPT_RATIO`) and on its baseline (`SMALL_CAP_BASELINE`): a script is off it. A run of
-    them, in one font, that ends a word is one of two shapes. After a full-size capital of the
-    same font on the baseline (the word "Lotka") its letters are lower-cased: that is what the
-    source had. At the start of a word, two letters or more (an all-small-caps "OTKA", or an
-    acronym) it keeps its case: whether the source was "nasa" or "NASA" is not in the file.
-    Anywhere else (a capital after a lower-case letter or a digit) the glyphs are left alone."""
+    The unit is a word of capital letters in one font, all on the line's baseline
+    (`SMALL_CAP_BASELINE`: a script is off it), set off from what is round it by anything but a
+    letter or digit. A letter of it smaller than the word's largest (`SCRIPT_RATIO`) is a small
+    capital, and a small capital is a lower-case letter of the source: the word is lower-cased
+    there ("Lotka", "LongMemEval" set as `LONGmEMeVAL`), and none of it is a script. A word with
+    no full-size capital in it, two letters or more and smaller than the line's text (an
+    all-small-caps "OTKA", or an acronym) keeps its case, which the file does not give
+    (the source was "nasa" or "NASA"), and is no script either. A capital next to a lower-case
+    letter or a digit makes no such word: its glyphs are left alone."""
     sizes = {round(c.size * 2) / 2 for c in chars if not c.blank}
     if len(sizes) < 2:
         return chars
     row = _Row(chars)
     size, base = row.size, row.baseline
-    limit, reach = SCRIPT_RATIO * size, SMALL_CAP_BASELINE * size
+    reach = SMALL_CAP_BASELINE * size
 
     def capital(c: _Char) -> bool:
         return c.c.isalpha() and c.c.isupper() and not c.math and abs(c.baseline - base) <= reach
@@ -255,27 +257,21 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
     out = list(chars)
     n, i = len(chars), 0
     while i < n:
-        if not (capital(chars[i]) and chars[i].size < limit):
+        if not capital(chars[i]):
             i += 1
             continue
         j = i + 1
-        while (
-            j < n and capital(chars[j]) and chars[j].size < limit and chars[j].font == chars[i].font
-        ):
+        while j < n and capital(chars[j]) and chars[j].font == chars[i].font:
             j += 1
-        i, start = j, i
-        if j < n and chars[j].c.isalnum():
-            continue  # the run goes on in a full-size letter: not a word of small capitals
-        lead = chars[start - 1] if start else None
-        if (
-            lead is not None
-            and capital(lead)
-            and lead.size >= limit
-            and lead.font == chars[start].font
-        ):
-            for k in range(start, j):
+        start, i = i, j
+        if (start and chars[start - 1].c.isalnum()) or (j < n and chars[j].c.isalnum()):
+            continue
+        largest = max(c.size for c in chars[start:j])
+        small = [k for k in range(start, j) if chars[k].size < SCRIPT_RATIO * largest]
+        if small:
+            for k in small:
                 out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
-        elif j - start >= 2 and (lead is None or not lead.c.isalnum()):
+        elif j - start >= 2 and largest < SCRIPT_RATIO * size:
             for k in range(start, j):
                 out[k] = replace(chars[k], small_cap=True)
     return out

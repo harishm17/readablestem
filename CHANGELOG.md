@@ -7,11 +7,13 @@
   scripts, because the script test looked at size alone, and came out as inline equations in the
   middle of a name: each cost the reviewer a decision and the job a model call. The small glyphs sit
   on the baseline; a script does not. `mark_small_capitals` (`layout/shared.py`) marks them when the
-  rows are read (`_Char.small_cap`): capitals smaller than the row's text, on its baseline, in one
-  font, ending a word. `_Row.is_script` and the three tests that called a glyph a script from its
-  size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip them. After a full-size
-  capital of the same font the letters are lower-cased ("Lotka", not "LOTKA"); an all-small-caps word
-  of two letters or more keeps its case. TeX's `\textsc` was never affected. Not built: the stored
+  rows are read (`_Char.small_cap`): a word of capitals in one font on the baseline, whose letters
+  smaller than its largest are small capitals. `_Row.is_script` and the three tests that called a
+  glyph a script from its size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip
+  them. In a word that has a full-size capital the small ones are lower-cased ("Lotka", not
+  "LOTKA"; "LongMemEval"); an all-small-caps word of two letters or more keeps its case. TeX's
+  `\textsc` in a font of its own was never affected; TeX with a scaled Times font (`times`,
+  Nimbus) was, and is fixed. Not built: the stored
   `small_caps` run (WS16.2). A version bump is owed at the next pull request and covers this
   (stored layouts change); no migration; no model request changed.
 
