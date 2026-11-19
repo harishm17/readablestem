@@ -171,7 +171,10 @@ def _prepare_rows(
         elif id(frag) not in placed:
             kept.append(frag)
     if document.region_tree:  # the page's regions, from the fragments (regions.py)
-        _mark_blanks(kept, rules)
+        # No gutter orders the page here, but a rule at the head of one column must still not
+        # become the blank of a line in the other (it would reach across the channel).
+        body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
+        _mark_blanks(kept, rules, _find_gutter(body))
         rows, tree, rest = regions.prepare(
             page, kept, dropped, rules, tables=tables, document=document
         )
