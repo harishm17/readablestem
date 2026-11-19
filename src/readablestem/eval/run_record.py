@@ -113,6 +113,48 @@ def source_state(repo: Path) -> tuple[str, bool]:
     return sha, bool(status)
 
 
+def provenance(repo: Path | None = None) -> dict[str, Any]:
+    """What made a report or record: the commit and whether the tree had changes, the pipeline
+    and render versions, and the versions of the programs a result depends on (pandoc,
+    LaTeXML, PyMuPDF, the fonts a page is drawn with). A number nobody can trace to these
+    cannot be compared with a later one. Every eval report and measured record carries it
+    as `provenance`; one made before it did has none (`provenance_line`)."""
+    import pymupdf
+
+    from readablestem.eval import corpus
+    from readablestem.ops import profile
+    from readablestem.pipeline.assemble import RENDER_VERSION
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    sha, dirty = source_state(repo or corpus.REPO)
+    return {
+        "commit": sha,
+        "clean": not dirty,
+        "pipeline_version": PIPELINE_VERSION,
+        "render_version": RENDER_VERSION,
+        "tools": {
+            "pandoc": profile.tool_version("pandoc", "--version"),
+            "latexml": profile.tool_version("latexml", "--VERSION"),
+            "pymupdf": pymupdf.__version__,
+            "fonts": profile.font_versions(),
+        },
+    }
+
+
+def provenance_line(record: dict[str, Any]) -> str:
+    """One line for a header: what made `record`, or that it says nothing (a record made
+    before records were stamped)."""
+    made = record.get("provenance")
+    if not made:
+        return "Made by: not stamped (made before records named their commit and tools)."
+    tools = "; ".join(f"{name}: {version}" for name, version in made.get("tools", {}).items())
+    return (
+        f"Made by: commit {str(made.get('commit'))[:12]}"
+        f"{'' if made.get('clean') else ' with changes'}, pipeline {made.get('pipeline_version')}, "
+        f"render {made.get('render_version')}; {tools}."
+    )
+
+
 def start(
     root: Path,
     set_name: str,

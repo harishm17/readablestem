@@ -62,7 +62,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from readablestem.eval import measure, split
+from readablestem.eval import measure, run_record, split
 from readablestem.ops import profile as run_profile
 from readablestem.pipeline.output_audit import OUTPUTS
 
@@ -690,6 +690,7 @@ def stamps(settings_stamp: Mapping[str, Any], commit: str) -> dict[str, Any]:
         "pipeline_version": PIPELINE_VERSION,
         "profile": dict(settings_stamp),
         "commit": commit,
+        "provenance": run_record.provenance(),
     }
 
 

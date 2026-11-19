@@ -827,4 +827,7 @@ def run_gate(
         print(f"error: cannot compare ({exc.code}): {exc}", file=sys.stderr)
         return 2
     print(format_table(result), end="")
+    from readablestem.eval import run_record
+
+    print(run_record.provenance_line(current), file=sys.stderr)
     return 0 if result.passed else 1

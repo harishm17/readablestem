@@ -689,6 +689,7 @@ def stamps(
         "profile": profile.stamp(settings),
         "pipeline_version": PIPELINE_VERSION,
         "commit": sha + ("+changes" if dirty else ""),
+        "provenance": run_record.provenance(corpus.REPO),
         "machine": machine(),
         "not_finished": [
             {"upload": done.upload, "step": stop.step, "page": stop.page, "reason": stop.reason}

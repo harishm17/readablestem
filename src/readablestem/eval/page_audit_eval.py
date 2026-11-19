@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from readablestem.eval import run_record
 from readablestem.pipeline import page_audit
 from readablestem.pipeline.page_audit import PageVerdict
 
@@ -183,6 +184,7 @@ def report(
     cost = round(sum(v.cost_usd for v in asked), 6)
     return {
         "task": "page_audit",
+        "provenance": run_record.provenance(),
         "date": date,
         "set": set_name,
         "client": client_label,
