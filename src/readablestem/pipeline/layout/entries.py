@@ -21,9 +21,6 @@ import re
 
 from readablestem.pipeline.layout.shared import _Row, _Run
 
-# The rules of the second round that live here, by number (see `regions.RULES` for the others).
-RULES: frozenset[int] = frozenset({9, 10})
-
 INDEX_PAGE = "~index"  # added to the column name of every row of an index page
 PAGE_NUMBER_END = re.compile(r"\d{1,4}\s*$")
 _SECTION_NUMBER = re.compile(r"^\s*\d{1,2}\.\d{1,2}\s+\S")
@@ -42,13 +39,12 @@ def starts_entry(prev: _Row, row: _Row, run: _Run) -> bool:
     """Does `row` start a new entry rather than continue `run`, whose last row is `prev`?"""
     size = prev.size
     if (
-        9 in RULES
-        and row.column.endswith(INDEX_PAGE)
+        row.column.endswith(INDEX_PAGE)
         and PAGE_NUMBER_END.search(prev.clean)
         and row.x0 <= run.margin + 0.5 * size
     ):
         return True
-    if 10 not in RULES or row.vertical or row.marker is not None:
+    if row.vertical or row.marker is not None:
         return False
     first = run.rows[0]
     if row.x0 > first.x0 + 0.3 * size:

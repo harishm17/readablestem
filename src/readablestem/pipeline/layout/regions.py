@@ -17,7 +17,6 @@ How the tree is cut (docs/layout.md "The region tree"):
   columns. A column at most `NOTE_RATIO` of its neighbor's width and at most `NOTE_FILL`
   filled is a notes column: its blocks are read after the body block they stand beside.
 - Pictures occupy space, so the text on both sides of a photo is not one row.
-- Rules 1 to 8 are the measured rules of the AQ2 round: see `RULES`.
 
 Nothing here is read with `REGION_TREE` off.
 """
@@ -45,11 +44,7 @@ from readablestem.pipeline.layout.order import (
     _top_down,
 )
 from readablestem.pipeline.layout.rows import _merge_baselines
-from readablestem.pipeline.layout.shared import _Context, _Display, _Figure, _Path, _Row
-
-# The rules of the first round (plan WS15.1, rules 1 to 8), by number. Each is a switch so the
-# one-rule-off table can be made; `RULES` is what the reader runs.
-RULES: frozenset[int] = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 11, 12})  # 9 and 10: entries.RULES
+from readablestem.pipeline.layout.shared import _Display, _Path, _Row
 
 CHANNEL_PT = 7.0  # narrowest white channel that cuts a segment into columns
 MAX_COLUMNS = 3
@@ -75,10 +70,6 @@ _NOTE_MARK = re.compile(r"^\s*([\d*\u2217\u2020\u2021\u00a7\u00b6]|\w+:)")
 _ROMAN = {"ii": 1, "iii": 2, "iv": 3, "vi": 5, "vii": 6, "viii": 7}
 
 Item = tuple[BBox, str]  # a box of the page and its text ("" for a picture)
-
-
-def _on(rule: int) -> bool:
-    return rule in RULES
 
 
 @dataclass
@@ -197,12 +188,11 @@ class _Build:
         if len(idx) < 2 or depth > MAX_DEPTH:
             return _Node("leaf", box, column=column)
         local: list[tuple[BBox, _Node, int]] = []
-        if _on(2):
-            idx, local = self._text_boxes(idx, column, depth)
-            if len(idx) < 2:
-                leaf = _Node("leaf", box, column=column)
-                leaf.boxes = [(r, n) for r, n, _ in local]
-                return leaf
+        idx, local = self._text_boxes(idx, column, depth)
+        if len(idx) < 2:
+            leaf = _Node("leaf", box, column=column)
+            leaf.boxes = [(r, n) for r, n, _ in local]
+            return leaf
         sub = [items[i] for i in idx]
         x0, x1 = box[0], box[2]
         segments = self._segments(sub, x0, x1)
@@ -227,17 +217,9 @@ class _Build:
         """Bands in segments: (items, the channels the segment's bands share)."""
         segments: list[tuple[list[int], list[tuple[float, float]]]] = []
         seg_bottom = 0.0
-        last_question = False
         for band in _bands(sub):
             free = _free([(sub[i][0][0], sub[i][0][2]) for i in band], x0, x1)
             top = min(sub[i][0][1] for i in band)
-            lead = min(band, key=lambda i: sub[i][0][0])
-            # a numbered question at the region's left edge ends a side-by-side part (the next
-            # question after an option grid or a matching exercise)
-            is_q = _on(7) and sub[lead][0][0] <= x0 + 2 and bool(_QNUM.match(sub[lead][1]))
-            # alone on its row, or with only a short tag such as "(2 points)"
-            alone = is_q and all(len(sub[i][1].split()) <= 3 for i in band if i != lead)
-            was_q, last_question = last_question, alone
             if segments:
                 members, chans = segments[-1]
                 both = _intersect(chans, free)
@@ -246,30 +228,10 @@ class _Build:
                 side_by_side = bool(_interior(free, sub, band))
                 # rule 6: only before a band that is itself side by side (the next row of slides
                 # or panels); a main column going on below a sidebar stays in its segment
-                wide_gap = _on(6) and top - seg_bottom >= WIDE_GAP * self.pitch and side_by_side
+                wide_gap = top - seg_bottom >= WIDE_GAP * self.pitch and side_by_side
                 # rule 1: one-column bands continue a one-column segment
-                flat = _on(1) and not inside and not side_by_side
-                # rule 7: only when the side-by-side part is indented from the region's edge, as
-                # option grids and matching lists are (a two-column exam's questions start at
-                # the edge), and only when labelled items stand side by side in it
-                question = (
-                    alone
-                    and bool(inside)
-                    and _paired_labels(sub, members)
-                    and min(
-                        (sub[i][0][0] for i in members if not _QNUM.match(sub[i][1])),
-                        default=x0,
-                    )
-                    > x0 + 4
-                )
-                # ...and the options under a question line are not a column pair with it
-                after_q = (
-                    was_q
-                    and side_by_side
-                    and _paired_labels(sub, band)
-                    and min(sub[i][0][0] for i in band) > x0 + 4
-                )
-                if (both or flat) and not opens and not wide_gap and not question and not after_q:
+                flat = not inside and not side_by_side
+                if (both or flat) and not opens and not wide_gap:
                     segments[-1] = (members + band, both)
                     seg_bottom = max(seg_bottom, max(sub[i][0][3] for i in band))
                     continue
@@ -324,7 +286,7 @@ class _Build:
         inner = _interior(chans, items, idx)
         if not inner or len(inner) > MAX_COLUMNS - 1:
             return _Node("leaf", box, column=column)
-        if _on(8) and len(inner) == 1:
+        if len(inner) == 1:
             (a, b), left, right = inner[0]
             grid = self._grid(idx, left, right, box, column)
             if isinstance(grid, _Node):
@@ -389,12 +351,6 @@ def _side(column: str, side: str) -> str:
     """The name of a column: the page's first two are "L" and "R", a column of a column
     "LL", "LR" ...; what stands in no column is "S" (a page with one column: "L")."""
     return side if column == "S" else column + side
-
-
-def _paired_labels(items: Sequence[Item], idx: Sequence[int]) -> bool:
-    """Do option labels or answer blanks start items at two different x positions?"""
-    xs = [items[i][0][0] for i in idx if _OPT.match(items[i][1]) or _BLANK.match(items[i][1])]
-    return len(xs) >= 2 and max(xs) - min(xs) > 40
 
 
 def _label(text: str) -> tuple[str, int] | None:
@@ -515,11 +471,7 @@ class RegionTree:
         ]
         walker = _Walk(self, boxes, body, list(context), blocks)
         seq = walker.order(self.root, members) + tail
-        if _on(8):
-            seq = _options(seq, boxes, self)
-        if _on(12):
-            seq = _numbered_runs(seq, boxes, self)
-        return seq
+        return _numbered_runs(_options(seq, boxes, self), boxes, self)
 
 
 class _Walk:
@@ -628,12 +580,8 @@ class _Walk:
             else:
                 span.append(i)
         if left and right:
-            if _on(3):
-                self._section_breaks(node, left, right, span, split)
-            if _on(4):
-                self._foot_headings(node, left, right, span)
-            if _on(3):
-                self._heads_of_spans(left, right, span)
+            self._section_breaks(node, left, right, span, split)
+            self._heads_of_spans(left, right, span)
         span.sort(key=lambda i: (boxes[i][1], boxes[i][0]))
         starts = [boxes[i][1] for i in span]
         groups: list[tuple[list[int], list[int]]] = [([], []) for _ in range(len(span) + 1)]
@@ -678,31 +626,6 @@ class _Walk:
                 if _heading_break(boxes[i], extent[side], extent[1 - side], body):
                     own.remove(i)
                     span.append(i)
-
-    def _foot_headings(
-        self, node: _Node, left: list[int], right: list[int], span: list[int]
-    ) -> None:
-        """Rule 4. A heading at the foot of one column, below the end of the other column and
-        apart from the lines above it, opens what follows the column pair ("Part E" under a
-        matching exercise): it is read after both columns."""
-        boxes, body = self.boxes, self.body
-        for own, other in ((left, right), (right, left)):
-            if not own or not other:
-                continue
-            last = max(own, key=lambda i: boxes[i][1])
-            bx = boxes[last]
-            above = [boxes[i][3] for i in own if i != last and boxes[i][3] <= bx[1] + 0.25 * body]
-            text = self.tree.text_of(bx)
-            if (
-                bx[3] - bx[1] <= 2.2 * body
-                and bx[2] - bx[0] < 0.4 * (node.box[2] - node.box[0])
-                and bx[0] <= min(boxes[i][0] for i in own) + 2
-                and not re.search(r"\d\W*$", text)
-                and max(boxes[o][3] for o in other) < bx[1] - 0.25 * body
-                and (not above or bx[1] - max(above) >= 0.8 * body)
-            ):
-                own.remove(last)
-                span.append(last)
 
     def _heads_of_spans(self, left: list[int], right: list[int], span: list[int]) -> None:
         """Rule 3. A short item directly above a spanning item, with nothing beside it in the
@@ -960,11 +883,11 @@ def _tree_of(
     sizes = [f.size for f in body if len(f.clean.split()) >= 4]
     body_size = statistics.median(sizes) if sizes else 10.0
     items += _pictures(page, height)
-    rects = _boxes_of(paths, (page.rect.width, height), items) if _on(2) else []
+    rects = _boxes_of(paths, (page.rect.width, height), items)
     build = _Build(items, document.slide_deck, pitch, rects)
     root = build.build(list(range(len(items))), "S")
     lines = [(f.bbox, f.clean) for f in kept if not f.vertical]
-    foot = _footnote_zones(root, body, body_size) if _on(5) else []
+    foot = _footnote_zones(root, body, body_size)
     columns = _has_columns(root)
     if not columns:  # one column: the name the rows had with no gutter
         _rename(root, "S", "L")
@@ -1018,65 +941,6 @@ def prepare(
         if not row.vertical:
             row.column = tree.column_of(row.bbox) + index
     return rows, tree, _merge_baselines(dropped, None)
-
-
-# -- rule 11: labels given back ----------------------------------------------------------------
-
-
-def claim_labels(
-    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
-) -> None:
-    """`figures._claim_labels`, then (rule 11) two kinds of row it took are given back to the
-    text: a heading-sized line outside the picture, and the last line of text that stands above
-    the picture (or the first under it): the second line of a two-line title is not a label of
-    the photo below it."""
-    had = {id(r) for f in figures for r in f.labels}
-    _figures._claim_labels(figures, rows, ctx, document=document)
-    if 11 not in RULES:
-        return
-    for figure in figures:
-        back = [
-            r
-            for r in figure.labels
-            if id(r) not in had and _belongs_to_text(r, rows, figure.drawing, ctx)
-        ]
-        if not back:
-            continue
-        for r in back:
-            r.absorbed = False
-        figure.labels[:] = [r for r in figure.labels if r not in back]
-        figure.bbox = _union([figure.drawing, *(r.bbox for r in figure.labels)])
-
-
-def _belongs_to_text(row: _Row, rows: Sequence[_Row], picture: BBox, ctx: _Context) -> bool:
-    """Is a row a figure took a line of the text round it, not a label?"""
-    x0, y0, x1, y1 = picture
-    if row.vertical or row.kind != "text":
-        return False
-    rx0, ry0, rx1, ry1 = row.bbox
-    area = max(1e-6, (rx1 - rx0) * (ry1 - ry0))
-    cut = max(0.0, min(rx1, x1) - max(rx0, x0)) * max(0.0, min(ry1, y1) - max(ry0, y0))
-    if cut >= 0.6 * area or not re.search(r"[A-Za-z]{3,}", row.clean):
-        return False  # on the picture, or no words
-    if row.size >= _figures.HEADING_SIZE_RATIO * ctx.body:
-        return True
-    above, below = ry1 <= y0 + 1, ry0 >= y1 - 1
-    for a in rows:
-        if a is row or a.vertical or a.kind != "text" or len(a.clean.split()) < 2:
-            continue
-        if abs(a.size - row.size) > 0.5 or a.bold != row.bold:
-            continue
-        ax0, ay0, ax1, ay1 = a.bbox
-        if min(ax1, x1) - max(ax0, x0) > 0 and min(ay1, y1) - max(ay0, y0) > 0:
-            continue  # a row on the picture is no witness
-        pitch = row.baseline - a.baseline
-        lined = abs(a.x0 - rx0) <= row.size or abs((ax0 + ax1) / 2 - (rx0 + rx1) / 2) <= row.size
-        if lined and (
-            (above and 0.5 * row.size <= pitch <= 1.6 * row.size)
-            or (below and 0.5 * row.size <= -pitch <= 1.6 * row.size)
-        ):
-            return True
-    return False
 
 
 # -- rule 12: numbered runs --------------------------------------------------------------------

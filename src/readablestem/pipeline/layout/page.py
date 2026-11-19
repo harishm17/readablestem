@@ -407,9 +407,7 @@ def _page_blocks(
         _classify_row(row, document=document)
     rows = [*rows, *restored]
     figures = [f for f in figures if not _backdrop(f, rows, ctx, page.parent, document=document)]
-    (regions.claim_labels if document.region_tree else _claim_labels)(
-        figures, rows, ctx, document=document
-    )
+    _claim_labels(figures, rows, ctx, document=document)
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures, document=document)
     figures += _fragment_figures(
         rows,
