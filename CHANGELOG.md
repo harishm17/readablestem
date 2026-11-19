@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: a Word table cell whose formula could not be read is a decision (branch fix/source-equation-words)
+
+- A formula in a cell of a Word table that fails the product's checks (a command it does not
+  allow, such as `\phantom`) stayed in the cell as TeX with no mark, no decision and no notice, and
+  the job read "Ready to share". `docx_reader._table` now makes the table a required decision
+  with the check `source_formula_unread`, as the LaTeX reader does for a table and the Word reader
+  already did for a heading. `Report.math_failed` (counted, read by nothing) is the count it
+  reads. A failed equation of its own was already told to the owner: it is an element with a
+  required decision, listed as not converted. The student page is unchanged; the job is held at
+  "Ready" until the owner decides. Not covered: a table too large for a grid is written as list
+  items whose formulas are TeX with nothing to hold a decision (noticed, not changed).
+
 ## Unreleased: a Word or LaTeX equation shown as its LaTeX is not called an image (branch fix/source-equation-words)
 
 - An equation of a Word or LaTeX file that could not be made into MathML is written on the student

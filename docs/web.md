@@ -836,8 +836,10 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   links, super- and subscripts, the title style, captions, and every equation typed in Word
   (`m:oMath`): pandoc writes LaTeX, which goes through `read_latex`, `check_latex` and
   `safe_latex_to_mathml` and then to the same fix a LaTeX equation gets. One that cannot be
-  converted is counted and stays what the PDF route would have made of it (a figure for the
-  model step).
+  converted is shown as its LaTeX and is a required decision (the equation element is listed
+  as not converted, and the job stays "Ready"); a formula in a heading or in a table cell has
+  no element of its own, so the heading or the table is the required decision
+  (`source_formula_unread`), as in a LaTeX source.
 - **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
   copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
   `w:lang`, the document language is the most common one; headers and footers (dropped) are
