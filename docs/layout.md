@@ -1681,7 +1681,12 @@ edge its column's text reaches (`_RightEdges`, the edge a quarter of the lines r
 ending in a broken word (`_keeps_lines`, set on `_Block.lines` in `_page_blocks`). A paragraph
 that wraps runs to the edge in every line but the last, a centered line starts each line
 elsewhere, and a slide deck's text box is not measured by its page's edge (slide decks are
-left out), so none of them is one. It is stored as a `Run` of kind `break` on the single
+left out), so none of them is one. Two more guards come from the corpus: justified text in a
+column narrower than the edge measured (a two-column page, a text box beside a figure) has at
+least `KEPT_JUSTIFIED` (60%, and two) of its lines ending at one place (within
+`KEPT_SAME_END`, 0.3 em), and a narrow ragged paragraph wraps in mid-sentence, so when at
+least `KEPT_WRAPPED` (25%) of its line ends have no stop (`KEPT_STOPS`: . ? ! : ; ) and
+closing quotes) with a lower-case letter starting the next line, it is a paragraph. It is stored as a `Run` of kind `break` on the single
 space that joins two lines (`script_marks.LINE_END`, a private-use mark put in the text by
 `_append_row` and taken out, with its offset, by `script_marks.split_lines`); the writer
 puts `<br>` there (`inline_text`), and Listen already pauses at a `<br>`. A block that keeps
@@ -1724,7 +1729,13 @@ punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier
 `(`, an option such as ` -x`, `//`, `->`), has no line that ends in ":" over a body set
 further right, has at least `QUOTATION_MIN_WORDS` (8) words and a sentence ending in a full
 stop, comma, question mark or exclamation mark is prose, not code (`_is_quotation`). A shell
-command, a name or a short snippet stays code. @@EXT@@
+command, a name or a short snippet stays code.
+
+**Code joined across prose (WS2.6 a), not built.** Monospaced lines already make one code
+block with their printed indentation (`preformatted`). Joining two listings that only a
+caption or a comment sets apart was measured on the corpus before it was built: of the 37
+places where prose sits between two listings, every one introduces the next listing ("The
+output is:"), so joining them would have made one block of two. The two stay two blocks.
 
 ### Tagged PDFs (T2-18, `pipeline/tagged.py`)
 
