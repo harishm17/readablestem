@@ -871,10 +871,20 @@ def _pictures(page: pymupdf.Page, height: float) -> list[Item]:
     return out
 
 
+def _takes_room(box: BBox, width: float, height: float) -> bool:
+    w, h = box[2] - box[0], box[3] - box[1]
+    return w >= PICTURE_MIN_PT and h >= PICTURE_MIN_PT and w * h < PICTURE_MAX_SHARE * width * height
+
+
 def _tree_of(
-    page: pymupdf.Page, kept: Sequence[_Row], paths: Sequence[_Path], document: _Document
+    page: pymupdf.Page,
+    kept: Sequence[_Row],
+    paths: Sequence[_Path],
+    tables: Sequence[BBox],
+    document: _Document,
 ) -> RegionTree:
-    """The region tree of a page from the fragments that are kept."""
+    """The region tree of a page from the fragments that are kept and the tables found on it
+    (their cells are no fragments of the page, but the table takes its room like a picture)."""
     height = page.rect.height
     body = [f for f in kept if not f.vertical and _margin_zone(f, height) is None]
     items: list[Item] = [(f.bbox, f.clean) for f in body]
@@ -883,6 +893,7 @@ def _tree_of(
     sizes = [f.size for f in body if len(f.clean.split()) >= 4]
     body_size = statistics.median(sizes) if sizes else 10.0
     items += _pictures(page, height)
+    items += [(t, "") for t in tables if _takes_room(t, page.rect.width, height)]
     rects = _boxes_of(paths, (page.rect.width, height), items)
     build = _Build(items, document.slide_deck, pitch, rects)
     root = build.build(list(range(len(items))), "S")
@@ -917,12 +928,13 @@ def prepare(
     dropped: list[_Row],
     rules: Sequence[_Path],
     *,
+    tables: Sequence[BBox] = (),
     document: _Document,
 ) -> tuple[list[_Row], RegionTree, list[_Row]]:
     """The rows of a page from the region tree: fragments grouped by the leaf they stand in,
     baselines merged inside a leaf only. Returns the rows, the tree (in place of the gutter)
     and the dropped rows."""
-    tree = _tree_of(page, kept, rules, document)
+    tree = _tree_of(page, kept, rules, tables, document)
     groups: dict[tuple[int, int], list[_Row]] = {}
     for f in kept:
         if f.vertical:

@@ -107,6 +107,23 @@ def _claim_tables(
     return found
 
 
+def _table_regions(found: Sequence[tables.PageTable], claimed: Sequence[_Row]) -> list[BBox]:
+    """Where each table stands on the page, caption included: its box and the boxes of the
+    lines it claimed (`claimed`: the page's fragments before `_claim_tables`)."""
+    out: list[BBox] = []
+    for table in found:
+        boxes = [table.bbox] + [claimed[i].bbox for i in table.lines if i < len(claimed)]
+        out.append(
+            (
+                min(b[0] for b in boxes),
+                min(b[1] for b in boxes),
+                max(b[2] for b in boxes),
+                max(b[3] for b in boxes),
+            )
+        )
+    return out
+
+
 CELL_MATHS_REASON = "table cell maths"
 MAX_CELL_EQUATIONS = 60  # a table with more maths cells than this is left to the table step
 _CELL_SCAN_LIMIT = 2_000_000  # cells x glyphs: a bigger table is not scanned

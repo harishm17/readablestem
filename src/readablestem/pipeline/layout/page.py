@@ -146,6 +146,7 @@ def _prepare_rows(
     rules: Sequence[_Path] = (),
     source: say_once.PageSource | None = None,
     *,
+    tables: Sequence[BBox] = (),
     document: _Document,
 ) -> tuple[list[_Row], Gutter, list[_Row]]:
     """The page's rows without its running headers, footers, page numbers and watermarks,
@@ -171,7 +172,9 @@ def _prepare_rows(
             kept.append(frag)
     if document.region_tree:  # the page's regions, from the fragments (regions.py)
         _mark_blanks(kept, rules)
-        rows, tree, rest = regions.prepare(page, kept, dropped, rules, document=document)
+        rows, tree, rest = regions.prepare(
+            page, kept, dropped, rules, tables=tables, document=document
+        )
         if source is not None:
             for row in rows:
                 source.add_row(row.chars)

@@ -92,7 +92,7 @@ from readablestem.pipeline.layout.rows import (
     take_form_fields,
 )
 from readablestem.pipeline.layout.shared import _Display, _PageBlocks, _Path, _Row
-from readablestem.pipeline.layout.tables import _claim_tables
+from readablestem.pipeline.layout.tables import _claim_tables, _table_regions
 
 HEADING_LEVEL_TOLERANCE = 0.05  # heading sizes within 5 % of each other share a level
 
@@ -418,6 +418,7 @@ def _analyze_document(
                 margins,
                 paths[number],
                 sources[number],
+                tables=_table_regions(found[number], unclaimed),
                 document=document,
             )
             # Axes with tick labels, an axis title or a curve from their corner are a plot's:
