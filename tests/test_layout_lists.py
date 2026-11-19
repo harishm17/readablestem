@@ -172,17 +172,20 @@ def test_a_spaced_minus_before_a_number_is_not_a_dash_bullet(dash):
     assert f"{dash} 40 m/s" in text and f"{dash} 20 m/s" in text
 
 
-def word_list_page(rows: list[tuple[int, str]]) -> bytes:
+def word_list_page(rows: list[tuple[int, str] | tuple[int, str, float]]) -> bytes:
     """A page as Word prints a bulleted list: the first-level bullet is a Wingdings square
     ("\\247" is U+F0A7) set as large as its text and cut off from it by a move of the pen, the
-    second-level bullet the letter "o" in Courier New. `rows` are (level, text)."""
+    second-level bullet the letter "o" in Courier New. `rows` are (level, text) or (level, text,
+    move): level 3 is a Wingdings square one step in, `move` the pen's move to the text."""
     size = 22
     stream = f"BT /F1 {size} Tf 72 700 Td\n"
     y = 700
-    for level, text in rows:
-        if level == 1:
+    for level, text, *move in rows:
+        if level in (1, 3):
+            x = 72 if level == 1 else 96
             stream += (
-                f"1 0 0 1 72 {y} Tm /F1 {size} Tf (\\247) Tj /F3 {size} Tf 14 0 Td ({text}) Tj\n"
+                f"1 0 0 1 {x} {y} Tm /F1 {size} Tf (\\247) Tj /F3 {size} Tf"
+                f" {move[0] if move else 14} 0 Td ({text}) Tj\n"
             )
         else:
             stream += f"1 0 0 1 120 {y} Tm /F2 {size} Tf (o) Tj /F3 {size} Tf 24 0 Td ({text}) Tj\n"
@@ -240,3 +243,26 @@ def test_a_lone_o_set_in_a_monospaced_font_before_monospaced_text_is_not_a_bulle
             page.insert_text((90, y), f"value{i} = compute(x)", fontsize=11, fontname="cour")
 
     assert not [e for e in analyze(one_page(fill)).elements if e.kind == Kind.LIST_ITEM]
+
+
+def test_a_bullet_with_only_an_operator_is_an_item_and_a_near_indent_takes_the_nearer_level():
+    """Slides: "\u25aa **" is an item whose text is an operator, and a first-level item whose
+    text starts a little right of its siblings' stays first level although the nested items'
+    text is within the nesting tolerance of it."""
+    page = word_list_page(
+        [
+            (1, "operator precedence"),
+            (3, "**"),
+            (3, "*"),
+            (3, "and the rest executed left to right"),
+            (1, "computers only know what you tell them", 25.4),
+        ]
+    )
+    got = [(lvl, t) for _, _, lvl, t in items(analyze(page).elements)]
+    assert got == [
+        (1, "operator precedence"),
+        (2, "**"),
+        (2, "*"),
+        (2, "and the rest executed left to right"),
+        (1, "computers only know what you tell them"),
+    ]

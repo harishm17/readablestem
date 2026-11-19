@@ -104,6 +104,10 @@
   the bullet), and Word's second-level bullet, the letter "o" in Courier New, is a nested list
   item marked `◦` (it came out as a paragraph, or ended in the item above). Two cases of one
   regression test. Stored documents with such lists change when they are converted again.
+  A bullet whose text is only an operator (`◦ **` on a slide) is an item too, and an item
+  takes the nearer of the two innermost open levels, not the deeper one whenever both are
+  within the tolerance (slides set at 26 pt put an item's text 6 pt from the first level
+  and 12 from the second). One more regression test.
 - Migrations: `8b1d5f3a9e04` (the step facts, the head of the release of 2026-11-18) is back
   where that release has it, after `c2f4a8d61e57`. `7b1d3e9a4c28` (`jobs.html_version`) and
   `8b3d5f0e2a71` (`request_tokens`) had been put under it, so a database already at the

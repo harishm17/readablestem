@@ -169,8 +169,10 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     start = rest[0][0]
     if chars[start].x0 - chars[m1 - 1].x1 > MAX_MARKER_GAP * row.size:
         return None
-    if not any(c.c.isalnum() or c.math for c in chars[start:]):
-        return None
+    if not any(
+        c.c.isalnum() or c.math or (sure and c.c not in _BULLET_GLYPHS) for c in chars[start:]
+    ):
+        return None  # a sure bullet may carry a lone operator ("◦ **"), nothing else is text
     marker = _Marker(text, family[0] != "bullet", start, chars[start].x0)
     return _MarkerCandidate(row, marker, family, readings, chars[m0].x0, sure)
 
@@ -359,7 +361,10 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             x = options
         else:
             x = options
-        while stack and x < stack[-1] - tolerance:
+        while stack and (
+            x < stack[-1] - tolerance
+            or (len(stack) > 1 and abs(x - stack[-2]) < abs(x - stack[-1]))
+        ):
             stack.pop()
         if not stack or x > stack[-1] + tolerance:
             stack.append(x)

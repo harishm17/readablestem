@@ -745,7 +745,9 @@ within 3 x font size:
   font size and no blank in the text layer; the usual split of a row's tokens is 0.3);
 - Word's second-level bullet, the letter `o` set in Courier New: a monospaced `o` followed by
   text that is not monospaced, with a sibling like a dash (so code that starts a line with
-  `o` in one monospaced face is not a list). It is reported as `◦` and nests by its indent;
+  `o` in one monospaced face is not a list). It is reported as `◦` and nests by its indent.
+  The text after a bullet glyph may be only an operator (`◦ **`); after any other marker it
+  needs a letter, a digit or math;
 - a bullet drawn as a small shape (at most 0.6 x font size) just left of the row at its
   height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
   filled squares "▪";
@@ -774,7 +776,8 @@ indent is fine). **Levels** come from the left edge of the item text, which is t
 for every item of one level even when the markers are right-aligned (LaTeX's "(i)",
 "(ii)", "(iii)"): consecutive items in reading order form one list, a deeper indent
 (more than 0.6 x body size) opens a level, a shallower one closes levels until one
-matches. The indent is measured from the left edge of the item's column on its page (the
+matches; an indent within that tolerance of both of the two innermost open levels takes
+the nearer one (a slide's 26 pt body makes the tolerance 16 pt). The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or
 on a page with another margin keeps its levels. A display equation inside an item does
 not end the list; any other block does.
