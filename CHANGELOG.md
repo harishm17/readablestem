@@ -49,6 +49,13 @@
   once the file owes nothing). A file of mostly scans uploaded with no box ticked waits for
   the choice (WS7.8); the replay answers it as offered. The answer to a file that looks cut
   off has a route test in the default suite.
+- Found on the pictures of every new state (60, at 1280 and 375 pixels, light and dark). The
+  table card said "the grid built from the PDF's own text with the first row as headers" on a
+  grid that has no header cell, right above "No cell is marked as a header": since WS5.2 a
+  first row is a header only where the page's layout shows one, so the two sentences
+  (`local_grid`, `numbers_not_a_table`) name no header. The question on a file that looks cut
+  off, with its two answers, stood under the whole download block; it is the first thing
+  under the page's links now, before the download it holds back.
 - Not changed, recorded as open: the job page does not yet say how many equations a Word file
   holds in words (the route logs the count, `docx_equations_as_words`); a page read without its
   ActualText raises no notice when the two readings differ. No model request changed.

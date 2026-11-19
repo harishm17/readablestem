@@ -65,6 +65,9 @@
     {% if job.is_owner %}<li><a href="#delete-heading">Delete</a></li>{% endif %}
   </ul>
 </nav>
+{# A question only the owner can answer comes before the download it holds back (WS14.5): the
+   status box asks it, and its two answers are the first thing under the links. #}
+{% if job.is_owner %}{% include "_job_cut_off.html" %}{% endif %}
 <div id="review-and-download" class="job-group">
 {% if state.group == "needs" %}
 {# Decisions open: the review is the main action; downloading now is a draft, and the
@@ -96,8 +99,6 @@
 {% if job.carry and job.is_owner %}
 {% include "_job_carry.html" %}
 {% endif %}
-
-{% if job.is_owner %}{% include "_job_cut_off.html" %}{% endif %}
 
 {% if pg.notices.total %}
 {% include "_job_notices.html" %}
