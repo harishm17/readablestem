@@ -561,6 +561,27 @@ def test_a_region_given_by_two_lines_is_the_box_the_four_numbers_for_it_would_ma
     assert "Choose both lines" in alone.text and "region.png" not in alone.text
 
 
+def test_every_line_of_a_dense_page_can_be_chosen_for_a_region(tmp_path):
+    output = edit_output()
+    for n in range(150):
+        output.result.elements.append(
+            Element(id=f"p1-d{n}", kind=Kind.PARAGRAPH, page=0, order=100 + n,
+                    bbox=(72.0, 10.0 + 4.5 * n, 540.0, 12.0 + 4.5 * n), text=f"Dense line {n}.")
+        )  # fmt: skip
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        path = f"/jobs/{env.job_id}/review"
+        query = {"page": 1, "tools": 1, "add": "picture"}
+        last = client.get(path, params=query | {"after": "p1-d149", "before": "bottom"})
+        assert "region.png" in last.text and "Choose both lines" not in last.text
+
+
 def test_the_most_that_can_be_added_is_limited(edits):
     for n in range(page_edits.MAX_ADDED):
         assert (

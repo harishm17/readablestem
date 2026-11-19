@@ -1619,14 +1619,14 @@ def split_list(
     )
 
 
-def _name_deciders(
-    request: Request, job_id: str, user: CurrentUser, items: dict[str, ReviewItem]
-) -> None:
-    """An item someone else decided says so ("Accepted by Sam"), not "by you": the words
-    that name them are those of the record (`shares.names_of`)."""
-    decided = {i.element_id for i in items.values() if i.by_you}
+def decider_names(
+    request: Request, job_id: str, user: CurrentUser, decided: set[str]
+) -> dict[str, str]:
+    """For each of the `decided` elements that someone else decided last, the words that
+    name them (`shares.names_of`): the review list and the side-by-side screen both say it
+    through this, so neither says "by you" for another person's decision."""
     if not decided:
-        return
+        return {}
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
         last: dict[str, str] = {}
@@ -1638,10 +1638,22 @@ def _name_deciders(
             last[edit.element_id] = edit.user_id
         others = {u for e, u in last.items() if e in decided and u != user.id}
         names = shares.names_of(session, job, user, others) if others else {}
-    for element_id, person in last.items():
-        if element_id in decided and person in names:
-            item = items[element_id]
-            item.status_label = item.status_label.replace(" by you", f" by {names[person]}")
+    return {e: names[u] for e, u in last.items() if e in decided and u in names}
+
+
+def name_decider(item: ReviewItem, name: str | None) -> None:
+    """Say who decided `item` when it was not the reader."""
+    if name is not None:
+        item.status_label = item.status_label.replace(" by you", f" by {name}")
+
+
+def _name_deciders(
+    request: Request, job_id: str, user: CurrentUser, items: dict[str, ReviewItem]
+) -> None:
+    """An item someone else decided says so ("Accepted by Sam"), not "by you"."""
+    names = decider_names(request, job_id, user, {i.element_id for i in items.values() if i.by_you})
+    for element_id, name in names.items():
+        name_decider(items[element_id], name)
 
 
 def _page(
@@ -2613,7 +2625,8 @@ def undo(
         log_event(logger, "review_stale", job_id=job_id)
         flash(
             request,
-            "Nothing was undone: this document changed after this page was opened.",
+            "Nothing was undone: this document changed after this page was opened. "
+            "Check the page as it is now and undo again if you still want to.",
             kind="warning",
         )
         return _back(exc.job_id, view)

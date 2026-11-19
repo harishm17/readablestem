@@ -128,6 +128,8 @@ from readablestem.web.routes.review import (
     _item,
     _load_result,
     _load_versioned,
+    decider_names,
+    name_decider,
     page_group_view,
     stale_notice,
     times_phrase,
@@ -157,7 +159,6 @@ SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 FIGURE_NUMBER = re.compile(r"\s*(?:figure|fig\.?)\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 SAID_HERE = "\ue000"  # stands for the equation in hand while a paragraph is cut into sentences
 LINES_BOTH = "Choose both lines, or leave both empty and give the four edges."
-MAX_TEXT_LINES = 120  # lines of text the page tools list for one page
 LINE_CHARS = 80  # of a line, in that list
 MARK_WORDS_CHARS = 60  # of an item's first words, in the list of a page's marks
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
@@ -307,7 +308,6 @@ class PageTools:
     opens: bool = False  # the tools are shown open (something was just done or refused)
     error: str = ""
     lines: list[TextLine] = field(default_factory=list)
-    lines_cut: int = 0  # lines not listed (a very long page)
     editor: TextEditor | None = None
     add: AddTool = field(default_factory=AddTool)
 
@@ -598,6 +598,11 @@ def _first_note(fix: Fix, compare: EquationCompare | None = None) -> str:
     return "Accepted with a note."
 
 
+def _first_lower(words: str) -> str:
+    """`words` to run on in a sentence: its first letter lower case, a person's name kept."""
+    return words[:1].lower() + words[1:]
+
+
 def _why(fix: Fix, compare: EquationCompare | None) -> str | None:
     """The one sentence that says what to look at."""
     if compare is not None and compare.summary:
@@ -649,6 +654,8 @@ class SplitBuilder:
         self.first_fix: dict[str, Fix] = {}
         for fix in self.result.fixes:
             self.first_fix.setdefault(fix.element_id, fix)
+        # Who decided what, read once and only when a reviewer decided something.
+        self._deciders: dict[str, str] | None = None
         # Notices with their names and places (T3-7), those the optional checks list.
         self.notes = [
             p
@@ -670,6 +677,15 @@ class SplitBuilder:
                 self.labels.get(fix.element_id),
                 tied=self.tied,
             )
+            if self.items[fix.element_id].by_you:
+                if self._deciders is None:
+                    self._deciders = decider_names(
+                        self.request,
+                        self.job_id,
+                        self.user,
+                        {f.element_id for f in self.result.fixes if f.decided_by_reviewer},
+                    )
+                name_decider(self.items[fix.element_id], self._deciders.get(fix.element_id))
         return self.items[fix.element_id]
 
     def url(
@@ -814,7 +830,8 @@ class SplitBuilder:
                 panel.status, panel.status_class = "Needs your decision", "pill-required"
             else:
                 states = {self.item(f).status_label for f in decision.fixes}
-                panel.status = "Decided: " + ", ".join(sorted(states)).lower().capitalize()
+                said = ", ".join(_first_lower(s) for s in sorted(states))
+                panel.status = f"Decided: {said[:1].upper()}{said[1:]}"
                 if any(f.element_id in self.view.carried_ids for f in decision.fixes):
                     panel.status += ", carried over from the earlier version"
                 panel.status_class = "pill-done"
@@ -1151,7 +1168,11 @@ class SplitBuilder:
             elif tier == "optional":
                 tag, name = "Note", f"{label}, optional check"
             else:
-                tag, name, tier = "✓", f"{label}, {self.item(fix).status_label.lower()}", "accepted"
+                tag, name, tier = (
+                    "✓",
+                    f"{label}, {_first_lower(self.item(fix).status_label)}",
+                    "accepted",
+                )
             boxes.append(
                 Box(
                     fix.element_id,
@@ -1234,14 +1255,10 @@ class SplitBuilder:
         held = [b.element for b in self.result.left_out_blocks if b.element.page == index]
         listed = sorted([*texts, *held], key=lambda e: e.order)
         left_out = {e.id for e in held}
-        # A line left out is listed however far down its page it is: the list is its way back.
-        shown = listed[:MAX_TEXT_LINES]
-        shown += [e for e in listed[MAX_TEXT_LINES:] if e.id in left_out]
-        for element in shown:
+        for element in listed:
             line = self.text_line(element, current=element.id == change)
             line.left_out = element.id in left_out
             tools.lines.append(line)
-        tools.lines_cut = len(listed) - len(shown)
         editing = next((e for e in self.result.elements if e.id == change), None)
         if editing is not None and editing.kind in TEXT_KINDS and editing.page == index:
             tools.editor = self.text_editor(editing)
@@ -1349,7 +1366,7 @@ class SplitBuilder:
             for error in invalid[1].errors:
                 tool.errors[error.field_id.split("-", 1)[0]] = error.message
         size = self.sizes.get(number - 1)
-        texts = self.page_texts(number - 1)[:MAX_TEXT_LINES]
+        texts = self.page_texts(number - 1)
         tool.lines = [self.text_line(e) for e in texts]
         tool.after, tool.before = add.get("after", ""), add.get("before", "")
         if tool.kind and (tool.after or tool.before) and size is not None:

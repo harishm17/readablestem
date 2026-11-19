@@ -559,6 +559,24 @@ def _behaviour(settings: Settings) -> str:
     return json.dumps(values, separators=(",", ":"))
 
 
+# The conversion options each step reads (`pipeline.options.current()`), by the kind it
+# handles. A step's key holds these and no others, so a choice a step never reads (exam
+# mode, for an equation or a table) leaves its stored answers findable. A step that starts
+# to read another option names it here, or it would be given an answer made without it.
+_STEP_OPTIONS: dict[Kind, tuple[str, ...]] = {
+    Kind.EQUATION: ("notation", "notation_memory"),  # `notation_memory.entries_in_force`
+    Kind.TABLE: ("tables",),  # `table_step.rebuild`
+    Kind.FIGURE: ("exam_mode", "long_descriptions"),  # `figure_step.describe`
+}
+
+
+def _options_read(kind: Kind, options: ConversionOptions) -> str:
+    names = _STEP_OPTIONS.get(kind)
+    if names is None:
+        return options.model_dump_json()
+    return json.dumps(options.model_dump(mode="json", include=set(names)), sort_keys=True)
+
+
 def step_key(
     element: Element,
     png: bytes,
@@ -570,14 +588,15 @@ def step_key(
     checked against the answer), the picture, the nearby text sent with it, the conversion
     options (notation, exam mode, feature flags), every behaviour setting (models, efforts,
     switches) and the conversion code with its prompts (`code_identity`). Equal keys mean
-    the same question, asked and handled the same way. A recorded model answer is keyed by
+    the same question, asked and handled the same way. Of the options, the key holds those
+    the element's step reads (`_STEP_OPTIONS`). A recorded model answer is keyed by
     its question alone (`models.question`); this key is for a finished fix."""
     parts = [
         code_identity(),
         element.model_dump_json(exclude={"id", "order"}),
         hashlib.sha256(png).hexdigest(),
         context_text or "",
-        options.model_dump_json(),
+        _options_read(element.kind, options),
         _behaviour(settings),
     ]
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()

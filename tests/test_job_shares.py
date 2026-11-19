@@ -774,6 +774,13 @@ def test_only_the_owner_sees_email_addresses_in_the_record(site):
     }
     assert f"by {DAVE}" in listed[OWNER] and "by you" not in listed[OWNER]
     assert "by you" in listed[REVIEWER] and f"by {ALICE}" not in listed[REVIEWER]
+    # and so does the side-by-side screen on the decided item
+    split = {
+        a: site.who[a].get(f"/jobs/{site.job_id}/review?item=p1-e3&accepted=1").text
+        for a in (OWNER, REVIEWER)
+    }
+    assert f"by {DAVE}" in split[OWNER] and "by you" not in split[OWNER]
+    assert "by you" in split[REVIEWER] and f"by {ALICE}" not in split[REVIEWER]
     # the banner and the list name the owner without an address
     assert ALICE not in site.who[VIEWER].get(f"/jobs/{site.job_id}").text
     assert ALICE not in site.who[VIEWER].get("/app").text

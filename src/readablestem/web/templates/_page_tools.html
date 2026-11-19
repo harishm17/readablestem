@@ -39,7 +39,6 @@
       {% endif %}
       {% endfor %}
     </ul>
-    {% if tools.lines_cut %}<p class="hint">{{ tools.lines_cut }} more {{ "line is" if tools.lines_cut == 1 else "lines are" }} not listed here.</p>{% endif %}
     {% else %}
     <p>Nothing was found on this page that has words to change.</p>
     {% endif %}
@@ -168,18 +167,18 @@
       {% if add.lines %}
       <fieldset class="table-fieldset region-lines" aria-describedby="lines-hint-{{ tools.number }}">
         <legend>Or choose it by the lines around it</legend>
-        <p class="hint" id="lines-hint-{{ tools.number }}">It is the part of the page between the two lines, across the width of the text. If you choose lines here, they are used and the four edges above are not.</p>
+        <p class="hint" id="lines-hint-{{ tools.number }}">It is the part of the page between the two lines, across the width of the text. If you choose lines here, they are used and the four edges above are not. Every line of the page is listed, numbered from the top: in a list, type a line's number to go to it.</p>
         <div class="region-grid">
           <div class="field"><label for="after-{{ tools.number }}">Starts after line</label>
             <select id="after-{{ tools.number }}" name="after">
               <option value="">No line chosen</option>
               <option value="top"{% if add.after == "top" %} selected{% endif %}>The top of the page</option>
-              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.after == line.element_id %} selected{% endif %}>{{ line.preview }}</option>{% endfor %}
+              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.after == line.element_id %} selected{% endif %}>{{ loop.index }}. {{ line.preview }}</option>{% endfor %}
             </select></div>
           <div class="field"><label for="before-{{ tools.number }}">Ends before line</label>
             <select id="before-{{ tools.number }}" name="before">
               <option value="">No line chosen</option>
-              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.before == line.element_id %} selected{% endif %}>{{ line.preview }}</option>{% endfor %}
+              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.before == line.element_id %} selected{% endif %}>{{ loop.index }}. {{ line.preview }}</option>{% endfor %}
               <option value="bottom"{% if add.before == "bottom" %} selected{% endif %}>The bottom of the page</option>
             </select></div>
         </div>

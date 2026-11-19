@@ -2363,13 +2363,15 @@ there). What it does not do:
 - **Pay for finished steps again.** While a job converts, each model step whose answer is
   worth keeping (`pipeline.run.reusable`: not `model_*`, `budget_*`, `internal_error` or
   `crop_error` failures, which a new try could change) is stored in `step_records` under a
-  key made from the element, its picture, its nearby text, the conversion options, every
+  key made from the element, its picture, its nearby text, the conversion options its step
+  reads (equations: the course notation; tables: the tables switch; figures: exam mode and
+  long descriptions, `pipeline.run._STEP_OPTIONS`), every
   behavior setting of the production profile and a digest of the conversion code and its
   prompts (`pipeline.run.step_key`, `code_identity`). A later conversion of the same job
   takes those answers instead of calling the model, so a retry spends only on what was
   missing; the cost and calls of the steps given back are taken off the new result's totals
   (`DbStepCache.reused_usd`), so `jobs.cost_usd` counts every step once. A changed key (a
-  new course notation, exam mode, another model, a changed setting, a deploy that changed
+  new course notation (equations), exam mode (figures), another model, a changed setting, a deploy that changed
   the conversion code) asks again: a stored fix is the model's answer after the code has
   judged it, so it is good for that code only, and nobody has to remember a version bump.
   The passes that ask about a whole page (page math, the page witness, a page read from
@@ -3494,8 +3496,10 @@ an edit or an error, and when `tools=1`) with, in this order:
 - *Add something the tool missed.* Step 1 is a plain GET form: a picture or an equation on its
   own line, and the region as four numbers from 0 to 100 (left and right across the page, top
   and bottom down it), or by two lines: "Starts after line" and "Ends before line", two selects
-  filled from the page's paragraphs, list items and headings in reading order (each option is
-  the line's first words, with "the top of the page" and "the bottom of the page" as ends; no
+  filled from the page's paragraphs, list items and headings in reading order, every one of
+  them however dense the page (each option is its number from the top of the page and the
+  line's first words, so typing a line's number in the list goes to it; "the top of the page"
+  and "the bottom of the page" are the ends; no
   view of the image, no JavaScript). The server writes the box the lines make into the four
   numbers (`page_edits.region_between`: below the first line, above the second, as wide as the
   page's text margins, rounded outward), so step 2 and the add route are the same for both; when

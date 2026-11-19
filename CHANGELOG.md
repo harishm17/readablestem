@@ -12,6 +12,22 @@
   and `data/eval/burden-corpus.json` are re-made at 0.5.13; the golden pages and the stored
   demo page are written again at render 9. Roll back: docs/deploy.md.
 
+## Unreleased: the review screen's names, long pages and out-of-date messages; step keys (branch fix/review-names-lines-keys)
+
+- The side-by-side review screen said "by you" for a decision another person made. It names
+  them now, with the same words as the review list (`routes/review.py` `decider_names`, used
+  by `SplitBuilder.item`); the delete page no longer says "You made N decisions" when
+  reviewers made some.
+- On a page with more than 120 lines of text the page tools stopped at line 120: the list of
+  lines and the two selects of "Add something the tool missed" now hold every line. The
+  options start with the line's number, so typing the number goes to the line.
+- Undo refused for an out-of-date page said what was not done and not what to do next; it
+  now says to check the page and undo again.
+- A step's key (`pipeline.run.step_key`) holds the conversion options its step reads: turning
+  exam mode on or off no longer discards the stored answers of equations and tables. Every
+  stored answer was already tied to the conversion code, so this release finds none of the
+  earlier ones either way.
+
 ## Unreleased: fixes after the independent review of this batch (branch fix/review-5)
 
 - A part shown as a picture had its "Not converted." label hidden from a screen reader whenever

@@ -416,7 +416,7 @@ def test_undo_a_group_decision_and_a_stale_or_empty_undo(ux):
     assert undo(ux, "0").status_code == 303  # a page from before that decision: refused
     assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"rejected"}
     page = screen(ux)
-    assert "Nothing was undone: this document changed after this page was opened." in page
+    assert "Nothing was undone" in page and "undo again if you still want to" in page  # a next step
     response = undo(ux, "1")
     assert response.headers["location"] == f"/jobs/{ux.job_id}/review?item={GROUP}"
     assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"needs_review"}
