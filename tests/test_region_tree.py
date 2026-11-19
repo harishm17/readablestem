@@ -97,7 +97,7 @@ def test_an_option_grid_is_read_in_label_order_with_the_tree_on_or_off():
     doc, page = _page()
     page.insert_text((40, 100), "Which of the following statements is true?", fontsize=10)
     for k, label in enumerate("abcdef"):
-        x, y = (40, 300)[k % 2], 130 + 62 * (k // 2)
+        x, y = (40, 300)[k % 2], 116 + 62 * (k // 2)
         page.insert_text((x, y), f"{label}) the first line of option {k} is", fontsize=10)
         for n in range(4):
             page.insert_text(

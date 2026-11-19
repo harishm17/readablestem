@@ -1085,6 +1085,7 @@ def _later_labels(rows: Sequence[_Row]) -> list[tuple[int, int]]:
 POINTS_LABEL = re.compile(
     r"^[(\[]\s*\d+(?:[.,]\d+)?\s*(?:points?|pts?\.?|marks?)\s*[)\]]$", re.IGNORECASE
 )
+OPTION_QUESTION_LINES = 12  # the most lines of a question's text that an option grid can follow
 OPTION_WRAP_REACH = 1.6  # x the line pitch: the most a wrapped line of an option is below the last
 
 
@@ -1169,6 +1170,36 @@ def _runs_on(piece: _Row) -> bool:
     return bool(words) and (words[-1].endswith((",", ";")) or words[-1].lower() in {"and", "or"})
 
 
+def _asks(
+    rows: list[_Row], start: int, opening: tuple[str, tuple[tuple[str, int], ...]], ctx: _Context
+) -> bool:
+    """Does the grid at `rows[start]` follow a question: a line that asks or introduces
+    ("...?", "...:"), or the lines of a list item of another marker family ("4." over "A.")
+    that run on to the grid? Subfigure captions "(a) ... (b) ...", runs of numbered blanks and
+    the like follow neither, so they are not options. A grid of capital letters with nothing
+    above it in its column carries on a question from the page or column before."""
+    form, readings = opening
+    below = rows[start]
+    if not any(row.column == below.column for row in rows[:start]):
+        return ("upper-alpha", 1) in readings
+    for row in reversed(rows[max(0, start - OPTION_QUESTION_LINES) : start]):
+        pitch = below.baseline - row.baseline
+        limit = max(OPTION_WRAP_REACH * ctx.pitch * below.size / ctx.body, 1.25 * below.size)
+        same_line = abs(pitch) <= 0.3 * below.size  # the points label at the right margin
+        if row.column != below.column or not (same_line or 0 < pitch <= limit):
+            return False
+        if row.marker is not None:
+            parsed = _ordered_marker(row.marker.text)
+            return parsed is None or parsed[0] != form
+        if row.kind != "text":
+            return False
+        if not same_line:
+            if row.clean.rstrip().endswith(("?", ":")):
+                return True
+            below = row
+    return False
+
+
 def _option_pieces(row: _Row, *, document: _Document) -> list[_Row]:
     """The row cut at each later option label (`_later_labels`): one row per option, each text.
     [row] when it holds one label, or when a piece would not be text."""
@@ -1237,6 +1268,8 @@ def _option_grid(
     if id(first) in skip or not _option_row(first) or opening is None:
         return None
     form = opening[0]
+    if not _asks(rows, start, opening, ctx):
+        return None
     cells: list[_OptionCell] = []
     at = start
     while at < len(rows):
