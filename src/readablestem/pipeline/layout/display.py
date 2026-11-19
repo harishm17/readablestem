@@ -18,6 +18,7 @@ from readablestem.pipeline.layout.drawings import (
     _column_content_near,
     _number_beside,
     _number_column,
+    _number_under,
     _rule_rows,
 )
 from readablestem.pipeline.layout.glyphs import _SIGNS, _Char, _clean, _union
@@ -62,11 +63,17 @@ def _split_labels(rows: list[_Row], *, document: _Document) -> list[_Row]:
     end in a relation or operator ("x =   2.4" keeps its right-hand side). Whether it is
     an equation number is decided later, by where it sits (`_equation_regions`).
 
-    A bracketed number that follows the comma or full stop ending the maths may stand closer
-    (`CLOSE_NUMBER_GAP`): a display that fills its column ("..., (2)") leaves less than a font
-    size before the number. Then the rest must read as a display equation on its own, so a
-    line of prose that ends in a reference ("... as in Eq. (2)") keeps it.
+    A bracketed number may stand closer (`CLOSE_NUMBER_GAP`) when it ends at the right edge of
+    its column's text: a display that fills its column ("..., (2)", "] (106)") leaves less than
+    a font size before the number. Then the rest must read as a display equation on its own,
+    so a line of prose that ends in a reference ("... as in Eq. (2)") keeps it.
     """
+    edges: dict[str, list[float]] = {}  # per column, the right ends of its rows, furthest first
+    for row in rows:
+        if not row.vertical:
+            edges.setdefault(row.column, []).append(row.x1)
+    for ends in edges.values():
+        ends.sort(reverse=True)
     out: list[_Row] = []
     for row in rows:
         tokens = _tokens(row)
@@ -85,7 +92,7 @@ def _split_labels(rows: list[_Row], *, document: _Document) -> list[_Row]:
             and before
             and (
                 row.chars[start].x0 - before[-1].x1 >= 1.0 * row.size
-                or _closes_display(row, start, before[-1], label, document=document)
+                or _closes_display(row, start, label, edges[row.column], document=document)
             )
             and before[-1].c not in _CONTINUATION_SIGNS
             and (
@@ -156,19 +163,31 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
         line.reasons = [*line.reasons, NUMBERED_REASON]
 
 
-CLOSE_NUMBER_GAP = (
-    0.3  # x font size: the least a bracketed number stands from the "," or "." before it
-)
+CLOSE_NUMBER_GAP = 0.3  # x font size: the least a bracketed number stands from the maths before it
 
 
-def _closes_display(row: _Row, start: int, last: _Char, label: str, *, document: _Document) -> bool:
-    """Is the bracketed number from `row.chars[start]` on the number of the display equation
-    that ends with `last` (a "," or "."), though it stands less than a font size from it?"""
+def _number_clearance(row: _Row) -> float:
+    """How far (x font size) a number stands clear of the maths it numbers: a font size, but
+    `CLOSE_NUMBER_GAP` for a bracketed number with a digit in it ("(50)" after a fraction that
+    fills the column's width)."""
+    text = row.clean
+    close = EQUATION_NUMBER.match(text) and text.endswith(")") and any(c.isdigit() for c in text)
+    return CLOSE_NUMBER_GAP if close else 1.0
+
+
+def _closes_display(
+    row: _Row, start: int, label: str, ends: list[float], *, document: _Document
+) -> bool:
+    """Is the bracketed number from `row.chars[start]` on the number of a display equation set
+    to the right edge of its column (`ends`: the right ends of the column's rows, furthest
+    first), though it stands less than a font size from the maths?"""
+    others = ends[1] if len(ends) > 1 and row.x1 >= ends[0] else ends[0]
+    before = [c for c in row.chars[:start] if not c.blank]
     if (
-        last.c not in ",."
-        or not label.endswith(")")
+        not label.endswith(")")
         or not any(c.isdigit() for c in label)
-        or row.chars[start].x0 - last.x1 < CLOSE_NUMBER_GAP * row.size
+        or row.chars[start].x0 - before[-1].x1 < CLOSE_NUMBER_GAP * row.size
+        or row.x1 < others - 0.5 * row.size
     ):
         return False
     probe = _Row(row.chars[:start], column=row.column)
@@ -619,7 +638,10 @@ def _equation_regions(
             if r.y0 <= middle <= r.y1
             and r.column == near[0].column
             and max(r.x0 - rule.bbox[2], rule.bbox[0] - r.x1) <= 4 * r.size
-            and not (_is_equation_number(r.clean) and r.x0 - rule.bbox[2] >= r.size)
+            and not (
+                _is_equation_number(r.clean)
+                and r.x0 - rule.bbox[2] >= _number_clearance(r) * r.size
+            )
         ]
         members = [*near, *(r for r in level if r not in near)]
         for row in members:
@@ -668,9 +690,24 @@ def _equation_regions(
             nearest.labels.append(label)
         elif label.far_number:
             label.kind, label.far_number = "text", False
+        elif under := _line_over_number(label, lines):
+            under.labels.append(label)
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
     return _stack_lines(lines, document=document)
+
+
+def _line_over_number(label: _Row, lines: list[_Line]) -> _Line | None:
+    """The line whose number `label` is, when it is set right-aligned on the line below it
+    (`_number_under`): the nearest line with no number yet that it stands under."""
+    over = [
+        line
+        for line in lines
+        if not line.labels
+        and line.rows[0].column == label.column
+        and _number_under(label, line.box, max(label.size, line.size))
+    ]
+    return min(over, key=lambda ln: label.y0 - ln.box[3]) if over else None
 
 
 def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:
