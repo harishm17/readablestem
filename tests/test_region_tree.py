@@ -15,6 +15,7 @@ import pymupdf
 
 from readablestem import config
 from readablestem.pipeline import layout
+from test_tables_detect import grid_table
 
 TAG = re.compile(r"[A-Z]\d\d")
 OPTION = re.compile(r"[a-f]\)")
@@ -98,6 +99,65 @@ def test_an_option_grid_is_read_in_label_order():
                 (x + 12, y + 12 * (n + 1)), "a following line of the option", fontsize=10
             )
     _right_only_on(doc, "abcdef", OPTION)
+
+
+def test_a_table_at_the_top_of_a_column_is_read_before_the_text_beside_it():
+    doc, page = _page()
+    grid_table(
+        page,
+        [["T00", "x", "y"], ["T01", "1", "2"], ["T02", "3", "4"]],
+        x0=40,
+        y0=100,
+        widths=[60.0, 60.0, 60.0],
+    )
+    _lines(page, "A", 40, 200, 30, 44)
+    _lines(page, "B", 320, 116, 40, 44)
+    assert _read(doc, on=True) == "TAB"
+
+
+def _picture(page: pymupdf.Page, rect: pymupdf.Rect) -> None:
+    pixels = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 200), False)
+    pixels.set_rect(pixels.irect, (120, 160, 200))
+    page.insert_image(rect, pixmap=pixels)
+
+
+def test_a_picture_that_starts_a_little_below_the_first_line_beside_it_is_in_its_row():
+    doc, page = _page()
+    _picture(page, pymupdf.Rect(40, 96, 280, 300))
+    _lines(page, "A", 40, 320, 30, 44)
+    _lines(page, "B", 320, 100, 40, 44)
+    assert _read(doc, on=True) == "AB"
+
+
+def test_a_rule_under_one_column_is_no_blank_of_the_line_in_the_other():
+    doc, page = _page()
+    _lines(page, "A", 40, 100, 40, 62)
+    _lines(page, "B", 320, 100, 8, 48)
+    _lines(page, "B", 320, 240, 20, 48)
+    page.draw_line((308, 219), (550, 219), width=0.6)  # under the 10th line of A, in a gap of B
+    assert _read(doc, on=True) == "AB"
+
+
+def test_line_numbers_in_the_margins_do_not_stop_the_columns():
+    doc, page = _page()
+    _lines(page, "A", 72, 100, 30, 34)
+    _lines(page, "B", 330, 100, 30, 34)
+    for i in range(0, 30, 5):
+        page.insert_text((56, 100 + 13 * i), str(i + 5), fontsize=7)
+        page.insert_text((560, 100 + 13 * i), str(i + 35), fontsize=7)
+    assert _read(doc, on=True) == "AB"
+
+
+def test_gaps_in_two_lines_of_a_paragraph_are_not_two_columns():
+    doc, page = _page()
+    _lines(page, "P", 40, 100, 3, 110)
+    page.insert_text((40, 150), "A01 alpha beta gamma delta eps", fontsize=9)
+    page.insert_text((210, 150), "B01 " + WORDS[:60], fontsize=9)
+    page.insert_text((40, 163), "A02 alpha beta", fontsize=9)
+    page.insert_text((110, 163), "A03 gamma delta", fontsize=9)
+    page.insert_text((210, 163), "B02 " + WORDS[:60], fontsize=9)
+    page.insert_text((210, 176), "B03 " + WORDS[:60], fontsize=9)
+    assert _read(doc, on=True) == "PABAB"
 
 
 def test_the_setting_is_off_by_default():

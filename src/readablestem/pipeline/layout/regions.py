@@ -296,7 +296,7 @@ class _Build:
         items = self.items
         box = _union([items[i][0] for i in idx])
         inner = _interior(chans, items, idx)
-        if not inner or len(inner) > MAX_COLUMNS - 1:
+        if not inner:
             return _Node("leaf", box, column=column)
         if len(inner) == 1:
             (a, b), left, right = inner[0]
@@ -314,15 +314,14 @@ class _Build:
                     channel=(a, b),
                 )
         need = 2 if self.slide else 3
+        # a channel counts when text stands beside text across it (the numbers of a margin,
+        # the gaps a formula leaves in a line are no columns), and only then are they counted
         good = [
             c
             for c in inner
-            if sum(self.weight.get(i, 1) for i in c[1]) >= need
-            and sum(self.weight.get(i, 1) for i in c[2]) >= need
-            and _prose(items, c[1])
-            and _prose(items, c[2])
+            if self._beside(c[1], c[2]) >= need and _prose(items, c[1]) and _prose(items, c[2])
         ]
-        if not good:
+        if not good or len(good) > MAX_COLUMNS - 1:
             return _Node("leaf", box, column=column)
         (a, b), left, right = max(good, key=lambda g: g[0][1] - g[0][0])
         lnode = self.build(left, _side(column, "L"), depth + 1)
@@ -335,6 +334,31 @@ class _Build:
             if widths[k] <= NOTE_RATIO * widths[1 - k] and filled <= NOTE_FILL * height:
                 node.notes = k
         return node
+
+    def _rows(self, side: Sequence[int]) -> list[tuple[float, float, int]]:
+        """A column's lines: (top, bottom, how many lines it holds) of each band of its
+        items, so that the pieces a formula cuts one line into are one line."""
+        items = self.items
+        return [
+            (
+                min(items[side[k]][0][1] for k in band),
+                max(items[side[k]][0][3] for k in band),
+                max(self.weight.get(side[k], 1) for k in band),
+            )
+            for band in _bands([items[i] for i in side])
+        ]
+
+    def _beside(self, left: Sequence[int], right: Sequence[int]) -> int:
+        """The lines (the fewer of the two columns') that have a line of the other column
+        at their height."""
+        lrows, rrows = self._rows(left), self._rows(right)
+
+        def facing(
+            rows: Sequence[tuple[float, float, int]], others: Sequence[tuple[float, float, int]]
+        ) -> int:
+            return sum(n for a, b, n in rows if any(min(b, d) > max(a, c) for c, d, _ in others))
+
+        return min(facing(lrows, rrows), facing(rrows, lrows))
 
     def _grid(
         self, idx: list[int], left: list[int], right: list[int], box: BBox, column: str
@@ -885,7 +909,9 @@ def _pictures(page: pymupdf.Page, height: float) -> list[Item]:
 
 def _takes_room(box: BBox, width: float, height: float) -> bool:
     w, h = box[2] - box[0], box[3] - box[1]
-    return w >= PICTURE_MIN_PT and h >= PICTURE_MIN_PT and w * h < PICTURE_MAX_SHARE * width * height
+    return (
+        w >= PICTURE_MIN_PT and h >= PICTURE_MIN_PT and w * h < PICTURE_MAX_SHARE * width * height
+    )
 
 
 def _tree_of(
