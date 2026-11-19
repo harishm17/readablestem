@@ -850,6 +850,35 @@ def _list_levels(items: list[Element]) -> list[int]:
 # --------------------------------------------------------------------------- headings
 
 
+ASIDE_LABEL = "Sidebar"
+# How a paragraph with a role is wrapped (`Element.role`): an aside is a landmark with a label
+# (a screen reader says what it is), a quote a `<blockquote>`.
+_ROLE_WRAP: dict[str, tuple[str, str]] = {
+    "aside": (f'<aside aria-label="{ASIDE_LABEL}">', "</aside>"),
+    "quote": ("<blockquote>", "</blockquote>"),
+}
+
+
+def _one_wrapper_each(chunks: list[str]) -> list[str]:
+    """Paragraphs of one role that follow each other with nothing written between them (no
+    page marker) go in one wrapper: one sidebar, one quotation."""
+    out: list[str] = []
+    for chunk in chunks:
+        for opening, closing in _ROLE_WRAP.values():
+            if (
+                out
+                and out[-1].startswith(opening)
+                and out[-1].endswith(closing)
+                and chunk.startswith(opening)
+                and chunk.endswith(closing)
+            ):
+                out[-1] = out[-1][: -len(closing)] + chunk[len(opening) :]
+                break
+        else:
+            out.append(chunk)
+    return out
+
+
 def is_entry(element: Element) -> bool:
     """A glossary entry that is written as a term and its definition."""
     text = element.text or ""
@@ -1256,7 +1285,7 @@ class _Renderer:
                 if after := self.marks_after(ordered[i]):
                     chunks.append(after)
             i += 1
-        return chunks
+        return _one_wrapper_each(chunks)
 
     def list_goes_on(self, ordered: list[Element], start: int) -> bool:
         """Is the next element after the equations from `start` on a list item?"""
@@ -1288,7 +1317,13 @@ class _Renderer:
         if element.id in self.footnote_ids:
             return self.footnote(element, text)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
-        return f"<p{attrs}>{self.rich(text, element)}</p>"
+        written = f"<p{attrs}>{self.rich(text, element)}</p>"
+        if element.role is None or element.term_end is not None or element.list_marker:
+            return written
+        if element.role == "aside":
+            self.add_style("aside", student_sheet.ASIDE)
+        opening, closing = _ROLE_WRAP[element.role]
+        return f"{opening}{written}{closing}"
 
     def footnote(self, element: Element, text: str) -> str:
         """A footnote, left where it falls in the text, as a `doc-footnote` with a

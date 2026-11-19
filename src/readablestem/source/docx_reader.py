@@ -199,8 +199,12 @@ class _Reader:
             self._heading(int(content[0]), content[2], str(content[1][0]))
         elif kind == "Div":
             self._div(content[0], content[1], depth)
-        elif kind == "BlockQuote":
+        elif kind == "BlockQuote":  # Word's "Quote" and "Block Text" styles
+            first = len(self.out.elements)
             self.blocks(content, depth + 1)
+            for element in self.out.elements[first:]:
+                if element.kind is Kind.PARAGRAPH and not element.preformatted:
+                    element.role = "quote"
         elif kind in ("BulletList", "OrderedList"):
             self._list(kind, content, 1, depth)
         elif kind == "Table":

@@ -543,6 +543,14 @@ RunKind = Literal[
 ]
 
 
+# What a block of text is apart from its kind (`Element.role`). "aside": text set apart from
+# the body, a sidebar, a callout box, a margin note or a pull quote (`<aside>`, which a screen
+# reader announces as a landmark). "quote": a block quotation (`<blockquote>`). A footnote is
+# not a role: it is a notice of its own (`Notice` "footnote"), and program code is
+# `Element.preformatted`, each read where it already was.
+Role = Literal["aside", "quote"]
+
+
 class Run(_Span):
     """A run of an element's `text` with a meaning of its own (`RunKind`). The characters
     stay in `text` as they were read: a struck date is kept and marked, never removed."""
@@ -756,6 +764,9 @@ class Element(BaseModel):
     # is `text[:term_end]`, the definition the rest; consecutive entries are written as one
     # definition list. None for every other element.
     term_end: int | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Paragraphs: set apart from the body (`Role`). None for every other element and left out
+    # of the JSON, so an element with no role is stored and written as before roles existed.
+    role: Role | None = Field(default=None, exclude_if=lambda v: v is None)
     # Figures: the alt text the PDF's own tags give this picture (a tagged Word or
     # PowerPoint export), cleaned. A proposal only: the figure step shows it to the model
     # as context, and offers it to a reviewer when the model has no usable description.

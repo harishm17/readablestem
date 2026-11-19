@@ -6,7 +6,7 @@ The sheet is a set of named parts and the builds made from them:
   every page has (`CORE_PARTS`, in this order: base, headings, equation, lists, hidden text,
   figure, flag and notice, about, skip link, then the narrow-screen, print and dark blocks). The
   feature parts (`CODE`, `DEFINITIONS`, `IMAGE_PAGE`, `TABLE`, `CONTENTS`, `PAGE_MARKER`,
-  `FOOTNOTE`, `FIGURE_DESCRIPTION`, `SCRIPT_STACK`, `DELETED`, `colour`, `print_fit`) are
+  `FOOTNOTE`, `ASIDE`, `FIGURE_DESCRIPTION`, `SCRIPT_STACK`, `DELETED`, `colour`, `print_fit`) are
   added only to a document that uses them (`assemble._Renderer.add_style`, once per name) and
   follow the core sorted by that name, so a document without a feature is written exactly as
   before.
@@ -258,6 +258,11 @@ PAGE_MARKER = """\
 @media screen and (prefers-color-scheme: dark) {
   .pagebreak { border-top-color: #8c8c8c; color: #c4c4c4; }
 }
+"""
+# Text set apart from the body (`<aside>`): a bar at its left edge in the text's own color, so it
+# shows on any theme and is not told by color alone (it is also a landmark with a label).
+ASIDE = """\
+aside { margin: 0 0 1em; padding-left: 1em; border-left: 3px solid currentColor; }
 """
 FOOTNOTE = """\
 [role="doc-footnote"] { font-size: 0.9em; }
