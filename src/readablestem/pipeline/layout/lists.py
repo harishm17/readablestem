@@ -353,10 +353,9 @@ def _list_markers(
         return False
 
     # A capital letter and a full stop starts a line of an author list as readily as an item
-    # ("A. Smith, B. Jones"), and some line of a long document has the next letter: the sibling
-    # of such a marker is a neighbor, the item just before or just after it in reading order, or
-    # the one just above or below it at the same x (options set in two columns across the page
-    # are read A, C, B, D by the line).
+    # ("A. Smith, B. Jones"), and some line of a long document has the next letter. A line that
+    # reads as names needs its sibling beside it: a neighbor, the item just before or just after
+    # it in reading order, or the one just above or below it at the same x.
     capitals = sorted(
         (c for c in candidates if _capital_letter(c)),
         key=lambda c: (page_of[id(c)], c.row.column == "R", c.row.baseline),
@@ -404,12 +403,23 @@ def _list_markers(
                 aligned((candidate.family, (style, value + step)), candidate, 1)
                 for style, value in candidate.readings
                 for step in (-1, 1)
-                if not (style == "upper-alpha" and _capital_letter(candidate))
-            ) or (bool(_capital_letter(candidate)) and beside(candidate))
+            )
+            if confirmed and _capital_letter(candidate) and _names(candidate):
+                confirmed = beside(candidate)
         else:  # the same bullet glyph on another row (this one counts itself)
             confirmed = aligned((candidate.family, ("bullet", 0)), candidate, 2)
         if candidate.sure or confirmed:
             candidate.row.marker = candidate.marker
+
+
+_NAMES = re.compile(r"[A-Z]\.|[A-Z][\w'\u2019-]+(?:,| and\b| et al\b)")
+
+
+def _names(candidate: _MarkerCandidate) -> bool:
+    """Does the text after the marker open like a list of authors: another initial ("S. Choi"), or
+    a surname and a comma, "and" or "et al"?"""
+    parts = candidate.row.clean.split(maxsplit=1)
+    return len(parts) == 2 and _NAMES.match(parts[1]) is not None
 
 
 def _capital_letter(candidate: _MarkerCandidate) -> int:
