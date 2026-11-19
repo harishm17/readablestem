@@ -180,6 +180,9 @@ VERSE = [
 ]
 
 
+WRAPPED = ["Round the answer to three", "decimal places and say what", "the year depends on."]
+
+
 def breaks(element) -> list[int]:
     return [r.start for r in element.runs if r.kind == "break"]
 
@@ -187,11 +190,12 @@ def breaks(element) -> list[int]:
 def test_short_lines_keep_their_line_ends_and_a_paragraph_that_ends_short_does_not():
     def fill(page):
         y = column(page, 100, LONG)
-        lines_at(page, y + 6, VERSE)
+        y = lines_at(page, y + 6, VERSE)
+        lines_at(page, y + 20, WRAPPED)  # a narrow paragraph, wrapped in mid-sentence
 
     elements = analyze(page_of(fill)).elements
-    paragraph, verse = [e for e in elements if e.kind is Kind.PARAGRAPH]
-    assert breaks(paragraph) == []
+    paragraph, verse, narrow = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert breaks(paragraph) == [] and breaks(narrow) == []
     assert verse.text == " ".join(VERSE)
     assert [verse.text[at] for at in breaks(verse)] == [" "] * 3
     assert breaks(verse) == [len(VERSE[0]), len(" ".join(VERSE[:2])), len(" ".join(VERSE[:3]))]

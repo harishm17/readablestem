@@ -985,6 +985,8 @@ KEPT_MIN_LINES = 3  # a block of at least this many lines can keep its line ends
 KEPT_SHORT_BY = 8.0  # em: a line that stops this far short of its column's right edge is short
 KEPT_LEFT_SPREAD = 1.0  # em: the lines of a poem or an address start at one left edge
 KEPT_SAME_END = 0.3  # em: lines that end this close to each other end at the same place
+KEPT_STOPS = '.?!:;)\u201d\u2019"'  # what a line may end in when the next one starts a sentence
+KEPT_WRAPPED = 0.25  # share of the line ends in the middle of a sentence: a wrapped paragraph
 KEPT_JUSTIFIED = 0.6  # share of the lines (two at least) ending at one place: justified text
 
 
@@ -1019,7 +1021,14 @@ def _keeps_lines(block: _Block, edges: _RightEdges, *, document: _Document) -> b
     # beside a figure) has every line end at one place; lines of verse do not.
     ends = sorted(r.x1 for r in rows[:-1])
     alike = max(sum(abs(x - end) <= KEPT_SAME_END * size for x in ends) for end in ends)
-    return alike < max(2, KEPT_JUSTIFIED * len(ends))
+    if alike >= max(2, KEPT_JUSTIFIED * len(ends)):
+        return False
+    # A narrow ragged paragraph wraps in the middle of a sentence: the line has no stop at
+    # its end and the next one starts in lower case. Verse and lists do not, or not often.
+    wrapped = sum(
+        a.clean[-1:] not in KEPT_STOPS and b.clean[:1].islower() for a, b in pairwise(rows)
+    )
+    return wrapped < KEPT_WRAPPED * (len(rows) - 1)
 
 
 # The text decisions layout raises on a paragraph or list item (`Element.reasons`; the
