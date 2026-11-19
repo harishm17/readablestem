@@ -2715,7 +2715,9 @@ fields, the equation's speech lines and LaTeX field, the figure's alt fields and
 keep-the-original block) is in `templates/_review_shared.html`; the two layouts keep their own.
 "More about this item" folds the details, the codes and the report link.
 
-**A phone** has a Decision / Page bar fixed at the bottom of the window (plain links; with script it
+**A phone** has a Decision / Page bar, fixed at the bottom of the window when the window is at
+least 32rem tall and a row above the decision in a shorter one (400% zoom on a laptop, a phone on
+its side: F-412) (plain links; with script it
 remembers where you were in each, so going back lands on the same place), "Fit to width" for the page
 image (kept for the tab), and "Enlarge" under each picture of the PDF, which opens it in a dialog (the
 image itself without script).

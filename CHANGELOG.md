@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased: the review bar leaves a short window alone (integration)
+
+- WS8.14 and WS13.7, as triage reduces them (F-412). The Decision / Page bar on the review screen
+  is fixed at the bottom of the window only when the window is at least 32rem tall. In a shorter
+  one (a laptop at 400% zoom is 16rem tall, and the bar took a quarter of it) it is a row above
+  the decision. CSS only.
+
 ## Unreleased: ActualText is chosen by page (branch fix/actualtext-by-page)
 
 - WS2.14, in its reduced form. A file's ActualText was applied to every span, and where a PDF

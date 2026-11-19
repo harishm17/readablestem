@@ -902,19 +902,24 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 /* Fit the page to the screen: no sideways scrolling of the page image. */
 .page-scroll.fit-width .page-frame { min-width: 0; }
 
-/* A phone: the Decision / Page bar stays at the bottom of the window. */
+/* A phone: the Decision / Page bar is a row above the decision, and stays at the bottom of the
+   window only when the window is tall enough to spare the room (32rem). At 400% zoom on a
+   laptop the window is 16rem tall, and a fixed bar took a quarter of it (F-412). */
 .view-toggle { display: none; }
 @media (max-width: 63.99rem) {
-  .view-toggle {
-    display: flex; gap: var(--space-2); position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-fixed);
-    padding: var(--space-2) var(--space-3); background: var(--bg); border-top: 1px solid var(--border-control);
-  }
+  .view-toggle { display: flex; gap: var(--space-2); padding: var(--space-2) 0; background: var(--bg); }
   .view-toggle a {
     flex: 1 1 0; display: flex; align-items: center; justify-content: center; min-height: 2.75rem;
     border: 2px solid var(--accent); border-radius: var(--radius-control); background: var(--bg);
     color: var(--accent); font-weight: 700; text-decoration: none;
   }
   .view-toggle a[aria-current="true"] { background: var(--accent); color: var(--on-accent); text-decoration: underline; text-underline-offset: 0.25em; }
+}
+@media (max-width: 63.99rem) and (min-height: 32rem) {
+  .view-toggle {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-fixed);
+    padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border-control);
+  }
   .wrap-review { padding-bottom: 5rem; }
   html:has(.view-toggle) { scroll-padding-bottom: 5rem; } /* a focused control is never under the bar */
   /* The footer's last links stay above the bar when the page is scrolled to its end. */
