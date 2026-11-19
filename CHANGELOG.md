@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: a reviewer's comments on a PDF are read as notes (branch feat/annotations-read)
+
+- WS14.4 (F-541, and the icon part of F-362). The comments in a PDF's annotations were lost, and
+  the drawings of its annotations (a sticky note's balloon, a caret, a pushpin) were read as
+  figures. A comment of a sticky note, a caret, a highlight, a box or a stamp is now a paragraph,
+  "Note on the page: ...", after the text it marks (a margin note after the nearest line, a reply
+  after its parent, a popup once); a caret the file calls a replacement says "replace with ...", and
+  struck text keeps its mark beside it. A highlight with no comment adds nothing. The drawings of
+  annotations are left out of the page's art where the page's drawings are first read
+  (`layout/document.py` `_read_page`, through `page_type.without_annotation_art`); the hidden-text
+  check still sees them (a box over a line is a fake redaction). Two optional notices:
+  `annotations_read` (a count) and `attachments_not_converted` (a count and the file names, shown
+  to the owner and kept in the record, never logged: `Notice.names`). On the seven annotation test
+  files the figures went from 4 to 1 (the pen mark stays a handwriting figure), the
+  "30 mL" note and the replacement date are present, and the struck date keeps its mark. The 73
+  replayed corpus results and the 996 layout results are identical before and after (the corpus holds
+  one file with annotation art and none with a comment or an attached file); replay errors and
+  crashes did not change (0 and 0; 3 layout refusals, as before). HTML, Listen, Word, EPUB, Canvas and
+  Common Cartridge carry the paragraph unchanged. No model request, prompt or migration changed;
+  `PIPELINE_VERSION` not bumped: the one bump owed at the next PR covers it.
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 
 - WS18.9 (F-557). LaTeXML already wrote `\ref`, `\eqref`, `\autoref`, `\cite` and each contents
