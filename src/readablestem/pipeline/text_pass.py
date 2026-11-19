@@ -17,7 +17,8 @@ keep, and adds to the elements without changing their text or anything a model s
   that number printed beside it (and not at the start of a paragraph, where it numbers
   the paragraph). Each links to the one figure, table or equation with that number; a
   number that two targets share, or none has, gets no link. The same for "Section 3.2"
-  (a heading that starts with that number), "Chapter 4" (a heading "Chapter 4"), and
+  (a heading that starts with that number), "Chapter 4" (a heading "Chapter 4"), "Appendix A"
+  and "Appendix B.2" (a heading "Appendix A", or "B.2 Title"), and
   "Theorem 2.1", "Lemma", "Proposition", "Corollary", "Definition" and "Example" (a
   paragraph or heading that starts with that label and number). A reference inside its own
   target is not linked.
@@ -93,6 +94,7 @@ from readablestem.pipeline import contrast, language, layout, page_type
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.baseline_rules import STRIKE_X_SLACK, Ink, classify
 from readablestem.pipeline.layout import FormField, Glyph, Strike
+from readablestem.pipeline.layout.elements import heading_number
 
 log = logging.getLogger(__name__)
 
@@ -622,6 +624,15 @@ CROSSREF = re.compile(
     re.IGNORECASE,
 )
 _NUMBER_RE = re.compile(_NUMBER, re.IGNORECASE)
+# "Appendix A", "Appendix B.2", "Appendices A and B": the number of an appendix is a capital letter
+# (or a digit), so the pattern is its own and "Table A" is not a reference.
+_APPENDIX_NUMBER = r"(?-i:[A-Z])(?:\.\d+)*|\d+(?:\.\d+)*"
+APPENDIX_REF = re.compile(
+    rf"(?<!\w)(?P<word>appendix|appendices)\s*(?P<first>{_APPENDIX_NUMBER})"
+    rf"(?P<rest>(?:{_JOIN}(?:{_APPENDIX_NUMBER}))*)(?![\w.]?\w)",
+    re.IGNORECASE,
+)
+_APPENDIX_NUMBER_RE = re.compile(_APPENDIX_NUMBER)
 # "(3)" alone, not right after a letter, digit or bracket ("f(3)", "x_(3)" are maths).
 BARE_EQUATION_REF = re.compile(r"(?<![\w)\]\u27e7])\((?P<num>\d+(?:\.\d+)*[a-z]?)\)(?!\w)")
 # A bare "(3)" is a reference only right after a word that introduces an equation
@@ -654,6 +665,7 @@ TargetKind = Literal[
     "equation",
     "section",
     "chapter",
+    "appendix",
     "theorem",
     "lemma",
     "proposition",
@@ -670,6 +682,7 @@ _KIND_OF_PREFIX: tuple[tuple[str, TargetKind], ...] = (
     ("sec", "section"),
     ("\u00a7", "section"),
     ("ch", "chapter"),
+    ("app", "appendix"),
     ("th", "theorem"),
     ("lem", "lemma"),
     ("prop", "proposition"),
@@ -701,13 +714,6 @@ _LABELLED = re.compile(
     r"(?P<num>\d+(?:[.\-]\d+)*[a-z]?)\s*(?=[.:(\u2013\u2014]|$)",
     re.IGNORECASE,
 )
-# A heading that numbers a section ("3.2 Title", "3.2. Title", "Section 3.2: Title") or a
-# chapter ("Chapter 4", "Chapter 4: Title").
-_SECTION_HEADING = re.compile(
-    r"\s*(?:(?:section|sec\.|\u00a7)\s*)?(?P<num>\d+(?:\.\d+)*)\.?(?=\s|$|[:\u2013\u2014])",
-    re.IGNORECASE,
-)
-_CHAPTER_HEADING = re.compile(r"\s*chapter\s+(?P<num>\d+)(?=\s|$|[.:\u2013\u2014])", re.IGNORECASE)
 
 
 @dataclass
@@ -752,14 +758,17 @@ def crossref_targets(
 
 
 def _label_targets(element: Element, targets: _Targets, lead: str = "") -> None:
-    """The section, chapter, theorem, ... that this heading or paragraph is, by the number
-    it starts with."""
+    """The section, chapter, appendix, theorem, ... that this heading or paragraph is, by the
+    number it starts with (`heading_number`: "3.2 Title", "Chapter 4", "Appendix A")."""
     text = lead + (element.text or "")
-    if element.kind is Kind.HEADING:
-        if match := _SECTION_HEADING.match(text):
-            targets.ids["section"][_key(match.group("num"))].add(element.id)
-        if match := _CHAPTER_HEADING.match(text):
-            targets.ids["chapter"][_key(match.group("num"))].add(element.id)
+    if element.kind is Kind.HEADING and (read := heading_number(text)):
+        label, number = read
+        if label in ("", "section") and number[0].isdigit():
+            targets.ids["section"][_key(number)].add(element.id)
+        if label == "chapter" and number.isdigit():
+            targets.ids["chapter"][_key(number)].add(element.id)
+        if label == "appendix" or (not label and number[0].isalpha() and "." in number):
+            targets.ids["appendix"][_key(number)].add(element.id)
     if match := _LABELLED.match(text):
         kind = _word_kind(match.group("word"))
         targets.ids[kind][_key(match.group("num"))].add(element.id)
@@ -781,15 +790,16 @@ class Reference:
 def references(text: str) -> list[Reference]:
     """Every reference-shaped piece of `text`, in order (targets are not looked up)."""
     found: list[Reference] = []
-    for match in CROSSREF.finditer(text):
-        if match.start() == 0 and _CAPTION_START.match(text, match.end()):
-            continue  # an unattached caption's own number
-        kind = _word_kind(match.group("word"))
-        found.append(Reference(match.start(), match.end("first"), kind, match.group("first")))
-        offset = match.start("rest")
-        for number in _NUMBER_RE.finditer(match.group("rest")):
-            start, end = offset + number.start(), offset + number.end()
-            found.append(Reference(start, end, kind, number.group()))
+    for pattern, numbers in ((CROSSREF, _NUMBER_RE), (APPENDIX_REF, _APPENDIX_NUMBER_RE)):
+        for match in pattern.finditer(text):
+            if match.start() == 0 and _CAPTION_START.match(text, match.end()):
+                continue  # an unattached caption's own number
+            kind = _word_kind(match.group("word"))
+            found.append(Reference(match.start(), match.end("first"), kind, match.group("first")))
+            offset = match.start("rest")
+            for number in numbers.finditer(match.group("rest")):
+                start, end = offset + number.start(), offset + number.end()
+                found.append(Reference(start, end, kind, number.group()))
     taken = [(r.start, r.end) for r in found]
     cued_end = -1  # end of the last bare reference an equation cue introduced
     for match in BARE_EQUATION_REF.finditer(text):

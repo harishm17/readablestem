@@ -42,12 +42,56 @@ def _title_key(text: str) -> str:
 
 _NUMBER_TAIL = re.compile(r" (\d{1,4}|[ivx]{1,6})$")
 
+# The number a heading or a contents entry starts with, after its label if it has one:
+# "3.2 Title", "Section 3.2: Title", "Chapter 4", "Appendix A", "B.2 Title", "Part IV", "II. Title".
+# A letter is a number only after "Appendix" or with a number after it ("B.2"); a roman numeral
+# only after a label or with the point that follows it ("II.").
+_HEADING_NUMBER = re.compile(
+    r"\s*(?:(?P<label>chapter|section|sec\.|\u00a7|part|appendix)\s*)?"
+    r"(?P<num>\d+(?:\.\d+)*|[a-z](?:\.\d+)*|[ivxlc]+)\.?(?=\s|$|[:\u2013\u2014])",
+    re.IGNORECASE,
+)
+_DIGITS = re.compile(r"\d+(?:\.\d+)*")
+_LETTER = re.compile(r"[a-z]\.\d+(?:\.\d+)*")
+
+
+def heading_number(text: str) -> tuple[str, str] | None:
+    """The label ("chapter", "section", "part", "appendix" or "") and the number (lower case:
+    "3.2", "a.1", "iv") that `text` starts with, or None. The one reading of "the number in
+    front" for a heading and for the contents entry that names it (`_contents_links`) and for
+    the references that name it (`text_pass`)."""
+    shown = unicodedata.normalize("NFKC", text).lstrip()
+    match = _HEADING_NUMBER.match(shown)
+    if match is None:
+        return None
+    label = (match.group("label") or "").lower()
+    label = "section" if label in ("sec.", "\u00a7") else label
+    num = match.group("num").lower()
+    if _DIGITS.fullmatch(num) or _LETTER.fullmatch(num):
+        return label, num
+    if len(num) == 1 and num.isalpha() and label == "appendix":
+        return label, num
+    if label and re.fullmatch(r"[ivxlc]+", num):
+        return label, num
+    if re.fullmatch(r"[ivx]+", num) and shown[len(num) : len(num) + 1] == ".":
+        return label, num
+    return None
+
+
+def _roman(number: str) -> bool:
+    """`number` (as `heading_number` gives it) is written in roman numerals."""
+    return re.fullmatch(r"[ivxlc]+", number) is not None
+
 
 def _contents_links(elements: list[Element]) -> list[Element]:
     """Each entry of a table of contents links to the heading it names, when the PDF's own
     links do not already say so (`text_pass` keeps those): a heading later in the document
-    whose title is the entry's, once the section number is left out of both. An entry that
-    names no heading, or more than one, is plain text."""
+    whose title is the entry's, once the section number is left out of both. When the entry and
+    the heading both print a number ("2.1", "Appendix A"), it must be the same one: "3.1 The
+    model" is not "2.1 The model", and of two headings with one title the number picks one.
+    A section number and an outline's roman numeral are not compared ("4.1 Scope" in the
+    contents of a file whose headings are "I. Scope", "II. ..."): there the title decides.
+    An entry that names no heading, or more than one, is plain text."""
     headings: dict[str, list[Element]] = {}
     for e in elements:
         if e.kind == Kind.HEADING and e.text:
@@ -58,7 +102,18 @@ def _contents_links(elements: list[Element]) -> list[Element]:
             key = _title_key(e.text)
             # An entry with no leaders keeps its page number as its last word.
             candidates = headings.get(key) or headings.get(_NUMBER_TAIL.sub("", key), [])
-            found = [h for h in candidates if h.order > e.order]
+            printed = heading_number(e.text)
+            found = [
+                h
+                for h in candidates
+                if h.order > e.order
+                and (
+                    printed is None
+                    or not (there := heading_number(h.text or ""))
+                    or there[1] == printed[1]
+                    or _roman(there[1]) != _roman(printed[1])
+                )
+            ]
             if len(found) == 1:
                 link = Link(start=0, end=len(e.text), kind="internal", target_id=found[0].id)
                 e = e.model_copy(update={"links": [link]})

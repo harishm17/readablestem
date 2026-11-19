@@ -1643,7 +1643,13 @@ bold). Items nest by indent (`list_level`). The page numbers are the printed boo
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document
 whose title is the same once section numbers are left out (`_contents_links`); when the
-PDF's own links already say where it goes, the text pass keeps those. Before, the
+entry and the heading both print a number ("2.1", "A.1", "Appendix A", "Chapter 4", "II."; one
+reading, `layout.elements.heading_number`, which the references below use too) it must be
+the same number, so "3.1 The model" does not link to "2.1 The model" when only that one is
+here (a part of a book), and of two headings with one title the entry's number picks one. With a
+number on one side only, or none, the title decides; so it does when one is a section number and
+the other an outline's roman numeral ("4.1 Scope" and "I. Scope"), which are not compared. When the PDF's own links already say where
+it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section
 lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
 
@@ -1657,7 +1663,7 @@ apart; a line with no number ends the list, so the section heading right after i
 taken in. It is tried before a grid is taken for a table: a table whose lines are mostly the
 list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`), so the
 reason `contents entry` fires and no second contents list is written. An entry with a number
-links to its heading by its title with the number left out (`_contents_links`). Not read: a
+links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). Not read: a
 list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
 it, a title that wraps onto a second line with the number on the second, and a two-column
 page (the columns are not known when tables are claimed).
@@ -2463,7 +2469,10 @@ beside it (an equation numbered "2.4" without brackets is not named by "(2.4)").
 when two targets share a number, when none has it, when it would overlap a PDF link or
 an inline equation, or at the very start of a paragraph that reads like an unattached
 caption ("Figure 2: ..."). The same table holds the other numbered things: a heading that
-starts with "3.2" is "Section 3.2", one that starts "Chapter 4" is "Chapter 4", and a
+starts with "3.2" is "Section 3.2", one that starts "Chapter 4" is "Chapter 4", one that
+starts "Appendix A" (or "B.2") is "Appendix A" ("Appendix B.2": `APPENDIX_REF` finds "Appendix A",
+"Appendix B.2", "Appendix 1" and "Appendices A and B"; the letter is a capital, so "an appendix a
+reader" is not one), and a
 paragraph or heading that starts "Theorem 2.1." (or "(name)." or ":" after the number) is
 that theorem; Lemma, Proposition, Corollary, Definition and "Example" (capital E, so "for
 example 3" is not one) work the same. A reference is never linked to the element it is in.
