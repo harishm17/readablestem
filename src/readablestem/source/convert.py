@@ -341,7 +341,14 @@ def _convert(
             # PDF route is not taken from here, so what the instructor can do is said
             failed.detail = failed.detail or {"kind": "docx"}
             raise
-        return finish(reading, origin="docx", report=None)
+        # What the reader left unread is kept on the stored result like a LaTeX source's, so the
+        # job page, the review page's student note and `checked.unread_of` still say it when the
+        # result is loaded again; nothing else of a Word file is in a report.
+        left = reading.unread_words or reading.unread_pictures
+        unread = SourceReport(
+            unread_words=reading.unread_words, unread_pictures=reading.unread_pictures
+        )
+        return finish(reading, origin="docx", report=unread if left else None)
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
         project, main, beamer, loaded = _project(
