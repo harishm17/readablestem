@@ -250,7 +250,7 @@ The first row is what it takes to tell a +1 point effect from none, so confirmin
 primary score" needs at least that many sections, more than the 15 of the registered set. Two
 caveats raise the number: the dev sections are ones the rules were tuned against, so their
 differences are probably smaller and less variable than a fresh set's; and the two recorded model
-runs of one system differ by 0.007 on equations (README), which is as large as the effect on the
+runs of one system differ by 0.007 on equations (docs/results.md), which is as large as the effect on the
 symbols score, so a real comparison needs replicates (two runs on each side) as well as sections.
 
 ## Against the chatbot recipe, on the same development pages (2026-10-21)
