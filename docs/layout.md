@@ -1938,8 +1938,8 @@ covers in the text, and a mark that opens no line or two places nothing (`_place
 block that begins a column is no continuation of the note that ends the one before it
 (`_merge_column_continuations`): a note ending in a URL, with no full stop, took the first
 paragraph of the next column in with it. The glyphs of a note's mark (the ones its link covers, and
-the ones that open the note's own line) are never read as maths (`NOTE_MARK_FLAG`, `_char_class`),
-so a mark beside a letter in a maths font is not made an inline equation with it. The mark is found
+the ones that open the note's own line) are never read as math (`NOTE_MARK_FLAG`, `_char_class`),
+so a mark beside a letter in a math font is not made an inline equation with it. The mark is found
 again in the element's text by what is printed before it; when an inline equation took some of
 those glyphs (it stands in the text as a placeholder) the context is cut from its left, down to the
 placeholder itself, and still has to be found exactly once, and not as the end of a number

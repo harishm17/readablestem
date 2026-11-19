@@ -23,7 +23,7 @@
   placed by the glyphs its link covers, when exactly one low line of small type opens with them;
   the second by the line the point lies just under (`_place_by_mark`, `_row_at`).
 - A footnote's mark was not linked to the note when an inline equation had taken the glyphs just
-  before it, or the mark itself (a mark beside a letter in a maths font). The mark's glyphs are
+  before it, or the mark itself (a mark beside a letter in a math font). The mark's glyphs are
   not read as maths, and the context that finds the mark in the text is cut down to the placeholder
   of the equation (`_mark_spots`, `NOTE_MARK_FLAG`).
 - Docs: docs/layout.md "Footnotes".
