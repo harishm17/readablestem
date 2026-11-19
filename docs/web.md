@@ -1895,7 +1895,9 @@ made before a page was left out is found.
   one whose result is the role the paragraph has now, which is also how a cleared role ("Not a
   quotation" on what a Word file had as one) is carried, and the new file's paragraph must say
   the same words. A role that was undone is not carried. If the new file already has that role
-  nothing is changed and it counts as carried.
+  nothing is changed and it counts as carried. Words, a heading, a role and "left out" are four
+  kinds of change: a paragraph that had two of them is two carried changes, or two listed as not
+  made again (`_apply_words` returns each kind it made), never one.
 - **Pictures and equations added by hand** come back only on the same page, where the region
   looks exactly as it did (both PDFs drawn the same way and compared; a file that is the same
   bytes needs no drawing), and where the tool has not found something new in that place (a

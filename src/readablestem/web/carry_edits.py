@@ -311,9 +311,9 @@ def _carry_words(
     old_fixes = {f.element_id: f for f in old.fixes}
     for old_id, origin in edited.items():
         new_id = matched.get(old_id)
-        kind = None
+        kinds = None
         if new_id is not None:
-            kind = _apply_words(
+            kinds = _apply_words(
                 old,
                 old_crops,
                 old_by[old_id],
@@ -326,19 +326,23 @@ def _carry_words(
                 role=roles.get(old_id),
                 leave_out=old_id in gone,
             )
-        if kind is None or new_id is None:
-            lost = (
-                BLOCK_LEFT_OUT
-                if old_id in gone
-                else HEADING
-                if "make_heading" in origin.ops
-                else TEXT
-                if origin.ops
-                else ROLE
-            )
-            out.drop(lost, old_by[old_id].page)
+        if kinds is None or new_id is None:
+            # The edits of one paragraph are made together or not at all: each is a change
+            # the person made, so each is listed.
+            lost = [
+                kind
+                for kind, was_made in (
+                    (HEADING, "make_heading" in origin.ops),
+                    (TEXT, old_by[old_id].text != origin.text),
+                    (ROLE, old_id in roles),
+                    (BLOCK_LEFT_OUT, old_id in gone),
+                )
+                if was_made
+            ]
+            for kind in lost:
+                out.drop(kind, old_by[old_id].page)
         else:
-            out.items.append((kind, new_id))
+            out.items.extend((kind, new_id) for kind in kinds)
     return out
 
 
@@ -355,12 +359,12 @@ def _apply_words(
     set_role: bool = False,
     role: str | None = None,
     leave_out: bool = False,
-) -> str | None:
-    """The edits of one item on its counterpart; BLOCK_LEFT_OUT, HEADING, TEXT or ROLE (only the
-    role was set) when they were made, None when not (the result is left as it was). A
-    paragraph left out is left out again last, and only where `page_edits.leave_out_block`
-    allows it: a new file that has a decision open on it, a link to it or an equation in it
-    keeps it, and the change is listed as not made again."""
+) -> list[str] | None:
+    """The edits of one item on its counterpart: the kind of each one made (HEADING, TEXT, ROLE,
+    BLOCK_LEFT_OUT, one per change the person made), None when they were not (the result is left
+    as it was). A paragraph left out is left out again last, and only where
+    `page_edits.leave_out_block` allows it: a new file that has a decision open on it, a link
+    to it or an equation in it keeps it, and the change is listed as not made again."""
     new_element = next(e for e in new.elements if e.id == new_id)
     typed = None
     if old_element.text != origin.text:
@@ -397,11 +401,16 @@ def _apply_words(
     except (ReviewInvalid, LookupError):
         page_edits.restore(new, before)
         return None
-    if leave_out:
-        return BLOCK_LEFT_OUT
-    if level is not None:
-        return HEADING
-    return TEXT if typed is not None else ROLE
+    return [
+        kind
+        for kind, made in (
+            (HEADING, level is not None),
+            (TEXT, typed is not None),
+            (ROLE, set_role),
+            (BLOCK_LEFT_OUT, leave_out),
+        )
+        if made
+    ]
 
 
 # --------------------------------------------------------------------------- added items

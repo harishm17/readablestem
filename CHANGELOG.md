@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
+
+- When a document is converted again, a paragraph the reviewer both reworded (or made a heading)
+  and set apart as a sidebar or quotation, or left out, was carried and counted as one change:
+  "1 change you made by hand was carried over", and the record named only the last kind. When the
+  paragraph had changed and none could be made again, "1 change was not made again" listed one
+  kind, so a lost role was reported as a lost wording (or a lost wording as a lost "left out").
+  `carry_edits._apply_words` now returns each kind it made, and `_carry_words` records each, as a
+  carried change or as one not made again. No stored data changes: the counts and the record rows
+  of documents already converted again stay as they were.
+
 ## Unreleased: a Word table cell whose formula could not be read is a decision (branch fix/source-equation-words)
 
 - A formula in a cell of a Word table that fails the product's checks (a command it does not
