@@ -332,7 +332,10 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    goes on in the left one; across columns the tail needs two rows or more, since a
    one-line tail across columns is too often a license line). A last line that stands in by
    a first-line indent (the one line of a paragraph, or the first line of the last paragraph
-   of a block) counts as at the edge. For a list item the head stands at the item's text,
+   of a block) counts as at the edge. A tail of two lines or more whose lines all stand
+   twelve ems or more in from its page's text edge is in the other column of a page whose
+   columns were not told apart (a first page with a one-column head over two columns), and is
+   compared like a tail across columns; an index's lines at several x do not qualify. For a list item the head stands at the item's text,
    not at its marker. When the place test is in doubt the break stays: a wrong join is worse
    than a cut. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
