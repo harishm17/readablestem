@@ -252,6 +252,9 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
    counted, so a break never vouches for itself.
+   Two lines that end and start in a script written without spaces (Han, Hiragana, Katakana,
+   Thai, Lao, Khmer, and their full-width punctuation) join with no separator
+   (`blocks._line_break`).
    A break that falls inside one token leaves it whole (`hyphens.joins_inside_token`, for
    paragraph text, headings, captions, list items and the cells of a table): a digit, a
    hyphen and a digit keep the hyphen with no space (`(2012-08-` / `17)`); a line that ends
@@ -609,9 +612,14 @@ it becomes inline equations with the item as their parent.
 
 Every character is classified: **math** (a math font such as CMMI, CMSY, MSBM, STIX,
 Cambria Math, Latin Modern Math, Noto Sans Math, Symbol; a Unicode math-italic letter like
-`𝑣`; Greek; a symbol that only occurs in math such as `∑ √ ≤ × →`), **digit**, **operator**
+`𝑣`; a Greek letter that is not part of a Greek word (below); a symbol that only occurs in math
+such as `∑ √ ≤ × →`), **digit**, **operator**
 (`+ - * / = < > ^` and the minus/plus-minus signs), bracket, letter, code (monospaced) or
 other. A minus sign alone is not math evidence: groff prints command-line options as `−d`.
+A run of two or more letters of the Greek script (U+0370 to U+03FF and U+1F00 to U+1FFF,
+accented letters included) in a text font is a Greek word, and prose (`glyphs.mark_greek_words`,
+set when the rows are read); so is the article "η" or "ο" with a Greek word beside it. A lone
+Greek letter, and Greek in a math font, stay math.
 
 - **Display equation rows**: `parse.equation_score >= 0.5`, no prose word (3+ plain
   letters other than `sin`, `log`, units like `mol`; or English two-letter words like `is`,
