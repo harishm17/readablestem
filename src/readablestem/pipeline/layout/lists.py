@@ -122,7 +122,7 @@ def _bullet_apart(
         gap = (chars[start + 1].x0 - chars[start].x1) / row.size
         own_font = chars[start].font != chars[start + 1].font
         apart = BULLET_APART_OWN_FONT if own_font else BULLET_APART
-        if gap >= apart or own_font:
+        if gap >= apart or (own_font and gap >= -apart):
             return [(start, start + 1), (start + 1, end), *tokens[1:]], gap < apart
     return tokens, False
 

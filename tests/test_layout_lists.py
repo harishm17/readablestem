@@ -146,6 +146,43 @@ def test_labels_that_are_not_a_full_run_are_left_in_page_order():
     ]
 
 
+def test_two_labelled_series_side_by_side_are_two_lists_below_their_question():
+    """A matching exercise: blanks and numbers on the left, letters on the right. Read row by
+    row it ran the question into the first blank and cut the lists apart."""
+    terms = ["___ 1. Osmosis", "___ 2. Diffusion", "___ 3. Active transport"]
+    meanings = ["A. Movement against a gradient", "B. Movement of water", "C. Movement downhill"]
+
+    def fill(page):
+        page.insert_text((72, 100), "7. Match each term with its definition.", fontsize=BODY)
+        for k, (term, meaning) in enumerate(zip(terms, meanings, strict=True)):
+            page.insert_text((90, 120 + PITCH * k), term, fontsize=BODY)
+            page.insert_text((250, 120 + PITCH * k), meaning, fontsize=BODY)
+        page.insert_text((72, 190), "8. Explain why cells are small.", fontsize=BODY)
+
+    assert items(analyze(one_page(fill)).elements) == [
+        ("7.", True, 1, "Match each term with its definition."),
+        ("1.", True, 2, "___ Osmosis"),
+        ("2.", True, 2, "___ Diffusion"),
+        ("3.", True, 2, "___ Active transport"),
+        ("A.", True, 2, "Movement against a gradient"),
+        ("B.", True, 2, "Movement of water"),
+        ("C.", True, 2, "Movement downhill"),
+        ("8.", True, 1, "Explain why cells are small."),
+    ]
+
+
+def test_a_bullet_set_against_its_text_is_an_item_when_another_line_has_the_same_bullet():
+    """Word's square touches its text ("\u25aaGrading", no gap, another font): a word that
+    starts with the sign is no item, so the line needs a sibling with the same bullet."""
+    glued = word_list_page([(1, "Grading", 11), (3, "approx. 20% quiz"), (1, "Recitations", 11)])
+    assert [(lvl, text) for _, _, lvl, text in items(analyze(glued).elements)] == [
+        (1, "Grading"),
+        (2, "approx. 20% quiz"),
+        (1, "Recitations"),
+    ]
+    assert not items(analyze(word_list_page([(1, "Grading", 11)])).elements)
+
+
 # ---------------------------------------------------------------- nesting and indents
 
 
