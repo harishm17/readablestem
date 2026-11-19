@@ -622,7 +622,7 @@ def _carry_unreadable(old: DocumentResult, rows: list[EditRow]) -> EditsCarried:
     for row in rows:
         if row.action != carry.CARRIED_ACTION:
             continue
-        kind = (row.after or {}).get(CARRIED_KEY)
+        kind = str((row.after or {}).get(CARRIED_KEY) or "edit")
         if (row.element_id, ROW_ACTIONS.get(kind, "")) in again:
             continue
         out.drop(kind, pages.get(row.element_id))

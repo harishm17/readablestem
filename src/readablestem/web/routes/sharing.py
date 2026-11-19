@@ -4,11 +4,11 @@ Three owner-only routes: the page that lists who has access (`GET /jobs/{id}/sha
 a person or changing their right (`POST /jobs/{id}/share`), and removing one
 (`POST /jobs/{id}/share/{share_id}/revoke`). Both POSTs are CSRF-checked and work without
 JavaScript. The Remove button's POST answers with the question "Remove <address>?" and removes
-only with `confirm=yes` (the answer to a click on a person nobody can bring back with one click,
-as on the course People section and the admin Block), so no address is in a URL. Nothing is sent to the person: the page shows the document's address for the
-owner to copy (a "Copy link" button with script, a selectable field without), and when the
-document will be deleted, which ends every share. The address works for nobody who is not signed
-in with the shared address.
+only with `confirm=yes` (as on the course People section and the admin Block), so no address is
+in a URL. Nothing is sent to the person: the page shows the document's address for the owner to
+copy (a "Copy link" button with script, a selectable field without), and when the document will
+be deleted, which ends every share. The address works for nobody who is not signed in with the
+shared address.
 
 No address is written to a log, a flash notice (it lives in the session cookie) or an event.
 
