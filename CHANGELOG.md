@@ -36,7 +36,9 @@
   that follows something says where it starts ("a plus the fraction b over c end fraction"); what
   stands last in another scope closes too; paired bars read "the absolute value of x" ("the norm of
   x" for double bars), closed when more follows, and a single bar keeps "such that", "divides" and
-  "given". Simple things stay short ("x squared", "x sub 0", "the square root of 2"). The pair
+  "given"; where a bar can be a sign of its own (`a|b, c|d`, a bra and a ket) every bar of the
+  row stays "vertical bar". Simple things stay short ("x squared", "x sub 0", "the square root of
+  2"). The pair
   search over every formula of up to six signs (56,796 prints) finds 3,765 groups of different
   prints said alike and 3,120 said alike up to trailing end words before, 15 and 0 after; at
   seven signs (495,459 prints) 99 and 0 after. All of those are the mixed number

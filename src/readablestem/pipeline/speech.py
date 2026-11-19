@@ -1284,12 +1284,39 @@ _ABSOLUTE = {"|": ("the absolute value of", "end absolute value"), "‖": ("the 
 _POSTFIX = frozenset("!′″‴%°")
 
 
+def _bar_operand(node: ET.Element) -> bool:
+    """Can a bar after this node close what it ends (a letter, a number, a closing bracket)?"""
+    text = _mo_text(node)
+    return node.tag != "mo" or text in _CLOSERS or text in _POSTFIX
+
+
+def _encloses(kids: list[ET.Element], start: int, end: int) -> bool:
+    """Can the bars at `start` and `end` only be a pair around what stands between them? Not when
+    a bracket between them opens or closes outside them (`|a⟩⟨b|`), and not when each bar stands
+    between two operands, where it can be a sign of its own (`a|b, c|d`, `⟨a|H|b⟩`)."""
+    depth = 0
+    for kid in kids[start + 1 : end]:
+        text = _mo_text(kid)
+        depth += (text in _OPENERS) - (text in _CLOSERS)
+        if depth < 0:
+            return False
+    if depth:
+        return False
+    before = start > 0 and _bar_operand(kids[start - 1])
+    after = end + 1 < len(kids) and (
+        kids[end + 1].tag != "mo" or _mo_text(kids[end + 1]) in _OPENERS
+    )
+    return not (before and after)
+
+
 def _pair_bars(kids: list[ET.Element]) -> None:
     """Pair the bars of a row that enclose something, and say so on them (`_BAR_ROLE`, the opening
     words in `_MARK`). A bar closes when something it can enclose stands before it (a letter, a
-    number, a closing bracket or another closed bar); after a sign, an opening bracket or at the
-    start of a row it opens. A bar already read another way (`_mark_bars`) or left without its
-    partner stays "vertical bar"."""
+    number, a closing bracket or another closed bar); otherwise it opens. "The absolute value of"
+    says what the bars mean, so it is said only where the row's bars can mean nothing else: every
+    bar has its partner and every pair can enclose (`_encloses`). In any other row (`a|b, c|d`,
+    a bra and a ket) every bar stays "vertical bar", as does a bar already read another way
+    (`_mark_bars`)."""
     stack: list[int] = []
     pairs: list[tuple[int, int]] = []
     operand = False
@@ -1302,7 +1329,9 @@ def _pair_bars(kids: list[ET.Element]) -> None:
                 stack.append(i)
                 operand = False
         else:
-            operand = kid.tag != "mo" or text in _CLOSERS or text in _POSTFIX
+            operand = _bar_operand(kid)
+    if stack or not all(_encloses(kids, start, end) for start, end in pairs):
+        return
     for start, end in pairs:
         inside = kids[start + 1 : end]
         opener, closer = kids[start], kids[end]

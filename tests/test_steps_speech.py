@@ -57,6 +57,13 @@ def test_every_gold_equation_has_speech(record):
         (r"\sqrt{a}+b", "the square root of a end root plus b"),
         (r"|x|", "the absolute value of x"),
         (r"|x|+1", "the absolute value of x end absolute value plus 1"),
+        (r"2|x-3|", "2 the absolute value of x minus 3 end absolute value"),
+        # bars that can be signs of their own are not called an absolute value
+        (r"a|b, c|d", "a vertical bar b comma c vertical bar d"),
+        (
+            r"|a\rangle\langle b|",
+            "vertical bar a close angle bracket open angle bracket b vertical bar",
+        ),
         (r"\|x\|", "the norm of x"),
         (r"\bar{a+b}", "the quantity a plus b end quantity bar"),
         # ions: the charge needs no "end power"; a nuclide is read as the element (the data
