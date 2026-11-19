@@ -815,7 +815,7 @@ or the item text starting within 3 pt in x. "i" is both a letter and a roman num
 siblings decide. So "A ball rolls", "2.5 metres is", "2.3 Speed", a lone "B. Smith" or
 "I. Newton", and a wrapped sentence that happens to start a line with a dash, stay
 paragraphs. A capital letter and a full stop is the marker of a list only beside its
-neighbour: the item just before or just after it, in reading order (a page's left column,
+neighbor: the item just before or just after it, in reading order (a page's left column,
 then its right), is the next or the previous letter. Some line of a long document starts
 with the next letter, so a row of an author list ("A. Smith, B. Jones" on a line of its own)
 has to find it next to it. Headings are decided first: "1. Introduction" in a large font is a
@@ -923,7 +923,7 @@ math font, stay math.
   A number that is a row of its own (`6.`, `14)`, in a text font, one or two tokens: OpenStax
   sets it above or beside the first line of an exercise that is only a stacked fraction or a
   system) is marked the same way (`_lone_exercise_number`, `_Row.exercise_number`); read as
-  a fragment it was drawn into the equation by `_math_neighbours`.
+  a fragment it was drawn into the equation by `_math_neighbors`.
 - **Rows of a table, braced systems (T2-2).** Two whole equations also join when they are
   set at most 0.7 x font size apart and share a left edge, a right edge or a center
   within 0.3 x font size (`_table_rows`: OpenStax centers each row of a system; a row may
@@ -1304,7 +1304,7 @@ OpenStax also prints "Solve the system by substitution. {" with the brace the la
 sentence's row and the two equations in rows of their own to its right, level with the brace and
 not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a math row
 starts within two font sizes to its right, another math row sits under that one, and the brace's
-middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
+middle is level with the two; `_math_neighbors` then takes the brace row into the system, so the
 crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
 layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
 answer key has them (text layer within 0.99), no other section moves by more than two; nothing else in
