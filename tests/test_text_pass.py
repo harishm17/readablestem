@@ -395,6 +395,14 @@ def test_a_coloured_phrase_becomes_a_run_and_the_body_text_does_not():
     result = annotate([el("p1-e0", text=text)], PdfText(glyphs={0: glyphs}), colour=True)
     (run,) = result.elements[0].colour_runs
     assert text[run.start : run.end] == "terms in red as vectors" and run.rgb == RED
+    # Small capitals: the page prints capitals where layout reads the lower-case letters.
+    text = "Read the Lotka and Volterra terms as vectors, the rest as scalars."
+    glyphs = coloured(
+        text.replace("Lotka and Volterra", "LOTKA AND VOLTERRA"), "LOTKA AND VOLTERRA"
+    )
+    result = annotate([el("p1-e0", text=text)], PdfText(glyphs={0: glyphs}), colour=True)
+    (run,) = result.elements[0].colour_runs
+    assert text[run.start : run.end] == "Lotka and Volterra"
 
 
 def test_colour_runs_need_the_flag():

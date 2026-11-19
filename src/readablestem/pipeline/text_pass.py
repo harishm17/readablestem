@@ -435,9 +435,18 @@ def _marker_ranges(text: str) -> list[tuple[int, int]]:
     return [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
 
 
+def _caseless(c: str) -> str:
+    """One character without its case (a character whose lower case is longer stays itself)."""
+    lower = c.lower()
+    return lower if len(lower) == 1 else c
+
+
 def align(text: str, glyphs: Sequence[Glyph]) -> list[int | None]:
     """For each character of `text`, the index of the glyph in `glyphs` that printed it,
-    or None (spaces, inline markers, and characters the alignment could not place)."""
+    or None (spaces, inline markers, and characters the alignment could not place).
+
+    Letters are compared without their case: layout reads a small capital as the lower-case
+    letter it stands for (`layout.shared.mark_small_capitals`), and the page prints a capital."""
     out: list[int | None] = [None] * len(text)
     if not text or not glyphs or len(text) > MAX_ALIGN_CHARS:
         return out
@@ -445,8 +454,8 @@ def align(text: str, glyphs: Sequence[Glyph]) -> list[int | None]:
     for start, end in _marker_ranges(text):
         masked[start:end] = [True] * (end - start)
     offsets = [i for i, c in enumerate(text) if not masked[i] and not c.isspace()]
-    ours = "".join(text[i] for i in offsets)
-    theirs = "".join(g.c for g in glyphs)
+    ours = "".join(_caseless(text[i]) for i in offsets)
+    theirs = "".join(_caseless(g.c) for g in glyphs)
     matcher = SequenceMatcher(None, ours, theirs, autojunk=False)
     for a, b, size in matcher.get_matching_blocks():
         for k in range(size):

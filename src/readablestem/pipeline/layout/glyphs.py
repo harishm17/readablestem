@@ -194,6 +194,10 @@ class _Char:
     # A letter of a Greek word: two or more letters of the Greek script in a text font
     # (`mark_greek_words`). Prose, not the symbols of a formula.
     greek_word: bool = False
+    # A small capital: a capital letter set smaller than its line's text but on its baseline
+    # (`mark_small_capitals`). Text, not a script; a lower-case letter of the source when a
+    # full-size capital leads the word.
+    small_cap: bool = False
 
     @property
     def blank(self) -> bool:

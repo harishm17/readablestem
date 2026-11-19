@@ -10,7 +10,7 @@ import bisect
 import statistics
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 
 import pymupdf
@@ -27,6 +27,9 @@ SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/super
 # glyph carrying MuPDF's superscript flag when it is raised this far. Word and LibreOffice
 # lower a subscript by 8 % of its size, TeX by 15 %, a raised mark by 33 % or more.
 SCRIPT_OFFSET = 0.04
+# A small capital sits on the baseline, to within this much (x the row size): Word and TeX
+# set it at 0, the least a script is lowered is about 0.1 (`mark_small_capitals`).
+SMALL_CAP_BASELINE = 0.05
 SCRIPT_MIN_RATIO = 0.62  # the smallest a script is, beside the text it belongs to
 SCRIPT_MAX_LIFT = 0.7  # the furthest off the baseline a script is (x the text size)
 _DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
@@ -215,13 +218,71 @@ class _Row:
 
         Smaller than the row's text, or raised with MuPDF's superscript flag. The flag
         alone is not trusted: MuPDF sets it on any span that starts above the previous
-        one, which in TeX output is most of a line after an inline fraction.
+        one, which in TeX output is most of a line after an inline fraction. A small
+        capital (`_Char.small_cap`, set by `mark_small_capitals`) is small and on the
+        baseline: text, never a script. Any test of a glyph's size against its line's that
+        means "a script" skips `small_cap` glyphs the same way.
         """
-        if c.blank:
+        if c.blank or c.small_cap:
             return False
         if c.size < SCRIPT_RATIO * self.size:
             return True
         return bool(c.flags & _SUPERSCRIPT_FLAG) and c.baseline < self.baseline - 0.2 * self.size
+
+
+def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
+    """`chars` with `small_cap` set on the small capitals of a line, and, in a word that also
+    has full-size capitals, lower-cased: "L" and "OTKA" (Word, LibreOffice and TeX with a
+    scaled font print the lower-case letters of "Lotka" as capitals at 80 %) read "Lotka".
+
+    The unit is a word of capital letters in one font, all on the line's baseline
+    (`SMALL_CAP_BASELINE`: a script is off it), set off from what is round it by anything but a
+    letter or digit. A letter of it smaller than the word's largest (`SCRIPT_RATIO`) is a small
+    capital, and a small capital is a lower-case letter of the source: the word is lower-cased
+    there ("Lotka", "LongMemEval" set as `L ONG M EM E VAL`), and none of it is a script. A word
+    of small capitals only is lower-cased too when the line shows what it is: its font and size
+    are those of a small capital found on the same line ("and" in `P OLICIES AND P ROCEDURES`).
+    On a line with no such word it is left alone, as is a capital next to a lower-case letter or
+    a digit: an all-small-caps "OTKA" by itself does not say whether it is a name, an acronym or
+    the name of a function in a formula (`OPT(x)` in a set, measured: read as text it cut that
+    formula in three), so it stays what the size rule made of it before."""
+    sizes = {round(c.size * 2) / 2 for c in chars if not c.blank}
+    if len(sizes) < 2:
+        return chars
+    row = _Row(chars)
+    size, base = row.size, row.baseline
+    reach = SMALL_CAP_BASELINE * size
+
+    def capital(c: _Char) -> bool:
+        return c.c.isalpha() and c.c.isupper() and not c.math and abs(c.baseline - base) <= reach
+
+    def face(c: _Char) -> tuple[str, float]:
+        return c.font, round(c.size * 2) / 2
+
+    out = list(chars)
+    words: list[tuple[int, int]] = []
+    n, i = len(chars), 0
+    while i < n:
+        if not capital(chars[i]):
+            i += 1
+            continue
+        j = i + 1
+        while j < n and capital(chars[j]) and chars[j].font == chars[i].font:
+            j += 1
+        start, i = i, j
+        if (start and chars[start - 1].c.isalnum()) or (j < n and chars[j].c.isalnum()):
+            continue
+        words.append((start, j))
+        largest = max(c.size for c in chars[start:j])
+        small = [k for k in range(start, j) if chars[k].size < SCRIPT_RATIO * largest]
+        for k in small:
+            out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
+    faces = {face(c) for c in out if c.small_cap}
+    for start, j in words if faces else ():
+        if all(face(chars[k]) in faces for k in range(start, j)):
+            for k in range(start, j):
+                out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
+    return out
 
 
 @dataclass(frozen=True)

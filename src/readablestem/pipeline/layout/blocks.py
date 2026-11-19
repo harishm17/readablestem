@@ -1119,7 +1119,10 @@ def _equation_block(
     first = [r for r in braces if r.x1 <= left + 0.5]
     ordered = [*first, *(r for r in rows if r not in first)]
     text = _clean(" ".join((r.text if plain else r.styled_text) for r in ordered))
-    script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
+    script = any(
+        c.flags & _SUPERSCRIPT_FLAG or (c.size < SCRIPT_RATIO * size and not c.small_cap)
+        for c in ink
+    )
     score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
     if len(rows) > 1:
         reasons.append(f"{len(rows)} lines merged")

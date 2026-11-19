@@ -800,6 +800,28 @@ Modern Sans):
 - MuPDF's superscript flag is set on any span that starts above the previous one, which
   in TeX output is most of a line after an inline fraction, so a character is a script
   only if it is smaller, or flagged and raised by at least 0.2 x font size.
+- **Small capitals are text.** Word, LibreOffice and TeX with a scaled font print the lower-case
+  letters of "Lotka" as capitals at 80 % of the size, on the baseline, in the same font: a
+  full-size "L" and the smaller "OTKA". Size alone made them a base with scripts, and an inline
+  equation in the middle of a name. A script is off the baseline (a Word subscript is lowered by
+  12 % of the row size, the least `SCRIPT_OFFSET` accepts is 4 %). `shared.mark_small_capitals`
+  sets `_Char.small_cap` when the rows are read. Its unit is a word of capital letters in one
+  font, all on the baseline (to within `SMALL_CAP_BASELINE`, 5 % of the row size), with no letter
+  or digit next to it. A letter smaller than the word's largest (`SCRIPT_RATIO`) is a small
+  capital, and that is a lower-case letter of the source: the word is lower-cased there ("Lotka",
+  "Volterra", "LongMemEval" printed as `L ONG M EM E VAL`), so search and speech get the word. A
+  word of small capitals only is lower-cased as well when its font and size are those of a small
+  capital found on the same line ("and" in `P OLICIES AND P ROCEDURES`: 68 such words in 10 of
+  the 19 corpus PDFs the rule touches). On a line with no such word it is left to the size rule,
+  as is a capital next to a lower-case letter or a digit: an all-small-caps "OTKA" by itself does
+  not say whether it is a name, an acronym or the name of a function in a formula (`OPT(x)` in a
+  set: read as text it cut that formula in three, measured on a corpus upload), so it reads as
+  before.
+  `_Row.is_script` and the tests of a glyph's size against its row's that decide "script" from
+  size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip `small_cap` glyphs; the
+  tests that also look at the baseline (`_script_glyphs`, `_Row.size`, `_stack_position`,
+  `_over_arrow`) need nothing. TeX's `\textsc` in a font of its own (CMCSC10) is one size with the
+  lower-case letters in the file: it reads as typed and was never affected.
 - Beamer sets math letters in Latin Modern Sans Oblique, a text font. Short italic runs
   (at most three letters) are variables, not words, when the row also has upright
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is

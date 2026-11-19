@@ -150,6 +150,27 @@
   summary is at least 44px high. No `disclosure()` macro, no markup change.
 - `/style` draws fields and notices with the macros in every kind and state; DESIGN.md has a short
   section on each.
+## Unreleased: small capitals are text, not scripts (branch fix/small-caps-are-text)
+
+- SW51d (F-512), the part that stands alone. A name set in small capitals ("Lotka–Volterra",
+  printed as a full-size capital and smaller capitals) was read as a base with raised or lowered
+  scripts, because the script test looked at size alone, and came out as inline equations in the
+  middle of a name: each cost the reviewer a decision and the job a model call. The small glyphs sit
+  on the baseline; a script does not. `mark_small_capitals` (`layout/shared.py`) marks them when the
+  rows are read (`_Char.small_cap`): a word of capitals in one font on the baseline, whose letters
+  smaller than its largest are small capitals. `_Row.is_script` and the three tests that called a
+  glyph a script from its size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip
+  them. In a word that has a full-size capital the small ones are lower-cased ("Lotka", not
+  "LOTKA"; "LongMemEval"); a word of small capitals only is lower-cased when the same line has
+  such a word in its font and size ("Policies and Procedures", not "Policies AND Procedures"),
+  and is otherwise left as it was (read as text, a function name in a formula cut the formula in
+  three). TeX's
+  `\textsc` in a font of its own was never affected; TeX with a scaled Times font (`times`,
+  Nimbus) was, and is fixed. Not built: the stored
+  `small_caps` run (WS16.2). A version bump is owed at the next pull request and covers this
+  (stored layouts change); no migration; no model request changed. The text pass now matches
+  the page's glyphs to the words without regard to case (`text_pass.align`), so a color, a
+  strike-through or a style on a small-capitals word covers the whole word.
 
 ## Unreleased: the icons are drawn from one SVG (branch fix/brand-icons-one-source)
 

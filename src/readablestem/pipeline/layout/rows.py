@@ -52,6 +52,7 @@ from readablestem.pipeline.layout.shared import (
     _Path,
     _Row,
     _RowIndex,
+    mark_small_capitals,
 )
 from readablestem.pipeline.parse import is_math_alphanumeric
 
@@ -370,9 +371,13 @@ def _page_rows(
                     )
             if any(not c.blank for c in chars):
                 vertical = abs(dy) > 0.2 or dx < 0
+                diagonal = abs(dx) > 0.2 and abs(dy) > 0.2
+                chars = mark_greek_words(chars)
                 rows.append(
                     _Row(
-                        mark_greek_words(chars), vertical, diagonal=abs(dx) > 0.2 and abs(dy) > 0.2
+                        chars if vertical or diagonal else mark_small_capitals(chars),
+                        vertical,
+                        diagonal=diagonal,
                     )
                 )
     return rows
@@ -1004,7 +1009,10 @@ def _leading_script(frag: _Row, size: float) -> tuple[_Row | None, _Row | None]:
         return None, None
     limit = SCRIPT_RATIO * size
     cut = 0
-    while cut < len(frag.chars) and frag.chars[cut].size <= limit and not frag.chars[cut].blank:
+    while cut < len(frag.chars):
+        c = frag.chars[cut]
+        if c.blank or c.small_cap or c.size > limit:
+            break
         cut += 1
     if cut == 0 or cut > 6:
         return None, None
@@ -1021,7 +1029,7 @@ def _stacked_tail(row: _Row, frag: _Row) -> bool:
     glyph = max(c.size for c in frag.ink)
     if not SCRIPT_MIN_RATIO * row.size <= glyph <= SCRIPT_RATIO * row.size:
         return False  # not script-sized: the numbers of a fraction are half the size
-    tail = [c for c in row.ink[-4:] if c.size <= SCRIPT_RATIO * row.size]
+    tail = [c for c in row.ink[-4:] if c.size <= SCRIPT_RATIO * row.size and not c.small_cap]
     return any(c.x1 > frag.x0 + 0.5 and c.x0 < frag.x1 for c in tail) and (
         frag.x0 >= row.x1 - 4 * frag.size
     )
