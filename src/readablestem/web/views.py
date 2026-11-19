@@ -397,6 +397,12 @@ class JobView:
         return self.role == "owner"
 
     @property
+    def combine_left_out(self) -> int:
+        """The parts of this file that "Combine parts" would leave out: the ones the person
+        keeps that are not ready (the combine page's count, `combine_view`)."""
+        return max(0, len(self.parts) - self.combinable)
+
+    @property
     def can_review(self) -> bool:
         return self.role in {"owner", "review"}
 
