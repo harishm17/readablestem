@@ -567,18 +567,25 @@ def _equation_regions(
     ]
     if document.grouping:
         lines = _join_connectives(lines, rows)
-    for label in labels:
+    # Numbers beside a line first, then the far ones (`_Row.far_number`), which go only to a
+    # line with no number yet: a number that fits none was never maths.
+    for label in sorted(labels, key=lambda r: r.far_number):
         centre = (label.y0 + label.y1) / 2
         beside = [
             line
             for line in lines
-            if _number_column(label, line.rows[0].column, line.box[2])
-            and _number_beside(label, line.box, line.size)
+            if _number_beside(label, line.box, line.size, far=label.far_number)
+            and not (label.far_number and line.labels)
             and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+        ]
+        beside = [ln for ln in beside if ln.rows[0].column == label.column] or [
+            ln for ln in beside if _number_column(label, ln.rows[0].column, ln.box[2])
         ]
         if beside:
             nearest = min(beside, key=lambda ln: abs((ln.box[1] + ln.box[3]) / 2 - centre))
             nearest.labels.append(label)
+        elif label.far_number:
+            label.kind, label.far_number = "text", False
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
     return _stack_lines(lines, document=document)

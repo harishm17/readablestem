@@ -65,6 +65,10 @@ class _Row:
     region: _Region | None = None  # the display equation it belongs to (_equation_regions)
     # An exercise number ("18.", "4)") cut off the front of a maths row: text, never maths.
     exercise_number: bool = False
+    # An equation number made maths only for standing within `NUMBER_REACH` font sizes of a
+    # piece of one (`_resolve_fragments`): `_equation_regions` gives it to a piece that has no
+    # number yet, or sets it back to text.
+    far_number: bool = False
     # The destinations the file names for a footnote that starts at this row (`_mark_notes`).
     note: tuple[str, ...] = ()
     # A line of a table of contents with its leaders and page number cut off

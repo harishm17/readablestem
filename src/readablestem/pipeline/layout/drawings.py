@@ -629,13 +629,25 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
             used.append(rule)
             attached.update(id(r) for r in near)
     queue = deque(r for r in mathish if id(r) in attached)
-    reach = NUMBER_REACH * index.largest  # _math_neighbours' widest vertical gap (a number's)
+    reach = 0.6 * index.largest  # _math_neighbours' widest vertical gap
     while queue:
         source = queue.popleft()
         for row in index.near(source.y0 - reach, source.y1 + reach):
             if id(row) not in attached and _math_neighbours(row, source):
                 attached.add(id(row))
                 queue.append(row)
+    far = NUMBER_REACH * index.largest
+    for row in mathish:
+        if row.kind == "frag" and id(row) not in attached:
+            for other in index.near(row.y0 - far, row.y1 + far):
+                if (
+                    other.kind == "math"
+                    and _number_column(row, other.column, other.x1)
+                    and _number_beside(row, other.bbox, max(row.size, other.size), far=True)
+                ):
+                    row.far_number = True
+                    attached.add(id(row))
+                    break
     for row in mathish:
         if row.kind == "frag":
             row.kind = "math" if id(row) in attached else "text"
@@ -678,15 +690,16 @@ def _number_column(row: _Row, column: str, x1: float) -> bool:
     return row.column == column or row.x0 >= x1
 
 
-def _number_beside(row: _Row, box: BBox, size: float) -> bool:
+def _number_beside(row: _Row, box: BBox, size: float, *, far: bool = False) -> bool:
     """Is `row` an equation number for the maths in `box`?
 
     Its vertical centre must be within half a font size of the maths: numbers sit on the
     baseline of a one-line equation, or halfway down a fraction (between numerator and
     denominator, on neither line). "(2.4)" or "Eq. 2.4" may sit on either side; a bare
-    "2.4" counts only to the right of the maths, with a gap. A bracketed number at the right
-    edge may stand up to `NUMBER_REACH` font sizes off the maths: it is centered on a group
-    of lines (or on an aligned row with wide spacing) and the nearest line is its equation.
+    "2.4" counts only to the right of the maths, with a gap. With `far`, a bracketed number
+    at the right edge may stand up to `NUMBER_REACH` font sizes off the maths: it is
+    centered on a group of lines (or on an aligned row with wide spacing) and the nearest
+    line is its equation.
     """
     text = row.clean
     bare = bool(BARE_EQUATION_NUMBER.match(text))
@@ -694,7 +707,7 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
         return False
     centre = (row.y0 + row.y1) / 2
     right = row.x0 - box[2] >= 1.0 * size
-    reach = NUMBER_REACH if right and not bare else 0.5
+    reach = NUMBER_REACH if far and right and not bare else 0.5
     if not box[1] - reach * size <= centre <= box[3] + reach * size:
         return False
     return not bare or right
