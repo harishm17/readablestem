@@ -512,8 +512,9 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
     assert response.status_code == 303 and response.headers["location"] == "/app"
     assert count(web, Job) == 0 and count(web, Blob) == 0
     page = web.browser.get("/app").text
-    assert "have been deleted" in page
-    assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
+    # The notice takes focus: a live region present at page load is not announced.
+    box = re.search(r"<div[^>]*>\s*<p>[^<]*have been deleted", page)
+    assert box and 'role="status"' in box.group(0) and " autofocus>" in box.group(0)
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
     # The upload's usage event stays for the counts, without the file's fingerprint.
     from readablestem.web.db import Event

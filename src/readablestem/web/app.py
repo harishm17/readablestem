@@ -196,6 +196,18 @@ def _breakable(text: str | None) -> Markup:
     return Markup(_BREAK_AFTER.sub(r"\1<wbr>", str(Markup.escape(text or ""))))
 
 
+def _attrs(values: dict[str, object]) -> Markup:
+    """The `attrs` template filter: a dict as HTML attributes, each with a space before it.
+    `True` writes the bare name (`novalidate`, `autofocus`: jinja's `xmlattr` writes
+    `autofocus="True"`, which is not a valid boolean attribute); `None` and `False` leave the
+    attribute out."""
+    return Markup("").join(
+        Markup(" {}").format(name) if value is True else Markup(' {}="{}"').format(name, value)
+        for name, value in values.items()
+        if value is not None and value is not False
+    )
+
+
 def _usd(value: float | None) -> str:
     return f"${(value or 0):.4f}" if (value or 0) < 0.01 else f"${(value or 0):.2f}"
 
@@ -216,6 +228,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     env.globals["REREAD_SHARED_NOTE"] = REREAD_SHARED_NOTE  # ty: ignore[invalid-assignment]
     env.filters["utc_text"] = _utc_text
     env.filters["breakable"] = _breakable
+    env.filters["attrs"] = _attrs
     env.filters["usd"] = _usd
     env.filters["speakable"] = _speakable
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)

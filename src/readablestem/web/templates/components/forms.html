@@ -14,12 +14,12 @@
 {% macro form(key, action, attrs={}, token_in_action=false) -%}
 {%- set row = form_row(key) -%}
 {%- set token = mint_request_token() if row.token else "" -%}
-<form method="post" action="{{ action }}{% if token_in_action and token %}{{ '&' if '?' in action else '?' }}{{ request_token_field }}={{ token }}{% endif %}"{{ attrs|xmlattr }} data-submit-once="{{ key }}" data-busy-label="{{ row.busy_label }}">
+<form method="post" action="{{ action }}{% if token_in_action and token %}{{ '&' if '?' in action else '?' }}{{ request_token_field }}={{ token }}{% endif %}"{{ attrs|attrs }} data-submit-once="{{ key }}" data-busy-label="{{ row.busy_label }}">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">{% if token %}<input type="hidden" name="{{ request_token_field }}" value="{{ token }}">{% endif %}
 {{- caller() }}
 </form>
 {%- endmacro %}
 
 {% macro submit_button(label, busy, name="", value="", class="", attrs={}) -%}
-<button type="submit"{% if name %} name="{{ name }}" value="{{ value }}"{% endif %}{% if class %} class="{{ class }}"{% endif %}{{ attrs|xmlattr }} data-busy-label="{{ busy_label(busy) }}">{{ label }}{% if caller is defined %}{{ caller() }}{% endif %}</button>
+<button type="submit"{% if name %} name="{{ name }}" value="{{ value }}"{% endif %}{% if class %} class="{{ class }}"{% endif %}{{ attrs|attrs }} data-busy-label="{{ busy_label(busy) }}">{{ label }}{% if caller is defined %}{{ caller() }}{% endif %}</button>
 {%- endmacro %}
