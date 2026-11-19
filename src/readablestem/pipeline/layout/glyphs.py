@@ -262,7 +262,10 @@ def mark_greek_words(chars: list[_Char]) -> list[_Char]:
     letters of the Greek script in a text font is prose. A lone Greek letter, and one in a
     maths font, stay maths (`_Char.math`), except the article "\u03b7" or "\u03bf" (and
     capitals) with one blank between it and a Greek word: it is a word of the sentence,
-    not a variable. A combining accent belongs to its letter."""
+    not a variable. Two letters are a word only on a line that holds a Greek word of three
+    or more: alone in a line of another language they are a product of two symbols (a
+    change of angle typed as capital delta and theta). A combining accent belongs to its
+    letter."""
     out = list(chars)
     n = len(chars)
 
@@ -284,6 +287,7 @@ def mark_greek_words(chars: list[_Char]) -> list[_Char]:
     def letters(span: tuple[int, int]) -> list[int]:
         return [k for k in range(*span) if _greek_letter(chars[k].c)]
 
+    long_word = any(len(letters(span)) >= 3 for span in spans)
     for at, span in enumerate(spans):
         run = letters(span)
         if len(run) == 1 and chars[run[0]].c in _GREEK_ARTICLES:
@@ -301,7 +305,7 @@ def mark_greek_words(chars: list[_Char]) -> list[_Char]:
             )
             if not (next_word or last_word):
                 continue
-        elif len(run) < 2:
+        elif len(run) < 2 or (len(run) == 2 and not long_word):
             continue
         for k in run:
             out[k] = replace(chars[k], greek_word=True)

@@ -54,7 +54,9 @@
 - SW54c, SW54d (F-544, F-545). A Greek sentence in a text font became a row of equations; now a
   run of two or more letters of the Greek script (accented letters included) is a word, and
   prose. A lone Greek letter, Greek in a math font and a lone theta in an English sentence stay
-  math; the article "η" or "ο" next to a Greek word is a word of the sentence. A line that ended
+  math; so do two Greek letters alone in a line of another language ("Δθ"), which are a word
+  only beside a Greek word of three or more letters; the article "η" or "ο" next to a Greek
+  word is a word of the sentence. A line that ended
   and the next one that began in Han, Kana, Thai, Lao or Khmer (or their full-width punctuation)
   were joined with a space in the middle of a word; they now join with none. Text of such
   paragraphs changes. One PIPELINE_VERSION bump is owed at the next PR.

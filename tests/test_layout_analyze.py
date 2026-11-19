@@ -213,6 +213,11 @@ def test_a_greek_sentence_is_prose_and_a_lone_greek_letter_is_still_maths():
     assert "είναι η επιστήμη" in greek[0].text
     english = analyze(html_page("<p>The angle \u03b8 is small and the force is large today.</p>"))
     assert [e.text for e in english.elements if e.kind == Kind.EQUATION] == ["\u03b8"]
+    # Two Greek letters alone in an English line are two symbols, not a word.
+    pair = analyze(
+        html_page("<p>The change \u0394\u03b8 is small and the force is large today.</p>")
+    )
+    assert [e.text for e in pair.elements if e.kind == Kind.EQUATION] == ["\u0394\u03b8"]
 
 
 def test_lines_of_chinese_japanese_and_thai_join_without_a_space():

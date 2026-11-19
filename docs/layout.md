@@ -618,8 +618,10 @@ such as `∑ √ ≤ × →`), **digit**, **operator**
 other. A minus sign alone is not math evidence: groff prints command-line options as `−d`.
 A run of two or more letters of the Greek script (U+0370 to U+03FF and U+1F00 to U+1FFF,
 accented letters included) in a text font is a Greek word, and prose (`glyphs.mark_greek_words`,
-set when the rows are read); so is the article "η" or "ο" with a Greek word beside it. A lone
-Greek letter, and Greek in a math font, stay math.
+set when the rows are read); so is the article "η" or "ο" with a Greek word beside it. Two
+letters count as a word only on a line that holds a Greek word of three or more letters: alone
+in a line of another language ("Δθ") they are two symbols. A lone Greek letter, and Greek in a
+math font, stay math.
 
 - **Display equation rows**: `parse.equation_score >= 0.5`, no prose word (3+ plain
   letters other than `sin`, `log`, units like `mol`; or English two-letter words like `is`,
