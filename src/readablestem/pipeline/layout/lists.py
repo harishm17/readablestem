@@ -127,6 +127,18 @@ def _bullet_apart(
     return tokens, False
 
 
+BLANK_RUN = 3  # underscores in a blank to fill in (a drawn blank is written as five)
+
+
+def lead_blank(row: _Row, tokens: list[tuple[int, int]]) -> bool:
+    """Does the row open with a blank to fill in, typed or drawn ("___ 1. Osmosis"), and go on
+    with at least a label and a word? (The blank is a run of underscores a token of its own.)"""
+    if len(tokens) < 3:
+        return False
+    start, end = tokens[0]
+    return end - start >= BLANK_RUN and all(c.c == "_" for c in row.chars[start:end])
+
+
 def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | None:
     """Does `row` start like a list item? A bullet glyph, an ordered marker ("a.", "(3)",
     "iv)", "3 ." as OpenStax prints it) or a drawn bullet just left of it, followed by
@@ -144,12 +156,17 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     if len(tokens) < 2:
         return None
     chars = row.chars
+    blank = lead_blank(row, tokens)
+    if blank:  # "___ 1. Osmosis": the label after the blank is the marker, the blank stays text
+        tokens = tokens[1:]
     (m0, m1), rest = tokens[0], tokens[1:]
     first = chars[m0].c
     if m1 - m0 == 1 and first in _DASHES and _signed_value(chars[m0], chars[rest[0][0] :]):
         return None  # "- 40 m/s", "\u2013 5 \u00b0C": a negative value, not a dash bullet
     hollow = m1 - m0 == 1 and first == "o" and chars[m0].mono and not chars[rest[0][0]].mono
     if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS or hollow):
+        if blank:
+            return None
         glyph = _HOLLOW_BULLET if hollow else _clean(first)
         family: tuple[str, str] = ("bullet", glyph)
         readings: tuple[tuple[str, int], ...] = ()
@@ -178,7 +195,7 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
         c.c.isalnum() or c.math or (sure and c.c not in _BULLET_GLYPHS) for c in chars[start:]
     ):
         return None  # a sure bullet may carry a lone operator ("◦ **"), nothing else is text
-    marker = _Marker(text, family[0] != "bullet", start, chars[start].x0)
+    marker = _Marker(text, family[0] != "bullet", start, chars[start].x0, start=m0 if blank else 0)
     return _MarkerCandidate(row, marker, family, readings, chars[m0].x0, sure)
 
 

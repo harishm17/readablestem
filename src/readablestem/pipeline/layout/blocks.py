@@ -47,6 +47,7 @@ from readablestem.pipeline.layout.lists import (
     MARKER_ALIGN,
     MAX_MARKER_GAP,
     _ordered_marker,
+    lead_blank,
     marker_readings,
 )
 from readablestem.pipeline.layout.rows import _join_rows
@@ -1245,7 +1246,9 @@ def _option_grids(
     out: list[_Row] = []
     i = 0
     while i < len(rows):
-        found = _option_grid(rows, i, ctx, skip, document=document)
+        found = _option_grid(rows, i, ctx, skip, document=document) or _matching_series(
+            rows, i, ctx, skip, document=document
+        )
         if found is None:
             out.append(rows[i])
             i += 1
@@ -1309,6 +1312,134 @@ def _option_grid(
             label_text, True, text_start, label_row.chars[text_start].x0, (id(first), place)
         )
         ordered += cell.rows
+    return at - start, ordered
+
+
+def _series_label(
+    row: _Row, tokens: list[tuple[int, int]], k: int
+) -> tuple[int, int, str, str, tuple[tuple[str, int], ...]] | None:
+    """The label that starts at token `k` of the row, after a blank to fill in if the token is
+    one: (index of its first character, index where the text after it starts, its text, its
+    form, its readings), None when the tokens there are no label with a word after it."""
+    if lead_blank(row, tokens[k:]):
+        k += 1
+    if k + 1 >= len(tokens):
+        return None
+    (start, end), (text_start, _) = tokens[k], tokens[k + 1]
+    text = "".join(c.c for c in row.chars[start:end])
+    parsed = _ordered_marker(text)
+    if parsed is None or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size:
+        return None
+    readings = marker_readings(parsed[1])
+    return (start, text_start, text, parsed[0], readings) if readings else None
+
+
+def _series_pieces(row: _Row, *, document: _Document) -> list[_Row] | None:
+    """The row cut where a label stands set apart from the text before it, one row per piece,
+    each starting with a label: a line that holds two series side by side ("___ 3. Active
+    transport  C. Movement ..."). [row] when it starts with a label and holds no other, None
+    when it does not start with one or a piece would not be text."""
+    tokens = _tokens(row)
+    starts = []
+    for k in range(len(tokens)):
+        at = tokens[k][0]
+        if _series_label(row, tokens, k) is None or (starts and tokens[k][0] <= tokens[starts[-1]][1]):
+            continue
+        if k and row.chars[at].x0 - row.chars[tokens[k - 1][1] - 1].x1 < OPTION_GAP * row.size:
+            continue
+        starts.append(k)
+    if not starts or starts[0] != 0:
+        return None
+    if len(starts) == 1:
+        return [row]
+    pieces = []
+    bounds = [tokens[k][0] for k in starts]
+    for begin, end in pairwise([*bounds, len(row.chars)]):
+        chars = row.chars[begin:end]
+        while chars and chars[-1].blank:
+            chars = chars[:-1]
+        piece = _Row(chars, column=row.column)
+        _classify_row(piece, document=document)
+        if piece.kind != "text" or _series_label(piece, _tokens(piece), 0) is None:
+            return None
+        pieces.append(piece)
+    return pieces
+
+
+def _matching_series(
+    rows: list[_Row], start: int, ctx: _Context, skip: dict[int, int], *, document: _Document
+) -> tuple[int, list[_Row]] | None:
+    """Two series of labels set side by side are read column by column, one list each: the
+    terms "___ 1. ... ___ 2. ..." beside the definitions "A. ... B. ..." of a matching exercise
+    read row by row ran the two together. It is a matching exercise when the labels of each
+    series are a full run (1, 2, 3 and A, B, C), the two are not of one style, each series
+    stands at an edge of its own in one column, and two labels share a line. The options of the
+    two lists are set a level below the question above, like those of a grid of options
+    (`_list_levels`)."""
+    first = rows[start]
+    if id(first) in skip or not _option_row(first) or _series_pieces(first, document=document) is None:
+        return None
+    cells: list[_OptionCell] = []
+    edges: list[float] = []  # the left edges of the series
+    at = start
+    while at < len(rows):
+        row = rows[at]
+        if id(row) in skip or not _option_row(row) or row.column != first.column:
+            break
+        pieces = _series_pieces(row, document=document)
+        if pieces is not None:
+            fresh: list[float] = []
+            for piece in pieces:
+                if not any(abs(piece.x0 - e) <= MARKER_ALIGN for e in (*edges, *fresh)):
+                    fresh.append(piece.x0)
+            if len(edges) + len(fresh) > 2:
+                if len(pieces) > 1:
+                    return None
+                break  # a third edge: the next question's number, not a series
+            edges += fresh
+            for piece in pieces:
+                label = _series_label(piece, _tokens(piece), 0)
+                assert label is not None
+                cells.append(_OptionCell([piece], label[3], label[4]))
+        elif row.marker is None and cells:
+            column = _option_column(cells, row)
+            if column is None:
+                break
+            cell = max(column, key=lambda c: c.rows[-1].baseline)
+            above = cell.rows[-1]
+            pitch = row.baseline - above.baseline
+            limit = max(OPTION_WRAP_REACH * ctx.pitch * row.size / ctx.body, 1.25 * row.size)
+            if abs(row.size - above.size) > max(1.0, 0.12 * row.size) or not (
+                0.5 * row.size <= pitch <= limit
+            ):
+                break
+            cell.rows.append(row)
+        else:
+            break
+        at += 1
+    if len(edges) != 2:
+        return None
+    series = [[c for c in cells if abs(c.x - edge) <= MARKER_ALIGN] for edge in edges]
+    if not all(_full_sequence(part) for part in series) or not _side_by_side(cells):
+        return None
+    if series[0][0].readings[0][0] == series[1][0].readings[0][0]:
+        return None
+    ordered: list[_Row] = []
+    place = 0
+    for part in series:
+        for cell in sorted(part, key=_value):
+            label_row = cell.rows[0]
+            label_start, text_start, text, _, _ = _series_label(label_row, _tokens(label_row), 0) or (0, 0, "", "", ())
+            label_row.marker = _Marker(
+                text,
+                True,
+                text_start,
+                label_row.chars[text_start].x0,
+                (id(first), place),
+                start=label_start,
+            )
+            ordered += cell.rows
+            place += 1
     return at - start, ordered
 
 
@@ -1951,11 +2082,21 @@ PAGE_SPAN_REASON = "page pass span"
 PAGE_LAYOUT_ONLY_REASON = "page pass did not confirm"
 
 
-def _carry_page_math(old: _Row, new: _Row, offset: int) -> None:
-    """The page math marks of `old` on `new`, a row made of `old.chars[offset:]`."""
+def _carry_page_math(old: _Row, new: _Row, offset: int, keep: int = 0) -> None:
+    """The page math marks of `old` on `new`, a row made of `old.chars[:keep]` and
+    `old.chars[offset:]`."""
     new.page_checked = old.page_checked
-    new.page_inline = [(a - offset, b - offset, t) for a, b, t in old.page_inline if a >= offset]
-    new.page_nonmath = [(a - offset, b - offset) for a, b in old.page_nonmath if a >= offset]
+    cut = offset - keep
+    new.page_inline = [
+        (a - cut if a >= offset else a, b - cut, t)
+        for a, b, t in old.page_inline
+        if a >= offset or b <= keep
+    ]
+    new.page_nonmath = [
+        (a - cut if a >= offset else a, b - cut)
+        for a, b in old.page_nonmath
+        if a >= offset or b <= keep
+    ]
 
 
 def _with_page_spans(
@@ -2013,9 +2154,9 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
     pieces: list[str | _Inline] = []
     rows = list(block.rows)
     if block.marker is not None and block.marker.end:
-        first = rows[0]
-        rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
-        _carry_page_math(first, rows[0], block.marker.end)
+        first, marker = rows[0], block.marker
+        rows[0] = _Row(first.chars[: marker.start] + first.chars[marker.end :], column=first.column)
+        _carry_page_math(first, rows[0], marker.end, marker.start)
     letters = _BoldLetters.start()
     steps: list[list[str | _Inline]] = []
     for row in rows:

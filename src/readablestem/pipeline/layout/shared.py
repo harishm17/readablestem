@@ -500,6 +500,9 @@ class _Marker:
     # label order). All the options of one question are one list a level below it, whatever
     # their x (`_list_levels`), and stay in label order (`_option_order`).
     option: tuple[int, int] | None = None
+    # Index in row.chars of the marker's first character: 0, or after a blank to fill in that
+    # opens the line ("___ 3. Active transport"). What stands before it stays in the item's text.
+    start: int = 0
 
 
 def _tokens(row: _Row) -> list[tuple[int, int]]:
