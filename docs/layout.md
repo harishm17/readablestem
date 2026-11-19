@@ -73,6 +73,7 @@ tests import), so `from readablestem.pipeline import layout` and `layout.analyze
 | `access` | opening the PDF under the one lock, the document cache, the probe process (see "Untrusted PDFs"), the content budget, `crop`, `crop_line`, `render_page`, `page_ink`, `release` |
 | `glyphs` | `_Char`, font classes and styles, character classes, text cleaning, `glyph_style` |
 | `shared` | the types the stages hand to each other (`_Row`, `_Block`, `_Run`, `_Figure`, `_Region`, `_Path`, ...) and the few helpers more than one stage needs |
+| `entries` | where a list of entries (an index, a glossary, key terms, an outline) starts a new entry, asked only with the region tree on |
 | `rows` | lines merged into rows, form fields, ligatures, right-to-left text, stacked fractions, scripts, big operators, reaction arrows; `line_glyphs`, `page_glyphs`, `page_strikes` |
 | `drawings` | the vector paths of a page: lines, turns, boxes, radicals, rules, axes |
 | `figures` | raster images and their budgets, vector clusters, diagrams, plots, labels and their owners, page furniture bands |
@@ -83,6 +84,7 @@ tests import), so `from readablestem.pipeline import layout` and `layout.analyze
 | `lists` | list markers and levels |
 | `blocks` | rows grouped into paragraphs, headings, list items, captions, code, contents lists, entries, with their text |
 | `tables` | table claims: the cells of a found table taken out of the page, their math and key terms |
+| `regions` | the region tree (`REGION_TREE`, off): the page cut into regions before its lines are made, and the reading order taken from it ("The region tree") |
 | `page` | one page, from its rows to its blocks (`_page_blocks`); figure labels, pen marks, drawn rules, footnote marks |
 | `joins` | passes over the whole document: run-in labels, numbered headings, paragraphs that go on over a page break |
 | `bold` | bold-letter runs and glossary entries |
@@ -300,6 +302,82 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    joined ones, are not carried and are shown as "decide again" or counted in
    `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
    unchanged.
+
+### The region tree (`REGION_TREE`, off in code and in production)
+
+`pipeline/layout/regions.py` (and `entries.py`). The reader above finds one gutter for the page,
+merges the page's fragments into lines and then orders the lines. A page with three columns, a
+notes column, text on both sides of a picture or a boxed sidebar has no one gutter, so its lines
+are read across the columns. With `REGION_TREE=on` the page is cut into regions first and read
+from the tree; with `off` (the default) none of this code runs and the output is byte-identical
+(a hash of `layout.analyze` over 996 PDF-and-variant pairs: 0 differences).
+
+**What a region is.** A node of a tree, with four kinds. A `leaf` holds lines read top to bottom
+(and, in a leaf, baselines are merged: a line never runs across a column, a picture or a box,
+because merging happens only inside one leaf). A `stack` is horizontal cuts: its children are
+read from the top. `cols` is one vertical cut: its children are read left to right, with a notes
+column last. A `grid` is a set of labeled cells read in label order. The items cut are the
+unmerged line fragments, the page's raster pictures (they occupy space), the rectangles drawn
+round text, and nothing else; tables are claimed before the rows are made (`_claim_tables`), so
+their cells are not items.
+
+**The cuts.**
+
+- *Horizontal.* Items are grouped in bands (items that overlap vertically). A run of bands that
+  keep one set of white channels is a segment. A band that does not (a line that spans the
+  region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
+  only when the band below is side by side (rule 6).
+- *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
+  lines each side (two on a slide) and a line of three words or more cuts it in two. Each side is
+  cut again, so a page has at most three columns. A column at most 0.35 of its neighbor's width
+  and at most 0.6 filled is a notes column: it is read after the body block it stands beside (at
+  block level) or after the whole body (at row level).
+- *Boxes (rule 2).* A rectangle drawn at least 40 x 18 pt and less than 0.8 of the page, holding
+  at least two lines and crossed by none, is cut as a region of its own, ordered inside itself
+  and read as one item. Touching filled pieces are joined. With text beside it, it is read at
+  the first block break below its bottom edge.
+
+**The rules, in the order they run.** The numbers are the plan's (WS15.1).
+
+1. Flat bands: one-column bands continue a one-column segment.
+2. Box regions (above).
+3. Section breaks in a column pair: `order._section_break` with `_ColumnExtent`, captions in the
+   extents, items taller than 2.5 body lines skipped, one line of large type allowed to be as
+   wide as its column; a short item directly above a spanning item opens it.
+5. Footnote zones: lines at most 0.92 of the body size at the foot of a column, at most 40 % of
+   it, are read at the end of the page.
+6. Wide gap (above).
+8. Options in label order: `(A) (B)` over `(C) (D)` and `(A) (C)` over `(B) (D)` read A, B, C, D;
+   a grid of labeled cells is a `grid` node.
+9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
+   on): on a page of 20 or more lines, half ending in a page number, median line seven words or
+   fewer, a line at the entry margin after a line that ends in a number starts a new entry.
+10. Entry lists: a line at the first line's edge starts a new paragraph when the run hangs (a
+    glossary), or when both open with a section number or a bold term.
+12. Numbered runs, the reordering only: where a run of six or more numbered labels is out of
+    sequence, the column-by-column reading is used if it makes the run consecutive.
+
+Rules 4 (a foot heading), 7 (the question rule) and 11 (labels given back to the text) were
+built, measured and taken out: leaving each out changed no page of the development sets, or
+adding it changed none. Rule 13 was not ported, and rule 12's page check was not built.
+
+**How it is wired.** `RegionTree` stands where the gutter stood: `order._Ordering` is a protocol,
+`Gutter` is `tuple | _Ordering | None`, and `order._reading_order` hands the boxes to
+`gutter.order(...)` when it is not a pair. `page._prepare_rows` returns the tree when
+`_Document.region_tree` is set; the row-level and the block-level calls differ (`blocks=True` only
+on the final block-level order of `_page_blocks`). Row `column` names are the tree's
+(`L`, `R`, `LL`, a `#k` suffix for a box, `~index` on an index page). The setting is
+`Settings.region_tree` (`off` or `on`), passed by `run.py` and the say-once report as
+`layout.analyze(region_tree=True)`.
+
+**Measured** (`eval order --set layout-dev-1` and the corpus gold pages, no model, scored on
+the elements): 267 development pages, 141 right off, 154 on (22 made right, 9 made wrong);
+91 corpus gold pages, 69 right off, 82 on (13 made right, none made wrong). Added alone on top
+of rules 1 to 8: rule 9 made 1 page right, rule 10 made 8, rule 12 made 1, none made one wrong.
+Leaving one of rules 1 to 8 out (pages that stop being right / pages that become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4 and 7 0/0. Speed: 0.575
+(off) and 0.578 s per page (on).
+
+**Why it is off.** It makes 9 development pages wrong while making 22 right, and the 9 are mostly pages with a table, an algorithm box or a figure at the top of one column (the other column's first lines are read first or the table is read after the text below it), two pages where a paragraph is joined across the columns or an inline formula line is read into its paragraph, and a page with line numbers in the margin, where every line becomes its own element. Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION` bump and a recorded re-measurement first.
 
 ### Headings
 
