@@ -35,6 +35,19 @@
   `notes` already exist as the run kind `break`, `term_end`, WS16.6 and WS14.4.
 - A document with no role writes the same page as before; no request to a model, prompt, model
   id, pipeline version, render version or migration changed.
+## Unreleased: paragraphs and list items that cross a page (branch feat/page-joins)
+
+- A paragraph or list item cut by a page break stayed two elements in cases the old test
+  could not see: a figure or table on top of the next page, a page number set low on a tall
+  page, a one-line tail in by its first-line indent, a tail whose last line starts a
+  paragraph, a list item that goes on at its text, and a page whose margin differs from the
+  one before. `_goes_on` compared the document's widest text area and any block's left edge;
+  it now compares the tail and the head each in its own column (the left edge against that
+  column's text edge on its own page), takes the tail from the body flow (`_flow_tail`) and
+  the head as the first block that is not a picture, table or caption (`_flow_head`), and
+  never joins across a display equation or a heading. A join the test doubts stays cut.
+  A joined list item no longer ends its list (`lists.py`). Pipeline version bump owed:
+  element ids and counts after a new join shift.
 
 ## Unreleased: the eval gate sees switches (branch fix/eval-guard-flags)
 

@@ -317,21 +317,31 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    two variables side by side and two formulas with a word between stay separate. The
    joined equation's box is the union of both lines, so its crop also shows the words
    either side of the break.
-   A paragraph that goes on over a page break is one element
-   (`_join_page_splits`, `Element.reasons` "joined across pages"): the lowest body block of
-   a page (footnotes in smaller type below it, and the running header and footer the margin
-   filter dropped, are not in the way) does not end a sentence, the top block of the next
-   page starts with a lower-case letter, and the two share size, typeface, weight and left
-   edge (or the left edge of another body block of its page: a two-column page that ends in
-   the right column and goes on in the left column of the next, which needs a tail of two
-   rows or more, since a one-line tail across columns is too often a license line) with
-   no first-line indent, both at the text area's edges. The element keeps the
+   A paragraph (or list item) that goes on over a page break is one element
+   (`_join_page_splits`, `Element.reasons` "joined across pages"). The tail is the last block
+   of the body flow of a page (`_flow_tail`): a picture, a table or a caption at the foot,
+   footnotes in smaller type, and a lone page number the margin filter left in the body (a
+   footer set low on a tall page) are skipped, but a display equation or a heading is the
+   tail itself, so nothing joins across it. The head is the first block that is not a
+   picture, a table or a caption (`_flow_head`), so a figure on top of the page does not hide
+   it. `_goes_on` is the one test: the tail does not end a sentence, the head is a paragraph
+   without a marker that starts with a lower-case letter and has no first-line indent, and
+   the two share size, typeface and weight. They stand at one edge (`_same_edge`): the same
+   x, or each at the text edge of its own column (`_text_edges` of its own page, so odd and
+   even pages with other margins agree, and a two-column page that ends in the right column
+   goes on in the left one; across columns the tail needs two rows or more, since a
+   one-line tail across columns is too often a license line). A last line that stands in by
+   a first-line indent (the one line of a paragraph, or the first line of the last paragraph
+   of a block) counts as at the edge. For a list item the head stands at the item's text,
+   not at its marker. When the place test is in doubt the break stays: a wrong join is worse
+   than a cut. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
    part keeps its own page for its crop. A hyphen at the page break is repaired like one at
    a line break. A paragraph that starts with math, a break onto a column that is not at the
-   left edge of a body block of the next page, and a list item (a lowercase paragraph after
-   a list item at a page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
+   text edge of the next page, and a head at a list item's marker rather than its text
+   are not joined. A list item that is joined no longer ends the list: the next item goes
+   on at the same level. `Element.last_page` is the 0-based page of
    the last part (None when it ends on its own page). The assembler writes the page markers
    of the pages after `page` up to `last_page` right after the joined paragraph (`marks_after`),
    never inside it, so the markers stay in order and continuous (Page 1, Page 2, Page 3) and the
