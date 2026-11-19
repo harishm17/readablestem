@@ -88,6 +88,40 @@
   uses them, and the pipeline's About version date and finish sentence use
   `checked_words.long_date`: "the last on <date>" now carries the year. A render bump is owed
   for the finish sentence; this branch does not raise `RENDER_VERSION`.
+## Unreleased: eval records that say what made them, and small guards (branch fix/eval-stamps-and-guards)
+
+- Every eval report and measured record now carries `provenance`: the commit, whether the tree
+  had changes, the pipeline and render versions, and the versions of pandoc, LaTeXML, PyMuPDF
+  and the fonts (`run_record.provenance`, one helper for every writer: `eval pipeline`,
+  `eval tables`, the measured records, the ledger, the page audit and the calibrate probes).
+  `eval gate` prints who made the current report; a report made before has no `provenance`
+  and is still read, as "not stamped". No kept record was made again.
+- The burden record counts the equations and tables with math that the check against the page
+  could not compare, by cause (`no_characters`, `no_usable_characters`, `unmapped_characters`,
+  `bold_letter`), and `eval burden --same` also compares how many answers each upload lacks.
+- A math cell of a table that is held against nothing writes the same passed check an
+  equation does (`table.math_not_compared`), with the cause. No card, no second reading.
+- The proof replay's code identity takes its settings from the gate's list
+  (`gate.guarded_settings`), so the two cannot differ. A bundle recorded with a shorter
+  identity is compared on the keys it names.
+- `eval.gate.UNGUARDED_CONSTANTS` and a test: a numeric constant of a step module that is in
+  neither list fails `tests/test_eval_gate.py`. Several that decide a request or a bar are
+  marked "NOT YET GUARDED" there; guarding them waits for the two no-model reports to be made
+  again.
+- The workflow tests' `OWED` list (29 files, 1,286 answers) is read from the replay record
+  instead of kept by hand. `eval/render.py` `png_bytes` checks the pixel budget before it
+  decodes. `docs/eval.md` no longer names an items file the local tables evaluation does not
+  use.
+- Text read without `font_codes.remap`: the PDF's own heading tags (`pipeline/tagged.py`), the
+  bold letters counted for the before and after card (`source_facts._bold_letters`) and the
+  old `parse` listing now read a symbol or TeX font's codes as layout does. A heading set with
+  a ligature code ("effects", with its ff one control code) had its tag text "eects" and
+  matched no element; a bold Symbol letter was counted as a bold plain letter.
+  `page_type.probe_pages` is unchanged: it counts non-space characters, which a code map does
+  not move except by a ligature's second letter.
+- A page joined from several parts names the pipeline versions the parts were converted at in
+  its generator tag (`ReadableSTEM 0.1.0, pipeline 0.5.11, 0.5.12`), where it named only the
+  package.
 
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 

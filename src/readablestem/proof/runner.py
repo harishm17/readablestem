@@ -163,14 +163,15 @@ def gold_label(pset: ProofSet) -> str:
 
 def code_identity(settings: Settings) -> dict[str, Any]:
     """What the recorded answers depend on: versions, models, the settings that matter."""
-    from readablestem.eval.gate import code_versions
+    from readablestem.eval.gate import code_versions, guarded_settings
 
     names = IDENTITY_SETTINGS
     if settings.model_provider != "openai":
-        # Only a run on another provider records these, so that a recording made on the
-        # OpenAI provider keeps exactly the identity it was made with.
         names = (*names, *ANTHROPIC_IDENTITY_SETTINGS)
-    values = {name: getattr(settings, name) for name in names}
+    # The gate's list of the settings that decide what is asked and accepted, so a proof
+    # replay and an eval report cannot disagree about it. A recording made before this
+    # names fewer: `check_identity` compares what a recording names.
+    values = {name: getattr(settings, name) for name in names} | guarded_settings(settings)
     return {
         "pipeline_version": run.PIPELINE_VERSION,
         "prompts": dict(sorted(code_versions().items())),
@@ -194,7 +195,9 @@ def check_identity(recorded: dict[str, Any], current: dict[str, Any]) -> list[st
             if was.get(key) != now.get(key):
                 out.append(f"{group} {key}: recorded {was.get(key)}, this checkout {now.get(key)}")
     was, now = recorded.get("settings", {}), current["settings"]
-    for key in sorted(set(was) | set(now)):
+    # A setting the recording does not name was not part of what it was made under (it
+    # predates the setting, or the list of them): there is no recorded value to differ from.
+    for key in sorted(was):
         if was.get(key) != now.get(key):
             out.append(f"setting {key}: recorded {was.get(key)!r}, now {now.get(key)!r}")
     return out

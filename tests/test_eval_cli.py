@@ -235,3 +235,32 @@ def test_an_unpriced_model_is_an_error_not_a_traceback(gold, tmp_path, fake_inpu
     assert main(args) == 2
     err = capsys.readouterr().err
     assert "invalid model settings" in err and "no price for ANTHROPIC_MAIN_MODEL" in err
+
+
+def test_every_report_and_record_says_which_code_and_tools_made_it(
+    gold, tmp_path, fake_inputs, monkeypatch
+):
+    from readablestem.eval import measure, run_record
+
+    # A made-up tool version, so the test does not depend on what this machine has installed.
+    monkeypatch.setattr(
+        "readablestem.ops.profile.tool_version", lambda program, flag: f"{program} 9.9"
+    )
+    assert main(pipeline_args(gold, tmp_path, "--fake")) == 0
+    ledger_out = tmp_path / "ledger.json"
+    assert main(["eval", "ledger", "--out", str(ledger_out)]) == 0
+    measured = measure.record([], settings(), {}, of_set={"split": {}})
+    made = [
+        json.loads((tmp_path / "report.json").read_text())["provenance"],
+        json.loads(ledger_out.read_text())["provenance"],
+        measured["provenance"],
+    ]
+    for stamp in made:
+        assert len(stamp["commit"]) in (7, 40) or stamp["commit"] == "unknown"
+        assert isinstance(stamp["clean"], bool)
+        assert stamp["pipeline_version"] and stamp["render_version"]
+        assert stamp["tools"]["pandoc"] == "pandoc 9.9"
+        assert set(stamp["tools"]) == {"pandoc", "latexml", "pymupdf", "fonts"}
+    # A record made before stamps existed is still read.
+    assert "not stamped" in run_record.provenance_line({"pipeline_version": "0.5.0"})
+    assert "pandoc: pandoc 9.9" in run_record.provenance_line(measured)

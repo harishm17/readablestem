@@ -25,6 +25,8 @@ from typing import Literal
 
 import pymupdf
 
+from readablestem.pipeline import font_codes
+
 ElementKind = Literal["text", "image", "equation_candidate"]
 
 # Font families used only for maths: TeX (CM*, AMS MSAM/MSBM, txfonts/pxfonts, rsfs,
@@ -154,7 +156,10 @@ def parse_page(page: pymupdf.Page, number: int) -> list[Element]:
     and the order prose -> equation -> prose is kept.
     """
     out: list[Element] = []
-    data = page.get_text("dict")
+    data = page.get_text("rawdict")
+    # The characters as layout reads them (`font_codes`): a Symbol theta is a theta here too,
+    # not the plain letter its code is.
+    font_codes.remap(data.get("blocks", []))
     for block in data.get("blocks", []):
         bbox = tuple(round(v, 2) for v in block["bbox"])
         if block.get("type") == 1:
@@ -171,7 +176,9 @@ def parse_page(page: pymupdf.Page, number: int) -> list[Element]:
         run = _ProseRun()
         for line in block.get("lines", []):
             spans = line.get("spans", [])
-            text = "".join(s.get("text", "") for s in spans).strip()
+            text = "".join(
+                "".join(char.get("c", "") for char in s.get("chars", ())) for s in spans
+            ).strip()
             if not text:
                 continue
             fonts = sorted({s.get("font", "") for s in spans})

@@ -95,7 +95,12 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
     reasons: Counter[str] = Counter()
     every_page: list[int] = []
     rows: list[dict[str, Any]] = []
+    formulas: Counter[str] = Counter()
+    not_compared: Counter[str] = Counter()
     for done in counted:
+        held = done.not_compared or {}
+        formulas.update({key: held.get(key, 0) for key in ("equations", "tables_with_math")})
+        not_compared.update(held.get("causes", {}))
         counts = page_counts(done)
         every_page += counts
         for kind, count in zip(done.kinds, counts, strict=True):
@@ -142,6 +147,13 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
                 "per_100_pages": round(100 * count / pages, 2) if pages else 0.0,
             }
             for code, count in sorted(reasons.items(), key=lambda pair: (-pair[1], pair[0]))
+        },
+        # Accepted with nothing to hold against, by cause (`measure.held_against_nothing`):
+        # no decision is asked for these, so they are counted here and not above.
+        "not_compared": {
+            "equations": formulas["equations"],
+            "tables_with_math": formulas["tables_with_math"],
+            "causes": dict(sorted(not_compared.items())),
         },
         "documents": sorted(rows, key=lambda row: (-row["per_page"], row["upload"])),
     }
@@ -193,6 +205,18 @@ def judge(
                 differ.append(
                     f"{row['upload']}: {row['decisions']} decisions on {row['pages']} pages, "
                     f"{was['decisions']} on {was['pages']} in the record"
+                )
+        # The answers an upload asks for that the recording does not hold (what the workflow
+        # suite's `OWED` is read from): an upload measured now, in either record.
+        asked_now = {row["upload"] for row in one["documents"]} | set(
+            one["uploads"]["answers_missing"]
+        )
+        for upload in sorted(asked_now | set(other["uploads"]["answers_missing"])):
+            now_n = one["uploads"]["answers_missing"].get(upload, 0)
+            was_n = other["uploads"]["answers_missing"].get(upload, 0)
+            if upload in asked_now and now_n != was_n:
+                differ.append(
+                    f"{upload}: {now_n} answers missing from the recording, {was_n} in the record"
                 )
         return Verdict(True, more=differ, same=True)
     here = (now.get("split") or {}).get("set_sha256")
@@ -282,6 +306,14 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
             for code, row in made["reasons"].items()
         ],
     )
+    held = made.get("not_compared")  # a record made before the causes were counted has none
+    if held:
+        lines += [
+            "",
+            f"accepted with nothing to hold them against ({held['equations']} equations, "
+            f"{held['tables_with_math']} tables with math), by cause:",
+        ]
+        lines += measure.table(("check:cause", "count"), list(held["causes"].items()))
     lines += ["", f"the {worst} documents that ask the most a page:"]
     lines += measure.table(
         ("upload", "pages", "decisions", "a page"),

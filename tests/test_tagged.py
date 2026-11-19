@@ -16,6 +16,7 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import figure_step, tagged
 from readablestem.pipeline.layout import analyze, heading_levels, tagged_level
 from readablestem.pipeline.run import convert_pdf
+from test_layout_analyze import font_page
 from test_steps_support import figure_element, make_settings, use_fallback_router
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tagged" / "tagged_notes.pdf"
@@ -108,6 +109,33 @@ def test_a_conversion_uses_the_tags(pdf):
     assert "<h3 " in html and ">Practical tips</h3>" in html
     figures = [e for e in output.result.elements if e.kind is Kind.FIGURE]
     assert [f.source_alt for f in figures] == [ALT, None, None]
+
+
+def test_a_tagged_heading_set_with_a_ligature_code_still_matches_the_layout_text():
+    # A TeX font gives "ff" as one control code. Layout reads it as the letters; the tag's own
+    # text must too, or its key ("Our eects") matches no element and the heading is missed.
+    doc = pymupdf.open(
+        stream=font_page("CMR10", ["Small print here", "", "", "Our e\\013ects"], "11 /uni000B")
+    )
+    stream = doc.xref_stream(doc[0].get_contents()[0]).decode("latin-1")
+    stream = stream.replace("(Our", "/H1 << /MCID 0 >> BDC (Our").replace(
+        "ects) Tj", "ects) Tj EMC"
+    )
+    doc.update_stream(doc[0].get_contents()[0], stream.encode("latin-1"))
+    element, root, parents = (doc.get_new_xref() for _ in range(3))
+    doc.update_object(
+        element, f"<< /Type /StructElem /S /H1 /P {root} 0 R /Pg {doc[0].xref} 0 R /K 0 >>"
+    )
+    doc.update_object(parents, f"<< /Nums [0 [{element} 0 R]] >>")
+    doc.update_object(
+        root, f"<< /Type /StructTreeRoot /K [{element} 0 R] /ParentTree {parents} 0 R >>"
+    )
+    doc.xref_set_key(doc[0].xref, "StructParents", "0")
+    doc.xref_set_key(doc.pdf_catalog(), "StructTreeRoot", f"{root} 0 R")
+    doc.xref_set_key(doc.pdf_catalog(), "MarkInfo", "<< /Marked true >>")
+    data = doc.tobytes()
+    elements = tagged.apply(analyze(data).elements, tagged.read(data, [0]))
+    assert {e.text: e.kind for e in elements}["Our effects"] is Kind.HEADING
 
 
 # ----------------------------------------------------------------- the figure step

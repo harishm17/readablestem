@@ -239,6 +239,40 @@ def _first_line(*command: str) -> str:
     return lines[0].strip() if done.returncode == 0 and lines else UNKNOWN
 
 
+@cache
+def tool_version(program: str, flag: str) -> str:
+    """The first line a program prints for its version flag; "none" when it is not here."""
+    return _first_line(program, flag) if shutil.which(program) else ABSENT
+
+
+@cache
+def font_versions() -> str:
+    """The fonts a rendered page is drawn with (the packages `docs/development.md` names),
+    as the package manager has them; "unknown" where there is no package manager."""
+    if not shutil.which("dpkg-query"):
+        return UNKNOWN
+    try:
+        done = subprocess.run(
+            [
+                "dpkg-query",
+                "-W",
+                "-f",
+                "${Package}=${Version}\\n",
+                "fonts-noto-core",
+                "fonts-liberation",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return UNKNOWN
+    return (
+        " ".join(sorted(line for line in done.stdout.splitlines() if line.split("=")[-1])) or ABSENT
+    )
+
+
 def measure_image_facts() -> dict[str, str]:
     """What this machine carries, for the image build. A program that is missing is "none";
     a fact this function cannot measure stays "unknown"."""
@@ -267,8 +301,8 @@ def measure_image_facts() -> dict[str, str]:
         "tex": tex,
         # Not a build argument on main: nothing can measure it yet.
         "install_tex_witness": UNKNOWN,
-        "latexml": _first_line("latexml", "--VERSION") if shutil.which("latexml") else ABSENT,
-        "pandoc": _first_line("pandoc", "--version") if shutil.which("pandoc") else ABSENT,
+        "latexml": tool_version("latexml", "--VERSION"),
+        "pandoc": tool_version("pandoc", "--version"),
         "libreoffice": "present" if shutil.which("soffice") else ABSENT,
         "lxml": lxml,
         "tex_names": str(names) if names else ABSENT,

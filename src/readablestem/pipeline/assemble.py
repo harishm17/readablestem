@@ -2132,8 +2132,9 @@ def render_html(
 
     `pipeline_version` is the version of the pipeline that converted the result the page is
     made from (`DocumentResult.pipeline_version`), which the generator tag names beside the
-    version of this code, since the two differ when a stored result is rendered again; None
-    (a page made from several results) names only this code.
+    version of this code, since the two differ when a stored result is rendered again; a page
+    joined from several results names each version its parts were converted at
+    (`combine.Joined.pipeline_version`); None names only this code.
 
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps

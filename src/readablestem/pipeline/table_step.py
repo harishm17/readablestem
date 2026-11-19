@@ -148,6 +148,7 @@ from readablestem.pipeline.equation_step import (
     TEXT_LAYER_MISMATCH_BELOW,
     _mathml_symbols,
     _symbol_bag,
+    not_compared,
     read_latex,
     restyle_bold_italic,
     text_layer_similarity,
@@ -176,6 +177,8 @@ OUTPUT_TOKENS_PER_SLOT = 40
 MIN_OUTPUT_TOKENS = 4096
 MAX_OUTPUT_TOKENS = 16384
 # Failed checks that are only notes: the fix is still ACCEPTED (review "optional").
+# Passed check: the table's maths cells were held against nothing (`_math_not_compared`).
+MATH_NOT_COMPARED = "table.math_not_compared"
 NOTE_CODES = frozenset(
     {"whitespace_differs", "style_cosmetic", "row_headers_dropped", "written_as_text"}
 )
@@ -939,6 +942,15 @@ def flattened_check(grid: TableGrid) -> list[Check]:
     return [Check(name="table.math", passed=False, severity="error", code="flattened_maths")]
 
 
+def _math_not_compared(cause: str | None) -> Check:
+    """The passed check for a table whose maths cells were held against nothing, with why:
+    the equation step's causes (`equation_step.not_compared`), `no_local_grid` (the PDF
+    gave no grid of its own) or `grid_not_aligned` (its rows and columns differ from the
+    model's, so no cell stands in another's place). No card is made: it is a record, like
+    an equation's."""
+    return Check(name=MATH_NOT_COMPARED, passed=True, severity="warning", code=cause)
+
+
 def table_checks(grid: TableGrid, element: Element) -> list[Check]:
     """Every check of a data table proposal against the PDF (see the module docstring)."""
     checks = structure_checks(grid) + flattened_check(grid)
@@ -974,9 +986,16 @@ def table_checks(grid: TableGrid, element: Element) -> list[Check]:
         )
     )
     if local is None or not _aligned(grid, local):
+        checks.append(_math_not_compared("no_local_grid" if local is None else "grid_not_aligned"))
         return checks
     verdict = maths_verdict(grid, local)
     if not verdict.compared:
+        # Every maths cell stands where the PDF has nothing to compare it with: say why.
+        owner = _owners(local)
+        first = next((c for c in grid.cells if c.mathml), None)
+        if first is not None:  # none: every cell is invalid, which `table.math` already says
+            layer = " ".join(local.cells[i].text for i in _counterparts(first, owner)).strip()
+            checks.append(_math_not_compared(not_compared(layer).code))
         return checks
     checks.append(
         Check(
