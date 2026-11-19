@@ -814,17 +814,19 @@ way, the next or previous value ("b." for "a."; the same glyph for a dash) and t
 or the item text starting within 3 pt in x. "i" is both a letter and a roman numeral; its
 siblings decide. So "A ball rolls", "2.5 metres is", "2.3 Speed", a lone "B. Smith" or
 "I. Newton", and a wrapped sentence that happens to start a line with a dash, stay
-paragraphs. A capital letter and a full stop is the marker of a list only beside its
-neighbor: the item just before or just after it, in reading order (a page's left column,
-then its right), is the next or the previous letter. Some line of a long document starts
-with the next letter, so a row of an author list ("A. Smith, B. Jones" on a line of its own)
-has to find it next to it. Headings are decided first: "1. Introduction" in a large font is a
+paragraphs. A capital letter and a full stop whose text opens like a list of authors (another initial,
+or a surname and a comma, "and" or "et al": "A. Smith, B. Jones", "D. S. Turaga, ...") is the
+marker of a list only beside its neighbor: the item just before or just after it in reading
+order (a page's left column, then its right), or the one just above or below it at the same x,
+is the next or the previous letter (`_names`, `_list_markers`). Some line of a long document
+has the next letter, and a reference list or a byline had its lines read as lettered items.
+Any other capital letter keeps the sibling test above. Headings are decided first: "1. Introduction" in a large font is a
 heading; so is a line of 2 to 12 words that starts with a capital letter and a full stop and is
 set, all of it, in bold or in italics, and does not end like a sentence ("A. Problem
 Descriptions", IEEE's subsections; reason "lettered title", one level under its section like
 a letter of an index). A line like that is a block of its own, apart from the text under it
-set in another face (`_lettered_title`). A bold line that starts with a bullet glyph is a list
-item, not a heading.
+set in another face (`_lettered_title`). A bold line that starts with a bullet glyph in its text
+is a list item, not a heading (a bullet drawn beside the row changes nothing).
 
 The item text starts after the marker; continuation lines join the item (a hanging
 indent is fine). **Levels** come from the left edge of the item text, which is the same

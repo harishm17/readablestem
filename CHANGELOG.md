@@ -20,14 +20,16 @@
   table goes on at its levels where the next item takes up the numbering. Before, the list
   ended at the first answer word and the items after it began again at level 1
   (`lists._list_levels`, `_Level`, `_Number`, `_taken_up`).
-- A capital letter and a full stop ("A. Smith") is a list marker only when the item just
+- A line that starts with a capital letter and a full stop and then reads as names ("A. Smith,
+  B. Jones", "D. S. Turaga, ...", a surname and a comma) is a list item only when the item just
   before or just after it in reading order is the next or previous letter; some line of a long
-  document with the next letter was enough, so a list of authors and their references became
-  a lettered list (`lists._list_markers`).
+  document with the next letter was enough, so a reference list or a byline became a lettered
+  list (`lists._list_markers`, `_names`). Any other capital letter keeps the old test.
 - "A. Problem Descriptions" set in bold or italics on a line of its own, a title of 2 to 12
   words that does not end like a sentence, is a heading one level under its section, not a list
   item (`blocks._lettered_title`, reason "lettered title", `document.heading_levels`).
 - A bold line that begins with a bullet glyph stays a list item; it was read as a bold heading.
+  A bullet drawn beside the row (a label such as "Solution") changes nothing.
 - No change to a prompt, a model or the version numbers: a PDF's lists, headings and levels
   change, so the next pipeline raise is owed.
 
