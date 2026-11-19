@@ -1,11 +1,11 @@
-/* ReadableSTEM design tokens: fonts, colour, type, space, radius, widths.
+/* ReadableSTEM design tokens: fonts, color, type, space, radius, widths.
    Shared by the web app (app.css), the error pages and the static showcase (site/), so a
    change here reaches every page. The system is written up in DESIGN.md.
 
    - Fonts are self-hosted (static/vendor/fonts, SIL Open Font License; see vendor/README.md):
      Source Sans 3 for text and for headings on app screens, Source Serif 4 600 for headings
      on pages people read (landing, guides, help, offices, privacy). No outside requests.
-   - Every text colour is at least 7:1 on the surface it is used on, in light and in dark.
+   - Every text color is at least 7:1 on the surface it is used on, in light and in dark.
      Non-text borders on controls are at least 3:1.
    - Light and dark follow the visitor's setting (prefers-color-scheme); there is no toggle.
    - Nothing is smaller than 0.875rem (14px). Sizes are in rem so zoom and text-only zoom work. */
@@ -115,7 +115,7 @@
   --sticky-offset: var(--space-2);
   --listen-sticky: 4rem;
 
-  /* Colour, light. */
+  /* Color, light. */
   --bg: #ffffff;
   --surface: #f5f6f8;
   --surface-2: #eef1f5;
@@ -131,7 +131,7 @@
   --focus-outline: #0b3d91;
   --focus-halo: #ffd33d;
 
-  /* Status: always shown with words. Text colour on its tint is at least 7:1. */
+  /* Status: always shown with words. Text color on its tint is at least 7:1. */
   --ok: #155a36;
   --ok-tint: #e6f4ea;
   --warn: #7a4100;
@@ -217,7 +217,7 @@
   color: var(--paper-ink);
 }
 
-/* Windows high contrast and other forced-colour modes: system colours only. Box shadows
+/* Windows high contrast and other forced-color modes: system colors only. Box shadows
    (the focus halo) are dropped by the browser, so the outline carries the focus alone. */
 @media (forced-colors: active) {
   :focus-visible { outline: 3px solid Highlight; box-shadow: none; }

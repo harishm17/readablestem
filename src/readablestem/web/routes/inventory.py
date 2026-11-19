@@ -20,8 +20,8 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 
 from readablestem.core.types import DocumentResult, Kind
-from readablestem.web import inventory
-from readablestem.web.deps import UserDep, flash, pop_flash, render, require_csrf
+from readablestem.web import inventory, outcome
+from readablestem.web.deps import UserDep, flash, get_ctx, pop_flash, render, require_csrf
 from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import ReviewInvalid, ReviewStale
@@ -69,6 +69,7 @@ def _page(
     context = {
         "job": job,
         "inv": inventory.inventory(result, crop_ids),
+        "image_pages_cost": outcome.image_pages_cost_offered(get_ctx(request).settings),
         "result_version": version,
         "view": view,
         "back_href": _back(job.id, view),

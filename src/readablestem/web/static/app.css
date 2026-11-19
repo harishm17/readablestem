@@ -1,8 +1,8 @@
-/* ReadableSTEM web app. Plain CSS, no framework. Tokens (colour, type, space, radius, fonts)
+/* ReadableSTEM web app. Plain CSS, no framework. Tokens (color, type, space, radius, fonts)
    are in tokens.css, which every page loads first; DESIGN.md says how they are used.
    Text is at least 7:1 on its background and nothing is smaller than 14px; focus rings are
    at least 3:1 against both the page and the control. Status is always written out in text;
-   colour only repeats it. Components are in the "Components" section; the /style page shows
+   color only repeats it. Components are in the "Components" section; the /style page shows
    each one. */
 
 * { box-sizing: border-box; }
@@ -201,14 +201,14 @@ main :is(p, li, dd) { max-width: 75ch; }
 .cancel-link, .inline-form + p > a:only-child, .inline-controls > a:not([class]), .actions > li > a:not([class]) { display: inline-flex; align-items: center; min-height: 2.75rem; }
 .canvas-download { margin: var(--space-5) 0 0; max-width: 40rem; }
 .canvas-download .hint { margin-bottom: var(--space-3); }
-/* The link that opens a delete confirmation: red text on the page colour. The label says what
-   is deleted, so colour is not the only cue (the button form is `.button-danger-outline`,
+/* The link that opens a delete confirmation: red text on the page color. The label says what
+   is deleted, so color is not the only cue (the button form is `.button-danger-outline`,
    controls.css). */
 a.danger-link, a.danger-link:visited { color: var(--err); }
 a.danger-link:hover { color: var(--err-strong); }
 @media (forced-colors: active) { a.danger-link { color: LinkText; } }
 
-/* Tags: a status in words. The colour only repeats the word; the shape is a 4px box. */
+/* Tags: a status in words. The color only repeats the word; the shape is a 4px box. */
 .tag { display: inline-block; font-weight: 700; font-size: var(--step--1); line-height: 1.2; padding: 0.2em 0.55em; border: 1px solid currentColor; border-radius: var(--radius-control); background: var(--bg); }
 .tag-warn { color: var(--warn); background: var(--warn-tint); }
 .tag-ok { color: var(--ok); background: var(--ok-tint); }
@@ -373,7 +373,7 @@ tbody th { font-weight: 700; }
 .table-scroll:focus-visible { outline-offset: 0; }
 .num { text-align: right; }
 
-/* Status badges: the text says the status; the colour only repeats it. A small radius,
+/* Status badges: the text says the status; the color only repeats it. A small radius,
    not a pill: a long status wraps on a phone, and a pill's curve cut through the words. */
 .status-badge {
   display: inline-block;
@@ -405,7 +405,7 @@ progress { width: 16rem; height: 1.1rem; }
 .summary-list .summary-long dd { font-weight: 400; overflow-wrap: break-word; }
 @media (forced-colors: active) { .summary-list div { border: 1px solid CanvasText; } }
 /* A state's symbol (✓ fine, ⚠ needs attention, – not known) beside its word: the shape says it
-   without colour, and the word still says it to a screen reader (the symbol is aria-hidden). */
+   without color, and the word still says it to a screen reader (the symbol is aria-hidden). */
 .state { margin-right: var(--space-1); }
 
 /* Review cards */
@@ -488,11 +488,11 @@ math[intent] mi { text-transform: none; }
    One decision at a time beside the page it is on (templates/review_split.html).
    Marks on the page image: the position of each comes from /jobs/{id}/review/marks.css?page=N
    (the CSP allows no inline styles). Every mark is a link of at least 24 x 24 CSS px
-   (WCAG 2.5.8), and status is in its number, shape and text, never its colour alone:
+   (WCAG 2.5.8), and status is in its number, shape and text, never its color alone:
    a decision is a numbered disc and a solid frame, an optional check a "Note" label and
    a dashed frame, an accepted item a tick and a dotted frame (shown on request). The
-   marks keep their own colours in forced-colors mode: they sit on the page image, which
-   stays white whatever the theme, and system colours could make them white on white. */
+   marks keep their own colors in forced-colors mode: they sit on the page image, which
+   stays white whatever the theme, and system colors could make them white on white. */
 
 
 .wrap-review { max-width: var(--review-max); }
@@ -682,7 +682,7 @@ mark.said-diff {
 code.latex { overflow-wrap: anywhere; }
 
 /* The live check of an edit, and a draft put back after signing in again (or one that could
-   not be kept). Existing colours only. */
+   not be kept). Existing colors only. */
 .live-status { margin: var(--space-1) 0 0; font-size: var(--step-0); }
 .live-check:empty { display: none; }
 .live-check { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--surface); border-radius: var(--radius-control); }
@@ -761,9 +761,9 @@ p.draft-failed { border-color: var(--warn); background: var(--warn-tint); }
 .is-edited [data-role="save"] { background: var(--accent); color: var(--on-accent); }
 .is-edited [data-role="accept"] { background: var(--bg); color: var(--accent); }
 /* Review choices: the primary action is filled; "Accept anyway" (the proposal changes the
-   meaning) is cautioned in the warning colours, and the option that keeps the original
+   meaning) is cautioned in the warning colors, and the option that keeps the original
    ("Keep as image", "Make bold text") is quiet, so none of them looks like Save edit.
-   In forced colours the caution has a dashed border, so it differs without colour. */
+   In forced colors the caution has a dashed border, so it differs without color. */
 button[data-tone="caution"] { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
 button[data-tone="caution"]:hover { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); text-decoration: underline; }
 button[data-tone="quiet"] { background: var(--bg); color: var(--ink); border-color: var(--border-control); }
@@ -865,7 +865,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .key-repeat { background: var(--paper); color: var(--pmark-required); border: 2px solid var(--pmark-required); border-radius: 0.7rem; }
 .key-accepted { background: var(--paper); min-width: 1.9rem; color: var(--pmark-accepted); border: 1.5px dotted var(--pmark-accepted); border-radius: var(--radius-control); }
 @media (forced-colors: active) {
-  /* The legend keys show what the marks look like, and the marks keep their colours. */
+  /* The legend keys show what the marks look like, and the marks keep their colors. */
   .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
 }
 .page-scroll {
@@ -1175,7 +1175,7 @@ section.job-group { padding-top: 0; }
 #suggestions .button { max-width: 100%; white-space: normal; text-align: left; }
 
 /* Review at scale: accept many at once, the decision filter, the preview list, "Report this
-   item", "Leave this page out", the finish notice and the guides list. Existing colours
+   item", "Leave this page out", the finish notice and the guides list. Existing colors
    only; every control is a native link, button or field, 44 px high where it stands alone
    (WCAG 2.5.5 target; 2.5.8 needs 24). */
 .bulk-offers, .decision-filter { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); background: var(--surface); border-radius: var(--radius-control); }
@@ -1402,7 +1402,7 @@ details.option-group[open] .group-change { display: none; }
   --focus-halo: #0f1115; --ok: #7fd69b; --ok-tint: #12261a; --warn: #ffc46b; --warn-tint: #2a2010;
   --err: #ff9a92; --err-tint: #2c1515; --err-strong: #ffb8b2;
 }
-/* The forced-colour preview approximates the system colours: the real rules are in the
+/* The forced-color preview approximates the system colors: the real rules are in the
    forced-colors media queries of this file and controls.css, shown by switching the mode on. */
 .style-scheme-forced {
   --bg: Canvas; --surface: Canvas; --ink: CanvasText; --ink-muted: CanvasText; --accent: LinkText;
@@ -1625,7 +1625,7 @@ details.option-group[open] .group-change { display: none; }
 @media (forced-colors: active) { .list-tools { border-color: CanvasText; } }
 
 /* The comparison chart (templates/_proof_chart.html): horizontal bars, a name and a number on
-   every bar, three fills (solid, hatched, dotted) so colour is not the only difference. */
+   every bar, three fills (solid, hatched, dotted) so color is not the only difference. */
 .proof-chart { margin: var(--space-5) 0; max-width: 52rem; }
 .mode-read main > .proof-chart { max-width: 52rem; }
 .proof-chart-title { margin: 0 0 var(--space-3); }

@@ -764,8 +764,17 @@ def source_item_notes(result: DocumentResult) -> dict[str, str]:
     return notes
 
 
-def explain_reason(reason: str) -> Explained:
+# The two reasons that point to the scan option: what reading such pages uses is added to them
+# (`outcome.image_pages_cost_offered`), as everywhere else the option is offered.
+SCAN_OPTION_REASONS = ("handwritten_page", "scanned_page")
+
+
+def explain_reason(reason: str, *, scan_cost: str = "") -> Explained:
+    """The sentence for a stored reason. `scan_cost`: what reading scanned or handwritten
+    pages uses, added to the reasons that tell the person to ask for them to be read."""
     text = REASON_MESSAGES.get(reason)
+    if text is not None and scan_cost and reason in SCAN_OPTION_REASONS:
+        text = f"{text} {scan_cost}"
     return Explained(text or UNKNOWN_REASON_MESSAGE, reason, known=text is not None)
 
 

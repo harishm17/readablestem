@@ -323,3 +323,24 @@ def choose(env, symbol: str, to: str, *, include: tuple[str, ...], version: str 
         "include": list(include),
     }
     return followed(env, env.browser.post(f"/jobs/{env.job_id}/symbols", data=data))
+
+
+def test_where_the_scan_option_is_offered_the_notes_that_point_to_it_say_what_it_uses(tmp_path):
+    """WS7.2: the Symbols screen of a document with no handwriting, and the reason on a page kept
+    as a picture, send the person to "Convert scanned or handwritten pages" and give its cost, in
+    the words of the upload form; a deployment without the option says no cost."""
+    cost = "uses up to $0.25 of the server’s budget"
+    for offered in (True, False):
+        env = WebEnv(tmp_path / str(offered), feature_image_pages=offered)
+        output = review_output()
+        next(f for f in output.result.fixes if f.pending).reason = "scanned_page"
+        env.converter.output = output
+        with env.running() as client:
+            env.allow(ALICE)
+            login(client, ALICE)
+            job_id = job_id_from(upload(client, review_pdf()))
+            env.run_worker()
+            for path in ("symbols?view=split", "review/list"):
+                said = " ".join(client.get(f"/jobs/{job_id}/{path}").text.split())
+                assert "upload again with" in said or "when you upload" in said, path
+                assert (cost in said) is offered, path

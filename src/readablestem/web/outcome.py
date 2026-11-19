@@ -392,6 +392,12 @@ def image_pages_cost(settings: Settings, pages: int | None = None, many: bool = 
     )
 
 
+def image_pages_cost_offered(settings: Settings) -> str:
+    """`image_pages_cost` where the option is offered, else nothing (a deployment without it
+    has no scan option to say a cost of)."""
+    return image_pages_cost(settings) if settings.feature_image_pages else ""
+
+
 def image_pages_offer(
     count: page_type.ImagePageCount, settings: Settings, *, listed: bool = False
 ) -> str:

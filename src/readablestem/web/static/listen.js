@@ -31,7 +31,7 @@
      Focus never moves. The polite status line says only what the person asked for (playing,
      paused, stopped, "Place set to item 47 of 520"), never each item as it is spoken: a
      screen reader user who also hears the voice gets the item once.
-   - Play starts at the lesson (past the title, notices and licence) when there is no place.
+   - Play starts at the lesson (past the title, notices and license) when there is no place.
      The transcript can be filtered; while it is, Previous, Next and playing move through the
      items shown.
    - The second column (data-listen-thing-panel) is a picture of the selected item for people
@@ -438,7 +438,7 @@
     }
 
     function lessonIndex() {
-      // The main content: past the title, language, notices and licence. The page marks the
+      // The main content: past the title, language, notices and license. The page marks the
       // lesson's first item; a page with no main landmark starts at its first heading.
       var at = -1;
       items.forEach(function (el, i) {

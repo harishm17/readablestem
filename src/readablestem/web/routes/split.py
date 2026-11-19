@@ -59,6 +59,7 @@ from readablestem.web import (
     marks,
     notation,
     notice_places,
+    outcome,
     page_edits,
     page_images,
     queue,
@@ -598,12 +599,12 @@ def _first_note(fix: Fix, compare: EquationCompare | None = None) -> str:
     return "Accepted with a note."
 
 
-def _why(fix: Fix, compare: EquationCompare | None) -> str | None:
+def _why(fix: Fix, compare: EquationCompare | None, scan_cost: str = "") -> str | None:
     """The one sentence that says what to look at."""
     if compare is not None and compare.summary:
         return compare.summary
     if fix.reason:
-        return explain_reason(fix.reason).text
+        return explain_reason(fix.reason, scan_cost=scan_cost).text
     for check in fix.failed_checks:
         return explain_check(check).text
     if fix.pending and fix.confidence is not None:
@@ -639,6 +640,7 @@ class SplitBuilder:
         self.places = heading_places(self.result)
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
+        self.scan_cost = outcome.image_pages_cost_offered(get_ctx(request).settings)
         self.page_count = _page_count(self.view.page_count, self.result)
         self.omitted = set(self.result.omitted_pages)
         self.items: dict[str, ReviewItem] = {}
@@ -934,9 +936,9 @@ class SplitBuilder:
             rebuilt = item.table is not None and item.table.in_document
             listed = fix.failed_checks or (item.table and item.table.problems)
             if (fix.reason and not rebuilt) or not (fix.reason or listed):
-                panel.why = _why(fix, None)
+                panel.why = _why(fix, None, self.scan_cost)
             return
-        panel.why = _why(fix, panel.compare)
+        panel.why = _why(fix, panel.compare, self.scan_cost)
 
     # ------------------------------------------------------------------ evidence in words
 

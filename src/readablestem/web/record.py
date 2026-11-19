@@ -546,13 +546,15 @@ def build(
     exam_mode: bool,
     downloaded_formats: list[str] | None = None,
     state: Any = None,
+    scan_cost: str = "",
 ) -> Record:
     """The record from a finished job's parts. `edits` are its `ReviewEdit` rows (any
     order); `who` maps a user id to the name shown for them; `state` is the job's
     `states.State`, whose label and gap notes the record prints. `who` and `file_who` map a
     user id to the words that name the person on the page and in the CSV (`shares.names_of`).
     `review_url` is the review screen's address for a reader who may open it, else None: the
-    items the record names are links to it."""
+    items the record names are links to it. `scan_cost`: what reading scanned pages uses, said
+    with the reasons that point to that option."""
     elements = {e.id: e for e in result.elements}
     fixes: dict[str, Fix] = {}
     for fix in result.fixes:
@@ -603,7 +605,7 @@ def build(
             item=labels.get(p.element_id)
             or KIND_LABELS.get(elements[p.element_id].kind, p.kind.title()),
             page=p.page if summary.origin == "pdf" else None,  # a source has no pages
-            why=explain_reason(fix.reason).text
+            why=explain_reason(fix.reason, scan_cost=scan_cost).text
             if (fix := fixes.get(p.element_id)) is not None and fix.reason
             else "",
             ref=ref(
