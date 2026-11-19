@@ -15,6 +15,7 @@ from readablestem.pipeline.layout.drawings import (
     _OPENING_BRACES,
     EQUATION_NUMBER,
     STRAY_BRACE_REACH,
+    _column_content_near,
     _number_beside,
     _number_column,
     _rule_rows,
@@ -593,24 +594,6 @@ def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:
     return any(
         other.labels and other.box[1] < line.box[3] and line.box[1] < other.box[3]
         for other in lines
-    )
-
-
-def _column_content_near(label: _Row, rows: list[_Row]) -> bool:
-    """Is there text of the number's own column within two lines of it?
-
-    On a page with two columns there, the number closes that column's content (a matrix, a
-    drawn bracket), not the maths of the other column.
-    """
-    reach = 2 * label.size
-    return any(
-        r is not label
-        and r.column == label.column
-        and r.y0 < label.y1 + reach
-        and label.y0 - reach < r.y1
-        and r.kind == "text"
-        and not _is_equation_number(r.clean)
-        for r in rows
     )
 
 

@@ -629,11 +629,21 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
             used.append(rule)
             attached.update(id(r) for r in near)
     queue = deque(r for r in mathish if id(r) in attached)
+    crossing: dict[int, bool] = {}  # may a number go to maths of the other column? (cached)
+
+    def may_cross(row: _Row) -> bool:
+        if id(row) not in crossing:
+            number = EQUATION_NUMBER.match(row.clean) or BARE_EQUATION_NUMBER.match(row.clean)
+            crossing[id(row)] = not (number and _column_content_near(row, rows))
+        return crossing[id(row)]
+
     reach = 0.6 * index.largest  # _math_neighbours' widest vertical gap
     while queue:
         source = queue.popleft()
         for row in index.near(source.y0 - reach, source.y1 + reach):
-            if id(row) not in attached and _math_neighbours(row, source):
+            if id(row) not in attached and _math_neighbours(
+                row, source, cross=row.kind != "frag" or may_cross(row)
+            ):
                 attached.add(id(row))
                 queue.append(row)
     far = NUMBER_REACH * index.largest
@@ -642,7 +652,7 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
             for other in index.near(row.y0 - far, row.y1 + far):
                 if (
                     other.kind == "math"
-                    and _number_column(row, other.column, other.x1)
+                    and (row.column == other.column or (row.x0 >= other.x1 and may_cross(row)))
                     and _number_beside(row, other.bbox, max(row.size, other.size), far=True)
                 ):
                     row.far_number = True
@@ -658,7 +668,7 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
 STRAY_BRACE_REACH = 2.0
 
 
-def _math_neighbours(row: _Row, other: _Row) -> bool:
+def _math_neighbours(row: _Row, other: _Row, *, cross: bool = True) -> bool:
     """Does fragment `row` belong with maths row `other`? Vertically adjacent and
     overlapping in x, or inside its box (the second row of a matrix, beside the tall bracket
     the first row starts with), or an equation number beside it (`_number_beside`), or an
@@ -679,7 +689,27 @@ def _math_neighbours(row: _Row, other: _Row) -> bool:
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
         return True
-    return _number_column(row, other.column, other.x1) and _number_beside(row, other.bbox, size)
+    if not (row.column == other.column or (cross and row.x0 >= other.x1)):
+        return False
+    return _number_beside(row, other.bbox, size)
+
+
+def _column_content_near(label: _Row, rows: Sequence[_Row]) -> bool:
+    """Is there text of the number's own column within two lines of it?
+
+    On a page with two columns there, the number closes that column's content (a matrix, a
+    drawn bracket), not the maths of the other column.
+    """
+    reach = 2 * label.size
+    return any(
+        r is not label
+        and r.column == label.column
+        and r.kind == "text"
+        and r.y0 < label.y1 + reach
+        and label.y0 - reach < r.y1
+        and not (EQUATION_NUMBER.match(r.clean) or BARE_EQUATION_NUMBER.match(r.clean))
+        for r in rows
+    )
 
 
 def _number_column(row: _Row, column: str, x1: float) -> bool:
