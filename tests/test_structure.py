@@ -549,6 +549,72 @@ def test_a_file_that_names_its_footnotes_decides_which_blocks_are_footnotes():
     assert terms == ["absolute pressure", "gauge pressure", "pascal"]
 
 
+def named_notes_pdf() -> bytes:
+    """Two columns, with the file naming two footnotes the way hyperref does. The note at the
+    foot of the left column ends without a full stop and the right column opens with a
+    lower-case word. Its destination (`Hfootnote.1`) sits a little under its line; the one for
+    the symbol note in the title block (`Hfootnote.2`) points at the corner of the page."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    for k in range(6):
+        page.insert_text(
+            (72, 100 + 14 * k), f"Left column line {k} of ordinary text here.", fontsize=BODY
+        )
+        page.insert_text(
+            (330, 100 + 14 * k), f"Right column line {k} of ordinary text here.", fontsize=BODY
+        )
+    page.insert_text((72, 60), "A line of the author block with a note", fontsize=BODY)
+    page.insert_text((72 + 175, 56), "*", fontsize=7, fontname="helv")
+    page.insert_text((72, 190), "See the code at the project page", fontsize=BODY)
+    page.insert_text((72 + 175, 186), "1", fontsize=7, fontname="helv")
+    page.draw_line((72, 700), (200, 700))
+    page.insert_text((72, 712), "1", fontsize=5.5, fontname="helv")
+    page.insert_text((77, 715), "https://example.org/linmix", fontsize=8, fontname="helv")
+    page.insert_text((72, 735), "*", fontsize=5.5, fontname="helv")
+    page.insert_text((77, 738), "Corresponding author.", fontsize=8, fontname="helv")
+    page.insert_text(
+        (330, 250), "where the right column goes on after a break in the left one.", fontsize=BODY
+    )
+    names = doc.get_new_xref()
+    # (72, 77) from the bottom is 715 from the top: under the one-line note, not above it
+    doc.update_object(
+        names,
+        f"<< /Names [(Hfootnote.1) [{page.xref} 0 R /XYZ 72 76.5 null] "
+        f"(Hfootnote.2) [{page.xref} 0 R /XYZ 0 0 null]] >>",
+    )
+    tree = doc.get_new_xref()
+    doc.update_object(tree, f"<< /Dests {names} 0 R >>")
+    doc.xref_set_key(doc.pdf_catalog(), "Names", f"{tree} 0 R")
+    refs = []
+    for x0, x1, top, bottom, name in (
+        (72 + 175, 72 + 179, 180, 188, "Hfootnote.1"),
+        (72 + 175, 72 + 179, 50, 58, "Hfootnote.2"),
+    ):
+        annot = doc.get_new_xref()
+        doc.update_object(
+            annot,
+            f"<< /Type /Annot /Subtype /Link /Rect [{x0} {792 - bottom} {x1} {792 - top}] "
+            f"/Border [0 0 0] /A << /S /GoTo /D ({name}) >> >>",
+        )
+        refs.append(f"{annot} 0 R")
+    doc.xref_set_key(page.xref, "Annots", f"[{' '.join(refs)}]")
+    return doc.tobytes()
+
+
+def test_named_footnotes_the_destination_does_not_sit_above_are_still_found():
+    layout = analyze(named_notes_pdf())
+    by_id = {e.id: e for e in layout.elements}
+    notes = [by_id[n.element_id] for n in layout.notices if n.code == "footnote"]
+    texts = sorted((n.text or "")[:12] for n in notes)
+    # both notes are found, each alone: the first is not run into the right column
+    assert texts == ["* Correspond", "1 https://ex"]
+    assert all(len(n.text or "") < 40 for n in notes)
+    right = next(e for e in layout.elements if (e.text or "").startswith("where the right"))
+    assert right.kind is Kind.PARAGRAPH
+    linked = {link.target_id for e in layout.elements for link in e.links}
+    assert {n.id for n in notes} <= linked
+
+
 # ------------------------------------------------------------------ where a block starts
 
 
